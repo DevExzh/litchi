@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::indexing_slicing))]
+
 //! Safe, structured RTF field-code support.
 
 use std::borrow::Cow;
@@ -6795,11 +6797,11 @@ fn equation_expression(instruction: &str) -> Option<&str> {
     let keyword_len = instruction
         .find(|value: char| value.is_ascii_whitespace())
         .unwrap_or(instruction.len());
-    instruction[..keyword_len]
+    let keyword = instruction.get(..keyword_len)?;
+    let remainder = instruction.get(keyword_len..)?;
+    keyword
         .eq_ignore_ascii_case("EQ")
-        .then(|| {
-            instruction[keyword_len..].trim_start_matches(|value: char| value.is_ascii_whitespace())
-        })
+        .then(|| remainder.trim_start_matches(|value: char| value.is_ascii_whitespace()))
 }
 
 fn print_field_instructions(instruction: &str) -> Option<&str> {
@@ -6810,9 +6812,11 @@ fn print_field_instructions(instruction: &str) -> Option<&str> {
     let keyword_len = instruction
         .find(|value: char| value.is_ascii_whitespace())
         .unwrap_or(instruction.len());
-    instruction[..keyword_len]
+    let keyword = instruction.get(..keyword_len)?;
+    let remainder = instruction.get(keyword_len..)?;
+    keyword
         .eq_ignore_ascii_case("PRINT")
-        .then(|| instruction[keyword_len..].trim())
+        .then(|| remainder.trim())
 }
 
 fn embed_field_instructions(instruction: &str) -> Option<&str> {
@@ -6873,7 +6877,7 @@ fn barcode_display_field_parts(
     let mut switches = Vec::new();
     let mut index = 3;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -6964,45 +6968,43 @@ fn private_field_instructions(instruction: &str) -> Option<&str> {
 }
 
 fn macro_button_parts(instruction: &str) -> Option<(Cow<'_, str>, Option<Cow<'_, str>>)> {
-    let mut tokens = tokenize(instruction).ok()?;
-    let keyword = tokens.first()?;
+    let tokens = tokenize(instruction).ok()?;
+    let (keyword, arguments) = tokens.split_first()?;
     if !keyword.value.eq_ignore_ascii_case("MACROBUTTON") {
         return None;
     }
-    tokens.remove(0);
-    let macro_name = tokens.first()?.value.clone();
-    if macro_name.is_empty() {
+    let (macro_name, display_tokens) = arguments.split_first()?;
+    if macro_name.value.is_empty() {
         return None;
     }
-    let display_text = match tokens.len() {
-        1 => None,
-        2 => Some(tokens[1].value.clone()),
-        _ => Some(Cow::Owned(
-            tokens[1..]
+    let display_text = match display_tokens {
+        [] => None,
+        [display] => Some(display.value.clone()),
+        displays => Some(Cow::Owned(
+            displays
                 .iter()
                 .map(|token| token.value.as_ref())
                 .collect::<Vec<_>>()
                 .join(" "),
         )),
     };
-    Some((macro_name, display_text))
+    Some((macro_name.value.clone(), display_text))
 }
 
 fn go_to_button_parts(instruction: &str) -> Option<(Cow<'_, str>, Cow<'_, str>)> {
     let tokens = tokenize(instruction).ok()?;
-    if tokens.len() != 3 || !tokens[0].value.eq_ignore_ascii_case("GOTOBUTTON") {
+    let [keyword, target, button_text] = tokens.as_slice() else {
         return None;
-    }
-    let target = tokens[1].value.clone();
-    let button_text = tokens[2].value.clone();
-    if target.is_empty()
-        || button_text.is_empty()
-        || switch_name(&tokens[1]).is_some()
-        || switch_name(&tokens[2]).is_some()
+    };
+    if !keyword.value.eq_ignore_ascii_case("GOTOBUTTON")
+        || target.value.is_empty()
+        || button_text.value.is_empty()
+        || switch_name(target).is_some()
+        || switch_name(button_text).is_some()
     {
         return None;
     }
-    Some((target, button_text))
+    Some((target.value.clone(), button_text.value.clone()))
 }
 
 fn auto_text_field_parts<'a>(
@@ -7025,7 +7027,7 @@ fn auto_text_field_parts<'a>(
     let mut unknown_switches = Vec::new();
     let mut index = 2;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|next| switch_name(next).is_none());
@@ -7063,7 +7065,7 @@ fn auto_text_list_field_parts<'a>(
     let mut options = Vec::new();
     let mut unknown_switches = Vec::new();
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens.get(index + 1).filter(|next| is_field_operand(next));
         match name.to_ascii_lowercase().as_str() {
             "s" => {
@@ -7126,7 +7128,7 @@ fn dde_field_parts(instruction: &str) -> Option<DdeFieldParts<'_>> {
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "a" if kind == DdeFieldKind::Dde => {
@@ -7234,7 +7236,7 @@ fn link_field_parts(instruction: &str) -> Option<LinkFieldParts<'_>> {
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "a" => {
@@ -7347,7 +7349,7 @@ fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>>
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         if name.eq_ignore_ascii_case("c") {
             options.push(ExternalIncludeOption::Converter(
                 switch_value(&tokens, index, name).ok()?,
@@ -7439,7 +7441,7 @@ fn referenced_document_field_parts(instruction: &str) -> Option<ReferencedDocume
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -7475,7 +7477,7 @@ fn table_of_contents_parts(instruction: &str) -> Option<TableOfContentsParts<'_>
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "a" => {
@@ -7643,7 +7645,7 @@ fn table_of_contents_entry_parts(instruction: &str) -> Option<TableOfContentsEnt
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "f" => {
@@ -7700,7 +7702,7 @@ fn table_of_authorities_entry_parts(instruction: &str) -> Option<TableOfAuthorit
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "b" => {
@@ -7778,7 +7780,7 @@ fn table_of_authorities_parts(instruction: &str) -> Option<TableOfAuthoritiesPar
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "b" => {
@@ -7884,7 +7886,7 @@ fn index_parts(instruction: &str) -> Option<IndexParts<'_>> {
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "b" => {
@@ -8016,7 +8018,7 @@ fn index_entry_parts(instruction: &str) -> Option<IndexEntryParts<'_>> {
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "b" => {
@@ -8101,7 +8103,7 @@ fn citation_parts(instruction: &str) -> Option<CitationParts<'_>> {
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "l" => {
@@ -8187,7 +8189,7 @@ fn bibliography_parts(instruction: &str) -> Option<BibliographyParts<'_>> {
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized_name = name.to_ascii_lowercase();
         match normalized_name.as_str() {
             "l" => {
@@ -8244,7 +8246,7 @@ fn document_variable_field_parts(instruction: &str) -> Option<DocumentVariableFi
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| switch_name(token).is_none());
@@ -8278,7 +8280,7 @@ fn document_property_field_parts(instruction: &str) -> Option<DocumentPropertyFi
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -8320,7 +8322,7 @@ fn info_field_parts(instruction: &str) -> Option<InfoFieldParts<'_>> {
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -8349,7 +8351,7 @@ fn document_information_field_parts(
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -8372,7 +8374,7 @@ fn document_context_field_parts(instruction: &str) -> Option<DocumentContextFiel
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -8403,7 +8405,7 @@ fn merge_field_parts(instruction: &str) -> Option<MergeFieldParts<'_>> {
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| switch_name(token).is_none());
@@ -8464,7 +8466,7 @@ fn mail_merge_data_field_parts(instruction: &str) -> Option<MailMergeDataFieldPa
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| switch_name(token).is_none());
@@ -8526,7 +8528,7 @@ fn prompt_field_parts(instruction: &str) -> Option<PromptFieldParts<'_>> {
     let mut prompts_once_per_mail_merge = false;
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         match name.to_ascii_lowercase().as_str() {
             "d" => {
                 if default_response.is_some() {
@@ -8588,7 +8590,7 @@ fn user_identity_field_parts(instruction: &str) -> Option<UserIdentityFieldParts
     let mut formatting = None;
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         if name != "*" || formatting.is_some() {
             return None;
         }
@@ -8629,7 +8631,7 @@ fn advance_field_adjustments(instruction: &str) -> Option<Vec<AdvanceFieldAdjust
     let mut adjustments = Vec::with_capacity(tokens.len() / 2);
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let operation = match name.to_ascii_lowercase().as_str() {
             "d" => AdvanceFieldOperation::Down,
             "l" => AdvanceFieldOperation::Left,
@@ -8673,7 +8675,7 @@ fn mail_merge_recipient_field_parts(instruction: &str) -> Option<MailMergeRecipi
     let mut unknown_switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let normalized = name.to_ascii_lowercase();
         let value = tokens
             .get(index + 1)
@@ -8749,13 +8751,12 @@ fn mail_merge_recipient_field_parts(instruction: &str) -> Option<MailMergeRecipi
 
 fn mail_merge_counter_kind(instruction: &str) -> Option<MailMergeCounterKind> {
     let tokens = tokenize(instruction).ok()?;
-    if tokens.len() != 1 {
+    let [keyword] = tokens.as_slice() else {
         return None;
-    }
-
-    if tokens[0].value.eq_ignore_ascii_case("MERGEREC") {
+    };
+    if keyword.value.eq_ignore_ascii_case("MERGEREC") {
         Some(MailMergeCounterKind::Record)
-    } else if tokens[0].value.eq_ignore_ascii_case("MERGESEQ") {
+    } else if keyword.value.eq_ignore_ascii_case("MERGESEQ") {
         Some(MailMergeCounterKind::Sequence)
     } else {
         None
@@ -8766,7 +8767,7 @@ fn is_mail_merge_next_instruction(instruction: &str) -> bool {
     let Ok(tokens) = tokenize(instruction) else {
         return false;
     };
-    tokens.len() == 1 && tokens[0].value.eq_ignore_ascii_case("NEXT")
+    matches!(tokens.as_slice(), [keyword] if keyword.value.eq_ignore_ascii_case("NEXT"))
 }
 
 fn mail_merge_conditional_control_parts(
@@ -8866,10 +8867,7 @@ fn set_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>, &'a str)> 
 
 fn field_argument_end(input: &str) -> Option<usize> {
     let bytes = input.as_bytes();
-    if bytes.is_empty() {
-        return None;
-    }
-    if bytes[0] != b'"' {
+    if bytes.first().copied()? != b'"' {
         return Some(
             bytes
                 .iter()
@@ -8879,14 +8877,18 @@ fn field_argument_end(input: &str) -> Option<usize> {
     }
 
     let mut index = 1;
-    while index < bytes.len() {
-        match bytes[index] {
+    while let Some(byte) = bytes.get(index).copied() {
+        match byte {
             b'"' => return Some(index + 1),
-            b'\\' if index + 1 < bytes.len() && matches!(bytes[index + 1], b'\\' | b'"') => {
+            b'\\'
+                if bytes
+                    .get(index + 1)
+                    .is_some_and(|next| matches!(*next, b'\\' | b'"')) =>
+            {
                 index += 2;
             },
             _ => {
-                let character = input[index..].chars().next()?;
+                let character = input.get(index..)?.chars().next()?;
                 index += character.len_utf8();
             },
         }
@@ -8984,7 +8986,7 @@ fn quote_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>, Vec<Fiel
     let mut switches = Vec::new();
     let mut index = 2;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|next| switch_name(next).is_none());
@@ -9011,7 +9013,7 @@ fn symbol_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>, Vec<Fie
     let mut switches = Vec::new();
     let mut index = 2;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|next| switch_name(next).is_none());
@@ -9033,7 +9035,7 @@ fn auto_number_field_parts(instruction: &str) -> Option<AutoNumberFieldParts<'_>
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -9066,7 +9068,7 @@ fn list_number_field_parts(instruction: &str) -> Option<ListNumberFieldParts<'_>
     let mut switches = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
-        let name = switch_name(&tokens[index])?;
+        let name = switch_name(tokens.get(index)?)?;
         let value = tokens
             .get(index + 1)
             .filter(|token| is_field_operand(token));
@@ -9104,7 +9106,7 @@ fn style_reference_field_parts<'a>(
     let mut unknown_switches = Vec::new();
     let mut index = 2;
     while index < tokens.len() {
-        let token = &tokens[index];
+        let token = tokens.get(index)?;
         let name = switch_name(token)?;
         let option = match name.to_ascii_lowercase().as_str() {
             "l" => Some(StyleReferenceFieldOption::FollowingText),
@@ -9164,18 +9166,18 @@ pub(crate) fn validate_story_events(
             StoryEvent::Drawing(drawing) => {
                 drawings.push(drawing);
                 match drawing {
-                    crate::StoryDrawing::Shape(index) if index < shapes.len() => {
-                        shapes[index].position
+                    crate::StoryDrawing::Shape(index) => {
+                        shapes.get(index).map(|shape| shape.position)
                     },
-                    crate::StoryDrawing::ShapeGroup(index) if index < shape_groups.len() => {
-                        shape_groups[index].position
-                    },
-                    _ => {
-                        return Err(crate::RtfError::MalformedDocument(format!(
-                            "RTF {label} story order has an invalid drawing reference"
-                        )));
+                    crate::StoryDrawing::ShapeGroup(index) => {
+                        shape_groups.get(index).map(|group| group.position)
                     },
                 }
+                .ok_or_else(|| {
+                    crate::RtfError::MalformedDocument(format!(
+                        "RTF {label} story order has an invalid drawing reference"
+                    ))
+                })?
             },
             StoryEvent::Field(field) => {
                 if !fields.insert(field.field_index)
@@ -9262,8 +9264,7 @@ fn parse_hyperlink(tokens: Vec<FieldCodeToken<'_>>) -> Result<HyperlinkCode<'_>,
         unknown_switches: Vec::new(),
     };
     let mut index = 0;
-    while index < tokens.len() {
-        let token = &tokens[index];
+    while let Some(token) = tokens.get(index) {
         if let Some(name) = switch_name(token) {
             let normalized = name.to_ascii_lowercase();
             match normalized.as_str() {
@@ -9335,8 +9336,7 @@ fn parse_reference(tokens: Vec<FieldCodeToken<'_>>) -> Result<ReferenceCode<'_>,
         unknown_switches: Vec::new(),
     };
     let mut index = 1;
-    while index < tokens.len() {
-        let token = &tokens[index];
+    while let Some(token) = tokens.get(index) {
         let Some(name) = switch_name(token) else {
             return Err(FieldCodeError::UnexpectedOperand(token.value.to_string()));
         };
@@ -9402,7 +9402,10 @@ fn tokenize(instruction: &str) -> Result<Vec<FieldCodeToken<'_>>, FieldCodeError
     let mut tokens = Vec::new();
     let mut index = 0;
     while index < bytes.len() {
-        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+        while bytes
+            .get(index)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
             index += 1;
         }
         if index == bytes.len() {
@@ -9411,29 +9414,39 @@ fn tokenize(instruction: &str) -> Result<Vec<FieldCodeToken<'_>>, FieldCodeError
         if tokens.len() >= MAX_TOKENS {
             return Err(FieldCodeError::TooManyTokens);
         }
-        if bytes[index] == b'"' {
+        if bytes.get(index).copied() == Some(b'"') {
             index += 1;
             let mut value = String::new();
             let mut closed = false;
-            while index < bytes.len() {
-                match bytes[index] {
+            while let Some(byte) = bytes.get(index).copied() {
+                match byte {
                     b'"' => {
                         index += 1;
                         closed = true;
                         break;
                     },
                     b'\\'
-                        if index + 1 < bytes.len() && matches!(bytes[index + 1], b'\\' | b'"') =>
+                        if bytes
+                            .get(index + 1)
+                            .is_some_and(|next| matches!(*next, b'\\' | b'"')) =>
                     {
-                        value.push(bytes[index + 1] as char);
+                        let escaped = bytes.get(index + 1).copied().ok_or_else(|| {
+                            FieldCodeError::UnexpectedOperand(
+                                "missing quoted field escape".to_string(),
+                            )
+                        })?;
+                        value.push(char::from(escaped));
                         index += 2;
                     },
                     _ => {
-                        let character = instruction[index..].chars().next().ok_or_else(|| {
-                            FieldCodeError::UnexpectedOperand(
-                                "invalid quoted field operand boundary".to_string(),
-                            )
-                        })?;
+                        let character = instruction
+                            .get(index..)
+                            .and_then(|remainder| remainder.chars().next())
+                            .ok_or_else(|| {
+                                FieldCodeError::UnexpectedOperand(
+                                    "invalid quoted field operand boundary".to_string(),
+                                )
+                            })?;
                         value.push(character);
                         index += character.len_utf8();
                     },
@@ -9448,11 +9461,16 @@ fn tokenize(instruction: &str) -> Result<Vec<FieldCodeToken<'_>>, FieldCodeError
             });
         } else {
             let start = index;
-            while index < bytes.len() && !bytes[index].is_ascii_whitespace() {
+            while bytes
+                .get(index)
+                .is_some_and(|byte| !byte.is_ascii_whitespace())
+            {
                 index += 1;
             }
             tokens.push(FieldCodeToken {
-                value: Cow::Borrowed(&instruction[start..index]),
+                value: Cow::Borrowed(instruction.get(start..index).ok_or_else(|| {
+                    FieldCodeError::UnexpectedOperand("invalid field operand boundary".to_string())
+                })?),
                 quoted: false,
             });
         }
@@ -9477,6 +9495,177 @@ pub(crate) fn quoted_field_operand(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn exercise_field_views(instruction: &str) {
+        let field = Field::parse_instruction(instruction);
+        let _ = field.parsed_code();
+        let _ = field.extract_url();
+        let _ = field.extract_bookmark();
+        let _ = field.equation();
+        let _ = field.macro_button();
+        let _ = field.go_to_button();
+        let _ = field.print_field();
+        let _ = field.embed_field();
+        let _ = field.barcode_field();
+        let _ = field.barcode_display_field();
+        let _ = field.bidi_outline_field();
+        let _ = field.shape_field();
+        let _ = field.legacy_form_field();
+        let _ = field.private_field();
+        let _ = field.active_content_field();
+        let _ = field.auto_text_field();
+        let _ = field.auto_text_list_field();
+        let _ = field.dde_link();
+        let _ = field.link_field();
+        let _ = field.external_include();
+        let _ = field.referenced_document();
+        let _ = field.table_of_contents();
+        let _ = field.table_of_contents_entry();
+        let _ = field.table_of_authorities_entry();
+        let _ = field.table_of_authorities();
+        let _ = field.index();
+        let _ = field.index_entry();
+        let _ = field.citation();
+        let _ = field.bibliography();
+        let _ = field.document_variable();
+        let _ = field.document_property();
+        let _ = field.info_field();
+        let _ = field.document_information();
+        let _ = field.document_context();
+        let _ = field.merge_field();
+        let _ = field.database_field();
+        let _ = field.mail_merge_data();
+        let _ = field.mail_merge_counter();
+        let _ = field.mail_merge_next();
+        let _ = field.mail_merge_conditional_control();
+        let _ = field.if_field();
+        let _ = field.compare_field();
+        let _ = field.set_field();
+        let _ = field.sequence_field();
+        let _ = field.formula_field();
+        let _ = field.quote_field();
+        let _ = field.symbol_field();
+        let _ = field.auto_number_field();
+        let _ = field.list_number_field();
+        let _ = field.style_reference_field();
+        let _ = field.prompt_field();
+        let _ = field.user_identity_field();
+        let _ = field.advance_field();
+        let _ = field.mail_merge_recipient_field();
+        let _ = field.hyperlink();
+        let _ = field.reference_field();
+    }
+
+    #[test]
+    fn field_views_are_total_for_truncated_and_mutated_instructions() {
+        let seeds = [
+            r#"HYPERLINK "https://例.example/a b" \l mark \n"#,
+            r"REF mark \h \p",
+            r#"DISPLAYBARCODE "123 456" QR \q 3"#,
+            r#"MACROBUTTON NoMacro "Click here now""#,
+            r#"GOTOBUTTON mark "Jump here""#,
+            r"AUTOTEXT Clause \x value",
+            r#"AUTOTEXTLIST "Choose" \s "Name Style" \x value"#,
+            r"DDE Excel book item \p \x value",
+            r"LINK Excel.Sheet.8 book item \f 4 \x value",
+            r"INCLUDETEXT source bookmark \c converter \! \q value",
+            r"RD source.doc \f \x value",
+            r#"TOC \o "1-3" \h \x value"#,
+            r#"TC "entry" \l 2 \n \x value"#,
+            r#"TA \l "long citation" \c 1 \b \x value"#,
+            r"TOA \c 1 \h \x value",
+            r"INDEX \c 2 \r \x value",
+            r#"XE "entry" \b \t "see also" \x value"#,
+            r"CITATION tag \l 1033 \n \x value",
+            r"BIBLIOGRAPHY \l 1033 \x value",
+            r"DOCVARIABLE name \x value",
+            r"DOCPROPERTY Title \* MERGEFORMAT",
+            r"INFO TITLE replacement \* MERGEFORMAT",
+            r"TITLE \* MERGEFORMAT",
+            r"FILENAME \p \* MERGEFORMAT",
+            r#"MERGEFIELD Name \b "Dear ""#,
+            r"DATA source.csv headers.csv \* MERGEFORMAT",
+            r#"ASK mark "Prompt?" \d default \o"#,
+            r#"USERNAME "Ada Lovelace" \* Upper"#,
+            r"ADVANCE \d 1 \x 2",
+            r"ADDRESSBLOCK \c 2 \d \e US \f fmt \l 1033 \x value",
+            "MERGEREC",
+            "NEXT",
+            r#"NEXTIF "A" = "B""#,
+            r#"SET name "value with spaces""#,
+            r"SEQ Figure mark \r 1",
+            r#"QUOTE "text" \* MERGEFORMAT"#,
+            r"SYMBOL 65 \f Symbol",
+            r"AUTONUM \s .",
+            r"LISTNUM Name \l 2",
+            r"STYLEREF Heading \l \x value",
+        ];
+        let replacements = ['\0', ' ', '"', '\\', '例'];
+
+        for seed in seeds {
+            for end in seed
+                .char_indices()
+                .map(|(index, _)| index)
+                .chain(std::iter::once(seed.len()))
+            {
+                if let Some(prefix) = seed.get(..end) {
+                    exercise_field_views(prefix);
+                }
+            }
+
+            for (start, character) in seed.char_indices() {
+                let end = start + character.len_utf8();
+                let Some(prefix) = seed.get(..start) else {
+                    continue;
+                };
+                let Some(suffix) = seed.get(end..) else {
+                    continue;
+                };
+                for replacement in replacements {
+                    let mut mutated =
+                        String::with_capacity(prefix.len() + replacement.len_utf8() + suffix.len());
+                    mutated.push_str(prefix);
+                    mutated.push(replacement);
+                    mutated.push_str(suffix);
+                    exercise_field_views(&mutated);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn field_code_limits_return_typed_malformed_results() {
+        let too_long = "x".repeat(MAX_INSTRUCTION_LEN + 1);
+        assert_eq!(
+            parse_field_code(&too_long),
+            ParsedFieldCode::Malformed(FieldCodeError::InstructionTooLong)
+        );
+
+        let too_many_tokens = (0..=MAX_TOKENS).map(|_| "x").collect::<Vec<_>>().join(" ");
+        assert_eq!(
+            parse_field_code(&too_many_tokens),
+            ParsedFieldCode::Malformed(FieldCodeError::TooManyTokens)
+        );
+    }
+
+    #[test]
+    fn story_validation_rejects_missing_drawing_references() {
+        let drawing = crate::StoryDrawing::Shape(0);
+        let error = validate_story_events(
+            "",
+            &[],
+            &[],
+            &[],
+            &[StoryEvent::Drawing(drawing)],
+            "test field",
+        )
+        .expect_err("an unresolved drawing reference must be rejected");
+        assert!(matches!(
+            error,
+            crate::RtfError::MalformedDocument(message)
+                if message.contains("invalid drawing reference")
+        ));
+    }
 
     #[test]
     fn exact_case_insensitive_keywords_and_distinct_references() {
