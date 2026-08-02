@@ -26,7 +26,7 @@ fn presentation_placeholders_preserve_type_decoding_errors() {
 
     assert!(matches!(
         package.presentation().unwrap().get_placeholders(0),
-        Err(OoxmlError::CommonXml(_))
+        Err(OoxmlError::Common(_))
     ));
 }
 

@@ -599,28 +599,46 @@ fn write_element(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::custom_xml_data::{CustomXmlDataItem, CustomXmlDataProperties};
     use crate::docx::bibliography::discover_bibliography_source_stores;
-    use litchi_ooxml_common::ExpandedName;
-    use litchi_opc::PackURI;
+    use litchi_ooxml_common::custom_xml::{
+        Conformance, Item, NewItem, NewProps, Props, add, discover,
+    };
+    use litchi_opc::constants::content_type as ct;
+    use litchi_opc::part::BlobPart;
+    use litchi_opc::{OpcPackage, PackURI};
 
-    fn item(xml: &[u8], namespace: &str, local_name: &str) -> CustomXmlDataItem {
-        CustomXmlDataItem {
-            source_part_name: PackURI::new("/word/document.xml").unwrap(),
-            relationship_id: "rIdBib".to_string(),
-            data_part_name: PackURI::new("/customXml/item1.xml").unwrap(),
-            content_type: "application/xml".to_string(),
-            root_name: ExpandedName {
-                namespace: namespace.to_string(),
-                local_name: local_name.to_string(),
+    fn item(xml: &[u8], namespace: &str, local_name: &str) -> Item {
+        let mut package = OpcPackage::new();
+        let source = PackURI::new("/word/document.xml").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            source.clone(),
+            ct::WML_DOCUMENT_MAIN.to_string(),
+            Vec::new(),
+        )));
+        add(
+            &mut package,
+            NewItem {
+                source,
+                rel_id: "rIdBib".to_string(),
+                part: PackURI::new("/customXml/item1.xml").unwrap(),
+                content_type: "application/xml".to_string(),
+                xml: xml.to_vec(),
+                props: Some(NewProps {
+                    part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                    rel_id: "rIdProps".to_string(),
+                    value: Props {
+                        id: "{11111111-1111-1111-1111-111111111111}".to_string(),
+                        schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
+                    },
+                }),
+                conformance: Conformance::Transitional,
             },
-            xml: xml.to_vec(),
-            properties_part_name: Some(PackURI::new("/customXml/itemProps1.xml").unwrap()),
-            properties: Some(CustomXmlDataProperties {
-                item_id: "{11111111-1111-1111-1111-111111111111}".to_string(),
-                schema_references: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
-            }),
-        }
+        )
+        .unwrap();
+        let item = discover(&package).unwrap().remove(0);
+        assert_eq!(item.root().namespace, namespace);
+        assert_eq!(item.root().local_name, local_name);
+        item
     }
 
     fn built() -> BibliographySourceBuilder {

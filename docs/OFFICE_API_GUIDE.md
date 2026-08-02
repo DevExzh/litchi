@@ -46,8 +46,12 @@ para.add_run_with_text("and italic text").italic(true);
 
 // Add tables
 let table = doc.add_table(3, 4); // 3 rows, 4 columns
-table.cell(0, 0).unwrap().set_text("Header 1");
-table.cell(0, 1).unwrap().set_text("Header 2");
+if let Some(cell) = table.cell(0, 0) {
+    cell.set_text("Header 1");
+}
+if let Some(cell) = table.cell(0, 1) {
+    cell.set_text("Header 2");
+}
 
 // Set metadata
 pkg.properties_mut().title = Some("My Document".to_string());
@@ -118,6 +122,55 @@ doc.add_paragraph_with_text("Additional content...");
 pkg.properties_mut().last_modified_by = Some("Editor Name".to_string());
 
 // Save (can overwrite or save to new file)
+pkg.save("updated.docx")?;
+```
+
+### Custom Properties and XML Data
+
+Custom document properties use the shared, bounded `custom::{Props, Value}`
+vocabulary. Names follow Office's case-insensitive identity rules, while the
+original spelling is preserved. Insert is fallible so invalid names, values,
+or resource limits cannot be bypassed.
+
+```rust
+use litchi::ooxml::custom::Value;
+use litchi::ooxml::docx::Package;
+
+let mut pkg = Package::open("document.docx")?;
+pkg.custom_props_mut().insert("Project", "Litchi")?;
+pkg.custom_props_mut().insert("Version", Value::I32(38))?;
+
+if let Some(value) = pkg.custom_props().get("PROJECT") {
+    println!("Project: {value:?}");
+}
+
+pkg.custom_props_mut().remove("Version");
+pkg.save("updated.docx")?;
+```
+
+Custom XML payloads stay inert: Litchi validates their bounded XML and package
+graph but never fetches schemas or executes XPath. Loaded payloads borrow shared
+immutable OPC storage internally, so repeated relationships do not duplicate
+the XML allocation.
+
+```rust
+use litchi::ooxml::custom_xml::Conformance;
+use litchi::ooxml::docx::{NewStore, Package};
+
+let mut pkg = Package::open("document.docx")?;
+let item = pkg.add_custom_xml(NewStore {
+    xml: br#"<customer xmlns="urn:customer" id="7"/>"#.to_vec(),
+    content_type: "application/xml".to_string(),
+    id: "{11111111-1111-4111-8111-111111111111}".to_string(),
+    schemas: vec!["urn:customer".to_string()],
+    conformance: Conformance::Transitional,
+})?;
+
+println!("Stored {} bytes in {}", item.xml().len(), item.part());
+pkg.set_custom_xml(
+    "{11111111-1111-4111-8111-111111111111}",
+    br#"<customer xmlns="urn:customer" id="8"/>"#.to_vec(),
+)?;
 pkg.save("updated.docx")?;
 ```
 

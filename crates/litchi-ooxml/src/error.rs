@@ -36,12 +36,9 @@ pub enum OoxmlError {
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 
-    #[error("markup compatibility error: {0}")]
-    MarkupCompatibility(#[from] litchi_ooxml_common::MceError),
-
-    /// Shared OOXML decoding error.
-    #[error("OOXML decoding error: {0}")]
-    CommonXml(#[from] litchi_ooxml_common::XmlError),
+    /// Shared host-neutral OOXML package-service error.
+    #[error("shared OOXML error: {0}")]
+    Common(#[from] litchi_ooxml_common::Error),
 
     /// Bounded, inert VBA parsing or authoring error.
     #[error("VBA error: {0}")]
@@ -50,10 +47,6 @@ pub enum OoxmlError {
     /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-
-    /// IO error (alternative form for compatibility)
-    #[error("IO error: {0}")]
-    IoError(std::io::Error),
 
     /// Invalid URI
     #[error("Invalid URI: {0}")]
@@ -100,11 +93,9 @@ impl From<OoxmlError> for litchi_core::Error {
             OoxmlError::InvalidRelationship(s) => litchi_core::Error::Other(s),
             OoxmlError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             OoxmlError::Drawing(e) => litchi_core::Error::InvalidFormat(e.to_string()),
-            OoxmlError::MarkupCompatibility(e) => litchi_core::Error::InvalidFormat(e.to_string()),
-            OoxmlError::CommonXml(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::Common(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Vba(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),
-            OoxmlError::IoError(e) => litchi_core::Error::Io(e),
             OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),
             OoxmlError::UnsafeEdit {
                 format,
@@ -115,5 +106,17 @@ impl From<OoxmlError> for litchi_core::Error {
             )),
             OoxmlError::Other(s) => litchi_core::Error::Other(s),
         }
+    }
+}
+
+impl From<litchi_ooxml_common::MceError> for OoxmlError {
+    fn from(error: litchi_ooxml_common::MceError) -> Self {
+        Self::Common(litchi_ooxml_common::Error::Mce(error))
+    }
+}
+
+impl From<litchi_ooxml_common::XmlError> for OoxmlError {
+    fn from(error: litchi_ooxml_common::XmlError) -> Self {
+        Self::Common(litchi_ooxml_common::Error::Decode(error))
     }
 }

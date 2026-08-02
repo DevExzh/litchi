@@ -1,10 +1,10 @@
-use crate::custom_xml_data::is_st_guid;
 /// Content control support for Word documents.
 ///
 /// Content controls are structured regions in a document that can contain
 /// specific types of content (text, dates, lists, etc.).
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::custom_xml::valid_guid;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -363,7 +363,7 @@ pub fn validate_data_binding_values(
             "content-control XPath is empty or exceeds lexical limits".to_string(),
         ));
     }
-    if !is_st_guid(store_item_id) {
+    if !valid_guid(store_item_id) {
         return Err(OoxmlError::InvalidFormat(format!(
             "content-control storeItemID '{store_item_id}' is not ST_Guid"
         )));

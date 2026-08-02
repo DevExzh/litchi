@@ -65,7 +65,13 @@ odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
 doc = ["dep:litchi-cfb", "dep:litchi-doc", "sign"]
 ppt = ["dep:litchi-cfb", "dep:litchi-ppt", "sign"]
 xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]
-ooxml = ["dep:litchi-drawingml", "dep:litchi-ooxml", "dep:soapberry-zip", "sign"]
+ooxml = [
+    "dep:litchi-drawingml",
+    "dep:litchi-ooxml",
+    "dep:litchi-ooxml-common",
+    "dep:soapberry-zip",
+    "sign",
+]
 ooxml_encryption = ["ooxml", "dep:litchi-cfb", "litchi-ooxml/encryption"]
 rtf = ["dep:litchi-rtf"]
 # Additional functionality features
@@ -101,6 +107,7 @@ litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpe
 litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
 litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt image grammar exposed by the image facade
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
+litchi-ooxml-common = { workspace = true, optional = true } # Host-neutral OOXML package grammar exposed directly by the OOXML facade
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary parser/writer (.ppt), independently gated by `ppt`
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 litchi-sign = { workspace = true, optional = true } # Trust-neutral Office signature authoring and verification

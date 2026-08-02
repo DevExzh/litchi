@@ -101,7 +101,7 @@ conversion, fonts, and image conversion are optional.
 | Built-in document-information state and statistics | ✅ | ✅ | N/A | Typed inert `CREATEDATE`/`SAVEDATE`/`PRINTDATE`/`REVNUM`/`EDITTIME`/`NUMPAGES`/`NUMWORDS`/`NUMCHARS` kind/switch/cached-result metadata; dates, revision state, and statistics are never read from package metadata, calculated, resolved, or refreshed |
 | Built-in document-context and runtime fields | ✅ | ✅ | N/A | Typed inert `FILENAME`/`TEMPLATE`/`DATE`/`TIME`/`PAGE`/`FILESIZE`/`SECTION`/`SECTIONPAGES` kind/switch/cached-result metadata; document paths, attached templates, host filesystem state or file size, current clock values, and page or section layout are never read, resolved, calculated, or refreshed |
 | Document statistics | ✅ | ✅ | N/A | Word, character, paragraph, line, and page metadata where present |
-| Core, extended, and custom properties | ✅ | ✅ | ✅ | Typed package properties |
+| Core, extended, and custom properties | ✅ | ✅ | ✅ | Shared bounded `custom::{Props, Value}` CRUD; canonical Unicode-caseless names with spelling preservation; strict package-graph validation; RFC3339 `filetime`; deterministic output; empty-store graph removal |
 
 ### Collaboration, package parts, and advanced content
 
@@ -111,7 +111,7 @@ conversion, fonts, and image conversion are optional.
 | Modern comment metadata | 🟡 | ✅ | ✅ | Extensible comments, people, presence, reactions, and ID mappings; metadata-oriented model |
 | Track changes | ✅ | ✅ | ✅ | Insert/delete/move plus paragraph, table, row, cell, and property revisions |
 | Content controls | ✅ | ✅ | ✅ | Structured document tags and properties |
-| Custom XML data stores and bindings | ✅ | ✅ | ✅ | Package graph load/store and ordered CRUD |
+| Custom XML data stores and bindings | ✅ | ✅ | ✅ | Bounded inert payloads, shared immutable payload storage, strict/transitional properties, concise semantic lookup and ordered CRUD, SDT binding integrity, transactional creation, and signature invalidation on mutation |
 | Document variables | ✅ | ✅ | ✅ | Settings-backed variables plus inert stored `DOCVARIABLE` references; field values are never resolved or refreshed |
 | Attached templates | ✅ | ✅ | ✅ | Internal/external template relationship metadata; external targets remain inert |
 | Smart tags | ✅ | ✅ | ✅ | Typed smart-tag properties and writer support |

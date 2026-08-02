@@ -46,6 +46,8 @@ pub enum XlsbError {
     Encoding(String),
     /// Shared DrawingML parsing error.
     Drawing(litchi_drawingml::Error),
+    /// Shared host-neutral OOXML package-service error.
+    Common(litchi_ooxml_common::Error),
     /// Bounded, inert VBA parsing or authoring error.
     Vba(litchi_vba::Error),
     /// Wide string length error
@@ -105,6 +107,7 @@ impl fmt::Display for XlsbError {
                 write!(f, "Encoding error: {}", msg)
             },
             XlsbError::Drawing(error) => write!(f, "DrawingML error: {error}"),
+            XlsbError::Common(error) => write!(f, "shared OOXML error: {error}"),
             XlsbError::Vba(error) => write!(f, "VBA error: {error}"),
             XlsbError::WideStringLength { expected, actual } => {
                 write!(
@@ -129,6 +132,7 @@ impl std::error::Error for XlsbError {
             XlsbError::Io(e) => Some(e),
             XlsbError::Xml(e) => Some(e),
             XlsbError::Drawing(e) => Some(e),
+            XlsbError::Common(e) => Some(e),
             XlsbError::Vba(e) => Some(e),
             _ => None,
         }
@@ -162,6 +166,12 @@ impl From<litchi_core::binary::BinaryError> for XlsbError {
 impl From<litchi_drawingml::Error> for XlsbError {
     fn from(error: litchi_drawingml::Error) -> Self {
         Self::Drawing(error)
+    }
+}
+
+impl From<litchi_ooxml_common::Error> for XlsbError {
+    fn from(error: litchi_ooxml_common::Error) -> Self {
+        Self::Common(error)
     }
 }
 
@@ -210,7 +220,6 @@ impl From<crate::error::OoxmlError> for XlsbError {
             crate::error::OoxmlError::InvalidContentType { expected, got } => XlsbError::Encoding(
                 format!("Invalid content type: expected {}, got {}", expected, got),
             ),
-            crate::error::OoxmlError::IoError(e) => XlsbError::Io(e),
             crate::error::OoxmlError::InvalidUri(s) => {
                 XlsbError::Encoding(format!("Invalid URI: {}", s))
             },
@@ -220,10 +229,7 @@ impl From<crate::error::OoxmlError> for XlsbError {
             crate::error::OoxmlError::InvalidFormat(msg) => XlsbError::Encoding(msg),
             crate::error::OoxmlError::Drawing(err) => XlsbError::Encoding(err.to_string()),
             crate::error::OoxmlError::Io(e) => XlsbError::Io(e),
-            crate::error::OoxmlError::MarkupCompatibility(err) => {
-                XlsbError::Encoding(err.to_string())
-            },
-            crate::error::OoxmlError::CommonXml(err) => XlsbError::Encoding(err.to_string()),
+            crate::error::OoxmlError::Common(err) => XlsbError::Common(err),
             crate::error::OoxmlError::Vba(err) => XlsbError::Vba(err),
             crate::error::OoxmlError::UnsafeEdit {
                 format,

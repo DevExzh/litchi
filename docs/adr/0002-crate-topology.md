@@ -57,6 +57,33 @@ only host anchoring, relationship allocation, and concrete package topology.
 Neither shared module depends on a concrete format or the OOXML migration host,
 and malformed input returns the crate-local `Error` rather than a host error.
 
+`litchi-ooxml-common::custom` owns the package-level custom-document-property
+grammar and graph service shared by every OOXML host. Its complete facade is
+`custom::{Props, Value}`: fallible `insert`, case-insensitive `get`, `contains`,
+and `remove`, plus `names`, `iter`, `clear`, `read`, and `write`. Property names
+use canonical Unicode caseless identity while retaining producer spelling.
+`Value::{Empty, Text, I32, I64, F32, F64, Bool, Time}` preserves the supported
+wire type without an external type-code enum. The Office producer profile,
+PID and format-ID rules, RFC3339 `vt:filetime` lexical form, namespace and
+cardinality checks, and bounded resource budgets are enforced at this owner.
+Missing relationships mean absence; ambiguous, external, orphaned, malformed,
+or wrong-content-type graphs are errors. Empty writes remove both part and
+relationship, and only actual mutations invalidate signatures.
+
+`litchi-ooxml-common::custom_xml` similarly owns inert Custom XML Data Storage
+grammar and topology. Its contextual vocabulary is `Conformance`, `Props`,
+`Item`, `NewProps`, and `NewItem`; its verbs are `read_props`, `write_props`,
+`discover`, `add`, and focused validation helpers. `NewProps` groups the
+properties part, relationship, and value so a partially-specified properties
+request is unrepresentable. Loaded `Item` state is read-only behind short
+accessors. Payloads share the OPC part's immutable allocation and `xml()` lends
+a slice, preventing relationship multiplicity from copying large XML parts.
+Creation consumes owned bytes, validates every fallible graph and XML step
+before mutation, rolls back defensive failures, and invalidates signatures only
+after commit. Neither service resolves schemas, executes XPath, or depends on a
+concrete document format. The migration host contains no compatibility module
+or alias for either former owner.
+
 `litchi-word`, `litchi-slide`, and `litchi-sheet` depend only on `litchi-core`.
 They contain selectors, queries, events, detached builders, and semantic values,
 not container parsing or concrete document handles. Concrete imported objects

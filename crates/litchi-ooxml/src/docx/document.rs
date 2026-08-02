@@ -5,7 +5,7 @@ use crate::docx::alt_chunk::{
 use crate::docx::bookmark::Bookmark;
 use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
-use crate::docx::custom_xml::CustomXmlPart;
+use crate::docx::custom_xml::Part;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
@@ -2617,12 +2617,12 @@ impl<'a> Document<'a> {
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
     ///
-    /// for xml_part in doc.custom_xml_parts()? {
+    /// for xml_part in doc.custom_xml()? {
     ///     println!("Custom XML part: {}", xml_part.id());
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn custom_xml_parts(&self) -> Result<Vec<CustomXmlPart>> {
+    pub fn custom_xml(&self) -> Result<Vec<Part>> {
         let mut custom_parts = Vec::new();
 
         // Custom XML parts are stored as relationships from the main document part
@@ -2635,7 +2635,7 @@ impl<'a> Document<'a> {
                 let target = rel.target_partname()?;
                 let part = self.opc.get_part(&target)?;
                 let id = rel.r_id().to_string();
-                let custom_xml = CustomXmlPart::from_part(part, id)?;
+                let custom_xml = Part::from_part(part, id)?;
                 custom_parts.push(custom_xml);
             }
         }
@@ -2724,7 +2724,7 @@ impl<'a> Document<'a> {
     // ✅ Statistics: statistics() with word/character/page counts
     // ✅ Theme: theme() with color and font schemes
     // ✅ Content Controls: content_controls()
-    // ✅ Custom XML: custom_xml_parts()
+    // ✅ Custom XML: custom_xml()
     // ✅ Search: search(), search_ignore_case()
     //
     // ========================================

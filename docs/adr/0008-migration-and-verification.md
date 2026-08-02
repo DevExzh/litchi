@@ -1946,6 +1946,81 @@ ownership and hardens failures without intentionally changing emitted Office
 artifacts, the full-workspace and Computer Use/native Microsoft Office reruns
 are skipped per the explicit review direction.
 
+The thirty-eighth implementation slice removes custom document properties and
+Custom XML Data Storage from the OOXML migration host. Their sole canonical
+owners are now `litchi-ooxml-common::{custom, custom_xml}`. The host's former
+`custom_properties` and `custom_xml_data` files, root modules, long type names,
+and function aliases are deleted rather than retained as a compatibility
+tunnel. The umbrella consumes the common crate directly and exposes these
+owners as `litchi::ooxml::{custom, custom_xml}`.
+
+Custom properties now use the compact `custom::{Props, Value}` facade. Insert
+is fallible and move-first; lookup, containment, and removal use canonical
+Unicode caseless identity while preserving the original name spelling. The
+parser applies explicit byte, depth, node, attribute, count, name, and text
+budgets; rejects DTDs, malformed namespaces/cardinality, duplicate names or
+PIDs, forbidden format IDs, illegal XML characters, and non-finite floats; and
+uses checked PID allocation. Per local `[MS-OE376]` evidence, the canonical
+Office format ID requires PIDs of at least two and case-insensitively unique
+names, while `vt:filetime` uses the RFC3339/XML-date-time lexical form rather
+than a numeric Windows FILETIME counter. Parsed `lpstr` versus `lpwstr` remains
+lossless, and deterministic output follows PID order.
+
+`Props::read` follows the package relationship instead of guessing a path. A
+genuinely absent part is empty, while duplicate, external, orphaned,
+wrong-content-type, colliding, or malformed graphs fail construction. DOCX
+`open`, `from_reader`, and `from_opc_package` now propagate that typed failure;
+they no longer silently replace corruption with an empty set. `Props::write`
+updates a valid alternate target, creates the canonical target when absent, and
+removes both part and relationship when cleared. Byte-identical writes preserve
+signatures; actual graph or byte changes unsign the package.
+
+Custom XML uses `Conformance`, `Props`, immutable loaded `Item`, and consuming
+`NewProps`/`NewItem` capabilities. Grouping the properties part, relationship,
+and value makes partial properties creation unrepresentable. Strict and
+transitional vocabularies, MCE, declarations, namespaces, QNames, character
+data, content types, item GUIDs, depth, elements, strings, parts, and package
+relationships are bounded and validated without resolving a schema or running
+XPath. Creation performs every fallible preparation before mutation, rolls back
+defensive failures, and invalidates signatures only after commit. Loaded
+payloads share the OPC part's immutable allocation, and `Item::xml()` lends a
+slice; repeated relationships no longer multiply large payload allocations or
+enable hidden aggregate clones.
+
+The concrete DOCX facade also adopts contextual names and semantic verbs:
+`docx::custom_xml::{NewStore, Binding, Part}` and
+`Package::{custom_xml, custom_xml_by_id, add_custom_xml, set_custom_xml,
+replace_custom_xml, remove_custom_xml, order_custom_xml,
+custom_xml_bindings, validate_custom_xml_bindings}`. Custom properties are
+`custom_props` and `custom_props_mut`. All former long methods and aliases are
+removed. Binding-aware deletion still refuses to remove a referenced item;
+shared-target deletion preserves parts with unrelated remaining references.
+
+A read-only audit resolves the next independent common-OOXML dependency chain:
+extract `embedded` first, `ribbon` second, and `web` last. Embedded objects are
+already borrowed but need a complete host MIME policy and memoized validation.
+Ribbon storage must eliminate payload copying during name allocation, validate
+the Ribbon part's image-only relationships, and add direct removal. Web
+extensions require the largest redesign: private valid states without raw
+relationship IDs in the semantic facade, shared snapshot storage, indexed
+graph lookup, checked arithmetic, explicit rollback, and removal of production
+`expect`/`unreachable!` paths. Those are subsequent atomic slices, not hidden
+inside this ownership cut.
+
+Focused verification for this slice passes with warnings denied: all 49
+`litchi-ooxml-common` library tests; two DOCX custom-property graph tests; five
+DOCX Custom XML CRUD, binding, rollback, sharing, and malformed-graph tests;
+and 16 bibliography-filtered host tests. All-feature/all-target checks pass for
+the host. Common and host warning-denied all-target Clippy and rustdoc pass; the
+isolated `ooxml` umbrella library and rustdoc pass. Formatting, manifest
+ordering, diff validation, the 32-package boundary inventory, and all nine
+regressions are green; the inventory contains 102 internal dependency edges and
+18 explicit migration-debt entries.
+Per explicit direction, the full-workspace rerun is skipped. This slice changes
+custom-property and Custom XML writing behavior, so it makes no new native
+Microsoft Office compatibility claim without a future artifact/open/edit/
+resave/reverse-read run.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

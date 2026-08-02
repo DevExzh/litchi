@@ -1,9 +1,3 @@
-use crate::custom_properties::CustomProperties;
-use crate::custom_xml_data::{
-    CustomXmlDataItem, CustomXmlDataProperties, NewCustomXmlDataItem, add_custom_xml_data,
-    discover_custom_xml_data, validate_custom_xml_content_type, validate_custom_xml_payload,
-    validate_custom_xml_properties, write_custom_xml_properties,
-};
 use crate::docx::alt_chunk::{
     AltChunk, AltChunkNamespace, AlternativeFormatImport, STRICT_ALTERNATIVE_FORMAT_IMPORT,
     is_alternative_format_relationship,
@@ -12,7 +6,7 @@ use crate::docx::bibliography::{
     BibliographySource, BibliographySourceStore, discover_bibliography_source_stores,
 };
 use crate::docx::content_control::ContentControl;
-use crate::docx::custom_xml::{CustomXmlBinding, NewCustomXmlDataStore};
+use crate::docx::custom_xml::{Binding, NewStore};
 use crate::docx::document::Document;
 use crate::docx::font_table::{FontTable, is_font_table_relationship};
 use crate::docx::glossary::{
@@ -49,6 +43,11 @@ use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
 use litchi_ooxml_common::DocumentProperties;
+use litchi_ooxml_common::custom::Props as CustomProps;
+use litchi_ooxml_common::custom_xml::{
+    self, Item as CustomXmlItem, MAX_ITEMS, NewItem as NewCustomXmlItem,
+    NewProps as NewCustomXmlProps, Props as CustomXmlProps,
+};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -56,6 +55,9 @@ use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::rel::TargetMode;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
+
+const MAX_ALT_CHUNKS: usize = 4096;
+const MAX_MAIL_MERGE_RELATIONSHIPS: usize = 65_536;
 
 fn validate_document_main_content_type(content_type: &str) -> Result<()> {
     if matches!(
@@ -129,7 +131,7 @@ pub struct Package {
     /// Document properties (metadata)
     properties: DocumentProperties,
     /// Custom document properties
-    custom_properties: CustomProperties,
+    custom_props: CustomProps,
 }
 
 struct StoredRelationship {
@@ -451,7 +453,7 @@ impl Package {
         let properties = DocumentProperties::new();
 
         // Initialize custom properties
-        let custom_properties = CustomProperties::new();
+        let custom_props = CustomProps::new();
 
         Ok(Self {
             opc,
@@ -459,7 +461,7 @@ impl Package {
             mutable_web_settings: None,
             web_settings_dirty: false,
             properties,
-            custom_properties,
+            custom_props,
         })
     }
 
@@ -487,9 +489,7 @@ impl Package {
 
         validate_document_main_content_type(main_part.content_type())?;
 
-        // Try to extract custom properties
-        let custom_properties = crate::custom_properties::extract_custom_properties(&opc)
-            .unwrap_or_else(|_| CustomProperties::new());
+        let custom_props = CustomProps::read(&opc)?;
 
         Ok(Self {
             opc,
@@ -497,7 +497,7 @@ impl Package {
             mutable_web_settings: None,
             web_settings_dirty: false,
             properties: DocumentProperties::new(),
-            custom_properties,
+            custom_props,
         })
     }
 
@@ -537,9 +537,7 @@ impl Package {
 
         validate_document_main_content_type(main_part.content_type())?;
 
-        // Try to extract custom properties
-        let custom_properties = crate::custom_properties::extract_custom_properties(&opc)
-            .unwrap_or_else(|_| CustomProperties::new());
+        let custom_props = CustomProps::read(&opc)?;
 
         Ok(Self {
             opc,
@@ -547,7 +545,7 @@ impl Package {
             mutable_web_settings: None,
             web_settings_dirty: false,
             properties: DocumentProperties::new(),
-            custom_properties,
+            custom_props,
         })
     }
 
@@ -578,9 +576,7 @@ impl Package {
 
         validate_document_main_content_type(main_part.content_type())?;
 
-        // Try to extract custom properties
-        let custom_properties = crate::custom_properties::extract_custom_properties(&opc)
-            .unwrap_or_else(|_| CustomProperties::new());
+        let custom_props = CustomProps::read(&opc)?;
 
         Ok(Self {
             opc,
@@ -588,7 +584,7 @@ impl Package {
             mutable_web_settings: None,
             web_settings_dirty: false,
             properties: DocumentProperties::new(),
-            custom_properties,
+            custom_props,
         })
     }
 
@@ -873,7 +869,9 @@ impl Package {
     ///
     /// // Add a table
     /// let table = doc.add_table(3, 2);
-    /// table.cell(0, 0).unwrap().set_text("Header 1");
+    /// if let Some(cell) = table.cell(0, 0) {
+    ///     cell.set_text("Header 1");
+    /// }
     ///
     /// pkg.save("output.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -895,7 +893,9 @@ impl Package {
             }
         }
 
-        Ok(self.mutable_doc.as_mut().unwrap())
+        self.mutable_doc.as_mut().ok_or_else(|| {
+            OoxmlError::InvalidFormat("mutable document initialization did not complete".into())
+        })
     }
 
     /// Append a package-backed alternative-format import to the document body.
@@ -1015,10 +1015,12 @@ impl Package {
         let document_uri = PackURI::new("/word/document.xml")
             .map_err(|error| OoxmlError::InvalidUri(format!("document URI: {error}")))?;
         let document = self.opc.get_part(&document_uri)?;
-        let relationship_id = (1usize..)
+        let relationship_id = (1usize..=MAX_ALT_CHUNKS)
             .map(|number| format!("rIdAltChunk{number}"))
             .find(|id| document.rels().get(id).is_none())
-            .expect("the relationship ID space is unbounded");
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat("altChunk relationship ID space is exhausted".into())
+            })?;
         let relationship_type = match namespace {
             AltChunkNamespace::Transitional => {
                 litchi_opc::constants::relationship_type::MS_ALTERNATIVE_FORMAT_IMPORT
@@ -1040,7 +1042,7 @@ impl Package {
                         "alternative-format part exceeds the 128 MiB authoring limit".to_string(),
                     ));
                 }
-                let (uri, target_ref) = (1usize..)
+                let (uri, target_ref) = (1usize..=MAX_ALT_CHUNKS)
                     .find_map(|number| {
                         let target_ref = format!("afchunk{number}.{}", data.extension());
                         let uri = PackURI::new(format!("/word/{target_ref}")).ok()?;
@@ -1049,7 +1051,11 @@ impl Package {
                             .is_err()
                             .then_some((uri, target_ref))
                     })
-                    .expect("the alternative-format part-name space is unbounded");
+                    .ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "alternative-format part-name space is exhausted".into(),
+                        )
+                    })?;
                 self.opc.try_add_part(Box::new(BlobPart::new(
                     uri.clone(),
                     data.content_type().to_string(),
@@ -1171,8 +1177,8 @@ impl Package {
     }
 
     /// Discover every validated Custom XML Data Storage relationship occurrence.
-    pub fn custom_xml_data_stores(&self) -> Result<Vec<CustomXmlDataItem>> {
-        discover_custom_xml_data(&self.opc)
+    pub fn custom_xml(&self) -> Result<Vec<CustomXmlItem>> {
+        Ok(custom_xml::discover(&self.opc)?)
     }
 
     /// Discover typed, inert bibliography source stores from Custom XML.
@@ -1182,7 +1188,7 @@ impl Package {
     /// metadata only. It never matches source tags to citations, resolves
     /// schemas or styles, runs transforms, refreshes fields, or changes data.
     pub fn bibliography_source_stores(&self) -> Result<Vec<BibliographySourceStore>> {
-        let items = discover_custom_xml_data(&self.opc)?;
+        let items = custom_xml::discover(&self.opc)?;
         discover_bibliography_source_stores(&items)
     }
 
@@ -1204,109 +1210,109 @@ impl Package {
     }
 
     /// Find a Custom XML data store by its case-insensitive datastore item GUID.
-    pub fn find_custom_xml_data_store(&self, item_id: &str) -> Result<Option<CustomXmlDataItem>> {
-        Ok(discover_custom_xml_data(&self.opc)?
-            .into_iter()
-            .find(|item| {
-                item.properties
-                    .as_ref()
-                    .is_some_and(|properties| properties.item_id.eq_ignore_ascii_case(item_id))
-            }))
+    pub fn custom_xml_by_id(&self, id: &str) -> Result<Option<CustomXmlItem>> {
+        Ok(custom_xml::discover(&self.opc)?.into_iter().find(|item| {
+            item.props()
+                .is_some_and(|props| props.id.eq_ignore_ascii_case(id))
+        }))
     }
 
     /// Add a collision-safe `/customXml/itemN.xml` data store to the main document.
-    pub fn add_custom_xml_data_store(
-        &mut self,
-        store: NewCustomXmlDataStore,
-    ) -> Result<CustomXmlDataItem> {
-        validate_custom_xml_content_type(&store.content_type)?;
-        validate_custom_xml_payload(&store.xml)?;
-        let properties = CustomXmlDataProperties {
-            item_id: store.item_id,
-            schema_references: store.schema_references,
+    pub fn add_custom_xml(&mut self, store: NewStore) -> Result<CustomXmlItem> {
+        custom_xml::validate_content_type(&store.content_type)?;
+        custom_xml::validate_payload(&store.xml)?;
+        let props = CustomXmlProps {
+            id: store.id,
+            schemas: store.schemas,
         };
-        validate_custom_xml_properties(&properties)?;
-        let source_part_name = self.opc.main_document_part()?.partname().clone();
-        let source = self.opc.get_part(&source_part_name)?;
-        let relationship_id = (1usize..)
+        custom_xml::validate_props(&props)?;
+        let source_part = self.opc.main_document_part()?.partname().clone();
+        let source = self.opc.get_part(&source_part)?;
+        let rel_id = (1usize..=MAX_ITEMS + 1)
             .map(|number| format!("rIdCustomXml{number}"))
             .find(|id| source.rels().get(id).is_none())
-            .expect("the relationship ID space is unbounded");
-        let (data_part_name, properties_part_name) = (1usize..)
-            .find_map(|number| {
-                let data = PackURI::new(format!("/customXml/item{number}.xml")).ok()?;
-                let properties = PackURI::new(format!("/customXml/itemProps{number}.xml")).ok()?;
-                let conflict = self.opc.iter_parts().any(|part| {
-                    part.partname().as_str().eq_ignore_ascii_case(data.as_str())
-                        || part
-                            .partname()
-                            .as_str()
-                            .eq_ignore_ascii_case(properties.as_str())
-                });
-                (!conflict).then_some((data, properties))
-            })
-            .expect("the Custom XML part-name space is unbounded");
-        add_custom_xml_data(
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat("Custom XML relationship ID space is exhausted".into())
+            })?;
+        let mut part_names = None;
+        for number in 1usize..=MAX_ITEMS + 1 {
+            let data = PackURI::new(format!("/customXml/item{number}.xml"))
+                .map_err(OoxmlError::InvalidUri)?;
+            let props = PackURI::new(format!("/customXml/itemProps{number}.xml"))
+                .map_err(OoxmlError::InvalidUri)?;
+            let conflict = self.opc.iter_parts().any(|part| {
+                part.partname().as_str().eq_ignore_ascii_case(data.as_str())
+                    || part
+                        .partname()
+                        .as_str()
+                        .eq_ignore_ascii_case(props.as_str())
+            });
+            if !conflict {
+                part_names = Some((data, props));
+                break;
+            }
+        }
+        let (data_part, props_part) = part_names.ok_or_else(|| {
+            OoxmlError::InvalidFormat("Custom XML part-name space is exhausted".into())
+        })?;
+        custom_xml::add(
             &mut self.opc,
-            NewCustomXmlDataItem {
-                source_part_name,
-                relationship_id,
-                data_part_name: data_part_name.clone(),
+            NewCustomXmlItem {
+                source: source_part,
+                rel_id,
+                part: data_part.clone(),
                 content_type: store.content_type,
                 xml: store.xml,
-                properties_part_name: Some(properties_part_name),
-                properties_relationship_id: "rIdProps1".to_string(),
-                properties: Some(properties),
+                props: Some(NewCustomXmlProps {
+                    part: props_part,
+                    rel_id: "rIdProps1".to_string(),
+                    value: props,
+                }),
                 conformance: store.conformance,
             },
         )?;
-        self.opc.unsign();
-        discover_custom_xml_data(&self.opc)?
+        custom_xml::discover(&self.opc)?
             .into_iter()
-            .find(|item| item.data_part_name == data_part_name)
+            .find(|item| item.part() == &data_part)
             .ok_or_else(|| {
                 OoxmlError::InvalidFormat("new Custom XML data store was not discoverable".into())
             })
     }
 
     /// Replace only the inert XML payload of a data store.
-    pub fn update_custom_xml_data_store(&mut self, item_id: &str, xml: Vec<u8>) -> Result<()> {
-        validate_custom_xml_payload(&xml)?;
+    pub fn set_custom_xml(&mut self, id: &str, xml: Vec<u8>) -> Result<()> {
+        custom_xml::validate_payload(&xml)?;
         let item = self
-            .find_custom_xml_data_store(item_id)?
-            .ok_or_else(|| OoxmlError::PartNotFound(format!("Custom XML itemID '{item_id}'")))?;
-        self.opc.get_part_mut(&item.data_part_name)?.set_blob(xml);
+            .custom_xml_by_id(id)?
+            .ok_or_else(|| OoxmlError::PartNotFound(format!("Custom XML itemID '{id}'")))?;
+        self.opc.get_part_mut(item.part())?.set_blob(xml);
         self.opc.unsign();
         Ok(())
     }
 
     /// Replace payload, content type, schema references, and canonical properties.
-    pub fn replace_custom_xml_data_store(
-        &mut self,
-        item_id: &str,
-        replacement: NewCustomXmlDataStore,
-    ) -> Result<()> {
-        validate_custom_xml_content_type(&replacement.content_type)?;
-        validate_custom_xml_payload(&replacement.xml)?;
-        if !replacement.item_id.eq_ignore_ascii_case(item_id) {
+    pub fn replace_custom_xml(&mut self, id: &str, replacement: NewStore) -> Result<()> {
+        custom_xml::validate_content_type(&replacement.content_type)?;
+        custom_xml::validate_payload(&replacement.xml)?;
+        if !replacement.id.eq_ignore_ascii_case(id) {
             return Err(OoxmlError::InvalidFormat(
                 "replacement itemID must identify the existing data store".into(),
             ));
         }
-        let properties = CustomXmlDataProperties {
-            item_id: replacement.item_id,
-            schema_references: replacement.schema_references,
+        let props = CustomXmlProps {
+            id: replacement.id,
+            schemas: replacement.schemas,
         };
-        let properties_xml = write_custom_xml_properties(&properties, replacement.conformance)?;
+        let props_xml = custom_xml::write_props(&props, replacement.conformance)?;
         let item = self
-            .find_custom_xml_data_store(item_id)?
-            .ok_or_else(|| OoxmlError::PartNotFound(format!("Custom XML itemID '{item_id}'")))?;
-        let properties_part_name = item.properties_part_name.ok_or_else(|| {
+            .custom_xml_by_id(id)?
+            .ok_or_else(|| OoxmlError::PartNotFound(format!("Custom XML itemID '{id}'")))?;
+        let props_part = item.props_part().cloned().ok_or_else(|| {
             OoxmlError::InvalidFormat("Custom XML data store has no properties part".into())
         })?;
         let existing_relationships = self
             .opc
-            .get_part(&item.data_part_name)?
+            .get_part(item.part())?
             .rels()
             .iter()
             .map(|relationship| {
@@ -1319,7 +1325,7 @@ impl Package {
             })
             .collect::<Vec<_>>();
         let mut data_part = BlobPart::new(
-            item.data_part_name.clone(),
+            item.part().clone(),
             replacement.content_type,
             replacement.xml,
         );
@@ -1329,51 +1335,47 @@ impl Package {
                 .add_relationship(reltype, target, id, external);
         }
         self.opc.add_part(Box::new(data_part));
-        self.opc
-            .get_part_mut(&properties_part_name)?
-            .set_blob(properties_xml);
+        self.opc.get_part_mut(&props_part)?.set_blob(props_xml);
         self.opc.unsign();
         Ok(())
     }
 
     /// Remove a data store unless an SDT still binds to its item GUID.
-    pub fn remove_custom_xml_data_store(&mut self, item_id: &str) -> Result<bool> {
-        let items = discover_custom_xml_data(&self.opc)?;
+    pub fn remove_custom_xml(&mut self, id: &str) -> Result<bool> {
+        let items = custom_xml::discover(&self.opc)?;
         let matching = items
             .iter()
             .filter(|item| {
-                item.properties
-                    .as_ref()
-                    .is_some_and(|properties| properties.item_id.eq_ignore_ascii_case(item_id))
+                item.props()
+                    .is_some_and(|props| props.id.eq_ignore_ascii_case(id))
             })
-            .cloned()
             .collect::<Vec<_>>();
-        if matching.is_empty() {
+        let Some(first) = matching.first() else {
             return Ok(false);
-        }
+        };
         if self
             .custom_xml_bindings()?
             .iter()
-            .any(|binding| binding.store_item_id.eq_ignore_ascii_case(item_id))
+            .any(|binding| binding.store_id.eq_ignore_ascii_case(id))
         {
             return Err(OoxmlError::InvalidFormat(format!(
-                "Custom XML itemID '{item_id}' is still referenced by a content control"
+                "Custom XML itemID '{id}' is still referenced by a content control"
             )));
         }
         for item in &matching {
             self.opc
-                .get_part_mut(&item.source_part_name)?
+                .get_part_mut(item.source())?
                 .rels_mut()
-                .remove(&item.relationship_id);
+                .remove(item.rel_id());
         }
-        let data_part_name = matching[0].data_part_name.clone();
-        let properties_part_name = matching[0].properties_part_name.clone();
-        if !self.part_is_referenced(&data_part_name) {
-            self.opc.remove_part(&data_part_name);
-            if let Some(properties_part_name) = properties_part_name
-                && !self.part_is_referenced(&properties_part_name)
+        let data_part = first.part().clone();
+        let props_part = first.props_part().cloned();
+        if !self.part_is_referenced(&data_part) {
+            self.opc.remove_part(&data_part);
+            if let Some(props_part) = props_part
+                && !self.part_is_referenced(&props_part)
             {
-                self.opc.remove_part(&properties_part_name);
+                self.opc.remove_part(&props_part);
             }
         }
         self.opc.unsign();
@@ -1398,10 +1400,10 @@ impl Package {
                 )
             })?
             .to_owned();
-        let item = self.find_custom_xml_data_store(&item_id)?.ok_or_else(|| {
+        let item = self.custom_xml_by_id(&item_id)?.ok_or_else(|| {
             OoxmlError::PartNotFound(format!("bibliography source store item '{item_id}'"))
         })?;
-        Ok(Some((item_id, item.xml)))
+        Ok(Some((item_id, item.xml().to_vec())))
     }
 
     /// Add a typed bibliography source to the document's source store.
@@ -1417,25 +1419,24 @@ impl Package {
     ) -> Result<String> {
         if let Some((item_id, xml)) = self.bibliography_store_item()? {
             let updated = crate::docx::bibliography_writer::add_source_xml(&xml, &source)?;
-            self.update_custom_xml_data_store(&item_id, updated.into_bytes())?;
+            self.set_custom_xml(&item_id, updated.into_bytes())?;
             // Re-validate the mutated store through the read side.
             self.bibliography_source_stores()?;
             Ok(item_id)
         } else {
             let xml = crate::docx::bibliography_writer::new_store_xml(&[source])?;
-            let item = self.add_custom_xml_data_store(NewCustomXmlDataStore {
+            let item = self.add_custom_xml(NewStore {
                 xml: xml.into_bytes(),
                 content_type: "application/xml".to_string(),
-                item_id: crate::docx::bibliography_writer::DEFAULT_STORE_ITEM_ID.to_string(),
-                schema_references: vec![crate::docx::OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
-                conformance: crate::custom_xml_data::CustomXmlConformance::Transitional,
+                id: crate::docx::bibliography_writer::DEFAULT_STORE_ITEM_ID.to_string(),
+                schemas: vec![crate::docx::OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
+                conformance: custom_xml::Conformance::Transitional,
             })?;
-            Ok(item
-                .properties
-                .map(|properties| properties.item_id)
-                .unwrap_or_else(|| {
-                    crate::docx::bibliography_writer::DEFAULT_STORE_ITEM_ID.to_string()
-                }))
+            item.props().map(|props| props.id.clone()).ok_or_else(|| {
+                OoxmlError::InvalidFormat(
+                    "new bibliography Custom XML store has no item GUID".into(),
+                )
+            })
         }
     }
 
@@ -1447,7 +1448,7 @@ impl Package {
         };
         let (updated, removed) = crate::docx::bibliography_writer::remove_source_xml(&xml, tag)?;
         if removed {
-            self.update_custom_xml_data_store(&item_id, updated.into_bytes())?;
+            self.set_custom_xml(&item_id, updated.into_bytes())?;
             // Re-validate the mutated store through the read side.
             self.bibliography_source_stores()?;
         }
@@ -1467,20 +1468,20 @@ impl Package {
             ));
         };
         let updated = crate::docx::bibliography_writer::replace_source_xml(&xml, tag, &source)?;
-        self.update_custom_xml_data_store(&item_id, updated.into_bytes())?;
+        self.set_custom_xml(&item_id, updated.into_bytes())?;
         // Re-validate the mutated store through the read side.
         self.bibliography_source_stores()?;
         Ok(())
     }
 
     /// Reorder main-document data-store relationships by item GUID.
-    pub fn reorder_custom_xml_data_stores(&mut self, ordered_item_ids: &[String]) -> Result<()> {
-        let source_part_name = self.opc.main_document_part()?.partname().clone();
-        let items = discover_custom_xml_data(&self.opc)?
+    pub fn order_custom_xml(&mut self, ordered_ids: &[String]) -> Result<()> {
+        let source_part = self.opc.main_document_part()?.partname().clone();
+        let items = custom_xml::discover(&self.opc)?
             .into_iter()
-            .filter(|item| item.source_part_name == source_part_name)
+            .filter(|item| item.source() == &source_part)
             .collect::<Vec<_>>();
-        if items.len() != ordered_item_ids.len() {
+        if items.len() != ordered_ids.len() {
             return Err(OoxmlError::InvalidFormat(
                 "reorder list must contain every main-document Custom XML item".into(),
             ));
@@ -1488,12 +1489,11 @@ impl Package {
         let mut by_id = std::collections::HashMap::new();
         for item in &items {
             let id = item
-                .properties
-                .as_ref()
+                .props()
                 .ok_or_else(|| {
                     OoxmlError::InvalidFormat("Custom XML item has no datastore itemID".into())
                 })?
-                .item_id
+                .id
                 .to_ascii_lowercase();
             if by_id.insert(id, item).is_some() {
                 return Err(OoxmlError::InvalidFormat(
@@ -1503,36 +1503,41 @@ impl Package {
         }
         let mut ordered = Vec::with_capacity(items.len());
         let mut seen = std::collections::HashSet::new();
-        for item_id in ordered_item_ids {
-            let key = item_id.to_ascii_lowercase();
+        for id in ordered_ids {
+            let key = id.to_ascii_lowercase();
             if !seen.insert(key.clone()) {
                 return Err(OoxmlError::InvalidFormat("duplicate reorder itemID".into()));
             }
             let item = *by_id.get(&key).ok_or_else(|| {
-                OoxmlError::InvalidFormat(format!("unknown reorder itemID '{item_id}'"))
+                OoxmlError::InvalidFormat(format!("unknown reorder itemID '{id}'"))
             })?;
             let reltype = self
                 .opc
-                .get_part(&source_part_name)?
+                .get_part(&source_part)?
                 .rels()
-                .get(&item.relationship_id)
-                .expect("discovery validated the relationship")
+                .get(item.rel_id())
+                .ok_or_else(|| {
+                    OoxmlError::InvalidRelationship(format!(
+                        "Custom XML relationship '{}' disappeared during reorder",
+                        item.rel_id()
+                    ))
+                })?
                 .reltype()
                 .to_string();
             ordered.push((item, reltype));
         }
-        let source = self.opc.get_part(&source_part_name)?;
+        let source = self.opc.get_part(&source_part)?;
         let reserved = source
             .rels()
             .iter()
             .filter(|relationship| {
                 !items
                     .iter()
-                    .any(|item| item.relationship_id == relationship.r_id())
+                    .any(|item| item.rel_id() == relationship.r_id())
             })
             .map(|relationship| relationship.r_id().to_string())
             .collect::<std::collections::HashSet<_>>();
-        let ids = (1usize..)
+        let ids = (1usize..=MAX_ITEMS + 1)
             .filter_map(|batch| {
                 let candidates = (0..ordered.len())
                     .map(|index| format!("rIdCustomXmlOrder{batch:04}_{index:06}"))
@@ -1543,16 +1548,20 @@ impl Package {
                     .then_some(candidates)
             })
             .next()
-            .expect("the relationship ID space is unbounded");
-        let source = self.opc.get_part_mut(&source_part_name)?;
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(
+                    "Custom XML reorder relationship ID space is exhausted".into(),
+                )
+            })?;
+        let source = self.opc.get_part_mut(&source_part)?;
         let source_base_uri = source.partname().base_uri().to_string();
         for item in &items {
-            source.rels_mut().remove(&item.relationship_id);
+            source.rels_mut().remove(item.rel_id());
         }
         for ((item, reltype), id) in ordered.into_iter().zip(ids) {
             source.rels_mut().add_relationship(
                 reltype,
-                item.data_part_name.relative_ref(&source_base_uri),
+                item.part().relative_ref(&source_base_uri),
                 id,
                 false,
             );
@@ -1562,7 +1571,7 @@ impl Package {
     }
 
     /// Collect and lexically validate SDT bindings from every permitted Word container.
-    pub fn custom_xml_bindings(&self) -> Result<Vec<CustomXmlBinding>> {
+    pub fn custom_xml_bindings(&self) -> Result<Vec<Binding>> {
         let permitted = [
             ct::WML_DOCUMENT_MAIN,
             ct::WML_DOCUMENT_GLOSSARY,
@@ -1583,41 +1592,38 @@ impl Package {
                     control.data_binding_xpath(),
                     control.data_binding_store_item_id(),
                 ) {
-                    bindings.push(CustomXmlBinding {
-                        source_part_name: part.partname().clone(),
-                        content_control_id: control.id(),
+                    bindings.push(Binding {
+                        source: part.partname().clone(),
+                        control_id: control.id(),
                         xpath: xpath.to_string(),
-                        store_item_id: store_item_id.to_string(),
-                        prefix_mappings: control.data_binding_prefix_mappings().map(str::to_string),
+                        store_id: store_item_id.to_string(),
+                        prefixes: control.data_binding_prefix_mappings().map(str::to_string),
                     });
                 }
             }
         }
         bindings.sort_unstable_by(|left, right| {
-            left.source_part_name
+            left.source
                 .as_str()
-                .cmp(right.source_part_name.as_str())
-                .then_with(|| left.content_control_id.cmp(&right.content_control_id))
+                .cmp(right.source.as_str())
+                .then_with(|| left.control_id.cmp(&right.control_id))
         });
         Ok(bindings)
     }
 
     /// Validate that every permitted SDT binding resolves to a datastore item GUID.
-    pub fn validate_custom_xml_binding_integrity(&self) -> Result<()> {
-        let item_ids = discover_custom_xml_data(&self.opc)?
+    pub fn validate_custom_xml_bindings(&self) -> Result<()> {
+        let item_ids = custom_xml::discover(&self.opc)?
             .into_iter()
-            .filter_map(|item| {
-                item.properties
-                    .map(|properties| properties.item_id.to_ascii_lowercase())
-            })
+            .filter_map(|item| item.props().map(|props| props.id.to_ascii_lowercase()))
             .collect::<std::collections::HashSet<_>>();
         for binding in self.custom_xml_bindings()? {
-            if !item_ids.contains(&binding.store_item_id.to_ascii_lowercase()) {
+            if !item_ids.contains(&binding.store_id.to_ascii_lowercase()) {
                 return Err(OoxmlError::InvalidFormat(format!(
                     "content control {} in '{}' references missing Custom XML itemID '{}'",
-                    binding.content_control_id,
-                    binding.source_part_name.as_str(),
-                    binding.store_item_id
+                    binding.control_id,
+                    binding.source.as_str(),
+                    binding.store_id
                 )));
             }
         }
@@ -1735,7 +1741,7 @@ impl Package {
         };
         let recipient_id = if let Some(recipients) = recipients {
             let xml = recipients.to_xml(conformance)?.into_bytes();
-            let id = allocate_mail_merge_relationship_id("Recipients", &mut used_ids);
+            let id = allocate_mail_merge_relationship_id("Recipients", &mut used_ids)?;
             let uri = self.allocate_mail_merge_part_name("recipientData", "xml")?;
             let target = uri.relative_ref(snapshot.target.base_uri());
             staged_parts.push(BlobPart::new(
@@ -1886,7 +1892,7 @@ impl Package {
         conformance: MailMergeConformance,
         used_ids: &mut std::collections::HashSet<String>,
     ) -> Result<(StoredRelationship, Option<BlobPart>)> {
-        let id = allocate_mail_merge_relationship_id(label, used_ids);
+        let id = allocate_mail_merge_relationship_id(label, used_ids)?;
         let settings_target = self.settings_part_snapshot()?.target;
         match source {
             MailMergeSource::External(uri) => {
@@ -1964,10 +1970,9 @@ impl Package {
             self.mutable_web_settings = Some(self.load_web_settings()?.unwrap_or_default());
         }
         self.web_settings_dirty = true;
-        Ok(self
-            .mutable_web_settings
-            .as_mut()
-            .expect("web settings were initialized above"))
+        self.mutable_web_settings.as_mut().ok_or_else(|| {
+            OoxmlError::InvalidFormat("web-settings initialization did not complete".into())
+        })
     }
 
     /// Replace the package's complete typed web-output settings.
@@ -2233,13 +2238,12 @@ impl Package {
     where
         F: FnOnce(&mut GlossaryEntry) -> Result<()>,
     {
-        let mut update = Some(update);
         self.update_glossary_document(|document| {
             document
                 .update_entry(index, |entry| {
-                    update.take().expect("glossary update closure called once")(entry).map_err(
-                        |error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>,
-                    )
+                    update(entry).map_err(|error| {
+                        Box::new(error) as Box<dyn std::error::Error + Send + Sync>
+                    })
                 })
                 .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
         })
@@ -2824,7 +2828,9 @@ impl Package {
             let xml = self
                 .mutable_web_settings
                 .as_ref()
-                .expect("dirty web settings must have a typed model")
+                .ok_or_else(|| {
+                    OoxmlError::InvalidFormat("dirty web settings have no typed model".to_string())
+                })?
                 .to_xml()?
                 .into_bytes();
             self.update_web_settings_part(xml)?;
@@ -2834,8 +2840,8 @@ impl Package {
         // Update core properties
         self.update_core_properties()?;
 
-        // Update custom properties
-        self.update_custom_properties()?;
+        // Update or remove the custom-properties package graph atomically.
+        self.custom_props.write(&mut self.opc)?;
 
         // Embed fonts if feature enabled and requested in options
         #[cfg(feature = "fonts")]
@@ -2844,7 +2850,7 @@ impl Package {
         }
 
         self.opc.to_stream(writer).map_err(|e| {
-            OoxmlError::IoError(std::io::Error::other(format!(
+            OoxmlError::Io(std::io::Error::other(format!(
                 "Failed to save package: {}",
                 e
             )))
@@ -2893,15 +2899,15 @@ impl Package {
     /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
-    /// let custom_props = pkg.custom_properties();
+    /// let custom = pkg.custom_props();
     ///
-    /// if let Some(value) = custom_props.get_property("ProjectName") {
+    /// if let Some(value) = custom.get("ProjectName") {
     ///     println!("Project: {:?}", value);
     /// }
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn custom_properties(&self) -> &CustomProperties {
-        &self.custom_properties
+    pub fn custom_props(&self) -> &CustomProps {
+        &self.custom_props
     }
 
     /// Get a mutable reference to the custom document properties.
@@ -2910,20 +2916,20 @@ impl Package {
     ///
     /// ```rust,no_run
     /// use litchi_ooxml::docx::Package;
-    /// use litchi_ooxml::custom_properties::PropertyValue;
+    /// use litchi_ooxml_common::custom::Value;
     ///
     /// let mut pkg = Package::new()?;
-    /// let custom_props = pkg.custom_properties_mut();
+    /// let custom = pkg.custom_props_mut();
     ///
-    /// custom_props.add_property("ProjectName", PropertyValue::String("MyProject".to_string()));
-    /// custom_props.add_property("Version", PropertyValue::Integer(1));
-    /// custom_props.add_property("Budget", PropertyValue::Double(50000.0));
+    /// custom.insert("ProjectName", "MyProject")?;
+    /// custom.insert("Version", Value::I32(1))?;
+    /// custom.insert("Budget", Value::F64(50_000.0))?;
     ///
     /// pkg.save("document.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn custom_properties_mut(&mut self) -> &mut CustomProperties {
-        &mut self.custom_properties
+    pub fn custom_props_mut(&mut self) -> &mut CustomProps {
+        &mut self.custom_props
     }
 
     /// Update the core.xml properties part.
@@ -2944,38 +2950,6 @@ impl Package {
         );
 
         self.opc.add_part(Box::new(core_part));
-
-        Ok(())
-    }
-
-    /// Update the custom.xml properties part.
-    fn update_custom_properties(&mut self) -> Result<()> {
-        use litchi_opc::constants::relationship_type as rt;
-        use litchi_opc::part::BlobPart;
-
-        // Only create custom properties part if there are custom properties
-        if self.custom_properties.is_empty() {
-            return Ok(());
-        }
-
-        let custom_uri = PackURI::new("/docProps/custom.xml")
-            .map_err(|e| OoxmlError::InvalidUri(format!("custom.xml URI: {}", e)))?;
-
-        // Generate XML from custom properties
-        let xml = self.custom_properties.to_xml()?;
-
-        // Create or update the custom properties part
-        let custom_part = BlobPart::new(
-            custom_uri.clone(),
-            ct::OFC_CUSTOM_PROPERTIES.to_string(),
-            xml.into_bytes(),
-        );
-
-        self.opc.add_part(Box::new(custom_part));
-
-        // Ensure relationship exists
-        self.opc
-            .relate_to("docProps/custom.xml", rt::CUSTOM_PROPERTIES);
 
         Ok(())
     }
@@ -3409,11 +3383,13 @@ fn mail_merge_relationship_type(conformance: MailMergeConformance, suffix: &str)
 fn allocate_mail_merge_relationship_id(
     label: &str,
     used: &mut std::collections::HashSet<String>,
-) -> String {
-    (1usize..)
+) -> Result<String> {
+    (1usize..=MAX_MAIL_MERGE_RELATIONSHIPS)
         .map(|number| format!("rIdMailMerge{label}{number}"))
         .find(|id| used.insert(id.clone()))
-        .expect("the mail-merge relationship ID space is unbounded")
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("mail-merge relationship ID space is exhausted".into())
+        })
 }
 
 fn validate_mail_merge_external_uri(uri: &str) -> Result<()> {
@@ -4585,14 +4561,14 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         package
-            .add_custom_xml_data_store(NewCustomXmlDataStore {
+            .add_custom_xml(NewStore {
                 xml: br#"<b:Sources xmlns:b="http://schemas.openxmlformats.org/officeDocument/2006/bibliography" SelectedStyle="/APA.XSL" StyleName="APA"><b:Source><b:Tag>Doe2024</b:Tag><b:SourceType>Book</b:SourceType><b:Title>Stored source</b:Title></b:Source></b:Sources>"#.to_vec(),
                 content_type: "application/xml".to_string(),
-                item_id: "{22222222-2222-2222-2222-222222222222}".to_string(),
-                schema_references: vec![
+                id: "{22222222-2222-2222-2222-222222222222}".to_string(),
+                schemas: vec![
                     crate::docx::OOXML_BIBLIOGRAPHY_NAMESPACE.to_string(),
                 ],
-                conformance: crate::custom_xml_data::CustomXmlConformance::Transitional,
+                conformance: custom_xml::Conformance::Transitional,
             })
             .unwrap();
         package.save(file.path()).unwrap();

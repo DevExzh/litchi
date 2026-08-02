@@ -116,29 +116,30 @@
 //!
 //! ```rust,no_run
 //! use litchi_ooxml::docx::Package;
-//! use litchi_ooxml::custom_properties::PropertyValue;
+//! use litchi_ooxml_common::custom::Value;
 //!
 //! let mut pkg = Package::new()?;
 //!
 //! // Add custom properties
-//! let custom_props = pkg.custom_properties_mut();
-//! custom_props.add_property("ProjectName", PropertyValue::String("MyProject".to_string()));
-//! custom_props.add_property("Version", PropertyValue::Integer(1));
-//! custom_props.add_property("Budget", PropertyValue::Double(50000.0));
-//! custom_props.add_property("IsApproved", PropertyValue::Boolean(true));
+//! let custom = pkg.custom_props_mut();
+//! custom.insert("ProjectName", "MyProject")?;
+//! custom.insert("Version", Value::I32(1))?;
+//! custom.insert("Budget", Value::F64(50_000.0))?;
+//! custom.insert("IsApproved", true)?;
+//! pkg.save("document.docx")?;
 //!
 //! // Read custom properties
 //! let pkg = Package::open("document.docx")?;
-//! for (name, value) in pkg.custom_properties().iter() {
+//! for (name, value) in pkg.custom_props().iter() {
 //!     println!("{}: {:?}", name, value);
 //! }
 //!
 //! // Modify custom property
 //! let mut pkg = Package::open("document.docx")?;
-//! pkg.custom_properties_mut().set_property("Version", PropertyValue::Integer(2));
+//! pkg.custom_props_mut().insert("Version", Value::I32(2))?;
 //!
 //! // Remove custom property
-//! pkg.custom_properties_mut().remove_property("Budget");
+//! pkg.custom_props_mut().remove("Budget");
 //!
 //! pkg.save("document.docx")?;
 //! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -344,7 +345,7 @@
 //!
 //! match Package::open("document.docx") {
 //!     Ok(pkg) => println!("Opened successfully"),
-//!     Err(OoxmlError::IoError(e)) => eprintln!("IO error: {}", e),
+//!     Err(OoxmlError::Io(e)) => eprintln!("IO error: {}", e),
 //!     Err(OoxmlError::InvalidFormat(msg)) => eprintln!("Invalid format: {}", msg),
 //!     Err(e) => eprintln!("Error: {}", e),
 //! }

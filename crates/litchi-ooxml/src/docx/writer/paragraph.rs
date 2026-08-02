@@ -385,7 +385,7 @@ impl MutableParagraph {
         height_emu: Option<i64>,
     ) -> Result<&mut MutableInlineImage> {
         use std::fs;
-        let data = fs::read(image_path).map_err(OoxmlError::IoError)?;
+        let data = fs::read(image_path).map_err(OoxmlError::Io)?;
         let image = MutableInlineImage::from_bytes(data, width_emu, height_emu)?;
         self.elements.push(ParagraphElement::InlineImage(image));
         match self.elements.last_mut().unwrap() {

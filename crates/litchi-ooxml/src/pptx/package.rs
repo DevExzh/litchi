@@ -1218,7 +1218,7 @@ impl Package {
                         };
 
                         std::fs::write(&path, ole_bytes).map_err(|e| {
-                            OoxmlError::IoError(std::io::Error::other(format!(
+                            OoxmlError::Io(std::io::Error::other(format!(
                                 "Failed to save encrypted package: {}",
                                 e
                             )))
@@ -1231,7 +1231,7 @@ impl Package {
         }
 
         self.opc.save(path).map_err(|e| {
-            OoxmlError::IoError(std::io::Error::other(format!(
+            OoxmlError::Io(std::io::Error::other(format!(
                 "Failed to save package: {}",
                 e
             )))

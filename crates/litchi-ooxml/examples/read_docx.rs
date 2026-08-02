@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Modified        : {:?}", props.modified);
 
     // ----- Custom (app-defined) properties, if any -----
-    let custom = pkg.custom_properties();
+    let custom = pkg.custom_props();
     if !custom.is_empty() {
         println!("\n--- Custom properties ({}) ---", custom.len());
         for (name, value) in custom.iter() {

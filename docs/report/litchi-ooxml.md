@@ -12,8 +12,10 @@ Subsystems audited:
 - `xlsb/` (binary Excel OOXML)
 - `pptx/` (PowerPoint OOXML)
 - `crypto/` (Standard-2007 + Agile encryption, OLE wrapper)
-- Top-level: `api.rs`, `error.rs`, `metadata.rs`, `custom_properties.rs`,
-  `pivot.rs`, `common/`, `charts/`, `drawings/`, `fonts/`
+- Top-level at the audited carve-out: `api.rs`, `error.rs`, `metadata.rs`,
+  `custom_properties.rs`, `pivot.rs`, `common/`, `charts/`, `drawings/`,
+  `fonts/`. Shared custom properties have since moved to
+  `litchi-ooxml-common::custom`.
 
 Carve-out commit: `41834df` (P4d). Companion commits `3c1d141` (doctest
 paths), `71158bd` (READMEs).
@@ -166,8 +168,9 @@ Changes:
 - `pivot.rs` — 100% rename, no content changes.
 - `common/properties.rs` — single import shift
   `crate::common::xml::escape_xml` → `litchi_core::xml::escape_xml`.
-- `metadata.rs`, `custom_properties.rs` — `crate::common::Metadata`
-  → `litchi_core::Metadata`; OPC paths via `litchi_opc`.
+- `metadata.rs`, historical `custom_properties.rs` —
+  `crate::common::Metadata` → `litchi_core::Metadata`; OPC paths via
+  `litchi_opc`. The latter is no longer owned by this migration host.
 - `drawings/{blip,ext,fill,xfrm,mod}.rs` — only `blip.rs` has an
   import change; others byte-identical.
 - `charts/` — imports only, plus one stylistic refactor at

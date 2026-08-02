@@ -35,8 +35,6 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 pub mod api;
-pub mod custom_properties;
-pub mod custom_xml_data;
 pub mod docx;
 pub mod embedded_object;
 pub mod error;
@@ -67,9 +65,6 @@ pub use litchi_ooxml_common::{
     DocumentProperties, ExpandedName, MceCapabilities, MceError, MceLimits, MceOutput, MceReport,
     process_markup_compatibility,
 };
-
-// Re-export custom properties
-pub use custom_properties::{CustomProperties, PropertyValue};
 
 // Re-export error types
 pub use error::{OoxmlError, Result};

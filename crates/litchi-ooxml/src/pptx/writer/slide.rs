@@ -265,7 +265,7 @@ impl MutableSlide {
     ) -> Result<()> {
         use std::fs;
 
-        let data = fs::read(image_path).map_err(OoxmlError::IoError)?;
+        let data = fs::read(image_path).map_err(OoxmlError::Io)?;
 
         let format = ImageFormat::detect_from_bytes(&data)
             .ok_or_else(|| OoxmlError::InvalidFormat("Unknown image format".to_string()))?;

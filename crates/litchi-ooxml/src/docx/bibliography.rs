@@ -6,8 +6,8 @@
 //! citation tags, loads bibliography styles, runs XSLT, refreshes fields, or
 //! accesses external resources.
 
-use crate::custom_xml_data::CustomXmlDataItem;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::custom_xml::Item;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use litchi_opc::PackURI;
 use quick_xml::XmlVersion;
@@ -204,11 +204,11 @@ impl BibliographySourceValue {
 }
 
 pub(crate) fn discover_bibliography_source_stores(
-    items: &[CustomXmlDataItem],
+    items: &[Item],
 ) -> Result<Vec<BibliographySourceStore>> {
     let mut stores = Vec::new();
     for item in items {
-        if !is_bibliography_root(&item.root_name.namespace, &item.root_name.local_name) {
+        if !is_bibliography_root(&item.root().namespace, &item.root().local_name) {
             continue;
         }
         stores.push(parse_bibliography_source_store(item)?);
@@ -216,8 +216,8 @@ pub(crate) fn discover_bibliography_source_stores(
     Ok(stores)
 }
 
-fn parse_bibliography_source_store(item: &CustomXmlDataItem) -> Result<BibliographySourceStore> {
-    let root = parse_xml_tree(&item.xml)?;
+fn parse_bibliography_source_store(item: &Item) -> Result<BibliographySourceStore> {
+    let root = parse_xml_tree(item.xml())?;
     if !is_bibliography_node(&root) || !matches!(root.local_name.as_str(), "Sources" | "Source") {
         return Err(invalid(
             "bibliography Custom XML root differs from its discovered root name",
@@ -241,23 +241,23 @@ fn parse_bibliography_source_store(item: &CustomXmlDataItem) -> Result<Bibliogra
             }
         },
         "Source" => sources.push(parse_bibliography_source(&root)?),
-        _ => unreachable!("root was checked above"),
+        _ => {
+            return Err(invalid(
+                "bibliography Custom XML root changed during parsing",
+            ));
+        },
     }
 
     Ok(BibliographySourceStore {
-        source_part_name: item.source_part_name.clone(),
-        relationship_id: item.relationship_id.clone(),
-        data_part_name: item.data_part_name.clone(),
-        content_type: item.content_type.clone(),
-        properties_part_name: item.properties_part_name.clone(),
-        data_store_item_id: item
-            .properties
-            .as_ref()
-            .map(|properties| properties.item_id.clone()),
+        source_part_name: item.source().clone(),
+        relationship_id: item.rel_id().to_string(),
+        data_part_name: item.part().clone(),
+        content_type: item.content_type().to_string(),
+        properties_part_name: item.props_part().cloned(),
+        data_store_item_id: item.props().map(|props| props.id.clone()),
         schema_references: item
-            .properties
-            .as_ref()
-            .map(|properties| properties.schema_references.clone())
+            .props()
+            .map(|props| props.schemas.clone())
             .unwrap_or_default(),
         selected_style: (root.local_name == "Sources")
             .then(|| unqualified_attribute(&root, "SelectedStyle"))
@@ -507,26 +507,43 @@ pub(crate) fn invalid(message: impl Into<String>) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::custom_xml_data::CustomXmlDataProperties;
-    use litchi_ooxml_common::ExpandedName;
+    use litchi_ooxml_common::custom_xml::{Conformance, NewItem, NewProps, Props, add, discover};
+    use litchi_opc::OpcPackage;
+    use litchi_opc::constants::content_type as ct;
+    use litchi_opc::part::BlobPart;
 
-    fn item(xml: &[u8], namespace: &str, local_name: &str) -> CustomXmlDataItem {
-        CustomXmlDataItem {
-            source_part_name: PackURI::new("/word/document.xml").unwrap(),
-            relationship_id: "rIdBib".to_string(),
-            data_part_name: PackURI::new("/customXml/item1.xml").unwrap(),
-            content_type: "application/xml".to_string(),
-            root_name: ExpandedName {
-                namespace: namespace.to_string(),
-                local_name: local_name.to_string(),
+    fn item(xml: &[u8], namespace: &str, local_name: &str) -> Item {
+        let mut package = OpcPackage::new();
+        let source = PackURI::new("/word/document.xml").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            source.clone(),
+            ct::WML_DOCUMENT_MAIN.to_string(),
+            Vec::new(),
+        )));
+        add(
+            &mut package,
+            NewItem {
+                source,
+                rel_id: "rIdBib".to_string(),
+                part: PackURI::new("/customXml/item1.xml").unwrap(),
+                content_type: "application/xml".to_string(),
+                xml: xml.to_vec(),
+                props: Some(NewProps {
+                    part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                    rel_id: "rIdProps".to_string(),
+                    value: Props {
+                        id: "{11111111-1111-1111-1111-111111111111}".to_string(),
+                        schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
+                    },
+                }),
+                conformance: Conformance::Transitional,
             },
-            xml: xml.to_vec(),
-            properties_part_name: Some(PackURI::new("/customXml/itemProps1.xml").unwrap()),
-            properties: Some(CustomXmlDataProperties {
-                item_id: "{11111111-1111-1111-1111-111111111111}".to_string(),
-                schema_references: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
-            }),
-        }
+        )
+        .unwrap();
+        let item = discover(&package).unwrap().remove(0);
+        assert_eq!(item.root().namespace, namespace);
+        assert_eq!(item.root().local_name, local_name);
+        item
     }
 
     #[test]

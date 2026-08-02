@@ -113,7 +113,7 @@ pub use chart::{
 };
 pub use comment::Comment;
 pub use content_control::ContentControl;
-pub use custom_xml::{CustomXmlBinding, CustomXmlPart, NewCustomXmlDataStore};
+pub use custom_xml::{Binding, NewStore, Part};
 pub use document::{Document, ImageWatermarkPart};
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};

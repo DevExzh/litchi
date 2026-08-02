@@ -1,30 +1,30 @@
-use crate::custom_xml_data::CustomXmlConformance;
 /// Custom XML parts support for Word documents.
 ///
 /// Custom XML parts allow storing arbitrary XML data within a Word document.
 use crate::error::Result;
+use litchi_ooxml_common::custom_xml::Conformance;
 use litchi_opc::PackURI;
-use litchi_opc::part::Part;
+use litchi_opc::part::Part as OpcPart;
 use std::collections::HashMap;
 
 /// High-level parameters for a DOCX Custom XML Data Storage item.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NewCustomXmlDataStore {
+#[derive(Debug, PartialEq, Eq)]
+pub struct NewStore {
     pub xml: Vec<u8>,
     pub content_type: String,
-    pub item_id: String,
-    pub schema_references: Vec<String>,
-    pub conformance: CustomXmlConformance,
+    pub id: String,
+    pub schemas: Vec<String>,
+    pub conformance: Conformance,
 }
 
 /// One validated SDT binding occurrence in a Word content-bearing part.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CustomXmlBinding {
-    pub source_part_name: PackURI,
-    pub content_control_id: u32,
+pub struct Binding {
+    pub source: PackURI,
+    pub control_id: u32,
     pub xpath: String,
-    pub store_item_id: String,
-    pub prefix_mappings: Option<String>,
+    pub store_id: String,
+    pub prefixes: Option<String>,
 }
 
 /// A custom XML part in a Word document.
@@ -40,30 +40,26 @@ pub struct CustomXmlBinding {
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;
 ///
-/// for custom_xml in doc.custom_xml_parts()? {
+/// for custom_xml in doc.custom_xml()? {
 ///     println!("Custom XML part: {}", custom_xml.id());
-///     println!("Content: {}", custom_xml.xml_content());
+///     println!("Content: {}", custom_xml.xml());
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone)]
-pub struct CustomXmlPart {
+#[derive(Debug)]
+pub struct Part {
     /// Part ID
     id: String,
     /// XML content
-    xml_content: String,
+    xml: String,
     /// Properties (optional)
-    properties: HashMap<String, String>,
+    props: HashMap<String, String>,
 }
 
-impl CustomXmlPart {
-    /// Create a new CustomXmlPart.
-    pub fn new(id: String, xml_content: String, properties: HashMap<String, String>) -> Self {
-        Self {
-            id,
-            xml_content,
-            properties,
-        }
+impl Part {
+    /// Create a detached Custom XML part view.
+    pub fn new(id: String, xml: String, props: HashMap<String, String>) -> Self {
+        Self { id, xml, props }
     }
 
     /// Get the part ID.
@@ -74,29 +70,36 @@ impl CustomXmlPart {
 
     /// Get the XML content.
     #[inline]
-    pub fn xml_content(&self) -> &str {
-        &self.xml_content
+    pub fn xml(&self) -> &str {
+        &self.xml
     }
 
     /// Get the properties.
     #[inline]
-    pub fn properties(&self) -> &HashMap<String, String> {
-        &self.properties
+    pub fn props(&self) -> &HashMap<String, String> {
+        &self.props
     }
 
     /// Get a property by key.
     #[inline]
-    pub fn get_property(&self, key: &str) -> Option<&str> {
-        self.properties.get(key).map(|s| s.as_str())
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.props.get(key).map(String::as_str)
     }
 
     /// Extract custom XML part from a part.
-    pub(crate) fn from_part(part: &dyn Part, id: String) -> Result<Self> {
-        let xml_content = String::from_utf8_lossy(part.blob()).into_owned();
+    pub(crate) fn from_part(part: &dyn OpcPart, id: String) -> Result<Self> {
+        let xml = std::str::from_utf8(part.blob())
+            .map_err(|error| {
+                crate::error::OoxmlError::Xml(format!(
+                    "Custom XML part '{}' is not UTF-8: {error}",
+                    part.partname().as_str()
+                ))
+            })?
+            .to_owned();
         Ok(Self {
             id,
-            xml_content,
-            properties: HashMap::new(),
+            xml,
+            props: HashMap::new(),
         })
     }
 }
@@ -110,14 +113,14 @@ mod tests {
         let mut props = HashMap::new();
         props.insert("name".to_string(), "test".to_string());
 
-        let part = CustomXmlPart::new(
+        let part = Part::new(
             "item1".to_string(),
             "<root><data>test</data></root>".to_string(),
             props,
         );
 
         assert_eq!(part.id(), "item1");
-        assert!(part.xml_content().contains("<data>test</data>"));
-        assert_eq!(part.get_property("name"), Some("test"));
+        assert!(part.xml().contains("<data>test</data>"));
+        assert_eq!(part.get("name"), Some("test"));
     }
 }
