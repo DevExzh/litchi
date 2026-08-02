@@ -7170,7 +7170,7 @@ fn dde_field_parts(instruction: &str) -> Option<DdeFieldParts<'_>> {
                     "r" => DdeRepresentation::RichText,
                     "t" => DdeRepresentation::Text,
                     "u" => DdeRepresentation::UnicodeText,
-                    _ => unreachable!("DDE representation switch was matched above"),
+                    _ => return None,
                 });
                 index += 1;
             },
@@ -7274,7 +7274,7 @@ fn link_field_parts(instruction: &str) -> Option<LinkFieldParts<'_>> {
                     "r" => LinkResultOption::RichText,
                     "t" => LinkResultOption::Text,
                     "u" => LinkResultOption::UnicodeText,
-                    _ => unreachable!("LINK result option switch was matched above"),
+                    _ => return None,
                 });
                 index += 1;
             },
@@ -8145,7 +8145,7 @@ fn citation_parts(instruction: &str) -> Option<CitationParts<'_>> {
                     "n" => CitationOption::SuppressAuthor,
                     "t" => CitationOption::SuppressTitle,
                     "y" => CitationOption::SuppressYear,
-                    _ => unreachable!("CITATION suppression switch was matched above"),
+                    _ => return None,
                 });
                 index += 1;
             },
@@ -9429,10 +9429,11 @@ fn tokenize(instruction: &str) -> Result<Vec<FieldCodeToken<'_>>, FieldCodeError
                         index += 2;
                     },
                     _ => {
-                        let character = instruction[index..]
-                            .chars()
-                            .next()
-                            .expect("index is inside instruction");
+                        let character = instruction[index..].chars().next().ok_or_else(|| {
+                            FieldCodeError::UnexpectedOperand(
+                                "invalid quoted field operand boundary".to_string(),
+                            )
+                        })?;
                         value.push(character);
                         index += character.len_utf8();
                     },
@@ -9522,6 +9523,20 @@ mod tests {
         let field = Field::parse_instruction(r#"HYPERLINK \l "_Toc1""#);
         assert_eq!(field.extract_url().as_deref(), Some("#_Toc1"));
         assert_eq!(field.extract_bookmark().as_deref(), Some("_Toc1"));
+    }
+
+    #[test]
+    fn quoted_field_tokens_preserve_multibyte_characters() {
+        let ParsedFieldCode::Hyperlink(code) =
+            parse_field_code(r#"HYPERLINK "https://例.example/文""#)
+        else {
+            panic!("expected hyperlink");
+        };
+
+        assert_eq!(
+            code.external_target.as_deref(),
+            Some("https://例.example/文")
+        );
     }
 
     #[test]

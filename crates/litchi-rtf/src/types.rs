@@ -1364,7 +1364,7 @@ impl Default for Formatting {
             char_style_rsid: None,
             underline_color: None,
             font_ref: 0,
-            font_size: NonZeroU16::new(24).expect("non-zero default font size"),
+            font_size: NonZeroU16::new(24).unwrap_or(NonZeroU16::MIN),
             color_ref: 0,
             background_color: None,
             highlight_color: None,

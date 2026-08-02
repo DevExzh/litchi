@@ -5527,12 +5527,13 @@ impl<W: Write> RtfWriter<W> {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         if !shape.instruction_present {
             self.write_str("{\\shp")?;
-            self.write_shape_result(
-                shape
-                    .result
-                    .as_ref()
-                    .expect("validated fallback-only shape result"),
-            )?;
+            let result = shape.result.as_ref().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "fallback-only RTF shape has no shape result",
+                )
+            })?;
+            self.write_shape_result(result)?;
             return self.write_str("}");
         }
         let right = shape

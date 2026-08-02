@@ -44,7 +44,7 @@ fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
     Ok(bytes)
 }
 
-fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> {
+fn owned_table(table: &super::table::Table<'_>) -> RtfResult<super::table::Table<'static>> {
     let mut output = super::table::Table::new();
     output.set_direction(table.direction());
     for row in table.rows() {
@@ -73,26 +73,22 @@ fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> 
             owned_cell.set_borders(cell.borders().clone());
             owned_cell.set_shading(cell.shading());
             for nested in cell.nested_tables() {
-                owned_cell
-                    .add_nested_table(nested.text_offset, owned_table(&nested.table))
-                    .expect("validated nested-table offset");
+                owned_cell.add_nested_table(nested.text_offset, owned_table(&nested.table)?)?;
             }
-            owned_cell
-                .set_story_content(
-                    cell.shapes()
-                        .iter()
-                        .cloned()
-                        .map(crate::Shape::into_owned)
-                        .collect(),
-                    cell.shape_groups()
-                        .iter()
-                        .cloned()
-                        .map(crate::ShapeGroup::into_owned)
-                        .collect(),
-                    cell.drawing_order().to_vec(),
-                    cell.story_events().to_vec(),
-                )
-                .expect("validated cell story order");
+            owned_cell.set_story_content(
+                cell.shapes()
+                    .iter()
+                    .cloned()
+                    .map(crate::Shape::into_owned)
+                    .collect(),
+                cell.shape_groups()
+                    .iter()
+                    .cloned()
+                    .map(crate::ShapeGroup::into_owned)
+                    .collect(),
+                cell.drawing_order().to_vec(),
+                cell.story_events().to_vec(),
+            )?;
             owned_row.add_cell(owned_cell);
         }
         owned_row.set_padding(row.padding().clone());
@@ -101,7 +97,7 @@ fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> 
         owned_row.set_positioning(row.positioning().clone());
         output.add_row(owned_row);
     }
-    output
+    Ok(output)
 }
 
 /// RTF Document.
@@ -400,7 +396,7 @@ impl<'a> RtfDocument<'a> {
             .tables
             .into_iter()
             .map(|table| owned_table(&table))
-            .collect();
+            .collect::<RtfResult<_>>()?;
 
         // Convert pictures to owned
         let owned_pictures: Vec<super::picture::Picture<'static>> = parsed
@@ -588,7 +584,7 @@ impl<'a> RtfDocument<'a> {
                 .into_iter()
                 .map(crate::GeneratedListMarker::into_owned)
                 .collect(),
-            list_table: Self::convert_list_table_to_owned(parsed.list_table),
+            list_table: Self::convert_list_table_to_owned(parsed.list_table)?,
             list_override_table: parsed.list_override_table,
             legacy_section_numbering: parsed.legacy_section_numbering.into_owned(),
             legacy_paragraph_numbering: parsed
@@ -4081,14 +4077,13 @@ impl<'a> RtfDocument<'a> {
         }
         let start = from.min(to);
         let end = from.max(to);
-        let anchor = self.root_drawing_position(self.drawing_order[from]);
-        if self.drawing_order[start..=end]
-            .iter()
-            .any(|drawing| self.root_drawing_position(*drawing) != anchor)
-        {
-            return Err(RtfError::MalformedDocument(
-                "RTF drawings at different body anchors cannot be reordered".to_string(),
-            ));
+        let anchor = self.root_drawing_position(self.drawing_order[from])?;
+        for &drawing in &self.drawing_order[start..=end] {
+            if self.root_drawing_position(drawing)? != anchor {
+                return Err(RtfError::MalformedDocument(
+                    "RTF drawings at different body anchors cannot be reordered".to_string(),
+                ));
+            }
         }
         let mut order = self.drawing_order.clone();
         let drawing = order.remove(from);
@@ -4097,7 +4092,11 @@ impl<'a> RtfDocument<'a> {
         let mut next = order.iter().copied();
         for event in &mut events {
             if let crate::BodyStoryEvent::Drawing(drawing) = event {
-                *drawing = next.next().expect("drawing event count matches order");
+                *drawing = next.next().ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF drawing event order contains too many events".to_string(),
+                    )
+                })?;
             }
         }
         if next.next().is_some() {
@@ -4110,10 +4109,26 @@ impl<'a> RtfDocument<'a> {
         Ok(())
     }
 
-    fn root_drawing_position(&self, drawing: crate::StoryDrawing) -> usize {
+    fn root_drawing_position(&self, drawing: crate::StoryDrawing) -> RtfResult<usize> {
         match drawing {
-            crate::StoryDrawing::Shape(index) => self.shapes[index].position,
-            crate::StoryDrawing::ShapeGroup(index) => self.shape_groups[index].position,
+            crate::StoryDrawing::Shape(index) => self
+                .shapes
+                .get(index)
+                .map(|shape| shape.position)
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF drawing order references a missing shape".to_string(),
+                    )
+                }),
+            crate::StoryDrawing::ShapeGroup(index) => self
+                .shape_groups
+                .get(index)
+                .map(|group| group.position)
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF drawing order references a missing shape group".to_string(),
+                    )
+                }),
         }
     }
 
@@ -4343,7 +4358,7 @@ impl<'a> RtfDocument<'a> {
     /// Convert list table to owned
     fn convert_list_table_to_owned(
         table: super::list::ListTable<'_>,
-    ) -> super::list::ListTable<'static> {
+    ) -> RtfResult<super::list::ListTable<'static>> {
         let mut owned = super::list::ListTable::new();
         for list in table.lists() {
             owned.add(super::list::List {
@@ -4386,10 +4401,9 @@ impl<'a> RtfDocument<'a> {
         }
         owned.picture_bullet_count = table.picture_bullet_count;
         owned
-            .set_picture_bullet_picture_indices(table.picture_bullet_picture_indices().to_vec())
-            .expect("parsed list-picture indices are bounded");
+            .set_picture_bullet_picture_indices(table.picture_bullet_picture_indices().to_vec())?;
         owned.picture_bullet_count = table.picture_bullet_count;
-        owned
+        Ok(owned)
     }
 
     /// Convert sections to owned
@@ -4908,7 +4922,12 @@ impl<'a> RtfDocument<'a> {
             super::annotation::RevisionType::Deletion => {
                 self.insert_body_story_event(crate::BodyStoryEvent::RevisionDeletion(index))?;
             },
-            _ => unreachable!("revision kind validated above"),
+            _ => {
+                self.revisions.pop();
+                return Err(RtfError::MalformedDocument(
+                    "this RTF revision kind has no lossless scoped-run representation".to_string(),
+                ));
+            },
         }
         Ok(())
     }
@@ -4991,7 +5010,12 @@ impl<'a> RtfDocument<'a> {
             super::annotation::RevisionType::Deletion => self
                 .table_cell_mut(path)?
                 .push_deletion_revision_reference(index, position),
-            _ => unreachable!(),
+            _ => {
+                self.revisions.pop();
+                return Err(RtfError::MalformedDocument(
+                    "this RTF revision kind has no lossless scoped-run representation".to_string(),
+                ));
+            },
         };
         if let Err(error) = result {
             self.revisions.pop();

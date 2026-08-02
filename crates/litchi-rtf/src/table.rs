@@ -1356,6 +1356,7 @@ impl<'a> Cell<'a> {
         Ok(())
     }
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+        let position = shape.position;
         let drawing = crate::StoryDrawing::Shape(self.shapes.len());
         let mut shapes = self.shapes.clone();
         let mut order = self.drawing_order.clone();
@@ -1368,7 +1369,6 @@ impl<'a> Cell<'a> {
             &order,
             "table cell",
         )?;
-        let position = shapes.last().unwrap().position;
         if self
             .story_events
             .last()
@@ -1384,6 +1384,7 @@ impl<'a> Cell<'a> {
         Ok(())
     }
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+        let position = group.position;
         let drawing = crate::StoryDrawing::ShapeGroup(self.shape_groups.len());
         let mut groups = self.shape_groups.clone();
         let mut order = self.drawing_order.clone();
@@ -1396,7 +1397,6 @@ impl<'a> Cell<'a> {
             &order,
             "table cell",
         )?;
-        let position = groups.last().unwrap().position;
         if self
             .story_events
             .last()

@@ -3507,7 +3507,7 @@ impl<'a> Parser<'a> {
                     }
                     let count = match owner {
                         RootDrawingOwner::FieldResult => {
-                            self.field_drawing_captures.last().unwrap().shapes.len()
+                            self.current_field_drawing_capture()?.shapes.len()
                         },
                         RootDrawingOwner::NoteSeparator => {
                             self.current_note_separator_drawings.shapes.len()
@@ -3530,7 +3530,7 @@ impl<'a> Parser<'a> {
                     let mut shape = self.parse_shape_destination(true)?;
                     match owner {
                         RootDrawingOwner::FieldResult => {
-                            let capture = self.field_drawing_captures.last_mut().unwrap();
+                            let capture = self.current_field_drawing_capture_mut()?;
                             shape.position = capture.story_offset;
                             let drawing = crate::StoryDrawing::Shape(capture.shapes.len());
                             capture.drawing_order.push(drawing);
@@ -3642,12 +3642,9 @@ impl<'a> Parser<'a> {
                         }
                     }
                     let count = match owner {
-                        RootDrawingOwner::FieldResult => self
-                            .field_drawing_captures
-                            .last()
-                            .unwrap()
-                            .shape_groups
-                            .len(),
+                        RootDrawingOwner::FieldResult => {
+                            self.current_field_drawing_capture()?.shape_groups.len()
+                        },
                         RootDrawingOwner::NoteSeparator => {
                             self.current_note_separator_drawings.shape_groups.len()
                         },
@@ -3669,7 +3666,7 @@ impl<'a> Parser<'a> {
                     let mut group = self.parse_shape_group_destination()?;
                     match owner {
                         RootDrawingOwner::FieldResult => {
-                            let capture = self.field_drawing_captures.last_mut().unwrap();
+                            let capture = self.current_field_drawing_capture_mut()?;
                             group.position = capture.story_offset;
                             let drawing =
                                 crate::StoryDrawing::ShapeGroup(capture.shape_groups.len());
@@ -5171,14 +5168,14 @@ impl<'a> Parser<'a> {
                         output.push(
                             char::decode_utf16([high, unit])
                                 .next()
-                                .expect("two UTF-16 units")
+                                .and_then(Result::ok)
                                 .unwrap_or('\u{FFFD}'),
                         );
                     } else {
                         output.push(
                             char::decode_utf16([unit])
                                 .next()
-                                .expect("one UTF-16 unit")
+                                .and_then(Result::ok)
                                 .unwrap_or('\u{FFFD}'),
                         );
                     }
@@ -6271,8 +6268,11 @@ impl<'a> Parser<'a> {
                 },
                 ControlWord::DocumentEventMask(Some(value @ 0..=0x7fff)) => {
                     self.processing_settings.event_mask = Some(
-                        crate::DocumentEventMask::from_bits(*value as u16)
-                            .expect("validated document event mask"),
+                        crate::DocumentEventMask::from_bits(*value as u16).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF grfdocevents contains unsupported event bits".to_string(),
+                            )
+                        })?,
                     );
                 },
                 ControlWord::DocumentEventMask(_) => {
@@ -6333,14 +6333,20 @@ impl<'a> Parser<'a> {
                 },
                 ControlWord::DrawingGridHorizontalSpacing(Some(value @ 0..=32767)) => {
                     self.drawing_grid.horizontal_spacing = Some(
-                        crate::DrawingGridSpacing::new(*value as u16)
-                            .expect("validated horizontal drawing-grid spacing"),
+                        crate::DrawingGridSpacing::new(*value as u16).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF dghspace is outside the supported range".to_string(),
+                            )
+                        })?,
                     );
                 },
                 ControlWord::DrawingGridVerticalSpacing(Some(value @ 0..=32767)) => {
                     self.drawing_grid.vertical_spacing = Some(
-                        crate::DrawingGridSpacing::new(*value as u16)
-                            .expect("validated vertical drawing-grid spacing"),
+                        crate::DrawingGridSpacing::new(*value as u16).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF dgvspace is outside the supported range".to_string(),
+                            )
+                        })?,
                     );
                 },
                 ControlWord::DrawingGridHorizontalOrigin(Some(value @ -32768..=32767)) => {
@@ -6351,14 +6357,20 @@ impl<'a> Parser<'a> {
                 },
                 ControlWord::DrawingGridHorizontalShow(Some(value @ 0..=32767)) => {
                     self.drawing_grid.horizontal_line_interval = Some(
-                        crate::DrawingGridLineInterval::new(*value as u16)
-                            .expect("validated horizontal drawing-grid interval"),
+                        crate::DrawingGridLineInterval::new(*value as u16).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF dghshow is outside the supported range".to_string(),
+                            )
+                        })?,
                     );
                 },
                 ControlWord::DrawingGridVerticalShow(Some(value @ 0..=32767)) => {
                     self.drawing_grid.vertical_line_interval = Some(
-                        crate::DrawingGridLineInterval::new(*value as u16)
-                            .expect("validated vertical drawing-grid interval"),
+                        crate::DrawingGridLineInterval::new(*value as u16).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF dgvshow is outside the supported range".to_string(),
+                            )
+                        })?,
                     );
                 },
                 _ => {
@@ -13787,7 +13799,11 @@ impl<'a> Parser<'a> {
                             && script.is_some()
                         {
                             let value = associated_font_ref(*parameter)?;
-                            match script.take().unwrap() {
+                            match script.take().ok_or_else(|| {
+                                RtfError::ParserError(
+                                    "RTF defchp script selector state was lost".to_string(),
+                                )
+                            })? {
                                 0 => low = Some(value),
                                 1 => high = Some(value),
                                 _ => double = Some(value),
@@ -13855,16 +13871,17 @@ impl<'a> Parser<'a> {
                                     "RTF defpap itap requires a numeric parameter".to_string(),
                                 )
                             })?;
-                            itap = Some(u8::try_from(value).map_err(|_| {
+                            let value = u8::try_from(value).map_err(|_| {
                                 RtfError::MalformedDocument(
                                     "RTF defpap itap value must be in 0..=32".to_string(),
                                 )
-                            })?);
-                            if itap.unwrap() > 32 {
+                            })?;
+                            if value > 32 {
                                 return Err(RtfError::MalformedDocument(
                                     "RTF defpap itap value must be in 0..=32".to_string(),
                                 ));
                             }
+                            itap = Some(value);
                         } else if let Some(key) = Self::default_paragraph_property_key(control) {
                             if !seen.insert(key) {
                                 return Err(RtfError::MalformedDocument(format!(
@@ -14562,7 +14579,9 @@ impl<'a> Parser<'a> {
             },
         }
         .as_mut()
-        .expect("active table border");
+        .ok_or_else(|| {
+            RtfError::ParserError("RTF active table-border state is missing".to_string())
+        })?;
         if let Some(style) = Self::table_border_style(control) {
             border.style = style
         } else {
@@ -14702,11 +14721,9 @@ impl<'a> Parser<'a> {
             )));
         }
         state.character_border_seen |= component;
-        let border = state
-            .formatting
-            .character_border
-            .as_mut()
-            .expect("active character border");
+        let border = state.formatting.character_border.as_mut().ok_or_else(|| {
+            RtfError::ParserError("RTF active character-border state is missing".to_string())
+        })?;
         if let Some(style) = Self::character_border_style(control) {
             border.style = style;
         } else {
@@ -18906,6 +18923,18 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| RtfError::ParserError("No parser state available".to_string()))
     }
 
+    fn current_field_drawing_capture(&self) -> RtfResult<&DrawingStoryCapture<'a>> {
+        self.field_drawing_captures.last().ok_or_else(|| {
+            RtfError::ParserError("No field-result drawing capture available".to_string())
+        })
+    }
+
+    fn current_field_drawing_capture_mut(&mut self) -> RtfResult<&mut DrawingStoryCapture<'a>> {
+        self.field_drawing_captures.last_mut().ok_or_else(|| {
+            RtfError::ParserError("No field-result drawing capture available".to_string())
+        })
+    }
+
     /// Parse Unicode character sequence with fallback handling.
     ///
     /// RTF Unicode format: `\uN` where N is a signed 16-bit decimal value
@@ -19076,7 +19105,9 @@ impl<'a> Parser<'a> {
             .last()
             .is_some_and(|builder| builder.level > parent_level)
         {
-            let builder = self.nested_table_builders.pop().unwrap();
+            let builder = self.nested_table_builders.pop().ok_or_else(|| {
+                RtfError::ParserError("RTF nested-table builder state is missing".to_string())
+            })?;
             if !builder.cell_text.is_empty()
                 || !builder.cell_nested.is_empty()
                 || !builder.cell_drawings.drawing_order.is_empty()
@@ -20611,9 +20642,11 @@ impl<'a> Parser<'a> {
         macro_rules! observe_background {
             ($visible:expr) => {
                 if $visible {
-                    let current = *background_stack
-                        .last()
-                        .expect("shape-text background state");
+                    let current = *background_stack.last().ok_or_else(|| {
+                        RtfError::ParserError(
+                            "RTF shape-text background state is missing".to_string(),
+                        )
+                    })?;
                     if let Some(observed) = observed_background {
                         if observed != current {
                             return Err(RtfError::MalformedDocument(
@@ -20691,9 +20724,11 @@ impl<'a> Parser<'a> {
                             "RTF shptxt nesting exceeds the safety limit".to_string(),
                         ));
                     }
-                    let inherited = *background_stack
-                        .last()
-                        .expect("shape-text background state");
+                    let inherited = *background_stack.last().ok_or_else(|| {
+                        RtfError::ParserError(
+                            "RTF shape-text background state is missing".to_string(),
+                        )
+                    })?;
                     background_stack.push(inherited);
                     self.pos += 1;
                 },
@@ -20733,16 +20768,19 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::ColorBackground(value))) => {
-                    *background_stack
-                        .last_mut()
-                        .expect("shape-text background state") =
-                        Some(Self::required_character_value(*value, "cb", u16::MAX)?);
+                    *background_stack.last_mut().ok_or_else(|| {
+                        RtfError::ParserError(
+                            "RTF shape-text background state is missing".to_string(),
+                        )
+                    })? = Some(Self::required_character_value(*value, "cb", u16::MAX)?);
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::Plain)) => {
-                    *background_stack
-                        .last_mut()
-                        .expect("shape-text background state") = None;
+                    *background_stack.last_mut().ok_or_else(|| {
+                        RtfError::ParserError(
+                            "RTF shape-text background state is missing".to_string(),
+                        )
+                    })? = None;
                     self.pos += 1;
                 },
                 Some(Token::Text(value)) => {
@@ -23949,13 +23987,11 @@ impl<'a> Parser<'a> {
                                 },
                                 Token::Control(ControlWord::Page(param)) if in_result => {
                                     require_parameterless(*param, "page")?;
-                                    self.field_drawing_captures
-                                        .last_mut()
-                                        .unwrap()
-                                        .story_events
-                                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                                    self.current_field_drawing_capture_mut()?.story_events.push(
+                                        crate::StoryEvent::PageBreak(crate::PageBreak::new(
                                             result.len(),
-                                        )));
+                                        )),
+                                    );
                                     self.pos += 1;
                                 },
                                 Token::Control(ControlWord::Tab) if in_result => {
@@ -23980,7 +24016,7 @@ impl<'a> Parser<'a> {
                                     ));
                                 },
                                 Token::OpenBrace if in_result && self.is_root_drawing_group() => {
-                                    self.field_drawing_captures.last_mut().unwrap().story_offset =
+                                    self.current_field_drawing_capture_mut()?.story_offset =
                                         result.len();
                                     self.parse_group()?;
                                 },
@@ -24033,7 +24069,7 @@ impl<'a> Parser<'a> {
                                         Some(Token::Control(ControlWord::Field))
                                     ) =>
                                 {
-                                    self.field_drawing_captures.last_mut().unwrap().story_offset =
+                                    self.current_field_drawing_capture_mut()?.story_offset =
                                         result.len();
                                     self.pos += 1;
                                     self.parse_field()?;
