@@ -29,7 +29,6 @@
 
 pub mod active_x;
 pub mod auto_filter;
-pub mod calculation_chain;
 pub mod calculation_properties;
 pub mod cell;
 pub mod cell_watches;
@@ -111,11 +110,6 @@ pub use auto_filter::{
     CustomFilters, DateGroupItem, DateTimeGrouping, DynamicFilter, DynamicFilterType,
     FilterColumnDefinition, FilterColumnPayload, FilterIconSet, FilterItem, FilterRange,
     FilterValues, IconFilter, SortConditionDefinition, SortStateDefinition, Top10Filter,
-};
-pub use calculation_chain::{
-    CalculationCell, CalculationChain, CalculationChainConformance,
-    CalculationChainExtensionAttribute, load_calculation_chain_from_package,
-    parse_calculation_chain, remove_calculation_chain, store_calculation_chain,
 };
 pub use calculation_properties::{
     WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,

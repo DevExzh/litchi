@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod cell;
+pub mod chain;
 pub mod column;
 mod error;
 pub mod formula;
