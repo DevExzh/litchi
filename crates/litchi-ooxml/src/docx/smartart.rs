@@ -13,13 +13,13 @@
 //! supported. Everything is treated as inert metadata: layout algorithms and
 //! style bodies are never interpreted.
 
-use crate::diagrams::{
+use crate::error::{OoxmlError, Result};
+use litchi_drawingml::diagram::{
     DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
     DIAGRAM_QUICK_STYLE_REL, DiagramDataModel, DiagramDefinition, DiagramNode, DiagramType,
     MS_DIAGRAM_DRAWING_REL, STRICT_DIAGRAM_COLORS_REL, STRICT_DIAGRAM_DATA_REL,
     STRICT_DIAGRAM_LAYOUT_REL, STRICT_DIAGRAM_QUICK_STYLE_REL,
 };
-use crate::error::{OoxmlError, Result};
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::Part;
@@ -320,7 +320,7 @@ fn resolve_definition(
     relationship_type: &str,
     content_type: &str,
     label: &str,
-    parse: fn(&str) -> Result<DiagramDefinition>,
+    parse: fn(&str) -> litchi_drawingml::Result<DiagramDefinition>,
     total: &mut usize,
 ) -> Result<(Option<String>, Option<String>, Option<DiagramDefinition>)> {
     let Some(relationship_id) = relationship_id else {

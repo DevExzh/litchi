@@ -2638,10 +2638,10 @@ impl Workbook {
     /// pivot tables, returning a normalized copy with the canonical
     /// sheet-qualified pivot-source name. Returns `None` for ordinary charts.
     fn normalized_pivot_chart_model(
-        chart: &crate::charts::Chart,
+        chart: &litchi_drawingml::chart::Chart,
         host_sheet_name: &str,
         authored_pivot_tables: &[(String, String)],
-    ) -> SheetResult<Option<crate::charts::Chart>> {
+    ) -> SheetResult<Option<litchi_drawingml::chart::Chart>> {
         if chart.pivot_source.is_none() {
             return Ok(None);
         }
@@ -4301,12 +4301,12 @@ fn validate_threaded_comment_people<'a>(
 #[cfg(test)]
 mod tests {
     use super::{Workbook, WorkbookProtectionMetadata, validate_threaded_comment_people};
-    use crate::charts::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
     use crate::xlsx::active_x::{
         ActiveXControlSet, ActiveXDescriptor, ActiveXProperty, LoadedActiveXControl, Persistence,
         WorksheetControl,
     };
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
+    use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
@@ -4634,7 +4634,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let mut point = crate::charts::DataPoint::new(0);
+        let mut point = litchi_drawingml::chart::DataPoint::new(0);
         point.extension_list = Some(
             ChartExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="dangling"><x:reference r:id="rId404"/></c:ext></c:extLst>"#.to_vec(),
@@ -4662,19 +4662,19 @@ mod tests {
             )
             .unwrap(),
         );
-        chart.chart.plot_area.data_table = Some(crate::charts::DataTable {
+        chart.chart.plot_area.data_table = Some(litchi_drawingml::chart::DataTable {
             shape_properties: Some(
                 ChartShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId408"/></a:blipFill></c:spPr>"#.to_vec(),
                 )
                 .unwrap(),
             ),
-            ..crate::charts::DataTable::default()
+            ..litchi_drawingml::chart::DataTable::default()
         });
         let TypeGroup::Bar(group) = &mut chart.chart.plot_area.type_groups[0] else {
             panic!("expected a bar chart");
         };
-        group.series_lines.push(crate::charts::ChartLines {
+        group.series_lines.push(litchi_drawingml::chart::ChartLines {
             shape_properties: Some(
                 ChartShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId409"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4682,18 +4682,19 @@ mod tests {
                 .unwrap(),
             ),
         });
-        let mut line =
-            crate::charts::LineTypeGroup::new(crate::charts::types::BarGrouping::Standard);
-        line.up_down_bars = Some(crate::charts::UpDownBars {
+        let mut line = litchi_drawingml::chart::LineTypeGroup::new(
+            litchi_drawingml::chart::types::BarGrouping::Standard,
+        );
+        line.up_down_bars = Some(litchi_drawingml::chart::UpDownBars {
             extension_list: Some(
                 ChartExtensionList::from_xml(
                     br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="bars"><x:reference r:id="rId410"/></c:ext></c:extLst>"#.to_vec(),
                 )
                 .unwrap(),
             ),
-            ..crate::charts::UpDownBars::default()
+            ..litchi_drawingml::chart::UpDownBars::default()
         });
-        let mut line_series = crate::charts::Series::new(0);
+        let mut line_series = litchi_drawingml::chart::Series::new(0);
         line_series.marker_shape_properties = Some(
             ChartShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId424"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4706,7 +4707,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let mut line_point = crate::charts::DataPoint::new(0);
+        let mut line_point = litchi_drawingml::chart::DataPoint::new(0);
         line_point.marker_shape_properties = Some(
             ChartShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId426"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4720,7 +4721,7 @@ mod tests {
             .unwrap(),
         );
         line_series.data_points.push(line_point);
-        let mut line_labels = crate::charts::DataLabels::new();
+        let mut line_labels = litchi_drawingml::chart::DataLabels::new();
         line_labels.shape_properties = Some(
             ChartShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId430"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4728,12 +4729,12 @@ mod tests {
             .unwrap(),
         );
         line_labels.text_properties = Some(
-            crate::charts::ChartTextProperties::from_xml(
+            litchi_drawingml::chart::ChartTextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId431"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
             )
             .unwrap(),
         );
-        line_labels.leader_lines = Some(crate::charts::ChartLines {
+        line_labels.leader_lines = Some(litchi_drawingml::chart::ChartLines {
             shape_properties: Some(
                 ChartShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId432"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4747,7 +4748,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let mut line_label = crate::charts::DataLabel::new(0);
+        let mut line_label = litchi_drawingml::chart::DataLabel::new(0);
         line_label.shape_properties = Some(
             ChartShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId434"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4755,7 +4756,7 @@ mod tests {
             .unwrap(),
         );
         line_label.text_properties = Some(
-            crate::charts::ChartTextProperties::from_xml(
+            litchi_drawingml::chart::ChartTextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId435"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
             )
             .unwrap(),
@@ -4768,10 +4769,10 @@ mod tests {
         );
         line_labels.labels.push(line_label);
         line_series.data_labels = Some(line_labels);
-        line_series.error_bars.push(crate::charts::series::ErrorBar {
-            direction: crate::charts::series::ErrorBarDirection::Y,
-            error_type: crate::charts::series::ErrorBarType::Both,
-            value_type: crate::charts::series::ErrorBarValueType::Fixed,
+        line_series.error_bars.push(litchi_drawingml::chart::series::ErrorBar {
+            direction: litchi_drawingml::chart::series::ErrorBarDirection::Y,
+            error_type: litchi_drawingml::chart::series::ErrorBarType::Both,
+            value_type: litchi_drawingml::chart::series::ErrorBarValueType::Fixed,
             value: Some(1.0),
             plus_values: None,
             minus_values: None,
@@ -4789,7 +4790,7 @@ mod tests {
                 .unwrap(),
             ),
         });
-        let mut line_trendline = crate::charts::series::Trendline::linear();
+        let mut line_trendline = litchi_drawingml::chart::series::Trendline::linear();
         line_trendline.show_label = true;
         line_trendline.shape_properties = Some(
             ChartShapeProperties::from_xml(
@@ -4804,7 +4805,7 @@ mod tests {
             .unwrap(),
         );
         line_trendline.label_text_properties = Some(
-            crate::charts::ChartTextProperties::from_xml(
+            litchi_drawingml::chart::ChartTextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId441"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
             )
             .unwrap(),
@@ -4828,8 +4829,8 @@ mod tests {
             .plot_area
             .type_groups
             .push(TypeGroup::Line(line));
-        let mut surface = crate::charts::plot_area::SurfaceTypeGroup::new();
-        let mut band = crate::charts::plot_area::BandFormat::new(0);
+        let mut surface = litchi_drawingml::chart::plot_area::SurfaceTypeGroup::new();
+        let mut band = litchi_drawingml::chart::plot_area::BandFormat::new(0);
         band.shape_properties = Some(
             ChartShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId444"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4842,16 +4843,16 @@ mod tests {
             .plot_area
             .type_groups
             .push(TypeGroup::Surface(surface));
-        let mut legend = crate::charts::Legend {
+        let mut legend = litchi_drawingml::chart::Legend {
             shape_properties: Some(
                 ChartShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId411"/></a:blipFill></c:spPr>"#.to_vec(),
                 )
                 .unwrap(),
             ),
-            ..crate::charts::Legend::default()
+            ..litchi_drawingml::chart::Legend::default()
         };
-        let mut legend_entry = crate::charts::legend::LegendEntry::new(0);
+        let mut legend_entry = litchi_drawingml::chart::legend::LegendEntry::new(0);
         legend_entry.extension_list = Some(
             ChartExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="entry"><x:reference r:id="rId412"/></c:ext></c:extLst>"#.to_vec(),
@@ -4867,14 +4868,14 @@ mod tests {
             .unwrap(),
         );
         let axis_common = chart.chart.plot_area.axes[0].common_mut();
-        axis_common.title = Some(crate::charts::TitleText::from_string("Axis"));
+        axis_common.title = Some(litchi_drawingml::chart::TitleText::from_string("Axis"));
         axis_common.title_shape_properties = Some(
             ChartShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId414"/></a:blipFill></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
-        axis_common.major_gridlines = Some(crate::charts::ChartLines {
+        axis_common.major_gridlines = Some(litchi_drawingml::chart::ChartLines {
             shape_properties: Some(
                 ChartShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId415"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4894,11 +4895,13 @@ mod tests {
             )
             .unwrap(),
         );
-        let crate::charts::Axis::Value(value_axis) = &mut chart.chart.plot_area.axes[1] else {
+        let litchi_drawingml::chart::Axis::Value(value_axis) = &mut chart.chart.plot_area.axes[1]
+        else {
             panic!("expected value axis");
         };
-        let mut display_units =
-            crate::charts::axis::DisplayUnits::built_in(crate::charts::axis::BuiltInUnit::Millions);
+        let mut display_units = litchi_drawingml::chart::axis::DisplayUnits::built_in(
+            litchi_drawingml::chart::axis::BuiltInUnit::Millions,
+        );
         display_units.show_label = true;
         display_units.label_shape_properties = Some(
             ChartShapeProperties::from_xml(
@@ -4907,7 +4910,7 @@ mod tests {
             .unwrap(),
         );
         display_units.label_text_properties = Some(
-            crate::charts::ChartTextProperties::from_xml(
+            litchi_drawingml::chart::ChartTextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId419"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
             )
             .unwrap(),
@@ -4919,7 +4922,7 @@ mod tests {
             .unwrap(),
         );
         value_axis.display_units = Some(Box::new(display_units));
-        let mut pivot_format = crate::charts::PivotFormat::new(0);
+        let mut pivot_format = litchi_drawingml::chart::PivotFormat::new(0);
         pivot_format.shape_properties = Some(
             ChartShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId421"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4927,7 +4930,7 @@ mod tests {
             .unwrap(),
         );
         pivot_format.text_properties = Some(
-            crate::charts::ChartTextProperties::from_xml(
+            litchi_drawingml::chart::ChartTextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId422"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
             )
             .unwrap(),
@@ -4938,7 +4941,7 @@ mod tests {
             )
             .unwrap(),
         );
-        pivot_format.marker = Some(crate::charts::Marker {
+        pivot_format.marker = Some(litchi_drawingml::chart::Marker {
             shape_properties: Some(
                 ChartShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId428"/></a:blipFill></c:spPr>"#.to_vec(),
@@ -4951,7 +4954,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            ..crate::charts::Marker::default()
+            ..litchi_drawingml::chart::Marker::default()
         });
         chart.chart.pivot_formats = Some(vec![pivot_format]);
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)

@@ -6,8 +6,8 @@
 //! header as inert metadata; the layout algorithm and style bodies are not
 //! interpreted.
 
-use crate::diagrams::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
-use crate::error::{OoxmlError, Result};
+use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
+use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_str;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -78,11 +78,16 @@ impl DiagramDefinition {
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
-                    depth += 1;
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| limit("definition XML depth"))?;
                     scan.visit(&reader, &element, depth)?;
                 },
                 Event::Empty(element) => {
-                    scan.visit(&reader, &element, depth + 1)?;
+                    let child_depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| limit("definition XML depth"))?;
+                    scan.visit(&reader, &element, child_depth)?;
                 },
                 Event::End(_) => {
                     if depth == 0 {
@@ -118,7 +123,10 @@ impl DefinitionScan<'_> {
         element: &BytesStart<'_>,
         depth: usize,
     ) -> Result<()> {
-        self.nodes += 1;
+        self.nodes = self
+            .nodes
+            .checked_add(1)
+            .ok_or_else(|| limit("definition XML node count"))?;
         if self.nodes > MAX_NODES || depth > MAX_DEPTH {
             return Err(limit("definition XML structure"));
         }
@@ -203,15 +211,15 @@ fn is_dgm(namespace: &str) -> bool {
     matches!(namespace, DGM_NAMESPACE | DGM_NAMESPACE_STRICT)
 }
 
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(error.to_string())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
-fn limit(label: &str) -> OoxmlError {
+fn limit(label: &str) -> Error {
     invalid(format!("diagram {label} limit exceeded"))
 }
 

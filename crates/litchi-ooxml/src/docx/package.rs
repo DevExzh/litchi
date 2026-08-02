@@ -45,6 +45,9 @@ use crate::web_extensions::{
     OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
     remove_web_extension_task_panes, store_web_extension_task_panes,
 };
+use litchi_drawingml::diagram::{
+    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
+};
 use litchi_ooxml_common::DocumentProperties;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
@@ -2589,13 +2592,11 @@ impl Package {
                         )));
                     }
                     let rel_ids = crate::docx::writer::smartart::SmartArtRelIds {
-                        data: temp_part.relate_to(&data_name, crate::diagrams::DIAGRAM_DATA_REL),
-                        layout: temp_part
-                            .relate_to(&layout_name, crate::diagrams::DIAGRAM_LAYOUT_REL),
+                        data: temp_part.relate_to(&data_name, DIAGRAM_DATA_REL),
+                        layout: temp_part.relate_to(&layout_name, DIAGRAM_LAYOUT_REL),
                         quick_style: temp_part
-                            .relate_to(&quick_style_name, crate::diagrams::DIAGRAM_QUICK_STYLE_REL),
-                        colors: temp_part
-                            .relate_to(&colors_name, crate::diagrams::DIAGRAM_COLORS_REL),
+                            .relate_to(&quick_style_name, DIAGRAM_QUICK_STYLE_REL),
+                        colors: temp_part.relate_to(&colors_name, DIAGRAM_COLORS_REL),
                     };
                     rel_mapper.add_smart_art(smartart.anchor_key(), rel_ids);
                 }

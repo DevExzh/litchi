@@ -6,7 +6,7 @@
 //! parts, identical to XLSX. This module parses the binary chart sheet
 //! stream into an inert typed model; the XML drawing inventory lives in
 //! [`crate::xlsb::drawing`] and the typed chart model is shared with the
-//! other formats in [`crate::charts`].
+//! other formats in [`litchi_drawingml::chart`].
 
 mod model;
 mod parse;

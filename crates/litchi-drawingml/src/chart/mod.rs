@@ -23,14 +23,14 @@
 //!
 //! # Example
 //!
-//! ```rust,ignore
-//! use litchi::ooxml::charts::{Chart, PlotArea, Series, NumericData, StringData};
-//! use litchi::ooxml::charts::plot_area::{BarTypeGroup, TypeGroup};
-//! use litchi::ooxml::charts::types::{BarDirection, BarGrouping};
-//! use litchi::ooxml::charts::axis::{CategoryAxis, ValueAxis, Axis};
-//! use litchi::ooxml::charts::types::AxisPosition;
-//! use litchi::ooxml::charts::legend::Legend;
-//! use litchi::ooxml::charts::types::LegendPosition;
+//! ```rust,no_run
+//! use litchi_drawingml::chart::{Chart, PlotArea, Series, NumericData, StringData};
+//! use litchi_drawingml::chart::plot_area::{BarTypeGroup, TypeGroup};
+//! use litchi_drawingml::chart::types::{BarDirection, BarGrouping};
+//! use litchi_drawingml::chart::axis::{CategoryAxis, ValueAxis, Axis};
+//! use litchi_drawingml::chart::types::AxisPosition;
+//! use litchi_drawingml::chart::legend::Legend;
+//! use litchi_drawingml::chart::types::LegendPosition;
 //!
 //! // Create a bar chart
 //! let mut chart = Chart::new()
@@ -65,13 +65,14 @@
 //!
 //! // Write to XML
 //! let mut xml_output = Vec::new();
-//! litchi::ooxml::charts::writer::write_chart(&mut xml_output, &chart)?;
+//! litchi_drawingml::chart::writer::write(&mut xml_output, &chart)?;
+//! # Ok::<(), std::io::Error>(())
 //! ```
 
 pub mod axis;
-pub mod chart;
+pub mod data;
 pub mod legend;
-pub mod models;
+pub mod model;
 pub mod plot_area;
 pub mod reader;
 pub mod series;
@@ -79,15 +80,15 @@ pub mod types;
 pub mod writer;
 
 pub use axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
-pub use chart::{
+pub use data::{
+    Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
+};
+pub use legend::Legend;
+pub use model::{
     Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
     ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
     ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
     ColorSchemeIndex, PictureFormat, PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
-};
-pub use legend::Legend;
-pub use models::{
-    Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
 pub use plot_area::{
     Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarShape, BarTypeGroup,

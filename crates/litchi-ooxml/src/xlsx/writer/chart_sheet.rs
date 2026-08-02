@@ -281,7 +281,7 @@ mod tests {
         let chart_resource = &loaded.drawing.charts[0];
         assert!(chart_resource.part_name.starts_with("/xl/charts/"));
         assert!(chart_resource.part_name.ends_with(".xml"));
-        let chart = crate::charts::reader::parse_chart(chart_resource.data.as_slice()).unwrap();
+        let chart = litchi_drawingml::chart::reader::read(chart_resource.data.as_slice()).unwrap();
         assert!(chart.pivot_source.is_none());
         assert_eq!(chart.plot_area.type_groups.len(), 1);
     }

@@ -189,7 +189,7 @@ read inventories above:
 
 ```rust
 use litchi::ooxml::docx::{MutableTextBox, MutableOleObject, MutableSmartArt, MutableVmlShape, VmlShapeKind};
-use litchi::ooxml::diagrams::{DiagramType, SmartArtBuilder};
+use litchi::drawing::diagram::{DiagramType, SmartArtBuilder};
 use litchi::ooxml::docx::Package;
 
 let mut pkg = Package::new()?;
@@ -639,4 +639,3 @@ cargo doc --open
 ## License
 
 See the main project LICENSE file for details.
-

@@ -21,7 +21,7 @@ fn xlsx_shared_strings_uses_fallback() {
 #[test]
 fn generic_chart_reader_uses_fallback() {
     let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><x:chart/></mc:Choice><mc:Fallback><c:chart/></mc:Fallback></mc:AlternateContent></c:chartSpace>"#;
-    litchi_ooxml::charts::reader::parse_chart(xml.as_slice()).expect("fallback chart");
+    litchi_drawingml::chart::reader::read(xml.as_slice()).expect("fallback chart");
 }
 
 #[test]

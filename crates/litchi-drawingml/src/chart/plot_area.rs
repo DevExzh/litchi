@@ -3,11 +3,11 @@
 //! This module contains structures for representing the plot area
 //! and chart type groups.
 
-use crate::charts::axis::Axis;
-use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
-use crate::charts::models::Layout;
-use crate::charts::series::{DataLabels, Series};
-use crate::charts::types::{
+use crate::chart::axis::Axis;
+use crate::chart::data::Layout;
+use crate::chart::model::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
+use crate::chart::series::{DataLabels, Series};
+use crate::chart::types::{
     BarDirection, BarGrouping, OfPieSplitType, OfPieType, RadarStyle, ScatterStyle,
 };
 

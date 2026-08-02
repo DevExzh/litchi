@@ -3193,9 +3193,9 @@ mod tests {
 
     #[test]
     fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
-        use crate::charts::plot_area::TypeGroup;
         use crate::xlsb::drawing::XlsbDrawingAnchorKind;
         use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use litchi_drawingml::chart::plot_area::TypeGroup;
 
         let bar = WorksheetChart::bar_chart_with_cache(
             "Quarterly sales",
@@ -3338,7 +3338,8 @@ mod tests {
             ChartAnchor::new(3, 0, 10, 14),
         )
         .unwrap()
-        .into_pivot_chart(view_name);
+        .into_pivot_chart(view_name)
+        .unwrap();
         let mut sheet = MutableXlsbWorksheet::new("Pivot Host");
         sheet.add_pivot_table_view(view).unwrap();
         sheet.add_chart(chart).unwrap();
@@ -3402,7 +3403,8 @@ mod tests {
             ChartAnchor::new(2, 0, 8, 12),
         )
         .unwrap()
-        .into_pivot_chart("MissingPivot");
+        .into_pivot_chart("MissingPivot")
+        .unwrap();
         let mut sheet = MutableXlsbWorksheet::new("Host");
         sheet.add_chart(chart).unwrap();
         let mut workbook = XlsbWorkbookWriter::new();
@@ -3416,12 +3418,12 @@ mod tests {
 
     #[test]
     fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
-        use crate::charts::{ChartExtensionList, ChartShapeProperties};
         use crate::xlsx::{
             ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
             ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
             ChartUserShapesRelationshipTarget, WorksheetChart,
         };
+        use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties};
 
         let mut worksheet_chart = WorksheetChart::bar_chart(
             "Resources",
@@ -3582,7 +3584,7 @@ mod tests {
 
         let mut mismatched_external_data = valid.clone();
         mismatched_external_data.chart.external_data =
-            Some(crate::charts::ChartExternalData::pending());
+            Some(litchi_drawingml::chart::ChartExternalData::pending());
         assert!(sheet.add_chart(mismatched_external_data).is_err());
         assert_eq!(sheet.charts().len(), 1);
 

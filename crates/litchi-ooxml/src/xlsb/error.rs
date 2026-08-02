@@ -44,6 +44,8 @@ pub enum XlsbError {
     UnsupportedFeature(String),
     /// Encoding error
     Encoding(String),
+    /// Shared DrawingML parsing error.
+    Drawing(litchi_drawingml::Error),
     /// Bounded, inert VBA parsing or authoring error.
     Vba(litchi_vba::Error),
     /// Wide string length error
@@ -102,6 +104,7 @@ impl fmt::Display for XlsbError {
             XlsbError::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
             },
+            XlsbError::Drawing(error) => write!(f, "DrawingML error: {error}"),
             XlsbError::Vba(error) => write!(f, "VBA error: {error}"),
             XlsbError::WideStringLength { expected, actual } => {
                 write!(
@@ -125,6 +128,7 @@ impl std::error::Error for XlsbError {
         match self {
             XlsbError::Io(e) => Some(e),
             XlsbError::Xml(e) => Some(e),
+            XlsbError::Drawing(e) => Some(e),
             XlsbError::Vba(e) => Some(e),
             _ => None,
         }
@@ -152,6 +156,12 @@ impl From<quick_xml::Error> for XlsbError {
 impl From<litchi_core::binary::BinaryError> for XlsbError {
     fn from(err: litchi_core::binary::BinaryError) -> Self {
         XlsbError::Encoding(err.to_string())
+    }
+}
+
+impl From<litchi_drawingml::Error> for XlsbError {
+    fn from(error: litchi_drawingml::Error) -> Self {
+        Self::Drawing(error)
     }
 }
 

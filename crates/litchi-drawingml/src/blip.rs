@@ -4,7 +4,7 @@ use std::{fmt, fmt::Write as _};
 
 use quick_xml::{Reader, events::BytesStart, events::Event};
 
-use crate::{DrawingError, Result};
+use crate::{Error, Result};
 
 /// Write an embedded-image reference, escaping the relationship ID.
 pub fn write_embed(xml: &mut String, relationship_id: &str, include_xmlns_r: bool) -> fmt::Result {
@@ -38,13 +38,13 @@ pub fn write_embed_id(
 /// Read an embedded relationship ID from a `blip` start element.
 pub fn read_embed(element: &BytesStart<'_>) -> Result<Option<String>> {
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| DrawingError::Xml(error.to_string()))?;
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"embed" {
             continue;
         }
 
-        let relationship_id = std::str::from_utf8(&attribute.value)
-            .map_err(|error| DrawingError::Xml(error.to_string()))?;
+        let relationship_id =
+            std::str::from_utf8(&attribute.value).map_err(|error| Error::Xml(error.to_string()))?;
         return Ok(Some(relationship_id.to_owned()));
     }
     Ok(None)
@@ -65,7 +65,7 @@ pub fn find_first_embed(xml: &[u8]) -> Result<Option<String>> {
                 }
             },
             Ok(Event::Eof) => return Ok(None),
-            Err(error) => return Err(DrawingError::Xml(error.to_string())),
+            Err(error) => return Err(Error::Xml(error.to_string())),
             _ => {},
         }
     }

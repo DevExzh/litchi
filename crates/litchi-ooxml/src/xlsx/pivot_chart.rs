@@ -1865,7 +1865,8 @@ mod tests {
             ChartAnchor::new(0, 0, 10, 15),
         )
         .unwrap()
-        .into_pivot_chart("PivotTable1");
+        .into_pivot_chart("PivotTable1")
+        .unwrap();
         workbook.add_chart_sheet("Pivot Chart", chart).unwrap();
         let path = temp_xlsx_path("pivot-chartsheet");
         workbook.save(&path).unwrap();

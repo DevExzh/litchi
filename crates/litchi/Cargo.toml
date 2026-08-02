@@ -65,7 +65,7 @@ odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
 doc = ["dep:litchi-cfb", "dep:litchi-doc", "sign"]
 ppt = ["dep:litchi-cfb", "dep:litchi-ppt", "sign"]
 xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]
-ooxml = ["dep:litchi-ooxml", "dep:soapberry-zip", "sign"]
+ooxml = ["dep:litchi-drawingml", "dep:litchi-ooxml", "dep:soapberry-zip", "sign"]
 ooxml_encryption = ["ooxml", "dep:litchi-cfb", "litchi-ooxml/encryption"]
 rtf = ["dep:litchi-rtf"]
 # Additional functionality features
@@ -90,6 +90,8 @@ flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # C
 itoa = "1.0" # Fast integer-to-string conversion
 litchi-cfb = { workspace = true, optional = true } # Compound File Binary substrate shared by independently gated legacy formats
 litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
+litchi-doc = { workspace = true, optional = true } # Legacy Word binary parser/writer (.doc), independently gated by `doc`
+litchi-drawingml = { workspace = true, optional = true } # Shared DrawingML chart and diagram vocabulary, gated by `ooxml`
 litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
 litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)
 litchi-formula = { workspace = true, optional = true } # Formula parser/converter (carved out in workspace split, gated by `formula` feature)
@@ -98,7 +100,6 @@ litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbe
 litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpers (carved out in workspace split)
 litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
 litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt image grammar exposed by the image facade
-litchi-doc = { workspace = true, optional = true } # Legacy Word binary parser/writer (.doc), independently gated by `doc`
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary parser/writer (.ppt), independently gated by `ppt`
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)

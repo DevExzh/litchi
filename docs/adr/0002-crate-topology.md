@@ -46,6 +46,17 @@ concrete Word, presentation, and spreadsheet crates also depend on their neutral
 vocabulary crate. `litchi-drawingml` may depend on `litchi-sheet` for neutral
 chart data references; no concrete spreadsheet crate may depend on another.
 
+`litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
+XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
+`plot_area`, `reader`, and `writer`; the public codec verbs are the short
+`reader::read` and `writer::write`. `writer::write_with_rels` is the focused
+low-level seam for relationship identifiers allocated by a concrete package.
+`litchi-drawingml::diagram` likewise owns the SmartArt semantic tree plus the
+data, definition, and generated-part grammar. DOCX, PPTX, XLSX, and XLSB retain
+only host anchoring, relationship allocation, and concrete package topology.
+Neither shared module depends on a concrete format or the OOXML migration host,
+and malformed input returns the crate-local `Error` rather than a host error.
+
 `litchi-word`, `litchi-slide`, and `litchi-sheet` depend only on `litchi-core`.
 They contain selectors, queries, events, detached builders, and semantic values,
 not container parsing or concrete document handles. Concrete imported objects

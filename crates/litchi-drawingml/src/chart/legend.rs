@@ -3,9 +3,9 @@
 //! This module contains structures for representing chart legends
 //! and their positioning.
 
-use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
-use crate::charts::models::Layout;
-use crate::charts::types::LegendPosition;
+use crate::chart::data::Layout;
+use crate::chart::model::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
+use crate::chart::types::LegendPosition;
 
 /// Chart legend configuration.
 #[derive(Debug, Clone)]

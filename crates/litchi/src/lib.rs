@@ -308,6 +308,17 @@ pub mod xls {
     pub use litchi_xls::*;
 }
 
+/// Shared DrawingML chart and diagram vocabulary.
+///
+/// This is the concise, host-neutral facade for drawing types shared by OOXML
+/// documents, presentations, and workbooks.
+///
+/// **Note**: This requires the `ooxml` feature to be enabled.
+#[cfg(feature = "ooxml")]
+pub mod drawing {
+    pub use litchi_drawingml::*;
+}
+
 /// OOXML format parser (modern .docx, .pptx files)
 ///
 /// This module provides direct access to OOXML parsing functionality.

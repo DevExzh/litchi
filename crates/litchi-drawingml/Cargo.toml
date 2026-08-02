@@ -9,5 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+litchi-core = { workspace = true }
+litchi-ooxml-common = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }

@@ -3,36 +3,36 @@
 //! This module provides functionality to parse chart XML files
 //! from OOXML packages.
 
-use crate::charts::axis::{
+use crate::chart::axis::{
     Axis, AxisCommon, AxisCrossBetween, AxisCrossMode, AxisLabelAlign, BuiltInUnit, CategoryAxis,
     DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
 };
-use crate::charts::chart::{
+use crate::chart::data::{
+    DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
+};
+use crate::chart::legend::{Legend, LegendEntry};
+use crate::chart::model::{
     Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
     ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
     ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
     ColorSchemeIndex, PictureFormat, PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
 };
-use crate::charts::legend::{Legend, LegendEntry};
-use crate::charts::models::{
-    DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
-};
-use crate::charts::plot_area::{
+use crate::chart::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarShape, BarTypeGroup,
     BubbleTypeGroup, ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup,
     OfPieTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup,
     StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
-use crate::charts::series::{
+use crate::chart::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
     Marker, Series, Trendline, TrendlineType,
 };
-use crate::charts::types::{
+use crate::chart::types::{
     AxisOrientation, AxisPosition, BarDirection, BarGrouping, DataLabelPosition, DisplayBlanks,
     LayoutMode, LayoutTarget, LegendPosition, MarkerStyle, OfPieSplitType, OfPieType, RadarStyle,
     ScatterStyle, TickLabelPosition, TickMark,
 };
-use crate::error::{OoxmlError, Result};
+use crate::{Error, Result};
 use litchi_ooxml_common::xml::{decode_xml_reference, is_drawingml_chart_name, is_drawingml_name};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -93,7 +93,7 @@ impl<R: BufRead> ChartXmlReader<R> {
 
         let mut value = None;
         for attribute in element.attributes() {
-            let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
             if attribute.key.local_name().as_ref() != name {
                 continue;
             }
@@ -108,14 +108,14 @@ impl<R: BufRead> ChartXmlReader<R> {
                 continue;
             }
             if value.is_some() {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart element contains duplicate relationship IDs".into(),
                 ));
             }
             value = Some(
                 attribute
                     .decoded_and_normalized_value(XmlVersion::Explicit1_0, self.decoder())
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .map_err(|error| Error::Xml(error.to_string()))?
                     .into_owned(),
             );
         }
@@ -143,7 +143,7 @@ impl<R: BufRead> ChartXmlReader<R> {
             .write_event(Event::Empty(
                 self.make_fragment_root_self_contained(element),
             ))
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            .map_err(|error| Error::Xml(error.to_string()))?;
         Ok(writer.into_inner())
     }
 
@@ -153,34 +153,30 @@ impl<R: BufRead> ChartXmlReader<R> {
             .write_event(Event::Start(
                 self.make_fragment_root_self_contained(element),
             ))
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            .map_err(|error| Error::Xml(error.to_string()))?;
         let fragment_depth = self.depth;
         let mut buffer = Vec::new();
         loop {
             let (_, event) = self
                 .inner
                 .read_resolved_event_into(&mut buffer)
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                .map_err(|error| Error::Xml(error.to_string()))?;
             match event {
                 Event::Start(_) => {
                     self.depth = self.depth.checked_add(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat(format!("{description} XML nesting is too deep"))
+                        Error::Invalid(format!("{description} XML nesting is too deep"))
                     })?;
                 },
                 Event::End(_) => {
                     self.depth = self.depth.checked_sub(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat(format!(
-                            "{description} has an unmatched closing element"
-                        ))
+                        Error::Invalid(format!("{description} has an unmatched closing element"))
                     })?;
                 },
                 Event::Eof => {
-                    return Err(OoxmlError::InvalidFormat(format!(
-                        "unterminated {description}"
-                    )));
+                    return Err(Error::Invalid(format!("unterminated {description}")));
                 },
                 Event::DocType(_) => {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "{description} cannot contain a document type"
                     )));
                 },
@@ -189,7 +185,7 @@ impl<R: BufRead> ChartXmlReader<R> {
             let finished = matches!(event, Event::End(_)) && self.depth < fragment_depth;
             writer
                 .write_event(event.into_owned())
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                .map_err(|error| Error::Xml(error.to_string()))?;
             buffer.clear();
             if finished {
                 break;
@@ -202,7 +198,7 @@ impl<R: BufRead> ChartXmlReader<R> {
         let (namespace, event) = self
             .inner
             .read_resolved_event_into(buffer)
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            .map_err(|error| Error::Xml(error.to_string()))?;
 
         match event {
             Event::Start(mut element) => {
@@ -213,15 +209,14 @@ impl<R: BufRead> ChartXmlReader<R> {
                     if self.saw_root
                         || !is_drawingml_chart_name(&namespace, element.name(), b"chartSpace")
                     {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart XML must have one DrawingML chartSpace root".to_string(),
                         ));
                     }
                     self.saw_root = true;
                     self.root_namespace_attributes.clear();
                     for attribute in element.attributes() {
-                        let attribute =
-                            attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let name = attribute.key.as_ref();
                         if name == b"xmlns" || name.starts_with(b"xmlns:") {
                             self.root_namespace_attributes
@@ -253,20 +248,21 @@ impl<R: BufRead> ChartXmlReader<R> {
                         }
                     }
                 }
-                self.depth = self.depth.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
-                })?;
+                self.depth = self
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Invalid("chart XML nesting is too deep".to_string()))?;
 
                 if self.skipped_depth > 0 {
                     self.skipped_depth = self.skipped_depth.checked_add(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
+                        Error::Invalid("chart XML nesting is too deep".to_string())
                     })?;
                     element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
                 } else if is_chart && is_drawing_color_map_choice(element.local_name().as_ref()) {
                     element.set_name(INVALID_COLOR_MAPPING_ELEMENT.as_bytes());
                 } else if !is_chart && !is_drawing {
                     self.skipped_depth = self.skipped_depth.checked_add(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
+                        Error::Invalid("chart XML nesting is too deep".to_string())
                     })?;
                     element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
                 } else if is_drawing && !is_preserved_drawing_element(element.local_name().as_ref())
@@ -277,7 +273,7 @@ impl<R: BufRead> ChartXmlReader<R> {
             },
             Event::Empty(mut element) => {
                 if self.depth == 0 {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart XML must have one non-empty DrawingML chartSpace root".to_string(),
                     ));
                 }
@@ -296,7 +292,7 @@ impl<R: BufRead> ChartXmlReader<R> {
             },
             Event::End(element) => {
                 if self.depth == 0 {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart XML has an unmatched closing element".to_string(),
                     ));
                 }
@@ -315,7 +311,7 @@ impl<R: BufRead> ChartXmlReader<R> {
                     is_drawingml_name(&namespace, element.name(), element.local_name().as_ref());
                 if self.depth == 0 {
                     if !is_drawingml_chart_name(&namespace, element.name(), b"chartSpace") {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart XML has an invalid root closing element".to_string(),
                         ));
                     }
@@ -327,7 +323,7 @@ impl<R: BufRead> ChartXmlReader<R> {
                 if is_chart || is_drawing {
                     return Ok(Event::End(element));
                 }
-                Err(OoxmlError::InvalidFormat(
+                Err(Error::Invalid(
                     "chart XML namespace state is inconsistent".to_string(),
                 ))
             },
@@ -335,20 +331,20 @@ impl<R: BufRead> ChartXmlReader<R> {
             Event::Text(ref text) if self.depth == 0 => {
                 if !text
                     .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .map_err(|error| Error::Xml(error.to_string()))?
                     .trim()
                     .is_empty()
                 {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart XML contains text outside its root".to_string(),
                     ));
                 }
                 Ok(event)
             },
-            Event::CData(_) | Event::GeneralRef(_) if self.depth == 0 => Err(
-                OoxmlError::InvalidFormat("chart XML contains data outside its root".to_string()),
-            ),
-            Event::Eof if !self.saw_root || !self.closed_root => Err(OoxmlError::InvalidFormat(
+            Event::CData(_) | Event::GeneralRef(_) if self.depth == 0 => Err(Error::Invalid(
+                "chart XML contains data outside its root".to_string(),
+            )),
+            Event::Eof if !self.saw_root || !self.closed_root => Err(Error::Invalid(
                 "chart XML has no complete chartSpace root".to_string(),
             )),
             Event::Eof => Ok(Event::Eof),
@@ -374,14 +370,14 @@ fn is_drawing_color_map_choice(local_name: &[u8]) -> bool {
 }
 
 /// Parse a chart XML document.
-pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
+pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
     let limits = litchi_ooxml_common::mce::MceLimits::default();
     let mut input = Vec::new();
     reader
         .take((limits.max_input_bytes as u64).saturating_add(1))
         .read_to_end(&mut input)?;
     if input.len() > limits.max_input_bytes {
-        return Err(OoxmlError::MarkupCompatibility(
+        return Err(Error::Mce(
             litchi_ooxml_common::mce::MceError::LimitExceeded("input bytes".into()),
         ));
     }
@@ -404,7 +400,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
         match xml_reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"lang" => {
                 if chart.language.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate language declarations".into(),
                     ));
                 }
@@ -418,7 +414,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"lang" => {
                 if chart.language.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate language declarations".into(),
                     ));
                 }
@@ -431,33 +427,33 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pivotSource" => {
                 if chart.pivot_source.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate pivot sources".into(),
                     ));
                 }
                 chart.pivot_source = Some(parse_pivot_source(&mut xml_reader)?);
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pivotSource" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart pivot source requires a name and format ID".into(),
                 ));
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"clrMapOvr" => {
                 if chart.color_map_override.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate color-map overrides".into(),
                     ));
                 }
                 chart.color_map_override = Some(parse_color_map_override(&mut xml_reader)?);
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"clrMapOvr" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart color-map override requires a mapping choice".into(),
                 ));
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"protection" => {
                 if chart.protection.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate protection settings".into(),
                     ));
                 }
@@ -465,7 +461,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"protection" => {
                 if chart.protection.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate protection settings".into(),
                     ));
                 }
@@ -473,7 +469,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pivotFmts" => {
                 if chart.pivot_formats.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate pivot-format collections".into(),
                     ));
                 }
@@ -481,7 +477,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pivotFmts" => {
                 if chart.pivot_formats.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate pivot-format collections".into(),
                     ));
                 }
@@ -489,17 +485,13 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"view3D" => {
                 if chart.view_3d.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
-                        "chart contains duplicate 3D views".into(),
-                    ));
+                    return Err(Error::Invalid("chart contains duplicate 3D views".into()));
                 }
                 chart.view_3d = Some(parse_view_3d(&mut xml_reader)?);
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"view3D" => {
                 if chart.view_3d.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
-                        "chart contains duplicate 3D views".into(),
-                    ));
+                    return Err(Error::Invalid("chart contains duplicate 3D views".into()));
                 }
                 chart.view_3d = Some(View3D::new());
             },
@@ -513,10 +505,12 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     b"floor" => &mut chart.floor,
                     b"backWall" => &mut chart.back_wall,
                     b"sideWall" => &mut chart.side_wall,
-                    _ => unreachable!(),
+                    _ => {
+                        return Err(Error::Invalid("invalid chart 3D surface element".into()));
+                    },
                 };
                 if target.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate 3D surfaces".into(),
                     ));
                 }
@@ -532,10 +526,12 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     b"floor" => &mut chart.floor,
                     b"backWall" => &mut chart.back_wall,
                     b"sideWall" => &mut chart.side_wall,
-                    _ => unreachable!(),
+                    _ => {
+                        return Err(Error::Invalid("invalid chart 3D surface element".into()));
+                    },
                 };
                 if target.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate 3D surfaces".into(),
                     ));
                 }
@@ -546,7 +542,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"printSettings" => {
                 if chart.print_settings.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate print settings".into(),
                     ));
                 }
@@ -554,7 +550,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"printSettings" => {
                 if chart.print_settings.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate print settings".into(),
                     ));
                 }
@@ -562,7 +558,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"externalData" => {
                 if chart.external_data.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate external-data relationships".into(),
                     ));
                 }
@@ -571,7 +567,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"externalData" => {
                 if chart.external_data.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate external-data relationships".into(),
                     ));
                 }
@@ -582,7 +578,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if closed_chart && e.local_name().as_ref() == b"spPr" => {
                 if chart.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart-space shape properties".into(),
                     ));
                 }
@@ -592,7 +588,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if closed_chart && e.local_name().as_ref() == b"spPr" => {
                 if chart.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart-space shape properties".into(),
                     ));
                 }
@@ -602,7 +598,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if closed_chart && e.local_name().as_ref() == b"txPr" => {
                 if chart.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart-space text properties".into(),
                     ));
                 }
@@ -612,7 +608,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if closed_chart && e.local_name().as_ref() == b"txPr" => {
                 if chart.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart-space text properties".into(),
                     ));
                 }
@@ -622,7 +618,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"userShapes" => {
                 if chart.user_shapes.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate user-shapes relationships".into(),
                     ));
                 }
@@ -638,7 +634,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"userShapes" => {
                 if chart.user_shapes.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate user-shapes relationships".into(),
                     ));
                 }
@@ -651,7 +647,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                 if saw_chart && !closed_chart && e.local_name().as_ref() == b"extLst" =>
             {
                 if chart.chart_extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart extension lists".into(),
                     ));
                 }
@@ -663,7 +659,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                 if saw_chart && !closed_chart && e.local_name().as_ref() == b"extLst" =>
             {
                 if chart.chart_extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart extension lists".into(),
                     ));
                 }
@@ -673,7 +669,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Start(ref e)) if closed_chart && e.local_name().as_ref() == b"extLst" => {
                 if chart.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart-space extension lists".into(),
                     ));
                 }
@@ -683,7 +679,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Empty(ref e)) if closed_chart && e.local_name().as_ref() == b"extLst" => {
                 if chart.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart contains duplicate chart-space extension lists".into(),
                     ));
                 }
@@ -698,9 +694,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     b"chartSpace" => {},
                     b"title" => {
                         if chart.title.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
-                                "chart contains duplicate titles".into(),
-                            ));
+                            return Err(Error::Invalid("chart contains duplicate titles".into()));
                         }
                         let title = parse_title(&mut xml_reader)?;
                         chart.title = Some(title.text);
@@ -745,7 +739,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             },
             Ok(Event::Eof) if saw_chart && closed_chart => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart XML has no complete chart element".to_string(),
                 ));
             },
@@ -766,7 +760,7 @@ fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"name" => {
                 if name.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot source contains duplicate names".into(),
                     ));
                 }
@@ -774,7 +768,7 @@ fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"name" => {
                 if name.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot source contains duplicate names".into(),
                     ));
                 }
@@ -782,7 +776,7 @@ fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"fmtId" => {
                 if format_id.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot source contains duplicate format IDs".into(),
                     ));
                 }
@@ -791,7 +785,7 @@ fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"fmtId" => {
                 if format_id.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot source contains duplicate format IDs".into(),
                     ));
                 }
@@ -799,9 +793,7 @@ fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pivotSource" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart pivot source".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart pivot source".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -833,7 +825,7 @@ fn parse_chart_protection<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
                     },
                 };
                 if field.is_some() {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "chart protection contains duplicate {} settings",
                         String::from_utf8_lossy(element.local_name().as_ref())
                     )));
@@ -855,7 +847,7 @@ fn parse_chart_protection<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
                     },
                 };
                 if field.is_some() {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "chart protection contains duplicate {} settings",
                         String::from_utf8_lossy(element.local_name().as_ref())
                     )));
@@ -866,9 +858,7 @@ fn parse_chart_protection<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
                 return Ok(protection);
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "chart protection is not closed".into(),
-                ));
+                return Err(Error::Invalid("chart protection is not closed".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -888,7 +878,7 @@ fn parse_color_map_override<R: BufRead>(
                 if element.local_name().as_ref() == b"masterClrMapping" =>
             {
                 if mapping.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart color-map override contains multiple choices".into(),
                     ));
                 }
@@ -908,7 +898,7 @@ fn parse_color_map_override<R: BufRead>(
                 if element.local_name().as_ref() == b"overrideClrMapping" =>
             {
                 if mapping.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart color-map override contains multiple choices".into(),
                     ));
                 }
@@ -929,19 +919,17 @@ fn parse_color_map_override<R: BufRead>(
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
             {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart color-map override contains an unexpected choice".into(),
                 ));
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"clrMapOvr" => {
                 return mapping.ok_or_else(|| {
-                    OoxmlError::InvalidFormat(
-                        "chart color-map override requires a mapping choice".into(),
-                    )
+                    Error::Invalid("chart color-map override requires a mapping choice".into())
                 });
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart color-map override is not closed".into(),
                 ));
             },
@@ -957,7 +945,7 @@ fn set_color_map_override_choice(
     value: ColorMapOverride,
 ) -> Result<()> {
     if target.is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart color-map override contains multiple choices".into(),
         ));
     }
@@ -989,7 +977,7 @@ fn required_chart_relationship_id<R: BufRead>(
     reader
         .relationship_attribute_value(element, b"id")?
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| OoxmlError::InvalidFormat("chart relationship ID is required".into()))
+        .ok_or_else(|| Error::Invalid("chart relationship ID is required".into()))
 }
 
 fn parse_external_data<R: BufRead>(
@@ -1003,7 +991,7 @@ fn parse_external_data<R: BufRead>(
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"autoUpdate" => {
                 if saw_auto_update {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart external data contains duplicate auto-update settings".into(),
                     ));
                 }
@@ -1017,7 +1005,7 @@ fn parse_external_data<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"autoUpdate" => {
                 if saw_auto_update {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart external data contains duplicate auto-update settings".into(),
                     ));
                 }
@@ -1027,7 +1015,7 @@ fn parse_external_data<R: BufRead>(
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
             {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart external data contains an unexpected child".into(),
                 ));
             },
@@ -1035,9 +1023,7 @@ fn parse_external_data<R: BufRead>(
                 return Ok(external_data);
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "chart external data is not closed".into(),
-                ));
+                return Err(Error::Invalid("chart external data is not closed".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1051,7 +1037,7 @@ fn required_color_scheme_index(
     attribute: &[u8],
 ) -> Result<ColorSchemeIndex> {
     let value = get_attr(element, attribute).ok_or_else(|| {
-        OoxmlError::InvalidFormat(format!(
+        Error::Invalid(format!(
             "chart color mapping is missing its {} assignment",
             String::from_utf8_lossy(attribute)
         ))
@@ -1084,7 +1070,7 @@ fn parse_pivot_formats<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Vec
                     .iter()
                     .any(|existing: &PivotFormat| existing.index == format.index)
                 {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "chart contains duplicate pivot-format index {}",
                         format.index
                     )));
@@ -1092,15 +1078,13 @@ fn parse_pivot_formats<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Vec
                 formats.push(format);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pivotFmt" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart pivot format is missing its index".into(),
                 ));
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pivotFmts" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart pivot formats".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart pivot formats".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1122,7 +1106,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate shape properties".into(),
                     ));
                 }
@@ -1132,7 +1116,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate shape properties".into(),
                     ));
                 }
@@ -1142,7 +1126,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate text properties".into(),
                     ));
                 }
@@ -1152,7 +1136,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate text properties".into(),
                     ));
                 }
@@ -1162,7 +1146,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"marker" => {
                 if marker.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate markers".into(),
                     ));
                 }
@@ -1170,7 +1154,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"marker" => {
                 if marker.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate markers".into(),
                     ));
                 }
@@ -1178,14 +1162,14 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbl" => {
                 if data_label.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate data labels".into(),
                     ));
                 }
                 data_label = Some(parse_data_label(reader)?);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dLbl" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart pivot-format data label is missing its index".into(),
                 ));
             },
@@ -1193,7 +1177,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                 if element.local_name().as_ref() == b"idx" =>
             {
                 if index.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate indexes".into(),
                     ));
                 }
@@ -1201,7 +1185,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate extension lists".into(),
                     ));
                 }
@@ -1211,7 +1195,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart pivot format contains duplicate extension lists".into(),
                     ));
                 }
@@ -1221,9 +1205,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pivotFmt" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart pivot format".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart pivot format".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1248,7 +1230,7 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"headerFooter" => {
                 if settings.header_footer.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart print settings contain duplicate headers and footers".into(),
                     ));
                 }
@@ -1256,7 +1238,7 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"headerFooter" => {
                 if settings.header_footer.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart print settings contain duplicate headers and footers".into(),
                     ));
                 }
@@ -1264,7 +1246,7 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pageMargins" => {
                 if settings.page_margins.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart print settings contain duplicate page margins".into(),
                     ));
                 }
@@ -1273,7 +1255,7 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pageMargins" => {
                 if settings.page_margins.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart print settings contain duplicate page margins".into(),
                     ));
                 }
@@ -1281,7 +1263,7 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pageSetup" => {
                 if settings.page_setup.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart print settings contain duplicate page setup".into(),
                     ));
                 }
@@ -1290,7 +1272,7 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pageSetup" => {
                 if settings.page_setup.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart print settings contain duplicate page setup".into(),
                     ));
                 }
@@ -1300,9 +1282,7 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
                 break;
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart print settings".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart print settings".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1356,13 +1336,13 @@ fn parse_chart_header_footer<R: BufRead>(
                         continue;
                     },
                     _ => {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart header/footer contains an unexpected child".into(),
                         ));
                     },
                 };
                 if value.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart header/footer contains a duplicate string".into(),
                     ));
                 }
@@ -1381,22 +1361,20 @@ fn parse_chart_header_footer<R: BufRead>(
                         continue;
                     },
                     _ => {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart header/footer contains an unexpected child".into(),
                         ));
                     },
                 };
                 if value.replace(String::new()).is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart header/footer contains a duplicate string".into(),
                     ));
                 }
             },
             Ok(Event::End(ref child)) if child.local_name().as_ref() == b"headerFooter" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart header/footer".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart header/footer".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1471,25 +1449,21 @@ fn consume_empty_chart_element<R: BufRead>(
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
             {
-                return Err(OoxmlError::InvalidFormat(format!(
+                return Err(Error::Invalid(format!(
                     "{description} contains child elements"
                 )));
             },
             Ok(Event::Text(ref text))
                 if !text
                     .decode()
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .map_err(|error| Error::Xml(error.to_string()))?
                     .trim()
                     .is_empty() =>
             {
-                return Err(OoxmlError::InvalidFormat(format!(
-                    "{description} contains text"
-                )));
+                return Err(Error::Invalid(format!("{description} contains text")));
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(format!(
-                    "unterminated {description}"
-                )));
+                return Err(Error::Invalid(format!("unterminated {description}")));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1524,7 +1498,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
                 if layout.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate layouts".into(),
                     ));
                 }
@@ -1534,7 +1508,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                 layout = Some(match layout {
                     None => Layout::new(),
                     Some(_) => {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart title contains duplicate layouts".into(),
                         ));
                     },
@@ -1544,7 +1518,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                 if element.local_name().as_ref() == b"overlay" =>
             {
                 if saw_overlay {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate overlay flags".into(),
                     ));
                 }
@@ -1553,7 +1527,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate shape properties".into(),
                     ));
                 }
@@ -1563,7 +1537,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate shape properties".into(),
                     ));
                 }
@@ -1573,7 +1547,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate text properties".into(),
                     ));
                 }
@@ -1583,7 +1557,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate text properties".into(),
                     ));
                 }
@@ -1593,7 +1567,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate extension lists".into(),
                     ));
                 }
@@ -1603,7 +1577,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate extension lists".into(),
                     ));
                 }
@@ -1613,7 +1587,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"f" => {
                 if formula.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart title contains duplicate formula references".to_string(),
                     ));
                 }
@@ -1624,10 +1598,10 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                 in_text = true;
             },
             Ok(Event::Text(e)) if in_text => {
-                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
+                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
             },
             Ok(Event::CData(e)) if in_text => {
-                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
+                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
             },
             Ok(Event::GeneralRef(reference)) if in_text => {
                 text.push_str(&decode_xml_reference(&reference)?);
@@ -1637,9 +1611,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"title" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1649,7 +1621,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
 
     let text = if let Some(formula) = formula {
         if saw_text {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "chart title mixes a formula reference with literal text".to_string(),
             ));
         }
@@ -1699,9 +1671,7 @@ fn parse_view_3d<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<View3D> {
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"view3D" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1720,7 +1690,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"thickness" => {
                 if wall_floor.thickness.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate thickness values".into(),
                     ));
                 }
@@ -1729,7 +1699,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"thickness" => {
                 if wall_floor.thickness.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate thickness values".into(),
                     ));
                 }
@@ -1737,7 +1707,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if wall_floor.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate shape properties".into(),
                     ));
                 }
@@ -1747,7 +1717,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if wall_floor.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate shape properties".into(),
                     ));
                 }
@@ -1757,7 +1727,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
                 if wall_floor.picture_options.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate picture options".into(),
                     ));
                 }
@@ -1765,7 +1735,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
                 if wall_floor.picture_options.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate picture options".into(),
                     ));
                 }
@@ -1773,7 +1743,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if wall_floor.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate extension lists".into(),
                     ));
                 }
@@ -1783,7 +1753,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if wall_floor.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart surface contains duplicate extension lists".into(),
                     ));
                 }
@@ -1801,9 +1771,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
                 }
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1835,9 +1803,7 @@ fn parse_picture_options<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<P
                 break;
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart picture options".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart picture options".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -1865,7 +1831,7 @@ fn parse_picture_option_child(
         b"applyToEnd" => Some(&mut options.apply_to_end),
         b"pictureFormat" => {
             if options.picture_format.is_some() {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart picture options contain duplicate formats".into(),
                 ));
             }
@@ -1875,7 +1841,7 @@ fn parse_picture_option_child(
                 "stack" => PictureFormat::Stack,
                 "stackScale" => PictureFormat::StackScale,
                 _ => {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "invalid chart picture format '{value}'"
                     )));
                 },
@@ -1884,7 +1850,7 @@ fn parse_picture_option_child(
         },
         b"pictureStackUnit" => {
             if options.picture_stack_unit.is_some() {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart picture options contain duplicate stack units".into(),
                 ));
             }
@@ -1894,11 +1860,16 @@ fn parse_picture_option_child(
             )?);
             None
         },
-        _ => unreachable!("picture option child was checked by caller"),
+        _ => {
+            return Err(Error::Invalid(format!(
+                "invalid chart picture option '{}'",
+                String::from_utf8_lossy(element.local_name().as_ref())
+            )));
+        },
     };
     if let Some(target) = target {
         if target.is_some() {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "chart picture options contain a duplicate apply flag".into(),
             ));
         }
@@ -1922,7 +1893,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dTable" => {
                 if saw_data_table {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart plot area contains duplicate data tables".into(),
                     ));
                 }
@@ -1931,7 +1902,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dTable" => {
                 if saw_data_table {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart plot area contains duplicate data tables".into(),
                     ));
                 }
@@ -1940,7 +1911,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if plot_area.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart plot area contains duplicate shape properties".into(),
                     ));
                 }
@@ -1950,7 +1921,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if plot_area.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart plot area contains duplicate shape properties".into(),
                     ));
                 }
@@ -1960,7 +1931,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if plot_area.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart plot area contains duplicate extension lists".into(),
                     ));
                 }
@@ -1970,7 +1941,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if plot_area.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart plot area contains duplicate extension lists".into(),
                     ));
                 }
@@ -1985,7 +1956,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                         b"catAx" | b"valAx" | b"dateAx" | b"serAx"
                     ) =>
             {
-                return Err(OoxmlError::InvalidFormat(format!(
+                return Err(Error::Invalid(format!(
                     "chart plot-area element {} cannot be empty",
                     String::from_utf8_lossy(e.local_name().as_ref())
                 )));
@@ -2098,9 +2069,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"plotArea" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2141,7 +2110,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if data_table.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data table contains duplicate shape properties".into(),
                     ));
                 }
@@ -2151,7 +2120,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if data_table.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data table contains duplicate shape properties".into(),
                     ));
                 }
@@ -2161,7 +2130,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if data_table.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data table contains duplicate text properties".into(),
                     ));
                 }
@@ -2171,7 +2140,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if data_table.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data table contains duplicate text properties".into(),
                     ));
                 }
@@ -2181,7 +2150,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if data_table.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data table contains duplicate extension lists".into(),
                     ));
                 }
@@ -2191,7 +2160,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if data_table.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data table contains duplicate extension lists".into(),
                     ));
                 }
@@ -2209,7 +2178,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
                 };
                 if let Some((index, field)) = field {
                     if seen[index] {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart data table contains a duplicate visibility setting".into(),
                         ));
                     }
@@ -2219,9 +2188,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dTable" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart data table".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart data table".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2263,9 +2230,7 @@ fn parse_layout<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Layout> {
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"layout" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart layout".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart layout".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2346,9 +2311,7 @@ fn parse_common_type_group<R: BufRead>(
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart type group".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart type group".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2365,7 +2328,7 @@ fn parse_type_group_extension<R: BufRead>(
     empty: bool,
 ) -> Result<()> {
     if common.extension_list.is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart type group contains duplicate extension lists".into(),
         ));
     }
@@ -2380,7 +2343,7 @@ fn parse_type_group_extension<R: BufRead>(
 
 fn begin_group_data_labels(seen: &mut bool) -> Result<()> {
     if *seen {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart type group contains duplicate data-label settings".into(),
         ));
     }
@@ -2394,9 +2357,7 @@ fn set_chart_lines(
     description: &str,
 ) -> Result<()> {
     if target.replace(lines).is_some() {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "{description} are duplicated"
-        )));
+        return Err(Error::Invalid(format!("{description} are duplicated")));
     }
     Ok(())
 }
@@ -2411,7 +2372,7 @@ fn parse_chart_lines<R: BufRead>(
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if lines.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart lines contain duplicate shape properties".into(),
                     ));
                 }
@@ -2421,7 +2382,7 @@ fn parse_chart_lines<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if lines.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart lines contain duplicate shape properties".into(),
                     ));
                 }
@@ -2431,9 +2392,7 @@ fn parse_chart_lines<R: BufRead>(
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart-line formatting".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart-line formatting".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2445,7 +2404,7 @@ fn parse_chart_lines<R: BufRead>(
 
 fn set_empty_up_down_bars(target: &mut Option<UpDownBars>, description: &str) -> Result<()> {
     if target.replace(UpDownBars::default()).is_some() {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "{description} contains duplicate up/down bars"
         )));
     }
@@ -2538,7 +2497,7 @@ fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Do
                     None => 0,
                 };
                 if first_slice_angle > 360 {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart first-slice angle exceeds 360".to_string(),
                     ));
                 }
@@ -2636,7 +2595,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"custSplit" => {
                 if saw_custom_split {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "of-pie chart contains duplicate custom splits".into(),
                     ));
                 }
@@ -2645,7 +2604,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"custSplit" => {
                 if saw_custom_split {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "of-pie chart contains duplicate custom splits".into(),
                     ));
                 }
@@ -2656,7 +2615,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
                 match element.local_name().as_ref() {
                     b"ofPieType" => {
                         if saw_of_pie_type {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "of-pie chart contains duplicate plot types".into(),
                             ));
                         }
@@ -2675,7 +2634,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
                     },
                     b"gapWidth" => {
                         if saw_gap_width {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "of-pie chart contains duplicate gap widths".into(),
                             ));
                         }
@@ -2689,7 +2648,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
                     },
                     b"splitType" => {
                         if saw_split_type {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "of-pie chart contains duplicate split types".into(),
                             ));
                         }
@@ -2707,7 +2666,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
                     },
                     b"splitPos" => {
                         if saw_split_position {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "of-pie chart contains duplicate split positions".into(),
                             ));
                         }
@@ -2717,7 +2676,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
                     },
                     b"secondPieSize" => {
                         if saw_second_pie_size {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "of-pie chart contains duplicate secondary sizes".into(),
                             ));
                         }
@@ -2737,9 +2696,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"ofPieChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated of-pie chart".into(),
-                ));
+                return Err(Error::Invalid("unterminated of-pie chart".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2748,7 +2705,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
     }
 
     if !saw_of_pie_type {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "of-pie chart is missing its plot type".into(),
         ));
     }
@@ -2767,9 +2724,7 @@ fn parse_custom_pie_split<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"custSplit" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated of-pie custom split".into(),
-                ));
+                return Err(Error::Invalid("unterminated of-pie custom split".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2801,7 +2756,7 @@ fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if bars.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart up/down bars contain duplicate extension lists".into(),
                     ));
                 }
@@ -2811,7 +2766,7 @@ fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if bars.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart up/down bars contain duplicate extension lists".into(),
                     ));
                 }
@@ -2823,7 +2778,7 @@ fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDo
                 if element.local_name().as_ref() == b"gapWidth" =>
             {
                 if saw_gap_width {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart up/down bars contain duplicate gap widths".into(),
                     ));
                 }
@@ -2837,9 +2792,7 @@ fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDo
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"upDownBars" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart up/down bars".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart up/down bars".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2904,7 +2857,7 @@ fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Stock
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"upDownBars" => {
                 if up_down_bars.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "stock chart contains duplicate up/down bars".into(),
                     ));
                 }
@@ -2936,7 +2889,7 @@ fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Stock
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"stockChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat("unterminated stock chart".into()));
+                return Err(Error::Invalid("unterminated stock chart".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -2990,7 +2943,7 @@ fn parse_surface_type_group<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"bandFmts" => {
                 if band_formats.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "surface chart contains duplicate band-format collections".into(),
                     ));
                 }
@@ -2998,7 +2951,7 @@ fn parse_surface_type_group<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"bandFmts" => {
                 if band_formats.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "surface chart contains duplicate band-format collections".into(),
                     ));
                 }
@@ -3010,7 +2963,7 @@ fn parse_surface_type_group<R: BufRead>(
                 }
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"ser" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "surface chart contains an empty series".into(),
                 ));
             },
@@ -3025,9 +2978,7 @@ fn parse_surface_type_group<R: BufRead>(
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated surface chart".into(),
-                ));
+                return Err(Error::Invalid("unterminated surface chart".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3050,7 +3001,7 @@ fn parse_surface_band_formats<R: BufRead>(
                     .iter()
                     .any(|existing: &BandFormat| existing.index == format.index)
                 {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "surface chart contains duplicate band index {}",
                         format.index
                     )));
@@ -3058,13 +3009,13 @@ fn parse_surface_band_formats<R: BufRead>(
                 formats.push(format);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"bandFmt" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "surface chart band format is missing its index".into(),
                 ));
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"bandFmts" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "unterminated surface chart band formats".into(),
                 ));
             },
@@ -3084,7 +3035,7 @@ fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resu
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "surface chart band format contains duplicate shape properties".into(),
                     ));
                 }
@@ -3094,7 +3045,7 @@ fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resu
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "surface chart band format contains duplicate shape properties".into(),
                     ));
                 }
@@ -3106,7 +3057,7 @@ fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resu
                 if element.local_name().as_ref() == b"idx" =>
             {
                 if index.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "surface chart band format contains duplicate indexes".into(),
                     ));
                 }
@@ -3114,7 +3065,7 @@ fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resu
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"bandFmt" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "unterminated surface chart band format".into(),
                 ));
             },
@@ -3206,9 +3157,7 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"barChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3300,9 +3249,7 @@ fn parse_bar_3d_chart<R: BufRead>(
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"bar3DChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3357,7 +3304,7 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"upDownBars" => {
                 if up_down_bars.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "line chart contains duplicate up/down bars".into(),
                     ));
                 }
@@ -3398,9 +3345,7 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"lineChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3462,9 +3407,7 @@ fn parse_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"pieChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3530,9 +3473,7 @@ fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"areaChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3604,9 +3545,7 @@ fn parse_scatter_chart<R: BufRead>(
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"scatterChart" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3631,7 +3570,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if series.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series contains duplicate shape properties".into(),
                     ));
                 }
@@ -3641,7 +3580,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if series.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series contains duplicate shape properties".into(),
                     ));
                 }
@@ -3651,7 +3590,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
                 if series.picture_options.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series contains duplicate picture options".into(),
                     ));
                 }
@@ -3659,7 +3598,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
                 if series.picture_options.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series contains duplicate picture options".into(),
                     ));
                 }
@@ -3667,7 +3606,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if series.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series contains duplicate extension lists".into(),
                     ));
                 }
@@ -3677,7 +3616,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if series.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series contains duplicate extension lists".into(),
                     ));
                 }
@@ -3687,7 +3626,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"marker" => {
                 if saw_marker {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series has duplicate marker".to_string(),
                     ));
                 }
@@ -3701,7 +3640,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"marker" => {
                 if saw_marker {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart series has duplicate marker".to_string(),
                     ));
                 }
@@ -3713,7 +3652,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                 match tag_name.as_ref() {
                     b"idx" => {
                         if saw_index {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart series has duplicate index".to_string(),
                             ));
                         }
@@ -3722,7 +3661,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                     },
                     b"order" => {
                         if saw_order {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart series has duplicate order".to_string(),
                             ));
                         }
@@ -3742,7 +3681,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                             .iter()
                             .any(|existing| existing.index == point.index)
                         {
-                            return Err(OoxmlError::InvalidFormat(format!(
+                            return Err(Error::Invalid(format!(
                                 "chart series has duplicate data-point index {}",
                                 point.index
                             )));
@@ -3751,7 +3690,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                     },
                     b"dLbls" => {
                         if saw_data_labels {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart series has duplicate data-label settings".to_string(),
                             ));
                         }
@@ -3766,7 +3705,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                             .iter()
                             .any(|existing| existing.direction == error_bar.direction)
                         {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart series has duplicate error-bar direction".to_string(),
                             ));
                         }
@@ -3798,7 +3737,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                     },
                     b"shape" => {
                         if series.bar_shape.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart series contains duplicate bar shapes".into(),
                             ));
                         }
@@ -3809,9 +3748,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"ser" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -3820,7 +3757,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
     }
 
     if !saw_index || !saw_order {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart series requires both index and order".to_string(),
         ));
     }
@@ -3850,7 +3787,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart marker has duplicate shape properties".into(),
                     ));
                 }
@@ -3860,7 +3797,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart marker has duplicate shape properties".into(),
                     ));
                 }
@@ -3870,7 +3807,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart marker has duplicate extension lists".into(),
                     ));
                 }
@@ -3880,7 +3817,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart marker has duplicate extension lists".into(),
                     ));
                 }
@@ -3892,7 +3829,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
                 match element.local_name().as_ref() {
                     b"symbol" => {
                         if symbol.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart marker has duplicate symbol".to_string(),
                             ));
                         }
@@ -3900,7 +3837,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
                     },
                     b"size" => {
                         if size.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart marker has duplicate size".to_string(),
                             ));
                         }
@@ -3911,7 +3848,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"marker" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "unterminated chart series marker".to_string(),
                 ));
             },
@@ -3942,7 +3879,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"marker" => {
                 if marker.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate markers".into(),
                     ));
                 }
@@ -3950,7 +3887,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"marker" => {
                 if marker.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate markers".into(),
                     ));
                 }
@@ -3958,7 +3895,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate shape properties".into(),
                     ));
                 }
@@ -3968,7 +3905,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate shape properties".into(),
                     ));
                 }
@@ -3978,7 +3915,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pictureOptions" => {
                 if picture_options.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate picture options".into(),
                     ));
                 }
@@ -3986,7 +3923,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pictureOptions" => {
                 if picture_options.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate picture options".into(),
                     ));
                 }
@@ -3994,7 +3931,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate extension lists".into(),
                     ));
                 }
@@ -4004,7 +3941,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data point contains duplicate extension lists".into(),
                     ));
                 }
@@ -4027,9 +3964,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dPt" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart data point".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart data point".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -4069,7 +4004,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                     .iter()
                     .any(|existing| existing.index == label.index)
                 {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "chart data labels contain duplicate point index {}",
                         label.index
                     )));
@@ -4077,13 +4012,13 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                 labels.labels.push(label);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dLbl" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart point data label is missing its index".into(),
                 ));
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if labels.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data labels contain duplicate shape properties".into(),
                     ));
                 }
@@ -4094,7 +4029,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if labels.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data labels contain duplicate shape properties".into(),
                     ));
                 }
@@ -4105,7 +4040,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if labels.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data labels contain duplicate text properties".into(),
                     ));
                 }
@@ -4116,7 +4051,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if labels.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data labels contain duplicate text properties".into(),
                     ));
                 }
@@ -4143,7 +4078,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if labels.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data labels contain duplicate extension lists".into(),
                     ));
                 }
@@ -4153,7 +4088,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if labels.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data labels contain duplicate extension lists".into(),
                     ));
                 }
@@ -4169,7 +4104,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                 match element.local_name().as_ref() {
                     b"delete" => {
                         if saw_delete {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart data labels contain duplicate delete flags".into(),
                             ));
                         }
@@ -4178,7 +4113,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                     },
                     b"numFmt" => {
                         if saw_number_format {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart data labels contain duplicate number formats".into(),
                             ));
                         }
@@ -4227,9 +4162,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dLbls" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart data labels".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart data labels".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -4237,7 +4170,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
         buf.clear();
     }
     if saw_delete && saw_shared_settings {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart data labels mix deletion with shared settings".into(),
         ));
     }
@@ -4255,7 +4188,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
                 if label.layout.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate layouts".into(),
                     ));
                 }
@@ -4266,7 +4199,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                 label.layout = Some(match label.layout {
                     None => Layout::new(),
                     Some(_) => {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart point data label contains duplicate layouts".into(),
                         ));
                     },
@@ -4275,7 +4208,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"tx" => {
                 if label.text.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate text".into(),
                     ));
                 }
@@ -4284,7 +4217,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if label.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate shape properties".into(),
                     ));
                 }
@@ -4295,7 +4228,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if label.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate shape properties".into(),
                     ));
                 }
@@ -4306,7 +4239,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if label.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate text properties".into(),
                     ));
                 }
@@ -4317,7 +4250,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if label.text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate text properties".into(),
                     ));
                 }
@@ -4328,7 +4261,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if label.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate extension lists".into(),
                     ));
                 }
@@ -4338,7 +4271,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if label.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart point data label contains duplicate extension lists".into(),
                     ));
                 }
@@ -4354,7 +4287,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                 let is_setting = match element.local_name().as_ref() {
                     b"idx" => {
                         if saw_index {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart point data label contains duplicate indexes".into(),
                             ));
                         }
@@ -4364,7 +4297,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                     },
                     b"delete" => {
                         if saw_delete {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart point data label contains duplicate delete flags".into(),
                             ));
                         }
@@ -4374,7 +4307,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                     },
                     b"numFmt" => {
                         if label.number_format.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart point data label contains duplicate number formats".into(),
                             ));
                         }
@@ -4419,9 +4352,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dLbl" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart point data label".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart point data label".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -4433,7 +4364,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
         return Err(missing_attribute("chart point data-label index"));
     }
     if saw_delete && saw_settings {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart point data label mixes deletion with label settings".into(),
         ));
     }
@@ -4450,7 +4381,7 @@ fn parse_label_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"f" => {
                 if formula.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart data label contains duplicate formula references".into(),
                     ));
                 }
@@ -4463,12 +4394,12 @@ fn parse_label_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             Ok(Event::Text(value)) if in_text => text.push_str(
                 &value
                     .decode()
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                    .map_err(|error| Error::Xml(error.to_string()))?,
             ),
             Ok(Event::CData(value)) if in_text => text.push_str(
                 &value
                     .decode()
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                    .map_err(|error| Error::Xml(error.to_string()))?,
             ),
             Ok(Event::GeneralRef(reference)) if in_text => {
                 text.push_str(&decode_xml_reference(&reference)?);
@@ -4478,9 +4409,7 @@ fn parse_label_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"tx" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart data-label text".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart data-label text".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -4490,7 +4419,7 @@ fn parse_label_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
 
     if let Some(formula) = formula {
         if saw_text {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "chart data label mixes a formula reference with literal text".into(),
             ));
         }
@@ -4512,7 +4441,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
                 if matches!(e.local_name().as_ref(), b"name" | b"trendlineName") =>
             {
                 if trendline.name.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline contains duplicate names".into(),
                     ));
                 }
@@ -4520,7 +4449,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if trendline.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline contains duplicate shape properties".into(),
                     ));
                 }
@@ -4530,7 +4459,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if trendline.shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline contains duplicate shape properties".into(),
                     ));
                 }
@@ -4540,7 +4469,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if trendline.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline contains duplicate extension lists".into(),
                     ));
                 }
@@ -4550,7 +4479,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if trendline.extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline contains duplicate extension lists".into(),
                     ));
                 }
@@ -4560,7 +4489,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"trendlineLbl" => {
                 if trendline.show_label {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline contains duplicate labels".into(),
                     ));
                 }
@@ -4575,7 +4504,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"trendlineLbl" => {
                 if trendline.show_label {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline contains duplicate labels".into(),
                     ));
                 }
@@ -4616,9 +4545,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"trendline" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart trendline".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart trendline".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -4637,14 +4564,14 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
         return Err(missing_attribute("moving-average trendline period"));
     }
     if !matches!(trendline.trendline_type, TrendlineType::Polynomial) && trendline.order.is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "only polynomial trendlines can specify an order".to_string(),
         ));
     }
     if !matches!(trendline.trendline_type, TrendlineType::MovingAverage)
         && trendline.period.is_some()
     {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "only moving-average trendlines can specify a period".to_string(),
         ));
     }
@@ -4676,7 +4603,7 @@ fn parse_trendline_label<R: BufRead>(
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
                 if layout.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate layouts".into(),
                     ));
                 }
@@ -4686,7 +4613,7 @@ fn parse_trendline_label<R: BufRead>(
                 layout = Some(match layout {
                     None => Layout::new(),
                     Some(_) => {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart trendline label contains duplicate layouts".into(),
                         ));
                     },
@@ -4694,7 +4621,7 @@ fn parse_trendline_label<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"tx" => {
                 if saw_text {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate text".into(),
                     ));
                 }
@@ -4705,7 +4632,7 @@ fn parse_trendline_label<R: BufRead>(
                 if element.local_name().as_ref() == b"numFmt" =>
             {
                 if number_format.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate number formats".into(),
                     ));
                 }
@@ -4717,7 +4644,7 @@ fn parse_trendline_label<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate shape properties".into(),
                     ));
                 }
@@ -4727,7 +4654,7 @@ fn parse_trendline_label<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate shape properties".into(),
                     ));
                 }
@@ -4737,7 +4664,7 @@ fn parse_trendline_label<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate text properties".into(),
                     ));
                 }
@@ -4747,7 +4674,7 @@ fn parse_trendline_label<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate text properties".into(),
                     ));
                 }
@@ -4757,7 +4684,7 @@ fn parse_trendline_label<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate extension lists".into(),
                     ));
                 }
@@ -4767,7 +4694,7 @@ fn parse_trendline_label<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart trendline label contains duplicate extension lists".into(),
                     ));
                 }
@@ -4779,9 +4706,7 @@ fn parse_trendline_label<R: BufRead>(
                 break;
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart trendline label".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart trendline label".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -4813,7 +4738,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart error bars contain duplicate shape properties".into(),
                     ));
                 }
@@ -4823,7 +4748,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart error bars contain duplicate shape properties".into(),
                     ));
                 }
@@ -4833,7 +4758,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart error bars contain duplicate extension lists".into(),
                     ));
                 }
@@ -4843,7 +4768,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart error bars contain duplicate extension lists".into(),
                     ));
                 }
@@ -4903,9 +4828,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"errBars" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart error bars".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart error bars".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -4935,7 +4858,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
             return Err(missing_attribute("custom error-bar values"));
         },
         ErrorBarValueType::StdErr | ErrorBarValueType::Custom if error_bar.value.is_some() => {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "standard-error and custom error bars cannot have a scalar value".to_string(),
             ));
         },
@@ -4961,9 +4884,7 @@ fn parse_string_data<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"cat" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -5001,9 +4922,7 @@ fn parse_numeric_data<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opti
                 break;
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -5032,7 +4951,7 @@ fn parse_series_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opti
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"tx" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "unterminated chart series title".to_string(),
                 ));
             },
@@ -5046,7 +4965,7 @@ fn parse_series_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opti
 
 fn set_title(target: &mut Option<TitleText>, title: TitleText) -> Result<()> {
     if target.replace(title).is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart series has duplicate title values".to_string(),
         ));
     }
@@ -5065,14 +4984,14 @@ fn parse_text_element<R: BufRead>(
                 text.push_str(
                     &value
                         .decode()
-                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        .map_err(|error| Error::Xml(error.to_string()))?,
                 );
             },
             Ok(Event::CData(value)) => {
                 text.push_str(
                     &value
                         .decode()
-                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        .map_err(|error| Error::Xml(error.to_string()))?,
                 );
             },
             Ok(Event::GeneralRef(reference)) => {
@@ -5082,12 +5001,12 @@ fn parse_text_element<R: BufRead>(
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if element.local_name().as_ref() == IGNORED_NAMESPACE_ELEMENT.as_bytes() => {},
             Ok(Event::Start(_)) | Ok(Event::Empty(_)) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart text element contains nested markup".to_string(),
                 ));
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "unterminated chart text element".to_string(),
                 ));
             },
@@ -5110,10 +5029,10 @@ fn parse_point_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                 in_v = true;
             },
             Ok(Event::Text(e)) if in_v => {
-                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
+                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
             },
             Ok(Event::CData(e)) if in_v => {
-                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
+                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
             },
             Ok(Event::GeneralRef(reference)) if in_v => {
                 text.push_str(&decode_xml_reference(&reference)?);
@@ -5123,9 +5042,7 @@ fn parse_point_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"pt" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -5139,7 +5056,7 @@ fn parse_point_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
 fn parse_point_value<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<f64>> {
     if let Some(text) = parse_point_text(reader)? {
         Ok(Some(text.trim().parse::<f64>().map_err(|_| {
-            OoxmlError::InvalidFormat(format!("invalid chart numeric point '{text}'"))
+            Error::Invalid(format!("invalid chart numeric point '{text}'"))
         })?))
     } else {
         Ok(None)
@@ -5162,13 +5079,13 @@ impl ParsedAxisScaling {
             _ => return Ok(false),
         };
         if slot.is_some() {
-            return Err(OoxmlError::InvalidFormat(format!(
+            return Err(Error::Invalid(format!(
                 "{description} is specified more than once"
             )));
         }
         let value = required_f64_attr(element, description)?;
         if element.local_name().as_ref() == b"logBase" && !(2.0..=1000.0).contains(&value) {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "chart logarithmic base must be between 2 and 1000".into(),
             ));
         }
@@ -5178,9 +5095,7 @@ impl ParsedAxisScaling {
 
     fn validate(&self) -> Result<()> {
         if self.min.zip(self.max).is_some_and(|(min, max)| min > max) {
-            return Err(OoxmlError::InvalidFormat(
-                "chart axis minimum exceeds maximum".into(),
-            ));
+            return Err(Error::Invalid("chart axis minimum exceeds maximum".into()));
         }
         Ok(())
     }
@@ -5287,7 +5202,7 @@ fn parse_axis_title<R: BufRead>(
     common: &mut ParsedAxisCommon,
 ) -> Result<()> {
     if common.title.is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart axis contains duplicate titles".into(),
         ));
     }
@@ -5371,7 +5286,7 @@ fn parse_axis_common_fragment<R: BufRead>(
         },
         b"spPr" => {
             if common.shape_properties.is_some() {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart axis contains duplicate shape properties".into(),
                 ));
             }
@@ -5384,7 +5299,7 @@ fn parse_axis_common_fragment<R: BufRead>(
         },
         b"txPr" => {
             if common.text_properties.is_some() {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart axis contains duplicate text properties".into(),
                 ));
             }
@@ -5413,7 +5328,7 @@ fn parse_axis_extension<R: BufRead>(
         &mut common.extension_list
     };
     if target.is_some() {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "chart axis contains duplicate {} extension lists",
             if scaling { "scaling" } else { "axis" }
         )));
@@ -5557,14 +5472,14 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dispUnits" => {
                 if display_units.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart value axis contains duplicate display units".into(),
                     ));
                 }
                 display_units = Some(parse_display_units(reader)?);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dispUnits" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart display units are missing their unit".into(),
                 ));
             },
@@ -5629,7 +5544,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dispUnitsLbl" => {
                 if saw_label {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display units contain duplicate labels".into(),
                     ));
                 }
@@ -5638,7 +5553,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dispUnitsLbl" => {
                 if saw_label {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display units contain duplicate labels".into(),
                     ));
                 }
@@ -5646,7 +5561,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display units contain duplicate extension lists".into(),
                     ));
                 }
@@ -5656,7 +5571,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display units contain duplicate extension lists".into(),
                     ));
                 }
@@ -5668,7 +5583,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
                 match element.local_name().as_ref() {
                     b"builtInUnit" => {
                         if built_in_unit.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart display units contain duplicate built-in units".into(),
                             ));
                         }
@@ -5676,7 +5591,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
                     },
                     b"custUnit" => {
                         if custom_unit.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart display units contain duplicate custom units".into(),
                             ));
                         }
@@ -5690,9 +5605,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dispUnits" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart display units".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart display units".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -5701,7 +5614,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
     }
 
     if built_in_unit.is_some() == custom_unit.is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart display units require exactly one built-in or custom unit".into(),
         ));
     }
@@ -5741,7 +5654,7 @@ fn parse_display_units_label<R: BufRead>(
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
                 if layout.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display-units label contains duplicate layouts".into(),
                     ));
                 }
@@ -5751,7 +5664,7 @@ fn parse_display_units_label<R: BufRead>(
                 layout = Some(match layout {
                     None => Layout::new(),
                     Some(_) => {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart display-units label contains duplicate layouts".into(),
                         ));
                     },
@@ -5759,7 +5672,7 @@ fn parse_display_units_label<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display-units label contains duplicate shape properties".into(),
                     ));
                 }
@@ -5770,7 +5683,7 @@ fn parse_display_units_label<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display-units label contains duplicate shape properties".into(),
                     ));
                 }
@@ -5780,7 +5693,7 @@ fn parse_display_units_label<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display-units label contains duplicate text properties".into(),
                     ));
                 }
@@ -5791,7 +5704,7 @@ fn parse_display_units_label<R: BufRead>(
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display-units label contains duplicate text properties".into(),
                     ));
                 }
@@ -5801,7 +5714,7 @@ fn parse_display_units_label<R: BufRead>(
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"f" => {
                 if formula.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart display-units label contains duplicate formula references".into(),
                     ));
                 }
@@ -5815,14 +5728,14 @@ fn parse_display_units_label<R: BufRead>(
                 text.push_str(
                     &value
                         .decode()
-                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        .map_err(|error| Error::Xml(error.to_string()))?,
                 );
             },
             Ok(Event::CData(value)) if in_text => {
                 text.push_str(
                     &value
                         .decode()
-                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        .map_err(|error| Error::Xml(error.to_string()))?,
                 );
             },
             Ok(Event::GeneralRef(reference)) if in_text => {
@@ -5835,7 +5748,7 @@ fn parse_display_units_label<R: BufRead>(
                 break;
             },
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "unterminated chart display-units label".into(),
                 ));
             },
@@ -5847,7 +5760,7 @@ fn parse_display_units_label<R: BufRead>(
 
     let label = if let Some(formula) = formula {
         if saw_text {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "chart display-units label mixes a formula reference with literal text".into(),
             ));
         }
@@ -6035,8 +5948,8 @@ fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
     Ok(Some(axis))
 }
 
-fn unterminated_axis(kind: &str) -> OoxmlError {
-    OoxmlError::InvalidFormat(format!("unterminated chart {kind} axis"))
+fn unterminated_axis(kind: &str) -> Error {
+    Error::Invalid(format!("unterminated chart {kind} axis"))
 }
 
 fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
@@ -6057,7 +5970,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                     .iter()
                     .any(|existing: &LegendEntry| existing.index == entry.index)
                 {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "chart legend contains duplicate entry index {}",
                         entry.index
                     )));
@@ -6065,13 +5978,13 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                 entries.push(entry);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"legendEntry" => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "chart legend entry is missing its index".into(),
                 ));
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
                 if layout.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend contains duplicate layouts".into(),
                     ));
                 }
@@ -6081,7 +5994,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                 layout = Some(match layout {
                     None => Layout::new(),
                     Some(_) => {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "chart legend contains duplicate layouts".into(),
                         ));
                     },
@@ -6089,7 +6002,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend contains duplicate shape properties".into(),
                     ));
                 }
@@ -6099,7 +6012,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend contains duplicate shape properties".into(),
                     ));
                 }
@@ -6109,7 +6022,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend contains duplicate text properties".into(),
                     ));
                 }
@@ -6119,7 +6032,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend contains duplicate text properties".into(),
                     ));
                 }
@@ -6129,7 +6042,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend contains duplicate extension lists".into(),
                     ));
                 }
@@ -6139,7 +6052,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend contains duplicate extension lists".into(),
                     ));
                 }
@@ -6170,9 +6083,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"legend" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated chart element".to_string()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -6201,7 +6112,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if saw_delete || text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend entry contains multiple choice values".into(),
                     ));
                 }
@@ -6211,7 +6122,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
                 if saw_delete || text_properties.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend entry contains multiple choice values".into(),
                     ));
                 }
@@ -6221,7 +6132,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend entry contains duplicate extension lists".into(),
                     ));
                 }
@@ -6231,7 +6142,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if extension_list.is_some() {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "chart legend entry contains duplicate extension lists".into(),
                     ));
                 }
@@ -6243,7 +6154,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
                 match element.local_name().as_ref() {
                     b"idx" => {
                         if index.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart legend entry contains duplicate indexes".into(),
                             ));
                         }
@@ -6251,7 +6162,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
                     },
                     b"delete" => {
                         if saw_delete || text_properties.is_some() {
-                            return Err(OoxmlError::InvalidFormat(
+                            return Err(Error::Invalid(
                                 "chart legend entry contains multiple choice values".into(),
                             ));
                         }
@@ -6263,9 +6174,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"legendEntry" => break,
             Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart legend entry".into(),
-                ));
+                return Err(Error::Invalid("unterminated chart legend entry".into()));
             },
             Err(error) => return Err(error),
             _ => {},
@@ -6275,7 +6184,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
 
     let index = index.ok_or_else(|| missing_attribute("chart legend entry index"))?;
     if !saw_delete && text_properties.is_none() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "chart legend entry is missing its delete or text-properties choice".into(),
         ));
     }
@@ -6452,10 +6361,10 @@ fn parse_number_format(
 ) -> Result<NumberFormat> {
     let format_code = element
         .try_get_attribute(b"formatCode")
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        .map_err(|error| Error::Xml(error.to_string()))?
         .ok_or_else(|| missing_attribute(&format!("{description} number format code")))?
         .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        .map_err(|error| Error::Xml(error.to_string()))?
         .into_owned();
     let source_linked = match get_attr(element, b"sourceLinked") {
         Some(value) => parse_bool_value(&value, &format!("{description} source-linked flag"))?,
@@ -6465,7 +6374,7 @@ fn parse_number_format(
 }
 
 #[inline]
-fn parse_display_blanks(e: &BytesStart) -> crate::error::Result<DisplayBlanks> {
+fn parse_display_blanks(e: &BytesStart) -> crate::Result<DisplayBlanks> {
     if let Some(val) = get_attr(e, b"val") {
         Ok(match val.as_slice() {
             b"gap" => DisplayBlanks::Gap,
@@ -6479,7 +6388,7 @@ fn parse_display_blanks(e: &BytesStart) -> crate::error::Result<DisplayBlanks> {
 }
 
 #[inline]
-fn parse_bool_attr(e: &BytesStart) -> crate::error::Result<bool> {
+fn parse_bool_attr(e: &BytesStart) -> crate::Result<bool> {
     if let Some(val) = get_attr(e, b"val") {
         parse_bool_value(&val, "chart boolean")
     } else {
@@ -6495,8 +6404,8 @@ fn parse_bool_value(value: &[u8], description: &str) -> Result<bool> {
     }
 }
 
-fn invalid_attribute(description: &str, value: &[u8]) -> OoxmlError {
-    OoxmlError::InvalidFormat(format!(
+fn invalid_attribute(description: &str, value: &[u8]) -> Error {
+    Error::Invalid(format!(
         "invalid {description} '{}'",
         String::from_utf8_lossy(value)
     ))
@@ -6518,11 +6427,11 @@ fn required_string_attr(
 ) -> Result<String> {
     element
         .try_get_attribute(name)
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        .map_err(|error| Error::Xml(error.to_string()))?
         .ok_or_else(|| missing_attribute(description))?
         .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
         .map(|value| value.into_owned())
-        .map_err(|error| OoxmlError::Xml(error.to_string()))
+        .map_err(|error| Error::Xml(error.to_string()))
 }
 
 fn optional_u32_attr(
@@ -6583,9 +6492,7 @@ fn required_named_f64_attr(
 fn required_positive_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32> {
     let value = required_u32_attr(element, description)?;
     if value == 0 {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "{description} must be positive"
-        )));
+        return Err(Error::Invalid(format!("{description} must be positive")));
     }
     Ok(value)
 }
@@ -6603,9 +6510,7 @@ fn required_f64_attr(element: &BytesStart<'_>, description: &str) -> Result<f64>
 fn required_positive_f64_attr(element: &BytesStart<'_>, description: &str) -> Result<f64> {
     let value = required_f64_attr(element, description)?;
     if value <= 0.0 {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "{description} must be positive"
-        )));
+        return Err(Error::Invalid(format!("{description} must be positive")));
     }
     Ok(value)
 }
@@ -6613,16 +6518,14 @@ fn required_positive_f64_attr(element: &BytesStart<'_>, description: &str) -> Re
 fn required_nonnegative_f64_attr(element: &BytesStart<'_>, description: &str) -> Result<f64> {
     let value = required_f64_attr(element, description)?;
     if value < 0.0 {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "{description} must be nonnegative"
-        )));
+        return Err(Error::Invalid(format!("{description} must be nonnegative")));
     }
     Ok(value)
 }
 
 fn required_enum_attr(element: &BytesStart<'_>, description: &str) -> Result<String> {
     let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
-    String::from_utf8(value).map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+    String::from_utf8(value).map_err(|error| Error::Invalid(error.to_string()))
 }
 
 fn bounded_u32_attr(
@@ -6633,7 +6536,7 @@ fn bounded_u32_attr(
 ) -> Result<u32> {
     let value = required_u32_attr(element, description)?;
     if !(minimum..=maximum).contains(&value) {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "{description} must be between {minimum} and {maximum}"
         )));
     }
@@ -6653,7 +6556,7 @@ fn bounded_percentage_u32_attr(
         .parse::<u32>()
         .map_err(|_| invalid_attribute(description, &value))?;
     if !(minimum..=maximum).contains(&parsed) {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "{description} must be between {minimum} and {maximum}"
         )));
     }
@@ -6673,15 +6576,15 @@ fn bounded_percentage_i32_attr(
         .parse::<i32>()
         .map_err(|_| invalid_attribute(description, &value))?;
     if !(minimum..=maximum).contains(&parsed) {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "{description} must be between {minimum} and {maximum}"
         )));
     }
     Ok(parsed)
 }
 
-fn missing_attribute(description: &str) -> OoxmlError {
-    OoxmlError::InvalidFormat(format!("{description} is missing its value"))
+fn missing_attribute(description: &str) -> Error {
+    Error::Invalid(format!("{description} is missing its value"))
 }
 
 #[inline]
@@ -6703,15 +6606,15 @@ mod tests {
             <c:lang val="zh-Hant"/><c:pivotSource><c:name>Pivot &amp; One</c:name>
                 <c:fmtId val="42"/></c:pivotSource>
             <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         assert_eq!(chart.language.as_deref(), Some("zh-Hant"));
         let source = chart.pivot_source.as_ref().unwrap();
         assert_eq!(source.name, "Pivot & One");
         assert_eq!(source.format_id, 42);
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         assert_eq!(reparsed.language.as_deref(), Some("zh-Hant"));
         assert_eq!(reparsed.pivot_source.as_ref().unwrap().name, "Pivot & One");
 
@@ -6724,7 +6627,7 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#.to_vec();
             document.extend_from_slice(invalid);
             document.extend_from_slice(b"<c:chart><c:plotArea/></c:chart></c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
     }
 
@@ -6735,7 +6638,7 @@ mod tests {
             <c:protection><c:chartObject/><c:data val="0"/><c:formatting val="true"/>
                 <c:selection val="false"/><c:userInterface/></c:protection>
             <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let protection = chart.protection.as_ref().unwrap();
         assert_eq!(protection.chart_object, Some(true));
         assert_eq!(protection.data, Some(false));
@@ -6744,8 +6647,8 @@ mod tests {
         assert_eq!(protection.user_interface, Some(true));
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let protection = reparsed.protection.as_ref().unwrap();
         assert_eq!(protection.chart_object, Some(true));
         assert_eq!(protection.selection, Some(false));
@@ -6753,7 +6656,7 @@ mod tests {
         let empty =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
             <c:protection/><c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
-        let empty = parse_chart(empty.as_slice()).unwrap();
+        let empty = read(empty.as_slice()).unwrap();
         let empty = empty.protection.as_ref().unwrap();
         assert_eq!(empty.chart_object, None);
         assert_eq!(empty.user_interface, None);
@@ -6767,7 +6670,7 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#.to_vec();
             document.extend_from_slice(invalid);
             document.extend_from_slice(b"<c:chart><c:plotArea/></c:chart></c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
     }
 
@@ -6781,7 +6684,7 @@ mod tests {
                 accent4="accent6" accent5="hlink" accent6="folHlink" hlink="dk2"
                 folHlink="lt2"/></c:clrMapOvr>
             <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let ColorMapOverride::Override(mapping) = chart.color_map_override.as_ref().unwrap() else {
             panic!("expected explicit chart color mapping");
         };
@@ -6791,8 +6694,8 @@ mod tests {
         assert_eq!(mapping.followed_hyperlink, ColorSchemeIndex::Light2);
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         assert_eq!(reparsed.color_map_override, chart.color_map_override);
 
         let master = br#"<c:chartSpace xmlns:c="http://purl.oclc.org/ooxml/drawingml/chart"
@@ -6800,7 +6703,7 @@ mod tests {
             <c:clrMapOvr><d:masterClrMapping></d:masterClrMapping></c:clrMapOvr>
             <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
         assert_eq!(
-            parse_chart(master.as_slice()).unwrap().color_map_override,
+            read(master.as_slice()).unwrap().color_map_override,
             Some(ColorMapOverride::Master)
         );
 
@@ -6814,7 +6717,7 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#.to_vec();
             document.extend_from_slice(invalid);
             document.extend_from_slice(b"<c:chart><c:plotArea/></c:chart></c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
     }
 
@@ -6826,14 +6729,14 @@ mod tests {
             <c:chart><c:plotArea/></c:chart>
             <c:externalData rel:id="rId7"><c:autoUpdate val="0"/></c:externalData>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let external_data = chart.external_data.as_ref().unwrap();
         assert_eq!(external_data.relationship_id.as_deref(), Some("rId7"));
         assert_eq!(external_data.auto_update, Some(false));
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         assert_eq!(reparsed.external_data, chart.external_data);
 
         let implicit_true = br#"<c:chartSpace
@@ -6842,7 +6745,7 @@ mod tests {
             <c:chart></c:chart><c:externalData r:id="rId1"><c:autoUpdate/></c:externalData>
         </c:chartSpace>"#;
         assert_eq!(
-            parse_chart(implicit_true.as_slice())
+            read(implicit_true.as_slice())
                 .unwrap()
                 .external_data
                 .unwrap()
@@ -6862,12 +6765,12 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart></c:chart>"#.to_vec();
             document.extend_from_slice(invalid);
             document.extend_from_slice(b"</c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
 
         let mut pending = Chart::new();
         pending.external_data = Some(ChartExternalData::pending());
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &pending).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &pending).is_err());
     }
 
     #[test]
@@ -6877,7 +6780,7 @@ mod tests {
                 xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
             <c:chart><c:plotArea/></c:chart><c:userShapes q:id="shapeRel"/>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         assert_eq!(
             chart
                 .user_shapes
@@ -6888,9 +6791,9 @@ mod tests {
             Some("shapeRel")
         );
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
         assert_eq!(
-            parse_chart(output.as_slice()).unwrap().user_shapes,
+            read(output.as_slice()).unwrap().user_shapes,
             chart.user_shapes
         );
 
@@ -6902,7 +6805,7 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart></c:chart>"#.to_vec();
             document.extend_from_slice(invalid);
             document.extend_from_slice(b"</c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
     }
 
@@ -6920,7 +6823,7 @@ mod tests {
             <c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Label</a:t></a:r></a:p></c:txPr>
             <c:extLst><c:ext uri="example"><x:payload enabled="1"/></c:ext></c:extLst>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let shape_properties = chart.shape_properties.as_ref().unwrap();
         assert!(
             std::str::from_utf8(shape_properties.as_xml())
@@ -6945,8 +6848,8 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         assert_eq!(reparsed.shape_properties, chart.shape_properties);
         assert_eq!(reparsed.text_properties, chart.text_properties);
         assert_eq!(reparsed.extension_list, chart.extension_list);
@@ -6992,7 +6895,7 @@ mod tests {
                 <c:extLst><c:ext uri="surface"><x:payload/></c:ext></c:extLst>
             </c:floor><c:plotArea/></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let floor = chart.floor.as_ref().unwrap();
         assert_eq!(floor.thickness, Some(64));
         assert!(
@@ -7013,8 +6916,8 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let reparsed_floor = reparsed.floor.unwrap();
         assert_eq!(reparsed_floor.thickness, floor.thickness);
         assert_eq!(reparsed_floor.shape_properties, floor.shape_properties);
@@ -7022,10 +6925,10 @@ mod tests {
         assert_eq!(reparsed_floor.extension_list, floor.extension_list);
 
         let invalid = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:floor><c:pictureOptions><c:pictureFormat val="tile"/></c:pictureOptions></c:floor><c:plotArea/></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(invalid.as_slice()).is_err());
+        assert!(read(invalid.as_slice()).is_err());
 
         let empty = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:view3D/><c:floor/><c:backWall/><c:sideWall/><c:plotArea/></c:chart></c:chartSpace>"#;
-        let empty_chart = parse_chart(empty.as_slice()).unwrap();
+        let empty_chart = read(empty.as_slice()).unwrap();
         assert!(empty_chart.view_3d.is_some());
         assert!(empty_chart.floor.is_some());
         assert!(empty_chart.back_wall.is_some());
@@ -7056,7 +6959,7 @@ mod tests {
                 </c:ser><c:axId val="1"/><c:axId val="2"/>
             </c:barChart></c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let TypeGroup::Bar(group) = &chart.plot_area.type_groups[0] else {
             panic!("expected a bar chart");
         };
@@ -7092,8 +6995,8 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let TypeGroup::Bar(reparsed_group) = &reparsed.plot_area.type_groups[0] else {
             panic!("expected a bar chart");
         };
@@ -7120,16 +7023,16 @@ mod tests {
             <c:chart><c:plotArea><c:lineChart><c:ser><c:idx val="0"/><c:order val="0"/>
                 <c:pictureOptions/></c:ser></c:lineChart></c:plotArea></c:chart>
             </c:chartSpace>"#;
-        let unsupported = parse_chart(unsupported.as_slice()).unwrap();
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &unsupported).is_err());
+        let unsupported = read(unsupported.as_slice()).unwrap();
+        assert!(crate::chart::writer::write(&mut Vec::new(), &unsupported).is_err());
 
         let unsupported_shape =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
             <c:chart><c:plotArea><c:lineChart><c:ser><c:idx val="0"/><c:order val="0"/>
                 <c:shape val="cone"/></c:ser></c:lineChart></c:plotArea></c:chart>
             </c:chartSpace>"#;
-        let unsupported_shape = parse_chart(unsupported_shape.as_slice()).unwrap();
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &unsupported_shape).is_err());
+        let unsupported_shape = read(unsupported_shape.as_slice()).unwrap();
+        assert!(crate::chart::writer::write(&mut Vec::new(), &unsupported_shape).is_err());
 
         for invalid_shape in [
             br#"<c:shape val="sphere"/>"#.as_slice(),
@@ -7139,14 +7042,14 @@ mod tests {
             document.extend_from_slice(invalid_shape);
             document
                 .extend_from_slice(b"</c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
 
         for invalid_unit in ["0", "-1"] {
             let document = format!(
                 r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:ser><c:idx val="0"/><c:order val="0"/><c:pictureOptions><c:pictureStackUnit val="{invalid_unit}"/></c:pictureOptions></c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>"#
             );
-            assert!(parse_chart(document.as_bytes()).is_err());
+            assert!(read(document.as_bytes()).is_err());
         }
 
         let mut invalid = Chart::new();
@@ -7158,7 +7061,7 @@ mod tests {
         });
         bar.common.series.push(series);
         invalid.plot_area.type_groups.push(TypeGroup::Bar(bar));
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
 
         for supported in [
             br#"<c:areaChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:pictureOptions/></c:ser></c:areaChart>"#.as_slice(),
@@ -7168,8 +7071,8 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea>"#.to_vec();
             document.extend_from_slice(supported);
             document.extend_from_slice(b"</c:plotArea></c:chart></c:chartSpace>");
-            let supported = parse_chart(document.as_slice()).unwrap();
-            crate::charts::writer::write_chart(&mut Vec::new(), &supported).unwrap();
+            let supported = read(document.as_slice()).unwrap();
+            crate::chart::writer::write(&mut Vec::new(), &supported).unwrap();
         }
     }
 
@@ -7187,7 +7090,7 @@ mod tests {
                     blackAndWhite="1" draft="true" useFirstPageNumber="1"
                     horizontalDpi="300" verticalDpi="1200" copies="2"/>
             </c:printSettings></c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let settings = chart.print_settings.as_ref().unwrap();
         let header_footer = settings.header_footer.as_ref().unwrap();
         assert!(!header_footer.align_with_margins);
@@ -7211,8 +7114,8 @@ mod tests {
         assert_eq!(setup.copies, 2);
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         assert_eq!(
             reparsed
                 .print_settings
@@ -7229,7 +7132,7 @@ mod tests {
         let empty =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
             <c:chart><c:plotArea/></c:chart><c:printSettings/></c:chartSpace>"#;
-        let empty = parse_chart(empty.as_slice()).unwrap();
+        let empty = read(empty.as_slice()).unwrap();
         let empty = empty.print_settings.unwrap();
         assert!(empty.header_footer.is_none());
         assert!(empty.page_margins.is_none());
@@ -7244,14 +7147,14 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea/></c:chart><c:printSettings>"#.to_vec();
             document.extend_from_slice(invalid);
             document.extend_from_slice(b"</c:printSettings></c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
 
         let mut invalid = Chart::new();
         let mut settings = ChartPrintSettings::new();
         settings.page_margins = Some(ChartPageMargins::new(f64::NAN, 0.3, 0.4, 0.5, 0.1, 0.15));
         invalid.print_settings = Some(settings);
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
     }
 
     #[test]
@@ -7269,7 +7172,7 @@ mod tests {
                     <c:extLst><c:ext uri="pivot"><x:payload/></c:ext></c:extLst></c:pivotFmt>
                 <c:pivotFmt><c:idx val="7"/><c:marker/></c:pivotFmt>
             </c:pivotFmts><c:plotArea/></c:chart></c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let formats = chart.pivot_formats.as_ref().unwrap();
         assert_eq!(formats.len(), 2);
         assert_eq!(formats[0].index, 2);
@@ -7301,8 +7204,8 @@ mod tests {
         assert!(formats[1].marker.is_some());
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         assert_eq!(reparsed.pivot_formats.as_ref().unwrap().len(), 2);
         let reparsed_format = &reparsed.pivot_formats.as_ref().unwrap()[0];
         assert_eq!(
@@ -7316,7 +7219,7 @@ mod tests {
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
             <c:chart><c:pivotFmts/><c:plotArea/></c:chart></c:chartSpace>"#;
         assert!(
-            parse_chart(empty.as_slice())
+            read(empty.as_slice())
                 .unwrap()
                 .pivot_formats
                 .unwrap()
@@ -7328,14 +7231,14 @@ mod tests {
             <c:chart><c:pivotFmts><c:pivotFmt><c:idx val="1"/></c:pivotFmt>
                 <c:pivotFmt><c:idx val="1"/></c:pivotFmt></c:pivotFmts>
                 <c:plotArea/></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate.as_slice()).is_err());
+        assert!(read(duplicate.as_slice()).is_err());
 
         let duplicate_shape = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:pivotFmts><c:pivotFmt><c:idx val="1"/><c:spPr/><c:spPr/></c:pivotFmt></c:pivotFmts><c:plotArea/></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate_shape.as_slice()).is_err());
+        assert!(read(duplicate_shape.as_slice()).is_err());
 
         let mut invalid = Chart::new();
         invalid.pivot_formats = Some(vec![PivotFormat::new(3), PivotFormat::new(3)]);
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
 
         let mut invalid = Chart::new();
         let mut format = PivotFormat::new(3);
@@ -7345,7 +7248,7 @@ mod tests {
             ..Marker::default()
         });
         invalid.pivot_formats = Some(vec![format]);
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
     }
 
     #[test]
@@ -7355,7 +7258,7 @@ mod tests {
             <c:chart><c:plotArea><c:lineChart><c:ser><c:idx val="0"/><c:order val="0"/>
                 <c:marker/><c:dPt><c:idx val="0"/><c:marker/></c:dPt>
             </c:ser></c:lineChart></c:plotArea></c:chart></c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let TypeGroup::Line(group) = &chart.plot_area.type_groups[0] else {
             panic!("expected line chart");
         };
@@ -7364,8 +7267,8 @@ mod tests {
         assert!(series.data_points[0].marker_present);
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let TypeGroup::Line(group) = &reparsed.plot_area.type_groups[0] else {
             panic!("expected line chart");
         };
@@ -7393,7 +7296,7 @@ mod tests {
                 <c:showDLblsOverMax val="1"/>
             </c:chart><c:style val="12"/></c:chartSpace>"#;
 
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let Some(TitleText::Literal(title)) = chart.title.as_ref() else {
             panic!("expected a literal chart title");
         };
@@ -7448,7 +7351,7 @@ mod tests {
             <c:style val="7"/>
         </c:chartSpace>"#;
 
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let Some(TitleText::Literal(title)) = chart.title else {
             panic!("expected a literal chart title");
         };
@@ -7475,7 +7378,7 @@ mod tests {
             <c:style val="4"/>
         </c:chartSpace>"#;
 
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let Some(TitleText::Reference(title)) = chart.title else {
             panic!("expected a chart title reference");
         };
@@ -7495,8 +7398,8 @@ mod tests {
             r#"<c:chartSpace xmlns:c="{chart_namespace}"><c:chart/></c:chartSpace><c:chartSpace xmlns:c="{chart_namespace}"/>"#
         );
 
-        assert!(parse_chart(foreign_root.as_slice()).is_err());
-        assert!(parse_chart(trailing_root.as_bytes()).is_err());
+        assert!(read(foreign_root.as_slice()).is_err());
+        assert!(read(trailing_root.as_bytes()).is_err());
     }
 
     #[test]
@@ -7510,7 +7413,7 @@ mod tests {
             </c:valAx></c:plotArea></c:chart>
         </c:chartSpace>"#;
 
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let Axis::Value(axis) = &chart.plot_area.axes[0] else {
             panic!("expected value axis");
         };
@@ -7521,7 +7424,7 @@ mod tests {
         assert!(display_units.layout.is_none());
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
         assert!(
             std::str::from_utf8(&output)
                 .unwrap()
@@ -7546,7 +7449,7 @@ mod tests {
             </c:valAx></c:plotArea></c:chart>
         </c:chartSpace>"#;
 
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let Axis::Value(axis) = &chart.plot_area.axes[0] else {
             panic!("expected value axis");
         };
@@ -7581,8 +7484,8 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let Axis::Value(reparsed_axis) = &reparsed.plot_area.axes[0] else {
             panic!("expected value axis");
         };
@@ -7598,7 +7501,7 @@ mod tests {
         assert_eq!(reparsed_units.extension_list, display_units.extension_list);
 
         let duplicate = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:valAx><c:axId val="1"/><c:scaling/><c:axPos val="l"/><c:crossAx val="2"/><c:dispUnits><c:builtInUnit val="millions"/><c:dispUnitsLbl><c:spPr/><c:spPr/></c:dispUnitsLbl></c:dispUnits></c:valAx></c:plotArea></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate.as_slice()).is_err());
+        assert!(read(duplicate.as_slice()).is_err());
     }
 
     #[test]
@@ -7616,7 +7519,7 @@ mod tests {
                 </c:dTable>
             </c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let table = chart.plot_area.data_table.as_ref().unwrap();
         assert!(table.show_horizontal_border);
         assert!(!table.show_vertical_border);
@@ -7635,8 +7538,8 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let reparsed = reparsed.plot_area.data_table.unwrap();
         assert_eq!(reparsed.shape_properties, table.shape_properties);
         assert_eq!(reparsed.text_properties, table.text_properties);
@@ -7648,7 +7551,7 @@ mod tests {
                 <c:showKeys/><c:showKeys val="0"/>
             </c:dTable></c:plotArea></c:chart>
         </c:chartSpace>"#;
-        assert!(parse_chart(duplicate.as_slice()).is_err());
+        assert!(read(duplicate.as_slice()).is_err());
     }
 
     #[test]
@@ -7663,7 +7566,7 @@ mod tests {
                 <c:area3DChart><c:dLbls/></c:area3DChart>
             </c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let TypeGroup::Line(line) = &chart.plot_area.type_groups[0] else {
             panic!("expected line chart");
         };
@@ -7684,7 +7587,7 @@ mod tests {
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
             <c:chart><c:plotArea><c:barChart><c:dLbls/><c:dLbls/>
             </c:barChart></c:plotArea></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate.as_slice()).is_err());
+        assert!(read(duplicate.as_slice()).is_err());
     }
 
     #[test]
@@ -7696,7 +7599,7 @@ mod tests {
                 <c:area3DChart><c:axId val="31"/><c:axId val="37"/><c:axId val="41"/></c:area3DChart>
             </c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let TypeGroup::Line(line) = &chart.plot_area.type_groups[0] else {
             panic!("expected line chart");
         };
@@ -7711,7 +7614,7 @@ mod tests {
             let mut line = LineTypeGroup::new(BarGrouping::Standard);
             line.common.axis_ids = axis_ids;
             chart.plot_area.type_groups.push(TypeGroup::Line(line));
-            assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+            assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
         }
     }
 
@@ -7734,7 +7637,7 @@ mod tests {
                 <c:stockChart><c:dropLines/><c:hiLowLines/><c:upDownBars/></c:stockChart>
             </c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let TypeGroup::Area(area) = &chart.plot_area.type_groups[0] else {
             panic!("expected area chart");
         };
@@ -7814,8 +7717,8 @@ mod tests {
         assert!(stock.up_down_bars.is_some());
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let TypeGroup::Line(line) = &reparsed.plot_area.type_groups[3] else {
             panic!("expected line chart");
         };
@@ -7844,13 +7747,13 @@ mod tests {
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
             <c:chart><c:plotArea><c:lineChart><c:dropLines/><c:dropLines/>
             </c:lineChart></c:plotArea></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate.as_slice()).is_err());
+        assert!(read(duplicate.as_slice()).is_err());
 
         let duplicate_formatting =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
             <c:chart><c:plotArea><c:lineChart><c:dropLines><c:spPr/><c:spPr/></c:dropLines>
             </c:lineChart></c:plotArea></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate_formatting.as_slice()).is_err());
+        assert!(read(duplicate_formatting.as_slice()).is_err());
 
         let mut invalid = Chart::new();
         let mut line = LineTypeGroup::new(BarGrouping::Standard);
@@ -7859,7 +7762,7 @@ mod tests {
             ..UpDownBars::default()
         });
         invalid.plot_area.type_groups.push(TypeGroup::Line(line));
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
     }
 
     #[test]
@@ -7875,7 +7778,7 @@ mod tests {
                 <c:surface3DChart><c:bandFmts/></c:surface3DChart>
             </c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let TypeGroup::Surface(surface) = &chart.plot_area.type_groups[0] else {
             panic!("expected surface chart");
         };
@@ -7910,8 +7813,8 @@ mod tests {
         assert!(surface.band_formats.as_ref().unwrap().is_empty());
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let TypeGroup::Surface(surface) = &reparsed.plot_area.type_groups[0] else {
             panic!("expected surface chart");
         };
@@ -7927,7 +7830,7 @@ mod tests {
                 <c:bandFmt><c:idx val="1"/></c:bandFmt>
                 <c:bandFmt><c:idx val="1"/></c:bandFmt>
             </c:bandFmts></c:surfaceChart></c:plotArea></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate.as_slice()).is_err());
+        assert!(read(duplicate.as_slice()).is_err());
 
         let mut invalid = Chart::new();
         let mut surface = SurfaceTypeGroup::new();
@@ -7936,7 +7839,7 @@ mod tests {
             .plot_area
             .type_groups
             .push(TypeGroup::Surface(surface));
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
     }
 
     #[test]
@@ -7948,7 +7851,7 @@ mod tests {
             </c:ofPieChart></c:plotArea></c:chart>
         </c:chartSpace>"#;
 
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let [TypeGroup::OfPie(group)] = chart.plot_area.type_groups.as_slice() else {
             panic!("expected an of-pie chart");
         };
@@ -7964,7 +7867,7 @@ mod tests {
                 <c:gapWidth val="225%"/><c:secondPieSize val="80%"/>
             </c:ofPieChart></c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(percent_xml.as_slice()).unwrap();
+        let chart = read(percent_xml.as_slice()).unwrap();
         let [TypeGroup::OfPie(group)] = chart.plot_area.type_groups.as_slice() else {
             panic!("expected an of-pie chart");
         };
@@ -7981,7 +7884,7 @@ mod tests {
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:ofPieChart><c:ofPieType/><c:secondPieSize val="4"/></c:ofPieChart></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:ofPieChart><c:ofPieType/><c:splitPos val="NaN"/></c:ofPieChart></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
         ] {
-            assert!(parse_chart(xml).is_err());
+            assert!(read(xml).is_err());
         }
 
         for invalid_group in [
@@ -8003,7 +7906,7 @@ mod tests {
                 .plot_area
                 .type_groups
                 .push(TypeGroup::OfPie(invalid_group));
-            assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+            assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
         }
     }
 
@@ -8022,7 +7925,7 @@ mod tests {
             </c:plotArea></c:chart>
         </c:chartSpace>"#;
 
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let TypeGroup::Bar(bar) = &chart.plot_area.type_groups[0] else {
             panic!("expected bar chart");
         };
@@ -8083,7 +7986,7 @@ mod tests {
         ] {
             let mut chart = Chart::new();
             chart.plot_area.type_groups.push(group);
-            assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+            assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
         }
     }
 
@@ -8095,20 +7998,20 @@ mod tests {
         units.built_in_unit = Some(BuiltInUnit::Thousands);
         axis.display_units = Some(Box::new(units));
         chart.plot_area.axes.push(Axis::Value(axis));
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
 
         let mut chart = Chart::new();
         let mut axis = CategoryAxis::new(1, AxisPosition::Bottom, 2);
         axis.min = Some(2.0);
         axis.max = Some(1.0);
         chart.plot_area.axes.push(Axis::Category(axis));
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
 
         let mut chart = Chart::new();
         let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
         axis.display_units = Some(Box::new(DisplayUnits::custom(f64::NAN)));
         chart.plot_area.axes.push(Axis::Value(axis));
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
 
         let mut chart = Chart::new();
         let legend = Legend {
@@ -8116,7 +8019,7 @@ mod tests {
             ..Legend::default()
         };
         chart.legend = Some(legend);
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
     }
 
     #[test]
@@ -8136,7 +8039,7 @@ mod tests {
                 <c:extLst><c:ext uri="legend"><x:legendPayload/></c:ext></c:extLst>
             </c:legend></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         let legend = chart.legend.as_ref().unwrap();
         assert_eq!(legend.position, LegendPosition::Bottom);
         assert!(legend.overlay);
@@ -8161,8 +8064,8 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         let reparsed = reparsed.legend.as_ref().unwrap();
         assert_eq!(reparsed.shape_properties, legend.shape_properties);
         assert_eq!(reparsed.text_properties, legend.text_properties);
@@ -8183,7 +8086,7 @@ mod tests {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea/><c:legend>"#.to_vec();
             document.extend_from_slice(invalid_entry);
             document.extend_from_slice(b"</c:legend></c:chart></c:chartSpace>");
-            assert!(parse_chart(document.as_slice()).is_err());
+            assert!(read(document.as_slice()).is_err());
         }
 
         let mut invalid = Chart::new();
@@ -8199,7 +8102,7 @@ mod tests {
         );
         legend.entries.push(entry);
         invalid.legend = Some(legend);
-        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+        assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
     }
 
     #[test]
@@ -8224,7 +8127,7 @@ mod tests {
                 <c:crossAx val="2"/><c:extLst><c:ext uri="axis"><x:axisBodyPayload/></c:ext></c:extLst>
                 </c:catAx></c:plotArea></c:chart>
         </c:chartSpace>"#;
-        let chart = parse_chart(xml.as_slice()).unwrap();
+        let chart = read(xml.as_slice()).unwrap();
         assert!(
             std::str::from_utf8(chart.title_shape_properties.as_ref().unwrap().as_xml())
                 .unwrap()
@@ -8291,8 +8194,8 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
-        let reparsed = parse_chart(output.as_slice()).unwrap();
+        crate::chart::writer::write(&mut output, &chart).unwrap();
+        let reparsed = read(output.as_slice()).unwrap();
         assert_eq!(
             reparsed.title_shape_properties,
             chart.title_shape_properties
@@ -8323,10 +8226,10 @@ mod tests {
         assert_eq!(reparsed_common.extension_list, common.extension_list);
 
         let duplicate = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:title><c:spPr/><c:spPr/></c:title><c:plotArea/></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate.as_slice()).is_err());
+        assert!(read(duplicate.as_slice()).is_err());
 
         let duplicate_gridlines = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:majorGridlines/><c:majorGridlines/><c:crossAx val="2"/></c:catAx></c:plotArea></c:chart></c:chartSpace>"#;
-        assert!(parse_chart(duplicate_gridlines.as_slice()).is_err());
+        assert!(read(duplicate_gridlines.as_slice()).is_err());
     }
 
     #[test]
@@ -8339,7 +8242,7 @@ mod tests {
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:view3D><c:perspective val="241"/></c:view3D></c:chart></c:chartSpace>"#.as_slice(),
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:legend><c:legendPos val="center"/></c:legend></c:chart></c:chartSpace>"#.as_slice(),
         ] {
-            assert!(parse_chart(xml).is_err());
+            assert!(read(xml).is_err());
         }
     }
 
@@ -8355,7 +8258,7 @@ mod tests {
             </c:chartSpace>"#
                 .as_slice(),
         ] {
-            assert!(parse_chart(xml).is_err());
+            assert!(read(xml).is_err());
         }
 
         let empty_layout =
@@ -8363,7 +8266,7 @@ mod tests {
                 <c:chart><c:plotArea><c:layout/><c:lineChart></c:lineChart>
                 </c:plotArea></c:chart>
             </c:chartSpace>"#;
-        let chart = parse_chart(empty_layout.as_slice()).unwrap();
+        let chart = read(empty_layout.as_slice()).unwrap();
         assert!(chart.plot_area.layout.is_some());
     }
 
@@ -8620,13 +8523,13 @@ mod tests {
         }
 
         let mut xml = Vec::new();
-        crate::charts::writer::write_chart(&mut xml, &chart).unwrap();
+        crate::chart::writer::write(&mut xml, &chart).unwrap();
         assert!(
             std::str::from_utf8(&xml)
                 .unwrap()
                 .contains("<c:name>Forecast &amp; fit</c:name>")
         );
-        let parsed = parse_chart(xml.as_slice()).unwrap();
+        let parsed = read(xml.as_slice()).unwrap();
 
         assert_eq!(parsed.plot_area.type_groups.len(), 16);
         for (index, group) in parsed.plot_area.type_groups.iter().enumerate() {
@@ -8998,10 +8901,10 @@ mod tests {
         ];
 
         let mut xml = Vec::new();
-        crate::charts::writer::write_chart(&mut xml, &chart).unwrap();
+        crate::chart::writer::write(&mut xml, &chart).unwrap();
         let xml_text = std::str::from_utf8(&xml).unwrap();
         assert_eq!(xml_text.matches("<c:scaling>").count(), 4);
-        let parsed = parse_chart(xml.as_slice()).unwrap();
+        let parsed = read(xml.as_slice()).unwrap();
         let Some(TitleText::Reference(title)) = parsed.title.as_ref() else {
             panic!("expected chart title reference");
         };
@@ -9116,7 +9019,7 @@ mod tests {
             let xml = format!(
                 r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea>{axis}</c:plotArea></c:chart></c:chartSpace>"#
             );
-            assert!(parse_chart(xml.as_bytes()).is_err());
+            assert!(read(xml.as_bytes()).is_err());
         }
     }
 }

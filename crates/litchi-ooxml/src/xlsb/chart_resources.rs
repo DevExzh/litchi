@@ -30,7 +30,7 @@ pub(crate) struct AuthoredChartGraph {
 }
 
 pub(crate) struct ResolvedChartGraph {
-    pub chart: crate::charts::Chart,
+    pub chart: litchi_drawingml::chart::Chart,
     pub external_data_part: Option<ChartExternalDataPart>,
     pub user_shapes_part: Option<ChartUserShapesPart>,
     pub additional_relationships: Vec<ChartRelationship>,
@@ -250,7 +250,7 @@ pub(crate) fn parse_chart_resources(
     if chart_relationship_count > MAX_RELATIONSHIPS {
         return Err(limit("chart relationship count"));
     }
-    let chart = crate::charts::reader::parse_chart(chart_part.blob())?;
+    let chart = litchi_drawingml::chart::reader::read(chart_part.blob())?;
     let mut total = 0usize;
     let mut consumed = HashSet::new();
 
@@ -616,7 +616,7 @@ fn validated_chart_xml(
     if xml.len() > MAX_CHART_XML_BYTES {
         return Err(limit("chart XML bytes"));
     }
-    crate::charts::reader::parse_chart(xml.as_slice())?;
+    litchi_drawingml::chart::reader::read(xml.as_slice())?;
     Ok(xml)
 }
 
@@ -700,8 +700,8 @@ fn limit(what: &str) -> XlsbError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::ChartExternalData;
     use crate::xlsx::{ChartAnchor, WorksheetChart};
+    use litchi_drawingml::chart::ChartExternalData;
 
     #[test]
     fn reader_refuses_missing_external_data_relationship() {

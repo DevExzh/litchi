@@ -2,26 +2,26 @@
 //!
 //! This module provides functionality to generate chart XML for OOXML packages.
 
-use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
-use crate::charts::chart::{
+use crate::chart::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
+use crate::chart::data::{Layout, NumericData, StringData, TitleText};
+use crate::chart::legend::Legend;
+use crate::chart::model::{
     Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
     ChartPageSetup, ChartPrintSettings, ChartProtection, ChartShapeProperties, ChartTextProperties,
     ChartUserShapes, ColorMapOverride, ColorMapping, PictureOptions, PivotFormat, PivotSource,
     View3D, WallFloor,
 };
-use crate::charts::legend::Legend;
-use crate::charts::models::{Layout, NumericData, StringData, TitleText};
-use crate::charts::plot_area::{
+use crate::chart::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
     ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup,
     Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup,
     Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
-use crate::charts::series::{
+use crate::chart::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
     Marker, Series, Trendline, TrendlineType,
 };
-use crate::charts::types::MarkerStyle;
+use crate::chart::types::MarkerStyle;
 use litchi_core::xml::escape_xml;
 use std::io::Write;
 
@@ -94,11 +94,16 @@ impl SeriesFeatures {
 }
 
 /// Write a chart to XML.
-pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
-    write_chart_with_relationship_ids(writer, chart, None, None)
+pub fn write<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
+    write_with_rels(writer, chart, None, None)
 }
 
-pub(crate) fn write_chart_with_relationship_ids<W: Write>(
+/// Write chart XML using relationship identifiers assigned by its package owner.
+///
+/// This is the focused low-level entry for concrete format crates. Ordinary
+/// semantic callers should use [`write`], while DOCX, PPTX, XLSX, and XLSB keep
+/// responsibility for allocating and validating their OPC relationships.
+pub fn write_with_rels<W: Write>(
     writer: &mut W,
     chart: &Chart,
     external_data_relationship_id: Option<&str>,

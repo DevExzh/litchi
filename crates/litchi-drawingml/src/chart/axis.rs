@@ -3,10 +3,10 @@
 //! This module contains structures for representing chart axes,
 //! including category, value, date, and series axes.
 
-use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
-use crate::charts::models::{Layout, NumberFormat, TitleText};
-use crate::charts::plot_area::ChartLines;
-use crate::charts::types::{AxisOrientation, AxisPosition, AxisType, TickLabelPosition, TickMark};
+use crate::chart::data::{Layout, NumberFormat, TitleText};
+use crate::chart::model::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
+use crate::chart::plot_area::ChartLines;
+use crate::chart::types::{AxisOrientation, AxisPosition, AxisType, TickLabelPosition, TickMark};
 
 /// Axis crossing mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

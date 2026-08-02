@@ -184,15 +184,15 @@ pub struct Layout {
     /// Height (0.0 to 1.0 for factor mode)
     pub height: Option<f64>,
     /// X mode (edge or factor)
-    pub x_mode: Option<crate::charts::types::LayoutMode>,
+    pub x_mode: Option<crate::chart::types::LayoutMode>,
     /// Y mode (edge or factor)
-    pub y_mode: Option<crate::charts::types::LayoutMode>,
+    pub y_mode: Option<crate::chart::types::LayoutMode>,
     /// Width mode (edge or factor)
-    pub width_mode: Option<crate::charts::types::LayoutMode>,
+    pub width_mode: Option<crate::chart::types::LayoutMode>,
     /// Height mode (edge or factor)
-    pub height_mode: Option<crate::charts::types::LayoutMode>,
+    pub height_mode: Option<crate::chart::types::LayoutMode>,
     /// Layout target (inner or outer)
-    pub target: Option<crate::charts::types::LayoutTarget>,
+    pub target: Option<crate::chart::types::LayoutTarget>,
 }
 
 impl Layout {

@@ -3,10 +3,10 @@
 //! This module contains structures for representing chart series,
 //! data points, and their associated properties.
 
-use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, PictureOptions};
-use crate::charts::models::{Layout, NumberFormat, NumericData, StringData, TitleText};
-use crate::charts::plot_area::{BarShape, ChartLines};
-use crate::charts::types::{DataLabelPosition, MarkerStyle};
+use crate::chart::data::{Layout, NumberFormat, NumericData, StringData, TitleText};
+use crate::chart::model::{ChartExtensionList, ChartShapeProperties, PictureOptions};
+use crate::chart::plot_area::{BarShape, ChartLines};
+use crate::chart::types::{DataLabelPosition, MarkerStyle};
 
 /// Marker formatting shared by chart elements that support point symbols.
 #[derive(Debug, Clone, Default)]
@@ -113,7 +113,7 @@ pub struct DataLabels {
     /// DrawingML shape properties for all labels
     pub shape_properties: Option<ChartShapeProperties>,
     /// DrawingML text properties for all labels
-    pub text_properties: Option<crate::charts::chart::ChartTextProperties>,
+    pub text_properties: Option<crate::chart::model::ChartTextProperties>,
     /// Position of data labels
     pub position: Option<DataLabelPosition>,
     /// Show legend key
@@ -195,7 +195,7 @@ pub struct DataLabel {
     /// DrawingML shape properties for this label
     pub shape_properties: Option<ChartShapeProperties>,
     /// DrawingML text properties for this label
-    pub text_properties: Option<crate::charts::chart::ChartTextProperties>,
+    pub text_properties: Option<crate::chart::model::ChartTextProperties>,
     /// Position of the label
     pub position: Option<DataLabelPosition>,
     /// Show legend key
@@ -340,7 +340,7 @@ pub struct Trendline {
     /// DrawingML shape properties for the trendline label
     pub label_shape_properties: Option<ChartShapeProperties>,
     /// DrawingML text properties for the trendline label
-    pub label_text_properties: Option<crate::charts::chart::ChartTextProperties>,
+    pub label_text_properties: Option<crate::chart::model::ChartTextProperties>,
     /// Trendline-label extension list
     pub label_extension_list: Option<ChartExtensionList>,
     /// Trendline extension list

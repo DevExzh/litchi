@@ -6,8 +6,8 @@
 //! links them. This parser reads both the transitional and the ISO Strict
 //! `drawingml/diagram` namespaces and treats everything as inert metadata.
 
-use crate::diagrams::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DiagramNode};
-use crate::error::{OoxmlError, Result};
+use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DiagramNode};
+use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_str;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -157,8 +157,12 @@ impl DiagramDataModel {
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
-                    depth += 1;
-                    nodes += 1;
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| limit("data-model XML depth"))?;
+                    nodes = nodes
+                        .checked_add(1)
+                        .ok_or_else(|| limit("data-model XML node count"))?;
                     if nodes > MAX_NODES || depth > MAX_DEPTH {
                         return Err(limit("data-model XML structure"));
                     }
@@ -192,8 +196,13 @@ impl DiagramDataModel {
                     }
                 },
                 Event::Empty(element) => {
-                    nodes += 1;
-                    if nodes > MAX_NODES || depth + 1 > MAX_DEPTH {
+                    nodes = nodes
+                        .checked_add(1)
+                        .ok_or_else(|| limit("data-model XML node count"))?;
+                    let child_depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| limit("data-model XML depth"))?;
+                    if nodes > MAX_NODES || child_depth > MAX_DEPTH {
                         return Err(limit("data-model XML structure"));
                     }
                     let namespace = element_namespace(&reader, &element)?;
@@ -231,7 +240,12 @@ impl DiagramDataModel {
                     {
                         let text = std::str::from_utf8(event.as_ref()).map_err(xml_error)?;
                         let text = quick_xml::escape::unescape(text).map_err(xml_error)?;
-                        if builder.text.len() + text.len() > MAX_TEXT_BYTES {
+                        if builder
+                            .text
+                            .len()
+                            .checked_add(text.len())
+                            .is_none_or(|length| length > MAX_TEXT_BYTES)
+                        {
                             return Err(limit("diagram text bytes"));
                         }
                         builder.text.push_str(&text);
@@ -242,7 +256,12 @@ impl DiagramDataModel {
                         && let Some((_, builder)) = &mut open_point
                     {
                         let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
-                        if builder.text.len() + text.len() > MAX_TEXT_BYTES {
+                        if builder
+                            .text
+                            .len()
+                            .checked_add(text.len())
+                            .is_none_or(|length| length > MAX_TEXT_BYTES)
+                        {
                             return Err(limit("diagram text bytes"));
                         }
                         builder.text.push_str(&text);
@@ -260,7 +279,9 @@ impl DiagramDataModel {
                         if local != "pt" {
                             return Err(invalid("unbalanced diagram point"));
                         }
-                        let (_, builder) = open_point.take().expect("open point checked above");
+                        let Some((_, builder)) = open_point.take() else {
+                            return Err(invalid("diagram point state is inconsistent"));
+                        };
                         model.points.push(builder.finish());
                     }
                     if depth == 0 {
@@ -361,7 +382,10 @@ fn build_children(
             }
             let mut node = DiagramNode::new(point.text.clone());
             node.depth = depth;
-            node.children = build_children(dest_id, depth + 1, points, children, visiting);
+            let Some(child_depth) = depth.checked_add(1) else {
+                continue;
+            };
+            node.children = build_children(dest_id, child_depth, points, children, visiting);
             nodes.push(node);
         }
     }
@@ -520,15 +544,15 @@ fn is_dgm(namespace: &str) -> bool {
     matches!(namespace, DGM_NAMESPACE | DGM_NAMESPACE_STRICT)
 }
 
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(error.to_string())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
-fn limit(label: &str) -> OoxmlError {
+fn limit(label: &str) -> Error {
     invalid(format!("diagram {label} limit exceeded"))
 }
 

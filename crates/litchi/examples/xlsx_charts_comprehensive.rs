@@ -5,15 +5,15 @@
 //! cargo run --example xlsx_charts_comprehensive -- /tmp/charts_all_types.xlsx
 //! ```
 
-use litchi::ooxml::charts::Chart;
-use litchi::ooxml::charts::axis::{Axis, CategoryAxis, ValueAxis};
-use litchi::ooxml::charts::legend::Legend;
-use litchi::ooxml::charts::models::{DataSourceRef, NumericData, RichText, StringData, TitleText};
-use litchi::ooxml::charts::plot_area::{
+use litchi::drawing::chart::Chart;
+use litchi::drawing::chart::axis::{Axis, CategoryAxis, ValueAxis};
+use litchi::drawing::chart::data::{DataSourceRef, NumericData, RichText, StringData, TitleText};
+use litchi::drawing::chart::legend::Legend;
+use litchi::drawing::chart::plot_area::{
     BubbleTypeGroup, DoughnutTypeGroup, PlotArea, RadarTypeGroup, TypeGroup,
 };
-use litchi::ooxml::charts::series::Series;
-use litchi::ooxml::charts::types::{AxisPosition, LegendPosition, RadarStyle};
+use litchi::drawing::chart::series::Series;
+use litchi::drawing::chart::types::{AxisPosition, LegendPosition, RadarStyle};
 use litchi::ooxml::xlsx::{ChartAnchor, Workbook, WorksheetChart};
 use std::env;
 use std::error::Error;

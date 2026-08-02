@@ -3,12 +3,12 @@
 //! This module contains the top-level chart structure that combines
 //! all chart elements (plot area, legend, title, etc.).
 
-use crate::charts::legend::Legend;
-use crate::charts::models::{Layout, TitleText};
-use crate::charts::plot_area::PlotArea;
-use crate::charts::series::{DataLabel, Marker};
-use crate::charts::types::DisplayBlanks;
-use crate::error::{OoxmlError, Result};
+use crate::chart::data::{Layout, TitleText};
+use crate::chart::legend::Legend;
+use crate::chart::plot_area::PlotArea;
+use crate::chart::series::{DataLabel, Marker};
+use crate::chart::types::DisplayBlanks;
+use crate::{Error, Result};
 use litchi_ooxml_common::xml::is_drawingml_chart_name;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
@@ -23,11 +23,11 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
                 if matches!(namespace, ResolveResult::Unknown(_)) {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "{description} contains an undeclared element prefix"
                     )));
                 }
@@ -35,20 +35,19 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                     is_drawingml_chart_name(&namespace, element.name(), expected_root);
                 drop(namespace);
                 for attribute in element.attributes() {
-                    let attribute =
-                        attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     if matches!(
                         reader.resolver().resolve_attribute(attribute.key).0,
                         ResolveResult::Unknown(_)
                     ) {
-                        return Err(OoxmlError::InvalidFormat(format!(
+                        return Err(Error::Invalid(format!(
                             "{description} contains an undeclared attribute prefix"
                         )));
                     }
                 }
                 if depth == 0 {
                     if saw_root || !has_expected_root {
-                        return Err(OoxmlError::InvalidFormat(format!(
+                        return Err(Error::Invalid(format!(
                             "{description} must have one DrawingML chart root"
                         )));
                     }
@@ -56,7 +55,7 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                 }
                 if matches!(event, Event::Start(_)) {
                     depth = depth.checked_add(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat(format!("{description} XML nesting is too deep"))
+                        Error::Invalid(format!("{description} XML nesting is too deep"))
                     })?;
                 } else if depth == 0 {
                     closed_root = true;
@@ -64,7 +63,7 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
             },
             Event::End(ref element) => {
                 if matches!(namespace, ResolveResult::Unknown(_)) {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "{description} contains an undeclared closing-element prefix"
                     )));
                 }
@@ -72,14 +71,14 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                     is_drawingml_chart_name(&namespace, element.name(), expected_root);
                 drop(namespace);
                 if depth == 0 {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "{description} has an unmatched closing element"
                     )));
                 }
                 depth -= 1;
                 if depth == 0 {
                     if !has_expected_root {
-                        return Err(OoxmlError::InvalidFormat(format!(
+                        return Err(Error::Invalid(format!(
                             "{description} has an invalid root closing element"
                         )));
                     }
@@ -90,21 +89,21 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                 if depth == 0
                     && !text
                         .decode()
-                        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                        .map_err(|error| Error::Xml(error.to_string()))?
                         .trim()
                         .is_empty() =>
             {
-                return Err(OoxmlError::InvalidFormat(format!(
+                return Err(Error::Invalid(format!(
                     "{description} contains text outside its root"
                 )));
             },
             Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
-                return Err(OoxmlError::InvalidFormat(format!(
+                return Err(Error::Invalid(format!(
                     "{description} contains data outside its root"
                 )));
             },
             Event::Decl(_) | Event::DocType(_) => {
-                return Err(OoxmlError::InvalidFormat(format!(
+                return Err(Error::Invalid(format!(
                     "{description} cannot contain an XML declaration or document type"
                 )));
             },
@@ -114,7 +113,7 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
         buffer.clear();
     }
     if !saw_root || !closed_root || depth != 0 {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "{description} has no complete root"
         )));
     }
@@ -830,11 +829,11 @@ impl Chart {
             || self.plot_area.type_groups.iter().any(|tg| {
                 matches!(
                     tg,
-                    crate::charts::plot_area::TypeGroup::Area3D(_)
-                        | crate::charts::plot_area::TypeGroup::Bar3D(_)
-                        | crate::charts::plot_area::TypeGroup::Line3D(_)
-                        | crate::charts::plot_area::TypeGroup::Pie3D(_)
-                        | crate::charts::plot_area::TypeGroup::Surface3D(_)
+                    crate::chart::plot_area::TypeGroup::Area3D(_)
+                        | crate::chart::plot_area::TypeGroup::Bar3D(_)
+                        | crate::chart::plot_area::TypeGroup::Line3D(_)
+                        | crate::chart::plot_area::TypeGroup::Pie3D(_)
+                        | crate::chart::plot_area::TypeGroup::Surface3D(_)
                 )
             })
     }

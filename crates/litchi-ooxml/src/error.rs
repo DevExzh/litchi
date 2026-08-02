@@ -34,7 +34,7 @@ pub enum OoxmlError {
 
     /// Shared DrawingML parsing error.
     #[error("DrawingML error: {0}")]
-    Drawing(#[from] litchi_drawingml::DrawingError),
+    Drawing(#[from] litchi_drawingml::Error),
 
     #[error("markup compatibility error: {0}")]
     MarkupCompatibility(#[from] litchi_ooxml_common::MceError),

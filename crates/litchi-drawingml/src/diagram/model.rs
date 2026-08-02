@@ -6,7 +6,7 @@
 //! colors, pre-rendered drawing). The model is shared by the format modules
 //! (`docx`, `pptx`); format-specific anchoring lives in those modules.
 
-use crate::error::{OoxmlError, Result};
+use crate::{Error, Result};
 use litchi_core::xml::escape_xml;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -176,7 +176,7 @@ impl SmartArt {
                     }
                 },
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                Err(e) => return Err(Error::Xml(e.to_string())),
                 _ => {},
             }
         }

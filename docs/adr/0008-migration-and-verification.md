@@ -1902,6 +1902,50 @@ Per the explicit review direction, the full-workspace and Computer Use/native
 Office reruns are skipped; the previously green baselines remain the applicable
 evidence for unchanged wire semantics.
 
+The thirty-seventh implementation slice moves the shared classic-chart and
+SmartArt grammar out of the OOXML migration host. Fourteen source files and
+17,401 lines now have one canonical owner under `litchi-drawingml`: the
+singular `chart` and `diagram` modules. Context replaces repeated prefixes, so
+the chart internals use short `model` and `data` modules rather than nested
+`chart::chart` and `chart::models` paths. The public codec entry points are
+`chart::reader::read`, `chart::writer::write`, and the focused low-level
+`chart::writer::write_with_rels` relationship seam. No plural-module,
+old-function-name, or retired root `charts`/`diagrams` compatibility aliases
+remain.
+
+DOCX and PPTX now consume `litchi_drawingml::diagram` directly, while XLSX and
+XLSB consume `litchi_drawingml::chart` directly. The shared owner depends only
+on neutral core and OOXML-common vocabulary; it has no dependency on a concrete
+document format or on `litchi-ooxml`. Concrete packages continue to own package
+relationships, anchors, and resource graphs. The umbrella exposes the same
+ownership through the concise `litchi::drawing::{chart, diagram}` facade under
+the existing `ooxml` feature. This is a breaking ownership move, not a
+compatibility tunnel through the migration host.
+
+The move also hardens the newly independent parser boundary. Invalid chart
+states that previously relied on `unreachable!` return the short crate-local
+`Error`; diagram node, depth, text, and XML-depth accounting uses checked
+arithmetic; and the shared production modules contain no `unwrap`, `expect`,
+`panic!`, `unreachable!`, `todo!`, or `unimplemented!` path. Host errors wrap
+the typed DrawingML error without reducing it to an unstructured string. The
+touched move-style pivot-chart constructor likewise returns `Result<Self>`
+instead of asserting that its built-in extension fragment remains valid.
+
+Focused verification passes with warnings denied for all targets of
+`litchi-drawingml` and all features and targets of `litchi-ooxml`.
+`litchi-drawingml` passes 47 unit tests, one compiled rustdoc example, and
+Clippy; the host passes four shared-OOXML adapter tests, 140 chart-filtered unit
+tests, 20 SmartArt-filtered unit tests, and the 17 directly affected pivot-chart
+tests. Clippy also passes for every host target and the isolated umbrella
+facade. The isolated `ooxml` umbrella library and comprehensive XLSX chart
+example compile with warnings denied.
+Formatting, diff validation, the 32-package boundary inventory, and all nine
+boundary regressions are green; the inventory now contains 101 direct internal
+dependencies and 18 explicit migration-debt entries. Because this slice moves
+ownership and hardens failures without intentionally changing emitted Office
+artifacts, the full-workspace and Computer Use/native Microsoft Office reruns
+are skipped per the explicit review direction.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

@@ -5,21 +5,20 @@
 //! `dgm:relIds` element with the relationship IDs of the four diagram parts
 //! (data, layout, quick style, colors) generated under `/word/diagrams/`.
 //! The parts are produced by the shared generators in
-//! [`crate::diagrams::model`] and are discoverable after save and reopen
+//! [`litchi_drawingml::diagram::model`] and are discoverable after save and reopen
 //! through [`crate::docx::Document::smart_arts`].
 //!
 //! The optional pre-rendered `drawingN.xml` part is deliberately not
 //! generated: Word and LibreOffice re-render the diagram from the layout and
 //! data parts when it is absent.
 
-use crate::diagrams::DGM_NAMESPACE;
-use crate::diagrams::model::{
-    SmartArt, generate_smartart_colors_xml, generate_smartart_data_xml,
-    generate_smartart_layout_xml, generate_smartart_quickstyle_xml,
-};
 use crate::error::{OoxmlError, Result};
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_core::xml::escape_xml;
+use litchi_drawingml::diagram::{
+    DGM_NAMESPACE, DiagramNode, SmartArt, generate_smartart_colors_xml, generate_smartart_data_xml,
+    generate_smartart_layout_xml, generate_smartart_quickstyle_xml,
+};
 use std::fmt::Write as FmtWrite;
 
 /// Maximum SmartArt diagrams in one document, matching the read-side bound.
@@ -61,7 +60,7 @@ pub(crate) struct SmartArtPartXml {
 /// A mutable SmartArt diagram being authored in a document.
 ///
 /// Wraps a semantic [`SmartArt`] built with
-/// [`crate::diagrams::model::SmartArtBuilder`], adding the drawing anchor
+/// [`litchi_drawingml::diagram::SmartArtBuilder`], adding the drawing anchor
 /// identity and extents. Attach it to a document via
 /// [`crate::docx::writer::MutableDocument::add_smart_art`].
 ///
@@ -225,8 +224,7 @@ fn validate_smartart(smartart: &SmartArt) -> Result<()> {
         ));
     }
     let mut nodes = 0usize;
-    let mut stack: Vec<(&crate::diagrams::model::DiagramNode, u32)> =
-        smartart.nodes.iter().map(|node| (node, 1)).collect();
+    let mut stack: Vec<(&DiagramNode, u32)> = smartart.nodes.iter().map(|node| (node, 1)).collect();
     while let Some((node, depth)) = stack.pop() {
         nodes += 1;
         if nodes > MAX_DIAGRAM_NODES || depth > MAX_DIAGRAM_DEPTH {
@@ -242,8 +240,7 @@ fn validate_smartart(smartart: &SmartArt) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagrams::DiagramType;
-    use crate::diagrams::model::{DiagramNode, SmartArtBuilder};
+    use litchi_drawingml::diagram::{DiagramType, SmartArtBuilder};
 
     fn built() -> SmartArt {
         SmartArtBuilder::new(DiagramType::Process)

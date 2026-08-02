@@ -2,11 +2,12 @@
 //!
 //! SmartArt graphics are represented as diagrams in OOXML. The semantic model
 //! (`SmartArt`, `DiagramNode`, `DiagramType`), the builder, and the diagram
-//! part generators live in the format-agnostic [`crate::diagrams`] module and
-//! are re-exported here so the existing `pptx::smartart` API keeps working.
+//! part generators live in the format-agnostic
+//! [`litchi_drawingml::diagram`] module and are re-exported here for the
+//! PowerPoint-specific facade.
 //! This module adds the PowerPoint-specific graphic-frame anchor.
 
-pub use crate::diagrams::{
+pub use litchi_drawingml::diagram::{
     DiagramNode, DiagramType, SmartArt, SmartArtBuilder, generate_smartart_colors_xml,
     generate_smartart_data_xml, generate_smartart_drawing_xml, generate_smartart_layout_xml,
     generate_smartart_quickstyle_xml,

@@ -794,7 +794,7 @@ impl MutableWorksheet {
         if pivot_table_name.is_empty() {
             return Err("pivot table name cannot be empty".into());
         }
-        self.charts.push(chart.into_pivot_chart(pivot_table_name));
+        self.charts.push(chart.into_pivot_chart(pivot_table_name)?);
         self.modified = true;
         Ok(())
     }

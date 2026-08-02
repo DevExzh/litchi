@@ -16,8 +16,8 @@
 //!   colors definition parts.
 //!
 //! Both the transitional and the ISO Strict `drawingml/diagram` namespaces are
-//! supported. Format-specific anchoring lives in `crate::docx::smartart` and
-//! `crate::pptx::smartart`.
+//! supported. Format-specific anchoring remains in the concrete `litchi-docx`
+//! and `litchi-pptx` crates.
 
 pub mod data;
 pub mod definition;
