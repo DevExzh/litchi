@@ -133,6 +133,7 @@ mod shared_strings;
 /// Styles parsing (fonts, fills, borders, number formats)
 mod styles;
 mod styles_table;
+mod template;
 pub mod vba_project;
 
 /// Date and time utilities

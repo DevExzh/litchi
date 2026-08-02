@@ -41,7 +41,6 @@ ryu             = { workspace = true }
 sha2            = { workspace = true, features = ["zeroize"] }
 smallvec        = { workspace = true }
 thiserror       = { workspace = true }
-xml-minifier    = { workspace = true }
 zeroize         = { workspace = true }
 
 [dev-dependencies]

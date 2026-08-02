@@ -249,13 +249,6 @@
       "exit": "Move callers to litchi-xlsx and delete the reverse adapter with the monolith."
     },
     {
-      "order": 45,
-      "dependent": "litchi-ooxml",
-      "dependency": "xml-minifier",
-      "reason": "The OOXML monolith still performs XML implementation work directly.",
-      "exit": "Move the remaining XML consumers into common or concrete crates and delete the host."
-    },
-    {
       "order": 47,
       "dependent": "litchi",
       "dependency": "litchi-ooxml",

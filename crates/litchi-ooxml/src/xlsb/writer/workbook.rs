@@ -597,7 +597,7 @@ impl XlsbWorkbookWriter {
         let core_part = BlobPart::new(
             core_uri,
             "application/vnd.openxmlformats-package.core-properties+xml".to_string(),
-            core_xml.into_bytes(),
+            core_xml.as_bytes().to_vec(),
         );
         package.add_part(Box::new(core_part));
         package.relate_to(
@@ -621,61 +621,12 @@ impl XlsbWorkbookWriter {
             ));
         }
 
-        xml_minifier::minified_xml_format!(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
-                xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-                <Application>The Litchi Rust Library</Application>
-                <DocSecurity>0</DocSecurity>
-                <ScaleCrop>false</ScaleCrop>
-                <HeadingPairs>
-                    <vt:vector size="2" baseType="variant">
-                        <vt:variant>
-                            <vt:lpstr>Sheet</vt:lpstr>
-                        </vt:variant>
-                        <vt:variant>
-                            <vt:i4>{}</vt:i4>
-                        </vt:variant>
-                    </vt:vector>
-                </HeadingPairs>
-                <TitlesOfParts>
-                    <vt:vector size="{}" baseType="lpstr">{}</vt:vector>
-                </TitlesOfParts>
-                <Company></Company>
-                <LinksUpToDate>false</LinksUpToDate>
-                <SharedDoc>false</SharedDoc>
-                <HyperlinksChanged>false</HyperlinksChanged>
-                <AppVersion>14.0000</AppVersion>
-            </Properties>"#,
-            sheet_count,
-            sheet_count,
-            sheet_names
-        )
+        crate::xlsb::template::app(sheet_count, &sheet_names)
     }
 
     /// Create core.xml content (Core Properties)
-    fn create_core_xml(&self) -> String {
-        // Get current timestamp in W3CDTF format
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
-        let timestamp = format_w3cdtf(now.as_secs());
-
-        xml_minifier::minified_xml_format!(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-                <cp:coreProperties
-                    xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
-                    xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/"
-                    xmlns:dcmitype="http://purl.org/dc/dcmitype/"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                    <dc:creator>The Litchi Rust Library</dc:creator>
-                    <cp:lastModifiedBy>The Litchi Rust Library</cp:lastModifiedBy>
-                    <dcterms:created xsi:type="dcterms:W3CDTF">{}</dcterms:created>
-                    <dcterms:modified xsi:type="dcterms:W3CDTF">{}</dcterms:modified>
-                </cp:coreProperties>"#,
-            timestamp,
-            timestamp
-        )
+    fn create_core_xml(&self) -> &'static str {
+        crate::xlsb::template::core()
     }
 
     /// Add theme (REQUIRED by Excel to open file)
@@ -696,7 +647,7 @@ impl XlsbWorkbookWriter {
 
     /// Create minimal Office theme XML
     fn create_minimal_theme(&self) -> &'static str {
-        xml_minifier::minified_xml!("../resources/theme/theme1.xml")
+        crate::xlsb::template::theme()
     }
 
     /// Add workbook part to the package
@@ -1533,27 +1484,6 @@ impl XlsbWorkbookWriter {
 
         Ok(())
     }
-}
-
-/// Format Unix timestamp as W3CDTF (ISO 8601)
-fn format_w3cdtf(secs: u64) -> String {
-    // Simple conversion: seconds since 1970-01-01 to ISO 8601
-    // This is a simplified version; for production, use chrono or time crate
-    let days = secs / 86400;
-    let year = 1970 + (days / 365);
-    let day_of_year = days % 365;
-    let month = ((day_of_year / 30) + 1).min(12);
-    let day = ((day_of_year % 30) + 1).min(31);
-
-    let time_of_day = secs % 86400;
-    let hours = time_of_day / 3600;
-    let minutes = (time_of_day % 3600) / 60;
-    let seconds = time_of_day % 60;
-
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        year, month, day, hours, minutes, seconds
-    )
 }
 
 impl Default for XlsbWorkbookWriter {
@@ -2708,24 +2638,27 @@ mod tests {
         workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
         workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet2"));
 
-        let app_xml = workbook.create_app_xml();
-        assert!(app_xml.contains("<Application>The Litchi Rust Library</Application>"));
-        assert!(app_xml.contains("<vt:i4>2</vt:i4>")); // Sheet count
-        assert!(app_xml.contains("<vt:lpstr>Sheet1</vt:lpstr>"));
-        assert!(app_xml.contains("<vt:lpstr>Sheet2</vt:lpstr>"));
+        assert_eq!(
+            workbook.create_app_xml(),
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>The Litchi Rust Library</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Sheet</vt:lpstr></vt:variant><vt:variant><vt:i4>2</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="2" baseType="lpstr"><vt:lpstr>Sheet1</vt:lpstr><vt:lpstr>Sheet2</vt:lpstr></vt:vector></TitlesOfParts><Company/><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>14.0000</AppVersion></Properties>"#
+        );
     }
 
     #[test]
-    fn test_create_core_xml() {
+    fn test_create_core_xml_is_repeatable_and_does_not_unwind() {
         let workbook = XlsbWorkbookWriter::new();
-        let core_xml = workbook.create_core_xml();
+        let first = std::panic::catch_unwind(|| workbook.create_core_xml())
+            .expect("deterministic core-property creation must not unwind");
+        let second = std::panic::catch_unwind(|| workbook.create_core_xml())
+            .expect("repeated core-property creation must not unwind");
 
-        assert!(core_xml.contains("<dc:creator>The Litchi Rust Library</dc:creator>"));
-        assert!(
-            core_xml.contains("<cp:lastModifiedBy>The Litchi Rust Library</cp:lastModifiedBy>")
-        );
-        assert!(core_xml.contains("<cp:coreProperties"));
-        assert!(core_xml.contains("</cp:coreProperties>"));
+        assert_eq!(first, second);
+        assert!(!first.contains("<dc:creator"));
+        assert!(!first.contains("<cp:lastModifiedBy"));
+        assert!(!first.contains("<dcterms:created"));
+        assert!(!first.contains("<dcterms:modified"));
+        assert!(first.contains("<cp:coreProperties"));
+        assert!(first.ends_with("/>"));
     }
 
     #[test]
@@ -2735,14 +2668,6 @@ mod tests {
 
         assert!(theme.contains("<a:theme"));
         assert!(theme.contains("</a:theme>"));
-    }
-
-    #[test]
-    fn test_format_w3cdtf() {
-        let timestamp = format_w3cdtf(0); // Unix epoch
-        assert!(timestamp.contains("T"));
-        assert!(timestamp.ends_with("Z"));
-        assert!(timestamp.starts_with("1970-"));
     }
 
     #[test]

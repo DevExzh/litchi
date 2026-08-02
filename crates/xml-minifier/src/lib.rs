@@ -101,9 +101,13 @@ pub fn minified_xml(input: TokenStream) -> TokenStream {
     let minified = minify_xml(&xml_content)
         .unwrap_or_else(|e| panic!("Failed to minify XML from '{}': {}", file_path, e));
 
-    let expanded = quote! {
+    let tracked_path = canonical_path.to_string_lossy().into_owned();
+    let expanded = quote! {{
+        // Keep the source XML in rustc's dependency graph so changing it
+        // invalidates this expansion instead of silently reusing stale bytes.
+        const _: &str = include_str!(#tracked_path);
         #minified
-    };
+    }};
 
     // Generate the output token stream
     TokenStream::from(expanded)

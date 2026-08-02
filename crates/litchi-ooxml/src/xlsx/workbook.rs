@@ -2738,7 +2738,7 @@ impl Workbook {
 
     /// Generate metadata.xml for threaded comments support.
     fn generate_metadata_xml() -> String {
-        xml_minifier::minified_xml!("resources/metadata.xml").to_string()
+        crate::xlsx::template::metadata_xml().to_string()
     }
 
     /// Generate bridge comments.xml for threaded comments backwards compatibility.

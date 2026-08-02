@@ -20,6 +20,12 @@
 //!    - `pptx`: PowerPoint presentations (placeholder)
 //!    - `metadata`: Core properties/metadata extraction
 //!
+//! # Generated producer XML
+//!
+//! Files under format-local `resources/generated/` directories are derived artifacts; do not
+//! edit them by hand. Change the readable sibling, then run
+//! `cargo test -p xml-minifier --test ooxml_assets update -- --ignored`.
+//!
 //! # Example: Working with Word Documents
 //!
 //! ```rust,no_run
