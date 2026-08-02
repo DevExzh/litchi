@@ -499,19 +499,23 @@ pub fn store_placeholder_shape(
 
     // Run the read-side placeholder inventory over the patched part.
     let part = package.get_part(&uri)?;
-    let placeholders = if part.content_type() == ct::PML_SLIDE_MASTER {
-        SlideMasterPart::from_part(part)?.placeholders()?
-    } else {
-        SlideLayoutPart::from_part(part)?.placeholders()?
+    let matches = |shape: litchi_pptx::shape::Shape<'_>| {
+        shape.placeholder().is_some_and(|placeholder| {
+            placeholder.kind().unwrap_or("obj") == spec.kind.as_str()
+                && placeholder.index() == spec.effective_index()
+        })
     };
-    let found = placeholders.iter().any(|shape| {
-        shape
-            .placeholder_type()
-            .is_ok_and(|kind| kind == spec.kind.as_str())
-            && shape
-                .placeholder_index()
-                .is_ok_and(|index| index.unwrap_or(0) == spec.effective_index())
-    });
+    let found = if part.content_type() == ct::PML_SLIDE_MASTER {
+        SlideMasterPart::from_part(part)?
+            .shapes()?
+            .placeholders()
+            .any(matches)
+    } else {
+        SlideLayoutPart::from_part(part)?
+            .shapes()?
+            .placeholders()
+            .any(matches)
+    };
     if !found {
         return Err(invalid(
             "read-side placeholder inventory lost the authored shape",
@@ -1652,20 +1656,29 @@ mod tests {
         }
 
         // Master placeholder inventory, including the replaced title text.
-        let master_placeholders = authored.placeholders().unwrap();
-        let titles = master_placeholders
-            .iter()
-            .filter(|shape| shape.placeholder_type().unwrap() == "title")
+        let master_shapes = authored.shapes().unwrap();
+        let titles = master_shapes
+            .placeholders()
+            .filter(|shape| {
+                shape
+                    .placeholder()
+                    .is_some_and(|value| value.kind() == Some("title"))
+            })
             .count();
         assert_eq!(titles, 1, "replaced title placeholder must not duplicate");
-        let title = master_placeholders
-            .iter()
-            .find(|shape| shape.placeholder_type().unwrap() == "title")
+        let title = master_shapes
+            .placeholders()
+            .find(|shape| {
+                shape
+                    .placeholder()
+                    .is_some_and(|value| value.kind() == Some("title"))
+            })
             .unwrap();
-        assert_eq!(title.text().unwrap().as_deref(), Some("Master title v2"));
-        assert!(master_placeholders.iter().any(|shape| {
-            shape.placeholder_type().unwrap() == "dt"
-                && shape.placeholder_index().unwrap() == Some(10)
+        assert_eq!(title.text(), Some("Master title v2"));
+        assert!(master_shapes.placeholders().any(|shape| {
+            shape
+                .placeholder()
+                .is_some_and(|value| value.kind() == Some("dt") && value.index() == 10)
         }));
 
         // Layout inventory: kinds, names, placeholders, and back-references.
@@ -1684,22 +1697,24 @@ mod tests {
                 .as_str(),
             master.part_name
         );
-        let layout_placeholders = title_layout_read.placeholders().unwrap();
-        assert_eq!(layout_placeholders.len(), 2);
-        let centered = layout_placeholders
-            .iter()
-            .find(|shape| shape.placeholder_type().unwrap() == "ctrTitle")
+        let layout_shapes = title_layout_read.shapes().unwrap();
+        assert_eq!(layout_shapes.placeholders().count(), 2);
+        let centered = layout_shapes
+            .placeholders()
+            .find(|shape| {
+                shape
+                    .placeholder()
+                    .is_some_and(|value| value.kind() == Some("ctrTitle"))
+            })
             .unwrap();
-        assert_eq!(
-            centered.text().unwrap().as_deref(),
-            Some("Click to edit the custom title")
-        );
-        assert!(layout_placeholders.iter().any(|shape| {
-            shape.placeholder_type().unwrap() == "subTitle"
-                && shape.placeholder_index().unwrap() == Some(1)
+        assert_eq!(centered.text(), Some("Click to edit the custom title"));
+        assert!(layout_shapes.placeholders().any(|shape| {
+            shape
+                .placeholder()
+                .is_some_and(|value| value.kind() == Some("subTitle") && value.index() == 1)
         }));
         assert_eq!(layouts[1].metadata().unwrap().layout_type(), "blank");
-        assert!(layouts[1].placeholders().unwrap().is_empty());
+        assert!(layouts[1].placeholders().unwrap().next().is_none());
 
         // The authored master inherits a working theme relationship.
         authored.theme().unwrap();
@@ -1761,9 +1776,10 @@ mod tests {
             .find(|candidate| candidate.name().unwrap() == "Two Objects Extra")
             .unwrap();
         assert_eq!(added.metadata().unwrap().layout_type(), "twoObj");
-        let placeholders = added.placeholders().unwrap();
-        assert_eq!(placeholders.len(), 1);
-        assert_eq!(placeholders[0].placeholder_index().unwrap(), Some(7));
+        let mut placeholders = added.placeholders().unwrap();
+        let placeholder = placeholders.next().unwrap().placeholder().unwrap();
+        assert_eq!(placeholder.index(), 7);
+        assert!(placeholders.next().is_none());
     }
 
     #[test]

@@ -766,6 +766,50 @@ impl Package {
         tag::remove(&mut self.opc, &slide_name).map_err(Into::into)
     }
 
+    /// Read the programmable-tag list attached to one semantic slide shape.
+    ///
+    /// Producer-visible shape names are the ordinary selector. A checked
+    /// depth-first numeric position is also accepted for source-order repair;
+    /// non-visual IDs and relationship IDs remain below the safe facade.
+    pub fn shape_tags<'s, 'k>(
+        &self,
+        slide: impl Into<SlideKey<'s>>,
+        shape: impl Into<litchi_pptx::shape::Key<'k>>,
+    ) -> Result<Option<tag::List>> {
+        self.ensure_tag_graph_current("shape_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        Ok(tag::shape::load(&self.opc, &slide_name, shape)?.map(tag::Source::into_list))
+    }
+
+    /// Create or replace one semantic slide shape's programmable-tag list.
+    ///
+    /// The list is moved into a staged part. Shape XML, its relationship, and
+    /// the target part commit together after source-preserving validation.
+    pub fn put_shape_tags<'s, 'k>(
+        &mut self,
+        slide: impl Into<SlideKey<'s>>,
+        shape: impl Into<litchi_pptx::shape::Key<'k>>,
+        list: tag::List,
+    ) -> Result<Option<tag::List>> {
+        self.ensure_tag_graph_current("put_shape_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        tag::shape::put(&mut self.opc, &slide_name, shape, list).map_err(Into::into)
+    }
+
+    /// Remove one semantic slide shape's programmable-tag list.
+    ///
+    /// Absence is an idempotent `Ok(None)`. Shared relationships and targets
+    /// are retained until no active anchor or package edge uses them.
+    pub fn remove_shape_tags<'s, 'k>(
+        &mut self,
+        slide: impl Into<SlideKey<'s>>,
+        shape: impl Into<litchi_pptx::shape::Key<'k>>,
+    ) -> Result<Option<tag::List>> {
+        self.ensure_tag_graph_current("remove_shape_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        tag::shape::remove(&mut self.opc, &slide_name, shape).map_err(Into::into)
+    }
+
     fn ensure_tag_graph_current(&self, operation: &'static str) -> Result<()> {
         if self
             .mutable_pres

@@ -169,6 +169,12 @@ impl From<litchi_ooxml_common::XmlError> for OoxmlError {
     }
 }
 
+impl From<litchi_pptx::shape::LookupError> for OoxmlError {
+    fn from(error: litchi_pptx::shape::LookupError) -> Self {
+        Self::Pptx(litchi_pptx::Error::from(error))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::error::Error as _;

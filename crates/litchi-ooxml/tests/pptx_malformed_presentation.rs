@@ -177,7 +177,7 @@ fn exercise_slide(
     blob: &[u8],
 ) -> (
     litchi_ooxml::error::Result<String>,
-    litchi_ooxml::error::Result<Vec<litchi_ooxml::pptx::shapes::base::BaseShape>>,
+    litchi_ooxml::error::Result<usize>,
     litchi_ooxml::error::Result<Option<litchi_pptx::transition::Transition>>,
 ) {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
@@ -200,7 +200,11 @@ fn exercise_slide(
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let slide = &slides[0];
-    (slide.text(), slide.shapes(), slide.transition())
+    (
+        slide.text(),
+        slide.shapes().map(litchi_pptx::shape::Scene::len),
+        slide.transition(),
+    )
 }
 
 #[test]

@@ -1,4 +1,5 @@
-use litchi_ooxml::pptx::shapes::{ShapeType, Table};
+use litchi_ooxml::pptx::shape::Shape;
+use litchi_ooxml::pptx::table::Table;
 use litchi_ooxml::pptx::{Package, TableStylePartKind};
 
 const SHAPES: &str = concat!(
@@ -53,9 +54,9 @@ fn slide_tables_report_style_switches_and_references() {
 
     let mut found = Vec::new();
     for slide in presentation.slides().unwrap() {
-        for shape in slide.shapes().unwrap() {
-            if shape.shape_type() == &ShapeType::GraphicFrame && shape.has_table() {
-                let table = Table::from_graphic_frame_xml(shape.xml_bytes()).unwrap();
+        for shape in slide.shapes().unwrap().iter() {
+            if let Shape::Table(shape) = shape {
+                let table = Table::from_graphic_frame_xml(shape.common().xml().unwrap()).unwrap();
                 let properties = table.properties().unwrap().unwrap();
                 found.push(properties);
             }

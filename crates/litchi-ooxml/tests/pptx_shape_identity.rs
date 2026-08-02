@@ -1,4 +1,3 @@
-use litchi_ooxml::OoxmlError;
 use litchi_ooxml::PackURI;
 use litchi_ooxml::pptx::Package;
 use tempfile::NamedTempFile;
@@ -7,7 +6,7 @@ const LOCAL_SHAPE_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/shapes/shape_identity.xml");
 
 #[test]
-fn slide_shapes_are_resolved_by_non_visual_id() {
+fn slide_shapes_use_names_first_with_checked_numeric_fallback() {
     let package = package_with_slide_xml(LOCAL_SHAPE_XML);
     let presentation = package.presentation().unwrap();
     assert_eq!(
@@ -16,34 +15,43 @@ fn slide_shapes_are_resolved_by_non_visual_id() {
     );
     let slide = presentation.slides().unwrap().remove(0);
 
-    let placeholders = slide.placeholders().unwrap();
-    assert_eq!(placeholders.len(), 2);
+    assert_eq!(slide.placeholders().unwrap().count(), 2);
 
-    let title = slide.shape_by_id(7).unwrap().unwrap();
-    assert_eq!(title.shape_id().unwrap(), Some(7));
-    assert_eq!(title.placeholder_type().unwrap(), "title");
-    assert_eq!(title.placeholder_index().unwrap(), Some(0));
+    let title = slide.shape("Title").unwrap().unwrap();
+    assert_eq!(title.name(), Some("Title"));
+    assert_eq!(title.id(), Some(7));
+    let title_placeholder = title.placeholder().unwrap();
+    assert_eq!(title_placeholder.kind(), Some("title"));
+    assert_eq!(title_placeholder.index(), 0);
 
-    let body = slide.shape_by_id(11).unwrap().unwrap();
-    assert_eq!(body.shape_id().unwrap(), Some(11));
-    assert_eq!(body.placeholder_type().unwrap(), "body");
-    assert_eq!(body.placeholder_index().unwrap(), Some(3));
-    assert!(slide.shape_by_id(99).unwrap().is_none());
+    let body = slide.shape(1_usize).unwrap().unwrap();
+    assert_eq!(body.name(), Some("Body"));
+    assert_eq!(body.id(), Some(11));
+    let body_placeholder = body.placeholder().unwrap();
+    assert_eq!(body_placeholder.kind(), Some("body"));
+    assert_eq!(body_placeholder.index(), 3);
+    assert!(slide.shape("Missing").unwrap().is_none());
 }
 
 #[test]
-fn duplicate_non_visual_shape_ids_are_rejected() {
+fn duplicate_semantic_shape_names_are_typed_errors() {
     let xml = std::str::from_utf8(LOCAL_SHAPE_XML)
         .unwrap()
-        .replace("id=\"11\"", "id=\"7\"");
+        .replace("name=\"Body\"", "name=\"Title\"");
     let package = package_with_slide_xml(xml.as_bytes());
     let presentation = package.presentation().unwrap();
     let slide = presentation.slides().unwrap().remove(0);
 
     assert!(matches!(
-        slide.shape_by_id(7),
-        Err(OoxmlError::InvalidFormat(message))
-            if message.contains("multiple shapes with non-visual ID 7")
+        slide.shape("Title"),
+        Err(litchi_ooxml::OoxmlError::Pptx(
+            litchi_pptx::Error::ShapeLookup(
+                litchi_pptx::shape::LookupError::AmbiguousName {
+                    name,
+                    matches: 2,
+                },
+            ),
+        )) if name == "Title"
     ));
 }
 

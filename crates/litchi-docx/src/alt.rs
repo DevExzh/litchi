@@ -469,125 +469,26 @@ struct PendingChunk {
 /// `mc:Fallback` branch.
 pub fn active(xml: &[u8], offsets: &[u32]) -> Result<Vec<u32>> {
     validate_xml(xml)?;
-    if offsets.len() > MAX_VISIBILITY_OFFSETS {
-        return Err(invalid("markup-compatibility offset limit exceeded"));
-    }
-    for &offset in offsets {
-        if usize::try_from(offset).map_or(true, |offset| offset >= xml.len()) {
-            return Err(invalid(
-                "markup-compatibility offset is outside the source XML",
-            ));
-        }
-    }
-    if offsets.is_empty() || !contains(xml, litchi_ooxml_common::mce::MCE_NAMESPACE.as_bytes()) {
-        return Ok(offsets.to_vec());
-    }
-
-    let prefix = marker_prefix(xml)?;
-    let marker_overhead = prefix
-        .len()
-        .checked_add(27)
-        .ok_or_else(|| invalid("markup-compatibility marker size overflowed"))?;
-    let marked_len = offsets
-        .len()
-        .checked_mul(marker_overhead)
-        .and_then(|extra| xml.len().checked_add(extra))
-        .ok_or_else(|| invalid("markup-compatibility marker size overflowed"))?;
-    if marked_len > MAX_MARKED_XML_BYTES {
-        return Err(invalid(
-            "markup-compatibility marked XML exceeds the 128 MiB limit",
-        ));
-    }
-
-    let mut positions = offsets
-        .iter()
-        .copied()
-        .enumerate()
-        .map(|(index, offset)| (offset, index))
-        .collect::<Vec<_>>();
-    positions.sort_unstable_by_key(|&(offset, index)| (offset, index));
-
-    let mut marked = Vec::with_capacity(marked_len);
-    let mut cursor = 0usize;
-    for (offset, index) in positions {
-        let offset = usize::try_from(offset)
-            .map_err(|_| invalid("markup-compatibility offset does not fit usize"))?;
-        marked.extend_from_slice(xml.get(cursor..offset).ok_or_else(|| {
-            invalid("markup-compatibility offsets are not valid source positions")
-        })?);
-        marked.extend_from_slice(b"<!--");
-        marked.extend_from_slice(prefix.as_bytes());
-        marked.extend_from_slice(index.to_string().as_bytes());
-        marked.extend_from_slice(b"-->");
-        cursor = offset;
-    }
-    marked.extend_from_slice(
-        xml.get(cursor..)
-            .ok_or_else(|| invalid("markup-compatibility source cursor is invalid"))?,
-    );
-
-    let limits = litchi_ooxml_common::mce::MceLimits {
-        max_input_bytes: MAX_MARKED_XML_BYTES,
-        max_output_bytes: MAX_MARKED_XML_BYTES,
-        max_depth: MAX_XML_DEPTH,
-        max_namespace_bindings: 4096,
-        max_directive_tokens: 4096,
-        max_choices_per_alternate: 1024,
+    let limits = litchi_ooxml_common::mce::ActiveOffsetLimits {
+        max_source_bytes: MAX_XML_BYTES,
+        max_offsets: MAX_VISIBILITY_OFFSETS,
+        max_marked_bytes: MAX_MARKED_XML_BYTES,
+        mce: litchi_ooxml_common::mce::MceLimits {
+            max_input_bytes: MAX_MARKED_XML_BYTES,
+            max_output_bytes: MAX_MARKED_XML_BYTES,
+            max_depth: MAX_XML_DEPTH,
+            max_namespace_bindings: 4096,
+            max_directive_tokens: 4096,
+            max_choices_per_alternate: 1024,
+        },
     };
-    let processed = litchi_ooxml_common::mce::process_markup_compatibility(
-        &marked,
+    litchi_ooxml_common::mce::active_offsets(
+        xml,
+        offsets,
         &litchi_ooxml_common::mce::MceCapabilities::default(),
         &limits,
-    )?
-    .xml;
-    let mut opening = Vec::with_capacity(prefix.len() + 4);
-    opening.extend_from_slice(b"<!--");
-    opening.extend_from_slice(prefix.as_bytes());
-    let mut selected = vec![false; offsets.len()];
-    let mut cursor = 0usize;
-    while let Some(relative) = find(
-        processed
-            .get(cursor..)
-            .ok_or_else(|| invalid("markup-compatibility output cursor is invalid"))?,
-        &opening,
-    ) {
-        let digits_start = cursor
-            .checked_add(relative)
-            .and_then(|start| start.checked_add(opening.len()))
-            .ok_or_else(|| invalid("markup-compatibility marker position overflowed"))?;
-        let tail = processed
-            .get(digits_start..)
-            .ok_or_else(|| invalid("markup-compatibility marker is truncated"))?;
-        let digits_end = find(tail, b"-->")
-            .ok_or_else(|| invalid("markup-compatibility marker is unterminated"))?;
-        let digits = tail
-            .get(..digits_end)
-            .ok_or_else(|| invalid("markup-compatibility marker range is invalid"))?;
-        if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
-            return Err(invalid("markup-compatibility marker index is invalid"));
-        }
-        let index = digits.iter().try_fold(0usize, |value, digit| {
-            value
-                .checked_mul(10)
-                .and_then(|value| value.checked_add(usize::from(*digit - b'0')))
-                .ok_or_else(|| invalid("markup-compatibility marker index overflowed"))
-        })?;
-        let slot = selected
-            .get_mut(index)
-            .ok_or_else(|| invalid("markup-compatibility marker index is out of range"))?;
-        *slot = true;
-        cursor = digits_start
-            .checked_add(digits_end)
-            .and_then(|end| end.checked_add(3))
-            .ok_or_else(|| invalid("markup-compatibility marker end overflowed"))?;
-    }
-
-    Ok(offsets
-        .iter()
-        .copied()
-        .zip(selected)
-        .filter_map(|(offset, selected)| selected.then_some(offset))
-        .collect())
+    )
+    .map_err(Error::from)
 }
 
 /// Parse every altChunk anchor against the full namespace context.
@@ -743,25 +644,7 @@ fn validate_xml(xml: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn marker_prefix(xml: &[u8]) -> Result<String> {
-    let hash = xml.iter().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
-        (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
-    });
-    for salt in 0u8..16 {
-        let prefix = format!("litchi-active-{hash:016x}-{salt}:");
-        if !contains(xml, prefix.as_bytes()) {
-            return Ok(prefix);
-        }
-    }
-    Err(invalid(
-        "source XML collides with markup-compatibility markers",
-    ))
-}
-
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
-    find(haystack, needle).is_some()
-}
-
+#[cfg(test)]
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);

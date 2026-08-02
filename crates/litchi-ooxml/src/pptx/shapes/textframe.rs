@@ -1,7 +1,7 @@
 use crate::error::{OoxmlError, Result};
 /// Text frame for accessing text content in shapes.
 use litchi_ooxml_common::xml::{
-    DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, extract_omml_formulas,
+    DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -292,92 +292,10 @@ fn emit_drawingml_range(
     )
 }
 
-/// A text frame containing text content.
-///
-/// Text frames are found in shape objects and provide access to the
-/// paragraphs and text within the shape.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// let text_frame = shape.text_frame()?;
-/// println!("Text: {}", text_frame.text()?);
-///
-/// for para in text_frame.paragraphs()? {
-///     println!("Paragraph: {}", para.text()?);
-/// }
-///
-/// // Check for embedded formulas
-/// for formula in text_frame.omml_formulas()? {
-///     println!("Found OMML formula: {}", formula);
-/// }
-/// ```
-#[derive(Debug, Clone)]
-pub struct TextFrame {
-    /// Raw XML bytes
-    xml_bytes: Vec<u8>,
-}
-
-impl TextFrame {
-    /// Create a TextFrame from XML bytes.
-    pub(crate) fn from_xml(xml_bytes: &[u8]) -> Result<Self> {
-        Ok(Self {
-            xml_bytes: xml_bytes.to_vec(),
-        })
-    }
-
-    /// Extract all text from this text frame.
-    ///
-    /// Returns all text content concatenated together.
-    pub fn text(&self) -> Result<String> {
-        extract_drawingml_text(&self.xml_bytes, Some('\n'))
-    }
-
-    /// Get paragraphs in this text frame.
-    ///
-    /// Returns a vector of Paragraph objects.
-    pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        let mut paragraphs = Vec::new();
-        scan_drawingml_element_ranges(&self.xml_bytes, b"p", |start, length| {
-            let start = start as usize;
-            paragraphs.push(Paragraph::new(
-                self.xml_bytes[start..start + length as usize].to_vec(),
-            ));
-            Ok(())
-        })?;
-        Ok(paragraphs)
-    }
-
-    /// Extract all OMML formulas from this text frame.
-    ///
-    /// Returns the exact XML of each OMML `<oMath>` element in document order.
-    pub fn omml_formulas(&self) -> Result<Vec<String>> {
-        Ok(extract_omml_formulas(&self.xml_bytes)?)
-    }
-}
-
-/// A paragraph in a text frame.
-#[derive(Debug, Clone)]
-pub struct Paragraph {
-    /// Raw XML bytes for this paragraph
-    xml_bytes: Vec<u8>,
-}
-
-impl Paragraph {
-    /// Create a new Paragraph from XML bytes.
-    pub fn new(xml_bytes: Vec<u8>) -> Self {
-        Self { xml_bytes }
-    }
-
-    /// Extract all text from this paragraph.
-    pub fn text(&self) -> Result<String> {
-        extract_drawingml_text(&self.xml_bytes, None)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_ooxml_common::xml::extract_omml_formulas;
 
     #[test]
     fn drawingml_text_preserves_runs_whitespace_and_paragraphs() {
@@ -387,34 +305,36 @@ mod tests {
                 <d:p><d:r><d:t>Second</d:t></d:r></d:p>
             </d:txBody>
         </p:sp>"#;
-        let frame = TextFrame::from_xml(xml).unwrap();
-        assert_eq!(frame.text().unwrap(), " A & B < C\t\nSecond");
-        let paragraphs = frame.paragraphs().unwrap();
+        assert_eq!(
+            extract_drawingml_text(xml, Some('\n')).unwrap(),
+            " A & B < C\t\nSecond"
+        );
+        let mut paragraphs = Vec::new();
+        scan_drawingml_element_ranges(xml, b"p", |start, length| {
+            let start = start as usize;
+            let end = start + length as usize;
+            paragraphs.push(extract_drawingml_text(&xml[start..end], None)?);
+            Ok(())
+        })
+        .unwrap();
         assert_eq!(paragraphs.len(), 2);
-        assert_eq!(paragraphs[0].text().unwrap(), " A & B < C\t\n");
-        assert_eq!(paragraphs[1].text().unwrap(), "Second");
+        assert_eq!(paragraphs[0], " A & B < C\t\n");
+        assert_eq!(paragraphs[1], "Second");
     }
 
     #[test]
     fn drawingml_paragraph_text_accepts_inherited_conventional_prefix() {
-        let paragraph = Paragraph::new(
-            br#"<a:p><a:r><a:t>one</a:t></a:r><a:r><a:t>two</a:t></a:r></a:p>"#.to_vec(),
-        );
-        assert_eq!(paragraph.text().unwrap(), "onetwo");
+        let paragraph = br#"<a:p><a:r><a:t>one</a:t></a:r><a:r><a:t>two</a:t></a:r></a:p>"#;
+        assert_eq!(extract_drawingml_text(paragraph, None).unwrap(), "onetwo");
     }
 
     #[test]
     fn drawingml_text_rejects_foreign_lookalikes_and_truncation() {
-        let foreign = Paragraph::new(
-            br#"<x:p xmlns:x="urn:not-drawingml"><x:r><x:t>ignored</x:t></x:r></x:p>"#.to_vec(),
-        );
-        assert_eq!(foreign.text().unwrap(), "");
+        let foreign = br#"<x:p xmlns:x="urn:not-drawingml"><x:r><x:t>ignored</x:t></x:r></x:p>"#;
+        assert_eq!(extract_drawingml_text(foreign, None).unwrap(), "");
 
-        let truncated = Paragraph::new(
-            br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:t>bad</a:t>"#
-                .to_vec(),
-        );
-        assert!(truncated.text().is_err());
+        let truncated = br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:t>bad</a:t>"#;
+        assert!(extract_drawingml_text(truncated, None).is_err());
     }
 
     #[test]
@@ -430,9 +350,8 @@ mod tests {
                 <math:oMath math:id="2"/>
             </a:p></a:txBody>
         </p:sp>"#;
-        let frame = TextFrame::from_xml(xml).unwrap();
         assert_eq!(
-            frame.omml_formulas().unwrap(),
+            extract_omml_formulas(xml).unwrap(),
             vec![
                 r#"<m:oMath data-id="1"><m:r><m:t><![CDATA[x < y]]></m:t></m:r></m:oMath>"#,
                 r#"<math:oMath math:id="2"/>"#,
@@ -444,26 +363,19 @@ mod tests {
     fn omml_formulas_accept_strict_and_inherited_conventional_prefixes() {
         let strict = br#"<root xmlns:s="http://purl.oclc.org/ooxml/officeDocument/math"><s:oMath><s:r/></s:oMath></root>"#;
         assert_eq!(
-            TextFrame::from_xml(strict)
-                .unwrap()
-                .omml_formulas()
-                .unwrap(),
+            extract_omml_formulas(strict).unwrap(),
             vec!["<s:oMath><s:r/></s:oMath>"]
         );
 
-        let inherited = TextFrame::from_xml(br#"<a:p><m:oMath><m:r/></m:oMath></a:p>"#).unwrap();
         assert_eq!(
-            inherited.omml_formulas().unwrap(),
+            extract_omml_formulas(br#"<a:p><m:oMath><m:r/></m:oMath></a:p>"#).unwrap(),
             vec!["<m:oMath><m:r/></m:oMath>"]
         );
     }
 
     #[test]
     fn omml_formulas_reject_malformed_xml() {
-        let frame = TextFrame::from_xml(
-            br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r/></a:p>"#,
-        )
-        .unwrap();
-        assert!(frame.omml_formulas().is_err());
+        let xml = br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r/></a:p>"#;
+        assert!(extract_omml_formulas(xml).is_err());
     }
 }

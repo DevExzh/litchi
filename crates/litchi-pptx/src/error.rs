@@ -120,6 +120,17 @@ pub enum Error {
         index: usize,
     },
 
+    /// A semantic shape selector is missing, ambiguous, or outside checked bounds.
+    #[error("PresentationML shape lookup error: {0}")]
+    ShapeLookup(#[from] crate::shape::LookupError),
+
+    /// A source-preserving mutation cannot yet map a rewritten direct owner.
+    #[error("source-preserving {operation} is unavailable when MCE rewrites the owner XML")]
+    MceOwnerMutation {
+        /// Mutation that was rejected before changing the package.
+        operation: &'static str,
+    },
+
     /// Markup-compatibility processing failed.
     #[error("PresentationML markup compatibility error: {0}")]
     MarkupCompatibility(#[from] litchi_ooxml_common::MceError),

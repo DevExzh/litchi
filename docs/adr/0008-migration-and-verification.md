@@ -2740,6 +2740,80 @@ its canonical and facade tests, warning-denied Clippy, rustdoc, formatting, and
 diff validation. The previously green full-workspace gate is not repeated by
 explicit user direction.
 
+## Borrowed PPTX shape scenes and shape-owned tag CRUD
+
+This PPTX slice replaces the migration host's copied
+`BaseShape + ShapeType + Vec<u8>` read model with the canonical
+`litchi-pptx::shape::{Scene, Shape}` owner. `Shape` is a non-exhaustive,
+data-bearing enum; common semantic accessors are implemented once on the enum
+and each contextual variant lends the same indexed record. After bounded MCE
+preprocessing, one namespace-aware indexing scan records shapes in depth-first
+pre-order, including nested group children, while `Group::shapes` retains the
+direct-child hierarchy. The shape-tree root and a graphic-frame OLE preview
+picture are not exposed as user shapes.
+
+Exact decoded `cNvPr` names are the primary selector. Checked numeric pre-order
+positions remain available for duplicate-name repair and source-order tooling.
+Ordinary `get` lookup represents a missing name as `None`; strict `shape`
+lookup, duplicate exact names, and out-of-range positions use explicit
+`LookupError` variants. The facade does not implement panicking indexing or
+require relationship IDs. Strict and Transitional namespaces are resolved in
+the complete owner context, so inherited aliases do not disappear when a
+shape is viewed.
+
+MCE processing is bounded by owner bytes, output bytes, nesting, nodes, shape
+count, and retained decoded text. An owner without an MCE rewrite remains
+borrowed. When Choice/Fallback processing produces replacement markup, the
+scene owns one processed owner buffer; every shape XML value is still a checked
+span into that shared buffer. This removes per-shape subtree copies without
+claiming allocation-free parsing or unmeasured speedups.
+
+Shape-owned tag CRUD is publicly wired as
+`litchi-pptx::tag::shape::{load, put, remove}` and reuses the canonical
+`shape::Key`. It maps the processed-scene selection back to the corresponding
+active raw-source shape span, then patches only that shape's `nvPr` anchor.
+Inactive MCE branches, customer-data siblings, comments, unrelated attributes,
+and schema order remain intact. The scanner covers `sp`, `pic`, `cxnSp`,
+`graphicFrame`, and `grpSp`, including children of bounded nested groups, while
+excluding the synthetic shape-tree root and nested OLE preview pictures.
+
+The OOXML migration facade exposes concise package `shape_tags`,
+`put_shape_tags`, and `remove_shape_tags` operations. They compose the existing
+name-first/checked-position slide selector with the canonical name-first or
+checked-depth-first shape selector, so ordinary callers never handle native
+shape IDs, relationship IDs, or part names. An already-resolved
+`Slide::shape_tags` performs the read directly against its package-backed owner.
+
+The graph mutation is staged before commit. Byte-identical puts preserve the
+part allocation and signatures; a relationship ID shared by active anchors or
+a target reached by another package edge is forked for replacement; removal
+retains shared edges and collects a target only when it is orphaned. Typed
+failures leave the owner XML, relationships, parts, signatures, and shared
+blobs unchanged, and owned `List` values move into successful writes.
+
+Direct-owner `load` also applies bounded MCE branch selection. Until that
+lower-level path has the same raw-coordinate mapping as shape-owned mutation,
+direct-owner `put` and `remove` fail before mutation with the typed
+`MceOwnerMutation` error whenever branch selection rewrites the owner. This is
+an explicit safe-default boundary rather than an attempt to edit processed
+offsets in the raw source; shape-owned mutation already has the required
+mapping and remains supported for those owners.
+
+All six focused shape-tag tests are green. They cover the five owner families
+and nested groups, both namespace profiles, raw-source MCE mapping,
+schema-order and byte-preservation cases, atomic/no-op behavior, and
+shared-anchor/target fork and collection.
+Warning-denied Clippy also passes for `litchi-pptx`. For native evidence,
+PowerPoint for macOS 16.110.2 opened the Litchi-mutated LibreOffice fixture
+without a repair prompt, saved a normalized `.pptx` copy, closed it, and
+reopened that copy without repair. A reverse read through the public facade
+found and replaced the pre-existing `LitchiNativeCheck` tag on shape `Objekt 2`.
+This certifies that specific shape-tag create/read/update and native-resave
+path on the tested desktop build; it does not certify every owner family,
+Office build, or unsupported extension. Per explicit user direction, this
+slice uses focused gates and does not repeat the previously green
+full-workspace run.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

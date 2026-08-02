@@ -5,7 +5,6 @@ use crate::pptx::parts::{
     MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
     SlideLayoutReference, SlideMasterPart, SlideMasterTextStyles, SlidePart, ThemePart,
 };
-use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::Part;
@@ -155,8 +154,7 @@ impl From<usize> for Key<'_> {
 
 /// A slide in a presentation.
 ///
-/// Provides access to slide content and properties, following the python-pptx
-/// interface design.
+/// Provides concise borrowed access to slide content and properties.
 ///
 /// # Examples
 ///
@@ -281,6 +279,25 @@ impl<'a> Slide<'a> {
         )
     }
 
+    /// Read the programmable-tag list attached to one semantic shape.
+    ///
+    /// Exact producer names are the primary selector; checked depth-first
+    /// positions remain available without exposing native IDs.
+    pub fn shape_tags<'k>(
+        &self,
+        shape: impl Into<litchi_pptx::shape::Key<'k>>,
+    ) -> Result<Option<litchi_pptx::tag::List>> {
+        let package = self.package.ok_or_else(|| {
+            crate::error::OoxmlError::InvalidFormat(
+                "shape tags require package-backed slide access".into(),
+            )
+        })?;
+        Ok(
+            litchi_pptx::tag::shape::load(package, self.part.part().partname(), shape)?
+                .map(litchi_pptx::tag::Source::into_list),
+        )
+    }
+
     /// Inspect all tag relationships on this slide in stable relationship-ID
     /// order, including shape-owned and unanchored producer markup.
     ///
@@ -306,47 +323,40 @@ impl<'a> Slide<'a> {
         crate::pptx::media_parts::load_slide_media(package, self.part.part().partname())
     }
 
-    /// Get all shapes on this slide.
+    /// Borrow the semantic shape scene for this slide.
     ///
-    /// Returns a vector of BaseShape objects that provide access to text,
-    /// pictures, tables, and other shape types.
+    /// The scene is indexed once, retains nested groups, and lends each
+    /// shape's XML from one owner buffer instead of cloning subtrees.
     ///
     /// # Examples
     ///
     /// ```rust,no_run
     /// use litchi_ooxml::pptx::Package;
-    /// use litchi_ooxml::pptx::shapes::ShapeType;
+    /// use litchi_ooxml::pptx::shape::Shape;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
     /// let slides = pres.slides()?;
     ///
     /// if let Some(slide) = slides.first() {
-    ///     for shape in slide.shapes()? {
-    ///         let mut shape_mut = shape;
-    ///         match shape_mut.shape_type() {
-    ///             ShapeType::Shape => {
-    ///                 println!("Text shape: {}", shape_mut.name()?);
-    ///             }
-    ///             ShapeType::Picture => {
-    ///                 println!("Picture: {}", shape_mut.name()?);
-    ///             }
-    ///             ShapeType::GraphicFrame if shape_mut.has_table() => {
-    ///                 println!("Table: {}", shape_mut.name()?);
-    ///             }
+    ///     for shape in slide.shapes()?.iter() {
+    ///         match shape {
+    ///             Shape::Auto(value) => println!("Auto shape: {:?}", value.common().name()),
+    ///             Shape::Picture(value) => println!("Picture: {:?}", value.common().name()),
+    ///             Shape::Table(value) => println!("Table: {:?}", value.common().name()),
     ///             _ => {}
     ///         }
     ///     }
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
+    pub fn shapes(&self) -> Result<&litchi_pptx::shape::Scene<'a>> {
         self.part.shapes()
     }
 
-    /// Get all placeholder shapes on this slide.
-    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
-        self.part.placeholders()
+    /// Lazily iterate placeholder shapes in depth-first source order.
+    pub fn placeholders(&self) -> Result<impl Iterator<Item = litchi_pptx::shape::Shape<'_>> + '_> {
+        Ok(self.shapes()?.placeholders())
     }
 
     /// Get the flags controlling whether master content is shown on this slide.
@@ -402,10 +412,11 @@ impl<'a> Slide<'a> {
         Ok(self.shapes()?.len())
     }
 
-    /// Get a specific shape by index.
+    /// Select a shape by its exact producer name or checked pre-order index.
     ///
     /// # Arguments
-    /// * `index` - Zero-based index of the shape
+    /// Names are the primary selector. A missing name returns `None`; duplicate
+    /// names and out-of-range numeric selectors are typed errors.
     ///
     /// # Examples
     ///
@@ -417,35 +428,17 @@ impl<'a> Slide<'a> {
     /// let slides = pres.slides()?;
     ///
     /// if let Some(slide) = slides.first() {
-    ///     if let Some(shape) = slide.shape(0)? {
-    ///         let mut shape_mut = shape;
-    ///         println!("First shape: {}", shape_mut.name()?);
+    ///     if let Some(shape) = slide.shape("Title 1")? {
+    ///         println!("Title shape: {:?}", shape.name());
     ///     }
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn shape(&self, index: usize) -> Result<Option<BaseShape>> {
-        Ok(self.shapes()?.into_iter().nth(index))
-    }
-
-    /// Get a shape by its non-visual shape ID.
-    ///
-    /// Shape IDs are used by PowerPoint animation and timing records. Returns
-    /// None if the slide has no shape with this ID, and returns an error when
-    /// the slide contains duplicate matching IDs.
-    pub fn shape_by_id(&self, id: u32) -> Result<Option<BaseShape>> {
-        let mut matched = None;
-        for shape in self.shapes()? {
-            if shape.shape_id()? == Some(id) {
-                if matched.is_some() {
-                    return Err(OoxmlError::InvalidFormat(format!(
-                        "slide contains multiple shapes with non-visual ID {id}"
-                    )));
-                }
-                matched = Some(shape);
-            }
-        }
-        Ok(matched)
+    pub fn shape<'k>(
+        &self,
+        key: impl Into<litchi_pptx::shape::Key<'k>>,
+    ) -> Result<Option<litchi_pptx::shape::Shape<'_>>> {
+        self.shapes()?.get(key).map_err(Into::into)
     }
 
     /// Check if the slide has any tables.
@@ -467,12 +460,10 @@ impl<'a> Slide<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn has_tables(&self) -> Result<bool> {
-        for shape in self.shapes()? {
-            if shape.has_table() {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        Ok(self
+            .shapes()?
+            .iter()
+            .any(|shape| matches!(shape, litchi_pptx::shape::Shape::Table(_))))
     }
 
     /// Check if the slide has any pictures.
@@ -494,14 +485,10 @@ impl<'a> Slide<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn has_pictures(&self) -> Result<bool> {
-        use crate::pptx::shapes::ShapeType;
-
-        for shape in self.shapes()? {
-            if matches!(shape.shape_type(), ShapeType::Picture) {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        Ok(self
+            .shapes()?
+            .iter()
+            .any(|shape| matches!(shape, litchi_pptx::shape::Shape::Picture(_))))
     }
 
     /// Get all text shapes from this slide.
@@ -518,24 +505,16 @@ impl<'a> Slide<'a> {
     /// let slides = pres.slides()?;
     ///
     /// if let Some(slide) = slides.first() {
-    ///     for mut shape in slide.text_shapes()? {
-    ///         if let Some(text) = shape.text()? {
+    ///     for shape in slide.text_shapes()? {
+    ///         if let Some(text) = shape.text() {
     ///             println!("Text: {}", text);
     ///         }
     ///     }
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn text_shapes(&self) -> Result<Vec<BaseShape>> {
-        let mut text_shapes = Vec::new();
-
-        for shape in self.shapes()? {
-            if shape.text()?.is_some() {
-                text_shapes.push(shape);
-            }
-        }
-
-        Ok(text_shapes)
+    pub fn text_shapes(&self) -> Result<impl Iterator<Item = litchi_pptx::shape::Shape<'_>> + '_> {
+        Ok(self.shapes()?.iter().filter(|shape| shape.text().is_some()))
     }
 
     /// Find text in the slide.
@@ -563,10 +542,8 @@ impl<'a> Slide<'a> {
     pub fn find_text(&self, query: &str) -> Result<Vec<usize>> {
         let mut matches = Vec::new();
 
-        for (idx, shape) in self.shapes()?.into_iter().enumerate() {
-            if let Some(text) = shape.text()?
-                && text.contains(query)
-            {
+        for (idx, shape) in self.shapes()?.iter().enumerate() {
+            if shape.text().is_some_and(|text| text.contains(query)) {
                 matches.push(idx);
             }
         }
@@ -895,13 +872,13 @@ impl<'a> SlideLayout<'a> {
     }
 
     /// Get all shapes defined by this slide layout.
-    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
+    pub fn shapes(&self) -> Result<&litchi_pptx::shape::Scene<'a>> {
         self.part.shapes()
     }
 
-    /// Get all placeholder shapes defined by this slide layout.
-    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
-        self.part.placeholders()
+    /// Lazily iterate placeholder shapes defined by this slide layout.
+    pub fn placeholders(&self) -> Result<impl Iterator<Item = litchi_pptx::shape::Shape<'_>> + '_> {
+        Ok(self.shapes()?.placeholders())
     }
 
     /// Get the flags controlling whether master content is shown on this layout.
@@ -1115,13 +1092,13 @@ impl<'a> SlideMaster<'a> {
     }
 
     /// Get all shapes defined by this slide master.
-    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
+    pub fn shapes(&self) -> Result<&litchi_pptx::shape::Scene<'a>> {
         self.part.shapes()
     }
 
-    /// Get all placeholder shapes defined by this slide master.
-    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
-        self.part.placeholders()
+    /// Lazily iterate placeholder shapes defined by this slide master.
+    pub fn placeholders(&self) -> Result<impl Iterator<Item = litchi_pptx::shape::Shape<'_>> + '_> {
+        Ok(self.shapes()?.placeholders())
     }
 
     /// Get the color map defined by this slide master.

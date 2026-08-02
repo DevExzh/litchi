@@ -6,7 +6,7 @@ use quick_xml::{
 };
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashSet, TryReserveError},
     str,
 };
 use thiserror::Error;
@@ -80,6 +80,35 @@ pub struct MceLimits {
     pub max_directive_tokens: usize,
     pub max_choices_per_alternate: usize,
 }
+
+/// Resource policy for retaining source offsets through MCE preprocessing.
+///
+/// The source and returned coordinates are byte offsets into the caller's
+/// original XML. `mce` bounds the marked intermediate document as it passes
+/// through [`process_markup_compatibility`].
+#[derive(Debug, Clone)]
+pub struct ActiveOffsetLimits {
+    /// Maximum raw source XML accepted by [`active_offsets`].
+    pub max_source_bytes: usize,
+    /// Maximum number of source offsets accepted in one call.
+    pub max_offsets: usize,
+    /// Maximum marked intermediate XML retained during branch selection.
+    pub max_marked_bytes: usize,
+    /// Bounds applied by the semantic MCE processor.
+    pub mce: MceLimits,
+}
+
+impl Default for ActiveOffsetLimits {
+    fn default() -> Self {
+        let mce = MceLimits::default();
+        Self {
+            max_source_bytes: mce.max_input_bytes,
+            max_offsets: 1_000_000,
+            max_marked_bytes: mce.max_input_bytes,
+            mce,
+        }
+    }
+}
 impl Default for MceLimits {
     fn default() -> Self {
         Self {
@@ -119,8 +148,282 @@ pub enum MceError {
     LimitExceeded(String),
     #[error("markup compatibility XML error: {0}")]
     Xml(String),
+
+    /// A bounded intermediate buffer could not be allocated.
+    #[error("markup compatibility allocation failed for {resource}")]
+    Allocation {
+        /// Intermediate representation that could not reserve storage.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
+    },
 }
 type R<T> = std::result::Result<T, MceError>;
+
+const ACTIVE_MARKER_TEMPLATE: &[u8; 38] = b"litchi-mce-active-0000000000000000-00:";
+const ACTIVE_MARKER_HASH_START: usize = 18;
+const ACTIVE_MARKER_HASH_END: usize = 34;
+const ACTIVE_MARKER_SALT_START: usize = 35;
+const ACTIVE_MARKER_SALT_END: usize = 37;
+const ACTIVE_MARKER_WRAPPER_BYTES: usize = 7;
+const DECIMAL_BUFFER_BYTES: usize = usize::BITS as usize;
+
+/// Retain source byte offsets that survive semantic MCE branch selection.
+///
+/// Returned offsets always refer to `xml`; the marked preprocessing buffer is
+/// an implementation detail. Input order and duplicate offsets are preserved.
+/// Every offset must be less than `xml.len()` and identify a position where an
+/// XML comment can be inserted (normally an element-start offset).
+pub fn active_offsets(
+    xml: &[u8],
+    offsets: &[u32],
+    capabilities: &MceCapabilities,
+    limits: &ActiveOffsetLimits,
+) -> R<Vec<u32>> {
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit("active-offset source bytes"));
+    }
+    if offsets.len() > limits.max_offsets {
+        return Err(limit("active-offset count"));
+    }
+    for &offset in offsets {
+        if usize::try_from(offset).map_or(true, |offset| offset >= xml.len()) {
+            return Err(bad("active offset is outside the source XML"));
+        }
+    }
+
+    if offsets.is_empty() {
+        return Ok(Vec::new());
+    }
+    if find_bytes(xml, MCE_NAMESPACE.as_bytes()).is_none() {
+        return copy_offsets(offsets);
+    }
+
+    let marker = active_marker(xml)?;
+    let max_index = offsets
+        .len()
+        .checked_sub(1)
+        .ok_or_else(|| bad("active-offset count is invalid"))?;
+    let decimal_digits = decimal_len(max_index)?;
+    let marker_bytes = marker
+        .len()
+        .checked_add(ACTIVE_MARKER_WRAPPER_BYTES)
+        .and_then(|bytes| bytes.checked_add(decimal_digits))
+        .ok_or_else(|| limit("active-offset marker bytes"))?;
+    let marked_len = offsets
+        .len()
+        .checked_mul(marker_bytes)
+        .and_then(|extra| xml.len().checked_add(extra))
+        .ok_or_else(|| limit("active-offset marked XML bytes"))?;
+    if marked_len > limits.max_marked_bytes {
+        return Err(limit("active-offset marked XML bytes"));
+    }
+
+    let mut positions = Vec::new();
+    reserve_exact(&mut positions, offsets.len(), "active-offset positions")?;
+    positions.extend(
+        offsets
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, offset)| (offset, index)),
+    );
+    positions.sort_unstable_by_key(|&(offset, index)| (offset, index));
+
+    let mut marked = Vec::new();
+    reserve_exact(&mut marked, marked_len, "active-offset marked XML")?;
+    let mut cursor = 0usize;
+    let mut decimal = [0u8; DECIMAL_BUFFER_BYTES];
+    for (offset, index) in positions {
+        let offset = usize::try_from(offset)
+            .map_err(|_| bad("active offset does not fit the platform address space"))?;
+        marked.extend_from_slice(
+            xml.get(cursor..offset)
+                .ok_or_else(|| bad("active offsets are not valid source positions"))?,
+        );
+        marked.extend_from_slice(b"<!--");
+        marked.extend_from_slice(&marker);
+        marked.extend_from_slice(decimal_bytes(index, &mut decimal)?);
+        marked.extend_from_slice(b"-->");
+        cursor = offset;
+    }
+    marked.extend_from_slice(
+        xml.get(cursor..)
+            .ok_or_else(|| bad("active-offset source cursor is invalid"))?,
+    );
+
+    let processed = process_markup_compatibility(&marked, capabilities, &limits.mce)?;
+    let processed = processed.xml.as_ref();
+    let mut selected = Vec::new();
+    reserve_exact(&mut selected, offsets.len(), "active-offset selection map")?;
+    selected.resize(offsets.len(), false);
+
+    let mut cursor = 0usize;
+    while let Some(relative) = find_bytes(
+        processed
+            .get(cursor..)
+            .ok_or_else(|| bad("active-offset output cursor is invalid"))?,
+        &marker,
+    ) {
+        let marker_start = cursor
+            .checked_add(relative)
+            .ok_or_else(|| bad("active-offset marker position overflowed"))?;
+        let opening_start = marker_start
+            .checked_sub(4)
+            .ok_or_else(|| bad("active-offset marker lacks a comment opening"))?;
+        if processed.get(opening_start..marker_start) != Some(b"<!--".as_slice()) {
+            return Err(bad("active-offset marker lacks a comment opening"));
+        }
+        let digits_start = marker_start
+            .checked_add(marker.len())
+            .ok_or_else(|| bad("active-offset marker position overflowed"))?;
+        let tail = processed
+            .get(digits_start..)
+            .ok_or_else(|| bad("active-offset marker is truncated"))?;
+        let digits_end =
+            find_bytes(tail, b"-->").ok_or_else(|| bad("active-offset marker is unterminated"))?;
+        let digits = tail
+            .get(..digits_end)
+            .ok_or_else(|| bad("active-offset marker range is invalid"))?;
+        let index = parse_decimal(digits)?;
+        let slot = selected
+            .get_mut(index)
+            .ok_or_else(|| bad("active-offset marker index is out of range"))?;
+        if *slot {
+            return Err(bad("active-offset marker is duplicated"));
+        }
+        *slot = true;
+        cursor = digits_start
+            .checked_add(digits_end)
+            .and_then(|end| end.checked_add(3))
+            .ok_or_else(|| bad("active-offset marker end overflowed"))?;
+    }
+
+    let retained = selected.iter().filter(|&&selected| selected).count();
+    let mut active = Vec::new();
+    reserve_exact(&mut active, retained, "active offsets")?;
+    for (&offset, selected) in offsets.iter().zip(selected) {
+        if selected {
+            active.push(offset);
+        }
+    }
+    Ok(active)
+}
+
+fn copy_offsets(offsets: &[u32]) -> R<Vec<u32>> {
+    let mut copied = Vec::new();
+    reserve_exact(&mut copied, offsets.len(), "active offsets")?;
+    copied.extend_from_slice(offsets);
+    Ok(copied)
+}
+
+fn reserve_exact<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> R<()> {
+    values
+        .try_reserve_exact(additional)
+        .map_err(|source| MceError::Allocation { resource, source })
+}
+
+fn active_marker(xml: &[u8]) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
+    let hash = xml.iter().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    active_marker_with_hash(xml, hash)
+}
+
+fn active_marker_with_hash(xml: &[u8], hash: u64) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
+    let mut base = *ACTIVE_MARKER_TEMPLATE;
+    write_hex(
+        hash,
+        base.get_mut(ACTIVE_MARKER_HASH_START..ACTIVE_MARKER_HASH_END)
+            .ok_or_else(|| bad("active-offset marker hash range is invalid"))?,
+    )?;
+    for salt in u8::MIN..=u8::MAX {
+        let mut candidate = base;
+        write_hex(
+            u64::from(salt),
+            candidate
+                .get_mut(ACTIVE_MARKER_SALT_START..ACTIVE_MARKER_SALT_END)
+                .ok_or_else(|| bad("active-offset marker salt range is invalid"))?,
+        )?;
+        if find_bytes(xml, &candidate).is_none() {
+            return Ok(candidate);
+        }
+    }
+    Err(bad("source XML collides with active-offset markers"))
+}
+
+fn write_hex(mut value: u64, output: &mut [u8]) -> R<()> {
+    for byte in output.iter_mut().rev() {
+        let nibble = u8::try_from(value & 0x0f)
+            .map_err(|_| bad("active-offset marker nibble is invalid"))?;
+        *byte = if nibble < 10 {
+            b'0' + nibble
+        } else {
+            b'a' + (nibble - 10)
+        };
+        value >>= 4;
+    }
+    if value == 0 {
+        Ok(())
+    } else {
+        Err(bad("active-offset marker value is too large"))
+    }
+}
+
+fn decimal_len(mut value: usize) -> R<usize> {
+    let mut len = 1usize;
+    while value >= 10 {
+        value /= 10;
+        len = len
+            .checked_add(1)
+            .ok_or_else(|| bad("active-offset decimal length overflowed"))?;
+    }
+    Ok(len)
+}
+
+fn decimal_bytes(mut value: usize, buffer: &mut [u8]) -> R<&[u8]> {
+    let mut cursor = buffer.len();
+    loop {
+        cursor = cursor
+            .checked_sub(1)
+            .ok_or_else(|| bad("active-offset decimal buffer is too small"))?;
+        let digit =
+            u8::try_from(value % 10).map_err(|_| bad("active-offset decimal digit is invalid"))?;
+        let slot = buffer
+            .get_mut(cursor)
+            .ok_or_else(|| bad("active-offset decimal cursor is invalid"))?;
+        *slot = b'0' + digit;
+        value /= 10;
+        if value == 0 {
+            break;
+        }
+    }
+    buffer
+        .get(cursor..)
+        .ok_or_else(|| bad("active-offset decimal range is invalid"))
+}
+
+fn parse_decimal(digits: &[u8]) -> R<usize> {
+    if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
+        return Err(bad("active-offset marker index is invalid"));
+    }
+    digits.iter().try_fold(0usize, |value, digit| {
+        value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(usize::from(*digit - b'0')))
+            .ok_or_else(|| bad("active-offset marker index overflowed"))
+    })
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum NamePattern {
     Exact(ExpandedName),
@@ -923,6 +1226,123 @@ pub fn process_str(x: &str) -> R<Cow<'_, str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn source_offset(xml: &[u8], needle: &[u8]) -> u32 {
+        let offset = find_bytes(xml, needle).expect("test element must occur in source XML");
+        u32::try_from(offset).expect("test source offset must fit u32")
+    }
+
+    #[test]
+    fn active_offsets_select_choice_and_fallback_in_caller_order() {
+        let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:s="urn:supported" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><inactive-choice/></mc:Choice><mc:Fallback><active-fallback/></mc:Fallback></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="s"><active-choice/></mc:Choice><mc:Fallback><inactive-fallback/></mc:Fallback></mc:AlternateContent></r>"#;
+        let inactive_choice = source_offset(xml, b"<inactive-choice/>");
+        let active_fallback = source_offset(xml, b"<active-fallback/>");
+        let active_choice = source_offset(xml, b"<active-choice/>");
+        let inactive_fallback = source_offset(xml, b"<inactive-fallback/>");
+        let input = [
+            active_choice,
+            inactive_choice,
+            inactive_choice,
+            active_fallback,
+            active_fallback,
+            inactive_fallback,
+        ];
+        let mut capabilities = MceCapabilities::new();
+        capabilities.understand_namespace("urn:supported");
+
+        let selected =
+            active_offsets(xml, &input, &capabilities, &ActiveOffsetLimits::default()).unwrap();
+
+        assert_eq!(
+            selected,
+            vec![active_choice, active_fallback, active_fallback]
+        );
+        assert!(selected.iter().all(|offset| {
+            usize::try_from(*offset)
+                .ok()
+                .and_then(|offset| xml.get(offset))
+                == Some(&b'<')
+        }));
+    }
+
+    #[test]
+    fn active_offsets_fast_path_preserves_order_and_duplicates() {
+        let xml = b"<r><first/><second/></r>";
+        let first = source_offset(xml, b"<first/>");
+        let second = source_offset(xml, b"<second/>");
+        let input = [second, first, second];
+
+        assert_eq!(
+            active_offsets(
+                xml,
+                &input,
+                &MceCapabilities::new(),
+                &ActiveOffsetLimits::default(),
+            )
+            .unwrap(),
+            input
+        );
+    }
+
+    #[test]
+    fn active_offsets_reject_invalid_offsets_and_resource_limits() {
+        let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><a/></r>"#;
+        let outside = u32::try_from(xml.len()).unwrap();
+        assert!(matches!(
+            active_offsets(
+                xml,
+                &[outside],
+                &MceCapabilities::new(),
+                &ActiveOffsetLimits::default(),
+            ),
+            Err(MceError::NonConformant(_))
+        ));
+
+        let offset = source_offset(xml, b"<a/>");
+        let count_limited = ActiveOffsetLimits {
+            max_offsets: 0,
+            ..ActiveOffsetLimits::default()
+        };
+        assert!(matches!(
+            active_offsets(xml, &[offset], &MceCapabilities::new(), &count_limited),
+            Err(MceError::LimitExceeded(_))
+        ));
+
+        let marked_limited = ActiveOffsetLimits {
+            max_marked_bytes: xml.len(),
+            ..ActiveOffsetLimits::default()
+        };
+        assert!(matches!(
+            active_offsets(xml, &[offset], &MceCapabilities::new(), &marked_limited),
+            Err(MceError::LimitExceeded(_))
+        ));
+    }
+
+    #[test]
+    fn active_offset_markers_skip_source_collisions() {
+        let hash = 0x0123_4567_89ab_cdef;
+        let first = active_marker_with_hash(b"", hash).unwrap();
+        let selected = active_marker_with_hash(&first, hash).unwrap();
+
+        assert_ne!(selected, first);
+        assert!(find_bytes(&first, &selected).is_none());
+    }
+
+    #[test]
+    fn active_offset_allocation_error_retains_allocator_source() {
+        let mut values = Vec::<u8>::new();
+        let error = reserve_exact(&mut values, usize::MAX, "test active offsets").unwrap_err();
+
+        assert!(matches!(
+            &error,
+            MceError::Allocation {
+                resource: "test active offsets",
+                ..
+            }
+        ));
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
     fn run(x: &str, c: &MceCapabilities) -> R<String> {
         Ok(String::from_utf8(
             process_markup_compatibility(x.as_bytes(), c, &MceLimits::default())?

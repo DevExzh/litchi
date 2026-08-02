@@ -266,6 +266,23 @@ bounded inert markup. A semantic sound or effect variant is exposed only when
 both read and write preserve it; the API does not keep constructor-only or
 writer-rejected compatibility variants.
 
+`litchi-pptx::shape` owns the canonical semantic index over PresentationML
+shape trees. `Scene` builds one bounded, namespace-aware owner index and
+exposes a non-exhaustive data-bearing `Shape` enum with contextual variants
+such as `Auto`, `Picture`, `Table`, `Chart`, `Diagram`, `Ole`, `Group`, and
+`Connector`; callers never compare a separate native type discriminator.
+Scenes preserve depth-first source order while `Group::shapes` exposes direct
+children, so nested groups remain both searchable and hierarchical. Exact
+producer-visible names are the primary selector and checked pre-order positions
+are the repair/import selector. Ordinary lookup represents a missing name as
+`None`; strict lookup, ambiguous names, and out-of-range positions have typed
+errors, and neither path uses indexing panics. MCE-free owners stay borrowed. When
+Choice/Fallback processing is required, the scene owns one bounded processed
+owner buffer, and every shape XML view remains a checked span into that shared
+owner rather than a copied subtree. The concrete PPTX crate retains shape
+classification and host semantics; `litchi-drawingml` remains responsible only
+for host-neutral DrawingML vocabularies.
+
 `litchi-pptx::tag` owns the bounded PresentationML programmable-tag grammar,
 low-level relationship inventory, and anchor-aware package mutation. Its
 contextual vocabulary is `List`, `Tag`, `Key`, `Source`, `Conformance`, and
@@ -279,8 +296,17 @@ migration facade exposes short slide-scoped `tags`, `put_tags`, and
 `remove_tags` operations selected first by producer-visible slide name and
 second by checked position; an already-resolved `Slide` reads its attachment
 directly without rescanning unrelated slide parts. Shape-owned lists remain
-distinct objects and are never flattened into the slide result; their typed
-semantic facade is a later slice. Checked-in
+distinct objects and are never flattened into the slide result.
+`tag::shape::{load, put, remove}` is the focused package layer for those
+anchors and reuses canonical `shape::Key`: exact producer-visible names remain
+the ordinary selector and checked depth-first positions remain available for
+repair. The editor resolves five schema shape families plus nested groups,
+maps the semantic selection back to the active raw-source MCE branch, and never
+requires a relationship ID in the public selector. The migration facade adds
+short package `shape_tags`, `put_shape_tags`, and `remove_shape_tags` methods,
+selecting the slide first by producer-visible name or checked position and the
+shape by the same semantic key. An already-resolved `Slide::shape_tags` reads
+without a presentation-wide rescan. Checked-in
 `[MS-OE376]` section 2.1.1170(c) requires case-insensitive uniqueness but does
 not prescribe this normalization algorithm.
 Malformed producer duplicates remain inspectable by numeric position and make

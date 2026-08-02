@@ -291,7 +291,7 @@
 //!     
 //!     // Access shapes
 //!     for shape in slide.shapes()? {
-//!         if let Some(text) = shape.text()? {
+//!         if let Some(text) = shape.text() {
 //!             println!("Shape text: {}", text);
 //!         }
 //!     }

@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 mod error;
+pub mod shape;
 pub mod tag;
 pub mod transition;
 

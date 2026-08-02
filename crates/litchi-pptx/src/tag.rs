@@ -16,7 +16,9 @@
 
 use crate::{Error, Result};
 use caseless::Caseless;
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{
+    ActiveOffsetLimits, MceCapabilities, active_offsets, process_ooxml,
+};
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -25,6 +27,9 @@ use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use unicode_normalization::UnicodeNormalization;
+
+/// Shape-owned programmable-tag anchors and package CRUD.
+pub mod shape;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -906,7 +911,8 @@ pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>
 /// Shape-level `p:nvPr` anchors and unanchored tag relationships are ignored.
 pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
     let owner = package.get_part(owner)?;
-    let layout = scan_owner_xml(owner.blob(), owner.content_type())?;
+    let processed = process_ooxml(owner.blob())?;
+    let layout = scan_owner_xml(processed.as_ref(), owner.content_type())?;
     layout
         .anchor
         .as_ref()
@@ -924,6 +930,7 @@ pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
 pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Option<List>> {
     let (owner_name, layout, attached, anchor_uses) = {
         let owner = package.get_part(owner)?;
+        require_unrewritten_owner(owner.blob(), "direct tag put")?;
         let layout = scan_owner_xml(owner.blob(), owner.content_type())?;
         let attached = layout
             .anchor
@@ -1069,6 +1076,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
 pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>> {
     let (owner_name, layout, attached, owner_xml, retain_relationship, orphan) = {
         let owner = package.get_part(owner)?;
+        require_unrewritten_owner(owner.blob(), "direct tag removal")?;
         let layout = scan_owner_xml(owner.blob(), owner.content_type())?;
         let Some(anchor) = layout.anchor.as_ref() else {
             return Ok(None);
@@ -1132,6 +1140,14 @@ struct Attached {
     source: Source,
 }
 
+fn require_unrewritten_owner(xml: &[u8], operation: &'static str) -> Result<()> {
+    if matches!(process_ooxml(xml)?, std::borrow::Cow::Owned(_)) {
+        Err(Error::MceOwnerMutation { operation })
+    } else {
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OwnerKind {
     Presentation,
@@ -1161,6 +1177,7 @@ struct Container {
 struct Anchor {
     id: String,
     span: Range<usize>,
+    id_value: Range<usize>,
 }
 
 struct OpenContainer {
@@ -1177,6 +1194,7 @@ struct OpenAnchor {
     start: usize,
     depth: usize,
     id: String,
+    id_value: Range<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1351,10 +1369,14 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
                                     "p:custDataLst contains multiple direct p:tags anchors",
                                 ));
                             }
+                            let identity = anchor_relationship_id(
+                                xml, start, end, &reader, &element, profile,
+                            )?;
                             open_anchor = Some(OpenAnchor {
                                 start,
                                 depth: depth + 1,
-                                id: anchor_relationship_id(&reader, &element, profile)?,
+                                id_value: identity.id_value,
+                                id: identity.value,
                             });
                         }
                     }
@@ -1420,8 +1442,11 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
                                 "p:custDataLst contains multiple direct p:tags anchors",
                             ));
                         }
+                        let identity =
+                            anchor_relationship_id(xml, start, end, &reader, &element, profile)?;
                         anchor = Some(Anchor {
-                            id: anchor_relationship_id(&reader, &element, profile)?,
+                            id_value: identity.id_value,
+                            id: identity.value,
                             span: start..end,
                         });
                     }
@@ -1450,6 +1475,7 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
                         .ok_or_else(|| invalid("tag anchor parser state is inconsistent"))?;
                     anchor = Some(Anchor {
                         id: value.id,
+                        id_value: value.id_value,
                         span: value.start..end,
                     });
                 }
@@ -1630,11 +1656,19 @@ fn presentation_later(local: &[u8]) -> bool {
     )
 }
 
+struct AnchorIdentity {
+    value: String,
+    id_value: Range<usize>,
+}
+
 fn anchor_relationship_id(
+    xml: &[u8],
+    start: usize,
+    end: usize,
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     conformance: Conformance,
-) -> Result<String> {
+) -> Result<AnchorIdentity> {
     let mut relationship_id = None;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
@@ -1652,7 +1686,20 @@ fn anchor_relationship_id(
         if value.is_empty() || value.len() > MAX_RELATIONSHIP_ID_BYTES {
             return Err(invalid("p:tags has an invalid relationship ID"));
         }
-        relationship_id = Some(value);
+        let raw = xml
+            .get(start..end)
+            .ok_or_else(|| invalid("p:tags opening span is outside owner XML"))?;
+        let relative = shape::attribute_value_span(raw, attribute.key.as_ref())?;
+        let value_start = start
+            .checked_add(relative.start)
+            .ok_or_else(|| invalid("p:tags relationship value offset overflow"))?;
+        let value_end = start
+            .checked_add(relative.end)
+            .ok_or_else(|| invalid("p:tags relationship value offset overflow"))?;
+        relationship_id = Some(AnchorIdentity {
+            value,
+            id_value: value_start..value_end,
+        });
     }
     relationship_id.ok_or_else(|| invalid("p:tags is missing required r:id"))
 }
@@ -1679,21 +1726,26 @@ fn has_non_namespace_attrs(element: &BytesStart<'_>) -> Result<bool> {
 fn owner_anchor_uses(xml: &[u8], conformance: Conformance, relationship_id: &str) -> Result<usize> {
     let mut reader = NsReader::from_reader(xml);
     let mut nodes = 0usize;
-    let mut uses = 0usize;
+    let mut candidates = Vec::new();
     loop {
+        let start = xml_position(&reader)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let is_pml = pml(&namespace) == Some(conformance);
         drop(namespace);
+        let end = xml_position(&reader)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 bump_owner_node(&mut nodes)?;
                 if is_pml && element.local_name().as_ref() == b"tags" {
-                    let candidate = anchor_relationship_id(&reader, &element, conformance)?;
-                    if candidate == relationship_id {
-                        uses = uses.checked_add(1).ok_or(Error::Limit {
-                            resource: "tag-owner anchor references",
-                            limit: MAX_OWNER_NODES,
-                        })?;
+                    let candidate =
+                        anchor_relationship_id(xml, start, end, &reader, &element, conformance)?;
+                    if candidate.value == relationship_id {
+                        candidates
+                            .try_reserve(1)
+                            .map_err(|source| allocation("tag-owner anchor offsets", source))?;
+                        candidates.push(u32::try_from(start).map_err(|_| {
+                            invalid("tag-owner anchor offset exceeds the compact u32 domain")
+                        })?);
                     }
                 }
             },
@@ -1701,7 +1753,16 @@ fn owner_anchor_uses(xml: &[u8], conformance: Conformance, relationship_id: &str
             _ => {},
         }
     }
-    Ok(uses)
+    let mut capabilities = MceCapabilities::ooxml_baseline();
+    capabilities.understand_namespace("http://schemas.microsoft.com/office/powerpoint/2010/main");
+    capabilities.understand_namespace("http://schemas.microsoft.com/office/powerpoint/2012/main");
+    Ok(active_offsets(
+        xml,
+        &candidates,
+        &capabilities,
+        &ActiveOffsetLimits::default(),
+    )?
+    .len())
 }
 
 fn resolve_anchor(
@@ -1801,13 +1862,7 @@ fn replace_anchor_relationship_id(
         .anchor
         .as_ref()
         .ok_or_else(|| invalid("tag owner has no direct p:tags anchor"))?;
-    let replacement = format!(
-        "<p:tags xmlns:p=\"{}\" xmlns:r=\"{}\" r:id=\"{}\"/>",
-        layout.conformance.namespace(),
-        layout.conformance.relationship_namespace(),
-        relationship_id
-    );
-    replace_xml(xml, anchor.span.clone(), replacement.as_bytes())
+    replace_xml(xml, anchor.id_value.clone(), relationship_id.as_bytes())
 }
 
 fn remove_anchor(xml: &[u8], layout: &OwnerXml) -> Result<Vec<u8>> {
@@ -3184,7 +3239,7 @@ mod tests {
         let owner = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let original_part = PackURI::new("/ppt/tags/tag1.xml").unwrap();
         let owner_xml = format!(
-            r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="1" name="Shape"/><p:cNvSpPr/><p:nvPr><p:custDataLst><p:tags r:id="rIdShared"/></p:custDataLst></p:nvPr></p:nvSpPr></p:sp></p:spTree><p:custDataLst><p:tags r:id="rIdShared"/></p:custDataLst></p:cSld></p:sld>"#
+            r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="1" name="Shape"/><p:cNvSpPr/><p:nvPr><p:custDataLst><p:tags r:id="rIdShared"/></p:custDataLst></p:nvPr></p:nvSpPr></p:sp></p:spTree><p:custDataLst><p:tags xmlns:x="urn:test" x:keep="yes" r:id='rIdShared'><!--keep-anchor--></p:tags></p:custDataLst></p:cSld></p:sld>"#
         );
         let mut package = OpcPackage::new();
         package.add_part(Box::new(XmlPart::new(
@@ -3224,6 +3279,8 @@ mod tests {
         );
         let updated = std::str::from_utf8(package.get_part(&owner).unwrap().blob()).unwrap();
         assert_eq!(updated.matches("rIdShared").count(), 1);
+        assert!(updated.contains("x:keep=\"yes\""));
+        assert!(updated.contains("<!--keep-anchor-->"));
         assert!(package.get_part(&original_part).is_ok());
 
         let fork = direct.part().clone();
@@ -3245,6 +3302,70 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn direct_owner_loads_active_mce_branch_and_mutation_fails_closed() {
+        use std::sync::Arc;
+
+        const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let owner = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let part_name = PackURI::new("/ppt/tags/tag1.xml").unwrap();
+        let owner_xml = format!(
+            r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}" xmlns:mc="{MC}" xmlns:x="urn:future" mc:Ignorable="x"><p:cSld><p:spTree/><mc:AlternateContent><mc:Choice Requires="x"><p:custDataLst><p:tags r:id="rIdInactive"/></p:custDataLst></mc:Choice><mc:Fallback><p:custDataLst><p:tags r:id="rIdActive"/></p:custDataLst></mc:Fallback></mc:AlternateContent></p:cSld></p:sld>"#
+        );
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(XmlPart::new(
+            owner.clone(),
+            "application/vnd.openxmlformats-officedocument.presentationml.slide+xml".into(),
+            owner_xml.into_bytes(),
+        )));
+        package.add_part(Box::new(XmlPart::new(
+            part_name.clone(),
+            CONTENT_TYPE.into(),
+            write(&list("Branch", "fallback"), Conformance::Transitional).unwrap(),
+        )));
+        package
+            .get_part_mut(&owner)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                TAG_REL.into(),
+                part_name.relative_ref(owner.base_uri()),
+                "rIdActive".into(),
+                false,
+            );
+
+        assert_eq!(
+            load(&package, &owner)
+                .unwrap()
+                .unwrap()
+                .list()
+                .get("branch")
+                .unwrap()
+                .value(),
+            "fallback"
+        );
+
+        let before = package.get_part(&owner).unwrap().blob_arc();
+        mark_signed(&mut package);
+        assert!(matches!(
+            put(&mut package, &owner, list("Reviewer", "Ada")),
+            Err(Error::MceOwnerMutation {
+                operation: "direct tag put"
+            })
+        ));
+        assert!(matches!(
+            remove(&mut package, &owner),
+            Err(Error::MceOwnerMutation {
+                operation: "direct tag removal"
+            })
+        ));
+        assert!(package.is_signed());
+        assert!(Arc::ptr_eq(
+            &before,
+            &package.get_part(&owner).unwrap().blob_arc()
+        ));
     }
 
     #[test]

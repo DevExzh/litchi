@@ -1,9 +1,7 @@
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{
     is_presentationml_name, presentation_name, relationship_attribute_value,
-    scan_presentationml_element_ranges,
 };
-use crate::pptx::shapes::base::{BaseShape, ShapeType};
 use crate::pptx::shapes::textframe::extract_drawingml_text;
 /// Slide parts and related types.
 ///
@@ -13,7 +11,7 @@ use litchi_opc::part::Part;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
@@ -25,45 +23,6 @@ fn processed(part: &dyn Part) -> Result<Arc<Vec<u8>>> {
             std::borrow::Cow::Owned(v) => Arc::new(v),
         },
     )
-}
-
-fn parse_shapes(xml: &[u8]) -> Result<Vec<BaseShape>> {
-    let mut shapes = Vec::new();
-    const TARGETS: &[&[u8]] = &[b"sp", b"pic", b"graphicFrame", b"grpSp", b"cxnSp"];
-    const TYPES: &[ShapeType] = &[
-        ShapeType::Shape,
-        ShapeType::Picture,
-        ShapeType::GraphicFrame,
-        ShapeType::GroupShape,
-        ShapeType::Connector,
-    ];
-    scan_presentationml_element_ranges(xml, TARGETS, |target, start, length| {
-        let start = usize::try_from(start).map_err(|_| {
-            OoxmlError::InvalidFormat("shape offset does not fit usize".to_string())
-        })?;
-        let length = usize::try_from(length).map_err(|_| {
-            OoxmlError::InvalidFormat("shape length does not fit usize".to_string())
-        })?;
-        let end = start
-            .checked_add(length)
-            .ok_or_else(|| OoxmlError::InvalidFormat("shape byte range overflow".to_string()))?;
-        let xml = xml.get(start..end).ok_or_else(|| {
-            OoxmlError::InvalidFormat("shape byte range is outside slide XML".to_string())
-        })?;
-        let shape_type = TYPES
-            .get(target)
-            .ok_or_else(|| OoxmlError::InvalidFormat("invalid shape range target".to_string()))?;
-        shapes.push(BaseShape::new(xml.to_vec(), shape_type.clone()));
-        Ok(())
-    })?;
-    Ok(shapes)
-}
-
-fn filter_placeholders(shapes: Vec<BaseShape>) -> Vec<BaseShape> {
-    shapes
-        .into_iter()
-        .filter(BaseShape::is_placeholder)
-        .collect()
 }
 
 /// Master-content visibility settings declared by a slide or slide layout.
@@ -984,13 +943,18 @@ pub struct SlidePart<'a> {
     /// The underlying OPC part
     part: &'a dyn Part,
     xml: Arc<Vec<u8>>,
+    scene: OnceLock<litchi_pptx::shape::Scene<'a>>,
 }
 
 impl<'a> SlidePart<'a> {
     /// Create a SlidePart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         let xml = processed(part)?;
-        Ok(Self { part, xml })
+        Ok(Self {
+            part,
+            xml,
+            scene: OnceLock::new(),
+        })
     }
 
     /// Get the XML bytes of the slide.
@@ -1027,17 +991,20 @@ impl<'a> SlidePart<'a> {
         self.part
     }
 
-    /// Parse and return all shapes on this slide.
+    /// Borrow the lazily indexed semantic shape scene.
     ///
-    /// Returns a vector of BaseShape objects that can be checked for type
-    /// and converted to specific shape types.
-    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
-        parse_shapes(self.xml_bytes())
-    }
-
-    /// Parse and return all placeholder shapes on this slide.
-    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
-        Ok(filter_placeholders(self.shapes()?))
+    /// The scene borrows the owner part when no MCE rewrite is needed and is
+    /// cached after the first successful scan. Individual shape XML is never
+    /// copied.
+    pub fn shapes(&self) -> Result<&litchi_pptx::shape::Scene<'a>> {
+        if let Some(scene) = self.scene.get() {
+            return Ok(scene);
+        }
+        let scene = litchi_pptx::shape::read(self.part.blob())?;
+        let _ = self.scene.set(scene);
+        self.scene.get().ok_or_else(|| {
+            OoxmlError::InvalidFormat("slide shape scene was not initialized".to_string())
+        })
     }
 
     /// Get the flags controlling whether master content is shown on this slide.
@@ -1079,13 +1046,18 @@ pub struct SlideLayoutPart<'a> {
     /// The underlying OPC part
     part: &'a dyn Part,
     xml: Arc<Vec<u8>>,
+    scene: OnceLock<litchi_pptx::shape::Scene<'a>>,
 }
 
 impl<'a> SlideLayoutPart<'a> {
     /// Create a SlideLayoutPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         let xml = processed(part)?;
-        Ok(Self { part, xml })
+        Ok(Self {
+            part,
+            xml,
+            scene: OnceLock::new(),
+        })
     }
 
     /// Get the XML bytes of the layout.
@@ -1109,14 +1081,16 @@ impl<'a> SlideLayoutPart<'a> {
         parse_header_footer_visibility(self.xml_bytes(), b"sldLayout", "slide layout")
     }
 
-    /// Get all shapes defined by this layout.
-    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
-        parse_shapes(self.xml_bytes())
-    }
-
-    /// Get all placeholder shapes defined by this layout.
-    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
-        Ok(filter_placeholders(self.shapes()?))
+    /// Borrow the lazily indexed semantic shape scene.
+    pub fn shapes(&self) -> Result<&litchi_pptx::shape::Scene<'a>> {
+        if let Some(scene) = self.scene.get() {
+            return Ok(scene);
+        }
+        let scene = litchi_pptx::shape::read(self.part.blob())?;
+        let _ = self.scene.set(scene);
+        self.scene.get().ok_or_else(|| {
+            OoxmlError::InvalidFormat("slide-layout shape scene was not initialized".to_string())
+        })
     }
 
     /// Get the flags controlling whether master content is shown on this layout.
@@ -1168,13 +1142,18 @@ pub struct SlideMasterPart<'a> {
     /// The underlying OPC part
     part: &'a dyn Part,
     xml: Arc<Vec<u8>>,
+    scene: OnceLock<litchi_pptx::shape::Scene<'a>>,
 }
 
 impl<'a> SlideMasterPart<'a> {
     /// Create a SlideMasterPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         let xml = processed(part)?;
-        Ok(Self { part, xml })
+        Ok(Self {
+            part,
+            xml,
+            scene: OnceLock::new(),
+        })
     }
 
     /// Get the XML bytes of the master.
@@ -1203,14 +1182,16 @@ impl<'a> SlideMasterPart<'a> {
         parse_slide_master_text_styles(self.xml_bytes())
     }
 
-    /// Get all shapes defined by this master.
-    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
-        parse_shapes(self.xml_bytes())
-    }
-
-    /// Get all placeholder shapes defined by this master.
-    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
-        Ok(filter_placeholders(self.shapes()?))
+    /// Borrow the lazily indexed semantic shape scene.
+    pub fn shapes(&self) -> Result<&litchi_pptx::shape::Scene<'a>> {
+        if let Some(scene) = self.scene.get() {
+            return Ok(scene);
+        }
+        let scene = litchi_pptx::shape::read(self.part.blob())?;
+        let _ = self.scene.set(scene);
+        self.scene.get().ok_or_else(|| {
+            OoxmlError::InvalidFormat("slide-master shape scene was not initialized".to_string())
+        })
     }
 
     /// Get the color map defined by this master.
@@ -1308,18 +1289,28 @@ mod tests {
         );
         let blob = part("/ppt/slides/slide1.xml", xml);
         let slide = SlidePart::from_part(&blob).unwrap();
-        let mut shapes = slide.shapes().unwrap();
+        let shapes = slide.shapes().unwrap();
         assert_eq!(shapes.len(), 4);
-        assert_eq!(shapes[0].shape_type(), &ShapeType::Shape);
-        assert_eq!(shapes[0].name().unwrap(), "Real & Name");
-        let raw = std::str::from_utf8(shapes[0].xml_bytes()).unwrap();
+        let first = shapes.at(0).unwrap();
+        assert!(matches!(first, litchi_pptx::shape::Shape::Auto(_)));
+        assert_eq!(first.name(), Some("Real & Name"));
+        let raw = std::str::from_utf8(first.xml().unwrap()).unwrap();
         assert!(raw.starts_with("<p:sp custom=\"kept\">"));
         assert!(raw.contains("<![CDATA[A < B]]>"));
         assert!(raw.contains("<!--keep-comment-->"));
         assert!(raw.ends_with("</p:sp>"));
-        assert_eq!(shapes[1].shape_type(), &ShapeType::Picture);
-        assert_eq!(shapes[2].shape_type(), &ShapeType::GraphicFrame);
-        assert_eq!(shapes[3].shape_type(), &ShapeType::Connector);
+        assert!(matches!(
+            shapes.at(1).unwrap(),
+            litchi_pptx::shape::Shape::Picture(_)
+        ));
+        assert!(matches!(
+            shapes.at(2).unwrap(),
+            litchi_pptx::shape::Shape::Frame(_)
+        ));
+        assert!(matches!(
+            shapes.at(3).unwrap(),
+            litchi_pptx::shape::Shape::Connector(_)
+        ));
     }
 
     #[test]

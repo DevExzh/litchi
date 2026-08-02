@@ -3,8 +3,9 @@
 //! This module provides parsing and manipulation of Microsoft PowerPoint presentations
 //! in the Office Open XML (OOXML) format (.pptx files).
 //!
-//! The implementation follows the structure and API design of the python-pptx library,
-//! adapted for Rust with performance optimizations and zero-copy parsing where possible.
+//! The concise facade delegates canonical semantic values to focused crates and
+//! keeps package identities below safe, name-first APIs. Shapes are exposed as
+//! borrowed data-bearing enums rather than copied XML plus a type discriminator.
 //!
 //! # Architecture
 //!
@@ -89,11 +90,13 @@ pub mod presentation_structure;
 pub mod protection;
 pub mod revision_information;
 pub mod sections;
-pub mod shapes;
+pub mod shape;
+mod shapes;
 pub mod show_events;
 pub mod slide;
 pub mod slide_sync;
 pub mod smartart;
+pub mod table;
 pub mod table_styles;
 pub mod template;
 pub mod theme;

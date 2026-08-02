@@ -641,9 +641,12 @@ impl<'a> Presentation<'a> {
             // Get the slide's placeholder inventory.
             let placeholders: Vec<String> = slide
                 .placeholders()?
-                .iter()
-                .map(|shape| shape.placeholder_type())
-                .collect::<Result<Vec<_>>>()?;
+                .filter_map(|shape| {
+                    shape
+                        .placeholder()
+                        .map(|placeholder| placeholder.kind().unwrap_or("obj").to_owned())
+                })
+                .collect();
 
             Ok(Some(placeholders))
         } else {
@@ -1171,7 +1174,7 @@ impl<'a> Presentation<'a> {
         for (slide_idx, slide) in self.slides()?.iter().enumerate() {
             let shapes = slide.shapes()?;
             for (shape_idx, shape) in shapes.iter().enumerate() {
-                if shape.has_table() {
+                if matches!(shape, litchi_pptx::shape::Shape::Table(_)) {
                     all_tables.push((slide_idx, shape_idx));
                 }
             }

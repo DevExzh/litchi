@@ -10,13 +10,16 @@ Public types use short names inside focused modules. Prefer
 fields are replaced by non-exhaustive data-bearing enums:
 
 ```rust,ignore
-pub enum Shape {
-    AutoShape(auto::Shape),
-    Callout(callout::Shape),
-    Canvas(Canvas),
-    Picture(Picture),
-    Chart(Chart),
-    Unknown(OpaqueShape),
+pub enum Shape<'a> {
+    Auto(Auto<'a>),
+    Picture(Picture<'a>),
+    Table(Table<'a>),
+    Chart(Chart<'a>),
+    Diagram(Diagram<'a>),
+    Ole(Ole<'a>),
+    Group(Group<'a>),
+    Connector(Connector<'a>),
+    Unknown(Unknown<'a>),
 }
 ```
 
@@ -24,6 +27,54 @@ The same rule applies to fills, transitions, plots, axes, fields, records, and
 other sum types. `Unknown` retains bounded lossless content. Common read methods
 live on the enum or narrow static-dispatch traits; the facade does not use boxed
 trait objects.
+
+PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
+`Scene` is a bounded semantic index over one slide-like owner, not a vector of
+detached XML allocations. Shapes are visited in depth-first pre-order, while a
+`Group` lends only its direct children so hierarchy is never inferred from raw
+non-visual IDs. The ordinary selector is an exact producer-visible name:
+
+```rust,ignore
+let Some(title) = scene.get("Title")? else {
+    return Ok(());
+};
+let fourth = scene.at(3)?;
+```
+
+The numeric form is a checked secondary path for source-order repair and import
+algorithms. Ordinary lookup represents a missing name as `None`, while strict
+`shape` lookup provides a typed not-found failure. Duplicate exact names and
+out-of-range positions are typed errors in either applicable path; none of
+these operations implements `Index` or panics. Native non-visual IDs remain
+diagnostic/reference metadata rather than the primary facade selector.
+
+An MCE-free scene borrows the caller's owner bytes. If bounded
+Choice/Fallback processing must rewrite the owner, the scene owns that one
+processed buffer. In either case each shape lends a checked byte span from the
+shared owner, so indexing does not allocate one XML buffer per shape. Decoded
+names and text may use a bounded compact arena; “borrowed” therefore describes
+the source payload and shape views, not a claim of allocation-free parsing.
+
+Shape-owned programmable tags reuse this same selector through
+`tag::shape::{load, put, remove}`. The focused package layer accepts the
+containing owner plus a `shape::Key`; it does not make callers rediscover a
+native shape ID, relationship ID, or tag-part name. Name selection therefore
+has the same strict not-found/ambiguity behavior as `Scene::shape`, and checked
+depth-first positions remain the deliberate repair path. The lower layer keeps
+package topology explicit without leaking that topology into the semantic
+selector.
+
+The migration facade composes the two semantic catalogs directly:
+
+```rust,ignore
+let current = package.shape_tags("Overview", "Status badge")?;
+package.put_shape_tags("Overview", "Status badge", replacement)?;
+package.remove_shape_tags(0_usize, 3_usize)?;
+```
+
+An already-resolved slide shortens the read path to
+`slide.shape_tags("Status badge")`. These conveniences preserve the same typed
+selection and transaction rules; they do not introduce a second ID-based API.
 
 Validated semantic scalars include `Length` (canonical EMU storage), `Percent`,
 `Angle`, `Row`, and `Column`. Internal const-generic bounded integers support
