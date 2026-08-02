@@ -1,15 +1,21 @@
+#![cfg_attr(not(test), deny(clippy::indexing_slicing))]
+
 //! RTF document representation.
 
-use super::error::{RtfError, RtfResult};
+use super::error::{RtfError, RtfResult, try_reserve_one};
 use super::lexer::Lexer;
 use super::limits::ParseLimits;
 use super::parser::Parser;
 use super::types::{ColorTable, FontTable, Paragraph as RtfParagraph, Run, StyleBlock};
 use bumpalo::Bump;
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+
+const MAX_ROOT_SHAPES: usize = 65_536;
+const MAX_ROOT_SHAPE_GROUPS: usize = 16_384;
 
 fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
     let file = File::open(path)
@@ -2046,7 +2052,7 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         if self
-            .last_body_story_position()
+            .last_body_story_position()?
             .is_some_and(|position| position > field.position)
         {
             return Err(RtfError::MalformedDocument(
@@ -2947,13 +2953,16 @@ impl<'a> RtfDocument<'a> {
                 "RTF XML namespace count exceeds the safety limit".to_string(),
             ));
         }
+        let mut ids = HashSet::new();
+        ids.try_reserve(namespaces.len())
+            .map_err(|_| RtfError::AllocationFailed {
+                resource: "XML namespace IDs",
+                requested: namespaces.len().saturating_mul(std::mem::size_of::<u32>()),
+            })?;
         let mut total = 0usize;
-        for (index, namespace) in namespaces.iter().enumerate() {
+        for namespace in namespaces {
             namespace.validate()?;
-            if namespaces[..index]
-                .iter()
-                .any(|existing| existing.id == namespace.id)
-            {
+            if !ids.insert(namespace.id) {
                 return Err(RtfError::MalformedDocument(
                     "RTF XML namespace IDs must be unique".to_string(),
                 ));
@@ -3630,7 +3639,7 @@ impl<'a> RtfDocument<'a> {
                 "RTF background shapes must use set_background_shape".to_string(),
             ));
         }
-        if self.shapes.len() >= 65_536 {
+        if self.shapes.len() >= MAX_ROOT_SHAPES {
             return Err(RtfError::MalformedDocument(
                 "RTF shape count exceeds the safety limit".to_string(),
             ));
@@ -3654,7 +3663,7 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         if self
-            .last_drawing_position()
+            .last_drawing_position()?
             .is_some_and(|position| position > shape.position)
         {
             return Err(RtfError::MalformedDocument(
@@ -3662,7 +3671,7 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         if self
-            .last_body_story_position()
+            .last_body_story_position()?
             .is_some_and(|position| position > shape.position)
         {
             return Err(RtfError::MalformedDocument(
@@ -3670,9 +3679,14 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         let drawing = crate::StoryDrawing::Shape(self.shapes.len());
-        self.drawing_order.push(drawing);
+        let event_at = self.checked_body_story_event_insertion_index(shape.position)?;
+        try_reserve_one(&mut self.shapes, "root shapes")?;
+        try_reserve_one(&mut self.drawing_order, "root drawing order")?;
+        try_reserve_one(&mut self.body_story_events, "body story events")?;
         self.shapes.push(shape);
-        self.insert_body_story_event(crate::BodyStoryEvent::Drawing(drawing))?;
+        self.drawing_order.push(drawing);
+        self.body_story_events
+            .insert(event_at, crate::BodyStoryEvent::Drawing(drawing));
         Ok(())
     }
 
@@ -3689,22 +3703,28 @@ impl<'a> RtfDocument<'a> {
         index: usize,
         replacement: super::shape::Shape<'a>,
     ) -> RtfResult<super::shape::Shape<'a>> {
-        let current = self.shapes.get(index).ok_or_else(|| {
-            RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
-        })?;
+        let current_position = self
+            .shapes
+            .get(index)
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
+            })?
+            .position;
         if self.background_shape_index == Some(index) || replacement.is_background {
             return Err(RtfError::MalformedDocument(
                 "RTF background shape must use set_background_shape".to_string(),
             ));
         }
-        if replacement.position != current.position {
+        if replacement.position != current_position {
             return Err(RtfError::MalformedDocument(
                 "RTF shape replacement cannot relocate its body anchor".to_string(),
             ));
         }
         replacement.validate()?;
-        let old = std::mem::replace(&mut self.shapes[index], replacement);
-        Ok(old)
+        let current = self.shapes.get_mut(index).ok_or_else(|| {
+            RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
+        })?;
+        Ok(std::mem::replace(current, replacement))
     }
 
     /// Atomically remove one non-background root shape and repair every stored index.
@@ -3719,31 +3739,25 @@ impl<'a> RtfDocument<'a> {
                 "RTF background shape must use clear_background_shape".to_string(),
             ));
         }
-        let mut shapes = self.shapes.clone();
-        let mut order = self.drawing_order.clone();
-        let mut events = self.body_story_events.clone();
-        let removed = shapes.remove(index);
-        order.retain(
+        let removed = self.shapes.remove(index);
+        self.drawing_order.retain(
             |drawing| !matches!(drawing, crate::StoryDrawing::Shape(value) if *value == index),
         );
-        events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) if *value == index));
-        for drawing in &mut order {
+        self.body_story_events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) if *value == index));
+        for drawing in &mut self.drawing_order {
             if let crate::StoryDrawing::Shape(value) = drawing
                 && *value > index
             {
                 *value -= 1;
             }
         }
-        for event in &mut events {
+        for event in &mut self.body_story_events {
             if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) = event
                 && *value > index
             {
                 *value -= 1;
             }
         }
-        self.shapes = shapes;
-        self.drawing_order = order;
-        self.body_story_events = events;
         if let Some(background) = &mut self.background_shape_index
             && *background > index
         {
@@ -3762,14 +3776,13 @@ impl<'a> RtfDocument<'a> {
                 crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(_))
             )
         });
-        if let Some(index) = self.background_shape_index {
-            let background = self.shapes.remove(index);
-            self.shapes.clear();
-            self.shapes.push(background);
-            self.background_shape_index = Some(0);
-        } else {
-            self.shapes.clear();
-        }
+        let background = self
+            .background_shape_index
+            .filter(|index| self.shapes.get(*index).is_some())
+            .map(|index| self.shapes.swap_remove(index));
+        self.shapes.clear();
+        self.background_shape_index = background.as_ref().map(|_| 0);
+        self.shapes.extend(background);
     }
 
     /// Return the typed shape in the document `background` destination.
@@ -3784,15 +3797,22 @@ impl<'a> RtfDocument<'a> {
         Self::validate_background_shape(&shape)?;
         shape.is_background = true;
         if let Some(index) = self.background_shape_index {
-            self.shapes[index] = shape;
+            let current = self.shapes.get_mut(index).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF background shape index is out of bounds".to_string(),
+                )
+            })?;
+            *current = shape;
         } else {
-            if self.shapes.len() >= 65_536 {
+            if self.shapes.len() >= MAX_ROOT_SHAPES {
                 return Err(RtfError::MalformedDocument(
                     "RTF shape count exceeds the safety limit".to_string(),
                 ));
             }
-            self.background_shape_index = Some(self.shapes.len());
+            try_reserve_one(&mut self.shapes, "root shapes")?;
+            let index = self.shapes.len();
             self.shapes.push(shape);
+            self.background_shape_index = Some(index);
         }
         Ok(())
     }
@@ -3800,6 +3820,7 @@ impl<'a> RtfDocument<'a> {
     /// Remove only the destination-owned background shape.
     pub fn clear_background_shape(&mut self) -> Option<super::shape::Shape<'a>> {
         let index = self.background_shape_index.take()?;
+        self.shapes.get(index)?;
         let removed = self.shapes.remove(index);
         for drawing in &mut self.drawing_order {
             if let crate::StoryDrawing::Shape(shape_index) = drawing
@@ -3962,7 +3983,7 @@ impl<'a> RtfDocument<'a> {
 
     /// Append a validated root shape group.
     pub fn push_shape_group(&mut self, group: super::shape::ShapeGroup<'a>) -> RtfResult<()> {
-        if self.shape_groups.len() >= 16_384 {
+        if self.shape_groups.len() >= MAX_ROOT_SHAPE_GROUPS {
             return Err(RtfError::MalformedDocument(
                 "RTF shape group count exceeds the safety limit".to_string(),
             ));
@@ -3980,7 +4001,7 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         if self
-            .last_drawing_position()
+            .last_drawing_position()?
             .is_some_and(|position| position > group.position)
         {
             return Err(RtfError::MalformedDocument(
@@ -3988,7 +4009,7 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         if self
-            .last_body_story_position()
+            .last_body_story_position()?
             .is_some_and(|position| position > group.position)
         {
             return Err(RtfError::MalformedDocument(
@@ -3996,9 +4017,14 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         let drawing = crate::StoryDrawing::ShapeGroup(self.shape_groups.len());
-        self.drawing_order.push(drawing);
+        let event_at = self.checked_body_story_event_insertion_index(group.position)?;
+        try_reserve_one(&mut self.shape_groups, "root shape groups")?;
+        try_reserve_one(&mut self.drawing_order, "root drawing order")?;
+        try_reserve_one(&mut self.body_story_events, "body story events")?;
         self.shape_groups.push(group);
-        self.insert_body_story_event(crate::BodyStoryEvent::Drawing(drawing))?;
+        self.drawing_order.push(drawing);
+        self.body_story_events
+            .insert(event_at, crate::BodyStoryEvent::Drawing(drawing));
         Ok(())
     }
 
@@ -4015,19 +4041,25 @@ impl<'a> RtfDocument<'a> {
         index: usize,
         replacement: super::shape::ShapeGroup<'a>,
     ) -> RtfResult<super::shape::ShapeGroup<'a>> {
-        let current = self.shape_groups.get(index).ok_or_else(|| {
-            RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds"))
-        })?;
-        if replacement.position != current.position {
+        let current_position = self
+            .shape_groups
+            .get(index)
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(format!(
+                    "RTF shape-group index {index} is out of bounds"
+                ))
+            })?
+            .position;
+        if replacement.position != current_position {
             return Err(RtfError::MalformedDocument(
                 "RTF shape-group replacement cannot relocate its body anchor".to_string(),
             ));
         }
         replacement.validate()?;
-        Ok(std::mem::replace(
-            &mut self.shape_groups[index],
-            replacement,
-        ))
+        let current = self.shape_groups.get_mut(index).ok_or_else(|| {
+            RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds"))
+        })?;
+        Ok(std::mem::replace(current, replacement))
     }
 
     /// Atomically remove one root group and repair every stored index.
@@ -4037,31 +4069,25 @@ impl<'a> RtfDocument<'a> {
                 "RTF shape-group index {index} is out of bounds"
             )));
         }
-        let mut groups = self.shape_groups.clone();
-        let mut order = self.drawing_order.clone();
-        let mut events = self.body_story_events.clone();
-        let removed = groups.remove(index);
-        order.retain(
+        let removed = self.shape_groups.remove(index);
+        self.drawing_order.retain(
             |drawing| !matches!(drawing, crate::StoryDrawing::ShapeGroup(value) if *value == index),
         );
-        events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) if *value == index));
-        for drawing in &mut order {
+        self.body_story_events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) if *value == index));
+        for drawing in &mut self.drawing_order {
             if let crate::StoryDrawing::ShapeGroup(value) = drawing
                 && *value > index
             {
                 *value -= 1;
             }
         }
-        for event in &mut events {
+        for event in &mut self.body_story_events {
             if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) = event
                 && *value > index
             {
                 *value -= 1;
             }
         }
-        self.shape_groups = groups;
-        self.drawing_order = order;
-        self.body_story_events = events;
         Ok(removed)
     }
 
@@ -4077,35 +4103,42 @@ impl<'a> RtfDocument<'a> {
         }
         let start = from.min(to);
         let end = from.max(to);
-        let anchor = self.root_drawing_position(self.drawing_order[from])?;
-        for &drawing in &self.drawing_order[start..=end] {
+        let drawing = self.drawing_order.get(from).copied().ok_or_else(|| {
+            RtfError::MalformedDocument("RTF drawing reorder index is out of bounds".to_string())
+        })?;
+        let anchor = self.root_drawing_position(drawing)?;
+        let range = self.drawing_order.get(start..=end).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF drawing reorder range is out of bounds".to_string())
+        })?;
+        for &drawing in range {
             if self.root_drawing_position(drawing)? != anchor {
                 return Err(RtfError::MalformedDocument(
                     "RTF drawings at different body anchors cannot be reordered".to_string(),
                 ));
             }
         }
-        let mut order = self.drawing_order.clone();
-        let drawing = order.remove(from);
-        order.insert(to, drawing);
-        let mut events = self.body_story_events.clone();
-        let mut next = order.iter().copied();
-        for event in &mut events {
-            if let crate::BodyStoryEvent::Drawing(drawing) = event {
-                *drawing = next.next().ok_or_else(|| {
-                    RtfError::MalformedDocument(
-                        "RTF drawing event order contains too many events".to_string(),
-                    )
-                })?;
-            }
-        }
-        if next.next().is_some() {
+        let event_count = self
+            .body_story_events
+            .iter()
+            .filter(|event| matches!(event, crate::BodyStoryEvent::Drawing(_)))
+            .count();
+        if event_count != self.drawing_order.len() {
             return Err(RtfError::MalformedDocument(
-                "RTF drawing event order is incomplete".to_string(),
+                "RTF drawing event order is incomplete or contains extra events".to_string(),
             ));
         }
-        self.drawing_order = order;
-        self.body_story_events = events;
+        let drawing = self.drawing_order.remove(from);
+        self.drawing_order.insert(to, drawing);
+        let drawing_events = self.body_story_events.iter_mut().filter_map(|event| {
+            if let crate::BodyStoryEvent::Drawing(drawing) = event {
+                Some(drawing)
+            } else {
+                None
+            }
+        });
+        for (event, drawing) in drawing_events.zip(self.drawing_order.iter().copied()) {
+            *event = drawing;
+        }
         Ok(())
     }
 
@@ -4145,25 +4178,35 @@ impl<'a> RtfDocument<'a> {
         });
     }
 
-    fn last_drawing_position(&self) -> Option<usize> {
-        self.drawing_order.last().map(|drawing| match *drawing {
-            crate::StoryDrawing::Shape(index) => self.shapes[index].position,
-            crate::StoryDrawing::ShapeGroup(index) => self.shape_groups[index].position,
-        })
+    fn last_drawing_position(&self) -> RtfResult<Option<usize>> {
+        self.drawing_order
+            .last()
+            .copied()
+            .map(|drawing| self.root_drawing_position(drawing))
+            .transpose()
     }
 
-    fn last_body_story_position(&self) -> Option<usize> {
-        self.body_story_events
-            .iter()
-            .rev()
-            .find_map(|event| match *event {
+    fn last_body_story_position(&self) -> RtfResult<Option<usize>> {
+        for event in self.body_story_events.iter().rev() {
+            if matches!(
+                *event,
                 crate::BodyStoryEvent::Drawing(_)
-                | crate::BodyStoryEvent::Field(_)
-                | crate::BodyStoryEvent::PageBreak(_)
-                | crate::BodyStoryEvent::ColumnBreak(_)
-                | crate::BodyStoryEvent::SectionBreak(_) => self.body_story_event_position(*event),
-                _ => None,
-            })
+                    | crate::BodyStoryEvent::Field(_)
+                    | crate::BodyStoryEvent::PageBreak(_)
+                    | crate::BodyStoryEvent::ColumnBreak(_)
+                    | crate::BodyStoryEvent::SectionBreak(_)
+            ) {
+                return self
+                    .body_story_event_position(*event)
+                    .map(Some)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF body story event references missing metadata".to_string(),
+                        )
+                    });
+            }
+        }
+        Ok(None)
     }
 
     fn body_story_event_position(&self, event: crate::BodyStoryEvent) -> Option<usize> {
@@ -4233,6 +4276,30 @@ impl<'a> RtfDocument<'a> {
                 region.position.checked_add(region.content.len())?
             },
         })
+    }
+
+    fn checked_body_story_event_insertion_index(&self, position: usize) -> RtfResult<usize> {
+        let mut at = 0usize;
+        let mut previous_position = None;
+        for (index, event) in self.body_story_events.iter().enumerate() {
+            let event_position = self.body_story_event_position(*event).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF body story event references missing metadata".to_string(),
+                )
+            })?;
+            if previous_position.is_some_and(|previous| previous > event_position) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF body story events are out of order".to_string(),
+                ));
+            }
+            if event_position <= position {
+                at = index.checked_add(1).ok_or_else(|| {
+                    RtfError::MalformedDocument("RTF body story event index overflows".to_string())
+                })?;
+            }
+            previous_position = Some(event_position);
+        }
+        Ok(at)
     }
 
     fn insert_body_story_event(&mut self, event: crate::BodyStoryEvent) -> RtfResult<()> {
@@ -5052,6 +5119,73 @@ mod tests {
         let doc = RtfDocument::parse(rtf).unwrap();
         let text = doc.text();
         assert!(text.contains("Hello World"));
+    }
+
+    #[test]
+    fn root_drawing_mutations_preflight_corrupt_indices_and_events() {
+        let mut document = RtfDocument::parse(r#"{\rtf1 body}"#).unwrap();
+        let mut first = crate::Shape::new(crate::ShapeType::Rectangle);
+        first.position = document.text().len();
+        let mut second = crate::Shape::new(crate::ShapeType::Ellipse);
+        second.position = document.text().len();
+        document.add_shape(first).unwrap();
+        document.add_shape(second).unwrap();
+
+        *document.drawing_order.last_mut().unwrap() = crate::StoryDrawing::Shape(usize::MAX);
+        let shapes_before = document.shapes.clone();
+        let order_before = document.drawing_order.clone();
+        let events_before = document.body_story_events.clone();
+        let mut third = crate::Shape::new(crate::ShapeType::TextBox);
+        third.position = document.text().len();
+        assert!(document.add_shape(third).is_err());
+        assert!(document.move_drawing(0, 1).is_err());
+        assert_eq!(document.shapes, shapes_before);
+        assert_eq!(document.drawing_order, order_before);
+        assert_eq!(document.body_story_events, events_before);
+
+        let mut document = RtfDocument::parse(r#"{\rtf1 body}"#).unwrap();
+        let mut first = crate::Shape::new(crate::ShapeType::Rectangle);
+        first.position = document.text().len();
+        let mut second = crate::Shape::new(crate::ShapeType::Ellipse);
+        second.position = document.text().len();
+        document.add_shape(first).unwrap();
+        document.add_shape(second).unwrap();
+        let drawing_event = document
+            .body_story_events
+            .iter()
+            .rposition(|event| matches!(event, crate::BodyStoryEvent::Drawing(_)))
+            .unwrap();
+        document.body_story_events.remove(drawing_event);
+        let order_before = document.drawing_order.clone();
+        let events_before = document.body_story_events.clone();
+        assert!(document.move_drawing(0, 1).is_err());
+        assert_eq!(document.drawing_order, order_before);
+        assert_eq!(document.body_story_events, events_before);
+    }
+
+    #[test]
+    fn background_mutations_are_total_for_a_corrupt_private_index() {
+        let mut document = RtfDocument::parse(r#"{\rtf1 body}"#).unwrap();
+        let mut shape = crate::Shape::new(crate::ShapeType::Rectangle);
+        shape.position = document.text().len();
+        document.add_shape(shape).unwrap();
+        document.background_shape_index = Some(usize::MAX);
+        let shapes_before = document.shapes.clone();
+
+        assert!(
+            document
+                .set_background_shape(crate::Shape::new(crate::ShapeType::Ellipse))
+                .is_err()
+        );
+        assert_eq!(document.shapes, shapes_before);
+        assert!(document.clear_background_shape().is_none());
+        assert_eq!(document.shapes, shapes_before);
+
+        document.background_shape_index = Some(usize::MAX);
+        document.clear_shapes();
+        assert!(document.shapes.is_empty());
+        assert!(document.drawing_order.is_empty());
+        assert!(document.background_shape_index.is_none());
     }
 
     #[test]

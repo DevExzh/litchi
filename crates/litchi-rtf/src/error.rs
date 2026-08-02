@@ -5,6 +5,21 @@ use std::fmt;
 /// Result type for RTF operations.
 pub type RtfResult<T> = Result<T, RtfError>;
 
+/// Reserve one additional vector element without exposing an allocation panic
+/// as a recoverable model mutation.
+pub(crate) fn try_reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> RtfResult<()> {
+    let requested = values
+        .len()
+        .saturating_add(1)
+        .saturating_mul(std::mem::size_of::<T>());
+    values
+        .try_reserve(1)
+        .map_err(|_| RtfError::AllocationFailed {
+            resource,
+            requested,
+        })
+}
+
 /// RTF parsing errors.
 #[derive(Debug, Clone)]
 #[non_exhaustive]

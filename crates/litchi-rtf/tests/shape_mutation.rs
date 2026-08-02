@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
 use litchi_rtf::{
-    RtfDocument, RtfWriter, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
-    ShapeHorizontalAnchor, ShapeProperty, ShapeRotationDegrees, ShapeTwips, ShapeType,
-    ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing,
+    BodyStoryEvent, RtfDocument, RtfWriter, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild,
+    ShapeGroupInfo, ShapeHorizontalAnchor, ShapeProperty, ShapeRotationDegrees, ShapeTwips,
+    ShapeType, ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing,
 };
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -81,6 +81,66 @@ fn document_shape_find_replace_remove_and_reorder_are_atomic() {
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), "Café");
     assert!(reparsed.find_shape_by_name("updated").is_some());
+}
+
+#[test]
+fn document_group_crud_repairs_root_order_without_tree_clones() {
+    let mut document = RtfDocument::parse(r#"{\rtf1 body}"#).unwrap();
+    let anchor = document.text().len();
+
+    let mut first = named_group("first group", 1);
+    first.position = anchor;
+    assert_eq!(document.add_shape_group(first).unwrap(), 0);
+    let mut standalone = named("standalone", 2);
+    standalone.position = anchor;
+    assert_eq!(document.add_shape(standalone).unwrap(), 0);
+    let mut second = named_group("second group", 3);
+    second.position = anchor;
+    assert_eq!(document.add_shape_group(second).unwrap(), 1);
+    assert_eq!(
+        document.drawing_order(),
+        &[
+            StoryDrawing::ShapeGroup(0),
+            StoryDrawing::Shape(0),
+            StoryDrawing::ShapeGroup(1),
+        ]
+    );
+
+    document.move_drawing(2, 0).unwrap();
+    let before: Vec<_> = document
+        .shape_groups()
+        .iter()
+        .cloned()
+        .map(ShapeGroup::into_owned)
+        .collect();
+    let mut relocated = named_group("invalid", 4);
+    relocated.position = 0;
+    assert!(document.replace_shape_group(0, relocated).is_err());
+    assert_eq!(document.shape_groups(), before);
+
+    let mut replacement = named_group("replacement", 4);
+    replacement.position = anchor;
+    let replaced = document.replace_shape_group(0, replacement).unwrap();
+    assert_eq!(replaced.name, "first group");
+    let removed = document.remove_shape_group(0).unwrap();
+    assert_eq!(removed.name, "replacement");
+    assert_eq!(
+        document.drawing_order(),
+        &[StoryDrawing::ShapeGroup(0), StoryDrawing::Shape(0)]
+    );
+    let event_drawings: Vec<_> = document
+        .body_story_events()
+        .iter()
+        .filter_map(|event| match event {
+            BodyStoryEvent::Drawing(drawing) => Some(*drawing),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(event_drawings, document.drawing_order());
+
+    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    assert!(reparsed.shape_groups()[0].find_shape_by_id(3).is_some());
+    assert!(reparsed.find_shape_by_name("standalone").is_some());
 }
 
 #[test]

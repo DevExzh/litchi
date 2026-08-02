@@ -1285,8 +1285,8 @@ impl<'a> ShapeGroup<'a> {
             ));
         }
         validate_grouped_shape_at_depth(&shape, 1)?;
-        reserve_one(&mut self.shapes, "shape-group shapes")?;
-        reserve_one(&mut self.child_order, "shape-group child order")?;
+        crate::error::try_reserve_one(&mut self.shapes, "shape-group shapes")?;
+        crate::error::try_reserve_one(&mut self.child_order, "shape-group child order")?;
 
         let index = self.shapes.len();
         self.shapes.push(shape);
@@ -1304,8 +1304,8 @@ impl<'a> ShapeGroup<'a> {
             ));
         }
         validate_nested_group_at_depth(&group, 1)?;
-        reserve_one(&mut self.groups, "shape-group nested groups")?;
-        reserve_one(&mut self.child_order, "shape-group child order")?;
+        crate::error::try_reserve_one(&mut self.groups, "shape-group nested groups")?;
+        crate::error::try_reserve_one(&mut self.child_order, "shape-group child order")?;
 
         let index = self.groups.len();
         self.groups.push(group);
@@ -1584,19 +1584,6 @@ fn nested_group_index_error(index: usize) -> crate::RtfError {
     crate::RtfError::MalformedDocument(format!(
         "RTF nested shape-group index {index} is out of bounds"
     ))
-}
-
-fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> crate::RtfResult<()> {
-    let requested = values
-        .len()
-        .saturating_add(1)
-        .saturating_mul(std::mem::size_of::<T>());
-    values
-        .try_reserve(1)
-        .map_err(|_| crate::RtfError::AllocationFailed {
-            resource,
-            requested,
-        })
 }
 
 fn validate_grouped_shape_at_depth(shape: &Shape<'_>, depth: usize) -> crate::RtfResult<()> {
