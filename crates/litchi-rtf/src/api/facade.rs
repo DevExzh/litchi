@@ -123,17 +123,19 @@ impl Document {
         crate::text::Story::new(
             self.inner.model.retained_blocks(),
             self.inner.model.body_boundaries(),
+            self.fonts(),
+            self.colors(),
         )
     }
 
     /// Borrow the document font resources.
-    pub fn fonts(&self) -> &[crate::font::Font<'_>] {
-        self.inner.model.font_table().fonts()
+    pub fn fonts(&self) -> crate::font::Catalog<'_> {
+        crate::font::Catalog::new(self.inner.model.font_table())
     }
 
     /// Borrow the document color resources.
-    pub fn colors(&self) -> &[crate::color::Color] {
-        self.inner.model.color_table().colors()
+    pub fn colors(&self) -> crate::color::Palette<'_> {
+        crate::color::Palette::new(self.inner.model.color_table())
     }
 
     /// Borrow body tables in source order.

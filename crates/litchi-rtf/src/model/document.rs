@@ -886,7 +886,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Get the font table.
-    pub fn font_table(&self) -> &FontTable<'_> {
+    pub fn font_table(&self) -> &FontTable<'a> {
         &self.font_table
     }
 

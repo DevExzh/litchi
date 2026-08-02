@@ -28,7 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, font) in doc.fonts().iter().enumerate() {
         println!(
             "  font[{}] name={:?} family={:?} charset={:?}",
-            i, font.name, font.family, font.charset
+            i,
+            font.name(),
+            font.family(),
+            font.charset()
         );
     }
 
@@ -44,13 +47,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         for inline in paragraph.inlines() {
             match inline {
-                Inline::Text(run) => println!(
-                    "  text={:?} bold={} italic={} underline={:?}",
-                    run.text(),
-                    run.format().bold(),
-                    run.format().italic(),
-                    run.format().underline()
-                ),
+                Inline::Text(run) => {
+                    let format = run.format();
+                    println!(
+                        "  text={:?} font={:?} bold={} italic={} underline={:?}",
+                        run.text(),
+                        format.font().map(|font| font.name()),
+                        format.bold(),
+                        format.italic(),
+                        format.underline()
+                    );
+                },
                 Inline::Break(kind) => println!("  break={kind:?}"),
                 _ => println!("  other inline content"),
             }

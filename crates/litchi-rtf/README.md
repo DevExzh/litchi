@@ -7,9 +7,10 @@ Parser and writer for the Rich Text Format (RTF), targeting the RTF 1.9.1 specif
 This crate provides a bounded RTF reader and streaming writer with an
 immutable, cheap-to-share `Document` facade. Borrowed semantic views traverse
 paragraphs, runs, and structural breaks without first flattening the retained
-document. The advanced retained model covers tables, lists, sections, fields,
-pictures, shapes, and stylesheets. The crate also handles the compressed RTF
-transport used inside MAPI messages.
+document. Borrowed font catalogs and color palettes resolve run formatting
+without exposing numeric RTF table IDs. The advanced retained model covers
+tables, lists, sections, fields, pictures, shapes, and stylesheets. The crate
+also handles the compressed RTF transport used inside MAPI messages.
 
 ## Usage
 
@@ -28,6 +29,12 @@ assert_eq!(doc.text(), "Hello World!\n");
 for paragraph in doc.body().paragraphs() {
     println!("{paragraph}");
 }
+
+let first_run = doc.body().runs().next().expect("body text");
+assert_eq!(
+    first_run.format().font().map(|font| font.name()),
+    Some("Helvetica")
+);
 # Ok::<(), litchi_rtf::Error>(())
 ```
 
@@ -39,6 +46,8 @@ for paragraph in doc.body().paragraphs() {
 - Compressed RTF (`MS-OXRTFCP`) encode/decode
 - Immutable, cheap-to-share `Document` snapshots for ordinary reads
 - Lazy borrowed `text::Story`, paragraph, inline, and run traversal
+- Sparse-safe `font::Catalog` and checked `color::Palette` resource views
+- Semantic run font/color resolution without numeric table references
 - Distinct semantic paragraph (`\\par`) and line (`\\line`) boundaries
 - Concise `read`, `write`, and `transport` modules for format operations
 - Streaming `write::Writer` with configurable `write::Options`
@@ -51,6 +60,7 @@ list:
 - `api`: the immutable facade and borrowed semantic story views
 - `codec`: compressed transport, limits, lexer, parser, and writer
 - `model`: retained document storage and native value types
+- `resource`: borrowed font catalogs and color palettes
 - `text`, `content`, and `drawing`: authored document content
 - `review`, `metadata`, `numbering`, and `policy`: supporting document state
 

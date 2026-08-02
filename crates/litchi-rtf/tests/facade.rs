@@ -3,10 +3,15 @@ use litchi_rtf::{Document, read};
 use litchi_rtf::{text, text::Inline};
 
 fn assert_snapshot_traits<T: Clone + Send + Sync>() {}
+fn assert_borrowed_view_traits<T: Copy + Send + Sync>() {}
 
 #[test]
 fn document_is_a_small_shared_snapshot() {
     assert_snapshot_traits::<Document>();
+    assert_borrowed_view_traits::<litchi_rtf::font::Catalog<'static>>();
+    assert_borrowed_view_traits::<litchi_rtf::font::Font<'static>>();
+    assert_borrowed_view_traits::<litchi_rtf::color::Palette<'static>>();
+    assert_borrowed_view_traits::<litchi_rtf::color::Value>();
     assert_eq!(
         std::mem::size_of::<Document>(),
         std::mem::size_of::<usize>()
@@ -40,6 +45,82 @@ fn snapshot_round_trips_through_concise_writer() {
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.fonts().len(), 1);
     assert!(!reparsed.is_empty());
+}
+
+#[test]
+fn font_catalog_hides_sparse_rtf_slots_and_resolves_runs() {
+    let document = Document::parse(
+        r"{\rtf1\ansi{\fonttbl{\f7\fswiss Sparse Sans;}{\f42\froman Story Serif;}}\f42 text}",
+    )
+    .unwrap();
+
+    let fonts = document.fonts();
+    assert_eq!(fonts.len(), 2);
+    assert_eq!(fonts.iter().count(), 2);
+    assert_eq!(fonts.at(0).map(|font| font.name()), Some("Sparse Sans"));
+    assert_eq!(fonts.at(1).map(|font| font.name()), Some("Story Serif"));
+    assert!(fonts.at(2).is_none());
+    assert_eq!(
+        fonts.find("Story Serif").unwrap().map(|font| font.name()),
+        Some("Story Serif")
+    );
+    assert!(fonts.find("missing").unwrap().is_none());
+
+    let run = document.body().runs().next().unwrap();
+    assert_eq!(
+        run.format().font().map(|font| font.name()),
+        Some("Story Serif")
+    );
+}
+
+#[test]
+fn font_lookup_reports_ambiguous_names() {
+    let document =
+        Document::parse(r"{\rtf1\ansi{\fonttbl{\f1\fswiss Shared;}{\f9\froman Shared;}}\f1 text}")
+            .unwrap();
+
+    assert!(matches!(
+        document.fonts().find("Shared"),
+        Err(litchi_rtf::font::LookupError::AmbiguousName)
+    ));
+}
+
+#[test]
+fn run_format_resolves_checked_color_values() {
+    let document = Document::parse(
+        r"{\rtf1\ansi{\fonttbl{\f0\fnil Arial;}}{\colortbl;\red12\green34\blue56;}\f0\cf1\cb1\highlight1\ul\ulc1 colored}",
+    )
+    .unwrap();
+
+    let expected = litchi_rtf::color::Color::new(12, 34, 56);
+    let colors = document.colors();
+    assert_eq!(colors.len(), 2);
+    assert_eq!(colors.at(0), Some(litchi_rtf::color::Value::Automatic));
+    assert_eq!(colors.at(1), Some(litchi_rtf::color::Value::Rgb(expected)));
+    assert_eq!(
+        colors.iter().next_back(),
+        Some(litchi_rtf::color::Value::Rgb(expected))
+    );
+
+    let format = document.body().runs().next().unwrap().format();
+    assert_eq!(
+        format.foreground(),
+        Some(litchi_rtf::color::Value::Rgb(expected))
+    );
+    assert_eq!(format.foreground_color(), Some(expected));
+    assert_eq!(format.background_color(), Some(expected));
+    assert_eq!(format.highlight_color(), Some(expected));
+    assert_eq!(format.underline_color(), Some(expected));
+
+    let reparsed = Document::from_bytes(&document.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reparsed.colors().at(0),
+        Some(litchi_rtf::color::Value::Automatic)
+    );
+    assert_eq!(
+        reparsed.colors().at(1),
+        Some(litchi_rtf::color::Value::Rgb(expected))
+    );
 }
 
 #[test]

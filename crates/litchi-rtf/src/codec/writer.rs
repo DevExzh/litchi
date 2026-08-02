@@ -1933,10 +1933,15 @@ impl<W: Write> RtfWriter<W> {
 
         // Clone colors to avoid borrowing issues
         let colors: Vec<_> = self.color_table.colors().to_vec();
-        for color in &colors {
-            self.write_control_word("red", Some(color.red as i32))?;
-            self.write_control_word("green", Some(color.green as i32))?;
-            self.write_control_word("blue", Some(color.blue as i32))?;
+        for (index, color) in colors.iter().enumerate() {
+            let automatic = u16::try_from(index)
+                .ok()
+                .is_some_and(|reference| self.color_table.is_automatic(reference));
+            if !automatic {
+                self.write_control_word("red", Some(color.red as i32))?;
+                self.write_control_word("green", Some(color.green as i32))?;
+                self.write_control_word("blue", Some(color.blue as i32))?;
+            }
             self.write_str(";")?;
         }
 

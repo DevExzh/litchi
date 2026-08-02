@@ -16419,34 +16419,46 @@ impl<'a> Parser<'a> {
         let mut current_red = 0;
         let mut current_green = 0;
         let mut current_blue = 0;
+        let mut has_component = false;
 
         while let Some(token) = self.tokens.get(self.pos) {
             match token {
                 Token::CloseBrace => {
-                    // Add final color if any
-                    let color = Color::new(current_red, current_green, current_blue);
-                    self.color_table.borrow_mut().add(color);
+                    // Retain a lenient unterminated final RGB entry, but do not
+                    // invent a trailing black entry after the normal `;`.
+                    if has_component {
+                        let color = Color::new(current_red, current_green, current_blue);
+                        self.color_table.borrow_mut().add(color);
+                    }
                     return Ok(());
                 },
                 Token::Control(ControlWord::Red(r)) => {
                     current_red = (*r).clamp(0, 255) as u8;
+                    has_component = true;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::Green(g)) => {
                     current_green = (*g).clamp(0, 255) as u8;
+                    has_component = true;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::Blue(b)) => {
                     current_blue = (*b).clamp(0, 255) as u8;
+                    has_component = true;
                     self.pos += 1;
                 },
                 Token::Text(text) if text.trim() == ";" => {
-                    // Color separator - add current color
-                    let color = Color::new(current_red, current_green, current_blue);
-                    self.color_table.borrow_mut().add(color);
+                    // An empty entry is the RTF automatic/default color.
+                    if has_component {
+                        let color = Color::new(current_red, current_green, current_blue);
+                        self.color_table.borrow_mut().add(color);
+                    } else {
+                        self.color_table.borrow_mut().add_automatic();
+                    }
                     current_red = 0;
                     current_green = 0;
                     current_blue = 0;
+                    has_component = false;
                     self.pos += 1;
                 },
                 _ => {

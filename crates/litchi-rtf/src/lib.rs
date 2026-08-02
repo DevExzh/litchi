@@ -31,6 +31,7 @@
 //! - `codec` owns bounded transport decoding, tokenization, parsing, and
 //!   serialization.
 //! - `model` owns the retained lossless RTF snapshot used by [`raw`].
+//! - `resource` owns borrowed font and color facades.
 //! - `text`, `content`, `drawing`, `review`, `metadata`, `numbering`, and
 //!   `policy` group the corresponding native RTF vocabularies.
 //!
@@ -60,6 +61,7 @@ pub mod metadata;
 mod model;
 mod numbering;
 mod policy;
+mod resource;
 pub mod review;
 pub mod text;
 
@@ -135,16 +137,16 @@ pub mod raw {
 
 /// Font resources and checked references.
 pub mod font {
+    pub use crate::resource::font::{Catalog, Embedded, Font, Iter, LookupError};
     pub use crate::types::{
-        EmbeddedFont as Embedded, EmbeddedFontFormat as EmbeddedFormat, Font,
-        FontCharset as Charset, FontFamily as Family, FontPage as Page, FontPitch as Pitch,
-        FontTheme as Theme,
+        EmbeddedFontFormat as EmbeddedFormat, FontCharset as Charset, FontFamily as Family,
+        FontPage as Page, FontPitch as Pitch, FontTheme as Theme,
     };
 }
 
 /// Color resources and checked references.
 pub mod color {
-    pub use crate::types::Color;
+    pub use crate::resource::color::{Color, Iter, Palette, Value};
 }
 
 /// Named document styles and stylesheet policy values.

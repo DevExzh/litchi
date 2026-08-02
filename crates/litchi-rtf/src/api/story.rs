@@ -39,11 +39,23 @@ impl Boundary {
 pub struct Story<'a> {
     blocks: &'a [StyleBlock<'static>],
     boundaries: &'a [Boundary],
+    fonts: crate::font::Catalog<'a>,
+    colors: crate::color::Palette<'a>,
 }
 
 impl<'a> Story<'a> {
-    pub(crate) const fn new(blocks: &'a [StyleBlock<'static>], boundaries: &'a [Boundary]) -> Self {
-        Self { blocks, boundaries }
+    pub(crate) const fn new(
+        blocks: &'a [StyleBlock<'static>],
+        boundaries: &'a [Boundary],
+        fonts: crate::font::Catalog<'a>,
+        colors: crate::color::Palette<'a>,
+    ) -> Self {
+        Self {
+            blocks,
+            boundaries,
+            fonts,
+            colors,
+        }
     }
 
     /// Number of UTF-8 bytes in the visible retained story text.
@@ -71,6 +83,16 @@ impl<'a> Story<'a> {
         Runs {
             inlines: self.inlines(),
         }
+    }
+
+    /// Borrow the font catalog used to resolve this story's runs.
+    pub const fn fonts(self) -> crate::font::Catalog<'a> {
+        self.fonts
+    }
+
+    /// Borrow the color palette used to resolve this story's runs.
+    pub const fn colors(self) -> crate::color::Palette<'a> {
+        self.colors
     }
 
     /// Write flattened plain text without allocating an intermediate string.
@@ -400,6 +422,8 @@ impl<'a> Iterator for Inlines<'a> {
             return Some(Inline::Text(Run {
                 text,
                 format: &block.formatting,
+                fonts: self.story.fonts,
+                colors: self.story.colors,
             }));
         }
         None
@@ -442,6 +466,8 @@ impl FusedIterator for Runs<'_> {}
 pub struct Run<'a> {
     text: &'a str,
     format: &'a RawFormat,
+    fonts: crate::font::Catalog<'a>,
+    colors: crate::color::Palette<'a>,
 }
 
 impl<'a> Run<'a> {
@@ -452,7 +478,11 @@ impl<'a> Run<'a> {
 
     /// Read this run's local character formatting.
     pub const fn format(self) -> Format<'a> {
-        Format { raw: self.format }
+        Format {
+            raw: self.format,
+            fonts: self.fonts,
+            colors: self.colors,
+        }
     }
 }
 
@@ -466,9 +496,11 @@ impl fmt::Display for Run<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct Format<'a> {
     raw: &'a RawFormat,
+    fonts: crate::font::Catalog<'a>,
+    colors: crate::color::Palette<'a>,
 }
 
-impl Format<'_> {
+impl<'a> Format<'a> {
     /// Whether bold formatting is active.
     pub const fn bold(self) -> bool {
         self.raw.bold
@@ -487,6 +519,73 @@ impl Format<'_> {
     /// Font size in half-points.
     pub const fn size(self) -> NonZeroU16 {
         self.raw.font_size
+    }
+
+    /// Resolve the run's font definition without exposing its numeric RTF ID.
+    ///
+    /// `None` means that the retained reference has no corresponding font-table
+    /// definition.
+    pub fn font(self) -> Option<crate::font::Font<'a>> {
+        self.fonts.resolve(self.raw.font_ref)
+    }
+
+    /// Resolve the local foreground selection, including automatic color.
+    pub fn foreground(self) -> Option<crate::color::Value> {
+        self.colors.resolve(self.raw.color_ref)
+    }
+
+    /// Resolve the explicitly authored character background selection.
+    pub fn background(self) -> Option<crate::color::Value> {
+        self.raw
+            .background_color
+            .and_then(|reference| self.colors.resolve(reference))
+    }
+
+    /// Resolve the explicitly authored highlight selection.
+    pub fn highlight(self) -> Option<crate::color::Value> {
+        self.raw
+            .highlight_color
+            .and_then(|reference| self.colors.resolve(reference))
+    }
+
+    /// Resolve the explicitly authored underline color selection.
+    pub fn underline_paint(self) -> Option<crate::color::Value> {
+        self.raw
+            .underline_color
+            .and_then(|reference| self.colors.resolve(reference))
+    }
+
+    /// Resolve the explicit foreground RGB value.
+    ///
+    /// Automatic color and an unresolved reference both return `None`; use
+    /// [`Self::foreground`] when that distinction matters.
+    pub fn foreground_color(self) -> Option<crate::color::Color> {
+        self.foreground().and_then(crate::color::Value::color)
+    }
+
+    /// Resolve the explicitly authored background RGB value.
+    ///
+    /// Automatic color and an unresolved reference both return `None`; use
+    /// [`Self::background`] when that distinction matters.
+    pub fn background_color(self) -> Option<crate::color::Color> {
+        self.background().and_then(crate::color::Value::color)
+    }
+
+    /// Resolve the explicitly authored highlight RGB value.
+    ///
+    /// Automatic color and an unresolved reference both return `None`; use
+    /// [`Self::highlight`] when that distinction matters.
+    pub fn highlight_color(self) -> Option<crate::color::Color> {
+        self.highlight().and_then(crate::color::Value::color)
+    }
+
+    /// Resolve the explicitly authored underline RGB value.
+    ///
+    /// Automatic color, an unresolved reference, and the RTF default where the
+    /// underline uses the foreground color all return `None`; use
+    /// [`Self::underline_paint`] when the authored distinction matters.
+    pub fn underline_color(self) -> Option<crate::color::Color> {
+        self.underline_paint().and_then(crate::color::Value::color)
     }
 
     /// Whether the run is hidden text.

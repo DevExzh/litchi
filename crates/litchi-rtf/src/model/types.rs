@@ -47,13 +47,17 @@ impl Color {
 #[derive(Debug, Clone)]
 pub struct ColorTable {
     colors: Vec<Color>,
+    automatic: Vec<bool>,
 }
 
 impl ColorTable {
     /// Create a new color table.
     #[inline]
     pub fn new() -> Self {
-        Self { colors: Vec::new() }
+        Self {
+            colors: Vec::new(),
+            automatic: Vec::new(),
+        }
     }
 
     /// Add a color to the table and return its index.
@@ -61,6 +65,16 @@ impl ColorTable {
     pub fn add(&mut self, color: Color) -> ColorRef {
         let index = self.colors.len() as ColorRef;
         self.colors.push(color);
+        self.automatic.push(false);
+        index
+    }
+
+    /// Add the automatic/default color entry and return its index.
+    #[inline]
+    pub fn add_automatic(&mut self) -> ColorRef {
+        let index = self.colors.len() as ColorRef;
+        self.colors.push(Color::default());
+        self.automatic.push(true);
         index
     }
 
@@ -68,6 +82,16 @@ impl ColorTable {
     #[inline]
     pub fn get(&self, color_ref: ColorRef) -> Option<&Color> {
         self.colors.get(color_ref as usize)
+    }
+
+    /// Whether a reference denotes the automatic/default color.
+    #[inline]
+    pub fn is_automatic(&self, color_ref: ColorRef) -> bool {
+        self.is_automatic_at(usize::from(color_ref))
+    }
+
+    pub(crate) fn is_automatic_at(&self, position: usize) -> bool {
+        self.automatic.get(position).copied().unwrap_or(false)
     }
 
     /// Get all colors in the table.
@@ -1672,6 +1696,18 @@ mod tests {
         assert_eq!(idx1, 0);
         assert_eq!(idx2, 1);
         assert_eq!(table.colors().len(), 2);
+    }
+
+    #[test]
+    fn test_color_table_preserves_automatic_entries() {
+        let mut table = ColorTable::new();
+        let automatic = table.add_automatic();
+        let explicit = table.add(Color::black());
+
+        assert!(table.is_automatic(automatic));
+        assert!(!table.is_automatic(explicit));
+        assert_eq!(table.get(automatic), Some(&Color::black()));
+        assert_eq!(table.get(explicit), Some(&Color::black()));
     }
 
     #[test]
