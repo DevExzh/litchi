@@ -460,11 +460,6 @@ pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
 pub use sheet_ext::{XlsSheetExt, XlsSheetExtOptional};
 pub use sheet_layout::XlsWorksheetLayout;
 pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
-pub use sort_data::{
-    CONTINUE_FRT12_RECORD_TYPE, SORT_DATA_RECORD_TYPE, XlsDifferentialFormatIndex,
-    XlsSortCondition, XlsSortData, XlsSortIcon, XlsSortIconSet, XlsSortMethod, XlsSortOn,
-    XlsSortOrientation, XlsSortParent, XlsSortRange, parse_sort_data,
-};
 pub use style_ext::{XlsStyleCategory, XlsStyleExt};
 pub use sxview_link::XlsSXViewLink;
 pub use table_styles::{
@@ -483,7 +478,7 @@ pub use workbook::{XlsOpenOptions, XlsWorkbook};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use worksheet::XlsWorksheet;
 pub use writer::{
-    XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
-    XlsShapeTextRun, XlsShapeWrite, XlsWriter,
+    XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun,
+    XlsShapeWrite, XlsWriter,
 };
 pub use xf_ext::{XlsExtProp, XlsFullColorExt, XlsFullColorType, XlsXfExt};

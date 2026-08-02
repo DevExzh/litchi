@@ -6,6 +6,7 @@
 
 use crate::{XlsError, XlsResult};
 use std::io::Write;
+use std::ops::RangeInclusive;
 
 /// `SortData` record identifier.
 pub const SORT_DATA_RECORD_TYPE: u16 = 0x0895;
@@ -21,6 +22,18 @@ const MAX_COLUMN_INDEX: u32 = 0x0000_3fff;
 
 fn invalid(message: impl Into<String>) -> XlsError {
     XlsError::InvalidData(message.into())
+}
+
+const fn allocation(context: &'static str) -> XlsError {
+    XlsError::Allocation(context)
+}
+
+fn copy_bytes(data: &[u8], context: &'static str) -> XlsResult<Vec<u8>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(data.len())
+        .map_err(|_| allocation(context))?;
+    copy.extend_from_slice(data);
+    Ok(copy)
 }
 
 fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
@@ -47,93 +60,211 @@ fn read_i32(data: &[u8], offset: usize) -> XlsResult<i32> {
     Ok(read_u32(data, offset)? as i32)
 }
 
-/// A validated `RFX` cell range used by extended sorting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsSortRange {
-    first_row: u32,
-    last_row: u32,
-    first_column: u32,
-    last_column: u32,
+/// Checked native value for the signed four-byte `[MS-XLS]` `Rw12` field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct Rw12(u32);
+
+impl Rw12 {
+    fn new(value: u32) -> XlsResult<Self> {
+        if value > MAX_ROW_INDEX {
+            return Err(invalid("sort row exceeds the Rw12 maximum"));
+        }
+        Ok(Self(value))
+    }
+
+    const fn index(self) -> u32 {
+        self.0
+    }
+
+    fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
+        let value = read_i32(data, offset)?;
+        let value = u32::try_from(value).map_err(|_| invalid("sort Rw12 is negative"))?;
+        Self::new(value)
+    }
+
+    fn write_to(self, output: &mut Vec<u8>) {
+        output.extend_from_slice(&self.0.to_le_bytes());
+    }
 }
 
-impl XlsSortRange {
-    /// Creates a range, enforcing the `Rw12`, `Col12`, and ordering bounds.
-    pub fn new(
-        first_row: u32,
-        last_row: u32,
-        first_column: u32,
-        last_column: u32,
-    ) -> XlsResult<Self> {
+/// Checked native value for the signed four-byte `[MS-XLS]` `Col12` field.
+///
+/// The wire field is four bytes, but its valid domain fits in two bytes. The
+/// retained representation therefore does not pay for impossible values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct Col12(u16);
+
+impl Col12 {
+    fn new(value: u32) -> XlsResult<Self> {
+        if value > MAX_COLUMN_INDEX {
+            return Err(invalid("sort column exceeds the Col12 maximum"));
+        }
+        let value = u16::try_from(value)
+            .map_err(|_| invalid("sort column cannot be represented by Col12"))?;
+        Ok(Self(value))
+    }
+
+    const fn index(self) -> u16 {
+        self.0
+    }
+
+    fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
+        let value = read_i32(data, offset)?;
+        let value = u32::try_from(value).map_err(|_| invalid("sort Col12 is negative"))?;
+        Self::new(value)
+    }
+
+    fn write_to(self, output: &mut Vec<u8>) {
+        output.extend_from_slice(&u32::from(self.0).to_le_bytes());
+    }
+}
+
+/// A checked row in the extended `Rw12` domain (`0..=1_048_575`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Row(Rw12);
+
+impl Row {
+    /// Check a zero-based row index without applying the smaller BIFF8 cell grid.
+    pub fn new(index: u32) -> XlsResult<Self> {
+        Rw12::new(index).map(Self)
+    }
+
+    /// Return the zero-based row index.
+    pub const fn index(self) -> u32 {
+        self.0.index()
+    }
+}
+
+/// A checked column in the extended `Col12` domain (`0..=16_383`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Col(Col12);
+
+impl Col {
+    /// Check a zero-based column index without applying the smaller BIFF8 cell grid.
+    pub fn new(index: u32) -> XlsResult<Self> {
+        Col12::new(index).map(Self)
+    }
+
+    /// Return the zero-based column index.
+    pub const fn index(self) -> u16 {
+        self.0.index()
+    }
+}
+
+/// A validated `RFX` cell range used by extended sorting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Range {
+    first_row: Rw12,
+    last_row: Rw12,
+    first_col: Col12,
+    last_col: Col12,
+}
+
+impl Range {
+    /// Create an inclusive range with the complete `Rw12` and `Col12` domains.
+    ///
+    /// `Range::new(1..=20, 0..=4)` is rows 2 through 21 and columns A through E.
+    pub fn new(rows: RangeInclusive<u32>, cols: RangeInclusive<u32>) -> XlsResult<Self> {
+        let first_row = Rw12::new(*rows.start())?;
+        let last_row = Rw12::new(*rows.end())?;
+        let first_col = Col12::new(*cols.start())?;
+        let last_col = Col12::new(*cols.end())?;
         if first_row > last_row {
-            return Err(invalid("SortData first row exceeds last row"));
+            return Err(invalid("sort range first row exceeds last row"));
         }
-        if first_column > last_column {
-            return Err(invalid("SortData first column exceeds last column"));
-        }
-        if last_row > MAX_ROW_INDEX {
-            return Err(invalid("SortData row exceeds the Rw12 maximum"));
-        }
-        if last_column > MAX_COLUMN_INDEX {
-            return Err(invalid("SortData column exceeds the Col12 maximum"));
+        if first_col > last_col {
+            return Err(invalid("sort range first column exceeds last column"));
         }
         Ok(Self {
             first_row,
             last_row,
-            first_column,
-            last_column,
+            first_col,
+            last_col,
         })
     }
 
-    pub fn first_row(self) -> u32 {
-        self.first_row
+    /// Return the first row.
+    pub const fn first_row(self) -> Row {
+        Row(self.first_row)
     }
 
-    pub fn last_row(self) -> u32 {
-        self.last_row
+    /// Return the last row.
+    pub const fn last_row(self) -> Row {
+        Row(self.last_row)
     }
 
-    pub fn first_column(self) -> u32 {
-        self.first_column
+    /// Return the first column.
+    pub const fn first_col(self) -> Col {
+        Col(self.first_col)
     }
 
-    pub fn last_column(self) -> u32 {
-        self.last_column
+    /// Return the last column.
+    pub const fn last_col(self) -> Col {
+        Col(self.last_col)
+    }
+
+    const fn contains(self, other: Self) -> bool {
+        self.first_row.0 <= other.first_row.0
+            && other.last_row.0 <= self.last_row.0
+            && self.first_col.0 <= other.first_col.0
+            && other.last_col.0 <= self.last_col.0
     }
 
     fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
-        Self::new(
-            read_u32(data, offset)?,
-            read_u32(data, offset + 4)?,
-            read_u32(data, offset + 8)?,
-            read_u32(data, offset + 12)?,
-        )
+        let first_row = Rw12::parse(data, offset)?;
+        let last_row = Rw12::parse(data, offset + 4)?;
+        let first_col = Col12::parse(data, offset + 8)?;
+        let last_col = Col12::parse(data, offset + 12)?;
+        if first_row > last_row {
+            return Err(invalid("sort range first row exceeds last row"));
+        }
+        if first_col > last_col {
+            return Err(invalid("sort range first column exceeds last column"));
+        }
+        Ok(Self {
+            first_row,
+            last_row,
+            first_col,
+            last_col,
+        })
     }
 
     fn write_to(self, output: &mut Vec<u8>) {
-        output.extend_from_slice(&self.first_row.to_le_bytes());
-        output.extend_from_slice(&self.last_row.to_le_bytes());
-        output.extend_from_slice(&self.first_column.to_le_bytes());
-        output.extend_from_slice(&self.last_column.to_le_bytes());
+        self.first_row.write_to(output);
+        self.last_row.write_to(output);
+        self.first_col.write_to(output);
+        self.last_col.write_to(output);
+    }
+
+    fn bytes(self) -> [u8; 16] {
+        let mut bytes = [0; 16];
+        bytes[..4].copy_from_slice(&self.first_row.0.to_le_bytes());
+        bytes[4..8].copy_from_slice(&self.last_row.0.to_le_bytes());
+        bytes[8..12].copy_from_slice(&u32::from(self.first_col.0).to_le_bytes());
+        bytes[12..].copy_from_slice(&u32::from(self.last_col.0).to_le_bytes());
+        bytes
     }
 }
 
-/// Whether fields identify rows or columns to reorder.
+/// Axis whose cells are reordered by the sort.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsSortOrientation {
+pub enum Axis {
+    /// Top-to-bottom: reorder rows using column keys.
     Rows,
-    Columns,
+    /// Left-to-right: reorder columns using row keys.
+    Cols,
 }
 
 /// Character-order versus locale-specific alternate sorting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsSortMethod {
+pub enum Method {
     CharacterOrder,
     Alternate,
 }
 
 /// Object which owns the sort field (`sfp` and `idParent`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsSortParent {
+pub enum Parent {
     Sheet,
     Table { id: u32 },
     AutoFilter,
@@ -142,9 +273,9 @@ pub enum XlsSortParent {
 
 /// A DXF table index used by color-based sorting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsDifferentialFormatIndex(u32);
+pub struct Dxf(u32);
 
-impl XlsDifferentialFormatIndex {
+impl Dxf {
     pub const fn new(index: u32) -> Self {
         Self(index)
     }
@@ -156,7 +287,7 @@ impl XlsDifferentialFormatIndex {
 
 /// Icon sets allowed by the `KPISets` enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsSortIconSet {
+pub enum IconSet {
     NoIcon,
     ThreeArrows,
     ThreeArrowsGray,
@@ -177,7 +308,7 @@ pub enum XlsSortIconSet {
     FiveQuarters,
 }
 
-impl XlsSortIconSet {
+impl IconSet {
     fn code(self) -> u32 {
         match self {
             Self::NoIcon => u32::MAX,
@@ -228,7 +359,7 @@ impl XlsSortIconSet {
 
 /// Icon ordinal used by icon-set sorting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsSortIcon {
+pub enum Icon {
     NoIcon,
     First,
     Second,
@@ -237,7 +368,7 @@ pub enum XlsSortIcon {
     Fifth,
 }
 
-impl XlsSortIcon {
+impl Icon {
     fn code(self) -> i32 {
         match self {
             Self::NoIcon => -1,
@@ -264,128 +395,247 @@ impl XlsSortIcon {
 
 /// The criterion used by a `SortCond12` entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsSortOn {
-    Values {
-        custom_list: Option<String>,
+pub enum On {
+    Values { custom_list: Option<String> },
+    CellColor { differential_format: Dxf },
+    FontColor { differential_format: Dxf },
+    Icon { set: IconSet, icon: Icon },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyRange {
+    Col {
+        first_row: Rw12,
+        last_row: Rw12,
+        col: Col12,
     },
-    CellColor {
-        differential_format: XlsDifferentialFormatIndex,
-    },
-    FontColor {
-        differential_format: XlsDifferentialFormatIndex,
-    },
-    Icon {
-        set: XlsSortIconSet,
-        icon: XlsSortIcon,
+    Row {
+        row: Rw12,
+        first_col: Col12,
+        last_col: Col12,
     },
 }
 
-/// One extended sort condition.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsSortCondition {
-    range: XlsSortRange,
-    descending: bool,
-    sort_on: XlsSortOn,
-}
-
-impl XlsSortCondition {
-    pub fn new(range: XlsSortRange, descending: bool, sort_on: XlsSortOn) -> Self {
-        Self {
-            range,
-            descending,
-            sort_on,
+impl KeyRange {
+    const fn axis(self) -> Axis {
+        match self {
+            Self::Col { .. } => Axis::Rows,
+            Self::Row { .. } => Axis::Cols,
         }
     }
 
-    pub fn range(&self) -> XlsSortRange {
-        self.range
+    const fn range(self) -> Range {
+        match self {
+            Self::Col {
+                first_row,
+                last_row,
+                col,
+            } => Range {
+                first_row,
+                last_row,
+                first_col: col,
+                last_col: col,
+            },
+            Self::Row {
+                row,
+                first_col,
+                last_col,
+            } => Range {
+                first_row: row,
+                last_row: row,
+                first_col,
+                last_col,
+            },
+        }
+    }
+}
+
+/// One checked sort key.
+///
+/// Use [`Key::col`] when rows are reordered and [`Key::row`] when columns are
+/// reordered. A key cannot represent an ambiguous two-dimensional rectangle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Key {
+    range: KeyRange,
+    descending: bool,
+    on: On,
+}
+
+impl Key {
+    /// Create a column key for a top-to-bottom row sort.
+    pub fn col(range: Range, descending: bool, on: On) -> XlsResult<Self> {
+        if range.first_col != range.last_col {
+            return Err(invalid("column sort key must contain exactly one column"));
+        }
+        Self::new(
+            KeyRange::Col {
+                first_row: range.first_row,
+                last_row: range.last_row,
+                col: range.first_col,
+            },
+            descending,
+            on,
+        )
     }
 
-    pub fn is_descending(&self) -> bool {
+    /// Create a row key for a left-to-right column sort.
+    pub fn row(range: Range, descending: bool, on: On) -> XlsResult<Self> {
+        if range.first_row != range.last_row {
+            return Err(invalid("row sort key must contain exactly one row"));
+        }
+        Self::new(
+            KeyRange::Row {
+                row: range.first_row,
+                first_col: range.first_col,
+                last_col: range.last_col,
+            },
+            descending,
+            on,
+        )
+    }
+
+    fn new(range: KeyRange, descending: bool, on: On) -> XlsResult<Self> {
+        validate_on(&on)?;
+        Ok(Self {
+            range,
+            descending,
+            on,
+        })
+    }
+
+    /// Return the axis this key can sort.
+    pub const fn axis(&self) -> Axis {
+        self.range.axis()
+    }
+
+    /// Return the key's inclusive range.
+    pub const fn range(&self) -> Range {
+        self.range.range()
+    }
+
+    /// Return whether this key sorts descending.
+    pub const fn descending(&self) -> bool {
         self.descending
     }
 
-    pub fn sort_on(&self) -> &XlsSortOn {
-        &self.sort_on
+    /// Borrow the criterion applied by this key.
+    pub const fn on(&self) -> &On {
+        &self.on
     }
 }
 
 /// Complete extended sorting metadata represented by one BIFF record group.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsSortData {
-    range: XlsSortRange,
-    orientation: XlsSortOrientation,
+pub struct Config {
+    range: Range,
+    axis: Axis,
     case_sensitive: bool,
-    method: XlsSortMethod,
-    parent: XlsSortParent,
-    conditions: Vec<XlsSortCondition>,
+    method: Method,
+    parent: Parent,
+    keys: Vec<Key>,
 }
 
-impl XlsSortData {
-    pub fn new(range: XlsSortRange, parent: XlsSortParent) -> Self {
+impl Config {
+    /// Create an empty top-to-bottom sort for `range`.
+    pub fn new(range: Range, parent: Parent) -> Self {
         Self {
             range,
-            orientation: XlsSortOrientation::Rows,
+            axis: Axis::Rows,
             case_sensitive: false,
-            method: XlsSortMethod::CharacterOrder,
+            method: Method::CharacterOrder,
             parent,
-            conditions: Vec::new(),
+            keys: Vec::new(),
         }
     }
 
-    pub fn set_orientation(&mut self, orientation: XlsSortOrientation) {
-        self.orientation = orientation;
+    /// Replace the reordered axis after validating every retained key.
+    ///
+    /// On failure, the configuration is unchanged.
+    pub fn put_axis(&mut self, axis: Axis) -> XlsResult<Axis> {
+        if self.keys.iter().any(|key| key.axis() != axis) {
+            return Err(invalid(
+                "sort axis does not match its retained key direction",
+            ));
+        }
+        Ok(std::mem::replace(&mut self.axis, axis))
     }
 
-    pub fn set_case_sensitive(&mut self, case_sensitive: bool) {
+    /// Set case-sensitive comparison.
+    pub fn set_case(&mut self, case_sensitive: bool) {
         self.case_sensitive = case_sensitive;
     }
 
-    pub fn set_method(&mut self, method: XlsSortMethod) {
+    /// Select the character-order or alternate comparison method.
+    pub fn set_method(&mut self, method: Method) {
         self.method = method;
     }
 
-    pub fn add_condition(&mut self, condition: XlsSortCondition) {
-        self.conditions.push(condition);
+    /// Append a checked key.
+    ///
+    /// The key direction and containment are checked before `self` changes.
+    pub fn add(&mut self, key: Key) -> XlsResult<()> {
+        if key.axis() != self.axis {
+            return Err(invalid("sort key direction does not match the sort axis"));
+        }
+        if !self.range.contains(key.range()) {
+            return Err(invalid("sort key is outside the range being sorted"));
+        }
+        let next_len = self
+            .keys
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| allocation("computing the next sort-key count"))?;
+        u32::try_from(next_len).map_err(|_| invalid("SortData has more than u32::MAX keys"))?;
+        self.keys
+            .try_reserve(1)
+            .map_err(|_| allocation("reserving storage for a sort key"))?;
+        self.keys.push(key);
+        Ok(())
     }
 
-    pub fn range(&self) -> XlsSortRange {
+    /// Return the range being sorted.
+    pub const fn range(&self) -> Range {
         self.range
     }
 
-    pub fn orientation(&self) -> XlsSortOrientation {
-        self.orientation
+    /// Return the reordered axis.
+    pub const fn axis(&self) -> Axis {
+        self.axis
     }
 
-    pub fn is_case_sensitive(&self) -> bool {
+    /// Return whether comparison is case-sensitive.
+    pub const fn case_sensitive(&self) -> bool {
         self.case_sensitive
     }
 
-    pub fn method(&self) -> XlsSortMethod {
+    /// Return the comparison method.
+    pub const fn method(&self) -> Method {
         self.method
     }
 
-    pub fn parent(&self) -> XlsSortParent {
+    /// Return the owning object.
+    pub const fn parent(&self) -> Parent {
         self.parent
     }
 
-    pub fn conditions(&self) -> &[XlsSortCondition] {
-        &self.conditions
+    /// Borrow the keys in priority order.
+    pub fn keys(&self) -> &[Key] {
+        &self.keys
     }
 
-    /// Writes the `SortData` record followed by one `ContinueFrt12` per condition.
-    pub fn write_biff_records<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
-        let condition_count = u32::try_from(self.conditions.len())
-            .map_err(|_| invalid("SortData has more than u32::MAX conditions"))?;
+    /// Write the `SortData` record followed by one `ContinueFrt12` per key.
+    pub(crate) fn write_biff_records<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
+        let condition_count = u32::try_from(self.keys.len())
+            .map_err(|_| invalid("SortData has more than u32::MAX keys"))?;
         let (parent_kind, parent_id) = match self.parent {
-            XlsSortParent::Sheet => (0u16, 0),
-            XlsSortParent::Table { id } => (1, id),
-            XlsSortParent::AutoFilter => (2, 0),
-            XlsSortParent::QueryTable { index } => (3, index),
+            Parent::Sheet => (0u16, 0),
+            Parent::Table { id } => (1, id),
+            Parent::AutoFilter => (2, 0),
+            Parent::QueryTable { index } => (3, index),
         };
-        let flags = u16::from(self.orientation == XlsSortOrientation::Columns)
+        let flags = u16::from(self.axis == Axis::Cols)
             | (u16::from(self.case_sensitive) << 1)
-            | (u16::from(self.method == XlsSortMethod::Alternate) << 2)
+            | (u16::from(self.method == Method::Alternate) << 2)
             | (parent_kind << 3);
 
         write_record_header(writer, SORT_DATA_RECORD_TYPE, SORT_DATA_BODY_LEN)?;
@@ -393,14 +643,12 @@ impl XlsSortData {
         writer.write_all(&0u16.to_le_bytes())?;
         writer.write_all(&[0; 8])?;
         writer.write_all(&flags.to_le_bytes())?;
-        let mut range = Vec::with_capacity(16);
-        self.range.write_to(&mut range);
-        writer.write_all(&range)?;
+        writer.write_all(&self.range.bytes())?;
         writer.write_all(&condition_count.to_le_bytes())?;
         writer.write_all(&parent_id.to_le_bytes())?;
 
-        for condition in &self.conditions {
-            let body = encode_condition(condition)?;
+        for key in &self.keys {
+            let body = encode_key(key)?;
             write_record_header(
                 writer,
                 CONTINUE_FRT12_RECORD_TYPE,
@@ -422,33 +670,73 @@ fn write_record_header<W: Write>(writer: &mut W, record_type: u16, len: usize) -
     Ok(())
 }
 
-fn encode_condition(condition: &XlsSortCondition) -> XlsResult<Vec<u8>> {
-    let (sort_on, cond_data, custom_list) = match &condition.sort_on {
-        XlsSortOn::Values { custom_list } => (0u16, [0u8; 8], custom_list.as_deref()),
-        XlsSortOn::CellColor {
+fn validate_on(on: &On) -> XlsResult<()> {
+    let On::Values {
+        custom_list: Some(custom_list),
+    } = on
+    else {
+        return Ok(());
+    };
+    if custom_list.is_empty() {
+        return Err(invalid(
+            "sort custom list must be None rather than an ambiguous empty string",
+        ));
+    }
+
+    let mut units = 0usize;
+    let mut wide = false;
+    for unit in custom_list.encode_utf16() {
+        units = units
+            .checked_add(1)
+            .ok_or_else(|| invalid("SortCond12 custom-list length overflows usize"))?;
+        wide |= unit > 0xff;
+    }
+    let encoded_len = units
+        .checked_mul(if wide { 2 } else { 1 })
+        .and_then(|len| len.checked_add(1))
+        .ok_or_else(|| invalid("SortCond12 custom-list byte length overflows usize"))?;
+    let body_len = SORT_CONDITION_FIXED_LEN
+        .checked_add(encoded_len)
+        .ok_or_else(|| invalid("SortCond12 encoded length overflows usize"))?;
+    if body_len > MAX_CONTINUE_RGB_LEN {
+        return Err(invalid("SortCond12 exceeds the ContinueFrt12 rgb limit"));
+    }
+    Ok(())
+}
+
+fn encode_key(key: &Key) -> XlsResult<Vec<u8>> {
+    validate_on(&key.on)?;
+    let (sort_on, cond_data, custom_list) = match &key.on {
+        On::Values { custom_list } => (0u16, [0u8; 8], custom_list.as_deref()),
+        On::CellColor {
             differential_format,
         } => {
             let mut data = [0u8; 8];
             data[..4].copy_from_slice(&differential_format.index().to_le_bytes());
             (1, data, None)
         },
-        XlsSortOn::FontColor {
+        On::FontColor {
             differential_format,
         } => {
             let mut data = [0u8; 8];
             data[..4].copy_from_slice(&differential_format.index().to_le_bytes());
             (2, data, None)
         },
-        XlsSortOn::Icon { set, icon } => {
+        On::Icon { set, icon } => {
             let mut data = [0u8; 8];
             data[..4].copy_from_slice(&set.code().to_le_bytes());
             data[4..].copy_from_slice(&icon.code().to_le_bytes());
             (3, data, None)
         },
     };
-    let units = custom_list
-        .map(|value| value.encode_utf16().collect::<Vec<_>>())
-        .unwrap_or_default();
+    let mut units = Vec::new();
+    if let Some(value) = custom_list {
+        let unit_count = value.encode_utf16().count();
+        units
+            .try_reserve_exact(unit_count)
+            .map_err(|_| allocation("reserving SortCond12 custom-list storage"))?;
+        units.extend(value.encode_utf16());
+    }
     let char_count = u32::try_from(units.len())
         .map_err(|_| invalid("SortCond12 custom list exceeds u32::MAX UTF-16 code units"))?;
     let compressed = units.iter().all(|unit| *unit <= 0xff);
@@ -466,9 +754,12 @@ fn encode_condition(condition: &XlsSortCondition) -> XlsResult<Vec<u8>> {
         return Err(invalid("SortCond12 exceeds the ContinueFrt12 rgb limit"));
     }
 
-    let mut output = Vec::with_capacity(body_len);
-    output.extend_from_slice(&((sort_on << 1) | u16::from(condition.descending)).to_le_bytes());
-    condition.range.write_to(&mut output);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(body_len)
+        .map_err(|_| allocation("reserving SortCond12 record storage"))?;
+    output.extend_from_slice(&((sort_on << 1) | u16::from(key.descending)).to_le_bytes());
+    key.range().write_to(&mut output);
     output.extend_from_slice(&cond_data);
     output.extend_from_slice(&char_count.to_le_bytes());
     if !units.is_empty() {
@@ -488,7 +779,7 @@ fn encode_condition(condition: &XlsSortCondition) -> XlsResult<Vec<u8>> {
 ///
 /// Inputs exclude the standard four-byte BIFF record headers, consistent with
 /// the rest of the XLS record parsers.
-pub fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> XlsResult<XlsSortData> {
+pub(crate) fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> XlsResult<Config> {
     if base.len() != SORT_DATA_BODY_LEN {
         return Err(XlsError::InvalidLength {
             expected: SORT_DATA_BODY_LEN,
@@ -507,10 +798,7 @@ pub fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> XlsResult<XlsSor
     }
     let flags = read_u16(base, 12)?;
     let parent_kind = (flags >> 3) & 0x0007;
-    if parent_kind > 3 {
-        return Err(invalid("SortData sfp is outside 0 through 3"));
-    }
-    let range = XlsSortRange::parse(base, 14)?;
+    let range = Range::parse(base, 14)?;
     let condition_count = usize::try_from(read_u32(base, 30)?)
         .map_err(|_| invalid("SortData condition count is not addressable"))?;
     if condition_count != continuations.len() {
@@ -521,33 +809,37 @@ pub fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> XlsResult<XlsSor
     }
     let parent_id = read_u32(base, 34)?;
     let parent = match parent_kind {
-        0 => XlsSortParent::Sheet,
-        1 => XlsSortParent::Table { id: parent_id },
-        2 => XlsSortParent::AutoFilter,
-        3 => XlsSortParent::QueryTable { index: parent_id },
-        _ => unreachable!(),
+        0 => Parent::Sheet,
+        1 => Parent::Table { id: parent_id },
+        2 => Parent::AutoFilter,
+        3 => Parent::QueryTable { index: parent_id },
+        _ => return Err(invalid("SortData sfp is outside 0 through 3")),
     };
-
-    let mut conditions = Vec::with_capacity(condition_count);
-    for continuation in continuations {
-        conditions.push(parse_continuation(continuation)?);
-    }
-    Ok(XlsSortData {
+    let axis = if flags & 0x0001 != 0 {
+        Axis::Cols
+    } else {
+        Axis::Rows
+    };
+    let mut keys = Vec::new();
+    keys.try_reserve_exact(condition_count)
+        .map_err(|_| allocation("reserving parsed SortData key storage"))?;
+    let mut config = Config {
         range,
-        orientation: if flags & 0x0001 != 0 {
-            XlsSortOrientation::Columns
-        } else {
-            XlsSortOrientation::Rows
-        },
+        axis,
         case_sensitive: flags & 0x0002 != 0,
         method: if flags & 0x0004 != 0 {
-            XlsSortMethod::Alternate
+            Method::Alternate
         } else {
-            XlsSortMethod::CharacterOrder
+            Method::CharacterOrder
         },
         parent,
-        conditions,
-    })
+        keys,
+    };
+    for continuation in continuations {
+        let key = parse_continuation(continuation, axis)?;
+        config.add(key)?;
+    }
+    Ok(config)
 }
 
 #[derive(Debug)]
@@ -568,7 +860,7 @@ impl SortDataCollector {
         &mut self,
         record_type: u16,
         data: &[u8],
-    ) -> XlsResult<Option<XlsSortData>> {
+    ) -> XlsResult<Option<Config>> {
         if let Some(pending) = self.pending.as_mut() {
             if record_type != CONTINUE_FRT12_RECORD_TYPE {
                 return Err(XlsError::InvalidRecord {
@@ -579,17 +871,21 @@ impl SortDataCollector {
                     ),
                 });
             }
-            pending.continuations.push(data.to_vec());
-            if pending.continuations.len() > pending.expected_conditions {
+            if pending.continuations.len() >= pending.expected_conditions {
                 return Err(invalid("SortData received too many ContinueFrt12 records"));
             }
+            let continuation = copy_bytes(data, "reserving SortData continuation payload storage")?;
+            pending.continuations.push(continuation);
             if pending.continuations.len() == pending.expected_conditions {
-                let pending = self.pending.take().expect("pending SortData exists");
-                let continuations = pending
-                    .continuations
-                    .iter()
-                    .map(Vec::as_slice)
-                    .collect::<Vec<_>>();
+                let pending = self
+                    .pending
+                    .take()
+                    .ok_or_else(|| invalid("SortData collector lost its pending record"))?;
+                let mut continuations = Vec::new();
+                continuations
+                    .try_reserve_exact(pending.continuations.len())
+                    .map_err(|_| allocation("reserving SortData continuation references"))?;
+                continuations.extend(pending.continuations.iter().map(Vec::as_slice));
                 return parse_sort_data(&pending.base, &continuations).map(Some);
             }
             return Ok(None);
@@ -609,9 +905,14 @@ impl SortDataCollector {
         if expected_conditions == 0 {
             return parse_sort_data(data, &[]).map(Some);
         }
+        let base = copy_bytes(data, "reserving SortData base-record storage")?;
+        let mut continuations = Vec::new();
+        continuations
+            .try_reserve_exact(expected_conditions)
+            .map_err(|_| allocation("reserving SortData continuation storage"))?;
         self.pending = Some(PendingSortData {
-            base: data.to_vec(),
-            continuations: Vec::new(),
+            base,
+            continuations,
             expected_conditions,
         });
         Ok(None)
@@ -632,7 +933,7 @@ impl SortDataCollector {
     }
 }
 
-fn parse_continuation(data: &[u8]) -> XlsResult<XlsSortCondition> {
+fn parse_continuation(data: &[u8], axis: Axis) -> XlsResult<Key> {
     if data.len() < FRT_HEADER_LEN + SORT_CONDITION_FIXED_LEN {
         return Err(XlsError::InvalidLength {
             expected: FRT_HEADER_LEN + SORT_CONDITION_FIXED_LEN,
@@ -665,7 +966,7 @@ fn parse_continuation(data: &[u8]) -> XlsResult<XlsSortCondition> {
         return Err(invalid("SortCond12 reserved flag bits are nonzero"));
     }
     let sort_on_code = (flags >> 1) & 0x000f;
-    let range = XlsSortRange::parse(body, 2)?;
+    let range = Range::parse(body, 2)?;
     let data_value = read_u32(body, 18)?;
     let reserved_data = read_u32(body, 22)?;
     let char_count = read_i32(body, 26)?;
@@ -679,19 +980,19 @@ fn parse_continuation(data: &[u8]) -> XlsResult<XlsSortCondition> {
                 return Err(invalid("value SortCond12 has nonzero CondDataValue fields"));
             }
             let custom_list = parse_custom_list(body, char_count)?;
-            XlsSortOn::Values { custom_list }
+            On::Values { custom_list }
         },
         1 | 2 => {
             if reserved_data != 0 || char_count != 0 || body.len() != SORT_CONDITION_FIXED_LEN {
                 return Err(invalid("color SortCond12 has reserved or trailing data"));
             }
-            let differential_format = XlsDifferentialFormatIndex::new(data_value);
+            let differential_format = Dxf::new(data_value);
             if sort_on_code == 1 {
-                XlsSortOn::CellColor {
+                On::CellColor {
                     differential_format,
                 }
             } else {
-                XlsSortOn::FontColor {
+                On::FontColor {
                     differential_format,
                 }
             }
@@ -702,14 +1003,17 @@ fn parse_continuation(data: &[u8]) -> XlsResult<XlsSortCondition> {
                     "icon SortCond12 has a custom list or trailing data",
                 ));
             }
-            XlsSortOn::Icon {
-                set: XlsSortIconSet::from_code(data_value)?,
-                icon: XlsSortIcon::from_code(reserved_data as i32)?,
+            On::Icon {
+                set: IconSet::from_code(data_value)?,
+                icon: Icon::from_code(reserved_data as i32)?,
             }
         },
         _ => return Err(invalid("SortCond12 sortOn is outside 0 through 3")),
     };
-    Ok(XlsSortCondition::new(range, flags & 0x0001 != 0, sort_on))
+    match axis {
+        Axis::Rows => Key::col(range, flags & 0x0001 != 0, sort_on),
+        Axis::Cols => Key::row(range, flags & 0x0001 != 0, sort_on),
+    }
 }
 
 fn parse_custom_list(body: &[u8], char_count: usize) -> XlsResult<Option<String>> {
@@ -740,16 +1044,27 @@ fn parse_custom_list(body: &[u8], char_count: usize) -> XlsResult<Option<String>
         });
     }
     let encoded = &body[SORT_CONDITION_FIXED_LEN + 1..];
-    let value = if wide {
+    let reserve = char_count
+        .checked_mul(if wide { 3 } else { 2 })
+        .ok_or_else(|| invalid("SortCond12 decoded string length overflows usize"))?;
+    let mut value = String::new();
+    value
+        .try_reserve_exact(reserve)
+        .map_err(|_| allocation("reserving decoded SortCond12 string storage"))?;
+    if wide {
         let units = encoded
             .chunks_exact(2)
-            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-            .collect::<Vec<_>>();
-        String::from_utf16(&units)
-            .map_err(|_| XlsError::Encoding("invalid UTF-16 in SortCond12 custom list".into()))?
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]));
+        for character in char::decode_utf16(units) {
+            value.push(character.map_err(|_| {
+                XlsError::Encoding("invalid UTF-16 in SortCond12 custom list".into())
+            })?);
+        }
     } else {
-        encoded.iter().map(|byte| char::from(*byte)).collect()
-    };
+        for byte in encoded {
+            value.push(char::from(*byte));
+        }
+    }
     Ok(Some(value))
 }
 
@@ -772,46 +1087,68 @@ mod tests {
 
     #[test]
     fn round_trips_every_sort_on_kind_and_unicode() {
-        let range = XlsSortRange::new(2, 1_048_575, 1, 16_383).unwrap();
-        let mut value = XlsSortData::new(range, XlsSortParent::Table { id: 41 });
-        value.set_orientation(XlsSortOrientation::Columns);
-        value.set_case_sensitive(true);
-        value.set_method(XlsSortMethod::Alternate);
-        value.add_condition(XlsSortCondition::new(
-            XlsSortRange::new(2, 20, 1, 1).unwrap(),
-            true,
-            XlsSortOn::Values {
-                custom_list: Some("High,中,Low".into()),
-            },
-        ));
-        value.add_condition(XlsSortCondition::new(
-            XlsSortRange::new(2, 20, 2, 2).unwrap(),
-            false,
-            XlsSortOn::CellColor {
-                differential_format: XlsDifferentialFormatIndex::new(7),
-            },
-        ));
-        value.add_condition(XlsSortCondition::new(
-            XlsSortRange::new(2, 20, 3, 3).unwrap(),
-            true,
-            XlsSortOn::FontColor {
-                differential_format: XlsDifferentialFormatIndex::new(11),
-            },
-        ));
-        value.add_condition(XlsSortCondition::new(
-            XlsSortRange::new(2, 20, 4, 4).unwrap(),
-            false,
-            XlsSortOn::Icon {
-                set: XlsSortIconSet::FiveQuarters,
-                icon: XlsSortIcon::Fifth,
-            },
-        ));
+        let range = Range::new(2..=MAX_ROW_INDEX, 1..=MAX_COLUMN_INDEX).unwrap();
+        let mut value = Config::new(range, Parent::Table { id: 41 });
+        value.put_axis(Axis::Cols).unwrap();
+        value.set_case(true);
+        value.set_method(Method::Alternate);
+        value
+            .add(
+                Key::row(
+                    Range::new(2..=2, 1..=20).unwrap(),
+                    true,
+                    On::Values {
+                        custom_list: Some("High,中,Low".into()),
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        value
+            .add(
+                Key::row(
+                    Range::new(3..=3, 1..=20).unwrap(),
+                    false,
+                    On::CellColor {
+                        differential_format: Dxf::new(7),
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        value
+            .add(
+                Key::row(
+                    Range::new(4..=4, 1..=20).unwrap(),
+                    true,
+                    On::FontColor {
+                        differential_format: Dxf::new(11),
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        value
+            .add(
+                Key::row(
+                    Range::new(5..=5, 1..=20).unwrap(),
+                    false,
+                    On::Icon {
+                        set: IconSet::FiveQuarters,
+                        icon: Icon::Fifth,
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
 
         let mut bytes = Vec::new();
         value.write_biff_records(&mut bytes).unwrap();
         let records = split_records(&bytes);
         assert_eq!(records.len(), 5);
         assert_eq!(records[0].0, SORT_DATA_RECORD_TYPE);
+        assert_eq!(&records[0].1[18..22], &MAX_ROW_INDEX.to_le_bytes());
+        assert_eq!(&records[0].1[26..30], &MAX_COLUMN_INDEX.to_le_bytes());
         assert!(
             records[1..]
                 .iter()
@@ -826,30 +1163,106 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_ranges_and_condition_count_mismatch() {
-        assert!(XlsSortRange::new(8, 7, 0, 0).is_err());
-        assert!(XlsSortRange::new(0, MAX_ROW_INDEX + 1, 0, 0).is_err());
-        assert!(XlsSortRange::new(0, 0, 0, MAX_COLUMN_INDEX + 1).is_err());
+    fn exact_domains_use_narrow_checked_storage() {
+        assert_eq!(std::mem::size_of::<Row>(), 4);
+        assert_eq!(std::mem::size_of::<Col>(), 2);
+        assert_eq!(std::mem::size_of::<Range>(), 12);
 
-        let value = XlsSortData::new(XlsSortRange::new(0, 0, 0, 0).unwrap(), XlsSortParent::Sheet);
+        let range = Range::new(0..=MAX_ROW_INDEX, 0..=MAX_COLUMN_INDEX).unwrap();
+        assert_eq!(range.first_row().index(), 0);
+        assert_eq!(range.last_row().index(), MAX_ROW_INDEX);
+        assert_eq!(range.first_col().index(), 0);
+        assert_eq!(u32::from(range.last_col().index()), MAX_COLUMN_INDEX);
+    }
+
+    #[test]
+    fn rejects_invalid_ranges_and_condition_count_mismatch_without_unwind() {
+        let rejected = std::panic::catch_unwind(|| {
+            let first = 8;
+            let last = 7;
+            (
+                Range::new(first..=last, 0..=0),
+                Row::new(MAX_ROW_INDEX + 1),
+                Col::new(MAX_COLUMN_INDEX + 1),
+                Col::new(u32::MAX),
+            )
+        });
+        let (reversed, row_overflow, col_overflow, wide_overflow) = rejected.unwrap();
+        assert!(reversed.is_err());
+        assert!(row_overflow.is_err());
+        assert!(col_overflow.is_err());
+        assert!(wide_overflow.is_err());
+
+        let value = Config::new(Range::new(0..=0, 0..=0).unwrap(), Parent::Sheet);
         let mut bytes = Vec::new();
         value.write_biff_records(&mut bytes).unwrap();
         let mut records = split_records(&bytes);
         records[0].1[30..34].copy_from_slice(&1u32.to_le_bytes());
         assert!(parse_sort_data(&records[0].1, &[]).is_err());
+
+        records[0].1[30..34].copy_from_slice(&0u32.to_le_bytes());
+        records[0].1[14..18].copy_from_slice(&(-1i32).to_le_bytes());
+        let parsed = std::panic::catch_unwind(|| parse_sort_data(&records[0].1, &[]));
+        assert!(matches!(parsed, Ok(Err(_))));
+    }
+
+    #[test]
+    fn key_edits_reject_ambiguity_and_are_failure_atomic() {
+        let range = Range::new(0..=5, 0..=2).unwrap();
+        let mut value = Config::new(range, Parent::Sheet);
+        let before = value.clone();
+        let row_key = Key::row(
+            Range::new(0..=0, 0..=2).unwrap(),
+            false,
+            On::Values { custom_list: None },
+        )
+        .unwrap();
+        assert!(value.add(row_key).is_err());
+        assert_eq!(value, before);
+
+        let outside = Key::col(
+            Range::new(0..=5, 3..=3).unwrap(),
+            false,
+            On::Values { custom_list: None },
+        )
+        .unwrap();
+        assert!(value.add(outside).is_err());
+        assert_eq!(value, before);
+
+        let ambiguous = Range::new(0..=5, 0..=1).unwrap();
+        assert!(Key::col(ambiguous, false, On::Values { custom_list: None }).is_err());
+
+        value
+            .add(
+                Key::col(
+                    Range::new(0..=5, 0..=0).unwrap(),
+                    false,
+                    On::Values { custom_list: None },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let before_axis = value.clone();
+        assert!(value.put_axis(Axis::Cols).is_err());
+        assert_eq!(value, before_axis);
     }
 
     #[test]
     fn rejects_malformed_continuation_fields_and_unicode() {
-        let range = XlsSortRange::new(0, 5, 0, 0).unwrap();
-        let mut value = XlsSortData::new(range, XlsSortParent::AutoFilter);
-        value.add_condition(XlsSortCondition::new(
-            range,
-            false,
-            XlsSortOn::Values {
-                custom_list: Some("中".into()),
-            },
-        ));
+        let range = Range::new(0..=5, 0..=0).unwrap();
+        let mut value = Config::new(range, Parent::AutoFilter);
+        value
+            .add(
+                Key::col(
+                    range,
+                    false,
+                    On::Values {
+                        custom_list: Some("中".into()),
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
         let mut bytes = Vec::new();
         value.write_biff_records(&mut bytes).unwrap();
         let records = split_records(&bytes);
@@ -870,19 +1283,36 @@ mod tests {
         let flags = read_u16(&reserved_bit, FRT_HEADER_LEN).unwrap() | 0x8000;
         reserved_bit[FRT_HEADER_LEN..FRT_HEADER_LEN + 2].copy_from_slice(&flags.to_le_bytes());
         assert!(parse_sort_data(&records[0].1, &[&reserved_bit]).is_err());
+
+        let mut ambiguous = records[1].1.clone();
+        ambiguous[FRT_HEADER_LEN + 14..FRT_HEADER_LEN + 18].copy_from_slice(&1u32.to_le_bytes());
+        let parsed =
+            std::panic::catch_unwind(|| parse_sort_data(&records[0].1, &[ambiguous.as_slice()]));
+        assert!(matches!(parsed, Ok(Err(_))));
     }
 
     #[test]
-    fn rejects_condition_larger_than_one_continue_frt12() {
-        let range = XlsSortRange::new(0, 0, 0, 0).unwrap();
-        let mut value = XlsSortData::new(range, XlsSortParent::Sheet);
-        value.add_condition(XlsSortCondition::new(
-            range,
-            false,
-            XlsSortOn::Values {
-                custom_list: Some("a".repeat(MAX_CONTINUE_RGB_LEN)),
-            },
-        ));
-        assert!(value.write_biff_records(&mut Vec::new()).is_err());
+    fn rejects_oversized_or_empty_custom_lists_before_retention() {
+        let range = Range::new(0..=0, 0..=0).unwrap();
+        let oversized = std::panic::catch_unwind(|| {
+            Key::col(
+                range,
+                false,
+                On::Values {
+                    custom_list: Some("a".repeat(MAX_CONTINUE_RGB_LEN)),
+                },
+            )
+        });
+        assert!(matches!(oversized, Ok(Err(_))));
+        assert!(
+            Key::col(
+                range,
+                false,
+                On::Values {
+                    custom_list: Some(String::new()),
+                },
+            )
+            .is_err()
+        );
     }
 }

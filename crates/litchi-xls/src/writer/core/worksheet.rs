@@ -274,7 +274,7 @@ pub(super) struct WritableWorksheet {
     /// Sort configuration.
     pub sort_config: Option<SortConfig>,
     /// Extended sort metadata and conditions.
-    pub sort_data: Option<crate::XlsSortData>,
+    pub sort_data: Option<crate::sort_data::Config>,
     /// Pivot tables to write.
     pub pivot_tables: Vec<WritablePivotTable>,
     pub formulas_pending_recalculation: bool,
@@ -461,8 +461,12 @@ impl WritableWorksheet {
         self.hyperlinks.push(hyperlink);
     }
 
-    pub(super) fn add_comment(&mut self, comment: WritableComment) {
+    pub(super) fn add_comment(&mut self, comment: WritableComment) -> XlsResult<()> {
+        self.comments
+            .try_reserve(1)
+            .map_err(|_| XlsError::Allocation("reserving worksheet comment storage"))?;
         self.comments.push(comment);
+        Ok(())
     }
 
     pub(super) fn show_column(&mut self, col: u16) {
@@ -489,8 +493,15 @@ impl WritableWorksheet {
         self.sort_config = Some(config);
     }
 
-    pub(super) fn set_sort_data(&mut self, sort_data: crate::XlsSortData) {
-        self.sort_data = Some(sort_data);
+    pub(super) fn put_sort(
+        &mut self,
+        sort: crate::sort_data::Config,
+    ) -> Option<crate::sort_data::Config> {
+        self.sort_data.replace(sort)
+    }
+
+    pub(super) fn remove_sort(&mut self) -> Option<crate::sort_data::Config> {
+        self.sort_data.take()
     }
 
     pub(super) fn add_pivot_table(&mut self, pt: WritablePivotTable) {

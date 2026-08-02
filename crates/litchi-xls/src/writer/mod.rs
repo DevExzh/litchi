@@ -18,6 +18,12 @@ pub mod formula;
 /// Typed worksheet view-state writing options
 pub mod view;
 
+/// Checked extended range-sort configuration.
+pub mod sort;
+
+/// Checked worksheet-shape anchors and primitive shape values.
+pub use core::shape;
+
 /// Checked BIFF8 INDEX/DBCELL worksheet layout generation
 pub mod row_blocks;
 
@@ -41,7 +47,7 @@ pub use crate::{XlsDefinedNameFutureRecords, XlsNameFnGrp12, XlsNamePublish};
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
     PivotCacheValue, XlsAddInFunctionOptions, XlsCalculationSettings, XlsCellValue,
-    XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsConditionalFormat,
+    XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsConditionalFormat,
     XlsConditionalFormat12Group, XlsConditionalFormat12Rule, XlsConditionalFormat12Type,
     XlsConditionalFormatGroup, XlsConditionalFormatOperator, XlsConditionalFormatRange,
     XlsConditionalFormatRule, XlsConditionalFormatType, XlsConditionalPattern,
@@ -50,10 +56,10 @@ pub use core::{
     XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
     XlsDataValidationType, XlsDdeOrOleItemOptions, XlsDdeOrOleLinkOptions, XlsDefinedName,
     XlsDefinedNameRecordOptions, XlsExternalCacheRowOptions, XlsExternalDefinedNameOptions,
-    XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsFunctionGroupOptions, XlsGroupRect,
+    XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsFunctionGroupOptions,
     XlsPageSetupOptions, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
-    XlsPivotTableConfig, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,
-    XlsShapeGroupWrite, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite,
+    XlsPivotTableConfig, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild, XlsShapeGroupWrite,
+    XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite,
     XlsWorkbookEnvironmentOptions, XlsWorkbookWindowOptions, XlsWorksheetLayoutOptions, XlsWriter,
 };
 pub use formatting::{

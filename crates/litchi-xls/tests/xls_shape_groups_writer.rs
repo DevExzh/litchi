@@ -1,37 +1,33 @@
 use std::io::Cursor;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use litchi_odraw::shape::Kind;
 use litchi_xls::shapes::extract_shapes_from_workbook;
+use litchi_xls::writer::shape::{Anchor, Behavior, Point, Rect};
 use litchi_xls::writer::{
-    XlsGroupRect, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,
-    XlsShapeGroupWrite, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
+    XlsShapeColor, XlsShapeFill, XlsShapeGroupChild, XlsShapeGroupWrite, XlsShapeKind,
+    XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
 };
 
-fn anchor() -> XlsShapeAnchor {
-    XlsShapeAnchor {
-        move_with_cells: true,
-        size_with_cells: true,
-        first_column: 1,
-        first_column_offset: 10,
-        first_row: 1,
-        first_row_offset: 20,
-        last_column: 6,
-        last_column_offset: 900,
-        last_row: 9,
-        last_row_offset: 200,
-    }
+fn anchor() -> Anchor {
+    Anchor::new(
+        Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
+        Point::new(9, 6).unwrap().offset(200, 900).unwrap(),
+        Behavior::MoveAndSize,
+    )
+    .unwrap()
 }
 
 fn group_with_children() -> XlsShapeGroupWrite {
     let mut group = XlsShapeGroupWrite::new(anchor());
-    group.coordinates = XlsGroupRect::new(0, 0, 2000, 1000);
+    group.coordinates = Rect::new(0, 0, 2000, 1000).unwrap();
     let mut rectangle =
-        XlsShapeGroupChild::new(XlsShapeKind::Rectangle, XlsGroupRect::new(0, 0, 900, 500));
+        XlsShapeGroupChild::new(XlsShapeKind::Rectangle, Rect::new(0, 0, 900, 500).unwrap());
     rectangle.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0x20, 0x40, 0x60));
     group.children.push(rectangle);
     let mut textbox = XlsShapeGroupChild::new(
         XlsShapeKind::TextBox,
-        XlsGroupRect::new(900, 400, 2000, 1000),
+        Rect::new(900, 400, 2000, 1000).unwrap(),
     );
     textbox.line = XlsShapeLine::None;
     textbox.text = Some(XlsShapeText::new("Grouped 世界"));
@@ -233,6 +229,23 @@ fn group_object_ids_are_collision_free_across_primitives_and_groups() {
 }
 
 #[test]
+fn automatic_group_ids_skip_ids_requested_by_later_children() {
+    let mut writer = XlsWriter::new();
+    let sheet = writer.add_worksheet("Requested").unwrap();
+    let mut group = group_with_children();
+    group.children[0].object_id = Some(1);
+
+    assert_eq!(writer.add_shape_group(sheet, group).unwrap(), 2);
+    let records = records(&write(&mut writer));
+    let object_ids = records
+        .iter()
+        .filter(|(kind, data)| *kind == 0x005D && data.len() >= 8)
+        .map(|(_, data)| u16::from_le_bytes(data[6..8].try_into().unwrap()))
+        .collect::<Vec<_>>();
+    assert_eq!(object_ids, vec![2, 1, 3]);
+}
+
+#[test]
 fn group_mutations_reject_malformed_input_and_are_atomic() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
@@ -243,9 +256,7 @@ fn group_mutations_reject_malformed_input_and_are_atomic() {
             .add_shape_group(sheet, XlsShapeGroupWrite::new(anchor()))
             .is_err()
     );
-    let mut degenerate = group_with_children();
-    degenerate.coordinates = XlsGroupRect::new(0, 0, 0, 1000);
-    assert!(writer.add_shape_group(sheet, degenerate).is_err());
+    assert!(Rect::new(0, 0, 0, 1000).is_err());
     let mut duplicated = group_with_children();
     duplicated.object_id = Some(9);
     duplicated.children[1].object_id = Some(9);
@@ -254,9 +265,15 @@ fn group_mutations_reject_malformed_input_and_are_atomic() {
     let mut primitive = XlsShapeWrite::new(XlsShapeKind::Rectangle, anchor());
     primitive.object_id = Some(3);
     writer.add_shape(sheet, primitive).unwrap();
+    let before = write(&mut writer);
     let mut colliding = group_with_children();
     colliding.children[0].object_id = Some(3);
-    assert!(writer.add_shape_group(sheet, colliding).is_err());
+    let outcome = catch_unwind(AssertUnwindSafe(|| {
+        writer.add_shape_group(sheet, colliding)
+    }));
+    assert!(outcome.is_ok());
+    assert!(outcome.unwrap().is_err());
+    assert_eq!(write(&mut writer), before);
 
     let group_id = writer
         .add_shape_group(sheet, group_with_children())

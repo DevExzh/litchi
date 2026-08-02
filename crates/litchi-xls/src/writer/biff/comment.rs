@@ -1,6 +1,7 @@
 use std::io::Write;
 
-use crate::writer::{XlsCommentAnchor, XlsCommentTextRunWrite};
+use crate::writer::XlsCommentTextRunWrite;
+use crate::writer::shape::Anchor;
 use crate::{XlsError, XlsResult};
 
 use super::write_record_header;
@@ -17,7 +18,7 @@ pub(crate) struct CommentConfig<'a> {
     pub text: &'a str,
     pub visible: bool,
     pub shared: bool,
-    pub anchor: XlsCommentAnchor,
+    pub anchor: Anchor,
     pub text_runs: &'a [XlsCommentTextRunWrite],
     pub font_when_empty: u16,
     pub guid: [u8; 16],
@@ -60,19 +61,7 @@ pub(super) fn comment_shape(config: &CommentConfig<'_>, shape_id: u32) -> Vec<u8
         out.extend_from_slice(&value.to_le_bytes());
     }
     escher_header(&mut out, 0, 0xF010, 18);
-    let anchor = config.anchor;
-    let flags = u16::from(anchor.move_with_cells) | (u16::from(anchor.size_with_cells) << 1);
-    for value in [
-        flags,
-        anchor.first_column,
-        anchor.first_column_offset,
-        anchor.first_row as u16,
-        anchor.first_row_offset,
-        anchor.last_column,
-        anchor.last_column_offset,
-        anchor.last_row as u16,
-        anchor.last_row_offset,
-    ] {
+    for value in config.anchor.fields() {
         out.extend_from_slice(&value.to_le_bytes());
     }
     escher_header(&mut out, 0, 0xF011, 0);

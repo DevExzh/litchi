@@ -39,19 +39,19 @@ use crate::encryption::{
 use crate::page_setup::{XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation};
 use crate::{XlsDifferentialFormat, XlsListObject, XlsTableStyle, XlsTableStyles, XlsXfProperty};
 use litchi_cfb::writer::OleWriter;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use zeroize::Zeroizing;
 
 mod comment;
 mod conditional_format;
 mod data_validation;
 mod named_range;
-mod shape;
+pub mod shape;
 mod shape_group;
 mod stream;
 mod worksheet;
 
-pub use self::comment::{XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions};
+pub use self::comment::{XlsCommentTextRunWrite, XlsCommentWriteOptions};
 pub use self::conditional_format::{
     XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormat12Rule,
     XlsConditionalFormat12Type, XlsConditionalFormatGroup, XlsConditionalFormatOperator,
@@ -67,10 +67,10 @@ pub use self::data_validation::{
 use self::named_range::XlsDefinedName as InternalDefinedName;
 pub use self::named_range::{XlsDefinedName, XlsDefinedNameRecordOptions};
 pub use self::shape::{
-    XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
-    XlsShapeTextRun, XlsShapeWrite,
+    XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun,
+    XlsShapeWrite,
 };
-pub use self::shape_group::{XlsGroupRect, XlsShapeGroupChild, XlsShapeGroupWrite};
+pub use self::shape_group::{XlsShapeGroupChild, XlsShapeGroupWrite};
 use self::worksheet::{
     AutoFilterColumnDef, AutoFilterRange, CellPos, HorizontalPageBreak, MergedRange,
     PivotCellXfRole, SortConfig, VerticalPageBreak, WritableCell, WritablePivotDataItem,
@@ -1271,7 +1271,7 @@ fn validate_list_object_relationships(
             }
         }
         if let Some(sort) = &worksheet.sort_data
-            && let crate::XlsSortParent::Table { id } = sort.parent()
+            && let crate::writer::sort::Parent::Table { id } = sort.parent()
             && !worksheet
                 .list_objects
                 .iter()
@@ -1863,14 +1863,8 @@ impl XlsWriter {
                 "comment GUID override is duplicated on the worksheet".to_string(),
             ));
         }
-        worksheet.add_comment(comment::WritableComment {
-            row,
-            column,
-            author: author.to_string(),
-            text: text.to_string(),
-            options,
-        });
-        Ok(())
+        let comment = comment::WritableComment::try_new(row, column, author, text, options)?;
+        worksheet.add_comment(comment)
     }
 
     /// Add a validated, macro-inert primitive shape and return its worksheet OBJ identifier.
@@ -1878,32 +1872,23 @@ impl XlsWriter {
         shape.validate()?;
         let worksheet = self
             .worksheets
-            .get(sheet)
+            .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
-        let pivot_ids = worksheet
-            .pivot_tables
-            .iter()
-            .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
-            .filter(|id| *id != 0 && *id != u16::MAX)
-            .collect::<std::collections::HashSet<_>>();
-        let shape_ids = worksheet
-            .shapes
-            .iter()
-            .filter_map(|shape| shape.object_id)
-            .chain(worksheet.shape_groups.iter().flat_map(group_object_ids))
-            .collect::<std::collections::HashSet<_>>();
-        let object_count = pivot_ids
-            .union(&shape_ids)
-            .count()
-            .checked_add(worksheet.comments.len())
-            .ok_or_else(|| XlsError::InvalidData("worksheet shape count overflows".to_string()))?;
+        let reserved = collect_reserved_object_ids(worksheet, 0)?;
+        let object_count =
+            reserved
+                .len()
+                .checked_add(worksheet.comments.len())
+                .ok_or(XlsError::Allocation(
+                    "computing the worksheet drawing-object count",
+                ))?;
         if object_count >= 1022 {
             return Err(XlsError::InvalidData(
                 "a worksheet cannot contain more than 1022 drawing objects".to_string(),
             ));
         }
         let object_id = if let Some(requested) = shape.object_id {
-            if pivot_ids.contains(&requested) || shape_ids.contains(&requested) {
+            if reserved.contains(&requested) {
                 return Err(XlsError::InvalidData(
                     "shape object ID collides with another worksheet object".to_string(),
                 ));
@@ -1911,13 +1896,17 @@ impl XlsWriter {
             requested
         } else {
             (1..u16::MAX)
-                .find(|candidate| !pivot_ids.contains(candidate) && !shape_ids.contains(candidate))
+                .find(|candidate| !reserved.contains(candidate))
                 .ok_or_else(|| {
                     XlsError::InvalidData("worksheet object IDs are exhausted".to_string())
                 })?
         };
+        worksheet
+            .shapes
+            .try_reserve(1)
+            .map_err(|_| XlsError::Allocation("reserving worksheet shape storage"))?;
         shape.object_id = Some(object_id);
-        self.worksheets.get_mut(sheet).unwrap().shapes.push(shape);
+        worksheet.shapes.push(shape);
         Ok(object_id)
     }
 
@@ -1963,33 +1952,22 @@ impl XlsWriter {
         group.validate()?;
         let worksheet = self
             .worksheets
-            .get(sheet)
+            .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
-        let pivot_ids = worksheet
-            .pivot_tables
-            .iter()
-            .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
-            .filter(|id| *id != 0 && *id != u16::MAX)
-            .collect::<std::collections::HashSet<_>>();
-        let shape_ids = worksheet
-            .shapes
-            .iter()
-            .filter_map(|shape| shape.object_id)
-            .chain(worksheet.shape_groups.iter().flat_map(group_object_ids))
-            .collect::<std::collections::HashSet<_>>();
-        let object_count = pivot_ids
-            .union(&shape_ids)
-            .count()
+        let group_count = group.object_count()?;
+        let mut reserved = collect_reserved_object_ids(worksheet, group_count)?;
+        let object_count = reserved
+            .len()
             .checked_add(worksheet.comments.len())
-            .and_then(|count| count.checked_add(group.object_count()))
-            .ok_or_else(|| XlsError::InvalidData("worksheet shape count overflows".to_string()))?;
+            .and_then(|count| count.checked_add(group_count))
+            .ok_or(XlsError::Allocation(
+                "computing the worksheet drawing-object count",
+            ))?;
         if object_count > 1022 {
             return Err(XlsError::InvalidData(
                 "a worksheet cannot contain more than 1022 drawing objects".to_string(),
             ));
         }
-        let mut reserved = pivot_ids;
-        reserved.extend(shape_ids);
         for requested in group_object_ids(&group) {
             if reserved.contains(&requested) {
                 return Err(XlsError::InvalidData(
@@ -1997,16 +1975,19 @@ impl XlsWriter {
                 ));
             }
         }
+        for requested in group_object_ids(&group) {
+            reserved.insert(requested);
+        }
+        worksheet
+            .shape_groups
+            .try_reserve(1)
+            .map_err(|_| XlsError::Allocation("reserving worksheet shape-group storage"))?;
         let group_id = assign_object_id(&mut reserved, group.object_id)?;
         group.object_id = Some(group_id);
         for child in &mut group.children {
             child.object_id = Some(assign_object_id(&mut reserved, child.object_id)?);
         }
-        self.worksheets
-            .get_mut(sheet)
-            .unwrap()
-            .shape_groups
-            .push(group);
+        worksheet.shape_groups.push(group);
         Ok(group_id)
     }
 
@@ -2210,18 +2191,43 @@ impl XlsWriter {
         Ok(())
     }
 
-    /// Set extended BIFF8 sort metadata for a worksheet.
+    /// Replace the extended BIFF8 sort metadata for a worksheet.
     ///
     /// Unlike [`set_sort`](Self::set_sort), this preserves the complete
     /// `SortData` model, including an explicit range, more than three keys,
-    /// custom lists, differential-format colors, and icon sets.
-    pub fn set_sort_data(&mut self, sheet: usize, sort_data: crate::XlsSortData) -> XlsResult<()> {
+    /// custom lists, differential-format colors, and icon sets. The previous
+    /// owned configuration is returned.
+    pub fn put_sort(
+        &mut self,
+        sheet: usize,
+        sort: crate::writer::sort::Config,
+    ) -> XlsResult<Option<crate::writer::sort::Config>> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
-        worksheet.set_sort_data(sort_data);
-        Ok(())
+        if let crate::writer::sort::Parent::Table { id } = sort.parent()
+            && !worksheet
+                .list_objects
+                .iter()
+                .any(|table| table.id().value() == id)
+        {
+            return Err(XlsError::InvalidData(
+                "table SortData references an unknown ListObject identifier".to_string(),
+            ));
+        }
+        Ok(worksheet.put_sort(sort))
+    }
+
+    /// Remove and return the extended BIFF8 sort metadata for a worksheet.
+    ///
+    /// Removing an absent configuration succeeds and returns `None`.
+    pub fn remove_sort(&mut self, sheet: usize) -> XlsResult<Option<crate::writer::sort::Config>> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        Ok(worksheet.remove_sort())
     }
 
     /// Add a pivot table definition to a worksheet.
@@ -4138,6 +4144,55 @@ fn group_object_ids(group: &XlsShapeGroupWrite) -> impl Iterator<Item = u16> + '
         .chain(group.children.iter().filter_map(|child| child.object_id))
 }
 
+/// Collect every existing worksheet drawing-object identifier with fallible
+/// capacity reservation for any IDs the caller will add before retaining data.
+fn collect_reserved_object_ids(
+    worksheet: &WritableWorksheet,
+    additional: usize,
+) -> XlsResult<HashSet<u16>> {
+    let pivot_capacity = worksheet
+        .pivot_tables
+        .iter()
+        .try_fold(0usize, |count, table| {
+            count
+                .checked_add(table.page_entries.len())
+                .ok_or(XlsError::Allocation(
+                    "computing worksheet pivot-object ID capacity",
+                ))
+        })?;
+    let group_capacity = worksheet
+        .shape_groups
+        .iter()
+        .try_fold(0usize, |count, group| {
+            count
+                .checked_add(group.object_count()?)
+                .ok_or(XlsError::Allocation(
+                    "computing worksheet shape-group ID capacity",
+                ))
+        })?;
+    let capacity = pivot_capacity
+        .checked_add(worksheet.shapes.len())
+        .and_then(|count| count.checked_add(group_capacity))
+        .and_then(|count| count.checked_add(additional))
+        .ok_or(XlsError::Allocation(
+            "computing worksheet drawing-object ID capacity",
+        ))?;
+    let mut reserved = HashSet::new();
+    reserved
+        .try_reserve(capacity)
+        .map_err(|_| XlsError::Allocation("reserving worksheet drawing-object ID storage"))?;
+    reserved.extend(
+        worksheet
+            .pivot_tables
+            .iter()
+            .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
+            .filter(|id| *id != 0 && *id != u16::MAX),
+    );
+    reserved.extend(worksheet.shapes.iter().filter_map(|shape| shape.object_id));
+    reserved.extend(worksheet.shape_groups.iter().flat_map(group_object_ids));
+    Ok(reserved)
+}
+
 /// Reserve the requested OBJ identifier or the first free canonical one.
 fn assign_object_id(
     reserved: &mut std::collections::HashSet<u16>,
@@ -4151,7 +4206,9 @@ fn assign_object_id(
                 XlsError::InvalidData("worksheet object IDs are exhausted".to_string())
             })?,
     };
-    reserved.insert(object_id);
+    if requested.is_none() {
+        reserved.insert(object_id);
+    }
     Ok(object_id)
 }
 

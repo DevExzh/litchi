@@ -1,58 +1,5 @@
+use super::shape::Anchor;
 use crate::{XlsError, XlsResult};
-
-/// Cell-relative rectangle used by the OfficeArt comment shape.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsCommentAnchor {
-    pub move_with_cells: bool,
-    pub size_with_cells: bool,
-    pub first_column: u16,
-    pub first_column_offset: u16,
-    pub first_row: u32,
-    pub first_row_offset: u16,
-    pub last_column: u16,
-    pub last_column_offset: u16,
-    pub last_row: u32,
-    pub last_row_offset: u16,
-}
-
-impl XlsCommentAnchor {
-    pub(crate) fn validate(&self) -> XlsResult<()> {
-        if self.first_column > 255
-            || self.last_column > 255
-            || self.first_row > 65_535
-            || self.last_row > 65_535
-            || self.first_column_offset > 1023
-            || self.last_column_offset > 1023
-            || self.first_row_offset > 255
-            || self.last_row_offset > 255
-            || self.first_column > self.last_column
-            || self.first_row > self.last_row
-            || (self.move_with_cells && !self.size_with_cells)
-        {
-            return Err(XlsError::InvalidData(
-                "comment anchor is outside BIFF8 bounds or has invalid movement flags".to_string(),
-            ));
-        }
-        Ok(())
-    }
-
-    pub(crate) fn default_for_cell(row: u16, column: u8) -> Self {
-        let first_column = u16::from(column).saturating_add(1).min(252);
-        let first_row = u32::from(row).min(65_531);
-        Self {
-            move_with_cells: true,
-            size_with_cells: true,
-            first_column,
-            first_column_offset: 0,
-            first_row,
-            first_row_offset: 0,
-            last_column: first_column + 3,
-            last_column_offset: 0,
-            last_row: first_row + 4,
-            last_row_offset: 0,
-        }
-    }
-}
 
 /// One ordered rich-text run in a comment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,7 +13,7 @@ pub struct XlsCommentTextRunWrite {
 pub struct XlsCommentWriteOptions {
     pub visible: bool,
     pub shared: bool,
-    pub anchor: Option<XlsCommentAnchor>,
+    pub anchor: Option<Anchor>,
     pub text_runs: Vec<XlsCommentTextRunWrite>,
     pub font_when_empty: u16,
     /// Stable GUID override. When absent, the writer derives a deterministic,
@@ -84,10 +31,38 @@ pub(super) struct WritableComment {
 }
 
 impl WritableComment {
-    pub(super) fn anchor(&self) -> XlsCommentAnchor {
+    pub(super) fn try_new(
+        row: u16,
+        column: u8,
+        author: &str,
+        text: &str,
+        options: XlsCommentWriteOptions,
+    ) -> XlsResult<Self> {
+        let mut owned_author = String::new();
+        owned_author
+            .try_reserve_exact(author.len())
+            .map_err(|_| XlsError::Allocation("reserving comment-author storage"))?;
+        owned_author.push_str(author);
+
+        let mut owned_text = String::new();
+        owned_text
+            .try_reserve_exact(text.len())
+            .map_err(|_| XlsError::Allocation("reserving comment-text storage"))?;
+        owned_text.push_str(text);
+
+        Ok(Self {
+            row,
+            column,
+            author: owned_author,
+            text: owned_text,
+            options,
+        })
+    }
+
+    pub(super) fn anchor(&self) -> Anchor {
         self.options
             .anchor
-            .unwrap_or_else(|| XlsCommentAnchor::default_for_cell(self.row, self.column))
+            .unwrap_or_else(|| Anchor::default_for_cell(self.row, self.column))
     }
 }
 
@@ -115,9 +90,6 @@ pub(crate) fn validate_comment(
         return Err(XlsError::InvalidData(
             "comment text exceeds 65535 UTF-16 code units".to_string(),
         ));
-    }
-    if let Some(anchor) = options.anchor {
-        anchor.validate()?;
     }
     if text_len == 0 && !options.text_runs.is_empty() {
         return Err(XlsError::InvalidData(

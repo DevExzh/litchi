@@ -121,13 +121,8 @@ pub(crate) fn group_fragments<'a>(
 /// Build the group-header SpContainer (Spgr + Sp + OPT + ClientAnchor + ClientData).
 fn group_header_shape(group: &XlsShapeGroupWrite, shape_id: u32) -> XlsResult<Vec<u8>> {
     let mut children = Vec::with_capacity(104);
-    write_spgr(
-        &mut children,
-        group.coordinates.left,
-        group.coordinates.top,
-        group.coordinates.right,
-        group.coordinates.bottom,
-    )?;
+    let [left, top, right, bottom] = group.coordinates.fields();
+    write_spgr(&mut children, left, top, right, bottom)?;
     ShapeBuilder::new(Native::FREEFORM, shape_id)
         .with_flags(Flags::GROUP | Flags::HAVE_ANCHOR)
         .write(&mut children)?;
@@ -163,13 +158,8 @@ fn grouped_child_shape(child: &XlsShapeGroupChild, shape_id: u32) -> XlsResult<(
         .with_flags(Flags::CHILD | Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
         .write(&mut children)?;
     style_properties(child.locked, child.fill, child.line, child.visible).write(&mut children)?;
-    write_child_anchor(
-        &mut children,
-        child.anchor.left,
-        child.anchor.top,
-        child.anchor.right,
-        child.anchor.bottom,
-    )?;
+    let [left, top, right, bottom] = child.anchor.fields();
+    write_child_anchor(&mut children, left, top, right, bottom)?;
     write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
     let has_textbox = child_has_textbox(child);
     if has_textbox {
@@ -183,22 +173,11 @@ fn grouped_child_shape(child: &XlsShapeGroupChild, shape_id: u32) -> XlsResult<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::{XlsGroupRect, XlsShapeAnchor};
+    use crate::writer::shape::{Anchor, Behavior, Rect};
     use litchi_odraw::RecordKind;
 
-    fn anchor() -> XlsShapeAnchor {
-        XlsShapeAnchor {
-            move_with_cells: true,
-            size_with_cells: true,
-            first_column: 0,
-            first_column_offset: 0,
-            first_row: 0,
-            first_row_offset: 0,
-            last_column: 6,
-            last_column_offset: 0,
-            last_row: 10,
-            last_row_offset: 0,
-        }
+    fn anchor() -> Anchor {
+        Anchor::cells(0, 0, 10, 6, Behavior::MoveAndSize).unwrap()
     }
 
     fn config(group: &XlsShapeGroupWrite) -> GroupShapeConfig<'_> {
@@ -219,14 +198,14 @@ mod tests {
     #[test]
     fn spgr_container_length_spans_every_fragment() {
         let mut group = XlsShapeGroupWrite::new(anchor());
-        group.coordinates = XlsGroupRect::new(0, 0, 2000, 1000);
+        group.coordinates = Rect::new(0, 0, 2000, 1000).unwrap();
         group.children.push(XlsShapeGroupChild::new(
             XlsShapeKind::Rectangle,
-            XlsGroupRect::new(0, 0, 900, 500),
+            Rect::new(0, 0, 900, 500).unwrap(),
         ));
         group.children.push(XlsShapeGroupChild::new(
             XlsShapeKind::Ellipse,
-            XlsGroupRect::new(900, 400, 2000, 1000),
+            Rect::new(900, 400, 2000, 1000).unwrap(),
         ));
         let config = config(&group);
         let fragments = group_fragments(&config, 1026).unwrap();
@@ -247,10 +226,10 @@ mod tests {
     #[test]
     fn group_header_holds_spgr_rect_group_flags_and_client_anchor() {
         let mut group = XlsShapeGroupWrite::new(anchor());
-        group.coordinates = XlsGroupRect::new(10, 20, 1210, 820);
+        group.coordinates = Rect::new(10, 20, 1210, 820).unwrap();
         group.children.push(XlsShapeGroupChild::new(
             XlsShapeKind::Rectangle,
-            XlsGroupRect::new(10, 20, 400, 300),
+            Rect::new(10, 20, 400, 300).unwrap(),
         ));
         let config = config(&group);
         let fragments = group_fragments(&config, 2049).unwrap();
@@ -295,9 +274,9 @@ mod tests {
     #[test]
     fn children_use_child_anchors_child_flags_and_sequential_shape_ids() {
         let mut group = XlsShapeGroupWrite::new(anchor());
-        group.coordinates = XlsGroupRect::new(0, 0, 1000, 1000);
+        group.coordinates = Rect::new(0, 0, 1000, 1000).unwrap();
         let mut textbox =
-            XlsShapeGroupChild::new(XlsShapeKind::TextBox, XlsGroupRect::new(-20, 0, 480, 480));
+            XlsShapeGroupChild::new(XlsShapeKind::TextBox, Rect::new(-20, 0, 480, 480).unwrap());
         textbox.text = Some(crate::writer::XlsShapeText::new("grouped"));
         group.children.push(textbox);
         let config = config(&group);

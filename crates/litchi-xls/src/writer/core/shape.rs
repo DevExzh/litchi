@@ -67,44 +67,228 @@ pub enum XlsShapeLine {
     },
 }
 
-/// Cell-relative BIFF8 client anchor.
+/// How a cell-relative anchor responds when its underlying cells change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsShapeAnchor {
-    pub move_with_cells: bool,
-    pub size_with_cells: bool,
-    pub first_column: u16,
-    pub first_column_offset: u16,
-    pub first_row: u32,
-    pub first_row_offset: u16,
-    pub last_column: u16,
-    pub last_column_offset: u16,
-    pub last_row: u32,
-    pub last_row_offset: u16,
+#[repr(u8)]
+pub enum Behavior {
+    /// Neither the BIFF `fMove` nor `fSize` flag is set.
+    Fixed,
+    /// Only the BIFF `fSize` flag is set.
+    Size,
+    /// Both the BIFF `fMove` and `fSize` flags are set.
+    MoveAndSize,
 }
 
-impl XlsShapeAnchor {
-    pub(crate) fn validate(self) -> XlsResult<()> {
-        let horizontal_order = (self.first_column, self.first_column_offset)
-            < (self.last_column, self.last_column_offset);
-        let vertical_order =
-            (self.first_row, self.first_row_offset) < (self.last_row, self.last_row_offset);
-        if self.first_column > 255
-            || self.last_column > 255
-            || self.first_row > 65_535
-            || self.last_row > 65_535
-            || self.first_column_offset > 1023
-            || self.last_column_offset > 1023
-            || self.first_row_offset > 255
-            || self.last_row_offset > 255
-            || !horizontal_order
-            || !vertical_order
-            || (self.move_with_cells && !self.size_with_cells)
-        {
+impl Behavior {
+    const fn bits(self) -> u16 {
+        match self {
+            Self::Fixed => 0,
+            Self::Size => 0b10,
+            Self::MoveAndSize => 0b11,
+        }
+    }
+}
+
+/// A checked cell-relative point in a BIFF8 worksheet anchor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Point {
+    row: u16,
+    column: u8,
+    row_offset: u8,
+    column_offset: u16,
+}
+
+impl Point {
+    /// Create a point at a cell boundary, rejecting locations outside the BIFF8 grid.
+    pub fn new(row: u32, column: u16) -> XlsResult<Self> {
+        let row = u16::try_from(row)
+            .map_err(|_| XlsError::InvalidData("shape anchor row must be <= 65535".to_string()))?;
+        let column = u8::try_from(column)
+            .map_err(|_| XlsError::InvalidData("shape anchor column must be <= 255".to_string()))?;
+        Ok(Self::cell(row, column))
+    }
+
+    /// Create a zero-offset point from already narrow BIFF8 coordinates.
+    pub const fn cell(row: u16, column: u8) -> Self {
+        Self {
+            row,
+            column,
+            row_offset: 0,
+            column_offset: 0,
+        }
+    }
+
+    /// Set the row and column fractions, moving the checked point on success.
+    pub fn offset(mut self, row: u16, column: u16) -> XlsResult<Self> {
+        let row = u8::try_from(row).map_err(|_| {
+            XlsError::InvalidData("shape anchor row offset must be <= 255".to_string())
+        })?;
+        if column > 1023 {
             return Err(XlsError::InvalidData(
-                "shape anchor is outside BIFF8 bounds or has invalid movement flags".to_string(),
+                "shape anchor column offset must be <= 1023".to_string(),
             ));
         }
-        Ok(())
+        self.row_offset = row;
+        self.column_offset = column;
+        Ok(self)
+    }
+
+    /// Return the zero-based row.
+    pub const fn row(self) -> u16 {
+        self.row
+    }
+
+    /// Return the zero-based column.
+    pub const fn column(self) -> u8 {
+        self.column
+    }
+
+    /// Return the offset in 256ths of the row height.
+    pub const fn row_offset(self) -> u8 {
+        self.row_offset
+    }
+
+    /// Return the offset in 1024ths of the column width.
+    pub const fn column_offset(self) -> u16 {
+        self.column_offset
+    }
+}
+
+/// A checked cell-relative BIFF8 client anchor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Anchor {
+    behavior: Behavior,
+    first: Point,
+    last: Point,
+}
+
+impl Anchor {
+    /// Create an anchor whose horizontal and vertical endpoints are strictly ordered.
+    pub fn new(first: Point, last: Point, behavior: Behavior) -> XlsResult<Self> {
+        let horizontal_order =
+            (first.column, first.column_offset) < (last.column, last.column_offset);
+        let vertical_order = (first.row, first.row_offset) < (last.row, last.row_offset);
+        if !horizontal_order || !vertical_order {
+            return Err(XlsError::InvalidData(
+                "shape anchor endpoints must be strictly ordered on both axes".to_string(),
+            ));
+        }
+        Ok(Self {
+            behavior,
+            first,
+            last,
+        })
+    }
+
+    /// Create a zero-offset anchor directly from wide worksheet coordinates.
+    pub fn cells(
+        first_row: u32,
+        first_column: u16,
+        last_row: u32,
+        last_column: u16,
+        behavior: Behavior,
+    ) -> XlsResult<Self> {
+        Self::new(
+            Point::new(first_row, first_column)?,
+            Point::new(last_row, last_column)?,
+            behavior,
+        )
+    }
+
+    /// Return the cell-change behavior.
+    pub const fn behavior(self) -> Behavior {
+        self.behavior
+    }
+
+    /// Return the top-left point.
+    pub const fn first(self) -> Point {
+        self.first
+    }
+
+    /// Return the bottom-right point.
+    pub const fn last(self) -> Point {
+        self.last
+    }
+
+    pub(crate) const fn fields(self) -> [u16; 9] {
+        [
+            self.behavior.bits(),
+            self.first.column as u16,
+            self.first.column_offset,
+            self.first.row,
+            self.first.row_offset as u16,
+            self.last.column as u16,
+            self.last.column_offset,
+            self.last.row,
+            self.last.row_offset as u16,
+        ]
+    }
+
+    pub(crate) fn default_for_cell(row: u16, column: u8) -> Self {
+        let first_column = column.saturating_add(1).min(252);
+        let first_row = row.min(65_531);
+        Self {
+            behavior: Behavior::MoveAndSize,
+            first: Point::cell(first_row, first_column),
+            last: Point::cell(first_row + 4, first_column + 3),
+        }
+    }
+}
+
+/// A checked rectangle in a shape group's child coordinate space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rect {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+
+impl Rect {
+    pub(crate) const DEFAULT_GROUP: Self = Self {
+        left: 0,
+        top: 0,
+        right: 1023,
+        bottom: 255,
+    };
+
+    /// Create a rectangle with strictly increasing axes.
+    pub fn new(left: i32, top: i32, right: i32, bottom: i32) -> XlsResult<Self> {
+        if left >= right || top >= bottom {
+            return Err(XlsError::InvalidData(
+                "group rectangle must have left < right and top < bottom".to_string(),
+            ));
+        }
+        Ok(Self {
+            left,
+            top,
+            right,
+            bottom,
+        })
+    }
+
+    /// Return the left coordinate.
+    pub const fn left(self) -> i32 {
+        self.left
+    }
+
+    /// Return the top coordinate.
+    pub const fn top(self) -> i32 {
+        self.top
+    }
+
+    /// Return the right coordinate.
+    pub const fn right(self) -> i32 {
+        self.right
+    }
+
+    /// Return the bottom coordinate.
+    pub const fn bottom(self) -> i32 {
+        self.bottom
+    }
+
+    pub(crate) const fn fields(self) -> [i32; 4] {
+        [self.left, self.top, self.right, self.bottom]
     }
 }
 
@@ -134,7 +318,11 @@ impl XlsShapeText {
     }
 
     fn validate(&self) -> XlsResult<()> {
-        let units = self.value.encode_utf16().collect::<Vec<_>>();
+        let mut units = Vec::new();
+        units
+            .try_reserve_exact(self.value.len())
+            .map_err(|_| XlsError::Allocation("reserving shape text validation storage"))?;
+        units.extend(self.value.encode_utf16());
         if units.len() > usize::from(u16::MAX) {
             return Err(XlsError::InvalidData(
                 "shape text exceeds 65535 UTF-16 code units".to_string(),
@@ -188,7 +376,7 @@ impl XlsShapeText {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XlsShapeWrite {
     pub kind: XlsShapeKind,
-    pub anchor: XlsShapeAnchor,
+    pub anchor: Anchor,
     /// Optional requested OBJ identifier. `None` assigns the first free canonical ID.
     pub object_id: Option<u16>,
     pub text: Option<XlsShapeText>,
@@ -199,7 +387,7 @@ pub struct XlsShapeWrite {
 }
 
 impl XlsShapeWrite {
-    pub fn new(kind: XlsShapeKind, anchor: XlsShapeAnchor) -> Self {
+    pub fn new(kind: XlsShapeKind, anchor: Anchor) -> Self {
         Self {
             kind,
             anchor,
@@ -216,7 +404,6 @@ impl XlsShapeWrite {
     }
 
     pub(crate) fn validate(&self) -> XlsResult<()> {
-        self.anchor.validate()?;
         validate_shape_style(
             self.kind,
             self.object_id,
@@ -256,4 +443,71 @@ pub(crate) fn validate_shape_style(
         text.validate()?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::catch_unwind;
+
+    #[test]
+    fn point_boundaries_are_checked_without_unwinding() {
+        let outcome = catch_unwind(|| {
+            assert!(Point::new(65_535, 255).is_ok());
+            assert!(Point::new(65_536, 255).is_err());
+            assert!(Point::new(65_535, 256).is_err());
+            assert!(Point::cell(u16::MAX, u8::MAX).offset(255, 1023).is_ok());
+            assert!(Point::cell(0, 0).offset(256, 1023).is_err());
+            assert!(Point::cell(0, 0).offset(255, 1024).is_err());
+        });
+        assert!(outcome.is_ok());
+        assert_eq!(std::mem::size_of::<Point>(), 6);
+    }
+
+    #[test]
+    fn anchor_and_group_rect_reject_degenerate_axes() {
+        let first = Point::cell(4, 3);
+        let right = Point::cell(4, 3).offset(1, 1).unwrap();
+        let anchor = Anchor::new(first, right, Behavior::MoveAndSize).unwrap();
+        assert_eq!(anchor.first(), first);
+        assert_eq!(anchor.last(), right);
+        assert_eq!(anchor.behavior(), Behavior::MoveAndSize);
+
+        let outcome = catch_unwind(|| {
+            assert!(Anchor::new(first, first, Behavior::Fixed).is_err());
+            assert!(Anchor::new(right, first, Behavior::Size).is_err());
+            assert!(Anchor::cells(0, 0, 65_536, 255, Behavior::Fixed).is_err());
+            assert!(
+                Anchor::new(
+                    Point::new(65_534, 254).unwrap().offset(255, 1023).unwrap(),
+                    Point::new(65_535, 255).unwrap().offset(255, 1023).unwrap(),
+                    Behavior::MoveAndSize,
+                )
+                .is_ok()
+            );
+        });
+        assert!(outcome.is_ok());
+        assert!(Rect::new(i32::MIN, i32::MIN, i32::MAX, i32::MAX).is_ok());
+        assert!(Rect::new(0, 0, 0, 1).is_err());
+        assert!(Rect::new(0, 0, 1, 0).is_err());
+    }
+
+    #[test]
+    fn text_validation_checks_utf16_boundaries_without_unwinding() {
+        let outcome = catch_unwind(|| {
+            let oversized = XlsShapeText::new("a".repeat(usize::from(u16::MAX) + 1));
+            assert!(oversized.validate().is_err());
+
+            let split_surrogate = XlsShapeText {
+                value: "😀".to_string(),
+                runs: vec![XlsShapeTextRun {
+                    character_index: 1,
+                    font_index: 0,
+                }],
+                font_when_empty: 0,
+            };
+            assert!(split_surrogate.validate().is_err());
+        });
+        assert!(outcome.is_ok());
+    }
 }

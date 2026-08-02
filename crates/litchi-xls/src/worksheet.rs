@@ -12,8 +12,8 @@ use crate::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::page_setup::XlsPageSetup;
 use crate::pivot_table::PivotTable;
 use crate::protection::SheetProtection;
-use crate::sort_data::XlsSortData;
 use crate::view::XlsWorksheetView;
+use crate::writer::sort::Config;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
 };
@@ -45,7 +45,7 @@ pub struct XlsWorksheet {
     /// Sort configuration (SORT record)
     sort_info: Option<SortInfo>,
     /// Extended sort configuration (SORTDATA + CONTINUEFRT12 records)
-    sort_data: Option<XlsSortData>,
+    sort_data: Option<Config>,
     /// Whether the sheet data was filtered (FILTERMODE record present)
     filter_mode: bool,
     /// Pivot tables (aggregated SX* records)
@@ -308,11 +308,11 @@ impl XlsWorksheet {
     }
 
     /// Extended range sort metadata, including color, icon, and custom-list keys.
-    pub fn sort_data(&self) -> Option<&XlsSortData> {
+    pub fn sort(&self) -> Option<&Config> {
         self.sort_data.as_ref()
     }
 
-    pub(crate) fn set_sort_data(&mut self, sort_data: XlsSortData) {
+    pub(crate) fn set_extended_sort(&mut self, sort_data: Config) {
         self.sort_data = Some(sort_data);
     }
 

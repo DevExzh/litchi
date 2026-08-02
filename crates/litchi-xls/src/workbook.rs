@@ -914,7 +914,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 && let Some(sort_data) =
                     sort_data_collector.feed_record(record.header.record_type, &record.data)?
             {
-                worksheet.set_sort_data(sort_data);
+                worksheet.set_extended_sort(sort_data);
             }
             row_block_index_collector.feed_record(
                 record_position,

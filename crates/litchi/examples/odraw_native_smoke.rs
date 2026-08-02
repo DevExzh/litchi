@@ -9,9 +9,10 @@ use litchi::doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosi
 use litchi::ppt::writer::{
     FillStyle, LineStyleConfig, PptWriter, ShapeColor, ShapeStyle, ShapeType, Table,
 };
+use litchi::xls::writer::shape::{Anchor, Behavior, Rect};
 use litchi::xls::writer::{
-    XlsGroupRect, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,
-    XlsShapeGroupWrite, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
+    XlsShapeColor, XlsShapeFill, XlsShapeGroupChild, XlsShapeGroupWrite, XlsShapeKind,
+    XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -117,7 +118,7 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let mut rectangle = XlsShapeWrite::new(XlsShapeKind::Rectangle, xls_anchor(1, 2, 5, 8));
+    let mut rectangle = XlsShapeWrite::new(XlsShapeKind::Rectangle, xls_anchor(1, 2, 5, 8)?);
     rectangle.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0x1F, 0x4E, 0x78));
     rectangle.line = XlsShapeLine::None;
     xls.add_shape(sheet, rectangle)?;
@@ -127,7 +128,7 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let mut textbox = XlsShapeWrite::new(XlsShapeKind::TextBox, xls_anchor(6, 2, 11, 8));
+    let mut textbox = XlsShapeWrite::new(XlsShapeKind::TextBox, xls_anchor(6, 2, 11, 8)?);
     textbox.text = Some(XlsShapeText::new("Typed XLS textbox 世界"));
     textbox.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0xE2, 0xF0, 0xD9));
     xls.add_shape(sheet, textbox)?;
@@ -137,16 +138,12 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let mut group = XlsShapeGroupWrite::new(xls_anchor(1, 10, 11, 20));
-    group.coordinates = XlsGroupRect::new(0, 0, 2000, 1000);
-    let mut child =
-        XlsShapeGroupChild::new(XlsShapeKind::Ellipse, XlsGroupRect::new(0, 0, 900, 900));
+    let mut group = XlsShapeGroupWrite::new(xls_anchor(1, 10, 11, 20)?);
+    group.coordinates = Rect::new(0, 0, 2000, 1000)?;
+    let mut child = XlsShapeGroupChild::new(XlsShapeKind::Ellipse, Rect::new(0, 0, 900, 900)?);
     child.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0xFF, 0xC0, 0x00));
     group.children.push(child);
-    let mut label = XlsShapeGroupChild::new(
-        XlsShapeKind::TextBox,
-        XlsGroupRect::new(950, 100, 2000, 900),
-    );
+    let mut label = XlsShapeGroupChild::new(XlsShapeKind::TextBox, Rect::new(950, 100, 2000, 900)?);
     label.text = Some(XlsShapeText::new("Grouped"));
     group.children.push(label);
     xls.add_shape_group(sheet, group)?;
@@ -155,17 +152,17 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn xls_anchor(first_col: u16, first_row: u32, last_col: u16, last_row: u32) -> XlsShapeAnchor {
-    XlsShapeAnchor {
-        move_with_cells: true,
-        size_with_cells: true,
-        first_column: first_col,
-        first_column_offset: 0,
+fn xls_anchor(
+    first_col: u16,
+    first_row: u32,
+    last_col: u16,
+    last_row: u32,
+) -> litchi::xls::XlsResult<Anchor> {
+    Anchor::cells(
         first_row,
-        first_row_offset: 0,
-        last_column: last_col,
-        last_column_offset: 0,
+        first_col,
         last_row,
-        last_row_offset: 0,
-    }
+        last_col,
+        Behavior::MoveAndSize,
+    )
 }

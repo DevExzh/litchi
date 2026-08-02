@@ -1,8 +1,8 @@
 use std::io::Cursor;
 
+use litchi_xls::writer::shape::{Anchor, Behavior, Point};
 use litchi_xls::writer::{
-    XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsPivotTableConfig,
-    XlsWriter,
+    XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsPivotTableConfig, XlsWriter,
 };
 use litchi_xls::{CommentVisibility, XlsWorkbook};
 
@@ -38,18 +38,14 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
             XlsCommentWriteOptions {
                 visible: true,
                 shared: true,
-                anchor: Some(XlsCommentAnchor {
-                    move_with_cells: true,
-                    size_with_cells: true,
-                    first_column: 4,
-                    first_column_offset: 10,
-                    first_row: 3,
-                    first_row_offset: 20,
-                    last_column: 7,
-                    last_column_offset: 900,
-                    last_row: 8,
-                    last_row_offset: 200,
-                }),
+                anchor: Some(
+                    Anchor::new(
+                        Point::new(3, 4).unwrap().offset(20, 10).unwrap(),
+                        Point::new(8, 7).unwrap().offset(200, 900).unwrap(),
+                        Behavior::MoveAndSize,
+                    )
+                    .unwrap(),
+                ),
                 text_runs: vec![XlsCommentTextRunWrite {
                     character_index: 0,
                     font_index: 0,

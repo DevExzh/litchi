@@ -1,8 +1,7 @@
 use std::io::Write;
 
-use crate::writer::{
-    XlsShapeAnchor, XlsShapeFill, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite,
-};
+use crate::writer::shape::Anchor;
+use crate::writer::{XlsShapeFill, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite};
 use crate::{XlsError, XlsResult};
 use litchi_odraw::{
     prop::Id,
@@ -125,20 +124,9 @@ fn group_prefix(drawing_id: u32, object_count: usize, shapes_size: usize) -> Xls
     Ok(out)
 }
 
-pub(super) fn write_xls_anchor<W: Write>(writer: &mut W, anchor: &XlsShapeAnchor) -> XlsResult<()> {
+pub(super) fn write_xls_anchor<W: Write>(writer: &mut W, anchor: &Anchor) -> XlsResult<()> {
     write_atom_header(writer, 0, WriteAtom::ClientAnchor, 18)?;
-    let flags = u16::from(anchor.move_with_cells) | (u16::from(anchor.size_with_cells) << 1);
-    for value in [
-        flags,
-        anchor.first_column,
-        anchor.first_column_offset,
-        anchor.first_row as u16,
-        anchor.first_row_offset,
-        anchor.last_column,
-        anchor.last_column_offset,
-        anchor.last_row as u16,
-        anchor.last_row_offset,
-    ] {
+    for value in anchor.fields() {
         writer.write_all(&value.to_le_bytes())?;
     }
     Ok(())
@@ -311,15 +299,13 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
 fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&XlsShapeText>) -> XlsResult<()> {
     let value = text.map_or("", |text| text.value.as_str());
     let units = value.encode_utf16().collect::<Vec<_>>();
-    let runs = if units.is_empty() {
-        Vec::new()
-    } else if text.is_none_or(|text| text.runs.is_empty()) {
-        vec![XlsShapeTextRun {
+    let runs = match text {
+        _ if units.is_empty() => Vec::new(),
+        Some(text) if !text.runs.is_empty() => text.runs.clone(),
+        _ => vec![XlsShapeTextRun {
             character_index: 0,
             font_index: 0,
-        }]
-    } else {
-        text.unwrap().runs.clone()
+        }],
     };
     let run_bytes = if units.is_empty() {
         0
@@ -488,4 +474,29 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
         comment::write_note(writer, comment)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::writer::shape::{Behavior, Point};
+
+    #[test]
+    fn checked_anchor_serializes_exact_client_anchor_bytes() {
+        let anchor = Anchor::new(
+            Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
+            Point::new(6, 4).unwrap().offset(200, 900).unwrap(),
+            Behavior::MoveAndSize,
+        )
+        .unwrap();
+        let mut bytes = Vec::new();
+        write_xls_anchor(&mut bytes, &anchor).unwrap();
+        assert_eq!(
+            bytes,
+            vec![
+                0x00, 0x00, 0x10, 0xF0, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x0A, 0x00,
+                0x01, 0x00, 0x14, 0x00, 0x04, 0x00, 0x84, 0x03, 0x06, 0x00, 0xC8, 0x00,
+            ]
+        );
+    }
 }

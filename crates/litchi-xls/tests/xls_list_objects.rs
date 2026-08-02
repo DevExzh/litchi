@@ -3,12 +3,12 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_core::sheet::WorkbookTrait;
+use litchi_xls::writer::sort::{Config, Key, On, Parent, Range};
 use litchi_xls::writer::{XlsCustomTableStyles, XlsWriter};
 use litchi_xls::{
     XlsListColumnId, XlsListObject, XlsListObjectColumn, XlsListObjectFeatureVersion,
     XlsListObjectId, XlsListObjectRange, XlsListObjectStyleOptions, XlsListTotalAggregation,
-    XlsSortCondition, XlsSortData, XlsSortOn, XlsSortParent, XlsSortRange, XlsTableStyle,
-    XlsWorkbook,
+    XlsTableStyle, XlsWorkbook,
 };
 
 fn workbook_records(bytes: &[u8]) -> Vec<(u16, usize)> {
@@ -186,21 +186,22 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
     let value = table(23, "Headerless", 0, 3, "TableStyleLight8")
         .with_header_row(false)
         .unwrap();
-    let mut sort = XlsSortData::new(
-        XlsSortRange::new(0, 3, 0, 1).unwrap(),
-        XlsSortParent::Table { id: 23 },
-    );
-    sort.add_condition(XlsSortCondition::new(
-        XlsSortRange::new(0, 3, 0, 0).unwrap(),
-        false,
-        XlsSortOn::Values {
-            custom_list: Some("East,West".to_string()),
-        },
-    ));
+    let mut sort = Config::new(Range::new(0..=3, 0..=1).unwrap(), Parent::Table { id: 23 });
+    sort.add(
+        Key::col(
+            Range::new(0..=3, 0..=0).unwrap(),
+            false,
+            On::Values {
+                custom_list: Some("East,West".to_string()),
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Extended").unwrap();
     writer.add_list_object(sheet, value).unwrap();
-    writer.set_sort_data(sheet, sort.clone()).unwrap();
+    assert_eq!(writer.put_sort(sheet, sort.clone()).unwrap(), None);
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     let bytes = output.into_inner();
@@ -226,7 +227,7 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
         XlsListObjectFeatureVersion::Feature12
     );
     assert!(!worksheet.list_objects()[0].has_header_row());
-    assert_eq!(worksheet.sort_data(), Some(&sort));
+    assert_eq!(worksheet.sort(), Some(&sort));
 }
 
 #[test]
@@ -237,8 +238,8 @@ fn producer_table_sort_continue_frt12_chain_remains_attached() {
     let mut found = false;
     for index in 0..workbook.worksheet_count() {
         let worksheet = workbook.xls_worksheet(index).unwrap();
-        if let Some(sort) = worksheet.sort_data()
-            && let XlsSortParent::Table { id } = sort.parent()
+        if let Some(sort) = worksheet.sort()
+            && let Parent::Table { id } = sort.parent()
         {
             assert!(
                 worksheet
@@ -246,7 +247,7 @@ fn producer_table_sort_continue_frt12_chain_remains_attached() {
                     .iter()
                     .any(|table| table.id().value() == id)
             );
-            assert!(!sort.conditions().is_empty());
+            assert!(!sort.keys().is_empty());
             found = true;
         }
     }

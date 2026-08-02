@@ -53,6 +53,8 @@ pub enum XlsError {
         /// Found length
         found: usize,
     },
+    /// A fallible retained-state or parsing allocation could not be reserved.
+    Allocation(&'static str),
     /// End of stream reached unexpectedly
     UnexpectedEndOfStream(String),
     /// Invalid formula
@@ -111,6 +113,9 @@ impl fmt::Display for XlsError {
             },
             XlsError::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
+            },
+            XlsError::Allocation(context) => {
+                write!(f, "Allocation failed while {context}")
             },
             XlsError::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)

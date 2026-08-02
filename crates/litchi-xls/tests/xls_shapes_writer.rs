@@ -1,24 +1,20 @@
 use std::io::Cursor;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use litchi_xls::shapes::extract_shapes_from_workbook;
+use litchi_xls::writer::shape::{Anchor, Behavior, Point};
 use litchi_xls::writer::{
-    XlsPivotTableConfig, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine,
-    XlsShapeText, XlsShapeTextRun, XlsShapeWrite, XlsWriter,
+    XlsPivotTableConfig, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
+    XlsShapeTextRun, XlsShapeWrite, XlsWriter,
 };
 
-fn anchor() -> XlsShapeAnchor {
-    XlsShapeAnchor {
-        move_with_cells: true,
-        size_with_cells: true,
-        first_column: 1,
-        first_column_offset: 10,
-        first_row: 1,
-        first_row_offset: 20,
-        last_column: 4,
-        last_column_offset: 900,
-        last_row: 6,
-        last_row_offset: 200,
-    }
+fn anchor() -> Anchor {
+    Anchor::new(
+        Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
+        Point::new(6, 4).unwrap().offset(200, 900).unwrap(),
+        Behavior::MoveAndSize,
+    )
+    .unwrap()
 }
 
 fn workbook_stream(bytes: Vec<u8>) -> Vec<u8> {
@@ -204,16 +200,16 @@ fn shape_mutations_reject_malformed_input_and_are_atomic() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
 
-    let mut invalid = XlsShapeWrite::new(XlsShapeKind::Rectangle, anchor());
-    invalid.anchor.last_column = 0;
-    assert!(writer.add_shape(sheet, invalid).is_err());
-
     let mut first = XlsShapeWrite::new(XlsShapeKind::Rectangle, anchor());
     first.object_id = Some(9);
     writer.add_shape(sheet, first).unwrap();
+    let before = write(&mut writer);
     let mut collision = XlsShapeWrite::new(XlsShapeKind::Ellipse, anchor());
     collision.object_id = Some(9);
-    assert!(writer.add_shape(sheet, collision).is_err());
+    let outcome = catch_unwind(AssertUnwindSafe(|| writer.add_shape(sheet, collision)));
+    assert!(outcome.is_ok());
+    assert!(outcome.unwrap().is_err());
+    assert_eq!(write(&mut writer), before);
     assert!(writer.remove_shape(sheet, 0).is_err());
     assert_eq!(writer.clear_shapes(sheet).unwrap(), 1);
     assert_eq!(writer.clear_shapes(sheet).unwrap(), 0);

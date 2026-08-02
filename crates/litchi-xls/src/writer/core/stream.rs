@@ -770,7 +770,7 @@ pub(crate) fn generate_workbook_stream(
             )?;
         }
         if let Some(ref sort_data) = worksheet.sort_data
-            && !matches!(sort_data.parent(), crate::XlsSortParent::Table { .. })
+            && !matches!(sort_data.parent(), crate::sort_data::Parent::Table { .. })
         {
             sort_data.write_biff_records(&mut stream)?;
         }

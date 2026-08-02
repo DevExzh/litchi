@@ -1,10 +1,10 @@
 use std::io::Cursor;
 
-use litchi_xls::{
-    CONTINUE_FRT12_RECORD_TYPE, SORT_DATA_RECORD_TYPE, XlsDifferentialFormatIndex,
-    XlsSortCondition, XlsSortData, XlsSortIcon, XlsSortIconSet, XlsSortMethod, XlsSortOn,
-    XlsSortOrientation, XlsSortParent, XlsSortRange, XlsWorkbook, XlsWriter,
+use litchi_xls::writer::sort::{
+    Axis, CONTINUE_FRT12_RECORD_TYPE, Config, Dxf, Icon, IconSet, Key, Method, On, Parent, Range,
+    SORT_DATA_RECORD_TYPE,
 };
+use litchi_xls::{XlsWorkbook, XlsWriter};
 
 const LEGACY_SORT_RECORD_TYPE: u16 = 0x0090;
 
@@ -22,34 +22,46 @@ fn workbook_record_types(bytes: &[u8]) -> Vec<u16> {
     record_types
 }
 
-fn extended_sort() -> XlsSortData {
-    let range = XlsSortRange::new(1, 20, 0, 4).unwrap();
-    let mut sort = XlsSortData::new(range, XlsSortParent::Sheet);
-    sort.set_orientation(XlsSortOrientation::Columns);
-    sort.set_case_sensitive(true);
-    sort.set_method(XlsSortMethod::Alternate);
-    sort.add_condition(XlsSortCondition::new(
-        XlsSortRange::new(1, 20, 0, 0).unwrap(),
-        true,
-        XlsSortOn::Values {
-            custom_list: Some("高,中,低".to_string()),
-        },
-    ));
-    sort.add_condition(XlsSortCondition::new(
-        XlsSortRange::new(1, 20, 1, 1).unwrap(),
-        false,
-        XlsSortOn::CellColor {
-            differential_format: XlsDifferentialFormatIndex::new(9),
-        },
-    ));
-    sort.add_condition(XlsSortCondition::new(
-        XlsSortRange::new(1, 20, 2, 2).unwrap(),
-        false,
-        XlsSortOn::Icon {
-            set: XlsSortIconSet::FiveRating,
-            icon: XlsSortIcon::Fourth,
-        },
-    ));
+fn extended_sort() -> Config {
+    let range = Range::new(1..=20, 0..=4).unwrap();
+    let mut sort = Config::new(range, Parent::Sheet);
+    sort.put_axis(Axis::Cols).unwrap();
+    sort.set_case(true);
+    sort.set_method(Method::Alternate);
+    sort.add(
+        Key::row(
+            Range::new(1..=1, 0..=4).unwrap(),
+            true,
+            On::Values {
+                custom_list: Some("高,中,低".to_string()),
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    sort.add(
+        Key::row(
+            Range::new(2..=2, 0..=4).unwrap(),
+            false,
+            On::CellColor {
+                differential_format: Dxf::new(9),
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    sort.add(
+        Key::row(
+            Range::new(3..=3, 0..=4).unwrap(),
+            false,
+            On::Icon {
+                set: IconSet::FiveRating,
+                icon: Icon::Fourth,
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
     sort
 }
 
@@ -59,7 +71,7 @@ fn writer_stream_round_trip_preserves_extended_sort_and_record_order() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Sorted").unwrap();
     writer.set_sort(sheet, true, true, &[(0, true)]).unwrap();
-    writer.set_sort_data(sheet, expected.clone()).unwrap();
+    assert_eq!(writer.put_sort(sheet, expected.clone()).unwrap(), None);
 
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
@@ -76,25 +88,56 @@ fn writer_stream_round_trip_preserves_extended_sort_and_record_order() {
     );
 
     let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
-    let parsed = workbook.xls_worksheet(0).unwrap().sort_data().unwrap();
+    let parsed = workbook.xls_worksheet(0).unwrap().sort().unwrap();
     assert_eq!(parsed, &expected);
 }
 
 #[test]
 fn writer_and_parser_support_zero_condition_sort_data() {
-    let expected = XlsSortData::new(
-        XlsSortRange::new(0, 0, 0, 0).unwrap(),
-        XlsSortParent::AutoFilter,
-    );
+    let expected = Config::new(Range::new(0..=0, 0..=0).unwrap(), Parent::AutoFilter);
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Empty sort").unwrap();
-    writer.set_sort_data(sheet, expected.clone()).unwrap();
+    assert_eq!(writer.put_sort(sheet, expected.clone()).unwrap(), None);
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
     let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(workbook.xls_worksheet(0).unwrap().sort(), Some(&expected));
+}
+
+#[test]
+fn writer_sort_crud_is_move_first_idempotent_and_failure_atomic() {
+    let first = Config::new(Range::new(0..=5, 0..=1).unwrap(), Parent::Sheet);
+    let mut second = Config::new(Range::new(2..=9, 1..=2).unwrap(), Parent::Sheet);
+    second
+        .add(
+            Key::col(
+                Range::new(2..=9, 1..=1).unwrap(),
+                false,
+                On::Values { custom_list: None },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+    let mut writer = XlsWriter::new();
+    let sheet = writer.add_worksheet("CRUD").unwrap();
+    assert_eq!(writer.put_sort(sheet, first.clone()).unwrap(), None);
     assert_eq!(
-        workbook.xls_worksheet(0).unwrap().sort_data(),
-        Some(&expected)
+        writer.put_sort(sheet, second.clone()).unwrap(),
+        Some(first.clone())
     );
+
+    let invalid_sheet = sheet + 1;
+    assert!(writer.put_sort(invalid_sheet, first.clone()).is_err());
+    assert!(writer.remove_sort(invalid_sheet).is_err());
+    let unknown_table = Config::new(Range::new(0..=0, 0..=0).unwrap(), Parent::Table { id: 99 });
+    assert!(writer.put_sort(sheet, unknown_table).is_err());
+    assert_eq!(writer.remove_sort(sheet).unwrap(), Some(second));
+    assert_eq!(writer.remove_sort(sheet).unwrap(), None);
+
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(workbook.xls_worksheet(0).unwrap().sort(), None);
 }

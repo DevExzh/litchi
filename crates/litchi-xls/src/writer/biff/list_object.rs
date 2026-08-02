@@ -1,10 +1,11 @@
-use crate::{XlsListObject, XlsResult, XlsSortData, XlsSortParent};
+use crate::sort_data::{Config, Parent};
+use crate::{XlsListObject, XlsResult};
 use std::io::Write;
 
 pub(crate) fn write_list_objects<W: Write>(
     writer: &mut W,
     tables: &[XlsListObject],
-    sort_data: Option<&XlsSortData>,
+    sort_data: Option<&Config>,
 ) -> XlsResult<()> {
     if tables.is_empty() {
         return Ok(());
@@ -17,10 +18,10 @@ pub(crate) fn write_list_objects<W: Write>(
         for record in table.to_following_record_bytes()? {
             writer.write_all(&record)?;
         }
-        if sort_data.is_some_and(
-            |sort| matches!(sort.parent(), XlsSortParent::Table { id } if id == table.id().value()),
-        ) {
-            sort_data.unwrap().write_biff_records(writer)?;
+        if let Some(sort) = sort_data
+            && matches!(sort.parent(), Parent::Table { id } if id == table.id().value())
+        {
+            sort.write_biff_records(writer)?;
         }
     }
     Ok(())
