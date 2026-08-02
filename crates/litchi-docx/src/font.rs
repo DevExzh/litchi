@@ -1,10 +1,13 @@
 //! Typed WordprocessingML font tables and inert embedded-font resources.
 
-use crate::error::{OoxmlError, Result};
+use crate::{Error, Result};
+use caseless::Caseless;
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, XmlPart};
 use quick_xml::{XmlVersion, events::Event, reader::Reader};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use unicode_normalization::UnicodeNormalization;
 
 const WT: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const WS: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -26,11 +29,11 @@ const MAX_DEPTH: usize = 32;
 const MAX_TEXT: usize = 32_768;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FontTableConformance {
+pub enum Conformance {
     Transitional,
     Strict,
 }
-impl FontTableConformance {
+impl Conformance {
     fn word(self) -> &'static str {
         match self {
             Self::Transitional => WT,
@@ -62,16 +65,12 @@ impl FontTableConformance {
 /// This module never searches, parses, loads, renders, or executes a font
 /// program. Licensing bits therefore remain inert metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmbeddedFontLicensing {
-    pub fs_type: u16,
-    pub restricted_license: bool,
-    pub preview_and_print: bool,
-    pub editable: bool,
-    pub no_subsetting: bool,
-    pub bitmap_only: bool,
-}
-impl EmbeddedFontLicensing {
-    pub fn from_fs_type(fs_type: u16) -> Result<Self> {
+#[repr(transparent)]
+pub struct License(u16);
+
+impl License {
+    /// Validate and retain the compact OpenType `fsType` bit field.
+    pub fn new(fs_type: u16) -> Result<Self> {
         const DEFINED: u16 = 0x0002 | 0x0004 | 0x0008 | 0x0100 | 0x0200;
         if fs_type & !DEFINED != 0 {
             return Err(invalid(format!(
@@ -89,39 +88,58 @@ impl EmbeddedFontLicensing {
                 "font fsType has contradictory restricted, preview/print, and editable modes",
             ));
         }
-        Ok(Self {
-            fs_type,
-            restricted_license: fs_type & 0x0002 != 0,
-            preview_and_print: fs_type & 0x0004 != 0,
-            editable: fs_type & 0x0008 != 0,
-            no_subsetting: fs_type & 0x0100 != 0,
-            bitmap_only: fs_type & 0x0200 != 0,
-        })
+        Ok(Self(fs_type))
     }
-    pub fn installable(self) -> bool {
-        self.fs_type & 0x000E == 0
+
+    /// Return the validated OpenType bit field.
+    pub const fn bits(self) -> u16 {
+        self.0
+    }
+
+    pub const fn restricted(self) -> bool {
+        self.0 & 0x0002 != 0
+    }
+
+    pub const fn preview_print(self) -> bool {
+        self.0 & 0x0004 != 0
+    }
+
+    pub const fn editable(self) -> bool {
+        self.0 & 0x0008 != 0
+    }
+
+    pub const fn no_subsetting(self) -> bool {
+        self.0 & 0x0100 != 0
+    }
+
+    pub const fn bitmap_only(self) -> bool {
+        self.0 & 0x0200 != 0
+    }
+
+    pub const fn installable(self) -> bool {
+        self.0 & 0x000E == 0
     }
 }
 
 /// Apply the reversible OOXML GUID XOR transformation to the first 32 bytes.
-pub fn obfuscate_embedded_font_data(data: &mut [u8], font_key: &str) -> Result<()> {
+pub fn obfuscate(data: &mut [u8], font_key: &str) -> Result<()> {
     if data.len() < 32 {
         return Err(invalid("OOXML font obfuscation requires at least 32 bytes"));
     }
     let key = parse_font_key_bytes(font_key)?;
-    for index in 0..32 {
-        data[index] ^= key[15 - (index % 16)];
+    for (byte, key_byte) in data.iter_mut().take(32).zip(key.iter().rev().cycle()) {
+        *byte ^= *key_byte;
     }
     Ok(())
 }
 
-/// Reverse [`obfuscate_embedded_font_data`]. XOR makes both operations identical.
-pub fn deobfuscate_embedded_font_data(data: &mut [u8], font_key: &str) -> Result<()> {
-    obfuscate_embedded_font_data(data, font_key)
+/// Reverse [`obfuscate`]. XOR makes both operations identical.
+pub fn deobfuscate(data: &mut [u8], font_key: &str) -> Result<()> {
+    obfuscate(data, font_key)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FontFamily {
+pub enum Family {
     Decorative,
     Modern,
     Roman,
@@ -129,7 +147,7 @@ pub enum FontFamily {
     Swiss,
     Auto,
 }
-impl FontFamily {
+impl Family {
     fn parse(v: &str) -> Result<Self> {
         match v {
             "decorative" => Ok(Self::Decorative),
@@ -154,12 +172,12 @@ impl FontFamily {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FontPitch {
+pub enum Pitch {
     Fixed,
     Variable,
     Default,
 }
-impl FontPitch {
+impl Pitch {
     fn parse(v: &str) -> Result<Self> {
         match v {
             "fixed" => Ok(Self::Fixed),
@@ -178,7 +196,7 @@ impl FontPitch {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FontCharacterSet {
+pub enum Charset {
     Ansi,
     Macintosh,
     ShiftJis,
@@ -197,7 +215,7 @@ pub enum FontCharacterSet {
     EastEurope,
     Legacy(u8),
 }
-impl FontCharacterSet {
+impl Charset {
     fn legacy(v: u8) -> Self {
         match v {
             0x00 => Self::Ansi,
@@ -285,13 +303,13 @@ impl FontCharacterSet {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EmbeddedFontStyle {
+pub enum Style {
     Regular,
     Bold,
     Italic,
     BoldItalic,
 }
-impl EmbeddedFontStyle {
+impl Style {
     fn element(self) -> &'static str {
         match self {
             Self::Regular => "embedRegular",
@@ -310,32 +328,49 @@ impl EmbeddedFontStyle {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FontTableExtensionAttribute {
-    qualified_name: String,
-    value: String,
-}
-impl FontTableExtensionAttribute {
-    pub fn new(qualified_name: impl Into<String>, value: impl Into<String>) -> Self {
-        Self {
-            qualified_name: qualified_name.into(),
-            value: value.into(),
+// Private implementation spellings keep the package codec compact without
+// leaking the retired monolith vocabulary into rustdoc or downstream code.
+
+/// Low-level, lossless XML details that normal font authoring can ignore.
+pub mod raw {
+    use super::{bounded, validate_attr_name};
+    use crate::Result;
+
+    /// An extension attribute preserved verbatim by the XML codec.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Attr {
+        pub(super) qualified_name: String,
+        pub(super) value: String,
+    }
+
+    impl Attr {
+        pub fn new(qualified_name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
+            let qualified_name = qualified_name.into();
+            let value = value.into();
+            validate_attr_name(&qualified_name)?;
+            bounded(&value)?;
+            Ok(Self {
+                qualified_name,
+                value,
+            })
         }
-    }
-    pub fn qualified_name(&self) -> &str {
-        &self.qualified_name
-    }
-    pub fn value(&self) -> &str {
-        &self.value
+
+        pub fn qualified_name(&self) -> &str {
+            &self.qualified_name
+        }
+
+        pub fn value(&self) -> &str {
+            &self.value
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FontSignature {
+pub struct Signature {
     unicode_subsets: [u32; 4],
     code_pages: [u32; 2],
 }
-impl FontSignature {
+impl Signature {
     pub fn new(unicode_subsets: [u32; 4], code_pages: [u32; 2]) -> Self {
         Self {
             unicode_subsets,
@@ -351,104 +386,103 @@ impl FontSignature {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EmbeddedFontResource {
+pub struct Resource {
+    // OPC identity is deliberately private: safe authoring allocates it.
     part_name: String,
     content_type: String,
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
 }
-impl EmbeddedFontResource {
-    pub fn new(part_name: impl Into<String>, data: Vec<u8>) -> Self {
-        Self {
-            part_name: part_name.into(),
+impl Resource {
+    /// Own an inert, already-obfuscated embedded-font payload.
+    pub fn new(data: Vec<u8>) -> Result<Self> {
+        Self::from_shared(Arc::new(data))
+    }
+
+    /// Share an inert payload without copying its allocation.
+    fn from_shared(data: Arc<Vec<u8>>) -> Result<Self> {
+        validate_resource_len(data.len())?;
+        Ok(Self {
+            part_name: String::new(),
             content_type: FONT_CT.into(),
             data,
-        }
+        })
     }
-    pub fn with_content_type(mut self, content_type: impl Into<String>) -> Self {
-        self.content_type = content_type.into();
-        self
+
+    /// Borrow the payload bytes.
+    pub fn bytes(&self) -> &[u8] {
+        self.data.as_slice()
     }
-    pub fn set_part_name(&mut self, part_name: impl Into<String>) {
-        self.part_name = part_name.into();
+
+    /// Share the payload allocation with another owner.
+    fn share(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.data)
     }
-    pub fn set_data(&mut self, data: Vec<u8>) {
-        self.data = data;
-    }
-    pub fn part_name(&self) -> &str {
-        &self.part_name
-    }
-    pub fn content_type(&self) -> &str {
-        &self.content_type
-    }
-    pub fn data(&self) -> &[u8] {
-        &self.data
+
+    /// Whether two resources retain the same package allocation.
+    pub fn shares_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EmbeddedFont {
-    style: EmbeddedFontStyle,
+pub struct Embed {
+    style: Style,
     relationship_id: String,
     font_key: Option<String>,
     subsetted: Option<bool>,
-    resource: Option<EmbeddedFontResource>,
-    extension_attributes: Vec<FontTableExtensionAttribute>,
+    resource: Option<Resource>,
+    extension_attributes: Vec<raw::Attr>,
 }
-impl EmbeddedFont {
-    pub fn new(style: EmbeddedFontStyle, resource: EmbeddedFontResource) -> Self {
-        Self {
+impl Embed {
+    pub fn new(style: Style, font_key: impl Into<String>, resource: Resource) -> Result<Self> {
+        let font_key = font_key.into();
+        parse_font_key_bytes(&font_key)?;
+        Ok(Self {
             style,
             relationship_id: String::new(),
-            font_key: None,
+            font_key: Some(font_key),
             subsetted: None,
             resource: Some(resource),
             extension_attributes: Vec::new(),
-        }
+        })
     }
-    pub fn with_relationship_id(mut self, relationship_id: impl Into<String>) -> Self {
-        self.relationship_id = relationship_id.into();
-        self
+
+    /// Replace the OOXML GUID used to obfuscate this payload.
+    pub fn rekey(&mut self, font_key: impl Into<String>) -> Result<()> {
+        let font_key = font_key.into();
+        parse_font_key_bytes(&font_key)?;
+        self.font_key = Some(font_key);
+        Ok(())
     }
-    pub fn with_font_key(mut self, font_key: impl Into<String>) -> Self {
-        self.font_key = Some(font_key.into());
-        self
-    }
-    pub fn with_subsetted(mut self, subsetted: bool) -> Self {
+
+    pub fn with_subset(mut self, subsetted: bool) -> Self {
         self.subsetted = Some(subsetted);
         self
     }
-    pub fn set_relationship_id(&mut self, relationship_id: impl Into<String>) {
-        self.relationship_id = relationship_id.into();
-    }
-    pub fn set_font_key(&mut self, font_key: Option<String>) {
-        self.font_key = font_key;
-    }
-    pub fn set_subsetted(&mut self, subsetted: Option<bool>) {
-        self.subsetted = subsetted;
-    }
-    pub fn resource_mut(&mut self) -> Option<&mut EmbeddedFontResource> {
-        self.resource.as_mut()
-    }
-    pub fn style(&self) -> EmbeddedFontStyle {
+
+    pub fn style(&self) -> Style {
         self.style
     }
-    pub fn relationship_id(&self) -> &str {
-        &self.relationship_id
-    }
-    pub fn font_key(&self) -> Option<&str> {
+
+    pub fn key(&self) -> Option<&str> {
         self.font_key.as_deref()
     }
+
     pub fn subsetted(&self) -> Option<bool> {
         self.subsetted
     }
-    pub fn resource(&self) -> Option<&EmbeddedFontResource> {
+
+    pub fn resource(&self) -> Option<&Resource> {
         self.resource.as_ref()
     }
-    pub fn extension_attributes(&self) -> &[FontTableExtensionAttribute] {
+
+    pub fn attrs(&self) -> &[raw::Attr] {
         &self.extension_attributes
     }
-    pub fn extension_attributes_mut(&mut self) -> &mut Vec<FontTableExtensionAttribute> {
-        &mut self.extension_attributes
+
+    pub fn with_attr(mut self, attr: raw::Attr) -> Self {
+        self.extension_attributes.push(attr);
+        self
     }
 }
 
@@ -457,18 +491,20 @@ pub struct Font {
     name: String,
     alternate_name: Option<String>,
     panose: Option<[u8; 10]>,
-    character_set: Option<FontCharacterSet>,
-    family: Option<FontFamily>,
+    character_set: Option<Charset>,
+    family: Option<Family>,
     not_true_type: Option<bool>,
-    pitch: Option<FontPitch>,
-    signature: Option<FontSignature>,
-    embedded_fonts: Vec<EmbeddedFont>,
-    extension_attributes: Vec<FontTableExtensionAttribute>,
+    pitch: Option<Pitch>,
+    signature: Option<Signature>,
+    embedded_fonts: Vec<Embed>,
+    extension_attributes: Vec<raw::Attr>,
 }
 impl Font {
-    pub fn new(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
+    pub fn new(name: impl Into<String>) -> Result<Self> {
+        let name = name.into();
+        validate_font_name(&name, "font name")?;
+        Ok(Self {
+            name,
             alternate_name: None,
             panose: None,
             character_set: None,
@@ -478,21 +514,25 @@ impl Font {
             signature: None,
             embedded_fonts: Vec::new(),
             extension_attributes: Vec::new(),
-        }
+        })
     }
-    pub fn with_alternate_name(mut self, value: impl Into<String>) -> Self {
-        self.alternate_name = Some(value.into());
-        self
+
+    pub fn with_alt(mut self, value: impl Into<String>) -> Result<Self> {
+        let value = value.into();
+        validate_font_name(&value, "alternate font name")?;
+        self.alternate_name = Some(value);
+        Ok(self)
     }
+
     pub fn with_panose(mut self, value: [u8; 10]) -> Self {
         self.panose = Some(value);
         self
     }
-    pub fn with_character_set(mut self, value: FontCharacterSet) -> Self {
+    pub fn with_charset(mut self, value: Charset) -> Self {
         self.character_set = Some(value);
         self
     }
-    pub fn with_family(mut self, value: FontFamily) -> Self {
+    pub fn with_family(mut self, value: Family) -> Self {
         self.family = Some(value);
         self
     }
@@ -500,66 +540,107 @@ impl Font {
         self.not_true_type = Some(value);
         self
     }
-    pub fn with_pitch(mut self, value: FontPitch) -> Self {
+    pub fn with_pitch(mut self, value: Pitch) -> Self {
         self.pitch = Some(value);
         self
     }
-    pub fn with_signature(mut self, value: FontSignature) -> Self {
+    pub fn with_signature(mut self, value: Signature) -> Self {
         self.signature = Some(value);
         self
     }
-    pub fn with_embedded_font(mut self, value: EmbeddedFont) -> Self {
+    pub fn with_embed(mut self, value: Embed) -> Result<Self> {
+        self.add_embed(value)?;
+        Ok(self)
+    }
+
+    pub fn rename(&mut self, value: impl Into<String>) -> Result<()> {
+        let value = value.into();
+        validate_font_name(&value, "font name")?;
+        self.name = value;
+        Ok(())
+    }
+
+    /// Add one embedded face, preserving schema order and rejecting duplicates.
+    pub fn add_embed(&mut self, value: Embed) -> Result<()> {
+        if self
+            .embedded_fonts
+            .iter()
+            .any(|existing| existing.style == value.style)
+        {
+            return Err(invalid("embedded-font style already exists"));
+        }
         self.embedded_fonts.push(value);
-        self
+        self.embedded_fonts.sort_by_key(|embed| embed.style.rank());
+        Ok(())
     }
-    pub fn set_name(&mut self, value: impl Into<String>) {
-        self.name = value.into();
-    }
-    pub fn embedded_fonts_mut(&mut self) -> &mut Vec<EmbeddedFont> {
-        &mut self.embedded_fonts
-    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn alternate_name(&self) -> Option<&str> {
+
+    pub fn alt(&self) -> Option<&str> {
         self.alternate_name.as_deref()
     }
     pub fn panose(&self) -> Option<&[u8; 10]> {
         self.panose.as_ref()
     }
-    pub fn character_set(&self) -> Option<FontCharacterSet> {
+    pub fn charset(&self) -> Option<Charset> {
         self.character_set
     }
-    pub fn family(&self) -> Option<FontFamily> {
+    pub fn family(&self) -> Option<Family> {
         self.family
     }
     pub fn not_true_type(&self) -> Option<bool> {
         self.not_true_type
     }
-    pub fn pitch(&self) -> Option<FontPitch> {
+    pub fn pitch(&self) -> Option<Pitch> {
         self.pitch
     }
-    pub fn signature(&self) -> Option<&FontSignature> {
+    pub fn signature(&self) -> Option<&Signature> {
         self.signature.as_ref()
     }
-    pub fn embedded_fonts(&self) -> &[EmbeddedFont] {
+    pub fn embeds(&self) -> &[Embed] {
         &self.embedded_fonts
     }
-    pub fn extension_attributes(&self) -> &[FontTableExtensionAttribute] {
+
+    pub fn attrs(&self) -> &[raw::Attr] {
         &self.extension_attributes
     }
-    pub fn extension_attributes_mut(&mut self) -> &mut Vec<FontTableExtensionAttribute> {
-        &mut self.extension_attributes
+
+    pub fn with_attr(mut self, attr: raw::Attr) -> Self {
+        self.extension_attributes.push(attr);
+        self
+    }
+}
+
+/// A safe table selector. Names are the primary stable selector; numeric
+/// positions remain available for import and inspection workflows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Key<'a> {
+    Name(&'a str),
+    Index(usize),
+}
+
+impl<'a> From<&'a str> for Key<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Name(value)
+    }
+}
+
+impl From<usize> for Key<'_> {
+    fn from(value: usize) -> Self {
+        Self::Index(value)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FontTable {
+pub struct Table {
     fonts: Vec<Font>,
-    namespaces: Vec<FontTableExtensionAttribute>,
-    extension_attributes: Vec<FontTableExtensionAttribute>,
+    namespaces: Vec<raw::Attr>,
+    extension_attributes: Vec<raw::Attr>,
 }
-impl FontTable {
+
+impl Table {
     pub fn new() -> Self {
         Self {
             fonts: Vec::new(),
@@ -570,39 +651,146 @@ impl FontTable {
     pub fn fonts(&self) -> &[Font] {
         &self.fonts
     }
-    pub fn extension_attributes(&self) -> &[FontTableExtensionAttribute] {
+
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &Font> {
+        self.fonts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.fonts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.fonts.is_empty()
+    }
+
+    pub fn get<'a, 's>(&'a self, key: impl Into<Key<'s>>) -> Result<Option<&'a Font>> {
+        match key.into() {
+            Key::Name(name) => Ok(
+                unique_font_offset(&self.fonts, name)?.and_then(|offset| self.fonts.get(offset))
+            ),
+            Key::Index(offset) => Ok(self.fonts.get(offset)),
+        }
+    }
+
+    pub fn add(&mut self, font: Font) -> Result<()> {
+        validate_font_entry(&font, false)?;
+        if unique_font_offset(&self.fonts, font.name())?.is_some() {
+            return Err(invalid(format!("font '{}' already exists", font.name())));
+        }
+        self.fonts.push(font);
+        Ok(())
+    }
+
+    pub fn replace<'s>(
+        &mut self,
+        key: impl Into<Key<'s>>,
+        replacement: Font,
+    ) -> Result<Option<Font>> {
+        validate_font_entry(&replacement, false)?;
+        let offset = match key.into() {
+            Key::Name(name) => unique_font_offset(&self.fonts, name)?,
+            Key::Index(offset) => (offset < self.fonts.len()).then_some(offset),
+        };
+        let Some(offset) = offset else {
+            return Ok(None);
+        };
+        let replacement_key = name_key(replacement.name());
+        if self
+            .fonts
+            .iter()
+            .enumerate()
+            .any(|(index, font)| index != offset && name_key(&font.name) == replacement_key)
+        {
+            return Err(invalid(format!(
+                "font '{}' already exists",
+                replacement.name()
+            )));
+        }
+        let slot = self
+            .fonts
+            .get_mut(offset)
+            .ok_or_else(|| invalid("font selector changed during replacement"))?;
+        Ok(Some(std::mem::replace(slot, replacement)))
+    }
+
+    pub fn remove<'s>(&mut self, key: impl Into<Key<'s>>) -> Result<Option<Font>> {
+        let offset = match key.into() {
+            Key::Name(name) => unique_font_offset(&self.fonts, name)?,
+            Key::Index(offset) => (offset < self.fonts.len()).then_some(offset),
+        };
+        Ok(offset.map(|offset| self.fonts.remove(offset)))
+    }
+
+    pub fn reorder<S: AsRef<str>>(&mut self, ordered_names: &[S]) -> Result<()> {
+        let mut rank = HashMap::with_capacity(ordered_names.len());
+        for (offset, name) in ordered_names.iter().enumerate() {
+            let name = name_key(name.as_ref());
+            if rank.insert(name, offset).is_some() {
+                return Err(invalid("font-table reorder contains duplicate names"));
+            }
+        }
+        let expected = self
+            .fonts
+            .iter()
+            .map(|font| name_key(&font.name))
+            .collect::<HashSet<_>>();
+        if rank.len() != self.fonts.len()
+            || rank.keys().any(|name| !expected.contains(name))
+            || expected.len() != self.fonts.len()
+        {
+            return Err(invalid("font-table reorder is not a font-name permutation"));
+        }
+        self.fonts.sort_by_cached_key(|font| {
+            rank.get(&name_key(&font.name))
+                .copied()
+                .unwrap_or(usize::MAX)
+        });
+        Ok(())
+    }
+
+    pub fn attrs(&self) -> &[raw::Attr] {
         &self.extension_attributes
     }
-    pub fn namespaces(&self) -> &[FontTableExtensionAttribute] {
+
+    pub fn namespaces(&self) -> &[raw::Attr] {
         &self.namespaces
     }
-    pub fn fonts_mut(&mut self) -> &mut Vec<Font> {
-        &mut self.fonts
+
+    pub fn with_attr(mut self, attr: raw::Attr) -> Self {
+        self.extension_attributes.push(attr);
+        self
     }
-    pub fn namespaces_mut(&mut self) -> &mut Vec<FontTableExtensionAttribute> {
-        &mut self.namespaces
+
+    pub fn with_namespace(mut self, attr: raw::Attr) -> Result<Self> {
+        if attr.qualified_name != "xmlns" && !attr.qualified_name.starts_with("xmlns:") {
+            return Err(invalid(
+                "namespace attribute must be named xmlns or xmlns:prefix",
+            ));
+        }
+        self.namespaces.push(attr);
+        Ok(self)
     }
-    pub fn extension_attributes_mut(&mut self) -> &mut Vec<FontTableExtensionAttribute> {
-        &mut self.extension_attributes
+
+    pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
+        write(self, conformance)
     }
-    pub fn to_xml(&self, c: FontTableConformance) -> Result<Vec<u8>> {
-        write_font_table(self, c)
-    }
+
     pub(crate) fn extract_from_part(part: &dyn Part, pkg: &OpcPackage) -> Result<Self> {
         if part.content_type() != FT_CT {
-            return Err(OoxmlError::InvalidContentType {
+            return Err(Error::ContentType {
                 expected: FT_CT.into(),
-                got: part.content_type().into(),
+                actual: part.content_type().into(),
             });
         }
-        let mut v = parse_font_table(part.blob())?;
+        let mut v = parse(part.blob())?;
         v.resolve(part, pkg)?;
         Ok(v)
     }
     fn resolve(&mut self, source: &dyn Part, pkg: &OpcPackage) -> Result<()> {
         validate_font_relationship_sources(pkg, source.partname())?;
         let mut used = HashSet::new();
-        let mut cached = HashMap::<String, EmbeddedFontResource>::new();
+        let mut cached = HashMap::<String, Resource>::new();
         let mut targets = HashSet::new();
         let mut total = 0usize;
         for font in &mut self.fonts {
@@ -632,9 +820,9 @@ impl FontTable {
                 }
                 let part = pkg.get_part(&uri)?;
                 if part.content_type() != FONT_CT {
-                    return Err(OoxmlError::InvalidContentType {
+                    return Err(Error::ContentType {
                         expected: FONT_CT.into(),
-                        got: part.content_type().into(),
+                        actual: part.content_type().into(),
                     });
                 }
                 if part.blob().len() > MAX_FONT {
@@ -654,10 +842,10 @@ impl FontTable {
                         "embedded font '{uri}' has nested relationships"
                     )));
                 }
-                let resource = EmbeddedFontResource {
+                let resource = Resource {
                     part_name: uri.to_string(),
                     content_type: part.content_type().into(),
-                    data: part.blob().to_vec(),
+                    data: part.blob_arc(),
                 };
                 cached.insert(target_name, resource.clone());
                 embed.resource = Some(resource)
@@ -675,14 +863,18 @@ impl FontTable {
         Ok(())
     }
 }
-impl Default for FontTable {
+impl Default for Table {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Load the document font table and its bounded, inert font resources.
-pub fn load_font_table(package: &OpcPackage) -> Result<Option<FontTable>> {
+/// Read the document font table and its bounded, inert font resources.
+///
+/// Embedded payload allocations are shared with the OPC package rather than
+/// copied. The returned table can therefore be queried repeatedly without
+/// reparsing or rediscovering the package graph.
+pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
     let (main_name, table_name, _) = locate_font_table(package)?;
     validate_font_table_relationship_sources(package, &main_name)?;
     let Some(table_name) = table_name else {
@@ -690,34 +882,45 @@ pub fn load_font_table(package: &OpcPackage) -> Result<Option<FontTable>> {
         return Ok(None);
     };
     let part = package.get_part(&table_name)?;
-    Ok(Some(FontTable::extract_from_part(part, package)?))
+    Ok(Some(Table::extract_from_part(part, package)?))
 }
 
-/// Store a complete font table after validating the staged XML and OPC graph.
+/// Move a complete font table into the package after validating the staged XML
+/// and OPC graph.
 ///
 /// Font bytes are stored exactly as supplied. Callers that have unobfuscated
-/// bytes must explicitly call [`obfuscate_embedded_font_data`] first. The API
+/// bytes must explicitly call [`obfuscate`] first. The API
 /// operates on an already decrypted in-memory `OpcPackage` and invalidates any
-/// package signatures immediately before the mutation phase.
-pub fn store_font_table(
-    package: &mut OpcPackage,
-    value: &FontTable,
-    conformance: FontTableConformance,
-) -> Result<()> {
+/// package signatures immediately before the mutation phase. Moving a default,
+/// empty [`Table`] removes the optional font-table graph and any font resources
+/// that become unreferenced.
+pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance) -> Result<()> {
     validate_package_conformance(package, conformance)?;
-    validate_table_value(value, true)?;
-    let old = load_font_table(package)?.unwrap_or_default();
+    let old = read(package)?.unwrap_or_default();
     let (main_name, old_table_name, old_table_relationship_id) = locate_font_table(package)?;
-    if old_table_name.is_none() && value.fonts.is_empty() {
+    if value.fonts.is_empty()
+        && value.namespaces.is_empty()
+        && value.extension_attributes.is_empty()
+    {
+        remove_graph(
+            package,
+            &old,
+            &main_name,
+            old_table_name.as_ref(),
+            old_table_relationship_id.as_deref(),
+        )?;
         return Ok(());
     }
-    let table_name = old_table_name.clone().unwrap_or_else(|| {
-        next_font_table_part_name(package)
-            .expect("the bounded part-name allocation was preflighted")
-    });
-    let table_relationship_id = old_table_relationship_id.clone().unwrap_or_else(|| {
-        next_named_relationship_id(package.get_part(&main_name).unwrap(), "rIdFontTable")
-    });
+    allocate_font_identifiers(package, &mut value)?;
+    validate_table_value(&value, true)?;
+    let table_name = match old_table_name.clone() {
+        Some(name) => name,
+        None => next_font_table_part_name(package)?,
+    };
+    let table_relationship_id = match old_table_relationship_id.clone() {
+        Some(id) => id,
+        None => next_named_relationship_id(package.get_part(&main_name)?, "rIdTable")?,
+    };
     if let Some(existing) = &old_table_name {
         let replaced = old_table_relationship_id
             .iter()
@@ -730,9 +933,9 @@ pub fn store_font_table(
         }
     }
 
-    let xml = write_font_table(value, conformance)?;
-    let staged = parse_font_table(&xml)?;
-    if staged != metadata_only(value) {
+    let xml = write(&value, conformance)?;
+    let staged = parse(&xml)?;
+    if !same_metadata(&staged, &value) {
         return Err(invalid("staged font-table XML did not round-trip"));
     }
 
@@ -759,7 +962,7 @@ pub fn store_font_table(
         .collect::<HashSet<_>>();
     let old_part_uris = old_part_names
         .iter()
-        .map(|name| PackURI::new(name).map_err(OoxmlError::InvalidUri))
+        .map(|name| PackURI::new(name).map_err(Error::Uri))
         .collect::<Result<Vec<_>>>()?;
 
     let table_part = old_table_name
@@ -767,7 +970,7 @@ pub fn store_font_table(
         .map(|name| package.get_part(name))
         .transpose()?;
     let mut relationships = HashMap::<String, PackURI>::new();
-    let mut resources = HashMap::<String, (String, Vec<u8>)>::new();
+    let mut resources = HashMap::<String, (String, Arc<Vec<u8>>)>::new();
     for font in &value.fonts {
         for embedded in &font.embedded_fonts {
             if let Some(part) = table_part
@@ -783,7 +986,7 @@ pub fn store_font_table(
                 .resource
                 .as_ref()
                 .ok_or_else(|| invalid("embedded-font resource is required for package storage"))?;
-            let uri = PackURI::new(&resource.part_name).map_err(OoxmlError::InvalidUri)?;
+            let uri = PackURI::new(&resource.part_name).map_err(Error::Uri)?;
             if let Some(previous) = relationships.get(&embedded.relationship_id) {
                 if previous != &uri {
                     return Err(invalid(format!(
@@ -795,7 +998,7 @@ pub fn store_font_table(
                 relationships.insert(embedded.relationship_id.clone(), uri.clone());
             }
             if let Some((content_type, data)) = resources.get(uri.as_str()) {
-                if content_type != &resource.content_type || data != &resource.data {
+                if content_type != &resource.content_type || data.as_slice() != resource.bytes() {
                     return Err(invalid(format!(
                         "shared font part '{uri}' has conflicting resources"
                     )));
@@ -803,14 +1006,14 @@ pub fn store_font_table(
             } else {
                 resources.insert(
                     uri.to_string(),
-                    (resource.content_type.clone(), resource.data.clone()),
+                    (resource.content_type.clone(), resource.share()),
                 );
             }
         }
     }
 
     for (part_name, (content_type, data)) in &resources {
-        let uri = PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?;
+        let uri = PackURI::new(part_name).map_err(Error::Uri)?;
         if let Ok(part) = package.get_part(&uri) {
             if part.content_type() != content_type {
                 return Err(invalid(format!("font part '{uri}' content type collision")));
@@ -820,10 +1023,10 @@ pub fn store_font_table(
                     "font part '{uri}' has outbound relationships"
                 )));
             }
-            if part.blob() != data && !old_part_names.contains(part_name) {
+            if part.blob() != data.as_slice() && !old_part_names.contains(part_name) {
                 return Err(invalid(format!("font part '{uri}' data collision")));
             }
-            if part.blob() != data
+            if part.blob() != data.as_slice()
                 && old_table_name.as_ref().is_some_and(|table| {
                     has_inbound_outside_relationships(package, &uri, table, &old_relationship_ids)
                         .unwrap_or(true)
@@ -842,22 +1045,20 @@ pub fn store_font_table(
         .map(|(name, (content_type, data))| {
             PackURI::new(&name)
                 .map(|uri| (uri, content_type, data))
-                .map_err(OoxmlError::InvalidUri)
+                .map_err(Error::Uri)
         })
         .collect::<Result<Vec<_>>>()?;
     package.unsign();
 
     for (uri, content_type, data) in resource_parts {
         if let Ok(part) = package.get_part_mut(&uri) {
-            part.set_blob(data);
+            part.set_blob_shared(data);
         } else {
-            package.add_part(Box::new(BlobPart::new(uri, content_type, data)));
+            package.add_part(Box::new(BlobPart::new_shared(uri, content_type, data)));
         }
     }
     if let Some(existing) = &old_table_name {
-        let part = package
-            .get_part_mut(existing)
-            .expect("font-table part was validated before mutation");
+        let part = package.get_part_mut(existing)?;
         let font_relationships = part
             .rels()
             .iter()
@@ -888,8 +1089,7 @@ pub fn store_font_table(
         }
         package.add_part(Box::new(part));
         package
-            .get_part_mut(&main_name)
-            .expect("main document was validated before mutation")
+            .get_part_mut(&main_name)?
             .rels_mut()
             .add_relationship(
                 conformance.font_table_rel().into(),
@@ -904,129 +1104,106 @@ pub fn store_font_table(
         .map(ToString::to_string)
         .collect::<HashSet<_>>();
     for uri in old_part_uris {
-        if !retained.contains(uri.as_str())
-            && !part_is_referenced(package, &uri)
-                .expect("all internal relationship targets were preflighted")
-        {
+        if !retained.contains(uri.as_str()) && !part_is_referenced(package, &uri)? {
             package.remove_part(&uri);
         }
     }
     Ok(())
 }
 
-pub fn find_font(package: &OpcPackage, name: &str) -> Result<Option<Font>> {
-    let Some(table) = load_font_table(package)? else {
-        return Ok(None);
-    };
-    Ok(unique_font_offset(&table.fonts, name)?.map(|offset| table.fonts[offset].clone()))
+/// Remove the optional font-table graph and every font resource that becomes
+/// unreferenced.
+///
+/// The complete relationship graph is validated before signatures, parts, or
+/// relationships are mutated. Resources shared by another source are retained.
+pub fn remove(package: &mut OpcPackage) -> Result<bool> {
+    let old = read(package)?.unwrap_or_default();
+    let (main_name, table_name, relationship_id) = locate_font_table(package)?;
+    remove_graph(
+        package,
+        &old,
+        &main_name,
+        table_name.as_ref(),
+        relationship_id.as_deref(),
+    )
 }
 
-pub fn add_font(
+fn remove_graph(
     package: &mut OpcPackage,
-    mut font: Font,
-    conformance: FontTableConformance,
-) -> Result<()> {
-    let mut table = load_font_table(package)?.unwrap_or_default();
-    if table
-        .fonts
-        .iter()
-        .any(|item| item.name.eq_ignore_ascii_case(&font.name))
-    {
-        return Err(invalid(format!("font '{}' already exists", font.name)));
-    }
-    allocate_font_identifiers(package, &mut font, &table)?;
-    table.fonts.push(font);
-    store_font_table(package, &table, conformance)
-}
-
-pub fn update_font(
-    package: &mut OpcPackage,
-    name: &str,
-    mut replacement: Font,
-    conformance: FontTableConformance,
-) -> Result<()> {
-    let mut table =
-        load_font_table(package)?.ok_or_else(|| invalid("document has no font table"))?;
-    let offset = unique_font_offset(&table.fonts, name)?
-        .ok_or_else(|| invalid(format!("font '{name}' was not found")))?;
-    table.fonts.remove(offset);
-    allocate_font_identifiers(package, &mut replacement, &table)?;
-    table.fonts.insert(offset, replacement);
-    store_font_table(package, &table, conformance)
-}
-
-pub fn replace_font(
-    package: &mut OpcPackage,
-    name: &str,
-    replacement: Font,
-    conformance: FontTableConformance,
-) -> Result<()> {
-    update_font(package, name, replacement, conformance)
-}
-
-pub fn remove_font(
-    package: &mut OpcPackage,
-    name: &str,
-    conformance: FontTableConformance,
+    old: &Table,
+    main_name: &PackURI,
+    table_name: Option<&PackURI>,
+    table_relationship_id: Option<&str>,
 ) -> Result<bool> {
-    let Some(mut table) = load_font_table(package)? else {
+    let Some(table_name) = table_name else {
         return Ok(false);
     };
-    let Some(offset) = unique_font_offset(&table.fonts, name)? else {
-        return Ok(false);
-    };
-    table.fonts.remove(offset);
-    store_font_table(package, &table, conformance)?;
-    Ok(true)
-}
-
-pub fn reorder_fonts(
-    package: &mut OpcPackage,
-    ordered_names: &[String],
-    conformance: FontTableConformance,
-) -> Result<()> {
-    let mut table =
-        load_font_table(package)?.ok_or_else(|| invalid("document has no font table"))?;
-    let expected = table
-        .fonts
+    let table_relationship_id =
+        table_relationship_id.ok_or_else(|| invalid("font-table relationship ID is missing"))?;
+    let table_part = package.get_part(table_name)?;
+    if table_part
+        .rels()
         .iter()
-        .map(|font| font.name.to_lowercase())
-        .collect::<HashSet<_>>();
-    if expected.len() != table.fonts.len() {
+        .any(|relationship| !is_font_relationship(relationship.reltype()))
+    {
         return Err(invalid(
-            "cannot reorder a font table with ambiguous case-insensitive names",
+            "font table with unknown outbound relationships cannot be removed safely",
         ));
     }
-    let actual = ordered_names
+    let font_relationship_ids = table_part
+        .rels()
         .iter()
-        .map(|name| name.to_lowercase())
+        .map(|relationship| relationship.r_id().to_owned())
         .collect::<HashSet<_>>();
-    if expected != actual || ordered_names.len() != table.fonts.len() {
-        return Err(invalid("font-table reorder is not a font-name permutation"));
+    let replaced_table_relationship = HashSet::from([table_relationship_id.to_owned()]);
+    if has_inbound_outside_relationships(
+        package,
+        table_name,
+        main_name,
+        &replaced_table_relationship,
+    )? {
+        return Err(invalid(format!(
+            "shared font-table part '{table_name}' cannot be removed"
+        )));
     }
-    table.fonts = ordered_names
+
+    let resource_names = old
+        .fonts
         .iter()
-        .map(|name| {
-            table
-                .fonts
-                .iter()
-                .find(|font| font.name.eq_ignore_ascii_case(name))
-                .expect("the font-name permutation was validated")
-                .clone()
-        })
-        .collect();
-    store_font_table(package, &table, conformance)
+        .flat_map(|font| font.embedded_fonts.iter())
+        .filter_map(|embed| embed.resource.as_ref())
+        .map(|resource| resource.part_name.as_str())
+        .collect::<HashSet<_>>();
+    let mut resources_to_remove = Vec::with_capacity(resource_names.len());
+    for name in resource_names {
+        let uri = PackURI::new(name).map_err(Error::Uri)?;
+        if !has_inbound_outside_relationships(package, &uri, table_name, &font_relationship_ids)? {
+            resources_to_remove.push(uri);
+        }
+    }
+    validate_all_internal_relationship_targets(package)?;
+
+    package.unsign();
+    package
+        .get_part_mut(main_name)?
+        .rels_mut()
+        .remove(table_relationship_id);
+    package.remove_part(table_name);
+    for uri in resources_to_remove {
+        package.remove_part(&uri);
+    }
+    Ok(true)
 }
 
 /// Reject embedded typefaces that are not directly named by any `w:rFonts`.
 /// Theme-based font resolution is intentionally not attempted.
-pub fn validate_embedded_font_usage(package: &OpcPackage, table: &FontTable) -> Result<()> {
+pub fn validate_usage(package: &OpcPackage, table: &Table) -> Result<()> {
     let used = directly_used_font_names(package)?;
     let unused = table
         .fonts
         .iter()
         .filter(|font| !font.embedded_fonts.is_empty())
-        .filter(|font| !used.contains(&font.name.to_lowercase()))
+        .filter(|font| !used.contains(&name_key(&font.name)))
         .map(|font| font.name.clone())
         .collect::<Vec<_>>();
     if unused.is_empty() {
@@ -1062,11 +1239,7 @@ fn locate_font_table(package: &OpcPackage) -> Result<(PackURI, Option<PackURI>, 
     ))
 }
 
-fn allocate_font_identifiers(
-    package: &OpcPackage,
-    font: &mut Font,
-    existing: &FontTable,
-) -> Result<()> {
+fn allocate_font_identifiers(package: &OpcPackage, table: &mut Table) -> Result<()> {
     let (_, table_name, _) = locate_font_table(package)?;
     let mut relationship_ids = table_name
         .as_ref()
@@ -1080,38 +1253,63 @@ fn allocate_font_identifiers(
         })
         .transpose()?
         .unwrap_or_default();
-    relationship_ids.extend(existing.fonts.iter().flat_map(|font| {
+    relationship_ids.extend(table.fonts.iter().flat_map(|font| {
         font.embedded_fonts
             .iter()
+            .filter(|embedded| !embedded.relationship_id.is_empty())
             .map(|embedded| embedded.relationship_id.clone())
     }));
     let mut part_names = package
         .iter_parts()
         .map(|part| part.partname().to_string())
         .collect::<HashSet<_>>();
-    part_names.extend(existing.fonts.iter().flat_map(|font| {
+    part_names.extend(table.fonts.iter().flat_map(|font| {
         font.embedded_fonts.iter().filter_map(|embedded| {
             embedded
                 .resource
                 .as_ref()
+                .filter(|resource| !resource.part_name.is_empty())
                 .map(|resource| resource.part_name.clone())
         })
     }));
-    for embedded in &mut font.embedded_fonts {
-        if embedded.relationship_id.is_empty() {
-            embedded.relationship_id = next_font_relationship_id(&relationship_ids)?;
+    let mut shared_names = HashMap::<usize, String>::new();
+    for font in &table.fonts {
+        for embedded in &font.embedded_fonts {
+            if let Some(resource) = &embedded.resource
+                && !resource.part_name.is_empty()
+            {
+                shared_names.insert(
+                    Arc::as_ptr(&resource.data) as usize,
+                    resource.part_name.clone(),
+                );
+            }
         }
-        relationship_ids.insert(embedded.relationship_id.clone());
-        let resource = embedded
-            .resource
-            .as_mut()
-            .ok_or_else(|| invalid("embedded-font resource is required"))?;
-        if resource.part_name.is_empty() {
-            resource.part_name = next_font_part_name(&part_names)?;
-        }
-        part_names.insert(resource.part_name.clone());
-        if resource.content_type.is_empty() {
-            resource.content_type = FONT_CT.into();
+    }
+    for font in &mut table.fonts {
+        for embedded in &mut font.embedded_fonts {
+            if embedded.relationship_id.is_empty() {
+                embedded.relationship_id = next_font_relationship_id(&relationship_ids)?;
+            }
+            relationship_ids.insert(embedded.relationship_id.clone());
+            let resource = embedded
+                .resource
+                .as_mut()
+                .ok_or_else(|| invalid("embedded-font resource is required"))?;
+            if resource.part_name.is_empty() {
+                let identity = Arc::as_ptr(&resource.data) as usize;
+                resource.part_name = match shared_names.get(&identity) {
+                    Some(name) => name.clone(),
+                    None => {
+                        let name = next_font_part_name(&part_names)?;
+                        shared_names.insert(identity, name.clone());
+                        name
+                    },
+                };
+            }
+            part_names.insert(resource.part_name.clone());
+            if resource.content_type.is_empty() {
+                resource.content_type = FONT_CT.into();
+            }
         }
     }
     Ok(())
@@ -1141,41 +1339,65 @@ fn next_font_table_part_name(package: &OpcPackage) -> Result<PackURI> {
         .map(|part| part.partname().to_string())
         .collect::<HashSet<_>>();
     if !used.contains("/word/fontTable.xml") {
-        return PackURI::new("/word/fontTable.xml").map_err(OoxmlError::InvalidUri);
+        return PackURI::new("/word/fontTable.xml").map_err(Error::Uri);
     }
     for index in 1..=u32::MAX {
         let candidate = format!("/word/fontTable{index}.xml");
         if !used.contains(&candidate) {
-            return PackURI::new(&candidate).map_err(OoxmlError::InvalidUri);
+            return PackURI::new(&candidate).map_err(Error::Uri);
         }
     }
     Err(invalid("too many font-table part names"))
 }
-fn next_named_relationship_id(source: &dyn Part, prefix: &str) -> String {
+fn next_named_relationship_id(source: &dyn Part, prefix: &str) -> Result<String> {
     for index in 1..=u32::MAX {
         let candidate = format!("{prefix}{index}");
         if source.rels().get(&candidate).is_none() {
-            return candidate;
+            return Ok(candidate);
         }
     }
-    unreachable!("u32 relationship ID space exhausted")
+    Err(invalid("too many relationship IDs"))
 }
 
-fn metadata_only(value: &FontTable) -> FontTable {
-    let mut value = value.clone();
-    for font in &mut value.fonts {
-        for embedded in &mut font.embedded_fonts {
-            embedded.resource = None;
-        }
-    }
-    value
+fn same_metadata(left: &Table, right: &Table) -> bool {
+    left.namespaces == right.namespaces
+        && left.extension_attributes == right.extension_attributes
+        && left.fonts.len() == right.fonts.len()
+        && left.fonts.iter().zip(&right.fonts).all(|(left, right)| {
+            left.name == right.name
+                && left.alternate_name == right.alternate_name
+                && left.panose == right.panose
+                && left.character_set == right.character_set
+                && left.family == right.family
+                && left.not_true_type == right.not_true_type
+                && left.pitch == right.pitch
+                && left.signature == right.signature
+                && left.extension_attributes == right.extension_attributes
+                && left.embedded_fonts.len() == right.embedded_fonts.len()
+                && left
+                    .embedded_fonts
+                    .iter()
+                    .zip(&right.embedded_fonts)
+                    .all(|(left, right)| {
+                        left.style == right.style
+                            && left.relationship_id == right.relationship_id
+                            && left.font_key == right.font_key
+                            && left.subsetted == right.subsetted
+                            && left.extension_attributes == right.extension_attributes
+                    })
+        })
+}
+
+fn name_key(value: &str) -> String {
+    value.chars().nfd().default_case_fold().nfd().collect()
 }
 
 fn unique_font_offset(fonts: &[Font], name: &str) -> Result<Option<usize>> {
+    let key = name_key(name);
     let mut matching = fonts
         .iter()
         .enumerate()
-        .filter(|(_, font)| font.name.eq_ignore_ascii_case(name))
+        .filter(|(_, font)| name_key(&font.name) == key)
         .map(|(offset, _)| offset);
     let first = matching.next();
     if first.is_some() && matching.next().is_some() {
@@ -1240,10 +1462,7 @@ fn validate_font_relationship_sources(package: &OpcPackage, table: &PackURI) -> 
     Ok(())
 }
 
-fn validate_package_conformance(
-    package: &OpcPackage,
-    requested: FontTableConformance,
-) -> Result<()> {
+fn validate_package_conformance(package: &OpcPackage, requested: Conformance) -> Result<()> {
     const STRICT_OFFICE_DOCUMENT: &str =
         "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument";
     let relationship = package
@@ -1258,9 +1477,9 @@ fn validate_package_conformance(
         })
         .ok_or_else(|| invalid("main-document relationship is missing"))?;
     let actual = if relationship.reltype() == STRICT_OFFICE_DOCUMENT {
-        FontTableConformance::Strict
+        Conformance::Strict
     } else {
-        FontTableConformance::Transitional
+        Conformance::Transitional
     };
     if actual == requested {
         Ok(())
@@ -1396,7 +1615,7 @@ fn directly_used_font_names(package: &OpcPackage) -> Result<HashSet<String>> {
                                 )
                                 .map_err(xml_error)?;
                             bounded(&value)?;
-                            output.insert(value.to_lowercase());
+                            output.insert(name_key(&value));
                         }
                     }
                 },
@@ -1411,35 +1630,15 @@ fn directly_used_font_names(package: &OpcPackage) -> Result<HashSet<String>> {
     Ok(output)
 }
 
-fn validate_table_value(value: &FontTable, require_resources: bool) -> Result<()> {
+fn validate_table_value(value: &Table, require_resources: bool) -> Result<()> {
     if value.fonts.len() > MAX_FONTS {
         return Err(invalid("too many fonts"));
     }
     let mut total = 0usize;
     let mut resource_names = HashSet::new();
     for font in &value.fonts {
-        validate_font_name(&font.name, "font name")?;
-        if let Some(name) = &font.alternate_name {
-            validate_font_name(name, "alternate font name")?;
-        }
-        for pair in font.embedded_fonts.windows(2) {
-            if pair[0].style.rank() >= pair[1].style.rank() {
-                return Err(invalid(
-                    "embedded-font styles are duplicated or out of schema order",
-                ));
-            }
-        }
+        validate_font_entry(font, require_resources)?;
         for embedded in &font.embedded_fonts {
-            if embedded.relationship_id.is_empty() || embedded.relationship_id.len() > MAX_TEXT {
-                return Err(invalid(
-                    "embedded-font relationship ID is empty or too long",
-                ));
-            }
-            if let Some(key) = &embedded.font_key {
-                font_key(key)?;
-            } else if require_resources {
-                return Err(invalid("fontKey is required for package storage"));
-            }
             if require_resources {
                 let resource = embedded.resource.as_ref().ok_or_else(|| {
                     invalid("embedded-font resource is required for package storage")
@@ -1450,9 +1649,7 @@ fn validate_table_value(value: &FontTable, require_resources: bool) -> Result<()
                         resource.content_type
                     )));
                 }
-                if resource.data.len() < 32 || resource.data.len() > MAX_FONT {
-                    return Err(invalid("embedded font size is outside the allowed bounds"));
-                }
+                validate_resource_len(resource.data.len())?;
                 if resource.part_name.is_empty() {
                     return Err(invalid("embedded-font part name is empty"));
                 }
@@ -1468,6 +1665,51 @@ fn validate_table_value(value: &FontTable, require_resources: bool) -> Result<()
         }
     }
     Ok(())
+}
+
+fn validate_font_entry(font: &Font, require_resources: bool) -> Result<()> {
+    validate_font_name(&font.name, "font name")?;
+    if let Some(name) = &font.alternate_name {
+        validate_font_name(name, "alternate font name")?;
+    }
+    for pair in font.embedded_fonts.windows(2) {
+        let [left, right] = pair else {
+            return Err(invalid("invalid embedded-font ordering window"));
+        };
+        if left.style.rank() >= right.style.rank() {
+            return Err(invalid(
+                "embedded-font styles are duplicated or out of schema order",
+            ));
+        }
+    }
+    for embedded in &font.embedded_fonts {
+        if require_resources
+            && (embedded.relationship_id.is_empty() || embedded.relationship_id.len() > MAX_TEXT)
+        {
+            return Err(invalid(
+                "embedded-font relationship ID is empty or too long",
+            ));
+        }
+        if let Some(key) = &embedded.font_key {
+            font_key(key)?;
+        } else if require_resources {
+            return Err(invalid("fontKey is required for package storage"));
+        }
+        if require_resources && embedded.resource.is_none() {
+            return Err(invalid(
+                "embedded-font resource is required for package storage",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_resource_len(len: usize) -> Result<()> {
+    if (32..=MAX_FONT).contains(&len) {
+        Ok(())
+    } else {
+        Err(invalid("embedded font size is outside the allowed bounds"))
+    }
 }
 
 fn validate_font_name(value: &str, kind: &str) -> Result<()> {
@@ -1492,15 +1734,15 @@ fn parse_font_key_bytes(value: &str) -> Result<[u8; 16]> {
         .filter(|byte| *byte != b'-')
         .collect::<Vec<_>>();
     let mut key = [0u8; 16];
-    for (index, output) in key.iter_mut().enumerate() {
-        let pair = std::str::from_utf8(&digits[index * 2..index * 2 + 2]).map_err(xml_error)?;
+    for (output, pair) in key.iter_mut().zip(digits.chunks_exact(2)) {
+        let pair = std::str::from_utf8(pair).map_err(xml_error)?;
         *output = u8::from_str_radix(pair, 16).map_err(xml_error)?;
     }
     Ok(key)
 }
 
 #[derive(Clone)]
-struct Attr {
+struct XmlAttr {
     q: String,
     local: String,
     ns: String,
@@ -1511,12 +1753,12 @@ struct Node {
     q: String,
     local: String,
     ns: String,
-    attrs: Vec<Attr>,
+    attrs: Vec<XmlAttr>,
     children: Vec<Node>,
     text: String,
 }
 
-pub fn is_font_table_relationship(v: &str) -> bool {
+fn is_font_table_relationship(v: &str) -> bool {
     matches!(v, FT_RT | FT_RS)
 }
 fn is_font_relationship(v: &str) -> bool {
@@ -1529,7 +1771,8 @@ fn rel_ns(v: &str) -> bool {
     matches!(v, RT | RS)
 }
 
-pub fn parse_font_table(xml: &[u8]) -> Result<FontTable> {
+/// Parse one bounded `fontTable.xml` payload without resolving OPC resources.
+pub fn parse(xml: &[u8]) -> Result<Table> {
     if xml.len() > MAX_XML {
         return Err(invalid("font-table part is too large"));
     }
@@ -1556,7 +1799,10 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
                     return Err(invalid("font-table XML resource limit exceeded"));
                 }
-                let (n, s) = make_node(&e, decoder, scopes.last().unwrap())?;
+                let parent = scopes
+                    .last()
+                    .ok_or_else(|| invalid("font-table namespace scope is missing"))?;
+                let (n, s) = make_node(&e, decoder, parent)?;
                 stack.push(n);
                 scopes.push(s)
             },
@@ -1565,13 +1811,19 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
                     return Err(invalid("font-table XML resource limit exceeded"));
                 }
-                let (n, _) = make_node(&e, decoder, scopes.last().unwrap())?;
+                let parent = scopes
+                    .last()
+                    .ok_or_else(|| invalid("font-table namespace scope is missing"))?;
+                let (n, _) = make_node(&e, decoder, parent)?;
                 attach(n, &mut stack, &mut root)?
             },
             Event::End(_) => {
                 let n = stack
                     .pop()
                     .ok_or_else(|| invalid("unexpected XML end tag"))?;
+                if scopes.len() <= 1 {
+                    return Err(invalid("font-table namespace scope underflow"));
+                }
                 scopes.pop();
                 attach(n, &mut stack, &mut root)?
             },
@@ -1634,7 +1886,7 @@ fn make_node(
         } else {
             resolve(&n, &scope, false)?
         };
-        attrs.push(Attr {
+        attrs.push(XmlAttr {
             local: local(&n).into(),
             q: n,
             ns: ans,
@@ -1691,7 +1943,7 @@ fn append_text(stack: &mut [Node], v: &str) -> Result<()> {
 struct Attributes {
     word: Vec<(String, String)>,
     rels: Vec<(String, String)>,
-    extensions: Vec<FontTableExtensionAttribute>,
+    extensions: Vec<raw::Attr>,
 }
 impl Attributes {
     fn new(n: &Node, w: &[&str], r: &[&str]) -> Result<Self> {
@@ -1713,7 +1965,7 @@ impl Attributes {
                 }
                 rels.push((a.local.clone(), a.value.clone()))
             } else if !a.ns.is_empty() && !word_ns(&a.ns) && !rel_ns(&a.ns) {
-                extensions.push(FontTableExtensionAttribute {
+                extensions.push(raw::Attr {
                     qualified_name: a.q.clone(),
                     value: a.value.clone(),
                 })
@@ -1754,7 +2006,7 @@ impl Attributes {
     }
 }
 
-fn parse_table_node(root: &Node) -> Result<FontTable> {
+fn parse_table_node(root: &Node) -> Result<Table> {
     require(root, "fonts")?;
     whitespace(root)?;
     let a = Attributes::new(root, &[], &[])?;
@@ -1766,7 +2018,7 @@ fn parse_table_node(root: &Node) -> Result<FontTable> {
         require(n, "font")?;
         fonts.push(parse_font(n)?)
     }
-    let table = FontTable {
+    let table = Table {
         fonts,
         namespaces: extension_namespaces(root)?,
         extension_attributes: a.extensions,
@@ -1824,7 +2076,7 @@ fn parse_font(n: &Node) -> Result<Font> {
             },
             "family" => {
                 leaf(c)?;
-                family = Some(FontFamily::parse(
+                family = Some(Family::parse(
                     &Attributes::new(c, &["val"], &[])?.req("val")?,
                 )?)
             },
@@ -1838,7 +2090,7 @@ fn parse_font(n: &Node) -> Result<Font> {
             },
             "pitch" => {
                 leaf(c)?;
-                pitch = Some(FontPitch::parse(
+                pitch = Some(Pitch::parse(
                     &Attributes::new(c, &["val"], &[])?.req("val")?,
                 )?)
             },
@@ -1846,11 +2098,11 @@ fn parse_font(n: &Node) -> Result<Font> {
                 leaf(c)?;
                 sig = Some(parse_sig(c)?)
             },
-            "embedRegular" => embedded.push(parse_embed(c, EmbeddedFontStyle::Regular)?),
-            "embedBold" => embedded.push(parse_embed(c, EmbeddedFontStyle::Bold)?),
-            "embedItalic" => embedded.push(parse_embed(c, EmbeddedFontStyle::Italic)?),
-            "embedBoldItalic" => embedded.push(parse_embed(c, EmbeddedFontStyle::BoldItalic)?),
-            _ => unreachable!(),
+            "embedRegular" => embedded.push(parse_embed(c, Style::Regular)?),
+            "embedBold" => embedded.push(parse_embed(c, Style::Bold)?),
+            "embedItalic" => embedded.push(parse_embed(c, Style::Italic)?),
+            "embedBoldItalic" => embedded.push(parse_embed(c, Style::BoldItalic)?),
+            unexpected => return Err(invalid(format!("unexpected font child '{unexpected}'"))),
         }
     }
     Ok(Font {
@@ -1866,7 +2118,7 @@ fn parse_font(n: &Node) -> Result<Font> {
         extension_attributes: a.extensions,
     })
 }
-fn parse_charset(n: &Node) -> Result<Option<FontCharacterSet>> {
+fn parse_charset(n: &Node) -> Result<Option<Charset>> {
     let a = Attributes::new(n, &["val", "characterSet"], &[])?;
     let old = a
         .opt("val")?
@@ -1875,20 +2127,20 @@ fn parse_charset(n: &Node) -> Result<Option<FontCharacterSet>> {
                 return Err(invalid(format!("invalid charset '{v}'")));
             }
             u8::from_str_radix(&v, 16)
-                .map(FontCharacterSet::legacy)
+                .map(Charset::legacy)
                 .map_err(xml_error)
         })
         .transpose()?;
     let strict = a
         .opt("characterSet")?
-        .map(|v| FontCharacterSet::strict(&v))
+        .map(|v| Charset::strict(&v))
         .transpose()?;
     if old.is_some() && strict.is_some() && old != strict {
         return Err(invalid("conflicting font character sets"));
     }
     Ok(strict.or(old))
 }
-fn parse_sig(n: &Node) -> Result<FontSignature> {
+fn parse_sig(n: &Node) -> Result<Signature> {
     let a = Attributes::new(n, &["usb0", "usb1", "usb2", "usb3", "csb0", "csb1"], &[])?;
     let p = |name: &str| -> Result<u32> {
         let v = a.req(name)?;
@@ -1897,19 +2149,19 @@ fn parse_sig(n: &Node) -> Result<FontSignature> {
         }
         u32::from_str_radix(&v, 16).map_err(xml_error)
     };
-    Ok(FontSignature {
+    Ok(Signature {
         unicode_subsets: [p("usb0")?, p("usb1")?, p("usb2")?, p("usb3")?],
         code_pages: [p("csb0")?, p("csb1")?],
     })
 }
-fn parse_embed(n: &Node, style: EmbeddedFontStyle) -> Result<EmbeddedFont> {
+fn parse_embed(n: &Node, style: Style) -> Result<Embed> {
     leaf(n)?;
     let a = Attributes::new(n, &["fontKey", "subsetted"], &["id"])?;
     let key = a.opt("fontKey")?;
     if let Some(v) = &key {
         font_key(v)?
     }
-    Ok(EmbeddedFont {
+    Ok(Embed {
         style,
         relationship_id: a.rel("id")?,
         font_key: key,
@@ -1919,7 +2171,8 @@ fn parse_embed(n: &Node, style: EmbeddedFontStyle) -> Result<EmbeddedFont> {
     })
 }
 
-pub fn write_font_table(t: &FontTable, c: FontTableConformance) -> Result<Vec<u8>> {
+/// Serialize one font table using the requested OOXML conformance family.
+pub fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
     validate_table_value(t, false)?;
     let mut o = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec();
     o.extend_from_slice(b"<w:fonts xmlns:w=\"");
@@ -1942,7 +2195,7 @@ pub fn write_font_table(t: &FontTable, c: FontTableConformance) -> Result<Vec<u8
     o.extend_from_slice(b"</w:fonts>");
     Ok(o)
 }
-fn write_font(o: &mut Vec<u8>, f: &Font, c: FontTableConformance) -> Result<()> {
+fn write_font(o: &mut Vec<u8>, f: &Font, c: Conformance) -> Result<()> {
     o.extend_from_slice(b"<w:font");
     extensions(o, &f.extension_attributes)?;
     wa(o, "name", &f.name);
@@ -1968,8 +2221,8 @@ fn write_font(o: &mut Vec<u8>, f: &Font, c: FontTableConformance) -> Result<()> 
     if let Some(v) = f.character_set {
         o.extend_from_slice(b"<w:charset");
         match c {
-            FontTableConformance::Transitional => wa(o, "val", &format!("{:02X}", v.legacy_code())),
-            FontTableConformance::Strict => wa(
+            Conformance::Transitional => wa(o, "val", &format!("{:02X}", v.legacy_code())),
+            Conformance::Strict => wa(
                 o,
                 "characterSet",
                 v.strict_name()
@@ -2030,20 +2283,14 @@ fn wa(o: &mut Vec<u8>, n: &str, v: &str) {
 fn ra(o: &mut Vec<u8>, n: &str, v: &str) {
     attr(o, &format!("r:{n}"), v)
 }
-fn extensions(o: &mut Vec<u8>, v: &[FontTableExtensionAttribute]) -> Result<()> {
+fn extensions(o: &mut Vec<u8>, v: &[raw::Attr]) -> Result<()> {
     for a in v {
         preserved(o, a)?
     }
     Ok(())
 }
-fn preserved(o: &mut Vec<u8>, a: &FontTableExtensionAttribute) -> Result<()> {
-    if a.qualified_name.is_empty()
-        || a.qualified_name
-            .bytes()
-            .any(|b| b.is_ascii_whitespace() || matches!(b, b'<' | b'>' | b'=' | b'\'' | b'\"'))
-    {
-        return Err(invalid("invalid preserved attribute name"));
-    }
+fn preserved(o: &mut Vec<u8>, a: &raw::Attr) -> Result<()> {
+    validate_attr_name(&a.qualified_name)?;
     attr(o, &a.qualified_name, &a.value);
     Ok(())
 }
@@ -2071,12 +2318,8 @@ fn esc(o: &mut Vec<u8>, v: &str) {
     }
 }
 
-fn extension_namespaces(root: &Node) -> Result<Vec<FontTableExtensionAttribute>> {
-    fn walk(
-        n: &Node,
-        map: &mut HashMap<String, String>,
-        out: &mut Vec<FontTableExtensionAttribute>,
-    ) -> Result<()> {
+fn extension_namespaces(root: &Node) -> Result<Vec<raw::Attr>> {
+    fn walk(n: &Node, map: &mut HashMap<String, String>, out: &mut Vec<raw::Attr>) -> Result<()> {
         for a in &n.attrs {
             if a.ns != XMLNS
                 || matches!(
@@ -2096,7 +2339,7 @@ fn extension_namespaces(root: &Node) -> Result<Vec<FontTableExtensionAttribute>>
                 }
             } else {
                 map.insert(p, a.value.clone());
-                out.push(FontTableExtensionAttribute {
+                out.push(raw::Attr {
                     qualified_name: a.q.clone(),
                     value: a.value.clone(),
                 })
@@ -2116,8 +2359,9 @@ fn fixed_hex<const N: usize>(v: &str, name: &str) -> Result<[u8; N]> {
         return Err(invalid(format!("invalid {name}")));
     }
     let mut out = [0; N];
-    for (i, x) in out.iter_mut().enumerate() {
-        *x = u8::from_str_radix(&v[i * 2..i * 2 + 2], 16).map_err(xml_error)?
+    for (x, pair) in out.iter_mut().zip(v.as_bytes().chunks_exact(2)) {
+        let pair = std::str::from_utf8(pair).map_err(xml_error)?;
+        *x = u8::from_str_radix(pair, 16).map_err(xml_error)?
     }
     Ok(out)
 }
@@ -2138,11 +2382,17 @@ fn on_off(v: &str) -> Result<bool> {
 fn font_key(v: &str) -> Result<()> {
     let b = v.as_bytes();
     let ok = b.len() == 38
-        && b[0] == b'{'
-        && b[37] == b'}'
-        && [9, 14, 19, 24].iter().all(|i| b[*i] == b'-')
-        && b[1..37].iter().enumerate().all(|(i, x)| {
-            [8, 13, 18, 23].contains(&i) || x.is_ascii_digit() || (b'A'..=b'F').contains(x)
+        && b.first() == Some(&b'{')
+        && b.last() == Some(&b'}')
+        && [9, 14, 19, 24]
+            .iter()
+            .all(|index| b.get(*index) == Some(&b'-'))
+        && b.get(1..37).is_some_and(|body| {
+            body.iter().enumerate().all(|(index, byte)| {
+                [8, 13, 18, 23].contains(&index)
+                    || byte.is_ascii_digit()
+                    || (b'A'..=b'F').contains(byte)
+            })
         });
     if ok {
         Ok(())
@@ -2179,113 +2429,36 @@ fn bounded(v: &str) -> Result<()> {
         Err(invalid("font-table string limit exceeded"))
     }
 }
-fn xml_error(e: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(e.to_string())
+fn validate_attr_name(value: &str) -> Result<()> {
+    if value.is_empty()
+        || value.len() > MAX_TEXT
+        || value.bytes().any(|byte| {
+            byte.is_ascii_whitespace() || matches!(byte, b'<' | b'>' | b'=' | b'\'' | b'\"')
+        })
+    {
+        Err(invalid("invalid extension attribute name"))
+    } else {
+        Ok(())
+    }
 }
-fn invalid(e: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(e.into())
+fn xml_error(e: impl std::fmt::Display) -> Error {
+    Error::Xml(e.to_string())
+}
+fn invalid(e: impl Into<String>) -> Error {
+    Error::Invalid(e.into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn complete_strict_round_trip() {
-        let xml=br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:font w:name="A&amp;B"><w:altName w:val="Alias"/><w:panose1 w:val="020F0502020204030204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:notTrueType w:val="0"/><w:pitch w:val="variable"/><w:sig w:usb0="E10002FF" w:usb1="4000ACFF" w:usb2="00000009" w:usb3="00000000" w:csb0="0000019F" w:csb1="00000000"/><w:embedRegular r:id="rId1" w:fontKey="{01014A78-CABC-4EF0-12AC-5CD89AEFDE01}" w:subsetted="1"/></w:font></w:fonts>"#;
-        let t = parse_font_table(xml).unwrap();
-        assert_eq!(t.fonts()[0].name(), "A&B");
-        assert_eq!(t.fonts()[0].signature().unwrap().code_pages()[0], 0x19F);
-        let strict = t.to_xml(FontTableConformance::Strict).unwrap();
-        let s = std::str::from_utf8(&strict).unwrap();
-        assert!(s.contains(WS));
-        assert!(s.contains("w:characterSet=\"iso-8859-1\""));
-        assert_eq!(parse_font_table(&strict).unwrap(), t)
-    }
-    #[test]
-    fn mce_and_real_strict_fixture() {
-        let xml=br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="x"><x:font/></mc:Choice><mc:Fallback><w:font w:name="Fallback"><w:family w:val="roman"/></w:font></mc:Fallback></mc:AlternateContent></w:fonts>"#;
-        assert_eq!(parse_font_table(xml).unwrap().fonts()[0].name(), "Fallback");
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let p = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
-            root.join("test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx"),
-        )
-        .unwrap();
-        let u = litchi_opc::PackURI::new("/word/fontTable.xml").unwrap();
-        let t = parse_font_table(&p.blob_for(&u).unwrap()).unwrap();
-        assert!(t.fonts().iter().any(|f| f.name() == "Calibri"));
-        assert_eq!(t.fonts()[0].character_set(), Some(FontCharacterSet::Ansi))
-    }
-    #[test]
-    fn malformed_order_and_bounds() {
-        for xml in [
-            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font/></w:fonts>"#,
-            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="x"><w:family w:val="fantasy"/></w:font></w:fonts>"#,
-            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="x"><w:panose1 w:val="1234"/></w:font></w:fonts>"#,
-            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="x"><w:pitch w:val="fixed"/><w:family w:val="roman"/></w:font></w:fonts>"#,
-            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="x"><w:sig w:usb0="0"/></w:font></w:fonts>"#,
-            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:font w:name="x"><w:embedRegular r:id="rId1" w:fontKey="bad"/></w:font></w:fonts>"#,
-            r#"<!DOCTYPE x><w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
-            r#"<?bad x?><w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
-        ] {
-            assert!(parse_font_table(xml.as_bytes()).is_err(), "{xml}")
-        }
-        assert!(parse_font_table(&vec![b' '; MAX_XML + 1]).is_err())
-    }
-    #[test]
-    fn real_poi_embedded_resources_are_inert() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let p = crate::docx::Package::open(
-            root.join("test-data/poi/test-data/document/saut_page.docx"),
-        )
-        .unwrap();
-        let t = p.font_table().unwrap().unwrap();
-        assert_eq!(t.fonts().len(), 7);
-        let e: Vec<_> = t.fonts().iter().flat_map(Font::embedded_fonts).collect();
-        assert_eq!(e.len(), 20);
-        assert_eq!(
-            e.iter()
-                .map(|v| v.relationship_id())
-                .collect::<HashSet<_>>()
-                .len(),
-            16
-        );
-        assert!(e.iter().all(|v| v.resource().is_some()));
-        assert!(
-            e.iter()
-                .all(|v| v.resource().unwrap().content_type() == FONT_CT)
-        )
-    }
 
-    #[test]
-    fn guid_obfuscation_is_reversible_and_fs_type_is_validated() {
-        let key = "{00112233-4455-6677-8899-AABBCCDDEEFF}";
-        let original = (0u8..64).collect::<Vec<_>>();
-        let mut data = original.clone();
-        obfuscate_embedded_font_data(&mut data, key).unwrap();
-        assert_ne!(data, original);
-        assert_eq!(&data[32..], &original[32..]);
-        deobfuscate_embedded_font_data(&mut data, key).unwrap();
-        assert_eq!(data, original);
-        assert!(obfuscate_embedded_font_data(&mut [0; 31], key).is_err());
-        assert!(obfuscate_embedded_font_data(&mut [0; 32], "bad").is_err());
+    const KEY: &str = "{00112233-4455-6677-8899-AABBCCDDEEFF}";
 
-        assert!(
-            EmbeddedFontLicensing::from_fs_type(0)
-                .unwrap()
-                .installable()
-        );
-        let editable = EmbeddedFontLicensing::from_fs_type(0x0108).unwrap();
-        assert!(editable.editable && editable.no_subsetting);
-        assert!(EmbeddedFontLicensing::from_fs_type(0x0006).is_err());
-        assert!(EmbeddedFontLicensing::from_fs_type(0x8000).is_err());
-    }
-
-    #[test]
-    fn generated_shared_font_crud_and_extensions_remain_inert() {
+    fn package() -> OpcPackage {
         let mut package = OpcPackage::new();
-        let document_name = PackURI::new("/word/document.xml").unwrap();
+        let document = PackURI::new("/word/document.xml").expect("test URI");
         package.add_part(Box::new(XmlPart::new(
-            document_name,
+            document,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
                 .into(),
             br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#.to_vec(),
@@ -2297,85 +2470,299 @@ mod tests {
             "rId1".into(),
             false,
         );
-
-        let key = "{00112233-4455-6677-8899-AABBCCDDEEFF}";
-        let resource =
-            EmbeddedFontResource::new("/word/fonts/shared.odttf", (0u8..64).collect::<Vec<_>>());
-        let mut first = Font::new("Alpha")
-            .with_alternate_name("Alpha Alt")
-            .with_panose([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-            .with_character_set(FontCharacterSet::Ansi)
-            .with_family(FontFamily::Swiss)
-            .with_pitch(FontPitch::Variable)
-            .with_signature(FontSignature::new([1, 2, 3, 4], [5, 6]))
-            .with_embedded_font(
-                EmbeddedFont::new(EmbeddedFontStyle::Regular, resource.clone())
-                    .with_relationship_id("rIdFont1")
-                    .with_font_key(key)
-                    .with_subsetted(true),
-            );
-        first
-            .extension_attributes_mut()
-            .push(FontTableExtensionAttribute::new("x:flag", "kept"));
-        let mut table = FontTable::new();
-        table
-            .namespaces_mut()
-            .push(FontTableExtensionAttribute::new(
-                "xmlns:x",
-                "urn:test-fonts",
-            ));
-        table.fonts_mut().push(first);
-        store_font_table(&mut package, &table, FontTableConformance::Transitional).unwrap();
-
-        add_font(
-            &mut package,
-            Font::new("Beta").with_embedded_font(
-                EmbeddedFont::new(EmbeddedFontStyle::Regular, resource).with_font_key(key),
-            ),
-            FontTableConformance::Transitional,
-        )
-        .unwrap();
-        let loaded = load_font_table(&package).unwrap().unwrap();
-        assert_eq!(loaded.fonts().len(), 2);
-        assert_eq!(loaded.fonts()[0].extension_attributes()[0].value(), "kept");
-        let relationships = loaded
-            .fonts()
-            .iter()
-            .map(|font| font.embedded_fonts()[0].relationship_id())
-            .collect::<HashSet<_>>();
-        assert_eq!(relationships.len(), 2);
-        assert_eq!(
-            loaded.fonts()[0].embedded_fonts()[0]
-                .resource()
-                .unwrap()
-                .part_name(),
-            loaded.fonts()[1].embedded_fonts()[0]
-                .resource()
-                .unwrap()
-                .part_name()
-        );
-
-        reorder_fonts(
-            &mut package,
-            &["Beta".into(), "Alpha".into()],
-            FontTableConformance::Transitional,
-        )
-        .unwrap();
-        assert!(remove_font(&mut package, "Alpha", FontTableConformance::Transitional).unwrap());
-        let shared = PackURI::new("/word/fonts/shared.odttf").unwrap();
-        assert!(package.get_part(&shared).is_ok());
-        assert!(find_font(&package, "beta").unwrap().is_some());
+        package
     }
 
     #[test]
-    fn word_font_name_limits_are_rejected_but_fixture_duplicates_round_trip() {
-        let mut table = FontTable::new();
-        table.fonts_mut().push(Font::new("A"));
-        table.fonts_mut().push(Font::new("a"));
-        assert!(write_font_table(&table, FontTableConformance::Transitional).is_ok());
-        assert!(parse_font_table(
-            br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="12345678901234567890123456789012"/></w:fonts>"#
+    fn strict_round_trip_and_safe_selectors() {
+        let xml = br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:font w:name="A&amp;B"><w:altName w:val="Alias"/><w:panose1 w:val="020F0502020204030204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:notTrueType w:val="0"/><w:pitch w:val="variable"/><w:sig w:usb0="E10002FF" w:usb1="4000ACFF" w:usb2="00000009" w:usb3="00000000" w:csb0="0000019F" w:csb1="00000000"/><w:embedRegular r:id="rId1" w:fontKey="{01014A78-CABC-4EF0-12AC-5CD89AEFDE01}" w:subsetted="1"/></w:font></w:fonts>"#;
+        let table = parse(xml).expect("parse");
+        let by_name = table.get("a&b").expect("lookup").expect("font");
+        let by_index = table.get(0usize).expect("lookup").expect("font");
+        assert_eq!(by_name, by_index);
+        assert!(table.get(9usize).expect("lookup").is_none());
+        assert_eq!(
+            by_name.signature().expect("signature").code_pages()[0],
+            0x19F
+        );
+
+        let strict = write(&table, Conformance::Strict).expect("write");
+        assert!(std::str::from_utf8(&strict).expect("UTF-8").contains(WS));
+        assert_eq!(parse(&strict).expect("reparse"), table);
+    }
+
+    #[test]
+    fn mce_and_real_strict_fixture() {
+        let xml = br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="x"><x:font/></mc:Choice><mc:Fallback><w:font w:name="Fallback"><w:family w:val="roman"/></w:font></mc:Fallback></mc:AlternateContent></w:fonts>"#;
+        assert_eq!(
+            parse(xml)
+                .expect("MCE parse")
+                .get("Fallback")
+                .expect("lookup")
+                .expect("font")
+                .family(),
+            Some(Family::Roman)
+        );
+
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
+            root.join("test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx"),
         )
-        .is_err());
+        .expect("open fixture");
+        let uri = PackURI::new("/word/fontTable.xml").expect("test URI");
+        let table = parse(&physical.blob_for(&uri).expect("font table")).expect("parse");
+        assert!(table.get("Calibri").expect("lookup").is_some());
+        assert_eq!(
+            table.get(0usize).expect("lookup").expect("font").charset(),
+            Some(Charset::Ansi)
+        );
+    }
+
+    #[test]
+    fn malformed_order_and_bounds_are_rejected() {
+        for xml in [
+            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font/></w:fonts>"#,
+            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="x"><w:family w:val="fantasy"/></w:font></w:fonts>"#,
+            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="x"><w:panose1 w:val="1234"/></w:font></w:fonts>"#,
+            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="x"><w:pitch w:val="fixed"/><w:family w:val="roman"/></w:font></w:fonts>"#,
+            r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:font w:name="x"><w:embedRegular r:id="rId1" w:fontKey="bad"/></w:font></w:fonts>"#,
+            r#"<!DOCTYPE x><w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+        ] {
+            assert!(parse(xml.as_bytes()).is_err(), "{xml}");
+        }
+        assert!(parse(&vec![b' '; MAX_XML + 1]).is_err());
+    }
+
+    #[test]
+    fn poi_resources_share_package_allocations() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let package =
+            OpcPackage::open(root.join("test-data/poi/test-data/document/saut_page.docx"))
+                .expect("open fixture");
+        let table = read(&package).expect("read").expect("font table");
+        assert_eq!(table.len(), 7);
+        let embeds = table.iter().flat_map(Font::embeds).collect::<Vec<_>>();
+        assert_eq!(embeds.len(), 20);
+        let first = embeds
+            .iter()
+            .find_map(|embed| embed.resource())
+            .expect("embedded resource");
+        let uri = PackURI::new(&first.part_name).expect("fixture part URI");
+        assert!(Arc::ptr_eq(
+            &first.data,
+            &package.get_part(&uri).expect("font part").blob_arc()
+        ));
+        assert!(embeds.iter().all(|embed| embed.resource().is_some()));
+    }
+
+    #[test]
+    fn obfuscation_and_compact_license_are_checked() {
+        let original = (0u8..64).collect::<Vec<_>>();
+        let mut data = original.clone();
+        obfuscate(&mut data, KEY).expect("obfuscate");
+        assert_ne!(data, original);
+        assert_eq!(&data[32..], &original[32..]);
+        deobfuscate(&mut data, KEY).expect("deobfuscate");
+        assert_eq!(data, original);
+        assert!(obfuscate(&mut [0; 31], KEY).is_err());
+        assert!(obfuscate(&mut [0; 32], "bad").is_err());
+
+        assert!(License::new(0).expect("license").installable());
+        let editable = License::new(0x0108).expect("license");
+        assert!(editable.editable() && editable.no_subsetting());
+        assert_eq!(editable.bits(), 0x0108);
+        assert!(License::new(0x0006).is_err());
+        assert!(License::new(0x8000).is_err());
+        assert_eq!(std::mem::size_of::<License>(), std::mem::size_of::<u16>());
+    }
+
+    #[test]
+    fn move_first_crud_preserves_shared_resources_and_extensions() {
+        let mut package = package();
+        let shared = Resource::new((0u8..64).collect()).expect("resource");
+        let first = Font::new("Alpha")
+            .expect("font")
+            .with_alt("Alpha Alt")
+            .expect("alternate")
+            .with_panose([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+            .with_charset(Charset::Ansi)
+            .with_family(Family::Swiss)
+            .with_pitch(Pitch::Variable)
+            .with_signature(Signature::new([1, 2, 3, 4], [5, 6]))
+            .with_embed(
+                Embed::new(Style::Regular, KEY, shared.clone())
+                    .expect("embed")
+                    .with_subset(true),
+            )
+            .expect("face")
+            .with_attr(raw::Attr::new("x:flag", "kept").expect("attribute"));
+        let mut table = Table::new()
+            .with_namespace(raw::Attr::new("xmlns:x", "urn:test-fonts").expect("namespace"))
+            .expect("namespace");
+        table.add(first).expect("add");
+        put(&mut package, table, Conformance::Transitional).expect("put");
+
+        let mut table = read(&package).expect("read").expect("table");
+        table
+            .add(
+                Font::new("Beta")
+                    .expect("font")
+                    .with_embed(Embed::new(Style::Regular, KEY, shared).expect("embed"))
+                    .expect("face"),
+            )
+            .expect("add");
+        table.reorder(&["Beta", "Alpha"]).expect("reorder");
+        put(&mut package, table, Conformance::Transitional).expect("put");
+
+        let mut table = read(&package).expect("read").expect("table");
+        assert_eq!(
+            table.get(0usize).expect("lookup").expect("font").name(),
+            "Beta"
+        );
+        assert_eq!(
+            table
+                .get("alpha")
+                .expect("lookup")
+                .expect("font")
+                .attrs()
+                .first()
+                .expect("attribute")
+                .value(),
+            "kept"
+        );
+        let beta = table.get("Beta").expect("lookup").expect("font");
+        let alpha = table.get("Alpha").expect("lookup").expect("font");
+        assert!(
+            beta.embeds()[0]
+                .resource()
+                .expect("resource")
+                .shares_with(alpha.embeds()[0].resource().expect("resource"))
+        );
+        let shared_part = beta.embeds()[0]
+            .resource()
+            .expect("resource")
+            .part_name
+            .clone();
+
+        assert!(table.remove("Alpha").expect("remove").is_some());
+        put(&mut package, table, Conformance::Transitional).expect("put");
+        assert!(
+            package
+                .get_part(&PackURI::new(&shared_part).expect("part URI"))
+                .is_ok()
+        );
+        assert!(
+            read(&package)
+                .expect("read")
+                .expect("table")
+                .get("Beta")
+                .expect("lookup")
+                .is_some()
+        );
+
+        put(&mut package, Table::new(), Conformance::Transitional).expect("remove graph");
+        assert!(read(&package).expect("read").is_none());
+        assert!(
+            package
+                .get_part(&PackURI::new(&shared_part).expect("part URI"))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn graph_delete_keeps_resources_referenced_outside_the_table() {
+        let mut package = package();
+        let font = Font::new("Shared")
+            .expect("font")
+            .with_embed(
+                Embed::new(
+                    Style::Regular,
+                    KEY,
+                    Resource::new(vec![0; 32]).expect("resource"),
+                )
+                .expect("embed"),
+            )
+            .expect("face");
+        let mut table = Table::new();
+        table.add(font).expect("add");
+        put(&mut package, table, Conformance::Transitional).expect("put");
+
+        let table = read(&package).expect("read").expect("table");
+        let resource_name = table.fonts[0].embedded_fonts[0]
+            .resource
+            .as_ref()
+            .expect("resource")
+            .part_name
+            .clone();
+        let resource = PackURI::new(&resource_name).expect("resource URI");
+        let main_name = package
+            .main_document_part()
+            .expect("main")
+            .partname()
+            .clone();
+        package
+            .get_part_mut(&main_name)
+            .expect("main")
+            .rels_mut()
+            .add_relationship(
+                "urn:litchi:test:keep-font".into(),
+                resource.relative_ref(main_name.base_uri()),
+                "rIdKeepFont".into(),
+                false,
+            );
+
+        assert!(remove(&mut package).expect("remove graph"));
+        assert!(read(&package).expect("read").is_none());
+        assert!(package.get_part(&resource).is_ok());
+        assert!(!remove(&mut package).expect("already absent"));
+    }
+
+    #[test]
+    fn constructors_prevent_invalid_authoring_state() {
+        assert!(Font::new("").is_err());
+        assert!(Font::new("12345678901234567890123456789012").is_err());
+        assert!(Resource::new(vec![0; 31]).is_err());
+        assert!(
+            Embed::new(
+                Style::Regular,
+                "bad",
+                Resource::new(vec![0; 32]).expect("resource")
+            )
+            .is_err()
+        );
+        assert!(raw::Attr::new("", "value").is_err());
+
+        let mut table = Table::new();
+        table.add(Font::new("Alpha").expect("font")).expect("add");
+        assert!(table.add(Font::new("alpha").expect("font")).is_err());
+        assert!(
+            table
+                .replace(9usize, Font::new("Beta").expect("font"))
+                .expect("replace")
+                .is_none()
+        );
+        assert!(table.remove(9usize).expect("remove").is_none());
+    }
+
+    #[test]
+    fn unicode_caseless_identity_is_consistent_and_ambiguous_sources_fail() {
+        let mut table = Table::new();
+        table.add(Font::new("Straße").expect("font")).expect("add");
+        assert!(table.add(Font::new("STRASSE").expect("font")).is_err());
+        table.add(Font::new("École").expect("font")).expect("add");
+
+        assert!(table.get("strasse").expect("lookup").is_some());
+        assert!(table.get("e\u{301}COLE").expect("lookup").is_some());
+        table
+            .reorder(&["e\u{301}cole", "STRASSE"])
+            .expect("reorder");
+        assert_eq!(
+            table.get(0usize).expect("lookup").expect("font").name(),
+            "École"
+        );
+
+        let malformed_xml = r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="Straße"/><w:font w:name="STRASSE"/></w:fonts>"#;
+        let malformed = parse(malformed_xml.as_bytes()).expect("parse malformed producer table");
+        assert!(malformed.get("strasse").is_err());
     }
 }

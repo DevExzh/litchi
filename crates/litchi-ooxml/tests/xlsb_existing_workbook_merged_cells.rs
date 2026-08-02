@@ -1,13 +1,9 @@
+use litchi_ooxml::xlsb::XlsbWorkbook;
 use litchi_ooxml::xlsb::merged_cells::MergedCell;
-use litchi_ooxml::xlsb::writer::{MutableXlsbWorksheet, RecordWriter, XlsbWorkbookWriter};
-use litchi_ooxml::xlsb::{XlsbRecord, XlsbWorkbook};
+use litchi_ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::raw::{Kind, Records, Writer, kind};
 use std::io::Cursor;
-
-const BEGIN_MERGE_CELLS: u16 = 0x00B1;
-const MERGE_CELL: u16 = 0x00B0;
-const END_MERGE_CELLS: u16 = 0x00B2;
-const END_SHEET: u16 = 0x0082;
 
 fn workbook_bytes(sheets: &[(&str, &[MergedCell])]) -> Vec<u8> {
     let mut workbook = XlsbWorkbookWriter::new();
@@ -39,17 +35,17 @@ fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
         .to_vec()
 }
 
-fn records(data: &[u8]) -> Vec<(u16, usize, usize, Vec<u8>)> {
-    let mut cursor = Cursor::new(data);
+fn records(data: &[u8]) -> Vec<(Kind, usize, usize, Vec<u8>)> {
+    let mut records = Records::new(data);
     let mut result = Vec::new();
-    while cursor.position() < data.len() as u64 {
-        let start = cursor.position() as usize;
-        let record = XlsbRecord::read(&mut cursor).unwrap();
+    while let Some(record) = records.next() {
+        let record = record.unwrap();
+        let start = record.offset();
         result.push((
-            record.header.record_type,
+            record.kind(),
             start,
-            cursor.position() as usize,
-            record.data.to_vec(),
+            records.offset(),
+            record.payload().to_vec(),
         ));
     }
     result
@@ -58,7 +54,7 @@ fn records(data: &[u8]) -> Vec<(u16, usize, usize, Vec<u8>)> {
 fn insert_before_end_sheet(data: &[u8], inserted: &[u8]) -> Vec<u8> {
     let offset = records(data)
         .into_iter()
-        .find_map(|(record_type, start, _, _)| (record_type == END_SHEET).then_some(start))
+        .find_map(|(record_type, start, _, _)| (record_type == kind::END_SHEET).then_some(start))
         .unwrap();
     let mut output = Vec::with_capacity(data.len() + inserted.len());
     output.extend_from_slice(&data[..offset]);
@@ -79,25 +75,27 @@ fn rewrite_first_sheet(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Ve
 
 fn merge_block(declared_count: u32, ranges: &[MergedCell]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = RecordWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer
-        .write_record(BEGIN_MERGE_CELLS, &declared_count.to_le_bytes())
+        .write_record(kind::BEGIN_MERGE_CELLS, &declared_count.to_le_bytes())
         .unwrap();
     for range in ranges {
-        writer.write_record(MERGE_CELL, &range.serialize()).unwrap();
+        writer
+            .write_record(kind::MERGE_CELL, &range.serialize())
+            .unwrap();
     }
-    writer.write_record(END_MERGE_CELLS, &[]).unwrap();
+    writer.write_record(kind::END_MERGE_CELLS, &[]).unwrap();
     output
 }
 
 fn strip_merge_block(data: &[u8]) -> Vec<u8> {
     let spans = records(data);
-    let begin = spans
-        .iter()
-        .find_map(|(kind, start, _, _)| (*kind == BEGIN_MERGE_CELLS).then_some(*start));
-    let end = spans
-        .iter()
-        .find_map(|(kind, _, end, _)| (*kind == END_MERGE_CELLS).then_some(*end));
+    let begin = spans.iter().find_map(|(record_kind, start, _, _)| {
+        (*record_kind == kind::BEGIN_MERGE_CELLS).then_some(*start)
+    });
+    let end = spans.iter().find_map(|(record_kind, _, end, _)| {
+        (*record_kind == kind::END_MERGE_CELLS).then_some(*end)
+    });
     match (begin, end) {
         (Some(begin), Some(end)) => [&data[..begin], &data[end..]].concat(),
         (None, None) => data.to_vec(),
@@ -110,8 +108,8 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
     let source = workbook_bytes(&[("First", &[]), ("Second", &[])]);
     let source = rewrite_first_sheet(&source, |sheet| {
         let mut unknown = Vec::new();
-        RecordWriter::new(&mut unknown)
-            .write_record(0x0FFE, b"unknown-record-payload")
+        Writer::new(&mut unknown)
+            .write_record(Kind::new(0x0FFE).unwrap(), b"unknown-record-payload")
             .unwrap();
         insert_before_end_sheet(sheet, &unknown)
     });
@@ -195,7 +193,7 @@ fn replaces_adds_removes_and_clears_present_block_by_index_and_name() {
             .iter()
             .all(|(kind, _, _, _)| !matches!(
                 *kind,
-                BEGIN_MERGE_CELLS | MERGE_CELL | END_MERGE_CELLS
+                kind::BEGIN_MERGE_CELLS | kind::MERGE_CELL | kind::END_MERGE_CELLS
             ))
     );
 }
@@ -228,12 +226,12 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
         }),
         rewrite_first_sheet(&base, |sheet| {
             let mut block = Vec::new();
-            let mut writer = RecordWriter::new(&mut block);
+            let mut writer = Writer::new(&mut block);
             writer
-                .write_record(BEGIN_MERGE_CELLS, &1u32.to_le_bytes())
+                .write_record(kind::BEGIN_MERGE_CELLS, &1u32.to_le_bytes())
                 .unwrap();
-            writer.write_record(MERGE_CELL, &[0; 15]).unwrap();
-            writer.write_record(END_MERGE_CELLS, &[]).unwrap();
+            writer.write_record(kind::MERGE_CELL, &[0; 15]).unwrap();
+            writer.write_record(kind::END_MERGE_CELLS, &[]).unwrap();
             insert_before_end_sheet(sheet, &block)
         }),
         rewrite_first_sheet(&base, |sheet| {
@@ -285,14 +283,14 @@ fn count_payload_and_record_order_are_strict_after_roundtrip() {
     let records = records(&sheet);
     let begin = records
         .iter()
-        .position(|(kind, _, _, _)| *kind == BEGIN_MERGE_CELLS)
+        .position(|(record_kind, _, _, _)| *record_kind == kind::BEGIN_MERGE_CELLS)
         .unwrap();
     assert_eq!(records[begin].3, 2u32.to_le_bytes());
-    assert_eq!(records[begin + 1].0, MERGE_CELL);
+    assert_eq!(records[begin + 1].0, kind::MERGE_CELL);
     assert_eq!(records[begin + 1].3.len(), 16);
-    assert_eq!(records[begin + 2].0, MERGE_CELL);
+    assert_eq!(records[begin + 2].0, kind::MERGE_CELL);
     assert_eq!(records[begin + 2].3.len(), 16);
-    assert_eq!(records[begin + 3].0, END_MERGE_CELLS);
+    assert_eq!(records[begin + 3].0, kind::END_MERGE_CELLS);
     assert!(records[begin + 3].3.is_empty());
 
     let reparsed = XlsbWorkbook::new(Cursor::new(output)).unwrap();

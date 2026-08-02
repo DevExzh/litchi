@@ -3,7 +3,7 @@
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::CellParsedFormula;
 use crate::xlsb::formula::ptg_types;
-use crate::xlsb::records::wide_str_with_len;
+use crate::xlsb::records::decode_string;
 use litchi_core::binary;
 
 /// Named range definition
@@ -148,7 +148,7 @@ impl NamedRange {
         let mut offset = 9;
 
         // Read name
-        let (name, consumed) = wide_str_with_len(&data[offset..])?;
+        let (name, consumed) = decode_string(&data[offset..])?;
         offset += consumed;
         validate_defined_name(&name)?;
 

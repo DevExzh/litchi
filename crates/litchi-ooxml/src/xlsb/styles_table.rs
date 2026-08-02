@@ -5,11 +5,11 @@
 //! Reference: [MS-XLSB] Section 2.4 - Styles Part
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::{XlsbRecordIter, record_types, wide_str_with_len};
+use crate::xlsb::records::decode_string;
 use crate::xlsb::styles::{Alignment, Border};
 use litchi_core::binary;
+use litchi_xlsb::raw::{Records, kind};
 use std::collections::HashMap;
-use std::io::Read;
 
 /// Font information
 ///
@@ -96,9 +96,9 @@ impl Default for StylesTable {
 
 impl StylesTable {
     /// Load styles from styles.bin file content
-    pub fn from_reader<R: Read>(reader: R) -> XlsbResult<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> XlsbResult<Self> {
         let mut styles = StylesTable::default();
-        let mut iter = XlsbRecordIter::new(reader);
+        let mut iter = Records::new(bytes);
 
         let mut in_fonts = false;
         let mut in_fills = false;
@@ -109,54 +109,54 @@ impl StylesTable {
 
         for record in iter.by_ref() {
             let record = record?;
-            let rec_type = record.header.record_type;
-            let data = &record.data;
+            let rec_type = record.kind();
+            let data = record.payload();
 
             match rec_type {
-                record_types::BEGIN_FONTS => {
+                kind::BEGIN_FONTS => {
                     in_fonts = true;
                     styles.fonts.clear(); // Clear default
                 },
-                record_types::END_FONTS => in_fonts = false,
-                record_types::FONT if in_fonts => {
+                kind::END_FONTS => in_fonts = false,
+                kind::FONT if in_fonts => {
                     styles.fonts.push(Self::parse_font(data)?);
                 },
-                record_types::BEGIN_FILLS => {
+                kind::BEGIN_FILLS => {
                     in_fills = true;
                     styles.fills.clear(); // Clear default
                 },
-                record_types::END_FILLS => in_fills = false,
-                record_types::FILL if in_fills => {
+                kind::END_FILLS => in_fills = false,
+                kind::FILL if in_fills => {
                     styles.fills.push(Self::parse_fill(data)?);
                 },
-                record_types::BEGIN_BORDERS => {
+                kind::BEGIN_BORDERS => {
                     in_borders = true;
                     styles.borders.clear(); // Clear default
                 },
-                record_types::END_BORDERS => in_borders = false,
-                record_types::BORDER if in_borders => {
+                kind::END_BORDERS => in_borders = false,
+                kind::BORDER if in_borders => {
                     styles.borders.push(Self::parse_border(data)?);
                 },
-                record_types::BEGIN_FMTS => in_fmts = true,
-                record_types::END_FMTS => in_fmts = false,
-                record_types::FMT if in_fmts => {
+                kind::BEGIN_FMTS => in_fmts = true,
+                kind::END_FMTS => in_fmts = false,
+                kind::FMT if in_fmts => {
                     let (id, format_code) = Self::parse_num_fmt(data)?;
                     styles.num_fmts.insert(id, format_code);
                 },
-                record_types::BEGIN_CELL_XFS => {
+                kind::BEGIN_CELL_XFS => {
                     in_cell_xfs = true;
                     styles.cell_xfs.clear();
                 },
-                record_types::END_CELL_XFS => in_cell_xfs = false,
-                record_types::XF if in_cell_xfs => {
+                kind::END_CELL_XFS => in_cell_xfs = false,
+                kind::XF if in_cell_xfs => {
                     styles.cell_xfs.push(Self::parse_xf(data)?);
                 },
-                record_types::BEGIN_CELL_STYLE_XFS => {
+                kind::BEGIN_CELL_STYLE_XFS => {
                     in_cell_style_xfs = true;
                     styles.cell_style_xfs.clear();
                 },
-                record_types::END_CELL_STYLE_XFS => in_cell_style_xfs = false,
-                record_types::XF if in_cell_style_xfs => {
+                kind::END_CELL_STYLE_XFS => in_cell_style_xfs = false,
+                kind::XF if in_cell_style_xfs => {
                     styles.cell_style_xfs.push(Self::parse_xf(data)?);
                 },
                 _ => {
@@ -192,7 +192,7 @@ impl StylesTable {
 
         // bFontScheme is at byte 20; this compact public model does not
         // currently expose theme font schemes.
-        let (name, _) = wide_str_with_len(&data[FONT_NAME_OFFSET..])?;
+        let (name, _) = decode_string(&data[FONT_NAME_OFFSET..])?;
 
         Ok(Font {
             size,
@@ -286,7 +286,7 @@ impl StylesTable {
                 val: id.to_string(),
             });
         }
-        let (format_code, consumed) = wide_str_with_len(&data[2..])?;
+        let (format_code, consumed) = decode_string(&data[2..])?;
         let length = format_code.encode_utf16().count();
         if !(1..=255).contains(&length) {
             return Err(XlsbError::Unrecognized {
@@ -545,7 +545,7 @@ mod tests {
             let part = package
                 .get_part(&PackURI::new("/xl/styles.bin").unwrap())
                 .unwrap();
-            let styles = StylesTable::from_reader(part.blob()).unwrap();
+            let styles = StylesTable::from_bytes(part.blob()).unwrap();
 
             assert!(!styles.fonts.is_empty(), "{fixture}");
             assert!(styles.fills.len() >= 2, "{fixture}");
@@ -581,7 +581,7 @@ mod tests {
         let part = package
             .get_part(&PackURI::new("/xl/styles.bin").unwrap())
             .unwrap();
-        let styles = StylesTable::from_reader(part.blob()).unwrap();
+        let styles = StylesTable::from_bytes(part.blob()).unwrap();
         assert!(styles.num_fmts.keys().any(|id| *id >= 164));
     }
 }

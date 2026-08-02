@@ -2379,6 +2379,92 @@ contexts, scratch planning, or output budgets. Those remain certification work;
 no allocation, latency, contention, or scaling conclusion follows from the
 functional tests.
 
+The next dependency-decoupling slice establishes the first canonical owners
+for all three remaining concrete OOXML families in parallel:
+`litchi-docx`, `litchi-pptx`, and `litchi-xlsb`. The new crates are
+runtime-neutral and have no concrete peer-format edges. The OOXML monolith
+depends on them only as an explicitly ordered migration host and converts their
+typed errors without string erasure. The old host-owned modules and flattened
+type aliases are removed; callers use contextual canonical modules and short
+names. The facade still depends on the migration host until each concrete
+package/object graph moves, so this slice does not misrepresent a partial crate
+as the completed top-level DOCX, PPTX, or XLSB facade.
+
+`litchi-docx::font` now owns WordprocessingML font-table XML and its OPC
+relationship graph. `Table` provides safe semantic name lookup as the ordinary
+entry and checked discovery-order lookup where a numeric position is useful;
+its add, replace, remove, and reorder operations return typed errors rather
+than indexing panics. Lookup and all mutations use the same NFD plus Unicode
+default-case-fold identity, including composed/decomposed and non-ASCII names;
+malformed producer tables with ambiguous identities remain readable but cannot
+be selected silently. Names and extension attributes are validated at
+construction. Package `read` shares embedded-font payload allocations,
+`Resource::bytes` lends a slice, and consuming `put` moves newly owned payloads
+into the graph instead of cloning the complete table and every font program.
+The service bounds XML, nodes, depth, font count, individual/aggregate payload
+bytes, validates Strict/Transitional relationships and content types, checks
+licensing and usage invariants, and removes only truly orphaned resources. It
+never discovers, loads, interprets, renders, or executes font programs. The
+migration host delegates the symmetric `fonts`, `put_fonts`, and
+`remove_fonts` facade directly to this owner.
+
+`litchi-pptx::transition` now owns the bounded transition reader/writer and a
+semantic model whose effect variants contain only their legal option domain.
+`Side`, `Axis`, `Corner`, `Origin`, `InOut`, `Shape`, `Ripple`, and `Spokes`
+replace an effect plus independently invalid direction fields. Checked `Ms`
+values cover custom duration and timed advance. Unknown direct effect and
+extension children are retained as size-bounded shared inert XML with no safe
+public raw constructor. Constructor-only effects, arbitrary writer-rejected
+strings, and the former sound field are not kept as false typed capabilities;
+they can return only after parse and write both preserve them. Slide, layout,
+master, inheritance, and mutable-writer callers consume the canonical model
+directly.
+
+`litchi-xlsb::raw` now owns BIFF12 record framing independently of XLSX and
+OPC. `Kind` admits the complete 14-bit future-record domain, constants live in
+`raw::kind`, `Record` lends its payload from the input, and `Records`
+distinguishes a clean record boundary at end-of-stream from a truncated kind,
+length, or payload. `Header` and `Writer` implement the exact one/two-byte kind
+and one-to-four-byte length grammar in checked-in `[MS-XLSB]` section 2.1.4;
+the fourth length continuation bit is ignored without consuming a fifth byte.
+Explicit finite payload and UTF-16 budgets apply before allocation or output,
+`Cursor` has no guarded panic paths, strict UTF-16 rejects unpaired
+surrogates, blob reads lend slices, and wide-string writing counts then streams
+code units without collecting a temporary vector. Validated `Header` and
+borrowed `Record` fields are private, with short `kind`, `len`, and `payload`
+accessors preventing callers from manufacturing mismatched records. Checked-in
+`[MS-XLSB]` section 2.5.123 also pins RK flag positions, signed 30-bit decoding,
+and floating reconstruction: `Cursor::read_rk` owns decoding, and
+`Writer::write_rk` emits only bit-exact direct, divide-by-100, or floating
+representations and returns a typed error instead of rounding other values.
+Both byte- and 32-bit Boolean reads reject values outside zero and one.
+Existing semantic records remain temporarily in the host but delegate framing
+and these scalar wire rules to this owner.
+
+This ownership slice changes library boundaries, validation, and previously
+false or permissive API states. It does not establish new native Office file
+support or make a performance claim. Per explicit direction, the previously
+green full-workspace and desktop Office gates are not repeated; focused crate,
+host-regression, warning-denied, documentation, and dependency-direction gates
+are the applicable evidence. Memory sharing, borrowed payload identity, and
+bounded wire traversal are structural properties; latency, CPU, cache,
+affinity, contention, and scaling still require ADR 0005 measurement and flame
+graphs.
+
+Focused evidence for this slice is green. Canonical owner tests pass with 9
+DOCX unit tests plus 1 downstream-API test, 13 PPTX unit tests plus one passing
+and one compile-fail documentation test, and 17 XLSB raw-wire integration
+tests. Migration-host regressions pass with 1 DOCX font test, 20 PPTX
+transition tests, 388 XLSB library tests, and 15 focused XLSB package tests.
+All-target Clippy with warnings denied passes for the three owner crates and
+`litchi-ooxml`; warning-denied checks also pass for the three migrated umbrella
+examples. Rustdoc passes with warnings denied for all three owners and the
+migration host. Scoped formatting and diff checks are clean. The executable
+dependency fence accepts 35 workspace packages and 110 internal dependency
+declarations with 21 explicitly ordered debt items, and all 10 boundary-policy
+regression tests pass. These are the intentionally focused gates described
+above, not a repeated full-workspace or native-Office certification run.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

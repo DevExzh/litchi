@@ -248,13 +248,8 @@ pub use worksheet::{
     XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
     XlsbWorksheet,
 };
-// Re-export low-level record iterator types for diagnostics and advanced users.
-// The actual implementations live in records.rs; this keeps the module private
-// while still allowing external tooling (like examples) to traverse raw records.
-pub use records::{XlsbRecord, XlsbRecordHeader, XlsbRecordIter};
-
 // Re-export writer types for convenience
 pub use writer::{
-    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, RecordWriter,
-    SheetProtection, StylesWriter, XlsbWorkbookWriter,
+    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, SheetProtection,
+    StylesWriter, XlsbWorkbookWriter,
 };

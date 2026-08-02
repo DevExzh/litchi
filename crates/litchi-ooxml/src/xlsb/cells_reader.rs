@@ -15,7 +15,7 @@ use crate::xlsb::formula::{
 };
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
-use crate::xlsb::records::{RecordIter, record_types};
+use crate::xlsb::records::Stream;
 use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use crate::xlsb::worksheet::{
@@ -23,6 +23,7 @@ use crate::xlsb::worksheet::{
 };
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
+use litchi_xlsb::raw::{Cursor, kind};
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::sync::Arc;
@@ -99,7 +100,7 @@ pub struct XlsbCellsReader<'a, RS>
 where
     RS: Read + Seek,
 {
-    iter: RecordIter<RS>,
+    iter: Stream<RS>,
     shared_strings: &'a [SharedString],
     formula_context: &'a FormulaResolutionContext,
     cell_xf_count: usize,
@@ -107,7 +108,7 @@ where
     current_row: u32,
     last_row: Option<u32>,
     buf: Vec<u8>,
-    pending_record: Option<(u16, Vec<u8>)>,
+    pending_record: Option<(litchi_xlsb::raw::Kind, Vec<u8>)>,
     formula_groups: Vec<Arc<FormulaGroup>>,
     /// Merged cells found in the worksheet
     pub merged_cells: Vec<MergedCell>,
@@ -143,7 +144,7 @@ where
     RS: Read + Seek,
 {
     pub fn new(
-        mut iter: RecordIter<RS>,
+        mut iter: Stream<RS>,
         shared_strings: &'a [SharedString],
         formula_context: &'a FormulaResolutionContext,
         cell_xf_count: usize,
@@ -156,10 +157,10 @@ where
         loop {
             let typ = iter.read_type()?;
             let _ = iter.fill_buffer(&mut buf)?;
-            if typ == record_types::WS_DIM {
+            if typ == kind::WS_DIM {
                 break;
             }
-            if typ == record_types::BEGIN_WS_VIEWS {
+            if typ == kind::BEGIN_WS_VIEWS {
                 sheet_views = crate::xlsb::sheet_view::read_sheet_views(&mut iter, &mut buf)?;
             }
         }
@@ -179,12 +180,12 @@ where
         loop {
             let typ = iter.read_type()?;
             let _ = iter.fill_buffer(&mut buf)?;
-            if typ == 0x0091 {
+            if typ == kind::BEGIN_SHEET_DATA {
                 break;
             }
-            if typ == record_types::COL_INFO {
+            if typ == kind::COL_INFO {
                 column_infos.push(Self::parse_column_info(&buf, cell_xf_count)?);
-            } else if typ == record_types::BEGIN_WS_VIEWS {
+            } else if typ == kind::BEGIN_WS_VIEWS {
                 sheet_views = crate::xlsb::sheet_view::read_sheet_views(&mut iter, &mut buf)?;
             }
         }
@@ -234,20 +235,23 @@ where
                 typ
             };
 
-            if typ == 0x0092 {
+            if typ == kind::END_SHEET_DATA {
                 // BrtEndSheetData - continue to read advanced features
                 self.read_advanced_features()?;
                 return Ok(None);
             }
 
-            let cell_header = if matches!(typ, 0x0001..=0x000B | record_types::CELL_R_STRING) {
+            let cell_header = if (kind::CELL_BLANK.get()..=kind::FMLA_ERROR.get())
+                .contains(&typ.get())
+                || typ == kind::CELL_R_STRING
+            {
                 Some(self.parse_cell_header()?)
             } else {
                 None
             };
 
             match typ {
-                0x0000 => {
+                kind::ROW_HDR => {
                     // BrtRowHdr
                     let info = Self::parse_row_info(
                         &self.buf,
@@ -258,7 +262,7 @@ where
                     self.last_row = Some(info.row);
                     self.row_infos.push(info);
                 },
-                0x0001
+                kind::CELL_BLANK
                     // BrtCellBlank
                     if self.buf.len() >= 8 => {
                         let header = cell_header.unwrap();
@@ -268,19 +272,19 @@ where
                             CellValue::Empty,
                         )));
                     },
-                0x0002
+                kind::CELL_RK
                     // BrtCellRk
                     if self.buf.len() >= 12 => {
                         let header = cell_header.unwrap();
-                        let rk_val = binary::read_u32_le_at(&self.buf, 8)?;
-                        let value = Self::parse_rk_value(rk_val);
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk");
+                        let value = Self::cell_value_from_number(cursor.read_rk()?);
                         return Ok(Some(XlsbCell::new_styled(
                             self.current_row,
                             header,
                             value,
                         )));
                     },
-                0x0003
+                kind::CELL_ERROR
                     // BrtCellError
                     if self.buf.len() >= 9 => {
                         let header = cell_header.unwrap();
@@ -302,18 +306,19 @@ where
                             CellValue::Error(error_msg.to_string()),
                         )));
                     },
-                0x0004
+                kind::CELL_BOOL
                     // BrtCellBool
                     if self.buf.len() >= 9 => {
                         let header = cell_header.unwrap();
-                        let value = self.buf[8] != 0;
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool");
+                        let value = cursor.read_bool8()?;
                         return Ok(Some(XlsbCell::new_styled(
                             self.current_row,
                             header,
                             CellValue::Bool(value),
                         )));
                     },
-                0x0005
+                kind::CELL_REAL
                     // BrtCellReal
                     if self.buf.len() >= 16 => {
                         let header = cell_header.unwrap();
@@ -324,18 +329,18 @@ where
                             CellValue::Float(value),
                         )));
                     },
-                0x0006
+                kind::CELL_ST
                     // BrtCellSt
                     if self.buf.len() >= 8 => {
                         let header = cell_header.unwrap();
-                        let (string, _) = super::records::wide_str_with_len(&self.buf[8..])?;
+                        let (string, _) = super::records::decode_string(&self.buf[8..])?;
                         return Ok(Some(XlsbCell::new_styled(
                             self.current_row,
                             header,
                             CellValue::String(string),
                         )));
                     },
-                0x0007
+                kind::CELL_ISST
                     // BrtCellIsst
                     if self.buf.len() >= 12 => {
                         let header = cell_header.unwrap();
@@ -351,7 +356,7 @@ where
                             value,
                         )));
                     },
-                record_types::CELL_R_STRING => {
+                kind::CELL_R_STRING => {
                     if self.buf.len() < 9 {
                         return Err(XlsbError::InvalidLength {
                             expected: 9,
@@ -366,7 +371,7 @@ where
                         rich_string,
                     )));
                 },
-                0x0008 => {
+                kind::FMLA_STRING => {
                     // BrtFmlaString - formula with string result
                     if self.buf.len() < 12 {
                         return Err(XlsbError::InvalidLength {
@@ -376,12 +381,12 @@ where
                     }
                     let header = cell_header.unwrap();
                     let (string, consumed) =
-                        super::records::wide_str_with_len(&self.buf[8..])?;
+                        super::records::decode_string(&self.buf[8..])?;
                     let parsed =
                         self.parse_formula_cell(header, CellValue::String(string), 8 + consumed)?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
-                0x0009 => {
+                kind::FMLA_NUM => {
                     // BrtFmlaNum - formula with numeric result
                     if self.buf.len() < 18 {
                         return Err(XlsbError::InvalidLength {
@@ -395,7 +400,7 @@ where
                         self.parse_formula_cell(header, CellValue::Float(num_value), 16)?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
-                0x000A => {
+                kind::FMLA_BOOL => {
                     // BrtFmlaBool - formula with boolean result
                     if self.buf.len() < 11 {
                         return Err(XlsbError::InvalidLength {
@@ -404,7 +409,8 @@ where
                         });
                     }
                     let header = cell_header.unwrap();
-                    let bool_value = self.buf[8] != 0;
+                    let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value");
+                    let bool_value = cursor.read_bool8()?;
                     let parsed = self.parse_formula_cell(
                         header,
                         CellValue::Bool(bool_value),
@@ -412,7 +418,7 @@ where
                     )?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
-                0x000B => {
+                kind::FMLA_ERROR => {
                     // BrtFmlaError - formula with error result
                     if self.buf.len() < 11 {
                         return Err(XlsbError::InvalidLength {
@@ -429,7 +435,7 @@ where
                     )?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
-                record_types::ARR_FMLA | record_types::SHR_FMLA => {
+                kind::ARR_FMLA | kind::SHR_FMLA => {
                     return Err(XlsbError::InvalidFormula(
                         "array/shared formula definition is not immediately preceded by a formula cell"
                             .to_string(),
@@ -676,8 +682,8 @@ where
         let mut next_data = Vec::new();
         let _ = self.iter.fill_buffer(&mut next_data)?;
         let new_group = match next_type {
-            record_types::ARR_FMLA => Some(FormulaGroup::parse_array(&next_data)?),
-            record_types::SHR_FMLA => Some(FormulaGroup::parse_shared(&next_data)?),
+            kind::ARR_FMLA => Some(FormulaGroup::parse_array(&next_data)?),
+            kind::SHR_FMLA => Some(FormulaGroup::parse_shared(&next_data)?),
             _ => {
                 self.pending_record = Some((next_type, next_data));
                 None
@@ -778,37 +784,11 @@ where
         }
     }
 
-    fn parse_rk_value(rk: u32) -> CellValue {
-        let d100 = (rk & 0x02) != 0;
-        let is_int = (rk & 0x01) != 0;
-
-        if is_int {
-            let int_val = (rk >> 2) as i32;
-            let value = if d100 {
-                if int_val % 100 != 0 {
-                    int_val as f64 / 100.0
-                } else {
-                    (int_val / 100) as f64
-                }
-            } else {
-                int_val as f64
-            };
+    fn cell_value_from_number(value: f64) -> CellValue {
+        if value == value.round() && value >= i64::MIN as f64 && value <= i64::MAX as f64 {
             CellValue::Int(value as i64)
         } else {
-            let mut float_bits = [0u8; 8];
-            let masked_rk = rk & 0xFFFFFFFC;
-            // RK floats use the lower 30 bits as the upper 32 bits of a double
-            // In little-endian, this goes in the last 4 bytes
-            float_bits[4..8].copy_from_slice(&masked_rk.to_le_bytes());
-            let mut value = f64::from_le_bytes(float_bits);
-            value = if d100 { value / 100.0 } else { value };
-
-            // Check if it's a whole number
-            if value == value.round() && value >= i64::MIN as f64 && value <= i64::MAX as f64 {
-                CellValue::Int(value as i64)
-            } else {
-                CellValue::Float(value)
-            }
+            CellValue::Float(value)
         }
     }
 
@@ -829,23 +809,23 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
 
             match typ {
-                0x00B1 => {
+                kind::BEGIN_MERGE_CELLS => {
                     // BrtBeginMergeCells - start of merged cells section
                     self.read_merged_cells()?;
                 },
-                0x00B0 => {
+                kind::MERGE_CELL => {
                     // BrtMergeCell - single merged cell
                     if let Ok(merged) = MergedCell::parse(&self.buf) {
                         self.merged_cells.push(merged);
                     }
                 },
-                0x01EE => {
+                kind::H_LINK => {
                     // BrtHLink - hyperlink
                     if let Ok(hyperlink) = Hyperlink::parse(&self.buf) {
                         self.hyperlinks.push(hyperlink);
                     }
                 },
-                record_types::BEGIN_A_FILTER => {
+                kind::BEGIN_A_FILTER => {
                     if self.auto_filter.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginAFilter".to_string(),
@@ -855,7 +835,7 @@ where
                     self.auto_filter = Some(Self::parse_auto_filter(&self.buf)?);
                     self.consume_auto_filter_records()?;
                 },
-                record_types::SHEET_PROTECTION => {
+                kind::SHEET_PROTECTION => {
                     if self.sheet_protection.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtSheetProtection".to_string(),
@@ -864,7 +844,7 @@ where
                     }
                     self.sheet_protection = Some(Self::parse_sheet_protection(&self.buf)?);
                 },
-                record_types::SHEET_PROTECTION_ISO => {
+                kind::SHEET_PROTECTION_ISO => {
                     if self.sheet_protection.is_some() || self.strong_sheet_protection.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtSheetProtectionIso".to_string(),
@@ -875,7 +855,7 @@ where
                     self.buf.clear();
                     let next_type = self.iter.read_type()?;
                     let _ = self.iter.fill_buffer(&mut self.buf)?;
-                    if next_type != record_types::SHEET_PROTECTION {
+                    if next_type != kind::SHEET_PROTECTION {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtSheetProtectionIso".to_string(),
                             val: "not immediately followed by BrtSheetProtection".to_string(),
@@ -893,7 +873,7 @@ where
                     self.sheet_protection = Some(base);
                     self.strong_sheet_protection = Some(strong);
                 },
-                record_types::BEGIN_D_VALS => {
+                kind::BEGIN_D_VALS => {
                     if self.data_validation_settings.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginDVals".to_string(),
@@ -904,7 +884,7 @@ where
                     self.data_validation_settings = Some(settings);
                     self.consume_classic_data_validations(count)?;
                 },
-                record_types::BEGIN_D_VALS14 => {
+                kind::BEGIN_D_VALS14 => {
                     if self.data_validation14_settings.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginDVals14".to_string(),
@@ -915,18 +895,18 @@ where
                     self.data_validation14_settings = Some(settings);
                     self.consume_extension_data_validations(count)?;
                 },
-                record_types::BEGIN_COND_FORMATTING => {
+                kind::BEGIN_COND_FORMATTING => {
                     let (mut formatting, count, base) = parse_classic_header(&self.buf)?;
                     self.consume_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
-                record_types::BEGIN_COND_FORMATTING14 => {
+                kind::BEGIN_COND_FORMATTING14 => {
                     let (mut formatting, count, base) =
                         ConditionalFormatting::parse_extension14_header_with_base(&self.buf)?;
                     self.consume_extension_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
-                record_types::BEGIN_WEB_EXTENSIONS => {
+                kind::BEGIN_WEB_EXTENSIONS => {
                     if self.saw_web_extension_collection {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginWebExtensions".to_string(),
@@ -942,7 +922,7 @@ where
                     self.saw_web_extension_collection = true;
                     self.consume_web_extension_bindings()?;
                 },
-                0x0082 => {
+                kind::END_SHEET => {
                     // BrtEndSheet - end of worksheet
                     self.resolve_conditional_formatting_links()?;
                     break;
@@ -963,7 +943,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::WEB_EXTENSION => {
+                kind::WEB_EXTENSION => {
                     if self.web_extension_bindings.len() == 65_536 {
                         return Err(XlsbError::Unrecognized {
                             typ: "WEBEXTENSIONS".to_string(),
@@ -981,7 +961,7 @@ where
                     }
                     self.web_extension_bindings.push(binding);
                 },
-                record_types::END_WEB_EXTENSIONS => {
+                kind::END_WEB_EXTENSIONS => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtEndWebExtensions".to_string(),
@@ -1096,7 +1076,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::D_VAL_LIST => {
+                kind::D_VAL_LIST => {
                     if pending_list.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtDValList".to_string(),
@@ -1105,7 +1085,7 @@ where
                     }
                     pending_list = Some(parse_dval_list(&self.buf)?);
                 },
-                record_types::D_VAL => {
+                kind::D_VAL => {
                     let rule = DataValidation::parse_classic(
                         &self.buf,
                         pending_list.take(),
@@ -1113,7 +1093,7 @@ where
                     )?;
                     self.data_validations.push(rule);
                 },
-                record_types::END_D_VALS => {
+                kind::END_D_VALS => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::InvalidLength {
                             expected: 0,
@@ -1153,14 +1133,13 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::D_VAL14 => {
-                    self.data_validations
-                        .push(DataValidation::parse_extension14(
-                            &self.buf,
-                            self.formula_context,
-                        )?)
-                },
-                record_types::END_D_VALS14 => {
+                kind::D_VAL14 => self
+                    .data_validations
+                    .push(DataValidation::parse_extension14(
+                        &self.buf,
+                        self.formula_context,
+                    )?),
+                kind::END_D_VALS14 => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::InvalidLength {
                             expected: 0,
@@ -1198,7 +1177,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::BEGIN_CF_RULE => {
+                kind::BEGIN_CF_RULE => {
                     let mut rule = ConditionalFormattingRule::parse_with_context(
                         &self.buf,
                         base,
@@ -1218,7 +1197,7 @@ where
                     self.consume_conditional_rule(&mut rule, base)?;
                     formatting.rules.push(rule);
                 },
-                record_types::END_COND_FORMATTING => {
+                kind::END_COND_FORMATTING => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::InvalidLength {
                             expected: 0,
@@ -1258,7 +1237,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::BEGIN_CF_RULE14 => {
+                kind::BEGIN_CF_RULE14 => {
                     let mut rule = ConditionalFormattingRule::parse_extension14_with_context(
                         &self.buf,
                         base,
@@ -1284,7 +1263,7 @@ where
                     self.consume_extension_conditional_rule(&mut rule, base)?;
                     formatting.rules.push(rule);
                 },
-                record_types::END_COND_FORMATTING14 => {
+                kind::END_COND_FORMATTING14 => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::InvalidLength {
                             expected: 0,
@@ -1323,7 +1302,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::BEGIN_COLOR_SCALE14 => {
+                kind::BEGIN_COLOR_SCALE14 => {
                     if rule.color_scale14.is_some() || !self.buf.is_empty() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginColorScale14".to_string(),
@@ -1332,7 +1311,7 @@ where
                     }
                     rule.color_scale14 = Some(self.consume_color_scale14(base)?);
                 },
-                record_types::BEGIN_DATABAR14 => {
+                kind::BEGIN_DATABAR14 => {
                     if rule.data_bar14.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginDatabar14".to_string(),
@@ -1347,7 +1326,7 @@ where
                         .priority;
                     rule.data_bar14 = Some(self.consume_data_bar14(&begin, base, priority)?);
                 },
-                record_types::BEGIN_ICON_SET14 => {
+                kind::BEGIN_ICON_SET14 => {
                     if rule.icon_set14.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginIconSet14".to_string(),
@@ -1357,7 +1336,7 @@ where
                     let begin = self.buf.clone();
                     rule.icon_set14 = Some(self.consume_icon_set14(&begin, base)?);
                 },
-                record_types::END_CF_RULE14 => {
+                kind::END_CF_RULE14 => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::InvalidLength {
                             expected: 0,
@@ -1415,7 +1394,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::BEGIN_COLOR_SCALE => {
+                kind::BEGIN_COLOR_SCALE => {
                     if rule.color_scale.is_some() || !self.buf.is_empty() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginColorScale".to_string(),
@@ -1424,7 +1403,7 @@ where
                     }
                     rule.color_scale = Some(self.consume_color_scale(base)?);
                 },
-                record_types::BEGIN_DATABAR => {
+                kind::BEGIN_DATABAR => {
                     if rule.data_bar.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginDatabar".to_string(),
@@ -1434,7 +1413,7 @@ where
                     let begin = self.buf.clone();
                     rule.data_bar = Some(self.consume_data_bar(&begin, base)?);
                 },
-                record_types::BEGIN_ICON_SET => {
+                kind::BEGIN_ICON_SET => {
                     if rule.icon_set.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtBeginIconSet".to_string(),
@@ -1444,7 +1423,7 @@ where
                     let begin = self.buf.clone();
                     rule.icon_set = Some(self.consume_icon_set(&begin, base)?);
                 },
-                record_types::CF_RULE_EXT => {
+                kind::CF_RULE_EXT => {
                     if rule.classic_extension_guid.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "BrtCFRuleExt".to_string(),
@@ -1453,7 +1432,7 @@ where
                     }
                     rule.classic_extension_guid = Some(parse_rule_extension_guid(&self.buf)?);
                 },
-                record_types::END_CF_RULE => {
+                kind::END_CF_RULE => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::InvalidLength {
                             expected: 0,
@@ -1499,13 +1478,13 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::CFVO if colors.is_empty() => cfvos.push(Cfvo::parse_with_context(
+                kind::CFVO if colors.is_empty() => cfvos.push(Cfvo::parse_with_context(
                     &self.buf,
                     base,
                     self.formula_context,
                 )?),
-                record_types::COLOR => colors.push(ConditionalFormatColor::parse(&self.buf)?),
-                record_types::END_COLOR_SCALE if self.buf.is_empty() => break,
+                kind::COLOR => colors.push(ConditionalFormatColor::parse(&self.buf)?),
+                kind::END_COLOR_SCALE if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
                         typ: "BrtBeginColorScale collection".to_string(),
@@ -1571,13 +1550,11 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::CFVO14 if colors.is_empty() => cfvos.push(
+                kind::CFVO14 if colors.is_empty() => cfvos.push(
                     Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
                 ),
-                record_types::COLOR14 => {
-                    colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?)
-                },
-                record_types::END_COLOR_SCALE14 if self.buf.is_empty() => break,
+                kind::COLOR14 => colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?),
+                kind::END_COLOR_SCALE14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
                         typ: "BrtBeginColorScale14 collection".to_string(),
@@ -1603,15 +1580,15 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::CFVO if color.is_none() => cfvos.push(Cfvo::parse_with_context(
+                kind::CFVO if color.is_none() => cfvos.push(Cfvo::parse_with_context(
                     &self.buf,
                     base,
                     self.formula_context,
                 )?),
-                record_types::COLOR if color.is_none() => {
+                kind::COLOR if color.is_none() => {
                     color = Some(ConditionalFormatColor::parse(&self.buf)?)
                 },
-                record_types::END_DATABAR if self.buf.is_empty() => break,
+                kind::END_DATABAR if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
                         typ: "BrtBeginDatabar collection".to_string(),
@@ -1666,13 +1643,11 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::CFVO14 if colors.is_empty() => cfvos.push(
+                kind::CFVO14 if colors.is_empty() => cfvos.push(
                     Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
                 ),
-                record_types::COLOR14 => {
-                    colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?)
-                },
-                record_types::END_DATABAR14 if self.buf.is_empty() => break,
+                kind::COLOR14 => colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?),
+                kind::END_DATABAR14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
                         typ: "BrtBeginDatabar14 collection".to_string(),
@@ -1765,12 +1740,12 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::CFVO => cfvos.push(Cfvo::parse_with_context(
+                kind::CFVO => cfvos.push(Cfvo::parse_with_context(
                     &self.buf,
                     base,
                     self.formula_context,
                 )?),
-                record_types::END_ICON_SET if self.buf.is_empty() => break,
+                kind::END_ICON_SET if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
                         typ: "BrtBeginIconSet collection".to_string(),
@@ -1812,11 +1787,11 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                record_types::CFVO14 if icons.is_empty() => cfvos.push(
+                kind::CFVO14 if icons.is_empty() => cfvos.push(
                     Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
                 ),
-                record_types::CF_ICON => icons.push(ConditionalFormatIcon::parse(&self.buf)?),
-                record_types::END_ICON_SET14 if self.buf.is_empty() => break,
+                kind::CF_ICON => icons.push(ConditionalFormatIcon::parse(&self.buf)?),
+                kind::END_ICON_SET14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
                         typ: "BrtBeginIconSet14 collection".to_string(),
@@ -1887,7 +1862,7 @@ where
             self.buf.clear();
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
-            if typ == record_types::END_A_FILTER {
+            if typ == kind::END_A_FILTER {
                 if !self.buf.is_empty() {
                     return Err(XlsbError::InvalidLength {
                         expected: 0,
@@ -1896,7 +1871,7 @@ where
                 }
                 return Ok(());
             }
-            if typ == record_types::BEGIN_A_FILTER {
+            if typ == kind::BEGIN_A_FILTER {
                 return Err(XlsbError::Unrecognized {
                     typ: "BrtBeginAFilter".to_string(),
                     val: "nested AutoFilter".to_string(),
@@ -2097,12 +2072,12 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
 
-            if typ == 0x00B2 {
+            if typ == kind::END_MERGE_CELLS {
                 // BrtEndMergeCells
                 break;
             }
 
-            if typ == 0x00B0 {
+            if typ == kind::MERGE_CELL {
                 // BrtMergeCell
                 if let Ok(merged) = MergedCell::parse(&self.buf) {
                     self.merged_cells.push(merged);
@@ -2120,28 +2095,22 @@ mod tests {
     use crate::xlsb::conditional_formatting::{
         ConditionalFormattingRecordKind, ConditionalFormattingRule14Metadata, DataBarAxisPosition14,
     };
-    use crate::xlsb::writer::RecordWriter;
     use litchi_core::sheet::Cell;
+    use litchi_xlsb::raw::Writer;
 
     fn rich_string_worksheet() -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut writer = RecordWriter::new(&mut bytes);
-        writer.write_record(0x0094, &[0; 16]).unwrap();
-        writer
-            .write_record(record_types::BEGIN_COL_INFOS, &[])
-            .unwrap();
+        let mut writer = Writer::new(&mut bytes);
+        writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
+        writer.write_record(kind::BEGIN_COL_INFOS, &[]).unwrap();
         let mut column = 2u32.to_le_bytes().to_vec();
         column.extend_from_slice(&4u32.to_le_bytes());
         column.extend_from_slice(&4096u32.to_le_bytes());
         column.extend_from_slice(&0u32.to_le_bytes());
         column.extend_from_slice(&0x130Fu16.to_le_bytes());
-        writer
-            .write_record(record_types::COL_INFO, &column)
-            .unwrap();
-        writer
-            .write_record(record_types::END_COL_INFOS, &[])
-            .unwrap();
-        writer.write_record(0x0091, &[]).unwrap();
+        writer.write_record(kind::COL_INFO, &column).unwrap();
+        writer.write_record(kind::END_COL_INFOS, &[]).unwrap();
+        writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
 
         let mut row = 4u32.to_le_bytes().to_vec();
         row.extend_from_slice(&0u32.to_le_bytes());
@@ -2150,7 +2119,7 @@ mod tests {
         row.extend_from_slice(&1u32.to_le_bytes());
         row.extend_from_slice(&2u32.to_le_bytes());
         row.extend_from_slice(&2u32.to_le_bytes());
-        writer.write_record(record_types::ROW_HDR, &row).unwrap();
+        writer.write_record(kind::ROW_HDR, &row).unwrap();
 
         let mut cell = 2u32.to_le_bytes().to_vec();
         cell.extend_from_slice(&[0, 0, 0, 1]);
@@ -2159,11 +2128,9 @@ mod tests {
         cell.extend_from_slice(&[b'A', 0, b'B', 0]);
         cell.extend_from_slice(&2u32.to_le_bytes());
         cell.extend_from_slice(&[0, 0, 3, 0, 1, 0, 5, 0]);
-        writer
-            .write_record(record_types::CELL_R_STRING, &cell)
-            .unwrap();
-        writer.write_record(0x0092, &[]).unwrap();
-        writer.write_record(0x0082, &[]).unwrap();
+        writer.write_record(kind::CELL_R_STRING, &cell).unwrap();
+        writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
+        writer.write_record(kind::END_SHEET, &[]).unwrap();
         bytes
     }
 
@@ -2227,19 +2194,17 @@ mod tests {
         assert_eq!(Reader::sheet_protection_flags(&protection), flags);
 
         let mut worksheet = Vec::new();
-        let mut writer = RecordWriter::new(&mut worksheet);
-        writer.write_record(0x0094, &[0; 16]).unwrap();
-        writer.write_record(0x0091, &[]).unwrap();
-        writer.write_record(0x0092, &[]).unwrap();
+        let mut writer = Writer::new(&mut worksheet);
+        writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
+        writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
+        writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
         writer
-            .write_record(record_types::SHEET_PROTECTION_ISO, &iso)
+            .write_record(kind::SHEET_PROTECTION_ISO, &iso)
             .unwrap();
-        writer
-            .write_record(record_types::SHEET_PROTECTION, &base)
-            .unwrap();
-        writer.write_record(0x0082, &[]).unwrap();
+        writer.write_record(kind::SHEET_PROTECTION, &base).unwrap();
+        writer.write_record(kind::END_SHEET, &[]).unwrap();
         let formula_context = FormulaResolutionContext::default();
-        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().unwrap().is_none());
         assert_eq!(reader.sheet_protection.unwrap(), protection);
@@ -2250,7 +2215,7 @@ mod tests {
     fn reads_inline_rich_string_cells() {
         let bytes = rich_string_worksheet();
         let formula_context = FormulaResolutionContext::default();
-        let iter = RecordIter::new(std::io::Cursor::new(bytes));
+        let iter = Stream::new(std::io::Cursor::new(bytes));
         let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
 
         let cell = reader.next_cell().unwrap().unwrap();
@@ -2293,20 +2258,18 @@ mod tests {
     #[test]
     fn rejects_a_validation_collection_with_a_mismatched_count() {
         let mut worksheet = Vec::new();
-        let mut writer = RecordWriter::new(&mut worksheet);
-        writer.write_record(0x0094, &[0; 16]).unwrap();
-        writer.write_record(0x0091, &[]).unwrap();
-        writer.write_record(0x0092, &[]).unwrap();
+        let mut writer = Writer::new(&mut worksheet);
+        writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
+        writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
+        writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
         let mut begin = vec![0; 14];
         begin.extend_from_slice(&1u32.to_le_bytes());
-        writer
-            .write_record(record_types::BEGIN_D_VALS, &begin)
-            .unwrap();
-        writer.write_record(record_types::END_D_VALS, &[]).unwrap();
-        writer.write_record(0x0082, &[]).unwrap();
+        writer.write_record(kind::BEGIN_D_VALS, &begin).unwrap();
+        writer.write_record(kind::END_D_VALS, &[]).unwrap();
+        writer.write_record(kind::END_SHEET, &[]).unwrap();
 
         let formula_context = FormulaResolutionContext::default();
-        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
             reader.next_cell(),
@@ -2317,24 +2280,22 @@ mod tests {
     #[test]
     fn rejects_conditional_formatting_with_a_mismatched_rule_count() {
         let mut worksheet = Vec::new();
-        let mut writer = RecordWriter::new(&mut worksheet);
-        writer.write_record(0x0094, &[0; 16]).unwrap();
-        writer.write_record(0x0091, &[]).unwrap();
-        writer.write_record(0x0092, &[]).unwrap();
+        let mut writer = Writer::new(&mut worksheet);
+        writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
+        writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
+        writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
         let mut begin = 1u32.to_le_bytes().to_vec();
         begin.extend_from_slice(&0u32.to_le_bytes());
         begin.extend_from_slice(&1u32.to_le_bytes());
         begin.extend_from_slice(&[0; 16]);
         writer
-            .write_record(record_types::BEGIN_COND_FORMATTING, &begin)
+            .write_record(kind::BEGIN_COND_FORMATTING, &begin)
             .unwrap();
-        writer
-            .write_record(record_types::END_COND_FORMATTING, &[])
-            .unwrap();
-        writer.write_record(0x0082, &[]).unwrap();
+        writer.write_record(kind::END_COND_FORMATTING, &[]).unwrap();
+        writer.write_record(kind::END_SHEET, &[]).unwrap();
 
         let formula_context = FormulaResolutionContext::default();
-        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
             reader.next_cell(),
@@ -2387,117 +2348,85 @@ mod tests {
         formatting.rules = vec![color_rule.clone(), bar_rule.clone(), icon_rule.clone()];
 
         let mut worksheet = Vec::new();
-        let mut writer = RecordWriter::new(&mut worksheet);
-        writer.write_record(0x0094, &[0; 16]).unwrap();
-        writer.write_record(0x0091, &[]).unwrap();
-        writer.write_record(0x0092, &[]).unwrap();
+        let mut writer = Writer::new(&mut worksheet);
+        writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
+        writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
+        writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
         writer
             .write_record(
-                record_types::BEGIN_COND_FORMATTING14,
+                kind::BEGIN_COND_FORMATTING14,
                 &formatting.serialize_extension14_header().unwrap(),
             )
             .unwrap();
 
         writer
             .write_record(
-                record_types::BEGIN_CF_RULE14,
+                kind::BEGIN_CF_RULE14,
                 &color_rule.serialize_extension14().unwrap(),
             )
             .unwrap();
-        writer
-            .write_record(record_types::BEGIN_COLOR_SCALE14, &[])
-            .unwrap();
+        writer.write_record(kind::BEGIN_COLOR_SCALE14, &[]).unwrap();
         for threshold in &color_thresholds {
             writer
-                .write_record(
-                    record_types::CFVO14,
-                    &threshold.serialize_extension14().unwrap(),
-                )
+                .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
                 .unwrap();
         }
         for color in color_records {
             writer
-                .write_record(
-                    record_types::COLOR14,
-                    &color.serialize_extension14().unwrap(),
-                )
+                .write_record(kind::COLOR14, &color.serialize_extension14().unwrap())
                 .unwrap();
         }
-        writer
-            .write_record(record_types::END_COLOR_SCALE14, &[])
-            .unwrap();
-        writer
-            .write_record(record_types::END_CF_RULE14, &[])
-            .unwrap();
+        writer.write_record(kind::END_COLOR_SCALE14, &[]).unwrap();
+        writer.write_record(kind::END_CF_RULE14, &[]).unwrap();
 
         writer
             .write_record(
-                record_types::BEGIN_CF_RULE14,
+                kind::BEGIN_CF_RULE14,
                 &bar_rule.serialize_extension14().unwrap(),
             )
             .unwrap();
         writer
-            .write_record(
-                record_types::BEGIN_DATABAR14,
-                &bar.serialize_header().unwrap(),
-            )
+            .write_record(kind::BEGIN_DATABAR14, &bar.serialize_header().unwrap())
             .unwrap();
         for threshold in [&bar.min_cfvo, &bar.max_cfvo] {
             writer
-                .write_record(
-                    record_types::CFVO14,
-                    &threshold.serialize_extension14().unwrap(),
-                )
+                .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
                 .unwrap();
         }
         for color in [bar.positive_color, bar.axis_color].into_iter().flatten() {
             writer
-                .write_record(
-                    record_types::COLOR14,
-                    &color.serialize_extension14().unwrap(),
-                )
+                .write_record(kind::COLOR14, &color.serialize_extension14().unwrap())
                 .unwrap();
         }
-        writer
-            .write_record(record_types::END_DATABAR14, &[])
-            .unwrap();
-        writer
-            .write_record(record_types::END_CF_RULE14, &[])
-            .unwrap();
+        writer.write_record(kind::END_DATABAR14, &[]).unwrap();
+        writer.write_record(kind::END_CF_RULE14, &[]).unwrap();
 
         writer
             .write_record(
-                record_types::BEGIN_CF_RULE14,
+                kind::BEGIN_CF_RULE14,
                 &icon_rule.serialize_extension14().unwrap(),
             )
             .unwrap();
         writer
             .write_record(
-                record_types::BEGIN_ICON_SET14,
+                kind::BEGIN_ICON_SET14,
                 &icon_set.serialize_header().unwrap(),
             )
             .unwrap();
         for threshold in &icon_thresholds {
             writer
-                .write_record(
-                    record_types::CFVO14,
-                    &threshold.serialize_extension14().unwrap(),
-                )
+                .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
                 .unwrap();
         }
+        writer.write_record(kind::END_ICON_SET14, &[]).unwrap();
+        writer.write_record(kind::END_CF_RULE14, &[]).unwrap();
         writer
-            .write_record(record_types::END_ICON_SET14, &[])
+            .write_record(kind::END_COND_FORMATTING14, &[])
             .unwrap();
-        writer
-            .write_record(record_types::END_CF_RULE14, &[])
-            .unwrap();
-        writer
-            .write_record(record_types::END_COND_FORMATTING14, &[])
-            .unwrap();
-        writer.write_record(0x0082, &[]).unwrap();
+        writer.write_record(kind::END_SHEET, &[]).unwrap();
 
         let formula_context = FormulaResolutionContext::default();
-        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().unwrap().is_none());
         let parsed = &reader.conditional_formattings[0];
@@ -2526,16 +2455,16 @@ mod tests {
     #[test]
     fn rejects_incomplete_color_scale_collection() {
         let mut worksheet = Vec::new();
-        let mut writer = RecordWriter::new(&mut worksheet);
-        writer.write_record(0x0094, &[0; 16]).unwrap();
-        writer.write_record(0x0091, &[]).unwrap();
-        writer.write_record(0x0092, &[]).unwrap();
+        let mut writer = Writer::new(&mut worksheet);
+        writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
+        writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
+        writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
         let mut begin = 1u32.to_le_bytes().to_vec();
         begin.extend_from_slice(&0u32.to_le_bytes());
         begin.extend_from_slice(&1u32.to_le_bytes());
         begin.extend_from_slice(&[0; 16]);
         writer
-            .write_record(record_types::BEGIN_COND_FORMATTING, &begin)
+            .write_record(kind::BEGIN_COND_FORMATTING, &begin)
             .unwrap();
 
         let mut rule = 3u32.to_le_bytes().to_vec();
@@ -2545,23 +2474,15 @@ mod tests {
         rule.extend_from_slice(&[0; 10]);
         rule.extend_from_slice(&[0; 12]);
         rule.extend_from_slice(&u32::MAX.to_le_bytes());
-        writer
-            .write_record(record_types::BEGIN_CF_RULE, &rule)
-            .unwrap();
-        writer
-            .write_record(record_types::BEGIN_COLOR_SCALE, &[])
-            .unwrap();
-        writer
-            .write_record(record_types::END_COLOR_SCALE, &[])
-            .unwrap();
-        writer.write_record(record_types::END_CF_RULE, &[]).unwrap();
-        writer
-            .write_record(record_types::END_COND_FORMATTING, &[])
-            .unwrap();
-        writer.write_record(0x0082, &[]).unwrap();
+        writer.write_record(kind::BEGIN_CF_RULE, &rule).unwrap();
+        writer.write_record(kind::BEGIN_COLOR_SCALE, &[]).unwrap();
+        writer.write_record(kind::END_COLOR_SCALE, &[]).unwrap();
+        writer.write_record(kind::END_CF_RULE, &[]).unwrap();
+        writer.write_record(kind::END_COND_FORMATTING, &[]).unwrap();
+        writer.write_record(kind::END_SHEET, &[]).unwrap();
 
         let formula_context = FormulaResolutionContext::default();
-        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().is_err());
     }

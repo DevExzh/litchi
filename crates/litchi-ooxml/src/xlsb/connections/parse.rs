@@ -9,8 +9,8 @@
 
 use crate::xlsb::connections::model::*;
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types as rt;
-use crate::xlsb::walker::{PayloadCursor, RecordWalker, malformed};
+use crate::xlsb::walker::{RecordWalker, malformed};
+use litchi_xlsb::raw::{Cursor, kind as rt};
 
 /// Maximum number of connections in one part.
 const MAX_CONNECTIONS: usize = super::write::MAX_CONNECTIONS;
@@ -18,11 +18,6 @@ const MAX_CONNECTIONS: usize = super::write::MAX_CONNECTIONS;
 const MAX_PARAMETERS: usize = super::write::MAX_PARAMETERS;
 /// Maximum number of Web query table items on one connection.
 const MAX_WEB_TABLE_ITEMS: usize = super::write::MAX_WEB_TABLE_ITEMS;
-
-/// `BrtPCDIMissing` / `BrtPCDIString` / `BrtPCDIIndex` payload sizes.
-const PCDI_MISSING_TYPE: u16 = 20;
-const PCDI_STRING_TYPE: u16 = 24;
-const PCDI_INDEX_TYPE: u16 = 26;
 
 // `BrtBeginExtConnection` flags word 1 (MS-XLSB 2.4.80).
 const CONN_MAINTAIN: u16 = 1 << 0;
@@ -86,24 +81,24 @@ pub fn parse_connections_part(data: &[u8]) -> XlsbResult<XlsbConnections> {
     const CONTEXT: &str = "ExternalDataConnections";
     let mut walker = RecordWalker::new(data);
     let begin = walker.required_begin(rt::BEGIN_EXT_CONNECTIONS, CONTEXT)?;
-    PayloadCursor::new(&begin.data, "BrtBeginExtConnections").finish()?;
+    Cursor::new(begin.payload(), "BrtBeginExtConnections").finish()?;
 
     let mut connections = XlsbConnections::default();
     loop {
         let Some(record) = walker.next()? else {
             return Err(XlsbError::UnexpectedEndOfStream(CONTEXT.to_string()));
         };
-        match record.header.record_type {
+        match record.kind() {
             rt::BEGIN_EXT_CONNECTION => {
                 if connections.connections.len() >= MAX_CONNECTIONS {
                     return Err(malformed(CONTEXT, "connection count limit exceeded"));
                 }
                 connections
                     .connections
-                    .push(parse_connection(&mut walker, &record.data)?);
+                    .push(parse_connection(&mut walker, record.payload())?);
             },
             rt::END_EXT_CONNECTIONS => {
-                PayloadCursor::new(&record.data, "BrtEndExtConnections").finish()?;
+                Cursor::new(record.payload(), "BrtEndExtConnections").finish()?;
                 super::write::validate_connections(&connections)?;
                 return Ok(connections);
             },
@@ -118,20 +113,20 @@ fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Xl
     let mut connection = parse_ext_connection(data)?;
     loop {
         let record = walker.required(CONTEXT)?;
-        match record.header.record_type {
+        match record.kind() {
             rt::BEGIN_EC_DB_PROPS => {
                 connection.properties =
-                    XlsbConnectionProperties::Database(parse_db_props(&record.data)?);
+                    XlsbConnectionProperties::Database(parse_db_props(record.payload())?);
                 walker.expect_end(rt::END_EC_DB_PROPS, "BrtBeginECDbProps")?;
             },
             rt::BEGIN_EC_OLAP_PROPS => {
                 connection.properties =
-                    XlsbConnectionProperties::Olap(parse_olap_props(&record.data)?);
+                    XlsbConnectionProperties::Olap(parse_olap_props(record.payload())?);
                 walker.expect_end(rt::END_EC_OLAP_PROPS, "BrtBeginECOlapProps")?;
             },
             rt::BEGIN_EC_WEB_PROPS => {
                 connection.properties =
-                    XlsbConnectionProperties::Web(parse_web_props(&record.data)?);
+                    XlsbConnectionProperties::Web(parse_web_props(record.payload())?);
                 walker.expect_end(rt::END_EC_WEB_PROPS, "BrtBeginECWebProps")?;
             },
             rt::BEGIN_EC_PARAMS => {
@@ -149,7 +144,7 @@ fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Xl
 /// `BrtBeginExtConnection` payload (MS-XLSB 2.4.80).
 fn parse_ext_connection(data: &[u8]) -> XlsbResult<XlsbConnection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
-    let mut cursor = PayloadCursor::new(data, CONTEXT);
+    let mut cursor = Cursor::new(data, CONTEXT);
     let refreshed_version = cursor.read_u8()?;
     let refreshable_min_version = cursor.read_u8()?;
     let pc = cursor.read_u8()?;
@@ -233,7 +228,7 @@ fn parse_ext_connection(data: &[u8]) -> XlsbResult<XlsbConnection> {
 
 /// `BrtBeginECDbProps` payload (MS-XLSB 2.4.61).
 fn parse_db_props(data: &[u8]) -> XlsbResult<XlsbDbProperties> {
-    let mut cursor = PayloadCursor::new(data, "BrtBeginECDbProps");
+    let mut cursor = Cursor::new(data, "BrtBeginECDbProps");
     let command_type = XlsbCommandType::try_from(cursor.read_u32()?)?;
     let flags = cursor.read_u8()?;
     let connection_string = cursor.read_wide_string()?;
@@ -258,7 +253,7 @@ fn parse_db_props(data: &[u8]) -> XlsbResult<XlsbDbProperties> {
 
 /// `BrtBeginECOlapProps` payload (MS-XLSB 2.4.62).
 fn parse_olap_props(data: &[u8]) -> XlsbResult<XlsbOlapProperties> {
-    let mut cursor = PayloadCursor::new(data, "BrtBeginECOlapProps");
+    let mut cursor = Cursor::new(data, "BrtBeginECOlapProps");
     let flags = cursor.read_u8()?;
     let drillthrough_rows = cursor.read_u32()?;
     let load_flags = cursor.read_u8()?;
@@ -283,7 +278,7 @@ fn parse_olap_props(data: &[u8]) -> XlsbResult<XlsbOlapProperties> {
 
 /// `BrtBeginECWebProps` payload (MS-XLSB 2.4.71).
 fn parse_web_props(data: &[u8]) -> XlsbResult<XlsbWebProperties> {
-    let mut cursor = PayloadCursor::new(data, "BrtBeginECWebProps");
+    let mut cursor = Cursor::new(data, "BrtBeginECWebProps");
     let html_format = match cursor.read_u8()? {
         0 => XlsbHtmlFormat::None,
         1 => XlsbHtmlFormat::RichText,
@@ -330,12 +325,12 @@ fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut XlsbConnection) 
     const CONTEXT: &str = "BrtBeginECParams";
     loop {
         let record = walker.required(CONTEXT)?;
-        match record.header.record_type {
+        match record.kind() {
             rt::BEGIN_EC_PARAM => {
                 if connection.parameters.len() >= MAX_PARAMETERS {
                     return Err(malformed(CONTEXT, "parameter count limit exceeded"));
                 }
-                connection.parameters.push(parse_param(&record.data)?);
+                connection.parameters.push(parse_param(record.payload())?);
                 walker.expect_end(rt::END_EC_PARAM, "BrtBeginECParam")?;
             },
             rt::END_EC_PARAMS => return Ok(()),
@@ -347,7 +342,7 @@ fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut XlsbConnection) 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
 fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
     const CONTEXT: &str = "BrtBeginECParam";
-    let mut cursor = PayloadCursor::new(data, CONTEXT);
+    let mut cursor = Cursor::new(data, CONTEXT);
     let flags = cursor.read_u16()?;
     let pbt = flags & PARAM_TYPE_MASK;
     let sql_type = cursor.read_u16()?;
@@ -373,7 +368,7 @@ fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
                 let boolean = if cursor.remaining() == 1 {
                     u32::from(cursor.read_u8()?)
                 } else {
-                    cursor.read_bool32()?
+                    u32::from(cursor.read_bool32()?)
                 };
                 Some(XlsbParameterValue::Boolean(boolean != 0))
             },
@@ -417,28 +412,28 @@ fn parse_web_tables(
     const CONTEXT: &str = "BrtBeginEcWpTables";
     loop {
         let record = walker.required(CONTEXT)?;
-        match record.header.record_type {
-            PCDI_MISSING_TYPE => {
+        match record.kind() {
+            rt::PCDI_MISSING => {
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
                 connection.web_tables.push(XlsbWebTableItem::Missing);
             },
-            PCDI_STRING_TYPE => {
+            rt::PCDI_STRING => {
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
-                let mut cursor = PayloadCursor::new(&record.data, "BrtPCDIString");
+                let mut cursor = Cursor::new(record.payload(), "BrtPCDIString");
                 connection
                     .web_tables
                     .push(XlsbWebTableItem::Named(cursor.read_wide_string()?));
                 cursor.finish()?;
             },
-            PCDI_INDEX_TYPE => {
+            rt::PCDI_INDEX => {
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
-                let mut cursor = PayloadCursor::new(&record.data, "BrtPCDIIndex");
+                let mut cursor = Cursor::new(record.payload(), "BrtPCDIIndex");
                 connection
                     .web_tables
                     .push(XlsbWebTableItem::Index(cursor.read_u32()?));

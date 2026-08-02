@@ -11,10 +11,8 @@
 //! tab-selected flag.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types;
 use crate::xlsb::utils::{cell_reference, parse_cell_reference};
-use crate::xlsb::walker::PayloadCursor;
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::{Cursor, Writer, kind};
 
 pub use crate::xlsx::views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
@@ -184,7 +182,7 @@ fn zoom_or_default(value: Option<u16>, default: u16, context: &str) -> XlsbResul
 /// `read_sheet_views`, not by this function.
 pub fn parse_ws_view(data: &[u8]) -> XlsbResult<SheetView> {
     let context = "BrtBeginWsView";
-    let mut cursor = PayloadCursor::new(data, context);
+    let mut cursor = Cursor::new(data, context);
     let flags = cursor.read_u16()?;
     let xl_view = cursor.read_u32()?;
     let row_top = cursor.read_u32()?;
@@ -300,7 +298,7 @@ pub fn write_ws_view_payload(view: Option<&SheetView>) -> XlsbResult<Vec<u8>> {
     }
 
     let mut payload = Vec::with_capacity(WS_VIEW_LEN);
-    let mut writer = RecordWriter::new(&mut payload);
+    let mut writer = Writer::new(&mut payload);
     writer.write_u16(flags)?;
     writer.write_u32(xl_view)?;
     writer.write_u32(row_top)?;
@@ -336,7 +334,7 @@ pub fn write_ws_view_payload(view: Option<&SheetView>) -> XlsbResult<Vec<u8>> {
 /// Parse a `BrtPane` record payload ([MS-XLSB] 2.4.723).
 pub fn parse_pane(data: &[u8]) -> XlsbResult<SheetPane> {
     let context = "BrtPane";
-    let mut cursor = PayloadCursor::new(data, context);
+    let mut cursor = Cursor::new(data, context);
     let x_split = cursor.read_f64()?;
     let y_split = cursor.read_f64()?;
     let row_top = cursor.read_u32()?;
@@ -384,7 +382,7 @@ pub fn write_pane_payload(pane: &SheetPane) -> XlsbResult<Vec<u8>> {
         Some(SheetPaneState::Split) | None => 0,
     };
     let mut payload = Vec::with_capacity(PANE_LEN);
-    let mut writer = RecordWriter::new(&mut payload);
+    let mut writer = Writer::new(&mut payload);
     writer.write_f64(x_split)?;
     writer.write_f64(y_split)?;
     writer.write_u32(row_top)?;
@@ -398,7 +396,7 @@ pub fn write_pane_payload(pane: &SheetPane) -> XlsbResult<Vec<u8>> {
 /// Parse a `BrtSel` record payload ([MS-XLSB] 2.4.790).
 pub fn parse_selection(data: &[u8]) -> XlsbResult<SheetSelection> {
     let context = "BrtSel";
-    let mut cursor = PayloadCursor::new(data, context);
+    let mut cursor = Cursor::new(data, context);
     let pnn = cursor.read_u32()?;
     let row_active = cursor.read_u32()?;
     let col_active = cursor.read_u32()?;
@@ -477,7 +475,7 @@ pub fn write_selection_payload(selection: &SheetSelection) -> XlsbResult<Vec<u8>
     }
 
     let mut payload = Vec::with_capacity(SEL_HEADER_LEN + ranges.len() * RANGE_LEN);
-    let mut writer = RecordWriter::new(&mut payload);
+    let mut writer = Writer::new(&mut payload);
     writer.write_u32(selection.pane.map(pane_position_to_u32).unwrap_or(0))?;
     writer.write_u32(row_active)?;
     writer.write_u32(col_active)?;
@@ -499,7 +497,7 @@ pub fn write_selection_payload(selection: &SheetSelection) -> XlsbResult<Vec<u8>
 /// `BrtBeginWsView`, `BrtPane`, and `BrtSel` — including future records — are
 /// skipped, matching the reader's tolerance for unmodelled content.
 pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
-    iter: &mut crate::xlsb::records::RecordIter<RS>,
+    iter: &mut crate::xlsb::records::Stream<RS>,
     buf: &mut Vec<u8>,
 ) -> XlsbResult<Vec<SheetView>> {
     let context = "BrtBeginWsViews collection";
@@ -510,7 +508,7 @@ pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
         let typ = iter.read_type()?;
         let _ = iter.fill_buffer(buf)?;
         match typ {
-            record_types::BEGIN_WS_VIEW => {
+            kind::BEGIN_WS_VIEW => {
                 if current.is_some() {
                     return Err(malformed(context, "nested BrtBeginWsView"));
                 }
@@ -520,11 +518,11 @@ pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
                 views.push(parse_ws_view(buf)?);
                 current = Some(views.len() - 1);
             },
-            record_types::END_WS_VIEW if current.take().is_none() => {
+            kind::END_WS_VIEW if current.take().is_none() => {
                 return Err(malformed(context, "BrtEndWsView without BrtBeginWsView"));
             },
-            record_types::END_WS_VIEW => {},
-            record_types::PANE => {
+            kind::END_WS_VIEW => {},
+            kind::PANE => {
                 if let Some(index) = current {
                     let view = &mut views[index];
                     if view.pane.is_some() {
@@ -533,7 +531,7 @@ pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
                     view.pane = Some(parse_pane(buf)?);
                 }
             },
-            record_types::SEL => {
+            kind::SEL => {
                 if let Some(index) = current {
                     let view = &mut views[index];
                     if view.selections.len() >= MAX_SHEET_VIEW_SELECTIONS {
@@ -542,7 +540,7 @@ pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
                     view.selections.push(parse_selection(buf)?);
                 }
             },
-            record_types::END_WS_VIEWS => {
+            kind::END_WS_VIEWS => {
                 if current.is_some() {
                     return Err(malformed(context, "unterminated BrtBeginWsView"));
                 }
@@ -556,6 +554,7 @@ pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_xlsb::raw::{Error as WireError, Stage};
 
     // BrtBeginWsView payload captured from a default Excel worksheet view.
     const EXCEL_WS_VIEW: [u8; 30] = [
@@ -658,7 +657,10 @@ mod tests {
     fn ws_view_rejects_invalid_length() {
         assert!(matches!(
             parse_ws_view(&EXCEL_WS_VIEW[..29]),
-            Err(XlsbError::InvalidLength { .. })
+            Err(XlsbError::Wire(WireError::Truncated {
+                stage: Stage::Value,
+                ..
+            }))
         ));
     }
 

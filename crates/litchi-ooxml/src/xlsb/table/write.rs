@@ -6,9 +6,9 @@
 //! through `XlsbWorkbook::structured_tables`.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types as rt;
 use crate::xlsb::table::model::{XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableStyleInfo};
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::Writer;
+use litchi_xlsb::raw::kind as rt;
 
 /// `DXFId` value meaning no differential formatting (MS-XLSB 2.5.38).
 const NO_DXF: u32 = u32::MAX;
@@ -159,7 +159,7 @@ fn style_client_payload(style: &XlsbTableStyleInfo) -> Vec<u8> {
 /// Serialize one table into its complete table-part stream.
 pub(crate) fn write_table_part(table: &XlsbTable) -> XlsbResult<Vec<u8>> {
     let mut data = Vec::with_capacity(256);
-    let mut writer = RecordWriter::new(&mut data);
+    let mut writer = Writer::new(&mut data);
     writer.write_record(rt::BEGIN_LIST, &list_payload(table))?;
 
     if !table.columns.is_empty() {
@@ -196,7 +196,7 @@ pub(crate) fn write_table_part(table: &XlsbTable) -> XlsbResult<Vec<u8>> {
 
 /// Serialize a worksheet's `BrtBeginListParts` collection (MS-XLSB 2.4.103).
 pub(crate) fn write_list_parts<W: std::io::Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     rel_ids: &[String],
 ) -> XlsbResult<()> {
     let declared = u32::try_from(rel_ids.len())
@@ -304,7 +304,7 @@ mod tests {
     fn serialized_list_parts_round_trip_through_rel_id_reader() {
         // Wrap in a worksheet-shaped stream: sheet begin, list parts, sheet end.
         let mut stream = Vec::new();
-        let mut writer = RecordWriter::new(&mut stream);
+        let mut writer = Writer::new(&mut stream);
         writer.write_record(rt::BEGIN_SHEET, &[]).unwrap();
         writer
             .write_record(rt::BEGIN_LIST_PARTS, &2u32.to_le_bytes())

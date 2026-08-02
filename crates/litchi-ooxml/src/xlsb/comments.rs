@@ -1,12 +1,12 @@
 //! Comment support for XLSB
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types, wide_str_with_len};
+use crate::xlsb::records::decode_string;
 use crate::xlsb::shared_strings::{SharedString, SharedStringRun};
-use crate::xlsb::writer::RecordWriter;
 use litchi_core::binary;
+use litchi_xlsb::raw::{Record, Records, Writer, kind};
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Write};
+use std::io::Write;
 
 /// Comment information
 ///
@@ -60,21 +60,21 @@ impl Comment {
     }
 }
 
-pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
-    let records = XlsbRecordIter::new(reader).collect::<XlsbResult<Vec<_>>>()?;
+pub(crate) fn read_comments(bytes: &[u8]) -> XlsbResult<Vec<Comment>> {
+    let records = Records::new(bytes).collect::<Result<Vec<_>, _>>()?;
     let mut pos = 0;
-    expect(&records, &mut pos, record_types::BEGIN_COMMENTS)?;
-    expect(&records, &mut pos, record_types::BEGIN_COMMENT_AUTHORS)?;
+    expect(&records, &mut pos, kind::BEGIN_COMMENTS)?;
+    expect(&records, &mut pos, kind::BEGIN_COMMENT_AUTHORS)?;
     let mut authors = Vec::new();
     while records
         .get(pos)
-        .is_some_and(|r| r.header.record_type == record_types::COMMENT_AUTHOR)
+        .is_some_and(|r| r.kind() == kind::COMMENT_AUTHOR)
     {
         let record = &records[pos];
         pos += 1;
-        let (author, consumed) = wide_str_with_len(&record.data)?;
+        let (author, consumed) = decode_string(record.payload())?;
         let len = author.encode_utf16().count();
-        if consumed != record.data.len() || len > 54 {
+        if consumed != record.payload().len() || len > 54 {
             return Err(XlsbError::Unrecognized {
                 typ: "BrtCommentAuthor".to_string(),
                 val: author,
@@ -82,43 +82,40 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
         }
         authors.push(author);
     }
-    expect(&records, &mut pos, record_types::END_COMMENT_AUTHORS)?;
-    expect(&records, &mut pos, record_types::BEGIN_COMMENT_LIST)?;
+    expect(&records, &mut pos, kind::END_COMMENT_AUTHORS)?;
+    expect(&records, &mut pos, kind::BEGIN_COMMENT_LIST)?;
     let mut comments = Vec::new();
     let mut cells = HashSet::new();
     loop {
-        let alternate_guid = if records
-            .get(pos)
-            .is_some_and(|r| r.header.record_type == record_types::AC_BEGIN)
-        {
+        let alternate_guid = if records.get(pos).is_some_and(|r| r.kind() == kind::AC_BEGIN) {
             pos += 1;
             let mut uid = None;
             while records
                 .get(pos)
-                .is_some_and(|record| record.header.record_type != record_types::AC_END)
+                .is_some_and(|record| record.kind() != kind::AC_END)
             {
                 let record = &records[pos];
-                if record.header.record_type == record_types::UID {
-                    if record.data.len() != 16 || uid.is_some() {
+                if record.kind() == kind::UID {
+                    if record.payload().len() != 16 || uid.is_some() {
                         return Err(XlsbError::Unrecognized {
                             typ: "ACUID BrtUid".to_string(),
                             val: "invalid or duplicate UID".to_string(),
                         });
                     }
                     let mut value = [0; 16];
-                    value.copy_from_slice(&record.data);
+                    value.copy_from_slice(record.payload());
                     uid = Some(value);
                 }
                 pos += 1;
             }
-            expect(&records, &mut pos, record_types::AC_END)?;
+            expect(&records, &mut pos, kind::AC_END)?;
             uid
         } else {
             None
         };
         if records
             .get(pos)
-            .is_none_or(|r| r.header.record_type != record_types::BEGIN_COMMENT)
+            .is_none_or(|r| r.kind() != kind::BEGIN_COMMENT)
         {
             if alternate_guid.is_some() {
                 return Err(XlsbError::Unrecognized {
@@ -130,17 +127,17 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
         }
         let begin = &records[pos];
         pos += 1;
-        if begin.data.len() != 36 {
+        if begin.payload().len() != 36 {
             return Err(XlsbError::InvalidLength {
                 expected: 36,
-                found: begin.data.len(),
+                found: begin.payload().len(),
             });
         }
-        let author_raw = binary::read_u32_le_at(&begin.data, 0)?;
-        let row = binary::read_u32_le_at(&begin.data, 4)?;
-        let last_row = binary::read_u32_le_at(&begin.data, 8)?;
-        let col = binary::read_u32_le_at(&begin.data, 12)?;
-        let last_col = binary::read_u32_le_at(&begin.data, 16)?;
+        let author_raw = binary::read_u32_le_at(begin.payload(), 0)?;
+        let row = binary::read_u32_le_at(begin.payload(), 4)?;
+        let last_row = binary::read_u32_le_at(begin.payload(), 8)?;
+        let col = binary::read_u32_le_at(begin.payload(), 12)?;
+        let last_col = binary::read_u32_le_at(begin.payload(), 16)?;
         if author_raw > i32::MAX as u32
             || author_raw as usize >= authors.len()
             || row != last_row
@@ -156,11 +153,11 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
         }
         let rich = if records
             .get(pos)
-            .is_some_and(|r| r.header.record_type == record_types::COMMENT_TEXT)
+            .is_some_and(|r| r.kind() == kind::COMMENT_TEXT)
         {
-            let value = SharedString::parse(&records[pos].data)?;
+            let value = SharedString::parse(records[pos].payload())?;
             pos += 1;
-            if records[pos - 1].data[0] & 1 == 0 || value.phonetic.is_some() {
+            if records[pos - 1].payload()[0] & 1 == 0 || value.phonetic.is_some() {
                 return Err(XlsbError::Unrecognized {
                     typ: "BrtCommentText".to_string(),
                     val: "invalid RichStr flags".to_string(),
@@ -174,9 +171,9 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
                 phonetic: None,
             }
         };
-        expect(&records, &mut pos, record_types::END_COMMENT)?;
+        expect(&records, &mut pos, kind::END_COMMENT)?;
         let mut guid = [0; 16];
-        guid.copy_from_slice(&begin.data[20..36]);
+        guid.copy_from_slice(&begin.payload()[20..36]);
         comments.push(Comment {
             row,
             col,
@@ -188,27 +185,27 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
             visible: false,
         });
     }
-    expect(&records, &mut pos, record_types::END_COMMENT_LIST)?;
+    expect(&records, &mut pos, kind::END_COMMENT_LIST)?;
     while records
         .get(pos)
-        .is_some_and(|record| record.header.record_type == record_types::FRT_BEGIN)
+        .is_some_and(|record| record.kind() == kind::FRT_BEGIN)
     {
-        if records[pos].data.len() != 4 {
+        if records[pos].payload().len() != 4 {
             return Err(XlsbError::InvalidLength {
                 expected: 4,
-                found: records[pos].data.len(),
+                found: records[pos].payload().len(),
             });
         }
         pos += 1;
         while records
             .get(pos)
-            .is_some_and(|record| record.header.record_type != record_types::FRT_END)
+            .is_some_and(|record| record.kind() != kind::FRT_END)
         {
             pos += 1;
         }
-        expect(&records, &mut pos, record_types::FRT_END)?;
+        expect(&records, &mut pos, kind::FRT_END)?;
     }
-    expect(&records, &mut pos, record_types::END_COMMENTS)?;
+    expect(&records, &mut pos, kind::END_COMMENTS)?;
     if pos != records.len() {
         return Err(XlsbError::Unrecognized {
             typ: "Comments stream".to_string(),
@@ -218,15 +215,17 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
     Ok(comments)
 }
 
-fn expect(records: &[XlsbRecord], pos: &mut usize, typ: u16) -> XlsbResult<()> {
-    let record = records.get(*pos).ok_or(XlsbError::InvalidRecordType(typ))?;
-    if record.header.record_type != typ {
-        return Err(XlsbError::InvalidRecordType(record.header.record_type));
+fn expect(records: &[Record<'_>], pos: &mut usize, typ: litchi_xlsb::raw::Kind) -> XlsbResult<()> {
+    let record = records
+        .get(*pos)
+        .ok_or(XlsbError::InvalidRecordType(typ.get()))?;
+    if record.kind() != typ {
+        return Err(XlsbError::InvalidRecordType(record.kind().get()));
     }
-    if !record.data.is_empty() {
+    if !record.payload().is_empty() {
         return Err(XlsbError::InvalidLength {
             expected: 0,
-            found: record.data.len(),
+            found: record.payload().len(),
         });
     }
     *pos += 1;
@@ -234,11 +233,11 @@ fn expect(records: &[XlsbRecord], pos: &mut usize, typ: u16) -> XlsbResult<()> {
 }
 
 pub(crate) fn write_comments<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     comments: &[Comment],
 ) -> XlsbResult<()> {
-    writer.write_record(record_types::BEGIN_COMMENTS, &[])?;
-    writer.write_record(record_types::BEGIN_COMMENT_AUTHORS, &[])?;
+    writer.write_record(kind::BEGIN_COMMENTS, &[])?;
+    writer.write_record(kind::BEGIN_COMMENT_AUTHORS, &[])?;
     let mut authors = Vec::<&str>::new();
     let mut author_ids = HashMap::<&str, u32>::new();
     for comment in comments {
@@ -259,10 +258,10 @@ pub(crate) fn write_comments<W: Write>(
         for unit in author.encode_utf16() {
             data.extend_from_slice(&unit.to_le_bytes());
         }
-        writer.write_record(record_types::COMMENT_AUTHOR, &data)?;
+        writer.write_record(kind::COMMENT_AUTHOR, &data)?;
     }
-    writer.write_record(record_types::END_COMMENT_AUTHORS, &[])?;
-    writer.write_record(record_types::BEGIN_COMMENT_LIST, &[])?;
+    writer.write_record(kind::END_COMMENT_AUTHORS, &[])?;
+    writer.write_record(kind::BEGIN_COMMENT_LIST, &[])?;
     let mut cells = HashSet::new();
     for comment in comments {
         if comment.row >= 1_048_576
@@ -281,19 +280,19 @@ pub(crate) fn write_comments<W: Write>(
         begin.extend_from_slice(&comment.col.to_le_bytes());
         begin.extend_from_slice(&comment.col.to_le_bytes());
         begin.extend_from_slice(&comment.guid);
-        writer.write_record(record_types::BEGIN_COMMENT, &begin)?;
+        writer.write_record(kind::BEGIN_COMMENT, &begin)?;
         if !comment.text.is_empty() {
             let rich = SharedString {
                 text: comment.text.clone(),
                 runs: comment.runs.clone(),
                 phonetic: None,
             };
-            writer.write_record(record_types::COMMENT_TEXT, &rich.to_comment_bytes()?)?;
+            writer.write_record(kind::COMMENT_TEXT, &rich.to_comment_bytes()?)?;
         }
-        writer.write_record(record_types::END_COMMENT, &[])?;
+        writer.write_record(kind::END_COMMENT, &[])?;
     }
-    writer.write_record(record_types::END_COMMENT_LIST, &[])?;
-    writer.write_record(record_types::END_COMMENTS, &[])?;
+    writer.write_record(kind::END_COMMENT_LIST, &[])?;
+    writer.write_record(kind::END_COMMENTS, &[])?;
     Ok(())
 }
 
@@ -313,27 +312,19 @@ mod tests {
     #[test]
     fn reads_alternate_uid_and_future_record_wrappers() {
         let mut bytes = Vec::new();
-        let mut writer = RecordWriter::new(&mut bytes);
+        let mut writer = Writer::new(&mut bytes);
+        writer.write_record(kind::BEGIN_COMMENTS, &[]).unwrap();
         writer
-            .write_record(record_types::BEGIN_COMMENTS, &[])
+            .write_record(kind::BEGIN_COMMENT_AUTHORS, &[])
             .unwrap();
         writer
-            .write_record(record_types::BEGIN_COMMENT_AUTHORS, &[])
+            .write_record(kind::COMMENT_AUTHOR, &0u32.to_le_bytes())
             .unwrap();
-        writer
-            .write_record(record_types::COMMENT_AUTHOR, &0u32.to_le_bytes())
-            .unwrap();
-        writer
-            .write_record(record_types::END_COMMENT_AUTHORS, &[])
-            .unwrap();
-        writer
-            .write_record(record_types::BEGIN_COMMENT_LIST, &[])
-            .unwrap();
-        writer
-            .write_record(record_types::AC_BEGIN, &[0; 4])
-            .unwrap();
-        writer.write_record(record_types::UID, &[9; 16]).unwrap();
-        writer.write_record(record_types::AC_END, &[]).unwrap();
+        writer.write_record(kind::END_COMMENT_AUTHORS, &[]).unwrap();
+        writer.write_record(kind::BEGIN_COMMENT_LIST, &[]).unwrap();
+        writer.write_record(kind::AC_BEGIN, &[0; 4]).unwrap();
+        writer.write_record(kind::UID, &[9; 16]).unwrap();
+        writer.write_record(kind::AC_END, &[]).unwrap();
         let mut begin = Vec::new();
         begin.extend_from_slice(&0u32.to_le_bytes());
         begin.extend_from_slice(&2u32.to_le_bytes());
@@ -341,21 +332,13 @@ mod tests {
         begin.extend_from_slice(&3u32.to_le_bytes());
         begin.extend_from_slice(&3u32.to_le_bytes());
         begin.extend_from_slice(&[7; 16]);
-        writer
-            .write_record(record_types::BEGIN_COMMENT, &begin)
-            .unwrap();
-        writer.write_record(record_types::END_COMMENT, &[]).unwrap();
-        writer
-            .write_record(record_types::END_COMMENT_LIST, &[])
-            .unwrap();
-        writer
-            .write_record(record_types::FRT_BEGIN, &[0; 4])
-            .unwrap();
-        writer.write_record(record_types::UID, &[1; 16]).unwrap();
-        writer.write_record(record_types::FRT_END, &[]).unwrap();
-        writer
-            .write_record(record_types::END_COMMENTS, &[])
-            .unwrap();
+        writer.write_record(kind::BEGIN_COMMENT, &begin).unwrap();
+        writer.write_record(kind::END_COMMENT, &[]).unwrap();
+        writer.write_record(kind::END_COMMENT_LIST, &[]).unwrap();
+        writer.write_record(kind::FRT_BEGIN, &[0; 4]).unwrap();
+        writer.write_record(kind::UID, &[1; 16]).unwrap();
+        writer.write_record(kind::FRT_END, &[]).unwrap();
+        writer.write_record(kind::END_COMMENTS, &[]).unwrap();
 
         let comments = read_comments(bytes.as_slice()).unwrap();
         assert_eq!(comments.len(), 1);

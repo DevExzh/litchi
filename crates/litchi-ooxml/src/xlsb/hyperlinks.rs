@@ -1,7 +1,7 @@
 //! Hyperlink support for XLSB
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::wide_str_with_len;
+use crate::xlsb::records::decode_string;
 use litchi_core::binary;
 
 /// Hyperlink information
@@ -164,12 +164,12 @@ impl Hyperlink {
         let mut offset = 16;
 
         // Read relationship ID
-        let (r_id, consumed) = wide_str_with_len(&data[offset..])?;
+        let (r_id, consumed) = decode_string(&data[offset..])?;
         offset += consumed;
 
         // Read location (optional)
         let (location, consumed) = if offset < data.len() {
-            let (loc, c) = wide_str_with_len(&data[offset..])?;
+            let (loc, c) = decode_string(&data[offset..])?;
             (if loc.is_empty() { None } else { Some(loc) }, c)
         } else {
             (None, 0)
@@ -178,7 +178,7 @@ impl Hyperlink {
 
         // Read tooltip (optional)
         let (tooltip, consumed) = if offset < data.len() {
-            let (tt, c) = wide_str_with_len(&data[offset..])?;
+            let (tt, c) = decode_string(&data[offset..])?;
             (if tt.is_empty() { None } else { Some(tt) }, c)
         } else {
             (None, 0)
@@ -187,7 +187,7 @@ impl Hyperlink {
 
         // Read display text (optional)
         let display = if offset < data.len() {
-            let (disp, _) = wide_str_with_len(&data[offset..])?;
+            let (disp, _) = decode_string(&data[offset..])?;
             if disp.is_empty() { None } else { Some(disp) }
         } else {
             None

@@ -42,6 +42,7 @@ litchi-codepage  = { version = "0.0.1", path = "crates/litchi-codepage" }
 litchi-core      = { version = "0.0.1", path = "crates/litchi-core" }
 litchi-crypto    = { version = "0.0.1", path = "crates/litchi-crypto" }
 litchi-doc       = { version = "0.0.1", path = "crates/litchi-doc" }
+litchi-docx      = { version = "0.0.1", path = "crates/litchi-docx" }
 litchi-drawingml = { version = "0.0.1", path = "crates/litchi-drawingml" }
 litchi-eval      = { version = "0.0.1", path = "crates/litchi-eval" }
 litchi-fonts     = { version = "0.0.1", path = "crates/litchi-fonts" }
@@ -57,6 +58,7 @@ litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
 litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
 litchi-opc       = { version = "0.0.1", path = "crates/litchi-opc" }
 litchi-ppt       = { version = "0.0.1", path = "crates/litchi-ppt" }
+litchi-pptx      = { version = "0.0.1", path = "crates/litchi-pptx" }
 litchi-rtf       = { version = "0.0.1", path = "crates/litchi-rtf" }
 litchi-sheet     = { version = "0.0.1", path = "crates/litchi-sheet" }
 litchi-sign      = { version = "0.0.1", path = "crates/litchi-sign" }
@@ -64,6 +66,7 @@ litchi-slide     = { version = "0.0.1", path = "crates/litchi-slide" }
 litchi-vba       = { version = "0.0.1", path = "crates/litchi-vba" }
 litchi-word      = { version = "0.0.1", path = "crates/litchi-word" }
 litchi-xls       = { version = "0.0.1", path = "crates/litchi-xls" }
+litchi-xlsb      = { version = "0.0.1", path = "crates/litchi-xlsb" }
 litchi-xlsx      = { version = "0.0.1", path = "crates/litchi-xlsx" }
 md-5          = { version = "0.11", features = ["zeroize"] }
 memchr        = "2.7"

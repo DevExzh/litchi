@@ -3,8 +3,7 @@
 use super::model::*;
 use super::parse::parse_pivot_cache_definition;
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types as rt;
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -22,16 +21,16 @@ fn nullable_wide_string(value: Option<&str>) -> Vec<u8> {
     }
 }
 
-fn stream(records: &[(u16, Vec<u8>)]) -> Vec<u8> {
+fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = RecordWriter::new(&mut data);
+    let mut writer = Writer::new(&mut data);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
     data
 }
 
-fn parse(records: &[(u16, Vec<u8>)]) -> XlsbResult<PivotCacheDefinition> {
+fn parse(records: &[(Kind, Vec<u8>)]) -> XlsbResult<PivotCacheDefinition> {
     parse_pivot_cache_definition(&stream(records))
 }
 
@@ -462,7 +461,7 @@ fn parses_olap_hierarchies() {
         (rt::END_PCDHGL_GROUP, Vec::new()),
         (rt::END_PCDHGL_GROUPS, Vec::new()),
         (
-            1037, // BrtPCDH14
+            rt::PCD_H14, // BrtPCDH14
             {
                 let mut data = vec![0; 4]; // FRTBlank
                 data.push(0b0000_0101); // fFlattenHierarchies | fHierarchizeDistinct
@@ -677,24 +676,24 @@ fn skips_unknown_records_and_collections() {
     let definition = parse(&[
         (rt::BEGIN_PIVOT_CACHE_DEF, definition_payload()),
         // Unknown standalone record with garbage payload.
-        (0x0F00, vec![0xDE, 0xAD, 0xBE, 0xEF]),
+        (Kind::new(0x0F00).unwrap(), vec![0xDE, 0xAD, 0xBE, 0xEF]),
         // FRT wrapper containing an unknown record.
         (rt::FRT_BEGIN, vec![0; 12]),
-        (0x0F01, vec![1, 2, 3]),
+        (Kind::new(0x0F01).unwrap(), vec![1, 2, 3]),
         (rt::FRT_END, Vec::new()),
         (rt::BEGIN_PCD_FIELDS, 1u32.to_le_bytes().to_vec()),
         (rt::BEGIN_PCD_FIELD, minimal_field_payload("F")),
         // Unmodelled KPI collection inside the field.
-        (269, 1u32.to_le_bytes().to_vec()), // BrtBeginPCDKPIs
-        (271, vec![9; 8]),                  // BrtBeginPCDKPI
-        (272, Vec::new()),                  // BrtEndPCDKPI
-        (270, Vec::new()),                  // BrtEndPCDKPIs
-        (0x0F02, vec![0xFF]),               // unknown record inside the field collection
+        (rt::BEGIN_PCD_KPIS, 1u32.to_le_bytes().to_vec()), // BrtBeginPCDKPIs
+        (rt::BEGIN_PCD_KPI, vec![9; 8]),                   // BrtBeginPCDKPI
+        (rt::END_PCD_KPI, Vec::new()),                     // BrtEndPCDKPI
+        (rt::END_PCD_KPIS, Vec::new()),                    // BrtEndPCDKPIs
+        (Kind::new(0x0F02).unwrap(), vec![0xFF]), // unknown record inside the field collection
         (rt::END_PCD_FIELD, Vec::new()),
         (rt::END_PCD_FIELDS, Vec::new()),
         // Unmodelled top-level collection with nested content.
         (rt::BEGIN_PCD_SFCI_ENTRIES, 1u32.to_le_bytes().to_vec()),
-        (659, wide_string("#,##0.00")), // BrtPCDSFCIEntry
+        (rt::PCD_SFCI_ENTRY, wide_string("#,##0.00")), // BrtPCDSFCIEntry
         (rt::END_PCD_SFCI_ENTRIES, Vec::new()),
         (rt::END_PIVOT_CACHE_DEF, Vec::new()),
     ])
@@ -717,7 +716,13 @@ fn rejects_malformed_streams() {
         (rt::END_PIVOT_CACHE_DEF, Vec::new()),
     ])
     .unwrap_err();
-    assert!(matches!(error, XlsbError::InvalidLength { .. }));
+    assert!(matches!(
+        error,
+        XlsbError::Wire(WireError::Truncated {
+            stage: Stage::Value,
+            ..
+        })
+    ));
 
     // Missing BrtEndPivotCacheDef.
     let error = parse(&[(rt::BEGIN_PIVOT_CACHE_DEF, definition_payload())]).unwrap_err();

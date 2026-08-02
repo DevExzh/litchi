@@ -51,6 +51,22 @@ class BoundaryPolicyTests(unittest.TestCase):
             violations,
         )
 
+    def test_xlsb_cannot_depend_on_concrete_xlsx(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-xlsb", "litchi-xlsx")
+        edges = dict(snapshot.edges)
+        edges[edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            "OOXML concrete peer edge from litchi-xlsb: litchi-xlsx",
+            violations,
+        )
+
     def test_resolved_migration_edge_requires_policy_cleanup(self) -> None:
         snapshot = valid_snapshot(self.policy)
         edge = self.policy.migration_debt[0].edge

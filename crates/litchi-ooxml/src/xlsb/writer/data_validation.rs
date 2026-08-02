@@ -34,14 +34,14 @@ use crate::xlsb::data_validation::{
 };
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{CellParsedFormula, FormulaCompiler};
-use crate::xlsb::records::record_types;
-use crate::xlsb::writer::RecordWriter;
 use crate::xlsb::writer::bin_range::{parse_range_list, write_bin_range_list};
+use litchi_xlsb::raw::Writer;
+use litchi_xlsb::raw::kind;
 use std::io::Write;
 
 /// Write classic and Office 2013 validation collections as required.
 pub fn write_data_validations<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     validations: &[DataValidation],
     classic_settings: DataValidationSettings,
     extension14_settings: DataValidationSettings,
@@ -69,7 +69,7 @@ pub fn write_data_validations<W: Write>(
 }
 
 fn write_classic_collection<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     validations: &[&DataValidation],
     settings: DataValidationSettings,
 ) -> XlsbResult<()> {
@@ -91,24 +91,24 @@ fn write_classic_collection<W: Write>(
     dvals_buf.extend_from_slice(&u32::from(settings.prompt_y).to_le_bytes());
     dvals_buf.extend_from_slice(&0u32.to_le_bytes()); // unused3
     dvals_buf.extend_from_slice(&(validations.len() as u32).to_le_bytes()); // idvMac
-    writer.write_record(record_types::BEGIN_D_VALS, &dvals_buf)?;
+    writer.write_record(kind::BEGIN_D_VALS, &dvals_buf)?;
 
     for &dv in validations {
         if let Some(list_formula) = &dv.list_formula {
             let mut payload = Vec::new();
             write_xl_wide_string(&mut payload, list_formula);
-            writer.write_record(record_types::D_VAL_LIST, &payload)?;
+            writer.write_record(kind::D_VAL_LIST, &payload)?;
         }
         let payload = serialize_data_validation(dv)?;
-        writer.write_record(record_types::D_VAL, &payload)?;
+        writer.write_record(kind::D_VAL, &payload)?;
     }
 
-    writer.write_record(record_types::END_D_VALS, &[])?;
+    writer.write_record(kind::END_D_VALS, &[])?;
     Ok(())
 }
 
 fn write_extension14_collection<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     validations: &[&DataValidation],
     settings: DataValidationSettings,
 ) -> XlsbResult<()> {
@@ -122,14 +122,14 @@ fn write_extension14_collection<W: Write>(
     begin.extend_from_slice(&u32::from(settings.prompt_y).to_le_bytes());
     begin.extend_from_slice(&0u32.to_le_bytes());
     begin.extend_from_slice(&(validations.len() as u32).to_le_bytes());
-    writer.write_record(record_types::BEGIN_D_VALS14, &begin)?;
+    writer.write_record(kind::BEGIN_D_VALS14, &begin)?;
     for &validation in validations {
         writer.write_record(
-            record_types::D_VAL14,
+            kind::D_VAL14,
             &serialize_extension14_validation(validation)?,
         )?;
     }
-    writer.write_record(record_types::END_D_VALS14, &[])?;
+    writer.write_record(kind::END_D_VALS14, &[])?;
     Ok(())
 }
 
@@ -529,7 +529,7 @@ fn build_ptg_for_value(text: &str, ptg: &mut Vec<u8>) {
 mod tests {
     use super::*;
     use crate::xlsb::formula::FormulaResolutionContext;
-    use crate::xlsb::writer::RecordWriter;
+    use litchi_xlsb::raw::Writer;
 
     #[test]
     fn test_serialize_list_validation() {
@@ -662,7 +662,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_empty() {
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let validations: Vec<DataValidation> = vec![];
 
         let result = write_data_validations(
@@ -678,7 +678,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_single() {
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let validations = vec![DataValidation {
             validation_type: 3, // list
             operator: 0,

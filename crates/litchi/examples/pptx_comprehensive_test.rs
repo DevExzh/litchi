@@ -57,8 +57,8 @@
 //! - Phase 1 works standalone
 //! - Phases 2 & 3 require `test.pptx` in repository root (gracefully skips if missing)
 
-use litchi::ooxml::pptx::transitions::ZoomDirection;
 use litchi::ooxml::pptx::*;
+use litchi_pptx::transition::{Axis, InOut, Kind, Ms, Shape, Side, Speed, Spokes, Transition};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -103,9 +103,9 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
     slide1.set_title("PPTX Feature Test Suite");
     slide1.set_background(SlideBackground::solid("1F4E78"));
     slide1.set_transition(
-        SlideTransition::new(TransitionType::Fade)
-            .with_speed(TransitionSpeed::Medium)
-            .with_advance_after_ms(2000),
+        Transition::new(Kind::Fade { black: None })
+            .with_speed(Speed::Medium)
+            .with_after(Ms::new(2000)?),
     );
     slide1.set_notes("This is the title slide demonstrating solid background and fade transition.");
 
@@ -141,12 +141,7 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
         ],
     );
     slide2.set_background(linear_gradient);
-    slide2.set_transition(
-        SlideTransition::new(TransitionType::Push {
-            direction: TransitionDirection::Left,
-        })
-        .with_speed(TransitionSpeed::Fast),
-    );
+    slide2.set_transition(Transition::new(Kind::Push(Side::Left)).with_speed(Speed::Fast));
     slide2.add_text_box(
         "Linear gradient: Blue → Green → Orange",
         914400,
@@ -172,12 +167,7 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
         },
     ]);
     slide3.set_background(radial_gradient);
-    slide3.set_transition(
-        SlideTransition::new(TransitionType::Wipe {
-            direction: TransitionDirection::Up,
-        })
-        .with_speed(TransitionSpeed::Medium),
-    );
+    slide3.set_transition(Transition::new(Kind::Wipe(Side::Up)).with_speed(Speed::Medium));
     slide3.add_text_box(
         "Radial gradient: White center to black edges",
         914400,
@@ -196,9 +186,7 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
         "FF0000".to_string(),
         "FFFF00".to_string(),
     ));
-    slide4.set_transition(
-        SlideTransition::new(TransitionType::Circle).with_speed(TransitionSpeed::Slow),
-    );
+    slide4.set_transition(Transition::new(Kind::Shape(Shape::Circle)).with_speed(Speed::Slow));
     slide4.add_text_box(
         "Pattern: Diagonal cross (Red/Yellow)",
         914400,
@@ -235,12 +223,7 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
 
     slide5.add_text_box("Text Box Only", 6400800, 1828800, 2286000, 1371600);
 
-    slide5.set_transition(
-        SlideTransition::new(TransitionType::Zoom {
-            direction: ZoomDirection::In,
-        })
-        .with_speed(TransitionSpeed::Fast),
-    );
+    slide5.set_transition(Transition::new(Kind::Zoom(InOut::In)).with_speed(Speed::Fast));
     slide5.set_notes("Demonstrates rectangles, ellipses, and text boxes with colors.");
 
     // === Slide 6: Transition Types Demo ===
@@ -257,10 +240,11 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
     slide6.add_text_box("Zoom", 6400800, 2743200, 2286000, 685800);
 
     slide6.set_transition(
-        SlideTransition::new(TransitionType::Split {
-            direction: TransitionDirection::Horizontal,
+        Transition::new(Kind::Split {
+            axis: Axis::Horizontal,
+            toward: None,
         })
-        .with_speed(TransitionSpeed::Medium),
+        .with_speed(Speed::Medium),
     );
 
     // === Slide 7: Hyperlinks Demo ===
@@ -287,12 +271,8 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
         685800,
     );
 
-    slide7.set_transition(
-        SlideTransition::new(TransitionType::Blinds {
-            direction: TransitionDirection::Horizontal,
-        })
-        .with_speed(TransitionSpeed::Medium),
-    );
+    slide7
+        .set_transition(Transition::new(Kind::Blinds(Axis::Horizontal)).with_speed(Speed::Medium));
     slide7.set_notes("Demonstrates URL, email, and internal slide hyperlinks.");
 
     // === Slide 8: Advanced Transitions ===
@@ -310,9 +290,9 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
     );
 
     slide8.set_transition(
-        SlideTransition::new(TransitionType::Wheel { spokes: 8 })
-            .with_speed(TransitionSpeed::Medium)
-            .with_advance_on_click(true),
+        Transition::new(Kind::Wheel(Spokes::Eight))
+            .with_speed(Speed::Medium)
+            .with_click(true),
     );
     slide8.set_notes("Wheel transition with 8 spokes.");
 
@@ -323,9 +303,7 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
     slide9.set_background(SlideBackground::solid("C6E0B4"));
 
     slide9.add_text_box("Dissolve Effect", 914400, 2743200, 7315200, 914400);
-    slide9.set_transition(
-        SlideTransition::new(TransitionType::Dissolve).with_speed(TransitionSpeed::Slow),
-    );
+    slide9.set_transition(Transition::new(Kind::Dissolve).with_speed(Speed::Slow));
 
     // === Slide 10: Summary ===
     println!("  - Creating summary slide");
@@ -364,9 +342,7 @@ fn test_mutable_presentation_api() -> Result<(), Box<dyn Error>> {
     slide10.add_text_box("✓ Speaker notes", 914400, 3657600, 7315200, 457200);
     slide10.add_text_box("✓ Slide size management", 914400, 4114800, 7315200, 457200);
 
-    slide10.set_transition(
-        SlideTransition::new(TransitionType::Fade).with_speed(TransitionSpeed::Medium),
-    );
+    slide10.set_transition(Transition::new(Kind::Fade { black: None }).with_speed(Speed::Medium));
     slide10.set_notes("Summary of all tested features in this presentation.");
 
     // Test slide manipulation: duplicate a slide
@@ -421,7 +397,7 @@ fn verify_presentation(path: &str) -> Result<(), Box<dyn Error>> {
 
         // Check for transitions
         if let Ok(Some(trans)) = slide.transition() {
-            println!("      ✓ Has transition: {:?}", trans.transition_type);
+            println!("      ✓ Has transition: {:?}", trans.kind());
         }
 
         // Check for background

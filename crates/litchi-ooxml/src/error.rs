@@ -36,6 +36,18 @@ pub enum OoxmlError {
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 
+    /// Canonical WordprocessingML capability error.
+    #[error("DOCX error: {0}")]
+    Docx(#[from] litchi_docx::Error),
+
+    /// Canonical PresentationML capability error.
+    #[error("PPTX error: {0}")]
+    Pptx(#[from] litchi_pptx::Error),
+
+    /// Canonical Binary SpreadsheetML capability error.
+    #[error("XLSB error: {0}")]
+    Xlsb(#[from] litchi_xlsb::Error),
+
     /// Shared host-neutral OOXML package-service error.
     #[error("shared OOXML error: {0}")]
     Common(#[from] litchi_ooxml_common::Error),
@@ -93,6 +105,9 @@ impl From<OoxmlError> for litchi_core::Error {
             OoxmlError::InvalidRelationship(s) => litchi_core::Error::Other(s),
             OoxmlError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             OoxmlError::Drawing(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::Docx(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::Pptx(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::Xlsb(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Common(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Vba(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),

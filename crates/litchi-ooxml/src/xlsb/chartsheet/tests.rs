@@ -2,8 +2,7 @@
 
 use super::*;
 use crate::xlsb::error::XlsbError;
-use crate::xlsb::records::record_types as rt;
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -14,9 +13,9 @@ fn wide_string(value: &str) -> Vec<u8> {
     data
 }
 
-fn stream(records: &[(u16, Vec<u8>)]) -> Vec<u8> {
+fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = RecordWriter::new(&mut data);
+    let mut writer = Writer::new(&mut data);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -74,7 +73,7 @@ fn cs_protection_iso(spin_count: u32, locked: u32, objects: u32) -> Vec<u8> {
     data
 }
 
-fn chart_sheet_stream(extra: &[(u16, Vec<u8>)]) -> Vec<u8> {
+fn chart_sheet_stream(extra: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut records = vec![
         (rt::BEGIN_SHEET, Vec::new()),
         (
@@ -100,7 +99,7 @@ fn chart_sheet_stream(extra: &[(u16, Vec<u8>)]) -> Vec<u8> {
 #[test]
 fn parses_full_chart_sheet_stream() {
     let data = chart_sheet_stream(&[
-        (0x0FFF, vec![1, 2, 3]), // unknown record is skipped
+        (Kind::new(0x0FFF).unwrap(), vec![1, 2, 3]), // unknown record is skipped
         (rt::FRT_BEGIN, vec![0; 12]),
         (rt::FRT_END, Vec::new()),
     ]);
@@ -412,7 +411,10 @@ fn rejects_malformed_streams() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::InvalidLength { .. })
+        Err(XlsbError::Wire(WireError::Truncated {
+            stage: Stage::Value,
+            ..
+        }))
     ));
     // Trailing bytes in BrtCsProp.
     let mut payload = cs_prop(0, [0; 8], "A");
@@ -424,7 +426,10 @@ fn rejects_malformed_streams() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(XlsbError::Wire(WireError::Trailing {
+            context: "BrtCsProp",
+            ..
+        }))
     ));
     // Empty drawing relationship identifier.
     let data = stream(&[
@@ -451,7 +456,10 @@ fn rejects_malformed_streams() {
     data.truncate(data.len() - 1);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::UnexpectedEndOfStream(_)) | Err(XlsbError::Io(_))
+        Err(XlsbError::Wire(WireError::Truncated {
+            stage: Stage::Length,
+            ..
+        }))
     ));
 }
 

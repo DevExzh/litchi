@@ -1,18 +1,14 @@
 use litchi_ooxml::xlsb::XlsbWorkbook;
-use litchi_ooxml::xlsb::writer::RecordWriter;
 use litchi_ooxml::xlsx::Workbook;
 use litchi_ooxml_common::ribbon::{Family, Set, Version};
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_xlsb::raw::{Kind, Writer, kind};
 
 const UI_2007: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"/>"#;
 const UI_2010: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui"/>"#;
-const BRT_BEGIN_SHEET: u16 = 0x0081;
-const BRT_END_SHEET: u16 = 0x0082;
-const BRT_BUNDLE_SH: u16 = 0x009C;
-
 #[test]
 fn xlsx_ribbon_facade_creates_reads_and_removes_both_families() {
     let mut workbook = Workbook::create().expect("create XLSX workbook");
@@ -141,7 +137,7 @@ fn xlsb_workbook() -> XlsbWorkbook {
     let mut workbook_part = BlobPart::new(
         PackURI::new("/xl/workbook.bin").expect("workbook URI"),
         "application/vnd.ms-excel.sheet.binary.macroEnabled.main".to_string(),
-        records(&[(BRT_BUNDLE_SH, bundle_sheet)]),
+        records(&[(kind::BUNDLE_SH, bundle_sheet)]),
     );
     workbook_part.rels_mut().add_relationship(
         relationship_type::WORKSHEET.to_string(),
@@ -153,7 +149,10 @@ fn xlsb_workbook() -> XlsbWorkbook {
     let sheet_part = BlobPart::new(
         PackURI::new("/xl/worksheets/sheet1.bin").expect("worksheet URI"),
         "application/vnd.ms-excel.worksheet".to_string(),
-        records(&[(BRT_BEGIN_SHEET, Vec::new()), (BRT_END_SHEET, Vec::new())]),
+        records(&[
+            (kind::BEGIN_SHEET, Vec::new()),
+            (kind::END_SHEET, Vec::new()),
+        ]),
     );
 
     let mut package = OpcPackage::new();
@@ -162,9 +161,9 @@ fn xlsb_workbook() -> XlsbWorkbook {
     XlsbWorkbook::from_opc_package(package).expect("construct XLSB workbook")
 }
 
-fn records(values: &[(u16, Vec<u8>)]) -> Vec<u8> {
+fn records(values: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = RecordWriter::new(&mut bytes);
+    let mut writer = Writer::new(&mut bytes);
     for (kind, payload) in values {
         writer
             .write_record(*kind, payload)

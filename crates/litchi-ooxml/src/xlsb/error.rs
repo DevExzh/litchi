@@ -14,6 +14,8 @@ pub enum XlsbError {
     Zip(String),
     /// XML parsing error
     Xml(quick_xml::Error),
+    /// Validated BIFF12 wire-kernel error.
+    Wire(litchi_xlsb::Error),
     /// Invalid record type
     InvalidRecordType(u16),
     /// Unexpected record
@@ -74,6 +76,7 @@ impl fmt::Display for XlsbError {
             XlsbError::Io(e) => write!(f, "I/O error: {}", e),
             XlsbError::Zip(e) => write!(f, "ZIP error: {}", e),
             XlsbError::Xml(e) => write!(f, "XML error: {}", e),
+            XlsbError::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
             XlsbError::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
             XlsbError::UnexpectedRecord { expected, found } => {
                 write!(
@@ -131,6 +134,7 @@ impl std::error::Error for XlsbError {
         match self {
             XlsbError::Io(e) => Some(e),
             XlsbError::Xml(e) => Some(e),
+            XlsbError::Wire(e) => Some(e),
             XlsbError::Drawing(e) => Some(e),
             XlsbError::Common(e) => Some(e),
             XlsbError::Vba(e) => Some(e),
@@ -154,6 +158,12 @@ impl From<soapberry_zip::Error> for XlsbError {
 impl From<quick_xml::Error> for XlsbError {
     fn from(err: quick_xml::Error) -> Self {
         XlsbError::Xml(err)
+    }
+}
+
+impl From<litchi_xlsb::Error> for XlsbError {
+    fn from(error: litchi_xlsb::Error) -> Self {
+        Self::Wire(error)
     }
 }
 
@@ -228,6 +238,9 @@ impl From<crate::error::OoxmlError> for XlsbError {
             },
             crate::error::OoxmlError::InvalidFormat(msg) => XlsbError::Encoding(msg),
             crate::error::OoxmlError::Drawing(err) => XlsbError::Encoding(err.to_string()),
+            crate::error::OoxmlError::Docx(err) => XlsbError::Encoding(err.to_string()),
+            crate::error::OoxmlError::Pptx(err) => XlsbError::Encoding(err.to_string()),
+            crate::error::OoxmlError::Xlsb(err) => XlsbError::Wire(err),
             crate::error::OoxmlError::Io(e) => XlsbError::Io(e),
             crate::error::OoxmlError::Common(err) => XlsbError::Common(err),
             crate::error::OoxmlError::Vba(err) => XlsbError::Vba(err),

@@ -1,7 +1,6 @@
 use litchi_ooxml::PackURI;
-use litchi_ooxml::pptx::{
-    Package, RippleDirection, SlideTransition, TransitionDirection, TransitionType,
-};
+use litchi_ooxml::pptx::Package;
+use litchi_pptx::transition::{Kind, Ms, Origin, Ripple, Transition};
 use tempfile::NamedTempFile;
 
 const LOCAL_P14_RIPPLE: &str =
@@ -83,23 +82,13 @@ fn effective_slide_transition_falls_back_to_the_master() {
     assert_cover(&slides[0].effective_transition().unwrap().unwrap());
 }
 
-fn assert_cover(transition: &SlideTransition) {
-    assert_eq!(
-        transition.transition_type,
-        TransitionType::Cover {
-            direction: TransitionDirection::RightDown,
-        }
-    );
+fn assert_cover(transition: &Transition) {
+    assert_eq!(transition.kind(), &Kind::Cover(Origin::RightDown));
 }
 
-fn assert_ripple(transition: &SlideTransition) {
-    assert_eq!(transition.duration_ms, Some(1500));
-    assert_eq!(
-        transition.transition_type,
-        TransitionType::Ripple {
-            direction: RippleDirection::LeftDown,
-        }
-    );
+fn assert_ripple(transition: &Transition) {
+    assert_eq!(transition.duration().map(Ms::get), Some(1500));
+    assert_eq!(transition.kind(), &Kind::Ripple(Ripple::LeftDown));
 }
 
 fn package_with_transition_fragments(fragments: &[(&str, &str, &str)]) -> Package {

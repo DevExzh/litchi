@@ -8,15 +8,14 @@ use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
 };
 use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
-use crate::xlsb::records::record_types;
 use crate::xlsb::writer::{
-    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, RecordWriter,
-    StylesWriter,
+    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, StylesWriter,
 };
 use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_xlsb::raw::{Writer, kind};
 use std::io::{Seek, Write};
 use std::sync::Arc;
 
@@ -516,7 +515,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Write workbook-level defined names (BrtName records).
-    fn write_named_ranges<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_named_ranges<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         for named_range in &self.named_ranges {
             if named_range.function {
                 return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
@@ -546,7 +545,7 @@ impl XlsbWorkbookWriter {
                 rgcb: Vec::new(),
             };
             let mut data = Vec::new();
-            let mut temp_writer = RecordWriter::new(&mut data);
+            let mut temp_writer = Writer::new(&mut data);
 
             let mut flags = 0u32;
             if named_range.hidden {
@@ -562,7 +561,7 @@ impl XlsbWorkbookWriter {
             }
             temp_writer.write_u32(u32::MAX)?; // NULL comment
 
-            writer.write_record(record_types::NAME, &data)?;
+            writer.write_record(kind::NAME, &data)?;
         }
 
         Ok(())
@@ -775,7 +774,7 @@ impl XlsbWorkbookWriter {
 
         // Write workbook structure
         let mut workbook_data = Vec::new();
-        let mut writer = RecordWriter::new(&mut workbook_data);
+        let mut writer = Writer::new(&mut workbook_data);
         self.write_workbook(
             &mut writer,
             formula_sheet_ranges,
@@ -817,13 +816,13 @@ impl XlsbWorkbookWriter {
     /// single default view and sensible defaults for calculation settings.
     fn write_workbook<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         formula_sheet_ranges: &[(u32, u32)],
         pivot_cache_rel_ids: &[(u32, String)],
         external_link_rel_ids: &[String],
     ) -> XlsbResult<()> {
         // BrtBeginBook
-        writer.write_record(record_types::BEGIN_BOOK, &[])?;
+        writer.write_record(kind::BEGIN_BOOK, &[])?;
 
         // BrtFileVersion - required by Excel
         self.write_file_version(writer)?;
@@ -856,7 +855,7 @@ impl XlsbWorkbookWriter {
         self.write_calc_properties(writer)?;
 
         // BrtEndBook
-        writer.write_record(record_types::END_BOOK, &[])?;
+        writer.write_record(kind::END_BOOK, &[])?;
 
         Ok(())
     }
@@ -866,33 +865,33 @@ impl XlsbWorkbookWriter {
     /// pairing the workbook cache identifier (`idSx`) with the relationship
     /// ID of its PivotCache Definition part.
     fn write_pivot_cache_ids<W: Write>(
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         pivot_cache_rel_ids: &[(u32, String)],
     ) -> XlsbResult<()> {
         if pivot_cache_rel_ids.is_empty() {
             return Ok(());
         }
-        writer.write_record(record_types::BEGIN_PIVOT_CACHE_IDS, &[])?;
+        writer.write_record(kind::BEGIN_PIVOT_CACHE_IDS, &[])?;
         for (cache_id, rel_id) in pivot_cache_rel_ids {
             let mut data = Vec::with_capacity(rel_id.len() * 2 + 8);
-            let mut temp_writer = RecordWriter::new(&mut data);
+            let mut temp_writer = Writer::new(&mut data);
             temp_writer.write_u32(*cache_id)?;
             temp_writer.write_wide_string(rel_id)?;
-            writer.write_record(record_types::BEGIN_PIVOT_CACHE_ID, &data)?;
-            writer.write_record(record_types::END_PIVOT_CACHE_ID, &[])?;
+            writer.write_record(kind::BEGIN_PIVOT_CACHE_ID, &data)?;
+            writer.write_record(kind::END_PIVOT_CACHE_ID, &[])?;
         }
-        writer.write_record(record_types::END_PIVOT_CACHE_IDS, &[])?;
+        writer.write_record(kind::END_PIVOT_CACHE_IDS, &[])?;
         Ok(())
     }
 
     /// Write file version record (BrtFileVersion)
     /// This is REQUIRED for Excel to open the file
-    fn write_file_version<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_file_version<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         // Build structure per spec example (48 bytes total):
         // guidCodeName (16 zero bytes), stAppName ("xl"), stLastEdited ("4"),
         // stLowestEdited ("4"), stRupBuild ("4505")
         let mut data = Vec::with_capacity(48);
-        let mut w = RecordWriter::new(&mut data);
+        let mut w = Writer::new(&mut data);
 
         // GUID (16 bytes of zeros)
         w.write_u32(0)?;
@@ -909,14 +908,14 @@ impl XlsbWorkbookWriter {
         // stRupBuild: "4505"
         w.write_wide_string("4505")?;
 
-        writer.write_record(record_types::FILE_VERSION, &data)?;
+        writer.write_record(kind::FILE_VERSION, &data)?;
         Ok(())
     }
 
     /// Write workbook properties (BrtWbProp)
-    fn write_workbook_properties<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_workbook_properties<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Flags (4 bytes). We currently only support the 1904 date system
         // bit, mirroring the minimal SheetJS implementation:
@@ -934,17 +933,17 @@ impl XlsbWorkbookWriter {
         // "ThisWorkbook" as SheetJS and Excel commonly do.
         temp_writer.write_wide_string("ThisWorkbook")?;
 
-        writer.write_record(record_types::WORKBOOK_PROP, &data)?;
+        writer.write_record(kind::WORKBOOK_PROP, &data)?;
         Ok(())
     }
 
     /// Write book views (REQUIRED by Excel)
-    fn write_book_views<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
-        writer.write_record(record_types::BEGIN_BOOK_VIEWS, &[])?;
+    fn write_book_views<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+        writer.write_record(kind::BEGIN_BOOK_VIEWS, &[])?;
 
         // Write one default book view
         let mut view_data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut view_data);
+        let mut temp_writer = Writer::new(&mut view_data);
 
         // xWn (4), yWn (4), dxWn (4), dyWn (4)
         temp_writer.write_u32(0)?; // xWn
@@ -962,19 +961,19 @@ impl XlsbWorkbookWriter {
         // Flags (1 byte) - D/E/F bits set for scrollbars and tabs
         temp_writer.write_u8(0x78)?; // Total: 7*4 + 1 = 29 bytes
 
-        writer.write_record(record_types::BOOK_VIEW, &view_data)?;
+        writer.write_record(kind::BOOK_VIEW, &view_data)?;
 
-        writer.write_record(record_types::END_BOOK_VIEWS, &[])?;
+        writer.write_record(kind::END_BOOK_VIEWS, &[])?;
         Ok(())
     }
 
     /// Write bundle sheets in workbook order.
-    fn write_bundle_sheets<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
-        writer.write_record(record_types::BEGIN_BUNDLE_SHS, &[])?;
+    fn write_bundle_sheets<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+        writer.write_record(kind::BEGIN_BUNDLE_SHS, &[])?;
 
         for (i, slot) in self.sheet_order.iter().copied().enumerate() {
             let mut sheet_data = Vec::new();
-            let mut temp_writer = RecordWriter::new(&mut sheet_data);
+            let mut temp_writer = Writer::new(&mut sheet_data);
 
             let state = match slot {
                 XlsbSheetSlot::Worksheet(_) => 0,
@@ -995,20 +994,20 @@ impl XlsbWorkbookWriter {
             // strName (XLWideString): sheet name
             temp_writer.write_wide_string(self.sheet_name(slot))?;
 
-            writer.write_record(record_types::BUNDLE_SH, &sheet_data)?;
+            writer.write_record(kind::BUNDLE_SH, &sheet_data)?;
         }
 
-        writer.write_record(record_types::END_BUNDLE_SHS, &[])?;
+        writer.write_record(kind::END_BUNDLE_SHS, &[])?;
         Ok(())
     }
 
     /// Write calculation properties (CALC_PROP, 0x009D)
     ///
     /// Spec example fields and order
-    fn write_calc_properties<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_calc_properties<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         self.calculation_properties.validate()?;
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         temp_writer.write_u32(self.calculation_properties.recalculation_id)?;
         temp_writer.write_u32(self.calculation_properties.mode as u32)?;
@@ -1017,7 +1016,7 @@ impl XlsbWorkbookWriter {
         temp_writer.write_u32(self.calculation_properties.user_thread_count as u32)?;
         temp_writer.write_u16(self.calculation_properties.flags())?;
 
-        writer.write_record(record_types::CALC_PROP, &data)?;
+        writer.write_record(kind::CALC_PROP, &data)?;
         Ok(())
     }
 
@@ -1027,25 +1026,25 @@ impl XlsbWorkbookWriter {
     /// This creates self-references for the workbook and all sheets.
     fn write_externals<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         formula_sheet_ranges: &[(u32, u32)],
         external_link_rel_ids: &[String],
     ) -> XlsbResult<()> {
         // BrtBeginExternals - no data
-        writer.write_record(record_types::BEGIN_EXTERNALS, &[])?;
+        writer.write_record(kind::BEGIN_EXTERNALS, &[])?;
 
         // BrtSupSelf - no data
-        writer.write_record(record_types::SUP_SELF, &[])?;
+        writer.write_record(kind::SUP_SELF, &[])?;
 
         for relationship_id in external_link_rel_ids {
             let mut data = Vec::with_capacity(4 + relationship_id.len() * 2);
-            RecordWriter::new(&mut data).write_wide_string(relationship_id)?;
-            writer.write_record(record_types::SUP_BOOK_SRC, &data)?;
+            Writer::new(&mut data).write_wide_string(relationship_id)?;
+            writer.write_record(kind::SUP_BOOK_SRC, &data)?;
         }
 
         // BrtExternSheet - self-references data
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         let sheet_count = self.sheet_order.len();
 
@@ -1110,10 +1109,10 @@ impl XlsbWorkbookWriter {
             })?)?;
         }
 
-        writer.write_record(record_types::EXTERN_SHEET, &data)?;
+        writer.write_record(kind::EXTERN_SHEET, &data)?;
 
         // BrtEndExternals - no data
-        writer.write_record(record_types::END_EXTERNALS, &[])?;
+        writer.write_record(kind::END_EXTERNALS, &[])?;
 
         Ok(())
     }
@@ -1202,7 +1201,7 @@ impl XlsbWorkbookWriter {
                 sheet_part.relate_to(&format!("../{comments_name}"), rel::COMMENTS);
                 let mut comments_data = Vec::new();
                 crate::xlsb::comments::write_comments(
-                    &mut RecordWriter::new(&mut comments_data),
+                    &mut Writer::new(&mut comments_data),
                     worksheet.comments(),
                 )?;
                 Some(BlobPart::new(
@@ -1374,7 +1373,7 @@ impl XlsbWorkbookWriter {
             };
             let compiled_formulas = worksheet.compile_contextual_formulas(&formula_context)?;
             let write_result = {
-                let mut writer = RecordWriter::new(&mut sheet_data);
+                let mut writer = Writer::new(&mut sheet_data);
                 worksheet.write(&mut writer, &mut self.shared_strings)
             };
             worksheet.clear_compiled_formulas(compiled_formulas);
@@ -1504,7 +1503,7 @@ impl XlsbWorkbookWriter {
     /// Add shared strings part to the package
     fn add_shared_strings_part(&self, package: &mut OpcPackage) -> XlsbResult<()> {
         let mut sst_data = Vec::new();
-        let mut writer = RecordWriter::new(&mut sst_data);
+        let mut writer = Writer::new(&mut sst_data);
 
         self.shared_strings.write(&mut writer)?;
 
@@ -1523,7 +1522,7 @@ impl XlsbWorkbookWriter {
     /// Add styles part to the package
     fn add_styles_part(&self, package: &mut OpcPackage) -> XlsbResult<()> {
         let mut styles_data = Vec::new();
-        let mut writer = RecordWriter::new(&mut styles_data);
+        let mut writer = Writer::new(&mut styles_data);
 
         self.styles.write(&mut writer)?;
 
@@ -1708,12 +1707,12 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let mut support_relationship_ids = Vec::new();
-        for record in crate::xlsb::records::XlsbRecordIter::new(workbook_part.blob()) {
+        for record in litchi_xlsb::raw::Records::new(workbook_part.blob()) {
             let record = record.unwrap();
-            if record.header.record_type == record_types::SUP_BOOK_SRC {
+            if record.kind() == kind::SUP_BOOK_SRC {
                 let (relationship_id, consumed) =
-                    crate::xlsb::records::wide_str_with_len(&record.data).unwrap();
-                assert_eq!(consumed, record.data.len());
+                    crate::xlsb::records::decode_string(record.payload()).unwrap();
+                assert_eq!(consumed, record.payload().len());
                 support_relationship_ids.push(relationship_id);
             }
         }
@@ -3288,14 +3287,13 @@ mod tests {
         );
         let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
         let sheet_part = package.get_part(&sheet_uri).unwrap();
-        let drawing_record = crate::xlsb::records::XlsbRecordIter::new(sheet_part.blob())
+        let drawing_record = litchi_xlsb::raw::Records::new(sheet_part.blob())
             .find_map(|record| {
                 let record = record.unwrap();
-                (record.header.record_type == record_types::DRAWING).then_some(record)
+                (record.kind() == kind::DRAWING).then_some(record)
             })
             .expect("BrtDrawing missing");
-        let mut cursor =
-            crate::xlsb::walker::PayloadCursor::new(&drawing_record.data, "BrtDrawing");
+        let mut cursor = litchi_xlsb::raw::Cursor::new(drawing_record.payload(), "BrtDrawing");
         let drawing_rel_id = cursor.read_wide_string().unwrap();
         cursor.finish().unwrap();
         let relationship = sheet_part.rels().get(&drawing_rel_id).unwrap();
@@ -3316,17 +3314,15 @@ mod tests {
         }
         let mut view_bytes = Vec::new();
         {
-            let mut writer = RecordWriter::new(&mut view_bytes);
+            let mut writer = Writer::new(&mut view_bytes);
             writer
-                .write_record(record_types::BEGIN_SX_VIEW, &begin_view)
+                .write_record(kind::BEGIN_SX_VIEW, &begin_view)
                 .unwrap();
             writer
-                .write_record(record_types::BEGIN_SX_LOCATION, &[0; 36])
+                .write_record(kind::BEGIN_SX_LOCATION, &[0; 36])
                 .unwrap();
-            writer
-                .write_record(record_types::END_SX_LOCATION, &[])
-                .unwrap();
-            writer.write_record(record_types::END_SX_VIEW, &[]).unwrap();
+            writer.write_record(kind::END_SX_LOCATION, &[]).unwrap();
+            writer.write_record(kind::END_SX_VIEW, &[]).unwrap();
         }
         let view = crate::xlsb::pivot_view::XlsbPivotTableViewPart::from_bytes(view_bytes.clone())
             .unwrap();

@@ -1,15 +1,12 @@
 //! Worksheet web-extension binding records (MS-XLSB 2.4.868).
 
-use std::collections::HashSet;
-use std::io::Cursor;
-
 use litchi_ooxml_common::web;
+use std::collections::HashSet;
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{CellParsedFormula, FormulaParser, FormulaToken};
 use crate::xlsb::frt::{parse_formula_header, serialize_formula_header};
-use crate::xlsb::records::{XlsbRecordIter, record_types};
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::{Records, Writer, kind};
 
 const MAX_BINDINGS: usize = 65_536;
 const MAX_APP_REF_CODE_UNITS: usize = 32_767;
@@ -106,11 +103,11 @@ pub fn parse_xlsb_web_extension_bindings(
     records: &[u8],
     mut valid_external_sheet: impl FnMut(u16) -> bool,
 ) -> XlsbResult<Vec<XlsbWebExtensionBinding>> {
-    let mut iterator = XlsbRecordIter::new(Cursor::new(records));
+    let mut iterator = Records::new(records);
     let begin = iterator
         .next()
         .ok_or_else(|| XlsbError::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
-    if begin.header.record_type != record_types::BEGIN_WEB_EXTENSIONS || !begin.data.is_empty() {
+    if begin.kind() != kind::BEGIN_WEB_EXTENSIONS || !begin.payload().is_empty() {
         return Err(invalid(
             "WEBEXTENSIONS",
             "collection must start with empty BrtBeginWebExtensions",
@@ -122,12 +119,12 @@ pub fn parse_xlsb_web_extension_bindings(
         let record = iterator
             .next()
             .ok_or_else(|| XlsbError::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
-        match record.header.record_type {
-            record_types::WEB_EXTENSION => {
+        match record.kind() {
+            kind::WEB_EXTENSION => {
                 if bindings.len() == MAX_BINDINGS {
                     return Err(invalid("WEBEXTENSIONS", "binding count exceeds 65,536"));
                 }
-                let binding = XlsbWebExtensionBinding::parse_payload(&record.data, |index| {
+                let binding = XlsbWebExtensionBinding::parse_payload(record.payload(), |index| {
                     valid_external_sheet(index)
                 })?;
                 if !app_refs.insert(binding.application_reference.clone()) {
@@ -135,8 +132,8 @@ pub fn parse_xlsb_web_extension_bindings(
                 }
                 bindings.push(binding);
             },
-            record_types::END_WEB_EXTENSIONS => {
-                if !record.data.is_empty() {
+            kind::END_WEB_EXTENSIONS => {
+                if !record.payload().is_empty() {
                     return Err(invalid("BrtEndWebExtensions", "end record must be empty"));
                 }
                 if bindings.is_empty() {
@@ -175,15 +172,15 @@ pub fn write_xlsb_web_extension_bindings(
     }
     let mut app_refs = HashSet::with_capacity(bindings.len());
     let mut output = Vec::new();
-    let mut writer = RecordWriter::new(&mut output);
-    writer.write_record(record_types::BEGIN_WEB_EXTENSIONS, &[])?;
+    let mut writer = Writer::new(&mut output);
+    writer.write_record(kind::BEGIN_WEB_EXTENSIONS, &[])?;
     for binding in bindings {
         if !app_refs.insert(&binding.application_reference) {
             return Err(invalid("WEBEXTENSIONS", "duplicate binding appRef"));
         }
-        writer.write_record(record_types::WEB_EXTENSION, &binding.to_payload()?)?;
+        writer.write_record(kind::WEB_EXTENSION, &binding.to_payload()?)?;
     }
-    writer.write_record(record_types::END_WEB_EXTENSIONS, &[])?;
+    writer.write_record(kind::END_WEB_EXTENSIONS, &[])?;
     Ok(output)
 }
 

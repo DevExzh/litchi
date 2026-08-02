@@ -1,14 +1,14 @@
 //! Typed XLSB chart-sheet authoring (MS-XLSB 2.1.7.7).
 
-use super::RecordWriter;
 use crate::xlsb::chartsheet::{
     XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
     XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView,
 };
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types as rt;
 use crate::xlsb::worksheet::XlsbStrongProtection;
 use crate::xlsx::WorksheetChart;
+use litchi_xlsb::raw::Writer;
+use litchi_xlsb::raw::kind as rt;
 use std::io::Write;
 
 const MAX_CHART_SHEETS: usize = 65_536;
@@ -184,7 +184,7 @@ pub(crate) fn write_chart_sheet(
 ) -> XlsbResult<Vec<u8>> {
     sheet.validate()?;
     let mut output = Vec::new();
-    let mut writer = RecordWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer.write_record(rt::BEGIN_SHEET, &[])?;
     write_properties(&mut writer, &sheet.metadata)?;
     write_views(&mut writer, &sheet.metadata.views)?;
@@ -284,10 +284,7 @@ fn validate_page_setup(value: &XlsbChartSheetPageSetup) -> XlsbResult<()> {
     Ok(())
 }
 
-fn write_properties<W: Write>(
-    writer: &mut RecordWriter<W>,
-    value: &XlsbChartSheet,
-) -> XlsbResult<()> {
+fn write_properties<W: Write>(writer: &mut Writer<W>, value: &XlsbChartSheet) -> XlsbResult<()> {
     let mut data = Vec::new();
     data.extend_from_slice(&(u16::from(value.published)).to_le_bytes());
     let color_type = match value.tab_color.color_type {
@@ -300,14 +297,11 @@ fn write_properties<W: Write>(
     data.push(value.tab_color.index);
     data.extend_from_slice(&value.tab_color.tint.to_le_bytes());
     data.extend_from_slice(&value.tab_color.rgba);
-    RecordWriter::new(&mut data).write_wide_string(&value.code_name)?;
-    writer.write_record(rt::CS_PROP, &data)
+    Writer::new(&mut data).write_wide_string(&value.code_name)?;
+    Ok(writer.write_record(rt::CS_PROP, &data)?)
 }
 
-fn write_views<W: Write>(
-    writer: &mut RecordWriter<W>,
-    views: &[XlsbChartSheetView],
-) -> XlsbResult<()> {
+fn write_views<W: Write>(writer: &mut Writer<W>, views: &[XlsbChartSheetView]) -> XlsbResult<()> {
     writer.write_record(rt::BEGIN_CS_VIEWS, &[])?;
     for view in views {
         let mut data = Vec::with_capacity(10);
@@ -317,11 +311,11 @@ fn write_views<W: Write>(
         writer.write_record(rt::BEGIN_CS_VIEW, &data)?;
         writer.write_record(rt::END_CS_VIEW, &[])?;
     }
-    writer.write_record(rt::END_CS_VIEWS, &[])
+    Ok(writer.write_record(rt::END_CS_VIEWS, &[])?)
 }
 
 fn write_protection<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     classic: Option<XlsbChartSheetProtection>,
     strong: Option<&XlsbStrongProtection>,
 ) -> XlsbResult<()> {
@@ -335,7 +329,7 @@ fn write_protection<W: Write>(
         data.extend_from_slice(&u32::from(classic.objects).to_le_bytes());
         write_blob(&mut data, &strong.hash)?;
         write_blob(&mut data, &strong.salt)?;
-        RecordWriter::new(&mut data).write_wide_string(&strong.algorithm)?;
+        Writer::new(&mut data).write_wide_string(&strong.algorithm)?;
         writer.write_record(rt::CS_PROTECTION_ISO, &data)?;
     }
     let mut data = Vec::with_capacity(10);
@@ -349,11 +343,11 @@ fn write_protection<W: Write>(
     );
     data.extend_from_slice(&u32::from(classic.locked).to_le_bytes());
     data.extend_from_slice(&u32::from(classic.objects).to_le_bytes());
-    writer.write_record(rt::CS_PROTECTION, &data)
+    Ok(writer.write_record(rt::CS_PROTECTION, &data)?)
 }
 
 fn write_page_setup<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     setup: &XlsbChartSheetPageSetup,
     printer_rel_id: &str,
 ) -> XlsbResult<()> {
@@ -369,18 +363,18 @@ fn write_page_setup<W: Write>(
         | (u16::from(setup.use_page_start) << 4)
         | (u16::from(setup.draft) << 5);
     data.extend_from_slice(&flags.to_le_bytes());
-    RecordWriter::new(&mut data).write_wide_string(printer_rel_id)?;
-    writer.write_record(rt::CS_PAGE_SETUP, &data)
+    Writer::new(&mut data).write_wide_string(printer_rel_id)?;
+    Ok(writer.write_record(rt::CS_PAGE_SETUP, &data)?)
 }
 
 fn write_rel_id<W: Write>(
-    writer: &mut RecordWriter<W>,
-    record_type: u16,
+    writer: &mut Writer<W>,
+    record_type: litchi_xlsb::raw::Kind,
     rel_id: &str,
 ) -> XlsbResult<()> {
     let mut data = Vec::new();
-    RecordWriter::new(&mut data).write_wide_string(rel_id)?;
-    writer.write_record(record_type, &data)
+    Writer::new(&mut data).write_wide_string(rel_id)?;
+    Ok(writer.write_record(record_type, &data)?)
 }
 
 fn write_blob(data: &mut Vec<u8>, value: &[u8]) -> XlsbResult<()> {

@@ -22,7 +22,7 @@ pub struct MutableSlide {
     /// Speaker notes for the slide
     pub(crate) notes: Option<String>,
     /// Slide transition effect
-    pub(crate) transition: Option<crate::pptx::transitions::SlideTransition>,
+    pub(crate) transition: Option<litchi_pptx::transition::Transition>,
     /// Slide background
     pub(crate) background: Option<crate::pptx::backgrounds::SlideBackground>,
     /// Comments on the slide
@@ -143,18 +143,19 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi_ooxml::pptx::{MutablePresentation, TransitionType, TransitionSpeed, SlideTransition};
+    /// use litchi_ooxml::pptx::MutablePresentation;
+    /// use litchi_pptx::transition::{Kind, Speed, Transition};
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
     ///
     /// // Add a fade transition
-    /// let transition = SlideTransition::new(TransitionType::Fade)
-    ///     .with_speed(TransitionSpeed::Fast)
-    ///     .with_advance_after_ms(3000);
+    /// let transition = Transition::new(Kind::Fade { black: None })
+    ///     .with_speed(Speed::Fast)
+    ///     .with_after(litchi_pptx::transition::Ms::new(3000).unwrap());
     /// slide.set_transition(transition);
     /// ```
-    pub fn set_transition(&mut self, transition: crate::pptx::transitions::SlideTransition) {
+    pub fn set_transition(&mut self, transition: litchi_pptx::transition::Transition) {
         self.transition = Some(transition);
         self.modified = true;
     }
@@ -162,7 +163,7 @@ impl MutableSlide {
     /// Get the transition effect for the slide.
     ///
     /// Returns `None` if no transition is set.
-    pub fn transition(&self) -> Option<&crate::pptx::transitions::SlideTransition> {
+    pub fn transition(&self) -> Option<&litchi_pptx::transition::Transition> {
         self.transition.as_ref()
     }
 
@@ -1011,7 +1012,7 @@ impl MutableSlide {
 
         // Add transition if present
         if let Some(ref transition) = self.transition {
-            xml.push_str(&transition.to_xml()?);
+            litchi_pptx::transition::write_to(transition, &mut xml)?;
         }
 
         // Add timing/animations if present
@@ -1330,9 +1331,10 @@ mod tests {
         let mut slide = MutableSlide::new(256);
         assert!(slide.transition().is_none());
 
-        let transition = crate::pptx::transitions::SlideTransition::new(
-            crate::pptx::transitions::TransitionType::Fade,
-        );
+        let transition =
+            litchi_pptx::transition::Transition::new(litchi_pptx::transition::Kind::Fade {
+                black: None,
+            });
         slide.set_transition(transition);
         assert!(slide.transition().is_some());
         assert!(slide.is_modified());

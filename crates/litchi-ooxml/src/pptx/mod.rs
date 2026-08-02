@@ -99,7 +99,6 @@ pub mod tags;
 pub mod template;
 pub mod theme;
 pub mod tracks;
-pub mod transitions;
 pub mod vba_project;
 pub mod view_properties;
 pub mod writer;
@@ -270,10 +269,6 @@ pub use theme::{
     ThemeFontFace, ThemeFontScheme, ThemeOverride, ThemeScriptFont, add_theme,
     attach_theme_to_master, remove_theme_override, store_theme_color_scheme,
     store_theme_font_scheme, store_theme_override, theme_override, validate_theme_graph,
-};
-pub use transitions::{
-    RippleDirection, SlideTransition, SplitDirection, TransitionDirection, TransitionSpeed,
-    TransitionType,
 };
 pub use vba_project::VbaProject;
 pub use view_properties::{

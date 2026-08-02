@@ -178,7 +178,7 @@ fn exercise_slide(
 ) -> (
     litchi_ooxml::error::Result<String>,
     litchi_ooxml::error::Result<Vec<litchi_ooxml::pptx::shapes::base::BaseShape>>,
-    litchi_ooxml::error::Result<Option<litchi_ooxml::pptx::transitions::SlideTransition>>,
+    litchi_ooxml::error::Result<Option<litchi_pptx::transition::Transition>>,
 ) {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     let mut package = Package::new().unwrap();

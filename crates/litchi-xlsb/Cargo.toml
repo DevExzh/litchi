@@ -1,0 +1,12 @@
+[package]
+name = "litchi-xlsb"
+description = "Typed BIFF12 record framing and payload primitives for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }

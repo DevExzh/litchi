@@ -3,8 +3,7 @@
 use super::model::*;
 use super::parse::{parse_table_part, parse_table_part_rel_ids};
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types as rt;
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -22,16 +21,16 @@ fn nullable_wide_string(value: Option<&str>) -> Vec<u8> {
     }
 }
 
-fn stream(records: &[(u16, Vec<u8>)]) -> Vec<u8> {
+fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = RecordWriter::new(&mut data);
+    let mut writer = Writer::new(&mut data);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
     data
 }
 
-fn parse(records: &[(u16, Vec<u8>)]) -> XlsbResult<XlsbTable> {
+fn parse(records: &[(Kind, Vec<u8>)]) -> XlsbResult<XlsbTable> {
     parse_table_part(&stream(records))
 }
 
@@ -83,7 +82,7 @@ fn column_payload(id: u32, ilta: u32, caption: &str, total: Option<&str>) -> Vec
     data
 }
 
-fn minimal_table_records() -> Vec<(u16, Vec<u8>)> {
+fn minimal_table_records() -> Vec<(Kind, Vec<u8>)> {
     vec![
         (rt::BEGIN_LIST, list_payload()),
         (rt::BEGIN_LIST_COLS, 2u32.to_le_bytes().to_vec()),
@@ -228,14 +227,14 @@ fn parses_style_info_flags_and_alternate_text() {
 fn skips_unknown_records_and_balanced_collections() {
     let mut records = minimal_table_records();
     // Unknown standalone record before the column collection.
-    records.insert(1, (0x0FFF, vec![1, 2, 3]));
+    records.insert(1, (Kind::new(0x0FFF).unwrap(), vec![1, 2, 3]));
     // Unknown begin/end pair wrapping noise, between the columns and the end.
-    records.insert(5, (0x0ABC, vec![0]));
-    records.insert(6, (0x0DEF, vec![9; 8]));
-    records.insert(7, (0x0ABD, Vec::new()));
+    records.insert(5, (Kind::new(0x0ABC).unwrap(), vec![0]));
+    records.insert(6, (Kind::new(0x0DEF).unwrap(), vec![9; 8]));
+    records.insert(7, (Kind::new(0x0ABD).unwrap(), Vec::new()));
     // FRT wrapper around an unknown record.
     records.push((rt::FRT_BEGIN, vec![0; 4]));
-    records.push((0x0EEE, vec![0; 2]));
+    records.push((Kind::new(0x0EEE).unwrap(), vec![0; 2]));
     records.push((rt::FRT_END, Vec::new()));
     // Records after BrtEndList are ignored entirely.
     records.push((rt::BEGIN_LIST, Vec::new()));
@@ -276,7 +275,10 @@ fn rejects_truncated_and_malformed_streams() {
     // Truncated BrtBeginList payload.
     assert!(matches!(
         parse(&[(rt::BEGIN_LIST, vec![0; 8])]),
-        Err(XlsbError::InvalidLength { .. })
+        Err(XlsbError::Wire(WireError::Truncated {
+            stage: Stage::Value,
+            ..
+        }))
     ));
     // Missing BrtEndList.
     assert!(matches!(
@@ -301,7 +303,10 @@ fn rejects_truncated_and_malformed_streams() {
             }),
             (rt::END_LIST, Vec::new()),
         ]),
-        Err(XlsbError::Unrecognized { .. })
+        Err(XlsbError::Wire(WireError::Trailing {
+            context: "BrtBeginList",
+            ..
+        }))
     ));
     // Invalid table type enumeration value.
     let mut bad_type = list_payload();
@@ -327,7 +332,7 @@ fn rejects_truncated_and_malformed_streams() {
     bad_flag[24] = 2;
     assert!(matches!(
         parse(&[(rt::BEGIN_LIST, bad_flag), (rt::END_LIST, Vec::new())]),
-        Err(XlsbError::Unrecognized { .. })
+        Err(XlsbError::Wire(WireError::InvalidBool { value: 2, .. }))
     ));
     // Declared column count disagrees with the record collection.
     assert!(matches!(
@@ -359,10 +364,10 @@ fn tolerates_out_of_order_collections() {
 fn extracts_table_part_relationship_ids_from_worksheet_stream() {
     let rel_ids = parse_table_part_rel_ids(&stream(&[
         (rt::BEGIN_SHEET, Vec::new()),
-        (0x0FFF, vec![0; 3]), // unknown record before the collection
+        (Kind::new(0x0FFF).unwrap(), vec![0; 3]), // unknown record before the collection
         (rt::BEGIN_LIST_PARTS, 2u32.to_le_bytes().to_vec()),
         (rt::LIST_PART, wide_string("rIdTable1")),
-        (0x0ABC, vec![0]), // unknown record inside the collection
+        (Kind::new(0x0ABC).unwrap(), vec![0]), // unknown record inside the collection
         (rt::LIST_PART, wide_string("rIdTable2")),
         (rt::END_LIST_PARTS, Vec::new()),
         (rt::END_SHEET, Vec::new()),

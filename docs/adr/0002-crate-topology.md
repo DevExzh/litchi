@@ -216,6 +216,43 @@ the lower-level directory and compression codecs needed by focused tooling.
 The crate has no async-runtime edge, public lock wrapper, compatibility facade,
 or public type carrying a redundant `Vba` prefix.
 
+`litchi-docx::font` owns the WordprocessingML font-table model, bounded
+Strict/Transitional XML codec, and font-part relationship graph. Its public
+vocabulary is contextual (`Table`, `Font`, `Conformance`, `Family`, `Pitch`,
+`Charset`, `Signature`, `Embed`, `Style`, `Resource`, and `License`, with
+extension markup isolated as `font::raw::Attr`) rather than repeating `Docx`,
+`Wordprocessing`, `FontTable`, or `EmbeddedFont` in every name. Package writes
+consume the table or owned payload being installed;
+reads lend or share package-owned bytes. The capability validates names,
+licensing flags, resource ceilings, relationship topology, and orphan removal.
+One normalized Unicode-caseless identity is used by lookup and every CRUD
+operation, so spelling normalization cannot make selectors disagree. The
+package host exposes symmetric `fonts`, `put_fonts`, and `remove_fonts` entry
+points, but never discovers, loads, renders, or executes a font program.
+
+`litchi-pptx::transition` owns the PresentationML transition model and bounded
+XML codec. Each `Kind` variant carries only the direction/orientation value
+valid for that effect, so invalid effect-option pairs are not representable.
+Checked duration, delay, and wheel-spoke values reject invalid input before
+serialization. Unknown source effects and extension children are retained as
+bounded inert markup. A semantic sound or effect variant is exposed only when
+both read and write preserve it; the API does not keep constructor-only or
+writer-rejected compatibility variants.
+
+`litchi-xlsb::raw` owns the BIFF12 record wire kernel: `Kind`, `Header`,
+borrowed `Record`/`Records`, bounded `Cursor`, and `Writer`, with constants
+under `raw::kind`. Following `[MS-XLSB]` section 2.1.4, record kinds use exactly
+one or two bytes and remain below 16,384, while record lengths use at most four
+bytes. Clean end-of-stream is distinct from a truncated header or payload,
+payload and string budgets are explicit, and strict UTF-16 decoding is
+separate from byte preservation. `Header` and borrowed `Record` keep their
+validated fields private and expose short accessors. Following `[MS-XLSB]`
+section 2.5.123, RK reads preserve the signed 30-bit/floating and divide-by-100
+flags; RK writes refuse values that cannot be represented bit-exactly instead
+of silently rounding them. The kernel has no OPC, DrawingML, XLSX, runtime, or
+concrete peer dependency; XLSB semantic records remain in the concrete owner
+and migrate onto this substrate incrementally.
+
 The `litchi-ole` monolith is removed after DOC, PPT, and XLS migrate into their
 concrete crates. It does not remain as a compatibility crate, feature, or
 module. The current `litchi-ooxml` monolith is likewise removed after its

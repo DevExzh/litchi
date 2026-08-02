@@ -61,7 +61,6 @@ pub mod document;
 pub mod drawing;
 pub mod enums;
 pub mod field;
-pub mod font_table;
 pub mod footnote;
 pub mod format;
 pub mod glossary;
@@ -137,13 +136,6 @@ pub use field::{
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsEntryField,
     TableOfContentsField, TableOfContentsLevelRange, TableOfContentsSwitch, UserIdentityField,
     UserIdentityFieldKind, UserIdentityFormatting,
-};
-pub use font_table::{
-    EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,
-    FontCharacterSet, FontFamily, FontPitch, FontSignature, FontTable, FontTableConformance,
-    FontTableExtensionAttribute, add_font, deobfuscate_embedded_font_data, find_font,
-    load_font_table, obfuscate_embedded_font_data, parse_font_table, remove_font, reorder_fonts,
-    replace_font, store_font_table, update_font, validate_embedded_font_usage, write_font_table,
 };
 pub use footnote::{Note, NoteType};
 pub use glossary::{

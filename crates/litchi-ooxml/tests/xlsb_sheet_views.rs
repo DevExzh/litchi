@@ -8,16 +8,13 @@ use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
 use litchi_ooxml::xlsb::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
-    XlsbRecord, XlsbWorkbook,
+    XlsbWorkbook,
 };
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::raw::{Kind, Records, kind};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
-
-const BEGIN_WS_VIEW: u16 = 0x0089;
-const PANE: u16 = 0x0097;
-const SEL: u16 = 0x0098;
 
 /// Resolve a repository-relative fixture path.
 fn fixture(relative: &str) -> PathBuf {
@@ -46,17 +43,16 @@ fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
         .to_vec()
 }
 
-fn records(data: &[u8]) -> Vec<(u16, Vec<u8>)> {
-    let mut cursor = Cursor::new(data);
+fn records(data: &[u8]) -> Vec<(Kind, Vec<u8>)> {
     let mut result = Vec::new();
-    while cursor.position() < data.len() as u64 {
-        let record = XlsbRecord::read(&mut cursor).unwrap();
-        result.push((record.header.record_type, record.data.to_vec()));
+    for record in Records::new(data) {
+        let record = record.unwrap();
+        result.push((record.kind(), record.payload().to_vec()));
     }
     result
 }
 
-fn sheet_records(package_bytes: &[u8]) -> Vec<(u16, Vec<u8>)> {
+fn sheet_records(package_bytes: &[u8]) -> Vec<(Kind, Vec<u8>)> {
     records(&part_blob(package_bytes, "/xl/worksheets/sheet1.bin"))
 }
 
@@ -89,11 +85,19 @@ fn default_view_matches_legacy_writer_bytes() {
     let sheet = sheet_records(&bytes);
     let view = sheet
         .iter()
-        .find(|(kind, _)| *kind == BEGIN_WS_VIEW)
+        .find(|(record_kind, _)| *record_kind == kind::BEGIN_WS_VIEW)
         .expect("worksheet contains BrtBeginWsView");
     assert_eq!(view.1, legacy);
-    assert!(!sheet.iter().any(|(kind, _)| *kind == PANE));
-    assert!(!sheet.iter().any(|(kind, _)| *kind == SEL));
+    assert!(
+        !sheet
+            .iter()
+            .any(|(record_kind, _)| *record_kind == kind::PANE)
+    );
+    assert!(
+        !sheet
+            .iter()
+            .any(|(record_kind, _)| *record_kind == kind::SEL)
+    );
 
     let view = first_view(&bytes);
     assert_eq!(view.tab_selected, Some(true));
@@ -111,10 +115,13 @@ fn freeze_panes_round_trip() {
     let sheet = sheet_records(&bytes);
     let pane = sheet
         .iter()
-        .find(|(kind, _)| *kind == PANE)
+        .find(|(record_kind, _)| *record_kind == kind::PANE)
         .expect("worksheet contains BrtPane");
     assert_eq!(pane.1.len(), 29);
-    let selections: Vec<_> = sheet.iter().filter(|(kind, _)| *kind == SEL).collect();
+    let selections: Vec<_> = sheet
+        .iter()
+        .filter(|(record_kind, _)| *record_kind == kind::SEL)
+        .collect();
     assert_eq!(selections.len(), 1);
 
     let view = first_view(&bytes);
@@ -150,7 +157,11 @@ fn unfreeze_panes_removes_pane_records() {
         sheet.unfreeze_panes();
     });
     let sheet = sheet_records(&bytes);
-    assert!(!sheet.iter().any(|(kind, _)| *kind == PANE));
+    assert!(
+        !sheet
+            .iter()
+            .any(|(record_kind, _)| *record_kind == kind::PANE)
+    );
 }
 
 #[test]

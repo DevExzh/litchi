@@ -7,15 +7,15 @@ use crate::xlsb::conditional_formatting::{
 };
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{CellParsedFormula, FormulaCompiler, MAX_CELL_FORMULA_BYTES};
-use crate::xlsb::records::record_types;
-use crate::xlsb::writer::RecordWriter;
 use crate::xlsb::writer::bin_range::{parse_range_list, write_bin_range_list};
+use litchi_xlsb::raw::Writer;
+use litchi_xlsb::raw::kind;
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 
 /// Write all classic and Office 2013 conditional-formatting collections for a worksheet.
 pub fn write_conditional_formattings<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     cond_fmts: &[ConditionalFormatting],
 ) -> XlsbResult<()> {
     validate_extension_links(cond_fmts)?;
@@ -131,45 +131,39 @@ fn validate_extension_links(cond_fmts: &[ConditionalFormatting]) -> XlsbResult<(
 }
 
 fn write_single_cond_formatting<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     formatting: &ConditionalFormatting,
 ) -> XlsbResult<()> {
     writer.write_record(
-        record_types::BEGIN_COND_FORMATTING,
+        kind::BEGIN_COND_FORMATTING,
         &serialize_cond_formatting_header(formatting)?,
     )?;
     for rule in &formatting.rules {
-        writer.write_record(record_types::BEGIN_CF_RULE, &serialize_cf_rule(rule)?)?;
+        writer.write_record(kind::BEGIN_CF_RULE, &serialize_cf_rule(rule)?)?;
         write_rule_visualization(writer, rule)?;
         if let Some(guid) = rule.classic_extension_guid {
-            writer.write_record(
-                record_types::CF_RULE_EXT,
-                &serialize_rule_extension_guid(guid),
-            )?;
+            writer.write_record(kind::CF_RULE_EXT, &serialize_rule_extension_guid(guid))?;
         }
-        writer.write_record(record_types::END_CF_RULE, &[])?;
+        writer.write_record(kind::END_CF_RULE, &[])?;
     }
-    writer.write_record(record_types::END_COND_FORMATTING, &[])?;
+    writer.write_record(kind::END_COND_FORMATTING, &[])?;
     Ok(())
 }
 
 fn write_single_cond_formatting14<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     formatting: &ConditionalFormatting,
 ) -> XlsbResult<()> {
     writer.write_record(
-        record_types::BEGIN_COND_FORMATTING14,
+        kind::BEGIN_COND_FORMATTING14,
         &formatting.serialize_extension14_header()?,
     )?;
     for rule in &formatting.rules {
-        writer.write_record(
-            record_types::BEGIN_CF_RULE14,
-            &rule.serialize_extension14()?,
-        )?;
+        writer.write_record(kind::BEGIN_CF_RULE14, &rule.serialize_extension14()?)?;
         write_rule_visualization14(writer, rule)?;
-        writer.write_record(record_types::END_CF_RULE14, &[])?;
+        writer.write_record(kind::END_CF_RULE14, &[])?;
     }
-    writer.write_record(record_types::END_COND_FORMATTING14, &[])?;
+    writer.write_record(kind::END_COND_FORMATTING14, &[])?;
     Ok(())
 }
 
@@ -418,14 +412,14 @@ fn effective_formulas(rule: &ConditionalFormattingRule) -> XlsbResult<Vec<CellPa
 }
 
 fn write_rule_visualization<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     rule: &ConditionalFormattingRule,
 ) -> XlsbResult<()> {
     match rule.rule_type {
         CfRuleType::ColorScale => {
             let scale = rule.color_scale.as_ref().expect("validated color scale");
             validate_scale_thresholds(scale)?;
-            writer.write_record(record_types::BEGIN_COLOR_SCALE, &[])?;
+            writer.write_record(kind::BEGIN_COLOR_SCALE, &[])?;
             write_cfvo(writer, &scale.min_cfvo, false)?;
             if let Some(midpoint) = &scale.mid_cfvo {
                 write_cfvo(writer, midpoint, false)?;
@@ -436,7 +430,7 @@ fn write_rule_visualization<W: Write>(
                 write_color(writer, record, argb)?;
             }
             write_color(writer, scale.max_color_record, scale.max_color)?;
-            writer.write_record(record_types::END_COLOR_SCALE, &[])?;
+            writer.write_record(kind::END_COLOR_SCALE, &[])?;
         },
         CfRuleType::DataBar => {
             let bar = rule.data_bar.as_ref().expect("validated data bar");
@@ -445,13 +439,13 @@ fn write_rule_visualization<W: Write>(
             }
             validate_boundary_thresholds(&bar.min_cfvo, &bar.max_cfvo, "BrtBeginDatabar")?;
             writer.write_record(
-                record_types::BEGIN_DATABAR,
+                kind::BEGIN_DATABAR,
                 &[bar.min_length, bar.max_length, u8::from(bar.show_value)],
             )?;
             write_cfvo(writer, &bar.min_cfvo, false)?;
             write_cfvo(writer, &bar.max_cfvo, false)?;
             write_color(writer, bar.color_record, bar.color)?;
-            writer.write_record(record_types::END_DATABAR, &[])?;
+            writer.write_record(kind::END_DATABAR, &[])?;
         },
         CfRuleType::IconSet => {
             let set = rule.icon_set.as_ref().expect("validated icon set");
@@ -478,11 +472,11 @@ fn write_rule_visualization<W: Write>(
             let mut begin = Vec::with_capacity(6);
             begin.extend_from_slice(&u32::from(set.icon_set_type).to_le_bytes());
             begin.extend_from_slice(&flags.to_le_bytes());
-            writer.write_record(record_types::BEGIN_ICON_SET, &begin)?;
+            writer.write_record(kind::BEGIN_ICON_SET, &begin)?;
             for cfvo in &set.cfvos {
                 write_cfvo(writer, cfvo, true)?;
             }
-            writer.write_record(record_types::END_ICON_SET, &[])?;
+            writer.write_record(kind::END_ICON_SET, &[])?;
         },
         _ => {},
     }
@@ -490,7 +484,7 @@ fn write_rule_visualization<W: Write>(
 }
 
 fn write_rule_visualization14<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     rule: &ConditionalFormattingRule,
 ) -> XlsbResult<()> {
     if rule.color_scale.is_some() || rule.data_bar.is_some() || rule.icon_set.is_some() {
@@ -512,7 +506,7 @@ fn write_rule_visualization14<W: Write>(
                 ));
             }
             validate_scale_thresholds14(scale)?;
-            writer.write_record(record_types::BEGIN_COLOR_SCALE14, &[])?;
+            writer.write_record(kind::BEGIN_COLOR_SCALE14, &[])?;
             write_cfvo14(writer, &scale.min_cfvo, false)?;
             if let Some(midpoint) = &scale.mid_cfvo {
                 write_cfvo14(writer, midpoint, false)?;
@@ -523,7 +517,7 @@ fn write_rule_visualization14<W: Write>(
                 write_color14(writer, record, argb)?;
             }
             write_color14(writer, scale.max_color_record, scale.max_color)?;
-            writer.write_record(record_types::END_COLOR_SCALE14, &[])?;
+            writer.write_record(kind::END_COLOR_SCALE14, &[])?;
         },
         CfRuleType::DataBar => {
             let bar = rule
@@ -541,7 +535,7 @@ fn write_rule_visualization14<W: Write>(
                 .ok_or_else(|| invalid("BrtBeginCFRule14", "missing extension metadata"))?
                 .priority;
             validate_data_bar14(bar, priority)?;
-            writer.write_record(record_types::BEGIN_DATABAR14, &bar.serialize_header()?)?;
+            writer.write_record(kind::BEGIN_DATABAR14, &bar.serialize_header()?)?;
             write_cfvo14(writer, &bar.min_cfvo, false)?;
             write_cfvo14(writer, &bar.max_cfvo, false)?;
             for color in [
@@ -554,9 +548,9 @@ fn write_rule_visualization14<W: Write>(
             .into_iter()
             .flatten()
             {
-                writer.write_record(record_types::COLOR14, &color.serialize_extension14()?)?;
+                writer.write_record(kind::COLOR14, &color.serialize_extension14()?)?;
             }
-            writer.write_record(record_types::END_DATABAR14, &[])?;
+            writer.write_record(kind::END_DATABAR14, &[])?;
         },
         CfRuleType::IconSet => {
             let set = rule
@@ -570,16 +564,16 @@ fn write_rule_visualization14<W: Write>(
                 ));
             }
             validate_icon_set14(set)?;
-            writer.write_record(record_types::BEGIN_ICON_SET14, &set.serialize_header()?)?;
+            writer.write_record(kind::BEGIN_ICON_SET14, &set.serialize_header()?)?;
             for cfvo in &set.cfvos {
                 write_cfvo14(writer, cfvo, true)?;
             }
             if let Some(icons) = &set.custom_icons {
                 for icon in icons {
-                    writer.write_record(record_types::CF_ICON, &icon.serialize()?)?;
+                    writer.write_record(kind::CF_ICON, &icon.serialize()?)?;
                 }
             }
-            writer.write_record(record_types::END_ICON_SET14, &[])?;
+            writer.write_record(kind::END_ICON_SET14, &[])?;
         },
         _ => {
             if rule.color_scale14.is_some()
@@ -683,11 +677,7 @@ fn validate_icon_set14(set: &crate::xlsb::conditional_formatting::IconSet14) -> 
     Ok(())
 }
 
-fn write_cfvo14<W: Write>(
-    writer: &mut RecordWriter<W>,
-    cfvo: &Cfvo,
-    icon_set: bool,
-) -> XlsbResult<()> {
+fn write_cfvo14<W: Write>(writer: &mut Writer<W>, cfvo: &Cfvo, icon_set: bool) -> XlsbResult<()> {
     let mut cfvo = cfvo.clone();
     cfvo.formula_binary = effective_cfvo_formula(&cfvo)?;
     if cfvo.formula_binary.is_none() && matches!(cfvo.cfvo_type, 1 | 4 | 5) {
@@ -700,12 +690,12 @@ fn write_cfvo14<W: Write>(
     if icon_set {
         cfvo.save_greater_than_or_equal = true;
     }
-    writer.write_record(record_types::CFVO14, &cfvo.serialize_extension14()?)?;
+    writer.write_record(kind::CFVO14, &cfvo.serialize_extension14()?)?;
     Ok(())
 }
 
 fn write_color14<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     record: ConditionalFormatColor,
     legacy_argb: u32,
 ) -> XlsbResult<()> {
@@ -715,7 +705,7 @@ fn write_color14<W: Write>(
     } else {
         ConditionalFormatColor::from_argb(legacy_argb)
     };
-    writer.write_record(record_types::COLOR14, &record.serialize_extension14()?)?;
+    writer.write_record(kind::COLOR14, &record.serialize_extension14()?)?;
     Ok(())
 }
 
@@ -763,11 +753,7 @@ fn icon_count(icon_set_type: u8) -> XlsbResult<usize> {
     }
 }
 
-fn write_cfvo<W: Write>(
-    writer: &mut RecordWriter<W>,
-    cfvo: &Cfvo,
-    icon_set: bool,
-) -> XlsbResult<()> {
+fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Cfvo, icon_set: bool) -> XlsbResult<()> {
     if !matches!(cfvo.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7) {
         return Err(invalid(
             "BrtCFVO",
@@ -811,7 +797,7 @@ fn write_cfvo<W: Write>(
     if let Some(formula) = formula {
         payload.extend_from_slice(&formula.to_bytes()?);
     }
-    writer.write_record(record_types::CFVO, &payload)?;
+    writer.write_record(kind::CFVO, &payload)?;
     Ok(())
 }
 
@@ -832,7 +818,7 @@ fn effective_cfvo_formula(cfvo: &Cfvo) -> XlsbResult<Option<CellParsedFormula>> 
 }
 
 fn write_color<W: Write>(
-    writer: &mut RecordWriter<W>,
+    writer: &mut Writer<W>,
     record: ConditionalFormatColor,
     legacy_argb: u32,
 ) -> XlsbResult<()> {
@@ -842,7 +828,7 @@ fn write_color<W: Write>(
     } else {
         ConditionalFormatColor::from_argb(legacy_argb)
     };
-    writer.write_record(record_types::COLOR, &record.to_bytes()?)?;
+    writer.write_record(kind::COLOR, &record.to_bytes()?)?;
     Ok(())
 }
 
@@ -876,8 +862,7 @@ mod tests {
     use crate::xlsb::conditional_formatting::{
         ColorScale, ConditionalFormattingRule14Metadata, DataBar, DataBar14, IconSet,
     };
-    use crate::xlsb::records::XlsbRecordIter;
-    use std::io::Cursor;
+    use litchi_xlsb::raw::Records;
 
     fn compiled(text: &str) -> CellParsedFormula {
         FormulaCompiler::compile(text).unwrap()
@@ -941,18 +926,18 @@ mod tests {
         formatting.add_rule(icons);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut RecordWriter::new(&mut bytes), &[formatting]).unwrap();
-        let records = XlsbRecordIter::new(Cursor::new(bytes));
+        write_conditional_formattings(&mut Writer::new(&mut bytes), &[formatting]).unwrap();
+        let records = Records::new(&bytes);
         let mut found = Vec::new();
         for record in records {
-            found.push(record.unwrap().header.record_type);
+            found.push(record.unwrap().kind());
         }
         for typ in [
-            record_types::BEGIN_COLOR_SCALE,
-            record_types::BEGIN_DATABAR,
-            record_types::BEGIN_ICON_SET,
-            record_types::CFVO,
-            record_types::COLOR,
+            kind::BEGIN_COLOR_SCALE,
+            kind::BEGIN_DATABAR,
+            kind::BEGIN_ICON_SET,
+            kind::CFVO,
+            kind::COLOR,
         ] {
             assert!(found.contains(&typ), "record 0x{typ:04x}");
         }
@@ -968,8 +953,7 @@ mod tests {
         let mut second = ConditionalFormatting::new(vec!["B1".into()]);
         second.add_rule(rule);
         assert!(
-            write_conditional_formattings(&mut RecordWriter::new(Vec::new()), &[first, second])
-                .is_err()
+            write_conditional_formattings(&mut Writer::new(Vec::new()), &[first, second]).is_err()
         );
     }
 
@@ -993,23 +977,23 @@ mod tests {
         formatting.add_rule(rule);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut RecordWriter::new(&mut bytes), &[formatting]).unwrap();
-        let found = XlsbRecordIter::new(Cursor::new(bytes))
-            .map(|record| record.unwrap().header.record_type)
+        write_conditional_formattings(&mut Writer::new(&mut bytes), &[formatting]).unwrap();
+        let found = Records::new(&bytes)
+            .map(|record| record.unwrap().kind())
             .collect::<Vec<_>>();
         assert_eq!(
             found,
             [
-                record_types::BEGIN_COND_FORMATTING14,
-                record_types::BEGIN_CF_RULE14,
-                record_types::BEGIN_DATABAR14,
-                record_types::CFVO14,
-                record_types::CFVO14,
-                record_types::COLOR14,
-                record_types::COLOR14,
-                record_types::END_DATABAR14,
-                record_types::END_CF_RULE14,
-                record_types::END_COND_FORMATTING14,
+                kind::BEGIN_COND_FORMATTING14,
+                kind::BEGIN_CF_RULE14,
+                kind::BEGIN_DATABAR14,
+                kind::CFVO14,
+                kind::CFVO14,
+                kind::COLOR14,
+                kind::COLOR14,
+                kind::END_DATABAR14,
+                kind::END_CF_RULE14,
+                kind::END_COND_FORMATTING14,
             ]
         );
     }
@@ -1032,10 +1016,7 @@ mod tests {
             0xff00_ff00,
         ));
         extension.add_rule(rule);
-        assert!(
-            write_conditional_formattings(&mut RecordWriter::new(Vec::new()), &[extension])
-                .is_err()
-        );
+        assert!(write_conditional_formattings(&mut Writer::new(Vec::new()), &[extension]).is_err());
 
         let mut classic = ConditionalFormatting::new(vec!["A1".into()]);
         let mut bar = ConditionalFormattingRule::new(CfRuleType::DataBar, 1);
@@ -1046,8 +1027,6 @@ mod tests {
             0xff44_72c4,
         ));
         classic.add_rule(bar);
-        assert!(
-            write_conditional_formattings(&mut RecordWriter::new(Vec::new()), &[classic]).is_err()
-        );
+        assert!(write_conditional_formattings(&mut Writer::new(Vec::new()), &[classic]).is_err());
     }
 }

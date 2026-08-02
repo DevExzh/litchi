@@ -8,7 +8,6 @@ use crate::docx::bibliography::{
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::{Binding, NewStore};
 use crate::docx::document::Document;
-use crate::docx::font_table::{FontTable, is_font_table_relationship};
 use crate::docx::glossary::{
     GlossaryDocument, GlossaryEntry, GlossaryPackage, load_from_package, load_package_from_package,
     remove_from_package, store_in_package,
@@ -31,6 +30,7 @@ use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
+use litchi_docx::font;
 use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
@@ -706,29 +706,24 @@ impl Package {
         Ok(ribbon::remove(&mut self.opc, family)?)
     }
 
-    /// Load typed font metadata and inert embedded-font resources.
-    pub fn font_table(&self) -> Result<Option<FontTable>> {
-        let main_part = self.opc.main_document_part()?;
-        let mut matches = main_part
-            .rels()
-            .iter()
-            .filter(|relationship| is_font_table_relationship(relationship.reltype()));
-        let Some(relationship) = matches.next() else {
-            return Ok(None);
-        };
-        if matches.next().is_some() {
-            return Err(OoxmlError::InvalidFormat(
-                "document has multiple font-table relationships".into(),
-            ));
-        }
-        if relationship.is_external() {
-            return Err(OoxmlError::InvalidFormat(
-                "font-table relationship cannot be external".into(),
-            ));
-        }
-        let target = relationship.target_partname()?;
-        let part = self.opc.get_part(&target)?;
-        Ok(Some(FontTable::extract_from_part(part, &self.opc)?))
+    /// Read typed font metadata and inert embedded-font resources.
+    pub fn fonts(&self) -> Result<Option<font::Table>> {
+        Ok(font::read(&self.opc)?)
+    }
+
+    /// Move a complete font table into this package.
+    pub fn put_fonts(
+        &mut self,
+        table: font::Table,
+        conformance: font::Conformance,
+    ) -> Result<&mut Self> {
+        font::put(&mut self.opc, table, conformance)?;
+        Ok(self)
+    }
+
+    /// Remove the font table and font resources that become unreferenced.
+    pub fn remove_fonts(&mut self) -> Result<bool> {
+        Ok(font::remove(&mut self.opc)?)
     }
 
     /// Get the underlying OPC package.

@@ -10,14 +10,14 @@ use crate::xlsb::formula::{
 };
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
-use crate::xlsb::records::record_types;
 use crate::xlsb::sheet_view::{
     MAX_SHEET_VIEW_SELECTIONS, SheetPane, SheetPanePosition, SheetPaneState, SheetSelection,
     SheetView,
 };
 use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
-use crate::xlsb::writer::RecordWriter;
 use litchi_core::sheet::CellValue;
+use litchi_xlsb::raw::Writer;
+use litchi_xlsb::raw::kind;
 use std::collections::{BTreeMap, HashSet};
 use std::io::Write;
 
@@ -1564,11 +1564,11 @@ impl MutableXlsbWorksheet {
     /// Following Excel's required structure
     pub(crate) fn write<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         shared_strings: &mut crate::xlsb::writer::MutableSharedStringsWriter,
     ) -> XlsbResult<()> {
         // Write BrtBeginSheet
-        writer.write_record(record_types::BEGIN_SHEET, &[])?;
+        writer.write_record(kind::BEGIN_SHEET, &[])?;
 
         // Write worksheet properties and basic formatting information.
         self.write_ws_properties(writer)?;
@@ -1586,9 +1586,9 @@ impl MutableXlsbWorksheet {
         self.write_col_infos(writer)?;
 
         // Write sheet data
-        writer.write_record(record_types::BEGIN_SHEET_DATA, &[])?;
+        writer.write_record(kind::BEGIN_SHEET_DATA, &[])?;
         self.write_cells(writer, shared_strings)?;
-        writer.write_record(record_types::END_SHEET_DATA, &[])?;
+        writer.write_record(kind::END_SHEET_DATA, &[])?;
 
         // Sheet protection (BrtSheetProtection) - minimal skeleton mirroring
         // SheetJS and [MS-XLSB] examples.
@@ -1626,11 +1626,11 @@ impl MutableXlsbWorksheet {
         }
 
         if !self.web_extension_bindings.is_empty() {
-            writer.write_record(record_types::BEGIN_WEB_EXTENSIONS, &[])?;
+            writer.write_record(kind::BEGIN_WEB_EXTENSIONS, &[])?;
             for binding in &self.web_extension_bindings {
-                writer.write_record(record_types::WEB_EXTENSION, &binding.to_payload()?)?;
+                writer.write_record(kind::WEB_EXTENSION, &binding.to_payload()?)?;
             }
-            writer.write_record(record_types::END_WEB_EXTENSIONS, &[])?;
+            writer.write_record(kind::END_WEB_EXTENSIONS, &[])?;
         }
 
         if self.has_drawing_objects() {
@@ -1640,8 +1640,8 @@ impl MutableXlsbWorksheet {
                 )
             })?;
             let mut payload = Vec::with_capacity(4 + rel_id.len() * 2);
-            RecordWriter::new(&mut payload).write_wide_string(rel_id)?;
-            writer.write_record(record_types::DRAWING, &payload)?;
+            Writer::new(&mut payload).write_wide_string(rel_id)?;
+            writer.write_record(kind::DRAWING, &payload)?;
         }
 
         // Write table references (BrtBeginListParts / BrtListPart /
@@ -1656,7 +1656,7 @@ impl MutableXlsbWorksheet {
         }
 
         // Write BrtEndSheet
-        writer.write_record(record_types::END_SHEET, &[])?;
+        writer.write_record(kind::END_SHEET, &[])?;
 
         Ok(())
     }
@@ -1665,9 +1665,9 @@ impl MutableXlsbWorksheet {
     ///
     /// [MS-XLSB] 2.4.864 + spec example 3.7.21: 23 bytes total
     /// Structure: flags (3 bytes) + brtcolorTab (8 bytes) + rwSync (4) + colSync (4) + strName (4)
-    fn write_ws_properties<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_ws_properties<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Flags (3 bytes per spec example 3.7.21):
         // Byte 0-1 (USHORT): flags A-O
@@ -1700,7 +1700,7 @@ impl MutableXlsbWorksheet {
         // strName - CodeName (XLWideString): empty string
         temp_writer.write_u32(0)?;
 
-        writer.write_record(record_types::WS_PROP, &data)?;
+        writer.write_record(kind::WS_PROP, &data)?;
         Ok(())
     }
 
@@ -1708,7 +1708,7 @@ impl MutableXlsbWorksheet {
     ///
     /// [MS-XLSB] 2.4.307/2.4.308: BrtBeginWsViews / BrtBeginWsView, optionally
     /// followed by BrtPane (2.4.723) and BrtSel (2.4.790) records.
-    fn write_ws_views<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_ws_views<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         let mut view = self.sheet_view.clone().unwrap_or_default();
         let configured = self.sheet_view.is_some() || self.freeze_panes.is_some();
 
@@ -1751,24 +1751,24 @@ impl MutableXlsbWorksheet {
             });
         }
 
-        writer.write_record(record_types::BEGIN_WS_VIEWS, &[])?;
+        writer.write_record(kind::BEGIN_WS_VIEWS, &[])?;
 
         // BrtBeginWsView (30 bytes according to spec)
         let view_data =
             crate::xlsb::sheet_view::write_ws_view_payload(configured.then_some(&view))?;
-        writer.write_record(record_types::BEGIN_WS_VIEW, &view_data)?;
+        writer.write_record(kind::BEGIN_WS_VIEW, &view_data)?;
 
         if let Some(pane) = view.pane.as_ref() {
             let pane_data = crate::xlsb::sheet_view::write_pane_payload(pane)?;
-            writer.write_record(record_types::PANE, &pane_data)?;
+            writer.write_record(kind::PANE, &pane_data)?;
         }
         for selection in &view.selections {
             let selection_data = crate::xlsb::sheet_view::write_selection_payload(selection)?;
-            writer.write_record(record_types::SEL, &selection_data)?;
+            writer.write_record(kind::SEL, &selection_data)?;
         }
 
-        writer.write_record(record_types::END_WS_VIEW, &[])?;
-        writer.write_record(record_types::END_WS_VIEWS, &[])?;
+        writer.write_record(kind::END_WS_VIEW, &[])?;
+        writer.write_record(kind::END_WS_VIEWS, &[])?;
 
         Ok(())
     }
@@ -1777,9 +1777,9 @@ impl MutableXlsbWorksheet {
     /// REQUIRED by Excel
     ///
     /// [MS-XLSB] 2.4.862 + spec example 3.7.28: 12 bytes total
-    fn write_sheet_format_pr<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_sheet_format_pr<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // dxGCol (4 bytes) - 0xFFFFFFFF = use cchDefColWidth instead
         temp_writer.write_u32(0xFFFFFFFF)?;
@@ -1796,14 +1796,14 @@ impl MutableXlsbWorksheet {
         // fUnsynced=0, fDyZero=0, fExAsc=0, fExDesc=0, reserved=0, iOutLevelRw=0, iOutLevelCol=0
         temp_writer.write_u32(0)?;
 
-        writer.write_record(0x01E5, &data)?;
+        writer.write_record(kind::WS_FMT_INFO, &data)?;
         Ok(())
     }
 
     /// Write worksheet dimensions record
-    fn write_dimensions<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_dimensions<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         if let Some((min_row, min_col, max_row, max_col)) = self.dimensions() {
             let (max_row, max_col) = self
@@ -1824,14 +1824,14 @@ impl MutableXlsbWorksheet {
             temp_writer.write_u32(0)?;
         }
 
-        writer.write_record(record_types::WS_DIM, &data)?;
+        writer.write_record(kind::WS_DIM, &data)?;
         Ok(())
     }
 
     /// Write all cells
     fn write_cells<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         shared_strings: &mut crate::xlsb::writer::MutableSharedStringsWriter,
     ) -> XlsbResult<()> {
         let formula_groups = self.formula_groups_for_write()?;
@@ -1860,7 +1860,7 @@ impl MutableXlsbWorksheet {
 
     fn write_cells_from<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         shared_strings: &mut crate::xlsb::writer::MutableSharedStringsWriter,
         cells: &BTreeMap<(u32, u32), CellData>,
         formula_groups: &[FormulaGroup],
@@ -1967,7 +1967,7 @@ impl MutableXlsbWorksheet {
 
     fn write_grouped_formula_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         row: u32,
         col: u32,
         cell_data: &CellData,
@@ -1992,8 +1992,8 @@ impl MutableXlsbWorksheet {
 
         if group.range.top_left() == (row, col) {
             let record_type = match group.kind {
-                FormulaGroupKind::Array => record_types::ARR_FMLA,
-                FormulaGroupKind::Shared => record_types::SHR_FMLA,
+                FormulaGroupKind::Array => kind::ARR_FMLA,
+                FormulaGroupKind::Shared => kind::SHR_FMLA,
             };
             writer.write_record(record_type, &group.to_record_data()?)?;
         }
@@ -2014,12 +2014,12 @@ impl MutableXlsbWorksheet {
     ///   (colFirst (u32) + colLast (u32))
     fn write_row_header<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         row: u32,
         cells: &BTreeMap<(u32, u32), CellData>,
     ) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Fixed part
         temp_writer.write_u32(row)?; // rw: Row index
@@ -2097,14 +2097,14 @@ impl MutableXlsbWorksheet {
             }
         }
 
-        writer.write_record(record_types::ROW_HDR, &data)?;
+        writer.write_record(kind::ROW_HDR, &data)?;
         Ok(())
     }
 
     /// Write a single cell record
     fn write_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         _row: u32,
         col: u32,
         cell_data: &CellData,
@@ -2146,7 +2146,7 @@ impl MutableXlsbWorksheet {
     #[allow(clippy::too_many_arguments)]
     fn write_formula_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         col: u32,
         style: u32,
         formula_text: &str,
@@ -2182,33 +2182,33 @@ impl MutableXlsbWorksheet {
         let cached = cached_value.unwrap_or(&CellValue::Float(0.0));
 
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
         Self::write_cell_structure(&mut temp_writer, col, style)?;
 
         let record_type = match cached {
             CellValue::String(value) => {
                 temp_writer.write_wide_string(value)?;
-                record_types::FMLA_STRING
+                kind::FMLA_STRING
             },
             CellValue::Bool(value) => {
                 temp_writer.write_u8(u8::from(*value))?;
-                record_types::FMLA_BOOL
+                kind::FMLA_BOOL
             },
             CellValue::Error(error) => {
                 temp_writer.write_u8(Self::error_code(error))?;
-                record_types::FMLA_ERROR
+                kind::FMLA_ERROR
             },
             CellValue::Int(value) => {
                 temp_writer.write_f64(*value as f64)?;
-                record_types::FMLA_NUM
+                kind::FMLA_NUM
             },
             CellValue::Float(value) | CellValue::DateTime(value) => {
                 temp_writer.write_f64(*value)?;
-                record_types::FMLA_NUM
+                kind::FMLA_NUM
             },
             CellValue::Empty => {
                 temp_writer.write_f64(0.0)?;
-                record_types::FMLA_NUM
+                kind::FMLA_NUM
             },
             CellValue::Formula { .. } => {
                 return Err(crate::xlsb::error::XlsbError::InvalidFormula(
@@ -2218,7 +2218,7 @@ impl MutableXlsbWorksheet {
         };
         temp_writer.write_u16(effective_flags)?;
         data.extend_from_slice(&formula_bytes);
-        writer.write_record(record_type, &data)
+        Ok(writer.write_record(record_type, &data)?)
     }
 
     /// Write the Cell structure (2.5.10) - 8 bytes
@@ -2229,7 +2229,7 @@ impl MutableXlsbWorksheet {
     /// - fPhShow (1 bit): Phonetic info flag
     /// - reserved (7 bits): Reserved
     fn write_cell_structure<W: Write>(
-        temp_writer: &mut RecordWriter<W>,
+        temp_writer: &mut Writer<W>,
         col: u32,
         style: u32,
     ) -> XlsbResult<()> {
@@ -2248,23 +2248,23 @@ impl MutableXlsbWorksheet {
     /// Write a blank cell (BrtCellBlank - 8 bytes)
     fn write_blank_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         col: u32,
         style: u32,
     ) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         Self::write_cell_structure(&mut temp_writer, col, style)?;
 
-        writer.write_record(record_types::CELL_BLANK, &data)?;
+        writer.write_record(kind::CELL_BLANK, &data)?;
         Ok(())
     }
 
     /// Write a shared string cell (BrtCellIsst - Cell + u32 = 12 bytes)
     fn write_shared_string_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         col: u32,
         value: &str,
         style: u32,
@@ -2274,58 +2274,58 @@ impl MutableXlsbWorksheet {
         let string_index = shared_strings.add_string(value.to_string());
 
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Cell structure (8 bytes) + isst index (4 bytes) = 12 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
         temp_writer.write_u32(string_index)?;
 
-        writer.write_record(record_types::CELL_ISST, &data)?;
+        writer.write_record(kind::CELL_ISST, &data)?;
         Ok(())
     }
 
     /// Write a number cell (BrtCellReal - Cell + f64 = 16 bytes)
     fn write_number_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         col: u32,
         value: f64,
         style: u32,
     ) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Cell structure (8 bytes) + Xnum value (8 bytes) = 16 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
         temp_writer.write_f64(value)?;
 
-        writer.write_record(record_types::CELL_REAL, &data)?;
+        writer.write_record(kind::CELL_REAL, &data)?;
         Ok(())
     }
 
     /// Write a boolean cell (BrtCellBool - Cell + u8 = 9 bytes)
     fn write_bool_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         col: u32,
         value: bool,
         style: u32,
     ) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Cell structure (8 bytes) + fBool (1 byte) = 9 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
         temp_writer.write_u8(if value { 1 } else { 0 })?;
 
-        writer.write_record(record_types::CELL_BOOL, &data)?;
+        writer.write_record(kind::CELL_BOOL, &data)?;
         Ok(())
     }
 
     /// Write an error cell (BrtCellError - Cell + u8 = 9 bytes)
     fn write_error_cell<W: Write>(
         &self,
-        writer: &mut RecordWriter<W>,
+        writer: &mut Writer<W>,
         col: u32,
         error: &str,
         style: u32,
@@ -2333,13 +2333,13 @@ impl MutableXlsbWorksheet {
         let error_code = Self::error_code(error);
 
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Cell structure (8 bytes) + bError (1 byte) = 9 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
         temp_writer.write_u8(error_code)?;
 
-        writer.write_record(record_types::CELL_ERROR, &data)?;
+        writer.write_record(kind::CELL_ERROR, &data)?;
         Ok(())
     }
 
@@ -2358,35 +2358,35 @@ impl MutableXlsbWorksheet {
     }
 
     /// Write merged cells
-    fn write_merged_cells<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_merged_cells<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         // BrtBeginMergeCells (0x00B1) payload is a single DWORD count of BrtMergeCell
         // records that follow. SheetJS writes this as write_BrtBeginMergeCells(cnt).
         let mut header = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut header);
+        let mut temp_writer = Writer::new(&mut header);
         temp_writer.write_u32(self.merged_cells.len() as u32)?;
 
-        writer.write_record(record_types::BEGIN_MERGE_CELLS, &header)?;
+        writer.write_record(kind::BEGIN_MERGE_CELLS, &header)?;
 
         for merged in &self.merged_cells {
             let data = merged.serialize();
-            writer.write_record(record_types::MERGE_CELL, &data)?;
+            writer.write_record(kind::MERGE_CELL, &data)?;
         }
 
-        writer.write_record(record_types::END_MERGE_CELLS, &[])?;
+        writer.write_record(kind::END_MERGE_CELLS, &[])?;
         Ok(())
     }
 
     /// Write column information records.
-    fn write_col_infos<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_col_infos<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         if self.columns.is_empty() {
             return Ok(());
         }
 
-        writer.write_record(record_types::BEGIN_COL_INFOS, &[])?;
+        writer.write_record(kind::BEGIN_COL_INFOS, &[])?;
 
         for (col, info) in &self.columns {
             let mut data = Vec::new();
-            let mut temp_writer = RecordWriter::new(&mut data);
+            let mut temp_writer = Writer::new(&mut data);
 
             // firstCol / lastCol (both 0-based inclusive).
             temp_writer.write_u32(*col)?;
@@ -2415,30 +2415,30 @@ impl MutableXlsbWorksheet {
             }
             temp_writer.write_u16(flags)?;
 
-            writer.write_record(record_types::COL_INFO, &data)?;
+            writer.write_record(kind::COL_INFO, &data)?;
         }
 
-        writer.write_record(record_types::END_COL_INFOS, &[])?;
+        writer.write_record(kind::END_COL_INFOS, &[])?;
         Ok(())
     }
 
     /// Write hyperlinks
-    fn write_hyperlinks<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_hyperlinks<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         for hyperlink in &self.hyperlinks {
             let data = hyperlink.serialize();
-            writer.write_record(record_types::H_LINK, &data)?;
+            writer.write_record(kind::H_LINK, &data)?;
         }
         Ok(())
     }
 
     /// Write sheet protection if configured.
-    fn write_sheet_protection<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_sheet_protection<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         let Some(ref prot) = self.sheet_protection else {
             return Ok(());
         };
 
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // Password hash (Method 1). When absent, write 0.
         temp_writer.write_u16(prot.password_hash.unwrap_or(0))?;
@@ -2476,12 +2476,12 @@ impl MutableXlsbWorksheet {
         temp_writer.write_u32(flag(true, prot.pivot_tables))?;
         temp_writer.write_u32(flag(false, prot.select_unlocked_cells))?;
 
-        writer.write_record(record_types::SHEET_PROTECTION, &data)?;
+        writer.write_record(kind::SHEET_PROTECTION, &data)?;
         Ok(())
     }
 
     /// Write basic auto-filter range if configured.
-    fn write_auto_filter<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_auto_filter<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         let Some(ref af) = self.auto_filter else {
             return Ok(());
         };
@@ -2497,7 +2497,7 @@ impl MutableXlsbWorksheet {
         }
 
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         // UncheckedRfX: row_first, row_last, col_first, col_last
         temp_writer.write_u32(af.row_first)?;
@@ -2505,8 +2505,8 @@ impl MutableXlsbWorksheet {
         temp_writer.write_u32(af.col_first)?;
         temp_writer.write_u32(af.col_last)?;
 
-        writer.write_record(record_types::BEGIN_A_FILTER, &data)?;
-        writer.write_record(record_types::END_A_FILTER, &[])?;
+        writer.write_record(kind::BEGIN_A_FILTER, &data)?;
+        writer.write_record(kind::END_A_FILTER, &[])?;
         Ok(())
     }
 }
@@ -2519,9 +2519,9 @@ mod tests {
     use crate::xlsb::data_validation::DataValidation;
     use crate::xlsb::hyperlinks::Hyperlink;
     use crate::xlsb::merged_cells::MergedCell;
-    use crate::xlsb::records::XlsbRecordIter;
     use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
     use litchi_core::binary;
+    use litchi_xlsb::raw::Records;
     use std::io::Cursor;
 
     #[test]
@@ -2547,32 +2547,27 @@ mod tests {
             .set_web_extension_bindings(vec![binding.clone()])
             .unwrap();
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
         sheet.write(&mut writer, &mut shared_strings).unwrap();
 
-        let records = XlsbRecordIter::new(Cursor::new(buffer))
-            .collect::<XlsbResult<Vec<_>>>()
+        let records = Records::new(&buffer)
+            .collect::<Result<Vec<_>, _>>()
             .unwrap();
         let begin = records
             .iter()
-            .position(|record| record.header.record_type == record_types::BEGIN_WEB_EXTENSIONS)
+            .position(|record| record.kind() == kind::BEGIN_WEB_EXTENSIONS)
             .unwrap();
-        assert!(records[begin].data.is_empty());
+        assert!(records[begin].payload().is_empty());
+        assert_eq!(records[begin + 1].kind(), kind::WEB_EXTENSION);
         assert_eq!(
-            records[begin + 1].header.record_type,
-            record_types::WEB_EXTENSION
-        );
-        assert_eq!(
-            XlsbWebExtensionBinding::parse_payload(&records[begin + 1].data, |index| index == 0)
-                .unwrap(),
+            XlsbWebExtensionBinding::parse_payload(records[begin + 1].payload(), |index| index
+                == 0)
+            .unwrap(),
             binding
         );
-        assert_eq!(
-            records[begin + 2].header.record_type,
-            record_types::END_WEB_EXTENSIONS
-        );
-        assert!(records[begin + 2].data.is_empty());
+        assert_eq!(records[begin + 2].kind(), kind::END_WEB_EXTENSIONS);
+        assert!(records[begin + 2].payload().is_empty());
     }
 
     #[test]
@@ -2822,7 +2817,7 @@ mod tests {
     fn test_worksheet_write_empty() {
         let sheet = MutableXlsbWorksheet::new("Sheet1");
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
 
         let result = sheet.write(&mut writer, &mut shared_strings);
@@ -2838,7 +2833,7 @@ mod tests {
         sheet.set_cell(1, 0, true);
 
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
 
         let result = sheet.write(&mut writer, &mut shared_strings);
@@ -2873,17 +2868,20 @@ mod tests {
             },
         );
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
         sheet.write(&mut writer, &mut shared_strings).unwrap();
 
-        let record = crate::xlsb::records::XlsbRecordIter::new(buffer.as_slice())
+        let record = litchi_xlsb::raw::Records::new(buffer.as_slice())
             .find_map(|record| {
                 let record = record.unwrap();
-                (record.header.record_type == record_types::COL_INFO).then_some(record)
+                (record.kind() == kind::COL_INFO).then_some(record)
             })
             .unwrap();
-        assert_eq!(binary::read_u16_le_at(&record.data, 16).unwrap(), 0x0006);
+        assert_eq!(
+            binary::read_u16_le_at(record.payload(), 16).unwrap(),
+            0x0006
+        );
     }
 
     #[test]
@@ -2937,7 +2935,7 @@ mod tests {
             formula_flags: 0,
         };
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
         sheet
             .write_cell(&mut writer, 12, 1, &cell, &mut shared_strings)
@@ -2970,7 +2968,7 @@ mod tests {
             },
         );
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
         let error = sheet.write(&mut writer, &mut shared_strings).unwrap_err();
         assert!(matches!(
@@ -2994,7 +2992,7 @@ mod tests {
             formula_flags: 0,
         };
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
         sheet
             .write_cell(&mut writer, 0, 0, &cell, &mut shared_strings)
@@ -3006,8 +3004,7 @@ mod tests {
 
     #[test]
     fn writes_shared_definition_immediately_after_anchor_and_exp_followers() {
-        use crate::xlsb::records::RecordIter;
-        use std::io::Cursor;
+        use crate::xlsb::records::Stream;
 
         let mut sheet = MutableXlsbWorksheet::new("Sheet1");
         sheet.set_cell(2, 2, 10.0);
@@ -3015,11 +3012,11 @@ mod tests {
         sheet.set_shared_formula(2, 2, 3, 2, "B3").unwrap();
 
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
         sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
-        let mut iter = RecordIter::new(Cursor::new(buffer));
+        let mut iter = Stream::new(Cursor::new(buffer));
         let mut records = Vec::new();
         while let Ok(record_type) = iter.read_type() {
             let mut data = Vec::new();
@@ -3029,11 +3026,11 @@ mod tests {
         assert_eq!(
             records.iter().map(|record| record.0).collect::<Vec<_>>(),
             vec![
-                record_types::ROW_HDR,
-                record_types::FMLA_NUM,
-                record_types::SHR_FMLA,
-                record_types::ROW_HDR,
-                record_types::FMLA_NUM,
+                kind::ROW_HDR,
+                kind::FMLA_NUM,
+                kind::SHR_FMLA,
+                kind::ROW_HDR,
+                kind::FMLA_NUM,
             ]
         );
 
@@ -3048,7 +3045,7 @@ mod tests {
 
     #[test]
     fn writes_unsupported_group_definition_losslessly() {
-        use crate::xlsb::records::RecordIter;
+        use crate::xlsb::records::Stream;
         use std::io::Cursor;
 
         let group = FormulaGroup {
@@ -3065,16 +3062,16 @@ mod tests {
         sheet.set_formula_group_binary(group).unwrap();
 
         let mut buffer = Vec::new();
-        let mut writer = RecordWriter::new(&mut buffer);
+        let mut writer = Writer::new(&mut buffer);
         let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
         sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
-        let mut iter = RecordIter::new(Cursor::new(buffer));
+        let mut iter = Stream::new(Cursor::new(buffer));
         let mut definition = None;
         while let Ok(record_type) = iter.read_type() {
             let mut data = Vec::new();
             iter.fill_buffer(&mut data).unwrap();
-            if record_type == record_types::ARR_FMLA {
+            if record_type == kind::ARR_FMLA {
                 definition = Some(data);
             }
         }

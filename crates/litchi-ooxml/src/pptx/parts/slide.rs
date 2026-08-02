@@ -1054,8 +1054,8 @@ impl<'a> SlidePart<'a> {
     ///
     /// Parses the `<p:transition>` element from the slide XML.
     /// Returns `None` if no transition is defined.
-    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
-        crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
+    pub fn transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
+        litchi_pptx::transition::read(self.part.blob()).map_err(Into::into)
     }
 
     /// Parse the simple shape-animation metadata in this slide's timing tree.
@@ -1142,8 +1142,8 @@ impl<'a> SlideLayoutPart<'a> {
     ///
     /// Parses the `<p:transition>` element from the layout XML.
     /// Returns `None` if the layout has no transition.
-    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
-        crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
+    pub fn transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
+        litchi_pptx::transition::read(self.part.blob()).map_err(Into::into)
     }
 
     /// Get the background defined by this slide layout.
@@ -1227,8 +1227,8 @@ impl<'a> SlideMasterPart<'a> {
     ///
     /// Parses the `<p:transition>` element from the master XML.
     /// Returns `None` if the master has no transition.
-    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
-        crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
+    pub fn transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
+        litchi_pptx::transition::read(self.part.blob()).map_err(Into::into)
     }
 
     /// Get the background defined by this slide master.

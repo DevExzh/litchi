@@ -553,15 +553,15 @@ impl<'a> Slide<'a> {
     ///
     /// if let Some(slide) = slides.first() {
     ///     if let Some(transition) = slide.transition()? {
-    ///         println!("Transition type: {:?}", transition.transition_type);
-    ///         println!("Speed: {:?}", transition.speed);
+    ///         println!("Transition type: {:?}", transition.kind());
+    ///         println!("Speed: {:?}", transition.speed());
     ///     } else {
     ///         println!("No transition");
     ///     }
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+    pub fn transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
         self.part.transition()
     }
 
@@ -647,9 +647,7 @@ impl<'a> Slide<'a> {
     /// A transition defined on the slide takes precedence over its layout and
     /// slide master. If the slide has no transition, the layout's effective
     /// transition is returned instead.
-    pub fn effective_transition(
-        &self,
-    ) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+    pub fn effective_transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
         if let Some(transition) = self.transition()? {
             return Ok(Some(transition));
         }
@@ -877,7 +875,7 @@ impl<'a> SlideLayout<'a> {
     /// Get the transition effect inherited from this layout.
     ///
     /// Returns `None` if the layout has no transition.
-    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+    pub fn transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
         self.part.transition()
     }
 
@@ -886,9 +884,7 @@ impl<'a> SlideLayout<'a> {
     /// A transition defined on the layout takes precedence over its slide
     /// master. If the layout has no transition, the master's transition is
     /// returned instead.
-    pub fn effective_transition(
-        &self,
-    ) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+    pub fn effective_transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
         if let Some(transition) = self.transition()? {
             return Ok(Some(transition));
         }
@@ -1093,7 +1089,7 @@ impl<'a> SlideMaster<'a> {
     /// Get the transition effect inherited from this master.
     ///
     /// Returns `None` if the master has no transition.
-    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+    pub fn transition(&self) -> Result<Option<litchi_pptx::transition::Transition>> {
         self.part.transition()
     }
 

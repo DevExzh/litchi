@@ -7,8 +7,8 @@
 
 use crate::xlsb::connections::model::*;
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types as rt;
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::Writer;
+use litchi_xlsb::raw::kind as rt;
 use std::collections::HashSet;
 
 pub(crate) const MAX_CONNECTIONS: usize = 4_096;
@@ -20,10 +20,6 @@ const MAX_FORMULA_TOKEN_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CONNECTIONS_PART_BYTES: usize = 32 * 1024 * 1024;
 
 /// `BrtPCDIMissing` / `BrtPCDIString` / `BrtPCDIIndex` record types.
-const PCDI_MISSING_TYPE: u16 = 20;
-const PCDI_STRING_TYPE: u16 = 24;
-const PCDI_INDEX_TYPE: u16 = 26;
-
 // `BrtBeginExtConnection` flags word 1 (MS-XLSB 2.4.80).
 const CONN_MAINTAIN: u16 = 1 << 0;
 const CONN_NEW_QUERY: u16 = 1 << 1;
@@ -498,7 +494,7 @@ fn param_payload(parameter: &XlsbConnectionParameter) -> XlsbResult<Vec<u8>> {
 pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResult<Vec<u8>> {
     validate_connections(connections)?;
     let mut data = Vec::with_capacity(512);
-    let mut writer = RecordWriter::new(&mut data);
+    let mut writer = Writer::new(&mut data);
     writer.write_record(rt::BEGIN_EXT_CONNECTIONS, &[])?;
     for connection in &connections.connections {
         if connection.name.is_empty() {
@@ -538,14 +534,14 @@ pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResul
             writer.write_record(rt::BEGIN_EC_WP_TABLES, &[])?;
             for item in &connection.web_tables {
                 match item {
-                    XlsbWebTableItem::Missing => writer.write_record(PCDI_MISSING_TYPE, &[])?,
+                    XlsbWebTableItem::Missing => writer.write_record(rt::PCDI_MISSING, &[])?,
                     XlsbWebTableItem::Named(name) => {
                         let mut payload = Vec::new();
                         write_wide_string(&mut payload, name);
-                        writer.write_record(PCDI_STRING_TYPE, &payload)?;
+                        writer.write_record(rt::PCDI_STRING, &payload)?;
                     },
                     XlsbWebTableItem::Index(index) => {
-                        writer.write_record(PCDI_INDEX_TYPE, &index.to_le_bytes())?;
+                        writer.write_record(rt::PCDI_INDEX, &index.to_le_bytes())?;
                     },
                 }
             }

@@ -69,6 +69,8 @@ ooxml = [
     "dep:litchi-drawingml",
     "dep:litchi-ooxml",
     "dep:litchi-ooxml-common",
+    "dep:litchi-pptx",
+    "dep:litchi-xlsb",
     "dep:soapberry-zip",
     "sign",
 ]
@@ -109,9 +111,11 @@ litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt im
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
 litchi-ooxml-common = { workspace = true, optional = true } # Host-neutral OOXML package grammar exposed directly by the OOXML facade
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary parser/writer (.ppt), independently gated by `ppt`
+litchi-pptx = { workspace = true, optional = true } # Canonical PresentationML transition capability, gated by `ooxml`
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 litchi-sign = { workspace = true, optional = true } # Trust-neutral Office signature authoring and verification
 litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF parser/writer, independently gated by `xls`
+litchi-xlsb = { workspace = true, optional = true } # Canonical BIFF12 wire capability, gated by `ooxml`
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 once_cell = "1" # Lazy statics and one-time initialization for global state
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming

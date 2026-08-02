@@ -1,7 +1,6 @@
-use litchi_ooxml::pptx::{
-    Package, RippleDirection, SlideTransition, TransitionSpeed, TransitionType,
-};
+use litchi_ooxml::pptx::Package;
 use litchi_ooxml::{OoxmlError, PackURI};
+use litchi_pptx::transition::{Kind, Ms, Ripple, Speed, Transition};
 use tempfile::NamedTempFile;
 
 const LOCAL_P14_RIPPLE: &[u8] =
@@ -12,16 +11,11 @@ fn slide_transition_uses_local_powerpoint_2010_choice() {
     let package = package_with_transition_fragment(std::str::from_utf8(LOCAL_P14_RIPPLE).unwrap());
 
     let transition = first_transition(&package);
-    assert_eq!(transition.speed, TransitionSpeed::Slow);
-    assert_eq!(transition.duration_ms, Some(1500));
-    assert!(!transition.advance_on_click);
-    assert_eq!(transition.advance_after_ms, Some(4250));
-    assert_eq!(
-        transition.transition_type,
-        TransitionType::Ripple {
-            direction: RippleDirection::LeftDown,
-        }
-    );
+    assert_eq!(transition.speed(), Speed::Slow);
+    assert_eq!(transition.duration().map(Ms::get), Some(1500));
+    assert!(!transition.click());
+    assert_eq!(transition.after().map(Ms::get), Some(4250));
+    assert_eq!(transition.kind(), &Kind::Ripple(Ripple::LeftDown));
 }
 
 #[test]
@@ -37,19 +31,18 @@ fn slide_transition_rejects_invalid_powerpoint_2010_ripple_direction() {
 
     assert!(matches!(
         slides[0].transition(),
-        Err(OoxmlError::InvalidFormat(message)) if message.contains("ripple direction")
+        Err(OoxmlError::Pptx(litchi_pptx::Error::Invalid(message)))
+            if message.contains("ripple transition direction")
     ));
 }
 
 #[test]
 fn writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
-    let expected = SlideTransition::new(TransitionType::Ripple {
-        direction: RippleDirection::LeftDown,
-    })
-    .with_speed(TransitionSpeed::Slow)
-    .with_duration_ms(1500)
-    .with_advance_on_click(false)
-    .with_advance_after_ms(4250);
+    let expected = Transition::new(Kind::Ripple(Ripple::LeftDown))
+        .with_speed(Speed::Slow)
+        .with_duration(Ms::new(1500).unwrap())
+        .with_click(false)
+        .with_after(Ms::new(4250).unwrap());
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     let mut package = Package::new().unwrap();
     package
@@ -61,7 +54,7 @@ fn writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();
-    assert_eq!(first_transition(&package), expected);
+    assert!(first_transition(&package).same_semantics(&expected));
 
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let slide = package.opc_package().get_part(&slide_name).unwrap();
@@ -73,11 +66,11 @@ fn writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
 
 #[test]
 fn writer_round_trips_custom_duration_through_compatibility_markup() {
-    let expected = SlideTransition::new(TransitionType::Fade)
-        .with_speed(TransitionSpeed::Fast)
-        .with_duration_ms(750)
-        .with_advance_on_click(false)
-        .with_advance_after_ms(1250);
+    let expected = Transition::new(Kind::Fade { black: None })
+        .with_speed(Speed::Fast)
+        .with_duration(Ms::new(750).unwrap())
+        .with_click(false)
+        .with_after(Ms::new(1250).unwrap());
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     let mut package = Package::new().unwrap();
     package
@@ -89,7 +82,7 @@ fn writer_round_trips_custom_duration_through_compatibility_markup() {
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();
-    assert_eq!(first_transition(&package), expected);
+    assert!(first_transition(&package).same_semantics(&expected));
 
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let slide = package.opc_package().get_part(&slide_name).unwrap();
@@ -98,7 +91,7 @@ fn writer_round_trips_custom_duration_through_compatibility_markup() {
     assert!(xml.contains("<mc:Fallback>"));
 }
 
-fn first_transition(package: &Package) -> litchi_ooxml::pptx::SlideTransition {
+fn first_transition(package: &Package) -> Transition {
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     slides[0].transition().unwrap().unwrap()

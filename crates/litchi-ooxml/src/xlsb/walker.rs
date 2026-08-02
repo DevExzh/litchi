@@ -7,21 +7,11 @@
 //! modelled data are skipped as balanced collections.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types as rt, wide_str_with_len};
+use litchi_xlsb::raw::{Kind, Record, Records, kind as rt};
 
 /// Maximum number of leading future-record wrapper blocks skipped while
 /// looking for the record that opens a part stream.
 const MAX_LEADING_WRAPPER_BLOCKS: usize = 16;
-
-/// `BrtBeginPRule` / `BrtEndPRule` (MS-XLSB 2.4.186): unmodelled pivot rule.
-const BEGIN_PRULE: u16 = 247;
-const END_PRULE: u16 = 248;
-/// `BrtBeginPCDKPIs` / `BrtEndPCDKPIs` (MS-XLSB 2.4.149): unmodelled KPI collection.
-const BEGIN_PCD_KPIS: u16 = 269;
-const END_PCD_KPIS: u16 = 270;
-/// `BrtBeginPCDKPI` / `BrtEndPCDKPI` (MS-XLSB 2.4.148): unmodelled KPI.
-const BEGIN_PCD_KPI: u16 = 271;
-const END_PCD_KPI: u16 = 272;
 
 pub(crate) fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
     XlsbError::Unrecognized {
@@ -32,21 +22,21 @@ pub(crate) fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
 
 /// Wraps the shared record iterator with collection helpers.
 pub(crate) struct RecordWalker<'a> {
-    iter: XlsbRecordIter<&'a [u8]>,
+    iter: Records<'a>,
 }
 
 impl<'a> RecordWalker<'a> {
     pub(crate) fn new(data: &'a [u8]) -> Self {
         RecordWalker {
-            iter: XlsbRecordIter::new(data),
+            iter: Records::new(data),
         }
     }
 
-    pub(crate) fn next(&mut self) -> XlsbResult<Option<XlsbRecord>> {
-        self.iter.next().transpose()
+    pub(crate) fn next(&mut self) -> XlsbResult<Option<Record<'a>>> {
+        Ok(self.iter.next().transpose()?)
     }
 
-    pub(crate) fn required(&mut self, context: &'static str) -> XlsbResult<XlsbRecord> {
+    pub(crate) fn required(&mut self, context: &'static str) -> XlsbResult<Record<'a>> {
         self.next()?
             .ok_or_else(|| XlsbError::UnexpectedEndOfStream(context.to_string()))
     }
@@ -63,26 +53,26 @@ impl<'a> RecordWalker<'a> {
     /// crafted stream cannot loop unboundedly.
     pub(crate) fn required_begin(
         &mut self,
-        begin_type: u16,
+        begin_type: Kind,
         context: &'static str,
-    ) -> XlsbResult<XlsbRecord> {
+    ) -> XlsbResult<Record<'a>> {
         for _ in 0..MAX_LEADING_WRAPPER_BLOCKS {
             let record = self.required(context)?;
-            let record_type = record.header.record_type;
+            let record_type = record.kind();
             if record_type == begin_type {
                 return Ok(record);
             }
             if !matches!(record_type, rt::AC_BEGIN | rt::FRT_BEGIN) {
                 return Err(XlsbError::UnexpectedRecord {
-                    expected: begin_type,
-                    found: record_type,
+                    expected: begin_type.get(),
+                    found: record_type.get(),
                 });
             }
             self.skip_unhandled(record_type, context)?;
         }
         Err(XlsbError::UnexpectedRecord {
-            expected: begin_type,
-            found: rt::AC_BEGIN,
+            expected: begin_type.get(),
+            found: rt::AC_BEGIN.get(),
         })
     }
 
@@ -90,15 +80,15 @@ impl<'a> RecordWalker<'a> {
     /// collections of the same record pair.
     pub(crate) fn skip_collection(
         &mut self,
-        begin_type: u16,
-        end_type: u16,
+        begin_type: Kind,
+        end_type: Kind,
         context: &'static str,
     ) -> XlsbResult<()> {
         let mut depth = 1u32;
         while let Some(record) = self.next()? {
-            if record.header.record_type == begin_type {
+            if record.kind() == begin_type {
                 depth += 1;
-            } else if record.header.record_type == end_type {
+            } else if record.kind() == end_type {
                 depth -= 1;
                 if depth == 0 {
                     return Ok(());
@@ -112,7 +102,7 @@ impl<'a> RecordWalker<'a> {
     /// the type is a known begin record, a single record otherwise.
     pub(crate) fn skip_unhandled(
         &mut self,
-        record_type: u16,
+        record_type: Kind,
         context: &'static str,
     ) -> XlsbResult<()> {
         if let Some(end_type) = paired_end(record_type) {
@@ -123,9 +113,9 @@ impl<'a> RecordWalker<'a> {
 
     /// Consume everything up to the matching end record of a collection that
     /// is expected to contain no modelled children.
-    pub(crate) fn expect_end(&mut self, end_type: u16, context: &'static str) -> XlsbResult<()> {
+    pub(crate) fn expect_end(&mut self, end_type: Kind, context: &'static str) -> XlsbResult<()> {
         while let Some(record) = self.next()? {
-            let record_type = record.header.record_type;
+            let record_type = record.kind();
             if record_type == end_type {
                 return Ok(());
             }
@@ -141,7 +131,7 @@ impl<'a> RecordWalker<'a> {
 /// then skips as single records. This is the union of the record families
 /// the XLSB part parsers understand; begin types are unique across families,
 /// so the union cannot mis-pair a record.
-fn paired_end(record_type: u16) -> Option<u16> {
+fn paired_end(record_type: Kind) -> Option<Kind> {
     Some(match record_type {
         // PivotCache definition stream (2.1.7.38).
         rt::BEGIN_PCD_SOURCE => rt::END_PCD_SOURCE,
@@ -226,156 +216,10 @@ fn paired_end(record_type: u16) -> Option<u16> {
         // Shared wrapper records.
         rt::FRT_BEGIN => rt::FRT_END,
         rt::AC_BEGIN => rt::AC_END,
-        // Record families without constants in `records::record_types`.
-        BEGIN_PRULE => END_PRULE,
-        BEGIN_PCD_KPIS => END_PCD_KPIS,
-        BEGIN_PCD_KPI => END_PCD_KPI,
+        // Record families without constants in `records::kind`.
+        rt::BEGIN_PRULE => rt::END_PRULE,
+        rt::BEGIN_PCD_KPIS => rt::END_PCD_KPIS,
+        rt::BEGIN_PCD_KPI => rt::END_PCD_KPI,
         _ => return None,
     })
-}
-
-/// Bounds-checked cursor over one record payload.
-pub(crate) struct PayloadCursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-    context: &'static str,
-}
-
-impl<'a> PayloadCursor<'a> {
-    pub(crate) fn new(data: &'a [u8], context: &'static str) -> Self {
-        PayloadCursor {
-            data,
-            offset: 0,
-            context,
-        }
-    }
-
-    pub(crate) fn remaining(&self) -> usize {
-        self.data.len() - self.offset
-    }
-
-    pub(crate) fn guard(&self, needed: usize) -> XlsbResult<()> {
-        if self.remaining() < needed {
-            return Err(XlsbError::InvalidLength {
-                expected: self.offset + needed,
-                found: self.data.len(),
-            });
-        }
-        Ok(())
-    }
-
-    /// Advance over `len` bytes without reading them.
-    pub(crate) fn skip(&mut self, len: usize) -> XlsbResult<()> {
-        self.guard(len)?;
-        self.offset += len;
-        Ok(())
-    }
-
-    pub(crate) fn read_bytes(&mut self, len: usize) -> XlsbResult<&'a [u8]> {
-        self.guard(len)?;
-        let bytes = &self.data[self.offset..self.offset + len];
-        self.offset += len;
-        Ok(bytes)
-    }
-
-    pub(crate) fn read_u8(&mut self) -> XlsbResult<u8> {
-        self.guard(1)?;
-        let value = self.data[self.offset];
-        self.offset += 1;
-        Ok(value)
-    }
-
-    pub(crate) fn read_u16(&mut self) -> XlsbResult<u16> {
-        self.guard(2)?;
-        let value = u16::from_le_bytes([self.data[self.offset], self.data[self.offset + 1]]);
-        self.offset += 2;
-        Ok(value)
-    }
-
-    pub(crate) fn read_i16(&mut self) -> XlsbResult<i16> {
-        Ok(self.read_u16()? as i16)
-    }
-
-    pub(crate) fn read_u32(&mut self) -> XlsbResult<u32> {
-        self.guard(4)?;
-        let value = u32::from_le_bytes(
-            self.data[self.offset..self.offset + 4]
-                .try_into()
-                .expect("slice length is guarded"),
-        );
-        self.offset += 4;
-        Ok(value)
-    }
-
-    pub(crate) fn read_i32(&mut self) -> XlsbResult<i32> {
-        Ok(self.read_u32()? as i32)
-    }
-
-    pub(crate) fn read_f64(&mut self) -> XlsbResult<f64> {
-        self.guard(8)?;
-        let value = f64::from_le_bytes(
-            self.data[self.offset..self.offset + 8]
-                .try_into()
-                .expect("slice length is guarded"),
-        );
-        self.offset += 8;
-        Ok(value)
-    }
-
-    /// Read a full-width byte Boolean (any nonzero value is `true`).
-    pub(crate) fn read_bool8(&mut self) -> XlsbResult<bool> {
-        Ok(self.read_u8()? != 0)
-    }
-
-    /// Read a `Boolean` encoded as a 32-bit integer (MS-XLSB 2.5.98.3).
-    pub(crate) fn read_bool32(&mut self) -> XlsbResult<u32> {
-        let value = self.read_u32()?;
-        if value > 1 {
-            return Err(malformed(self.context, "non-Boolean 32-bit flag"));
-        }
-        Ok(value)
-    }
-
-    /// Read an `XLWideString` (MS-XLSB 2.5.169).
-    pub(crate) fn read_wide_string(&mut self) -> XlsbResult<String> {
-        let (value, consumed) = wide_str_with_len(&self.data[self.offset..])?;
-        self.offset += consumed;
-        Ok(value)
-    }
-
-    /// Read an `XLNullableWideString` (MS-XLSB 2.5.167).
-    pub(crate) fn read_nullable_wide_string(&mut self) -> XlsbResult<Option<String>> {
-        self.guard(4)?;
-        if u32::from_le_bytes(
-            self.data[self.offset..self.offset + 4]
-                .try_into()
-                .expect("slice length is guarded"),
-        ) == u32::MAX
-        {
-            self.offset += 4;
-            return Ok(None);
-        }
-        self.read_wide_string().map(Some)
-    }
-
-    /// Read a length-prefixed byte blob (`LPByteBuf`, MS-XLSB 2.5.91).
-    pub(crate) fn read_blob(&mut self) -> XlsbResult<Vec<u8>> {
-        let len = usize::try_from(self.read_u32()?)
-            .map_err(|_| malformed(self.context, "byte blob length overflow"))?;
-        self.guard(len)?;
-        let blob = self.data[self.offset..self.offset + len].to_vec();
-        self.offset += len;
-        Ok(blob)
-    }
-
-    /// Reject payloads with unparsed trailing bytes.
-    pub(crate) fn finish(&self) -> XlsbResult<()> {
-        if self.remaining() != 0 {
-            return Err(malformed(
-                self.context,
-                format!("{} trailing bytes", self.remaining()),
-            ));
-        }
-        Ok(())
-    }
 }

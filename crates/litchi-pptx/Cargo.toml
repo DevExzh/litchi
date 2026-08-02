@@ -1,0 +1,14 @@
+[package]
+name = "litchi-pptx"
+description = "Strict, safe, and move-first PresentationML (.pptx) APIs for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-ooxml-common = { workspace = true }
+quick-xml = { workspace = true }
+thiserror = { workspace = true }

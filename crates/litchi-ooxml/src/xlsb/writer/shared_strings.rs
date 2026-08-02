@@ -1,8 +1,8 @@
 //! Shared strings table writer for XLSB
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::record_types;
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::Writer;
+use litchi_xlsb::raw::kind;
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -54,10 +54,10 @@ impl MutableSharedStringsWriter {
     }
 
     /// Write shared strings table to binary format
-    pub(crate) fn write<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         // Write BrtBeginSst
         let mut sst_header = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut sst_header);
+        let mut temp_writer = Writer::new(&mut sst_header);
         let total_count = u32::try_from(self.total_count).map_err(|_| {
             XlsbError::Encoding("shared-string occurrence count exceeds u32".to_string())
         })?;
@@ -73,7 +73,7 @@ impl MutableSharedStringsWriter {
         temp_writer.write_u32(total_count)?;
         temp_writer.write_u32(unique_count)?;
 
-        writer.write_record(record_types::BEGIN_SST, &sst_header)?;
+        writer.write_record(kind::BEGIN_SST, &sst_header)?;
 
         // Write each string
         for string in &self.strings {
@@ -81,20 +81,20 @@ impl MutableSharedStringsWriter {
         }
 
         // Write BrtEndSst
-        writer.write_record(record_types::END_SST, &[])?;
+        writer.write_record(kind::END_SST, &[])?;
 
         Ok(())
     }
 
     /// Write a single SST item
-    fn write_sst_item<W: Write>(&self, writer: &mut RecordWriter<W>, s: &str) -> XlsbResult<()> {
+    fn write_sst_item<W: Write>(&self, writer: &mut Writer<W>, s: &str) -> XlsbResult<()> {
         let mut data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut data);
+        let mut temp_writer = Writer::new(&mut data);
 
         temp_writer.write_u8(0)?; // Flags (0 for plain text)
         temp_writer.write_wide_string(s)?;
 
-        writer.write_record(record_types::SST_ITEM, &data)?;
+        writer.write_record(kind::SST_ITEM, &data)?;
         Ok(())
     }
 }
@@ -188,11 +188,11 @@ mod tests {
         table.add_string("other".to_string());
 
         let mut bytes = Vec::new();
-        table.write(&mut RecordWriter::new(&mut bytes)).unwrap();
-        let mut records = crate::xlsb::records::XlsbRecordIter::new(bytes.as_slice());
+        table.write(&mut Writer::new(&mut bytes)).unwrap();
+        let mut records = litchi_xlsb::raw::Records::new(bytes.as_slice());
         let begin = records.next().unwrap().unwrap();
-        assert_eq!(begin.header.record_type, record_types::BEGIN_SST);
-        assert_eq!(&begin.data[..4], &3u32.to_le_bytes());
-        assert_eq!(&begin.data[4..], &2u32.to_le_bytes());
+        assert_eq!(begin.kind(), kind::BEGIN_SST);
+        assert_eq!(&begin.payload()[..4], &3u32.to_le_bytes());
+        assert_eq!(&begin.payload()[4..], &2u32.to_le_bytes());
     }
 }

@@ -1,7 +1,7 @@
 //! XLSB rich shared-string parsing.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::wide_str_with_len;
+use crate::xlsb::records::decode_string;
 use litchi_core::binary;
 
 /// A font change within an XLSB shared string.
@@ -108,7 +108,7 @@ impl SharedString {
         }
         let rich = data[0] & 1 != 0;
         let extended = data[0] & 2 != 0;
-        let (text, consumed) = wide_str_with_len(&data[1..])?;
+        let (text, consumed) = decode_string(&data[1..])?;
         let text_len = text.encode_utf16().count();
         if text_len > 0x7FFF {
             return Err(XlsbError::Unrecognized {
@@ -154,7 +154,7 @@ impl SharedString {
         }
 
         let phonetic = if extended {
-            let (phonetic_text, consumed) = wide_str_with_len(&data[offset..])?;
+            let (phonetic_text, consumed) = decode_string(&data[offset..])?;
             offset += consumed;
             let phonetic_len = phonetic_text.encode_utf16().count();
             let count = Self::read_count(data, &mut offset, "PhRun")?;

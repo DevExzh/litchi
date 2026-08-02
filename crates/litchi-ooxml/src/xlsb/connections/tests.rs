@@ -2,8 +2,7 @@
 
 use super::model::*;
 use super::parse::parse_connections_part;
-use crate::xlsb::records::record_types as rt;
-use crate::xlsb::writer::RecordWriter;
+use litchi_xlsb::raw::{Kind, Writer, kind as rt};
 
 fn wide(value: &str) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(4 + value.len() * 2);
@@ -14,13 +13,13 @@ fn wide(value: &str) -> Vec<u8> {
     bytes
 }
 
-fn record(record_type: u16, payload: &[u8]) -> (u16, Vec<u8>) {
+fn record(record_type: Kind, payload: &[u8]) -> (Kind, Vec<u8>) {
     (record_type, payload.to_vec())
 }
 
-fn build(records: &[(u16, Vec<u8>)]) -> Vec<u8> {
+fn build(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = RecordWriter::new(&mut data);
+    let mut writer = Writer::new(&mut data);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -127,14 +126,14 @@ fn param_payload(pbt: u16, data_type: Option<u32>, name: &str, tail: &[u8]) -> V
     bytes
 }
 
-fn full_part(extra_connection_records: &[(u16, Vec<u8>)]) -> Vec<u8> {
+fn full_part(extra_connection_records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut records = vec![record(rt::BEGIN_EXT_CONNECTIONS, &[])];
     records.extend_from_slice(extra_connection_records);
     records.push(record(rt::END_EXT_CONNECTIONS, &[]));
     build(&records)
 }
 
-fn odbc_connection_records() -> Vec<(u16, Vec<u8>)> {
+fn odbc_connection_records() -> Vec<(Kind, Vec<u8>)> {
     vec![
         record(
             rt::BEGIN_EXT_CONNECTION,
@@ -240,9 +239,9 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
         ),
         record(rt::END_EC_WEB_PROPS, &[]),
         record(rt::BEGIN_EC_WP_TABLES, &[]),
-        record(20, &[]),                 // BrtPCDIMissing
-        record(24, &wide("results")),    // BrtPCDIString
-        record(26, &3u32.to_le_bytes()), // BrtPCDIIndex
+        record(rt::PCDI_MISSING, &[]),               // BrtPCDIMissing
+        record(rt::PCDI_STRING, &wide("results")),   // BrtPCDIString
+        record(rt::PCDI_INDEX, &3u32.to_le_bytes()), // BrtPCDIIndex
         record(rt::END_EC_WP_TABLES, &[]),
         record(rt::END_EXT_CONNECTION, &[]),
     ];
@@ -292,10 +291,10 @@ fn skips_unknown_records_and_extension_collections() {
         record(rt::END_EC_TXT_WIZ, &[]),
         // Excel 2014 extension collection with unknown children inside.
         record(rt::BEGIN_EXT_CONN14, &[0x01]),
-        record(0x7FFE, &[0x00, 0x00]),
+        record(Kind::new(0x3FFE).unwrap(), &[0x00, 0x00]),
         record(rt::END_EXT_CONN14, &[]),
         // Unknown standalone record.
-        record(0x7FFD, &[0x10, 0x20, 0x30]),
+        record(Kind::new(0x3FFD).unwrap(), &[0x10, 0x20, 0x30]),
         record(rt::END_EXT_CONNECTION, &[]),
     ];
     let mut part = vec![record(rt::BEGIN_EXT_CONNECTIONS, &[])];

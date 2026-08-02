@@ -7,9 +7,9 @@
 //! identifier to validate PivotChart and PivotCache relationships.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::{XlsbRecordHeader, record_types};
 use litchi_core::binary;
-use std::io::{Cursor, ErrorKind, Read};
+use litchi_xlsb::raw::{Header, Kind, Limits, kind};
+use std::io::{Cursor, Read};
 
 const MAX_PIVOT_TABLE_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_PIVOT_TABLE_RECORDS: usize = 1_000_000;
@@ -52,8 +52,8 @@ impl XlsbPivotTableViewPart {
                 ));
             }
             let record = read_complete_record(&mut cursor)?;
-            match record.record_type {
-                record_types::BEGIN_SX_VIEW => {
+            match record.kind {
+                kind::BEGIN_SX_VIEW => {
                     if begin.is_some() || count != 1 || ended {
                         return Err(XlsbError::InvalidFormula(
                             "PivotTable has duplicate or misplaced BrtBeginSXView".to_string(),
@@ -61,7 +61,7 @@ impl XlsbPivotTableViewPart {
                     }
                     begin = Some(parse_begin_view(&record.data)?);
                 },
-                record_types::END_SX_VIEW => {
+                kind::END_SX_VIEW => {
                     if begin.is_none() || ended || !record.data.is_empty() {
                         return Err(XlsbError::InvalidFormula(
                             "PivotTable has malformed BrtEndSXView".to_string(),
@@ -120,34 +120,30 @@ impl XlsbPivotTableViewPart {
 }
 
 struct CompleteRecord {
-    record_type: u16,
+    kind: Kind,
     data: Vec<u8>,
 }
 
 fn read_complete_record(cursor: &mut Cursor<&[u8]>) -> XlsbResult<CompleteRecord> {
     let start = cursor.position();
-    let header = XlsbRecordHeader::read(cursor).map_err(|error| match error {
-        XlsbError::Io(io_error) if io_error.kind() == ErrorKind::UnexpectedEof => {
-            XlsbError::InvalidFormula(format!(
-                "PivotTable has a truncated record header at byte {start}"
-            ))
-        },
-        other => other,
+    let header = Header::read(cursor, Limits::DEFAULT)?.ok_or_else(|| {
+        XlsbError::InvalidFormula(format!("PivotTable unexpectedly ended at byte {start}"))
     })?;
     let remaining = cursor
         .get_ref()
         .len()
         .saturating_sub(usize::try_from(cursor.position()).unwrap_or(usize::MAX));
-    if header.data_len > remaining {
+    if header.len() > remaining {
         return Err(XlsbError::InvalidFormula(format!(
             "PivotTable record {} declares {} bytes with only {remaining} remaining",
-            header.record_type, header.data_len
+            header.kind(),
+            header.len()
         )));
     }
-    let mut data = vec![0u8; header.data_len];
+    let mut data = vec![0u8; header.len()];
     cursor.read_exact(&mut data)?;
     Ok(CompleteRecord {
-        record_type: header.record_type,
+        kind: header.kind(),
         data,
     })
 }
@@ -160,7 +156,7 @@ fn parse_begin_view(data: &[u8]) -> XlsbResult<(String, u32, u8)> {
         });
     }
     let cache_id = binary::read_u32_le_at(data, 28)?;
-    let (name, consumed) = crate::xlsb::records::wide_str_with_len(&data[32..])?;
+    let (name, consumed) = crate::xlsb::records::decode_string(&data[32..])?;
     if consumed > data.len() - 32 {
         return Err(XlsbError::InvalidFormula(
             "PivotTable view name overruns BrtBeginSXView".to_string(),
@@ -178,7 +174,7 @@ fn parse_begin_view(data: &[u8]) -> XlsbResult<(String, u32, u8)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::writer::RecordWriter;
+    use litchi_xlsb::raw::Writer;
 
     fn view_stream(name: &str, cache_id: u32) -> Vec<u8> {
         let mut begin = vec![0u8; 32];
@@ -188,17 +184,13 @@ mod tests {
             begin.extend_from_slice(&unit.to_le_bytes());
         }
         let mut bytes = Vec::new();
-        let mut writer = RecordWriter::new(&mut bytes);
+        let mut writer = Writer::new(&mut bytes);
+        writer.write_record(kind::BEGIN_SX_VIEW, &begin).unwrap();
         writer
-            .write_record(record_types::BEGIN_SX_VIEW, &begin)
+            .write_record(kind::BEGIN_SX_LOCATION, &[0; 36])
             .unwrap();
-        writer
-            .write_record(record_types::BEGIN_SX_LOCATION, &[0; 36])
-            .unwrap();
-        writer
-            .write_record(record_types::END_SX_LOCATION, &[])
-            .unwrap();
-        writer.write_record(record_types::END_SX_VIEW, &[]).unwrap();
+        writer.write_record(kind::END_SX_LOCATION, &[]).unwrap();
+        writer.write_record(kind::END_SX_VIEW, &[]).unwrap();
         bytes
     }
 
@@ -219,8 +211,8 @@ mod tests {
         assert!(XlsbPivotTableViewPart::from_bytes(truncated).is_err());
 
         let mut trailing = view_stream("P", 1);
-        RecordWriter::new(&mut trailing)
-            .write_record(record_types::END_SX_LOCATION, &[])
+        Writer::new(&mut trailing)
+            .write_record(kind::END_SX_LOCATION, &[])
             .unwrap();
         assert!(XlsbPivotTableViewPart::from_bytes(trailing).is_err());
     }

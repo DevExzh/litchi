@@ -1,7 +1,8 @@
 use litchi_ooxml::OoxmlError;
 use litchi_ooxml::PackURI;
-use litchi_ooxml::pptx::{Package, RippleDirection, SlideTransition, TransitionType};
+use litchi_ooxml::pptx::Package;
 use litchi_opc::constants::relationship_type as rt;
+use litchi_pptx::transition::{Kind, Ms, Ripple, Transition};
 use tempfile::NamedTempFile;
 
 const LOCAL_P14_RIPPLE: &[u8] =
@@ -149,14 +150,9 @@ fn layout_master_accessor_rejects_external_master_relationships() {
     ));
 }
 
-fn assert_ripple(transition: &SlideTransition) {
-    assert_eq!(transition.duration_ms, Some(1500));
-    assert_eq!(
-        transition.transition_type,
-        TransitionType::Ripple {
-            direction: RippleDirection::LeftDown,
-        }
-    );
+fn assert_ripple(transition: &Transition) {
+    assert_eq!(transition.duration().map(Ms::get), Some(1500));
+    assert_eq!(transition.kind(), &Kind::Ripple(Ripple::LeftDown));
 }
 
 fn package_with_inherited_transition_fragment(fragment: &str) -> Package {

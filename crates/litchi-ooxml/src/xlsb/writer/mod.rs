@@ -36,9 +36,6 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-/// Binary record writer with variable-length encoding
-mod record;
-
 /// Shared strings table writer
 mod shared_strings;
 
@@ -84,7 +81,6 @@ pub use crate::xlsx::{
     XlsxTextVerticalAnchor, XlsxTextWrap,
 };
 pub use chartsheet::MutableXlsbChartSheet;
-pub use record::RecordWriter;
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};
 pub use workbook::XlsbWorkbookWriter;
