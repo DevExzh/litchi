@@ -1846,11 +1846,11 @@ impl<'a> Worksheet<'a> {
             .border_id
             .and_then(|id| styles.get_border(id as usize))
             .map(|b| CellBorder {
-                left: b.left.as_ref().map(&map_border_style),
-                right: b.right.as_ref().map(&map_border_style),
-                top: b.top.as_ref().map(&map_border_style),
-                bottom: b.bottom.as_ref().map(&map_border_style),
-                diagonal: b.diagonal.as_ref().map(&map_border_style),
+                left: b.left.as_ref().map(map_border_style),
+                right: b.right.as_ref().map(map_border_style),
+                top: b.top.as_ref().map(map_border_style),
+                bottom: b.bottom.as_ref().map(map_border_style),
+                diagonal: b.diagonal.as_ref().map(map_border_style),
             });
 
         let number_format = style
