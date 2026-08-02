@@ -6,8 +6,8 @@ use super::shape_group::XlsShapeGroupWrite;
 use super::{
     XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup,
     XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation,
-    XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
-    XlsPageSetupOptions,
+    XlsDataValidationBiffPayload, XlsDataValidationOptions, XlsDataValidationRange,
+    XlsDataValidationTableOptions, XlsPageSetupOptions,
 };
 use crate::writer::biff::AutoFilterConditionWrite;
 use crate::{XlsError, XlsResult};
@@ -82,10 +82,113 @@ impl WritableCell {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct MergedRange {
-    pub first_row: u32,
-    pub last_row: u32,
-    pub first_col: u16,
-    pub last_col: u16,
+    first: CellPos,
+    last: CellPos,
+}
+
+impl MergedRange {
+    pub(super) fn try_new(
+        first_row: u32,
+        last_row: u32,
+        first_col: u16,
+        last_col: u16,
+    ) -> XlsResult<Self> {
+        let first = CellPos::try_new(first_row, first_col)?;
+        let last = CellPos::try_new(last_row, last_col)?;
+        if first.row() > last.row() || first.col() > last.col() {
+            return Err(XlsError::InvalidCellReference(format!(
+                "range ({first_row}, {first_col})..=({last_row}, {last_col}) is reversed"
+            )));
+        }
+        Ok(Self { first, last })
+    }
+
+    pub(super) const fn fields(self) -> (u16, u16, u8, u8) {
+        (
+            self.first.row(),
+            self.last.row(),
+            self.first.col(),
+            self.last.col(),
+        )
+    }
+
+    pub(super) const fn overlaps(self, other: Self) -> bool {
+        self.first.row() <= other.last.row()
+            && other.first.row() <= self.last.row()
+            && self.first.col() <= other.last.col()
+            && other.first.col() <= self.last.col()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct HorizontalPageBreak {
+    row: u16,
+    col_start: u16,
+    col_end: u16,
+}
+
+impl HorizontalPageBreak {
+    pub(super) fn try_new(row: u32, col_start: u16, col_end: u16) -> XlsResult<Self> {
+        let row = u16::try_from(row).map_err(|_| {
+            XlsError::InvalidCellReference(format!(
+                "horizontal page-break row {row} is outside the BIFF8 grid"
+            ))
+        })?;
+        if col_end <= col_start || col_end > 16_383 {
+            return Err(XlsError::InvalidCellReference(format!(
+                "horizontal page-break columns {col_start}..={col_end} are outside the BIFF8 page-break bounds"
+            )));
+        }
+        Ok(Self {
+            row,
+            col_start,
+            col_end,
+        })
+    }
+
+    pub(super) const fn overlaps(self, other: Self) -> bool {
+        self.row == other.row && self.col_start <= other.col_end && other.col_start <= self.col_end
+    }
+
+    pub(super) const fn fields(self) -> (u16, u16, u16) {
+        (self.row, self.col_start, self.col_end)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct VerticalPageBreak {
+    col: u8,
+    row_start: u16,
+    row_end: u16,
+}
+
+impl VerticalPageBreak {
+    pub(super) fn try_new(col: u16, row_start: u32, row_end: u32) -> XlsResult<Self> {
+        let invalid = || {
+            XlsError::InvalidCellReference(format!(
+                "vertical page-break column {col}, rows {row_start}..={row_end} are outside the BIFF8 grid"
+            ))
+        };
+        let col = u8::try_from(col).map_err(|_| invalid())?;
+        let row_start = u16::try_from(row_start).map_err(|_| invalid())?;
+        let row_end = u16::try_from(row_end).map_err(|_| invalid())?;
+        if row_end <= row_start {
+            return Err(invalid());
+        }
+        Ok(Self {
+            col,
+            row_start,
+            row_end,
+        })
+    }
+
+    pub(super) const fn overlaps(self, other: Self) -> bool {
+        self.col == other.col && self.row_start <= other.row_end && other.row_start <= self.row_end
+    }
+
+    pub(super) const fn fields(self) -> (u16, u16, u16) {
+        (self.col as u16, self.row_start, self.row_end)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -106,6 +209,7 @@ pub(super) struct XlsSheetProtection {
 #[derive(Debug, Clone)]
 pub(super) struct WritableDataValidation {
     pub validation: XlsDataValidation,
+    pub payload: XlsDataValidationBiffPayload,
     pub ranges: Vec<XlsDataValidationRange>,
     pub options: XlsDataValidationOptions,
 }
@@ -157,8 +261,8 @@ pub(super) struct WritableWorksheet {
     pub sheet_protection: Option<XlsSheetProtection>,
     pub sheet_layout: super::XlsWorksheetLayoutOptions,
     pub page_setup: Option<XlsPageSetupOptions>,
-    pub horizontal_page_breaks: Vec<(u16, u16, u16)>,
-    pub vertical_page_breaks: Vec<(u16, u16, u16)>,
+    pub horizontal_page_breaks: Vec<HorizontalPageBreak>,
+    pub vertical_page_breaks: Vec<VerticalPageBreak>,
     pub auto_filter: Option<AutoFilterRange>,
     /// Cell or range hyperlinks stored for this worksheet.
     pub hyperlinks: Vec<XlsHyperlink>,
@@ -297,11 +401,13 @@ impl WritableWorksheet {
     pub(super) fn add_data_validation(
         &mut self,
         validation: XlsDataValidation,
+        payload: XlsDataValidationBiffPayload,
         ranges: Vec<XlsDataValidationRange>,
         options: XlsDataValidationOptions,
     ) {
         self.data_validations.push(WritableDataValidation {
             validation,
+            payload,
             ranges,
             options,
         });
@@ -328,10 +434,8 @@ impl WritableWorksheet {
         self.conditional_formats12.push(group);
     }
 
-    pub(super) fn set_freeze_panes(&mut self, freeze_rows: u32, freeze_cols: u16) {
-        self.view
-            .set_frozen(freeze_rows as u16, freeze_cols as u8)
-            .expect("freeze pane bounds validated by public API");
+    pub(super) fn set_freeze_panes(&mut self, freeze_rows: u16, freeze_cols: u8) -> XlsResult<()> {
+        self.view.set_frozen(freeze_rows, freeze_cols)
     }
 
     pub(super) fn clear_freeze_panes(&mut self) {

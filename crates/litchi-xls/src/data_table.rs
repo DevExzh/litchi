@@ -79,13 +79,25 @@ pub enum XlsDataTableInputCell {
         /// Row of the input cell.
         row: u16,
         /// Column of the input cell.
-        col: u16,
+        col: u8,
     },
     /// The referenced input cell has been deleted (`fDeleted1`/`fDeleted2`).
     Deleted,
 }
 
 impl XlsDataTableInputCell {
+    /// Create a present input-cell reference from zero-based raw indices.
+    pub fn present(row: u32, col: u16) -> XlsResult<Self> {
+        let invalid = || {
+            XlsError::InvalidCellReference(format!(
+                "data-table input row {row}, column {col} is outside the BIFF8 grid"
+            ))
+        };
+        let row = u16::try_from(row).map_err(|_| invalid())?;
+        let col = u8::try_from(col).map_err(|_| invalid())?;
+        Ok(Self::Present { row, col })
+    }
+
     fn decode(row: u16, col: u16, deleted: bool) -> XlsResult<Self> {
         if deleted {
             if row != DELETED_COORDINATE || col != DELETED_COORDINATE {
@@ -93,15 +105,14 @@ impl XlsDataTableInputCell {
             }
             return Ok(Self::Deleted);
         }
-        if col == DELETED_COORDINATE {
-            return Err(invalid("input cell column must be nonnegative"));
-        }
+        let col =
+            u8::try_from(col).map_err(|_| invalid("input cell column exceeds the BIFF8 grid"))?;
         Ok(Self::Present { row, col })
     }
 
     fn encode(self) -> (u16, u16, bool) {
         match self {
-            Self::Present { row, col } => (row, col, false),
+            Self::Present { row, col } => (row, u16::from(col), false),
             Self::Deleted => (DELETED_COORDINATE, DELETED_COORDINATE, true),
         }
     }
@@ -378,6 +389,15 @@ mod tests {
         )
         .to_payload();
         payload[6] |= 0x10;
+        assert!(XlsDataTable::parse(&payload).is_err());
+        // A present input column outside the BIFF8 cell grid.
+        let mut payload = XlsDataTable::one_variable(
+            range(),
+            false,
+            XlsDataTableInputCell::Present { row: 1, col: 2 },
+        )
+        .to_payload();
+        payload[10..12].copy_from_slice(&256u16.to_le_bytes());
         assert!(XlsDataTable::parse(&payload).is_err());
         // Reversed or zero-based range.
         assert!(XlsDataTableRange::new(5, 2, 3, 3).is_err());

@@ -58,6 +58,7 @@ pub use self::conditional_format::{
     XlsConditionalFormatRange, XlsConditionalFormatRule, XlsConditionalFormatType,
     XlsConditionalPattern,
 };
+use self::data_validation::XlsDataValidationBiffPayload;
 pub use self::data_validation::{
     XlsDataValidation, XlsDataValidationErrorStyle, XlsDataValidationFormulaKind,
     XlsDataValidationImeMode, XlsDataValidationOperator, XlsDataValidationOptions,
@@ -71,9 +72,10 @@ pub use self::shape::{
 };
 pub use self::shape_group::{XlsGroupRect, XlsShapeGroupChild, XlsShapeGroupWrite};
 use self::worksheet::{
-    AutoFilterColumnDef, AutoFilterRange, CellPos, MergedRange, PivotCellXfRole, SortConfig,
-    WritableCell, WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
-    WritableWorksheet, XlsHyperlink, XlsSheetProtection,
+    AutoFilterColumnDef, AutoFilterRange, CellPos, HorizontalPageBreak, MergedRange,
+    PivotCellXfRole, SortConfig, VerticalPageBreak, WritableCell, WritablePivotDataItem,
+    WritablePivotField, WritablePivotItem, WritablePivotTable, WritableWorksheet, XlsHyperlink,
+    XlsSheetProtection,
 };
 
 /// Public configuration for adding a pivot table via [`XlsWriter::add_pivot_table`].
@@ -190,9 +192,28 @@ impl PivotCacheValue {
 fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
     if config.source_first_row > config.source_last_row
         || config.source_first_col > config.source_last_col
+        || config.first_row > config.last_row
+        || config.first_col > config.last_col
     {
-        return Err(XlsError::InvalidData(
-            "PivotTable source range is reversed".to_string(),
+        return Err(XlsError::InvalidCellReference(
+            "PivotTable source or output range is reversed".to_string(),
+        ));
+    }
+    if [
+        config.source_first_col,
+        config.source_last_col,
+        config.first_col,
+        config.last_col,
+        config.first_data_col,
+    ]
+    .into_iter()
+    .any(|col| col > u16::from(u8::MAX))
+        || !(config.first_row..=config.last_row).contains(&config.first_header_row)
+        || !(config.first_row..=config.last_row).contains(&config.first_data_row)
+        || !(config.first_col..=config.last_col).contains(&config.first_data_col)
+    {
+        return Err(XlsError::InvalidCellReference(
+            "PivotTable location is outside its BIFF8 output grid".to_string(),
         ));
     }
     u16::try_from(config.fields.len()).map_err(|_| {
@@ -1264,6 +1285,40 @@ fn validate_list_object_relationships(
     Ok(())
 }
 
+fn prepare_data_validation(
+    validation: &XlsDataValidation,
+) -> XlsResult<XlsDataValidationBiffPayload> {
+    if let Some(title) = validation.input_title.as_ref()
+        && title.encode_utf16().count() > 32
+    {
+        return Err(XlsError::InvalidData(
+            "Input message title must be at most 32 characters".to_string(),
+        ));
+    }
+    if let Some(text) = validation.input_message.as_ref()
+        && text.encode_utf16().count() > 255
+    {
+        return Err(XlsError::InvalidData(
+            "Input message text must be at most 255 characters".to_string(),
+        ));
+    }
+    if let Some(title) = validation.error_title.as_ref()
+        && title.encode_utf16().count() > 32
+    {
+        return Err(XlsError::InvalidData(
+            "Error message title must be at most 32 characters".to_string(),
+        ));
+    }
+    if let Some(text) = validation.error_message.as_ref()
+        && text.encode_utf16().count() > 225
+    {
+        return Err(XlsError::InvalidData(
+            "Error message text must be at most 225 characters".to_string(),
+        ));
+    }
+    validation.validation_type.to_biff_payload()
+}
+
 /// XLS file writer
 ///
 /// Provides methods to create and modify XLS (BIFF8) files.
@@ -1986,74 +2041,62 @@ impl XlsWriter {
         first_col: u16,
         last_col: u16,
     ) -> XlsResult<()> {
-        if first_row > last_row || first_col > last_col {
-            return Err(XlsError::InvalidData(
-                "set_auto_filter: first row/col must be <= last row/col".to_string(),
-            ));
-        }
-
-        if last_row > u16::MAX as u32 {
-            return Err(XlsError::InvalidData(
-                "set_auto_filter: row index must be <= 65535 for BIFF8".to_string(),
-            ));
-        }
-
-        if last_col >= 256 {
-            return Err(XlsError::InvalidData(
-                "set_auto_filter: column index must be < 256 for BIFF8".to_string(),
-            ));
-        }
-
-        if let Some(worksheet) = self.worksheets.get(sheet)
-            && worksheet.list_objects.iter().any(|table| {
-                first_row <= u32::from(table.range().last_row())
-                    && u32::from(table.range().first_row()) <= last_row
-                    && first_col <= table.range().last_column()
-                    && table.range().first_column() <= last_col
-            })
-        {
+        MergedRange::try_new(first_row, last_row, first_col, last_col)?;
+        let worksheet = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        if worksheet.list_objects.iter().any(|table| {
+            first_row <= u32::from(table.range().last_row())
+                && u32::from(table.range().first_row()) <= last_row
+                && first_col <= table.range().last_column()
+                && table.range().first_column() <= last_col
+        }) {
             return Err(XlsError::InvalidData(
                 "set_auto_filter: range overlaps a worksheet table".to_string(),
             ));
         }
+        let itab = sheet
+            .checked_add(1)
+            .and_then(|index| u16::try_from(index).ok())
+            .ok_or_else(|| {
+                XlsError::InvalidData(
+                    "set_auto_filter: sheet index exceeds BIFF8 itab limit".to_string(),
+                )
+            })?;
+        let target_sheet = u16::try_from(sheet).map_err(|_| {
+            XlsError::InvalidData("set_auto_filter: sheet index exceeds BIFF8 limit".to_string())
+        })?;
+
+        let start_ref = a1_cell(first_row, first_col);
+        let end_ref = a1_cell(last_row, last_col);
+        let reference = format!("{start_ref}:{end_ref}");
+        let defined_name = InternalDefinedName {
+            name: "_FilterDatabase".to_string(),
+            reference,
+            comment: None,
+            local_sheet: Some(itab),
+            target_sheet: Some(target_sheet),
+            hidden: true,
+            is_function: false,
+            is_built_in: true,
+            built_in_code: Some(0x0D),
+        };
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.auto_filter = Some(AutoFilterRange {
             first_row,
             last_row,
             first_col,
             last_col,
         });
-
-        let itab = u16::try_from(sheet + 1).map_err(|_| {
-            XlsError::InvalidData(
-                "set_auto_filter: sheet index exceeds BIFF8 itab limit".to_string(),
-            )
-        })?;
-
         self.defined_names.retain(|n| {
             !(n.is_built_in && n.built_in_code == Some(0x0D) && n.local_sheet == Some(itab))
         });
-
-        let start_ref = a1_cell(first_row, first_col);
-        let end_ref = a1_cell(last_row, last_col);
-        let reference = format!("{start_ref}:{end_ref}");
-
-        self.defined_names.push(InternalDefinedName {
-            name: "_FilterDatabase".to_string(),
-            reference,
-            comment: None,
-            local_sheet: Some(itab),
-            target_sheet: Some(sheet as u16),
-            hidden: true,
-            is_function: false,
-            is_built_in: true,
-            built_in_code: Some(0x0D),
-        });
+        self.defined_names.push(defined_name);
 
         Ok(())
     }
@@ -2096,9 +2139,24 @@ impl XlsWriter {
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
-        if worksheet.auto_filter.is_none() {
+        let Some(filter) = worksheet.auto_filter else {
             return Err(XlsError::InvalidData(
                 "add_filter_condition: call set_auto_filter first".to_string(),
+            ));
+        };
+        let width = filter.last_col - filter.first_col + 1;
+        if column_index >= width {
+            return Err(XlsError::InvalidCellReference(format!(
+                "AutoFilter relative column {column_index} exceeds its {width}-column range"
+            )));
+        }
+        if worksheet
+            .auto_filter_columns
+            .iter()
+            .any(|entry| entry.column_index == column_index)
+        {
+            return Err(XlsError::InvalidData(
+                "AutoFilter column already has a condition".to_string(),
             ));
         }
 
@@ -2130,6 +2188,11 @@ impl XlsWriter {
         if keys.is_empty() || keys.len() > 3 {
             return Err(XlsError::InvalidData(
                 "set_sort: must provide 1..3 sort keys".to_string(),
+            ));
+        }
+        if keys.iter().any(|(col, _)| *col > u16::from(u8::MAX)) {
+            return Err(XlsError::InvalidCellReference(
+                "sort key column is outside the BIFF8 grid".to_string(),
             ));
         }
 
@@ -2756,23 +2819,24 @@ impl XlsWriter {
         first_col: u16,
         last_col: u16,
     ) -> XlsResult<()> {
-        if first_row > last_row || first_col > last_col {
-            return Err(XlsError::InvalidData(
-                "merge_cells: first row/col must be <= last row/col".to_string(),
-            ));
-        }
+        let range = MergedRange::try_new(first_row, last_row, first_col, last_col)?;
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
-        worksheet.add_merged_range(MergedRange {
-            first_row,
-            last_row,
-            first_col,
-            last_col,
-        });
+        if worksheet
+            .merged_ranges
+            .iter()
+            .any(|existing| range.overlaps(*existing))
+        {
+            return Err(XlsError::InvalidData(
+                "merged-cell ranges overlap".to_string(),
+            ));
+        }
+
+        worksheet.add_merged_range(range);
 
         Ok(())
     }
@@ -2787,29 +2851,27 @@ impl XlsWriter {
         freeze_rows: u32,
         freeze_cols: u16,
     ) -> XlsResult<()> {
-        let worksheet = self
-            .worksheets
-            .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-
         if freeze_rows == 0 && freeze_cols == 0 {
+            let worksheet = self
+                .worksheets
+                .get_mut(sheet)
+                .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
             worksheet.clear_freeze_panes();
             return Ok(());
         }
-
-        if freeze_rows > u16::MAX as u32 {
-            return Err(XlsError::InvalidData(
-                "freeze_panes: freeze_rows must be <= 65535".to_string(),
-            ));
-        }
-        if freeze_cols > u8::MAX as u16 {
-            return Err(XlsError::InvalidData(
-                "freeze_panes: freeze_cols must be <= 255".to_string(),
-            ));
-        }
-
-        worksheet.set_freeze_panes(freeze_rows, freeze_cols);
-        Ok(())
+        let freeze_rows = u16::try_from(freeze_rows).map_err(|_| {
+            XlsError::InvalidCellReference("freeze-panes row is outside the BIFF8 grid".to_string())
+        })?;
+        let freeze_cols = u8::try_from(freeze_cols).map_err(|_| {
+            XlsError::InvalidCellReference(
+                "freeze-panes column is outside the BIFF8 grid".to_string(),
+            )
+        })?;
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        worksheet.set_freeze_panes(freeze_rows, freeze_cols)
     }
 
     /// Remove any freeze panes from the specified worksheet.
@@ -2961,57 +3023,20 @@ impl XlsWriter {
         sheet: usize,
         validation: XlsDataValidation,
     ) -> XlsResult<()> {
-        if validation.first_row > validation.last_row
-            || validation.first_col > validation.last_col
-            || validation.last_row > 65_535
-            || validation.last_col > 255
-        {
-            return Err(XlsError::InvalidData(
-                "add_data_validation: first row/col must be <= last row/col".to_string(),
-            ));
-        }
-
-        if let Some(title) = validation.input_title.as_ref()
-            && title.encode_utf16().count() > 32
-        {
-            return Err(XlsError::InvalidData(
-                "Input message title must be at most 32 characters".to_string(),
-            ));
-        }
-        if let Some(text) = validation.input_message.as_ref()
-            && text.encode_utf16().count() > 255
-        {
-            return Err(XlsError::InvalidData(
-                "Input message text must be at most 255 characters".to_string(),
-            ));
-        }
-        if let Some(title) = validation.error_title.as_ref()
-            && title.encode_utf16().count() > 32
-        {
-            return Err(XlsError::InvalidData(
-                "Error message title must be at most 32 characters".to_string(),
-            ));
-        }
-        if let Some(text) = validation.error_message.as_ref()
-            && text.encode_utf16().count() > 225
-        {
-            return Err(XlsError::InvalidData(
-                "Error message text must be at most 225 characters".to_string(),
-            ));
-        }
+        let payload = prepare_data_validation(&validation)?;
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
-        let range = XlsDataValidationRange {
-            first_row: validation.first_row,
-            last_row: validation.last_row,
-            first_col: validation.first_col,
-            last_col: validation.last_col,
-        };
-        worksheet.add_data_validation(validation, vec![range], XlsDataValidationOptions::default());
+        let range = validation.range;
+        worksheet.add_data_validation(
+            validation,
+            payload,
+            vec![range],
+            XlsDataValidationOptions::default(),
+        );
 
         Ok(())
     }
@@ -3024,29 +3049,23 @@ impl XlsWriter {
         additional_ranges: &[XlsDataValidationRange],
         options: XlsDataValidationOptions,
     ) -> XlsResult<()> {
-        self.add_data_validation(sheet, validation)?;
-        let worksheet = self.worksheets.get_mut(sheet).unwrap();
-        let written = worksheet.data_validations.last_mut().unwrap();
-        if written.ranges.len() + additional_ranges.len() > 432 {
-            worksheet.data_validations.pop();
+        let payload = prepare_data_validation(&validation)?;
+        let range_count = 1usize
+            .checked_add(additional_ranges.len())
+            .ok_or_else(|| XlsError::InvalidData("DV range count overflows".to_string()))?;
+        if range_count > 432 {
             return Err(XlsError::InvalidData(
                 "DV range count exceeds 432".to_string(),
             ));
         }
-        for range in additional_ranges {
-            if range.first_row > range.last_row
-                || range.first_col > range.last_col
-                || range.last_row > 65_535
-                || range.last_col > 255
-            {
-                worksheet.data_validations.pop();
-                return Err(XlsError::InvalidData(
-                    "DV contains an invalid target range".to_string(),
-                ));
-            }
-        }
-        written.ranges.extend_from_slice(additional_ranges);
-        written.options = options;
+        let mut ranges = Vec::with_capacity(range_count);
+        ranges.push(validation.range);
+        ranges.extend_from_slice(additional_ranges);
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        worksheet.add_data_validation(validation, payload, ranges, options);
         Ok(())
     }
 
@@ -3305,14 +3324,27 @@ impl XlsWriter {
     /// [`crate::XlsRealTimeData::common_prefix_len`] and store only the
     /// trailing sub-strings in `topic_segments`, matching the on-disk prefix
     /// compression.
-    pub fn add_real_time_data(&mut self, topic: crate::XlsRealTimeData) {
+    pub fn add_real_time_data(&mut self, topic: crate::XlsRealTimeData) -> XlsResult<()> {
+        if let Some(cell) = topic
+            .cells
+            .iter()
+            .find(|cell| usize::from(cell.sheet_index) >= self.worksheets.len())
+        {
+            return Err(XlsError::WorksheetNotFound(format!(
+                "Sheet {}",
+                cell.sheet_index
+            )));
+        }
         self.real_time_data.push(topic);
+        Ok(())
     }
 
     /// Append a Web page published from the workbook globals, emitted as a
     /// `WebPub` record (MS-XLS 2.4.344).
-    pub fn add_web_publication(&mut self, publication: crate::XlsWebPub) {
+    pub fn add_web_publication(&mut self, publication: crate::XlsWebPub) -> XlsResult<()> {
+        publication.validate_for_write()?;
         self.web_publications.push(publication);
+        Ok(())
     }
 
     /// Append a Web page published from a worksheet, emitted as a `WebPub`
@@ -3322,6 +3354,7 @@ impl XlsWriter {
         sheet: usize,
         publication: crate::XlsWebPub,
     ) -> XlsResult<()> {
+        publication.validate_for_write()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
@@ -3783,27 +3816,30 @@ impl XlsWriter {
     pub fn add_horizontal_page_break(
         &mut self,
         sheet: usize,
-        row: u16,
+        row: u32,
         col_start: u16,
         col_end: u16,
     ) -> XlsResult<()> {
-        if col_end <= col_start || col_end > 16383 {
-            return Err(XlsError::InvalidData(
-                "horizontal page-break columns are invalid".to_string(),
-            ));
-        }
+        let page_break = HorizontalPageBreak::try_new(row, col_start, col_end)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        if worksheet.horizontal_page_breaks.len() == 1026 {
+        if worksheet.horizontal_page_breaks.len() >= 1026 {
             return Err(XlsError::InvalidData(
                 "horizontal page-break count exceeds 1026".to_string(),
             ));
         }
-        worksheet
+        if worksheet
             .horizontal_page_breaks
-            .push((row, col_start, col_end));
+            .iter()
+            .any(|existing| page_break.overlaps(*existing))
+        {
+            return Err(XlsError::InvalidData(
+                "horizontal page-break ranges overlap".to_string(),
+            ));
+        }
+        worksheet.horizontal_page_breaks.push(page_break);
         Ok(())
     }
 
@@ -3812,26 +3848,29 @@ impl XlsWriter {
         &mut self,
         sheet: usize,
         column: u16,
-        row_start: u16,
-        row_end: u16,
+        row_start: u32,
+        row_end: u32,
     ) -> XlsResult<()> {
-        if column > 255 || row_end <= row_start {
-            return Err(XlsError::InvalidData(
-                "vertical page-break range is invalid".to_string(),
-            ));
-        }
+        let page_break = VerticalPageBreak::try_new(column, row_start, row_end)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        if worksheet.vertical_page_breaks.len() == 255 {
+        if worksheet.vertical_page_breaks.len() >= 255 {
             return Err(XlsError::InvalidData(
                 "vertical page-break count exceeds 255".to_string(),
             ));
         }
-        worksheet
+        if worksheet
             .vertical_page_breaks
-            .push((column, row_start, row_end));
+            .iter()
+            .any(|existing| page_break.overlaps(*existing))
+        {
+            return Err(XlsError::InvalidData(
+                "vertical page-break ranges overlap".to_string(),
+            ));
+        }
+        worksheet.vertical_page_breaks.push(page_break);
         Ok(())
     }
 
@@ -4325,6 +4364,338 @@ mod tests {
     }
 
     #[test]
+    fn worksheet_location_bounds_are_atomic_and_never_unwind() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Grid").unwrap();
+
+        writer.merge_cells(sheet, 65_534, 65_535, 254, 255).unwrap();
+        writer
+            .add_horizontal_page_break(sheet, 65_535, 0, 16_383)
+            .unwrap();
+        writer
+            .add_vertical_page_break(sheet, 255, 0, 65_535)
+            .unwrap();
+        let max_range = XlsDataValidationRange::new(65_535, 65_535, 255, 255).unwrap();
+        writer
+            .add_data_validation(
+                sheet,
+                XlsDataValidation::new(max_range, XlsDataValidationType::Any),
+            )
+            .unwrap();
+
+        let state = |writer: &XlsWriter| {
+            let worksheet = &writer.worksheets[sheet];
+            (
+                worksheet.merged_ranges.len(),
+                worksheet.horizontal_page_breaks.len(),
+                worksheet.vertical_page_breaks.len(),
+                worksheet.data_validations.len(),
+                writer.real_time_data.len(),
+                writer.web_publications.len(),
+            )
+        };
+        let max_state = (1, 1, 1, 1, 0, 0);
+        assert_eq!(state(&writer), max_state);
+
+        for outcome in [
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.merge_cells(sheet, 65_536, 65_536, 0, 0)
+            })),
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.merge_cells(sheet, 0, 0, 256, 256)
+            })),
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.merge_cells(sheet, 2, 1, 0, 0)
+            })),
+        ] {
+            assert!(matches!(
+                outcome,
+                Ok(Err(XlsError::InvalidCellReference(_)))
+            ));
+            assert_eq!(state(&writer), max_state);
+        }
+        let merge_overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.merge_cells(sheet, 65_535, 65_535, 255, 255)
+        }));
+        assert!(matches!(merge_overlap, Ok(Err(XlsError::InvalidData(_)))));
+        assert_eq!(state(&writer), max_state);
+
+        for outcome in [
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.add_horizontal_page_break(sheet, 65_536, 0, 1)
+            })),
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.add_horizontal_page_break(sheet, 0, 0, 16_384)
+            })),
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.add_vertical_page_break(sheet, 256, 0, 1)
+            })),
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.add_vertical_page_break(sheet, 0, 0, 65_536)
+            })),
+        ] {
+            assert!(matches!(
+                outcome,
+                Ok(Err(XlsError::InvalidCellReference(_)))
+            ));
+            assert_eq!(state(&writer), max_state);
+        }
+
+        let overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_horizontal_page_break(sheet, 65_535, 1, 2)
+        }));
+        assert!(matches!(overlap, Ok(Err(XlsError::InvalidData(_)))));
+        assert_eq!(state(&writer), max_state);
+        let overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_vertical_page_break(sheet, 255, 1, 2)
+        }));
+        assert!(matches!(overlap, Ok(Err(XlsError::InvalidData(_)))));
+        assert_eq!(state(&writer), max_state);
+
+        for outcome in [
+            std::panic::catch_unwind(|| XlsDataValidationRange::new(65_536, 65_536, 0, 0)),
+            std::panic::catch_unwind(|| XlsDataValidationRange::new(0, 0, 256, 256)),
+            std::panic::catch_unwind(|| XlsDataValidationRange::new(1, 0, 0, 0)),
+        ] {
+            assert!(matches!(
+                outcome,
+                Ok(Err(XlsError::InvalidCellReference(_)))
+            ));
+            assert_eq!(state(&writer), max_state);
+        }
+
+        let too_many_ranges = vec![max_range; 432];
+        let count_error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_data_validation_with_options(
+                sheet,
+                XlsDataValidation::new(max_range, XlsDataValidationType::Any),
+                &too_many_ranges,
+                XlsDataValidationOptions::default(),
+            )
+        }));
+        assert!(matches!(count_error, Ok(Err(XlsError::InvalidData(_)))));
+        assert_eq!(state(&writer), max_state);
+
+        let invalid_rule = XlsDataValidation::new(
+            max_range,
+            XlsDataValidationType::Whole {
+                operator: XlsDataValidationOperator::Between,
+                value1: 1,
+                value2: None,
+            },
+        );
+        let rule_error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_data_validation(sheet, invalid_rule)
+        }));
+        assert!(matches!(rule_error, Ok(Err(XlsError::InvalidData(_)))));
+        assert_eq!(state(&writer), max_state);
+
+        assert!(matches!(
+            crate::XlsDataTableInputCell::present(65_535, 255),
+            Ok(crate::XlsDataTableInputCell::Present {
+                row: 65_535,
+                col: 255
+            })
+        ));
+        for outcome in [
+            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(65_536, 0)),
+            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(u32::MAX, 0)),
+            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(0, 256)),
+            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(0, u16::MAX)),
+        ] {
+            assert!(matches!(
+                outcome,
+                Ok(Err(XlsError::InvalidCellReference(_)))
+            ));
+            assert_eq!(state(&writer), max_state);
+        }
+        let invalid_publication = crate::XlsWebPub {
+            source: crate::XlsWebSourceType::Workbook,
+            page_type: crate::XlsWebPageType::ViewOnly,
+            range: Some(crate::XlsWebPubRange::new(0, 0, 0, 0).unwrap()),
+            auto_republish: false,
+            single_file: false,
+            style_id: 1,
+            source_name: None,
+            file_destination: "x.htm".to_string(),
+            div_id: String::new(),
+            title: "x".to_string(),
+            chart_shape_id: None,
+            reserved: Vec::new(),
+        };
+        let invalid_publication = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_web_publication(invalid_publication)
+        }));
+        assert!(matches!(
+            invalid_publication,
+            Ok(Err(XlsError::InvalidData(_)))
+        ));
+        assert_eq!(state(&writer), max_state);
+
+        for outcome in [
+            std::panic::catch_unwind(|| crate::XlsWebPubRange::new(65_536, 65_536, 0, 0)),
+            std::panic::catch_unwind(|| crate::XlsWebPubRange::new(0, 0, 256, 256)),
+            std::panic::catch_unwind(|| crate::XlsWebPubRange::new(1, 0, 0, 0)),
+        ] {
+            assert!(matches!(
+                outcome,
+                Ok(Err(XlsError::InvalidCellReference(_)))
+            ));
+            assert_eq!(state(&writer), max_state);
+        }
+
+        for outcome in [
+            std::panic::catch_unwind(|| crate::XlsRtdCell::new(65_536, 0, 0)),
+            std::panic::catch_unwind(|| crate::XlsRtdCell::new(0, 256, 0)),
+        ] {
+            assert!(matches!(
+                outcome,
+                Ok(Err(XlsError::InvalidCellReference(_)))
+            ));
+            assert_eq!(state(&writer), max_state);
+        }
+        let invalid_topic = crate::XlsRealTimeData {
+            common_prefix_len: 0,
+            topic_segments: vec!["server".to_string(), String::new()],
+            topic: "server".to_string(),
+            value: crate::XlsRtdValue::Integer(1),
+            cells: vec![crate::XlsRtdCell::new(0, 0, 1).unwrap()],
+        };
+        let missing_sheet = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_real_time_data(invalid_topic)
+        }));
+        assert!(matches!(
+            missing_sheet,
+            Ok(Err(XlsError::WorksheetNotFound(_)))
+        ));
+        assert_eq!(state(&writer), max_state);
+
+        writer
+            .set_page_setup(sheet, XlsPageSetupOptions::default())
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.set_position(0);
+        let workbook = crate::XlsWorkbook::new(output).unwrap();
+        let worksheet = workbook.xls_worksheet(sheet).unwrap();
+        assert!(
+            worksheet
+                .merged_cells()
+                .iter()
+                .any(|range| range.first_row == 65_534
+                    && range.last_row == 65_535
+                    && range.first_col == 254
+                    && range.last_col == 255)
+        );
+        let page_setup = worksheet.page_setup().unwrap();
+        assert_eq!(page_setup.horizontal_page_breaks()[0].position(), 65_535);
+        assert_eq!(page_setup.horizontal_page_breaks()[0].range_end(), 16_383);
+        assert_eq!(page_setup.vertical_page_breaks()[0].position(), 255);
+        assert_eq!(page_setup.vertical_page_breaks()[0].range_end(), 65_535);
+    }
+
+    #[test]
+    fn filter_sort_and_pivot_locations_fail_before_mutation() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Locations").unwrap();
+        writer.set_auto_filter(sheet, 0, 65_535, 0, 255).unwrap();
+        let filter_state = |writer: &XlsWriter| {
+            let worksheet = &writer.worksheets[sheet];
+            (
+                worksheet.auto_filter.map(|range| {
+                    (
+                        range.first_row,
+                        range.last_row,
+                        range.first_col,
+                        range.last_col,
+                    )
+                }),
+                worksheet.auto_filter_columns.len(),
+                worksheet.sort_config.is_some(),
+                worksheet.pivot_tables.len(),
+                worksheet.cells.len(),
+                writer.defined_names.len(),
+            )
+        };
+        let initial = (Some((0, 65_535, 0, 255)), 0, false, 0, 0, 1);
+        assert_eq!(filter_state(&writer), initial);
+
+        for outcome in [
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.set_auto_filter(sheet, 0, 65_536, 0, 0)
+            })),
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.set_auto_filter(sheet, 0, 0, 0, 256)
+            })),
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.set_auto_filter(sheet, 1, 0, 0, 0)
+            })),
+        ] {
+            assert!(matches!(
+                outcome,
+                Ok(Err(XlsError::InvalidCellReference(_)))
+            ));
+            assert_eq!(filter_state(&writer), initial);
+        }
+
+        let invalid_filter = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_filter_condition(
+                sheet,
+                256,
+                false,
+                AutoFilterConditionWrite::None,
+                AutoFilterConditionWrite::None,
+            )
+        }));
+        assert!(matches!(
+            invalid_filter,
+            Ok(Err(XlsError::InvalidCellReference(_)))
+        ));
+        assert_eq!(filter_state(&writer), initial);
+
+        let invalid_sort = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.set_sort(sheet, false, false, &[(256, false)])
+        }));
+        assert!(matches!(
+            invalid_sort,
+            Ok(Err(XlsError::InvalidCellReference(_)))
+        ));
+        assert_eq!(filter_state(&writer), initial);
+
+        let invalid_pivot = XlsPivotTableConfig {
+            name: "InvalidPivot".to_string(),
+            source_type: 1,
+            source_sheet_name: "Locations".to_string(),
+            source_first_row: 0,
+            source_last_row: 0,
+            source_first_col: 0,
+            source_last_col: 256,
+            first_row: 0,
+            last_row: 1,
+            first_col: 0,
+            last_col: 1,
+            first_header_row: 0,
+            first_data_row: 1,
+            first_data_col: 1,
+            data_field_name: "Values".to_string(),
+            data_axis: 0,
+            data_position: 0,
+            fields: Vec::new(),
+            data_items: Vec::new(),
+            page_entries: Vec::new(),
+            source_data: Vec::new(),
+        };
+        let invalid_pivot = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_pivot_table(sheet, invalid_pivot)
+        }));
+        assert!(matches!(
+            invalid_pivot,
+            Ok(Err(XlsError::InvalidCellReference(_)))
+        ));
+        assert_eq!(filter_state(&writer), initial);
+    }
+
+    #[test]
     fn test_write_boolean() {
         let mut writer = XlsWriter::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
@@ -4554,24 +4925,16 @@ mod tests {
     #[test]
     fn test_writableworksheet_merge_cells() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        ws.add_merged_range(super::MergedRange {
-            first_row: 0,
-            last_row: 1,
-            first_col: 0,
-            last_col: 2,
-        }); // Merge A1:C2
+        ws.add_merged_range(super::MergedRange::try_new(0, 1, 0, 2).unwrap()); // Merge A1:C2
         assert_eq!(ws.merged_ranges.len(), 1);
-        assert_eq!(ws.merged_ranges[0].first_row, 0);
-        assert_eq!(ws.merged_ranges[0].last_row, 1);
-        assert_eq!(ws.merged_ranges[0].first_col, 0);
-        assert_eq!(ws.merged_ranges[0].last_col, 2);
+        assert_eq!(ws.merged_ranges[0].fields(), (0, 1, 0, 2));
     }
 
     #[test]
     fn test_writableworksheet_freeze_panes() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
         assert!(ws.view.pane.is_none());
-        ws.set_freeze_panes(1, 2);
+        ws.set_freeze_panes(1, 2).unwrap();
         let pane = ws.view.pane.unwrap();
         assert_eq!(pane.vertical_split, 1);
         assert_eq!(pane.horizontal_split, 2);
@@ -4598,10 +4961,7 @@ mod tests {
     fn test_writableworksheet_add_data_validation() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
         let dv = XlsDataValidation {
-            first_row: 0,
-            last_row: 10,
-            first_col: 0,
-            last_col: 0,
+            range: XlsDataValidationRange::new(0, 10, 0, 0).unwrap(),
             validation_type: super::XlsDataValidationType::List {
                 values: vec!["Option1".to_string(), "Option2".to_string()],
             },
@@ -4612,14 +4972,11 @@ mod tests {
             error_title: None,
             error_message: None,
         };
+        let payload = dv.validation_type.to_biff_payload().unwrap();
         ws.add_data_validation(
             dv,
-            vec![XlsDataValidationRange {
-                first_row: 0,
-                last_row: 9,
-                first_col: 0,
-                last_col: 0,
-            }],
+            payload,
+            vec![XlsDataValidationRange::new(0, 9, 0, 0).unwrap()],
             XlsDataValidationOptions::default(),
         );
         assert_eq!(ws.data_validations.len(), 1);

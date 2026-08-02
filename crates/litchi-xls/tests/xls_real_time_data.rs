@@ -63,7 +63,7 @@ fn real_time_data_round_trips_through_writer_and_reader() {
     let sheet = writer.add_worksheet("Quotes").unwrap();
     writer.write_number(sheet, 1, 2, 58.25).unwrap();
     for topic in &topics {
-        writer.add_real_time_data(topic.clone());
+        writer.add_real_time_data(topic.clone()).unwrap();
     }
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
@@ -88,8 +88,8 @@ fn real_time_data_prefix_compression_round_trips() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Quotes").unwrap();
     writer.write_number(sheet, 0, 0, 1.0).unwrap();
-    writer.add_real_time_data(first.clone());
-    writer.add_real_time_data(second.clone());
+    writer.add_real_time_data(first.clone()).unwrap();
+    writer.add_real_time_data(second.clone()).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 

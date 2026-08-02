@@ -1327,26 +1327,18 @@ pub fn write_row<W: Write>(
 pub fn write_mergedcells<W, I>(writer: &mut W, ranges: I) -> XlsResult<()>
 where
     W: Write,
-    I: IntoIterator<Item = (u32, u32, u16, u16)>,
+    I: IntoIterator<Item = (u16, u16, u8, u8)>,
 {
     const MAX_MERGED_REGIONS: usize = 1027;
 
-    let mut chunk: Vec<(u16, u16, u16, u16)> = Vec::new();
+    let mut chunk: Vec<(u16, u16, u8, u8)> = Vec::new();
 
-    for (first_row_u32, last_row_u32, first_col, last_col) in ranges {
-        let first_row = u16::try_from(first_row_u32).map_err(|_| {
-            XlsError::InvalidData(format!(
-                "Row index {} exceeds BIFF8 limit 65535 for MERGEDCELLS record",
-                first_row_u32
-            ))
-        })?;
-        let last_row = u16::try_from(last_row_u32).map_err(|_| {
-            XlsError::InvalidData(format!(
-                "Row index {} exceeds BIFF8 limit 65535 for MERGEDCELLS record",
-                last_row_u32
-            ))
-        })?;
-
+    for (first_row, last_row, first_col, last_col) in ranges {
+        if first_row > last_row || first_col > last_col {
+            return Err(XlsError::InvalidCellReference(
+                "MERGEDCELLS contains a reversed range".to_string(),
+            ));
+        }
         chunk.push((first_row, last_row, first_col, last_col));
 
         if chunk.len() == MAX_MERGED_REGIONS {
@@ -1364,12 +1356,13 @@ where
 
 fn write_mergedcells_chunk<W: Write>(
     writer: &mut W,
-    ranges: &[(u16, u16, u16, u16)],
+    ranges: &[(u16, u16, u8, u8)],
 ) -> XlsResult<()> {
     debug_assert!(!ranges.is_empty());
     debug_assert!(ranges.len() <= 1027);
 
-    let count = u16::try_from(ranges.len()).expect("MERGEDCELLS range count fits in u16");
+    let count = u16::try_from(ranges.len())
+        .map_err(|_| XlsError::InvalidData("MERGEDCELLS range count exceeds u16".to_string()))?;
     let data_len: u16 = 2u16 + count.saturating_mul(8);
 
     write_record_header(writer, 0x00E5, data_len)?;
@@ -1378,8 +1371,8 @@ fn write_mergedcells_chunk<W: Write>(
     for &(first_row, last_row, first_col, last_col) in ranges {
         writer.write_all(&first_row.to_le_bytes())?;
         writer.write_all(&last_row.to_le_bytes())?;
-        writer.write_all(&first_col.to_le_bytes())?;
-        writer.write_all(&last_col.to_le_bytes())?;
+        writer.write_all(&u16::from(first_col).to_le_bytes())?;
+        writer.write_all(&u16::from(last_col).to_le_bytes())?;
     }
 
     Ok(())

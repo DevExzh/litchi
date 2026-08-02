@@ -270,10 +270,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.write_string(sheet, 11, 0, "Value:")?;
 
     let dv = XlsDataValidation {
-        first_row: 11,
-        last_row: 11,
-        first_col: 1,
-        last_col: 1,
+        range: litchi_xls::writer::XlsDataValidationRange::new(11, 11, 1, 1)?,
         validation_type: XlsDataValidationType::List {
             values: vec![
                 "Not Started".to_string(),

@@ -151,13 +151,82 @@ impl XlsWebPageType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XlsWebPubRange {
     /// First row of the range.
-    pub first_row: u16,
+    first_row: u16,
     /// Last row of the range.
-    pub last_row: u16,
+    last_row: u16,
     /// First column of the range.
-    pub first_column: u16,
+    first_column: u8,
     /// Last column of the range.
-    pub last_column: u16,
+    last_column: u8,
+}
+
+impl XlsWebPubRange {
+    /// Create a checked, inclusive BIFF8 publication range.
+    pub fn new(
+        first_row: u32,
+        last_row: u32,
+        first_column: u16,
+        last_column: u16,
+    ) -> XlsResult<Self> {
+        let invalid = || {
+            XlsError::InvalidCellReference(format!(
+                "WebPub range ({first_row}, {first_column})..=({last_row}, {last_column}) is outside the BIFF8 grid"
+            ))
+        };
+        let first_row = u16::try_from(first_row).map_err(|_| invalid())?;
+        let last_row = u16::try_from(last_row).map_err(|_| invalid())?;
+        let first_column = u8::try_from(first_column).map_err(|_| invalid())?;
+        let last_column = u8::try_from(last_column).map_err(|_| invalid())?;
+        if first_row > last_row || first_column > last_column {
+            return Err(invalid());
+        }
+        Ok(Self {
+            first_row,
+            last_row,
+            first_column,
+            last_column,
+        })
+    }
+
+    fn decode(
+        first_row: u16,
+        last_row: u16,
+        first_column: u16,
+        last_column: u16,
+    ) -> XlsResult<Self> {
+        Self::new(
+            u32::from(first_row),
+            u32::from(last_row),
+            first_column,
+            last_column,
+        )
+        .map_err(|_| invalid("WebPub range is outside the BIFF8 grid"))
+    }
+
+    pub const fn first_row(self) -> u16 {
+        self.first_row
+    }
+
+    pub const fn last_row(self) -> u16 {
+        self.last_row
+    }
+
+    pub const fn first_column(self) -> u8 {
+        self.first_column
+    }
+
+    pub const fn last_column(self) -> u8 {
+        self.last_column
+    }
+
+    const fn fields(self) -> (u16, u16, u8, u8) {
+        (
+            self.first_row,
+            self.last_row,
+            self.first_column,
+            self.last_column,
+        )
+    }
 }
 
 /// Typed `WebPub` record content (MS-XLS 2.4.344).
@@ -207,12 +276,12 @@ impl XlsWebPub {
             return Err(invalid("WebPub FrtRefHeaderU.rt mismatch"));
         }
         let has_ref = read_u16(data, 2) & FRT_REF != 0;
-        let range_ref = XlsWebPubRange {
-            first_row: read_u16(data, 4),
-            last_row: read_u16(data, 6),
-            first_column: read_u16(data, 8),
-            last_column: read_u16(data, 10),
-        };
+        let range_ref = (
+            read_u16(data, 4),
+            read_u16(data, 6),
+            read_u16(data, 8),
+            read_u16(data, 10),
+        );
 
         let source = XlsWebSourceType::from_code(data[12])?;
         let page_type = XlsWebPageType::from_code(data[13])?;
@@ -268,7 +337,9 @@ impl XlsWebPub {
         Ok(XlsWebPub {
             source,
             page_type,
-            range: (source == XlsWebSourceType::Range).then_some(range_ref),
+            range: (source == XlsWebSourceType::Range)
+                .then(|| XlsWebPubRange::decode(range_ref.0, range_ref.1, range_ref.2, range_ref.3))
+                .transpose()?,
             auto_republish: flags & AUTO_REPUBLISH != 0,
             single_file: flags & MHTML != 0,
             style_id,
@@ -287,7 +358,7 @@ impl XlsWebPub {
     /// `range` is required exactly for [`XlsWebSourceType::Range`],
     /// `source_name` is required exactly when the source code is greater
     /// than 4, and `chart_shape_id` exactly for [`XlsWebSourceType::Chart`].
-    pub(crate) fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub(crate) fn validate_for_write(&self) -> XlsResult<()> {
         let wants_range = self.source == XlsWebSourceType::Range;
         if wants_range != self.range.is_some() {
             return Err(XlsError::InvalidData(
@@ -306,6 +377,23 @@ impl XlsWebPub {
                 "WebPub chart_shape_id must be present iff the source type is Chart".to_string(),
             ));
         }
+        for text in [
+            self.source_name.as_deref(),
+            Some(self.file_destination.as_str()),
+            Some(self.div_id.as_str()),
+            Some(self.title.as_str()),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            web_pub_string_layout(text)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn to_payload(&self) -> XlsResult<Vec<u8>> {
+        self.validate_for_write()?;
+        let wants_range = self.source == XlsWebSourceType::Range;
 
         let mut tail = Vec::new();
         if let Some(name) = &self.source_name {
@@ -327,16 +415,12 @@ impl XlsWebPub {
             grbit_frt |= FRT_REF;
         }
         payload.extend_from_slice(&grbit_frt.to_le_bytes());
-        let range = self.range.unwrap_or(XlsWebPubRange {
-            first_row: 0,
-            last_row: 0,
-            first_column: 0,
-            last_column: 0,
-        });
-        payload.extend_from_slice(&range.first_row.to_le_bytes());
-        payload.extend_from_slice(&range.last_row.to_le_bytes());
-        payload.extend_from_slice(&range.first_column.to_le_bytes());
-        payload.extend_from_slice(&range.last_column.to_le_bytes());
+        let (first_row, last_row, first_column, last_column) =
+            self.range.map_or((0, 0, 0, 0), XlsWebPubRange::fields);
+        payload.extend_from_slice(&first_row.to_le_bytes());
+        payload.extend_from_slice(&last_row.to_le_bytes());
+        payload.extend_from_slice(&u16::from(first_column).to_le_bytes());
+        payload.extend_from_slice(&u16::from(last_column).to_le_bytes());
         payload.push(self.source.code());
         payload.push(self.page_type.code());
         let mut flags = 0u16;
@@ -358,17 +442,7 @@ impl XlsWebPub {
 /// Serialize a `WebPubString` (MS-XLS 2.5.278), compressed when every
 /// character is in U+0000..=U+00FF and wide otherwise.
 fn write_web_pub_string(out: &mut Vec<u8>, text: &str) -> XlsResult<()> {
-    let compressible = text.chars().all(|ch| u32::from(ch) <= 0xFF);
-    let char_count = if compressible {
-        text.len()
-    } else {
-        text.encode_utf16().count()
-    };
-    if char_count > MAX_WEB_PUB_STRING_CHARS {
-        return Err(XlsError::InvalidData(
-            "WebPubString exceeds 255 characters".to_string(),
-        ));
-    }
+    let (compressible, char_count) = web_pub_string_layout(text)?;
     out.extend_from_slice(&(char_count as u16).to_le_bytes());
     if compressible {
         out.push(0u8); // fHighByte = 0
@@ -380,6 +454,21 @@ fn write_web_pub_string(out: &mut Vec<u8>, text: &str) -> XlsResult<()> {
         }
     }
     Ok(())
+}
+
+fn web_pub_string_layout(text: &str) -> XlsResult<(bool, usize)> {
+    let compressible = text.chars().all(|ch| u32::from(ch) <= 0xFF);
+    let char_count = if compressible {
+        text.len()
+    } else {
+        text.encode_utf16().count()
+    };
+    if char_count > MAX_WEB_PUB_STRING_CHARS {
+        return Err(XlsError::InvalidData(
+            "WebPubString exceeds 255 characters".to_string(),
+        ));
+    }
+    Ok((compressible, char_count))
 }
 
 /// Parse a `WebPubString` (MS-XLS 2.5.278): a 2-byte character count
@@ -526,12 +615,7 @@ mod tests {
         assert_eq!(pub_record.source, XlsWebSourceType::Range);
         assert_eq!(
             pub_record.range,
-            Some(XlsWebPubRange {
-                first_row: 1,
-                last_row: 9,
-                first_column: 2,
-                last_column: 5,
-            })
+            Some(XlsWebPubRange::new(1, 9, 2, 5).unwrap())
         );
         assert_eq!(pub_record.source_name, None);
     }
@@ -578,6 +662,13 @@ mod tests {
         builder.file_destination = "x.htm".to_string();
         builder.title = "x".to_string();
         assert!(XlsWebPub::parse(&builder.build()).is_err());
+
+        let mut builder = WebPubBuilder::new(0x04);
+        builder.file_destination = "x.htm".to_string();
+        builder.title = "x".to_string();
+        let mut payload = builder.build();
+        payload[8..10].copy_from_slice(&256u16.to_le_bytes());
+        assert!(XlsWebPub::parse(&payload).is_err());
     }
 
     #[test]
@@ -645,12 +736,7 @@ mod tests {
             XlsWebPub {
                 source: XlsWebSourceType::Range,
                 page_type: XlsWebPageType::ViewOnly,
-                range: Some(XlsWebPubRange {
-                    first_row: 1,
-                    last_row: 9,
-                    first_column: 2,
-                    last_column: 5,
-                }),
+                range: Some(XlsWebPubRange::new(1, 9, 2, 5).unwrap()),
                 auto_republish: false,
                 single_file: false,
                 style_id: 7,
@@ -688,12 +774,7 @@ mod tests {
         let mut value = XlsWebPub {
             source: XlsWebSourceType::Workbook,
             page_type: XlsWebPageType::ViewOnly,
-            range: Some(XlsWebPubRange {
-                first_row: 0,
-                last_row: 1,
-                first_column: 0,
-                last_column: 1,
-            }),
+            range: Some(XlsWebPubRange::new(0, 1, 0, 1).unwrap()),
             auto_republish: false,
             single_file: false,
             style_id: 1,

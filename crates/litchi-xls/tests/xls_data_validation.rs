@@ -12,10 +12,7 @@ use litchi_xls::{
 
 fn validation(row: u32, validation_type: XlsDataValidationType) -> XlsDataValidation {
     XlsDataValidation {
-        first_row: row,
-        last_row: row,
-        first_col: 0,
-        last_col: 0,
+        range: XlsDataValidationRange::new(row, row, 0, 0).unwrap(),
         validation_type,
         show_input_message: true,
         input_title: Some("输入".to_string()),
@@ -53,24 +50,9 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             custom,
             &[
-                XlsDataValidationRange {
-                    first_row: 8,
-                    last_row: 9,
-                    first_col: 4,
-                    last_col: 5,
-                },
-                XlsDataValidationRange {
-                    first_row: 1,
-                    last_row: 2,
-                    first_col: 2,
-                    last_col: 3,
-                },
-                XlsDataValidationRange {
-                    first_row: 4,
-                    last_row: 4,
-                    first_col: 0,
-                    last_col: 0,
-                },
+                XlsDataValidationRange::new(8, 9, 4, 5).unwrap(),
+                XlsDataValidationRange::new(1, 2, 2, 3).unwrap(),
+                XlsDataValidationRange::new(4, 4, 0, 0).unwrap(),
             ],
             XlsDataValidationOptions {
                 error_style: WriterErrorStyle::Warning,
@@ -222,10 +204,18 @@ fn malformed_writer_metadata_is_rejected() {
                     },
                 ),
             )
-            .is_ok()
+            .is_err()
     );
     let mut bytes = Cursor::new(Vec::new());
-    assert!(writer.write_to(&mut bytes).is_err());
+    writer.write_to(&mut bytes).unwrap();
+    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    assert!(
+        workbook
+            .xls_worksheet(0)
+            .unwrap()
+            .data_validations()
+            .is_empty()
+    );
 }
 
 #[test]

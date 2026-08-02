@@ -217,7 +217,7 @@ pub fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
 pub fn write_dv<W: Write>(
     writer: &mut W,
     cfg: &DvConfig<'_>,
-    ranges: &[(u32, u32, u16, u16)],
+    ranges: &[(u16, u16, u8, u8)],
 ) -> XlsResult<()> {
     validation::write_dv(writer, cfg, ranges)
 }
@@ -645,7 +645,7 @@ pub fn write_dimensions<W: Write>(
 pub fn write_mergedcells<W, I>(writer: &mut W, ranges: I) -> XlsResult<()>
 where
     W: Write,
-    I: IntoIterator<Item = (u32, u32, u16, u16)>,
+    I: IntoIterator<Item = (u16, u16, u8, u8)>,
 {
     worksheet::write_mergedcells(writer, ranges)
 }

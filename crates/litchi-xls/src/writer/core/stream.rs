@@ -659,11 +659,21 @@ pub(crate) fn generate_workbook_stream(
         }
 
         if let Some(page_setup) = &worksheet.page_setup {
+            let horizontal_breaks = worksheet
+                .horizontal_page_breaks
+                .iter()
+                .map(|page_break| page_break.fields())
+                .collect::<Vec<_>>();
+            let vertical_breaks = worksheet
+                .vertical_page_breaks
+                .iter()
+                .map(|page_break| page_break.fields())
+                .collect::<Vec<_>>();
             biff::write_page_settings(
                 &mut stream,
                 page_setup,
-                &worksheet.horizontal_page_breaks,
-                &worksheet.vertical_page_breaks,
+                &horizontal_breaks,
+                &vertical_breaks,
             )?;
         }
 
@@ -1088,10 +1098,7 @@ pub(crate) fn generate_workbook_stream(
         if !worksheet.merged_ranges.is_empty() {
             biff::write_mergedcells(
                 &mut stream,
-                worksheet
-                    .merged_ranges
-                    .iter()
-                    .map(|r| (r.first_row, r.last_row, r.first_col, r.last_col)),
+                worksheet.merged_ranges.iter().map(|range| range.fields()),
             )?;
         }
 
@@ -1113,17 +1120,17 @@ pub(crate) fn generate_workbook_stream(
 
             for writable in &worksheet.data_validations {
                 let dv = &writable.validation;
-                let payload = dv.validation_type.to_biff_payload()?;
+                let payload = &writable.payload;
 
                 let ranges = writable
                     .ranges
                     .iter()
                     .map(|range| {
                         (
-                            range.first_row,
-                            range.last_row,
-                            range.first_col,
-                            range.last_col,
+                            range.first_row(),
+                            range.last_row(),
+                            range.first_col(),
+                            range.last_col(),
                         )
                     })
                     .collect::<Vec<_>>();

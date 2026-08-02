@@ -63,7 +63,7 @@ pub fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
 pub fn write_dv<W: Write>(
     writer: &mut W,
     cfg: &DvConfig<'_>,
-    ranges: &[(u32, u32, u16, u16)],
+    ranges: &[(u16, u16, u8, u8)],
 ) -> XlsResult<()> {
     if ranges.is_empty() {
         return Err(XlsError::InvalidData(
@@ -74,6 +74,16 @@ pub fn write_dv<W: Write>(
     if ranges.len() > 432 {
         return Err(XlsError::InvalidData(
             "DV range count exceeds 432".to_string(),
+        ));
+    }
+    if ranges
+        .iter()
+        .any(|(first_row, last_row, first_col, last_col)| {
+            first_row > last_row || first_col > last_col
+        })
+    {
+        return Err(XlsError::InvalidCellReference(
+            "DV contains a reversed target range".to_string(),
         ));
     }
     let dv_count_u16 = ranges.len() as u16;
@@ -184,29 +194,11 @@ pub fn write_dv<W: Write>(
 
     // CellRangeAddressList with all affected ranges
     writer.write_all(&dv_count_u16.to_le_bytes())?;
-    for (first_row_u32, last_row_u32, first_col, last_col) in ranges {
-        if first_row_u32 > last_row_u32 || first_col > last_col || *last_col > 255 {
-            return Err(XlsError::InvalidData(
-                "DV contains an invalid target range".to_string(),
-            ));
-        }
-        let first_row = u16::try_from(*first_row_u32).map_err(|_| {
-            XlsError::InvalidData(format!(
-                "Row index {} exceeds BIFF8 limit 65535 for DV record",
-                first_row_u32
-            ))
-        })?;
-        let last_row = u16::try_from(*last_row_u32).map_err(|_| {
-            XlsError::InvalidData(format!(
-                "Row index {} exceeds BIFF8 limit 65535 for DV record",
-                last_row_u32
-            ))
-        })?;
-
+    for (first_row, last_row, first_col, last_col) in ranges {
         writer.write_all(&first_row.to_le_bytes())?;
         writer.write_all(&last_row.to_le_bytes())?;
-        writer.write_all(&first_col.to_le_bytes())?;
-        writer.write_all(&last_col.to_le_bytes())?;
+        writer.write_all(&u16::from(*first_col).to_le_bytes())?;
+        writer.write_all(&u16::from(*last_col).to_le_bytes())?;
     }
 
     Ok(())

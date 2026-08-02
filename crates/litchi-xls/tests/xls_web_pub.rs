@@ -25,12 +25,7 @@ fn range_publication() -> XlsWebPub {
     XlsWebPub {
         source: XlsWebSourceType::Range,
         page_type: XlsWebPageType::ViewOnly,
-        range: Some(XlsWebPubRange {
-            first_row: 1,
-            last_row: 9,
-            first_column: 2,
-            last_column: 5,
-        }),
+        range: Some(XlsWebPubRange::new(1, 9, 2, 5).unwrap()),
         auto_republish: false,
         single_file: false,
         style_id: 7,
@@ -50,7 +45,7 @@ fn workbook_web_pub_round_trips_through_writer_and_reader() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Report").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
-    writer.add_web_publication(publication.clone());
+    writer.add_web_publication(publication.clone()).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 

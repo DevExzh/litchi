@@ -98,9 +98,29 @@ pub struct XlsRtdCell {
     /// Zero-based row index of the cell.
     pub row: u16,
     /// Zero-based column index of the cell.
-    pub column: u16,
+    pub column: u8,
     /// Zero-based index of the sheet containing the cell (`TabIndex`).
     pub sheet_index: u16,
+}
+
+impl XlsRtdCell {
+    /// Create a checked RTD subscriber cell from raw zero-based indices.
+    pub fn new(row: u32, column: u16, sheet_index: usize) -> XlsResult<Self> {
+        let invalid = || {
+            XlsError::InvalidCellReference(format!(
+                "RTD subscriber row {row}, column {column} is outside the BIFF8 grid"
+            ))
+        };
+        let row = u16::try_from(row).map_err(|_| invalid())?;
+        let column = u8::try_from(column).map_err(|_| invalid())?;
+        let sheet_index = u16::try_from(sheet_index)
+            .map_err(|_| XlsError::WorksheetNotFound(format!("Sheet {sheet_index}")))?;
+        Ok(Self {
+            row,
+            column,
+            sheet_index,
+        })
+    }
 }
 
 /// Typed `RealTimeData` record content (MS-XLS 2.4.214).
@@ -158,12 +178,16 @@ impl XlsRealTimeData {
         }
         let cells = remaining
             .chunks_exact(RTD_E_ITEM_LEN)
-            .map(|chunk| XlsRtdCell {
-                row: read_u16(chunk, 0),
-                column: read_u16(chunk, 2),
-                sheet_index: read_u16(chunk, 4),
+            .map(|chunk| {
+                let column = u8::try_from(read_u16(chunk, 2))
+                    .map_err(|_| invalid("RTD subscriber column exceeds the BIFF8 grid"))?;
+                Ok(XlsRtdCell {
+                    row: read_u16(chunk, 0),
+                    column,
+                    sheet_index: read_u16(chunk, 4),
+                })
             })
-            .collect();
+            .collect::<XlsResult<Vec<_>>>()?;
 
         // Re-apply prefix compression against the previous topic.
         let stored: String = topic_segments.concat();
@@ -238,7 +262,7 @@ impl XlsRealTimeData {
         }
         for cell in &self.cells {
             payload.extend_from_slice(&cell.row.to_le_bytes());
-            payload.extend_from_slice(&cell.column.to_le_bytes());
+            payload.extend_from_slice(&u16::from(cell.column).to_le_bytes());
             payload.extend_from_slice(&cell.sheet_index.to_le_bytes());
         }
         Ok(payload)
@@ -378,12 +402,11 @@ fn parse_rtd_oper(data: &[u8]) -> XlsResult<(XlsRtdValue, usize)> {
                 expected: 12,
                 found: data.len(),
             })?;
-            Ok((
-                XlsRtdValue::Number(f64::from_le_bytes(
-                    bytes.try_into().expect("length checked"),
-                )),
-                12,
-            ))
+            let bytes = <[u8; 8]>::try_from(bytes).map_err(|_| XlsError::InvalidLength {
+                expected: 12,
+                found: data.len(),
+            })?;
+            Ok((XlsRtdValue::Number(f64::from_le_bytes(bytes)), 12))
         },
         RTD_OPER_SHORT_TEXT | RTD_OPER_LONG_TEXT => {
             let (text, used) = parse_rtd_oper_str(body)?;
@@ -408,7 +431,11 @@ fn parse_rtd_oper(data: &[u8]) -> XlsResult<(XlsRtdValue, usize)> {
                 expected: 8,
                 found: data.len(),
             })?;
-            let value = i32::from_le_bytes(raw.try_into().expect("length checked"));
+            let raw = <[u8; 4]>::try_from(raw).map_err(|_| XlsError::InvalidLength {
+                expected: 8,
+                found: data.len(),
+            })?;
+            let value = i32::from_le_bytes(raw);
             let variant = if kind == RTD_OPER_ERROR {
                 XlsRtdValue::Error(value)
             } else {
@@ -650,6 +677,16 @@ mod tests {
         payload.extend_from_slice(&RTD_OPER_INTEGER.to_le_bytes());
         payload.extend_from_slice(&0i32.to_le_bytes());
         payload.extend_from_slice(&[0u8; 5]); // not a multiple of 6
+        assert!(XlsRealTimeData::parse(&payload, None).is_err());
+
+        let mut payload = frt_header();
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&segmented_topic(&["A", "B", "C"]));
+        payload.extend_from_slice(&RTD_OPER_INTEGER.to_le_bytes());
+        payload.extend_from_slice(&0i32.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.extend_from_slice(&256u16.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
         assert!(XlsRealTimeData::parse(&payload, None).is_err());
     }
 

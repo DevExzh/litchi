@@ -87,10 +87,50 @@ impl XlsDataValidationFormulaKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XlsDataValidationRange {
-    pub first_row: u32,
-    pub last_row: u32,
-    pub first_col: u16,
-    pub last_col: u16,
+    first_row: u16,
+    last_row: u16,
+    first_col: u8,
+    last_col: u8,
+}
+
+impl XlsDataValidationRange {
+    /// Create a checked, inclusive BIFF8 cell range from zero-based indices.
+    pub fn new(first_row: u32, last_row: u32, first_col: u16, last_col: u16) -> XlsResult<Self> {
+        let invalid = || {
+            XlsError::InvalidCellReference(format!(
+                "range ({first_row}, {first_col})..=({last_row}, {last_col}) is outside the BIFF8 grid"
+            ))
+        };
+        let first_row = u16::try_from(first_row).map_err(|_| invalid())?;
+        let last_row = u16::try_from(last_row).map_err(|_| invalid())?;
+        let first_col = u8::try_from(first_col).map_err(|_| invalid())?;
+        let last_col = u8::try_from(last_col).map_err(|_| invalid())?;
+        if first_row > last_row || first_col > last_col {
+            return Err(invalid());
+        }
+        Ok(Self {
+            first_row,
+            last_row,
+            first_col,
+            last_col,
+        })
+    }
+
+    pub const fn first_row(self) -> u16 {
+        self.first_row
+    }
+
+    pub const fn last_row(self) -> u16 {
+        self.last_row
+    }
+
+    pub const fn first_col(self) -> u8 {
+        self.first_col
+    }
+
+    pub const fn last_col(self) -> u8 {
+        self.last_col
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -416,10 +456,7 @@ fn raw_payload(
 /// the rest of the XLS writer APIs.
 #[derive(Debug, Clone)]
 pub struct XlsDataValidation {
-    pub first_row: u32,
-    pub last_row: u32,
-    pub first_col: u16,
-    pub last_col: u16,
+    pub range: XlsDataValidationRange,
     pub validation_type: XlsDataValidationType,
     pub show_input_message: bool,
     pub input_title: Option<String>,
@@ -427,6 +464,22 @@ pub struct XlsDataValidation {
     pub show_error_alert: bool,
     pub error_title: Option<String>,
     pub error_message: Option<String>,
+}
+
+impl XlsDataValidation {
+    /// Create a validation rule with messages and alerts disabled by default.
+    pub fn new(range: XlsDataValidationRange, validation_type: XlsDataValidationType) -> Self {
+        Self {
+            range,
+            validation_type,
+            show_input_message: false,
+            input_title: None,
+            input_message: None,
+            show_error_alert: false,
+            error_title: None,
+            error_message: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -531,10 +584,7 @@ mod tests {
     #[test]
     fn test_xls_data_validation_struct() {
         let dv = XlsDataValidation {
-            first_row: 0,
-            last_row: 9,
-            first_col: 0,
-            last_col: 1,
+            range: XlsDataValidationRange::new(0, 9, 0, 1).unwrap(),
             validation_type: XlsDataValidationType::List {
                 values: vec!["A".to_string(), "B".to_string()],
             },
@@ -545,10 +595,10 @@ mod tests {
             error_title: Some("Error".to_string()),
             error_message: Some("Invalid choice".to_string()),
         };
-        assert_eq!(dv.first_row, 0);
-        assert_eq!(dv.last_row, 9);
-        assert_eq!(dv.first_col, 0);
-        assert_eq!(dv.last_col, 1);
+        assert_eq!(dv.range.first_row(), 0);
+        assert_eq!(dv.range.last_row(), 9);
+        assert_eq!(dv.range.first_col(), 0);
+        assert_eq!(dv.range.last_col(), 1);
         assert!(dv.show_input_message);
         assert!(dv.show_error_alert);
     }
@@ -556,10 +606,7 @@ mod tests {
     #[test]
     fn test_xls_data_validation_clone() {
         let dv = XlsDataValidation {
-            first_row: 0,
-            last_row: 9,
-            first_col: 0,
-            last_col: 1,
+            range: XlsDataValidationRange::new(0, 9, 0, 1).unwrap(),
             validation_type: XlsDataValidationType::Whole {
                 operator: XlsDataValidationOperator::GreaterThan,
                 value1: 10,
@@ -573,7 +620,6 @@ mod tests {
             error_message: None,
         };
         let cloned = dv.clone();
-        assert_eq!(cloned.first_row, dv.first_row);
-        assert_eq!(cloned.last_row, dv.last_row);
+        assert_eq!(cloned.range, dv.range);
     }
 }
