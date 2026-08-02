@@ -266,13 +266,21 @@ bounded inert markup. A semantic sound or effect variant is exposed only when
 both read and write preserve it; the API does not keep constructor-only or
 writer-rejected compatibility variants.
 
-`litchi-pptx::tag` owns the bounded PresentationML programmable-tag grammar and
-slide relationship discovery. Its contextual vocabulary is `List`, `Tag`,
-`Key`, `Source`, `Conformance`, and `tag::raw::Attr`. Semantic name lookup is
-the primary selector, while `Key::Index` supports checked source-order repair
-without exposing a relationship identifier as the ordinary API. Litchi chooses
-one deterministic NFD/default-case-fold/NFD identity for lookup and every
-detached add, insert, replace, set, remove, and reorder operation. Checked-in
+`litchi-pptx::tag` owns the bounded PresentationML programmable-tag grammar,
+low-level relationship inventory, and anchor-aware package mutation. Its
+contextual vocabulary is `List`, `Tag`, `Key`, `Source`, `Conformance`, and
+`tag::raw::Attr`. Semantic name lookup is the primary selector inside a list,
+while checked numeric positions support source-order repair without exposing
+relationship IDs or part names through the ordinary facade. Litchi chooses one
+deterministic NFD/default-case-fold/NFD identity for lookup and every detached
+add, insert, replace, set, remove, and reorder operation. Direct presentation
+and common-slide-data anchors use singleton `load`, `put`, and `remove`; the
+migration facade exposes short slide-scoped `tags`, `put_tags`, and
+`remove_tags` operations selected first by producer-visible slide name and
+second by checked position; an already-resolved `Slide` reads its attachment
+directly without rescanning unrelated slide parts. Shape-owned lists remain
+distinct objects and are never flattened into the slide result; their typed
+semantic facade is a later slice. Checked-in
 `[MS-OE376]` section 2.1.1170(c) requires case-insensitive uniqueness but does
 not prescribe this normalization algorithm.
 Malformed producer duplicates remain inspectable by numeric position and make
@@ -280,8 +288,15 @@ semantic selection explicitly ambiguous. Values and retained extension markup
 stay inert. Private escaped-wire counters make aggregate size preflight O(1)
 after scanning only the incoming value, so every successful checked mutation
 remains serializable under the 8 MiB part ceiling. Strict and Transitional
-relationship discovery rejects external, wrong-content-type, duplicate-target,
-and relationship-bearing tag parts.
+relationship discovery and anchored mutation reject external,
+wrong-content-type, duplicate-target, and relationship-bearing tag parts.
+Unanchored relationships remain visible only through the explicitly low-level
+inventory. Candidate operations complete bounded validation before commit,
+change the XML anchor, relationship, and target part as one transaction,
+preserve byte-identical signed no-ops, fork shared targets on replacement, and
+remove a target only after a package-wide inbound-edge scan proves it orphaned.
+A dirty legacy presentation writer is rejected because a later materialization
+could overwrite the edited slide markup and relationships.
 
 `litchi-xlsb::raw` owns the BIFF12 record wire kernel: `Kind`, `Header`,
 borrowed `Record`/`Records`, bounded `Cursor`, and `Writer`, with constants

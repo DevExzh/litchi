@@ -1,5 +1,7 @@
 //! Typed PPTX failures.
 
+use std::collections::TryReserveError;
+
 use thiserror::Error;
 
 /// Result of a PPTX operation.
@@ -28,6 +30,16 @@ pub enum Error {
         resource: &'static str,
         /// Active upper bound.
         limit: usize,
+    },
+
+    /// A bounded PresentationML operation could not reserve required memory.
+    #[error("could not reserve memory for PresentationML {resource}: {source}")]
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
     },
 
     /// A related part has a content type forbidden by PresentationML.
@@ -59,6 +71,28 @@ pub enum Error {
         name: String,
         /// Number of matching tags.
         matches: usize,
+    },
+
+    /// No slide has the requested semantic name.
+    #[error("slide name '{0}' was not found")]
+    SlideNameNotFound(String),
+
+    /// More than one slide has the requested semantic name.
+    #[error("slide name '{name}' is ambiguous ({matches} matches)")]
+    AmbiguousSlideName {
+        /// Selector spelling supplied by the caller.
+        name: String,
+        /// Number of matching slides.
+        matches: usize,
+    },
+
+    /// A numeric slide selector is outside the checked presentation bounds.
+    #[error("slide index {index} is outside a presentation of length {len}")]
+    SlideIndexOutOfBounds {
+        /// Requested zero-based index.
+        index: usize,
+        /// Current slide count.
+        len: usize,
     },
 
     /// A mutation would create a caseless-equivalent duplicate name.

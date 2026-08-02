@@ -23,7 +23,7 @@ use crate::cell::{Content, Value};
 use crate::column::{Assignments, Width};
 use crate::error::{
     ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, Result, RowEditBlock,
-    invalid,
+    allocation, invalid,
 };
 use crate::layout::{self, Descent};
 use crate::merge;
@@ -1157,7 +1157,7 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
     let mut output = Vec::new();
     output
         .try_reserve(extra)
-        .map_err(|error| invalid(format!("cannot reserve worksheet edit output: {error}")))?;
+        .map_err(|source| allocation("worksheet edit output", source))?;
     let Plan {
         defaults,
         cells,
@@ -1295,14 +1295,14 @@ pub(crate) fn rewrite_merges(content: &[u8], sheet: &str, plan: MergePlan) -> Re
         .map_or(0, |container| container.merges.len());
     let mut base = Vec::new();
     base.try_reserve_exact(merge_count)
-        .map_err(|error| invalid(format!("cannot reserve source merged ranges: {error}")))?;
+        .map_err(|source| allocation("source merged ranges", source))?;
     if let Some(container) = layout.merge_cells.as_ref() {
         base.extend(container.merges.iter().map(|merge| merge.range));
     }
     let mut projected = Vec::new();
     projected
         .try_reserve_exact(base.len().saturating_add(plan.add.len()))
-        .map_err(|error| invalid(format!("cannot reserve projected merged ranges: {error}")))?;
+        .map_err(|source| allocation("projected merged ranges", source))?;
     projected.extend_from_slice(&base);
     for range in &plan.remove {
         projected.retain(|candidate| candidate != range);
@@ -1343,7 +1343,7 @@ pub(crate) fn rewrite_merges(content: &[u8], sheet: &str, plan: MergePlan) -> Re
     let mut replacements = Vec::new();
     replacements
         .try_reserve_exact(2)
-        .map_err(|error| invalid(format!("cannot reserve merged-range replacements: {error}")))?;
+        .map_err(|source| allocation("merged-range replacements", source))?;
     if let Some(dimension) = layout.dimension.as_ref() {
         let expanded = projected
             .iter()
@@ -1476,7 +1476,7 @@ fn apply_merge_replacements(
     let mut output = Vec::new();
     output
         .try_reserve_exact(size)
-        .map_err(|error| invalid(format!("cannot reserve merged-range output: {error}")))?;
+        .map_err(|source| allocation("merged-range output", source))?;
     let mut cursor = 0usize;
     for replacement in replacements {
         output.extend_from_slice(&content[cursor..replacement.span.start]);
@@ -2652,7 +2652,7 @@ impl Scanner {
         let mut merged_ranges = Vec::new();
         merged_ranges
             .try_reserve_exact(merge_count)
-            .map_err(|error| invalid(format!("cannot reserve scanned merged ranges: {error}")))?;
+            .map_err(|source| allocation("scanned merged ranges", source))?;
         if let Some(container) = self.merge_cells.as_ref() {
             merged_ranges.extend(container.merges.iter().map(|merge| merge.range));
         }
@@ -2660,7 +2660,7 @@ impl Scanner {
         let mut merged = Vec::new();
         merged
             .try_reserve_exact(merged_ranges.as_slice().len())
-            .map_err(|error| invalid(format!("cannot reserve merge edit guards: {error}")))?;
+            .map_err(|source| allocation("merge edit guards", source))?;
         merged.extend(
             merged_ranges
                 .as_slice()
@@ -2910,7 +2910,7 @@ fn column_pieces(
     let mut pieces = Vec::new();
     pieces
         .try_reserve_exact(capacity)
-        .map_err(|error| invalid(format!("cannot reserve column edit splits: {error}")))?;
+        .map_err(|source| allocation("column edit splits", source))?;
     let mut next = stored.first.get();
     for (column, action) in edits {
         if column.get() > next {

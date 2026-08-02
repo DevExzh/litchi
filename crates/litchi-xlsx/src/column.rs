@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use litchi_sheet::{COLUMNS, Column as Index};
 use thiserror::Error;
 
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 pub use crate::outline::{Outline, OutlineAt, OutlineError};
 use crate::style::StyleState;
 
@@ -405,7 +405,7 @@ where
         let mut nodes = Vec::new();
         nodes
             .try_reserve_exact(capacity)
-            .map_err(|error| invalid(format!("cannot reserve column interval map: {error}")))?;
+            .map_err(|source| allocation("column interval map", source))?;
         nodes.resize(capacity, Node::Unset);
         Ok(Self { nodes })
     }
@@ -449,7 +449,7 @@ where
         let mut ranges = Vec::new();
         ranges
             .try_reserve_exact(raw.len())
-            .map_err(|error| invalid(format!("cannot reserve column ranges: {error}")))?;
+            .map_err(|source| allocation("column ranges", source))?;
         for (first, last, value) in raw {
             ranges.push(Assigned {
                 first: Index::new(first)?,
@@ -543,7 +543,7 @@ pub(crate) fn resolve(assignments: Option<Assignments<Properties>>) -> Result<Bo
     let mut stored = Vec::new();
     stored
         .try_reserve_exact(ranges.len())
-        .map_err(|error| invalid(format!("cannot reserve effective column ranges: {error}")))?;
+        .map_err(|source| allocation("effective column ranges", source))?;
     for range in ranges {
         stored.push(Stored {
             first: range.first,
@@ -569,7 +569,7 @@ fn push_range<T: Copy + Eq>(
     }
     output
         .try_reserve(1)
-        .map_err(|error| invalid(format!("cannot grow column interval map: {error}")))?;
+        .map_err(|source| allocation("column interval map", source))?;
     output.push((first, last, value));
     Ok(())
 }

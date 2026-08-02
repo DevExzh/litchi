@@ -8,7 +8,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 
 const EXTENDED: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
@@ -106,7 +106,7 @@ pub(crate) fn append_sheets(
     let mut order = Vec::new();
     order
         .try_reserve_exact(existing.len().saturating_add(added.len()))
-        .map_err(|error| invalid(format!("cannot reserve appended property order: {error}")))?;
+        .map_err(|source| allocation("appended property order", source))?;
     order.extend((0..existing.len()).map(Sheet::Existing));
     order.extend(added.iter().copied().map(Sheet::New));
     arrange_sheets(content, existing, &order)
@@ -128,7 +128,7 @@ pub(crate) fn arrange_sheets(
     }
     let mut seen = Vec::new();
     seen.try_reserve_exact(existing.len())
-        .map_err(|error| invalid(format!("cannot reserve property-order validation: {error}")))?;
+        .map_err(|source| allocation("property-order validation", source))?;
     seen.resize(existing.len(), false);
     let mut new_count = 0usize;
     let mut identity = order.len() == existing.len();
@@ -186,7 +186,7 @@ pub(crate) fn arrange_sheets(
     let mut replacements = Vec::new();
     replacements
         .try_reserve(3)
-        .map_err(|error| invalid(format!("cannot reserve property replacements: {error}")))?;
+        .map_err(|source| allocation("property replacements", source))?;
     replacements.push(Replacement {
         start: vector.start,
         end: vector.tag_end,
@@ -209,7 +209,7 @@ pub(crate) fn arrange_sheets(
         .ok_or_else(|| invalid("extended-properties title prefix is inverted"))?;
     arranged
         .try_reserve_exact(prefix_len)
-        .map_err(|error| invalid(format!("cannot reserve arranged sheet titles: {error}")))?;
+        .map_err(|source| allocation("arranged sheet titles", source))?;
     for entry in order {
         match entry {
             Sheet::Existing(index) => {
@@ -220,9 +220,9 @@ pub(crate) fn arrange_sheets(
                     .end
                     .checked_sub(title.start)
                     .ok_or_else(|| invalid("extended-properties title span is inverted"))?;
-                arranged.try_reserve(title_len).map_err(|error| {
-                    invalid(format!("cannot reserve existing sheet title: {error}"))
-                })?;
+                arranged
+                    .try_reserve(title_len)
+                    .map_err(|source| allocation("existing sheet title", source))?;
                 arranged.extend_from_slice(&content[title.start..title.end]);
             },
             Sheet::New(title) => {
@@ -235,7 +235,7 @@ pub(crate) fn arrange_sheets(
                     .ok_or_else(|| invalid("new extended-properties title size overflow"))?;
                 arranged
                     .try_reserve(required)
-                    .map_err(|error| invalid(format!("cannot reserve new sheet title: {error}")))?;
+                    .map_err(|source| allocation("new sheet title", source))?;
                 arranged.extend_from_slice(b"<");
                 arranged.extend_from_slice(title_name.as_bytes());
                 arranged.extend_from_slice(b">");
@@ -283,7 +283,7 @@ pub(crate) fn arrange_sheets(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|error| invalid(format!("cannot reserve extended properties: {error}")))?;
+        .map_err(|source| allocation("extended properties", source))?;
     let mut cursor = 0usize;
     for replacement in replacements {
         output.extend_from_slice(&content[cursor..replacement.start]);
@@ -339,7 +339,7 @@ pub(crate) fn remove_sheets(
     let mut replacements = Vec::new();
     replacements
         .try_reserve(removed.len().saturating_add(2))
-        .map_err(|error| invalid(format!("cannot reserve property removals: {error}")))?;
+        .map_err(|source| allocation("property removals", source))?;
     replacements.push(Replacement {
         start: vector.start,
         end: vector.tag_end,
@@ -391,7 +391,7 @@ pub(crate) fn remove_sheets(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|error| invalid(format!("cannot reserve extended properties: {error}")))?;
+        .map_err(|source| allocation("extended properties", source))?;
     let mut cursor = 0usize;
     for replacement in replacements {
         output.extend_from_slice(&content[cursor..replacement.start]);

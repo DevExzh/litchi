@@ -14,7 +14,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, Result, TabEditBlock, invalid};
+use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
 use crate::raw::namespace::{
     STRICT_SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
@@ -316,7 +316,7 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
                 .saturating_add(layout.workbook_views.len())
                 .saturating_add(layout.defined_name_slots.len()),
         )
-        .map_err(|error| invalid(format!("cannot reserve workbook edit plan: {error}")))?;
+        .map_err(|source| allocation("workbook edit plan", source))?;
     sheet_replacements(
         content,
         &layout,
@@ -363,7 +363,7 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|error| invalid(format!("cannot reserve workbook edit output: {error}")))?;
+        .map_err(|source| allocation("workbook edit output", source))?;
     let mut cursor = 0usize;
     for replacement in replacements {
         output.extend_from_slice(&content[cursor..replacement.span.start]);
@@ -454,7 +454,7 @@ pub(crate) fn append(content: &[u8], create: Create<'_>) -> Result<Vec<u8>> {
                     .and_then(|size| size.checked_add(replacement.len()))
                     .ok_or_else(|| invalid("workbook append output size overflow"))?,
             )
-            .map_err(|error| invalid(format!("cannot reserve workbook append output: {error}")))?;
+            .map_err(|source| allocation("workbook append output", source))?;
         output.extend_from_slice(&content[..layout.sheets.slot.span.start]);
         output.extend_from_slice(&replacement);
         output.extend_from_slice(&content[layout.sheets.slot.span.end..]);
@@ -470,7 +470,7 @@ pub(crate) fn append(content: &[u8], create: Create<'_>) -> Result<Vec<u8>> {
                 .checked_add(created.len())
                 .ok_or_else(|| invalid("workbook append output size overflow"))?,
         )
-        .map_err(|error| invalid(format!("cannot reserve workbook append output: {error}")))?;
+        .map_err(|source| allocation("workbook append output", source))?;
     output.extend_from_slice(&content[..at]);
     output.extend_from_slice(&created);
     output.extend_from_slice(&content[at..]);
@@ -512,7 +512,7 @@ pub(crate) fn remove(content: &[u8], plan: Remove<'_>) -> Result<Vec<u8>> {
     let mut removed = HashSet::new();
     removed
         .try_reserve(plan.relationship_ids.len())
-        .map_err(|error| invalid(format!("cannot reserve sheet-removal index: {error}")))?;
+        .map_err(|source| allocation("sheet-removal index", source))?;
     for relationship_id in &plan.relationship_ids {
         if !removed.insert(*relationship_id) {
             return Err(invalid(format!(
@@ -523,7 +523,7 @@ pub(crate) fn remove(content: &[u8], plan: Remove<'_>) -> Result<Vec<u8>> {
     let mut old_to_new = Vec::new();
     old_to_new
         .try_reserve_exact(layout.sheet_slots.len())
-        .map_err(|error| invalid(format!("cannot reserve sheet-removal mapping: {error}")))?;
+        .map_err(|source| allocation("sheet-removal mapping", source))?;
     let mut next = 0usize;
     for slot in &layout.sheet_slots {
         if removed.remove(slot.relationship_id.as_ref()) {
@@ -560,7 +560,7 @@ pub(crate) fn remove(content: &[u8], plan: Remove<'_>) -> Result<Vec<u8>> {
                 .saturating_add(layout.workbook_views.len().max(1))
                 .saturating_add(layout.defined_name_slots.len()),
         )
-        .map_err(|error| invalid(format!("cannot reserve sheet removals: {error}")))?;
+        .map_err(|source| allocation("sheet removals", source))?;
     for (slot, mapped) in layout.sheet_slots.iter().zip(&old_to_new) {
         if mapped.is_none() {
             replacements.push(Replacement {
@@ -687,7 +687,7 @@ pub(crate) fn remove(content: &[u8], plan: Remove<'_>) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|error| invalid(format!("cannot reserve workbook removal output: {error}")))?;
+        .map_err(|source| allocation("workbook removal output", source))?;
     let mut cursor = 0usize;
     for replacement in replacements {
         output.extend_from_slice(&content[cursor..replacement.span.start]);
@@ -777,7 +777,7 @@ fn validate_order(layout: &Layout, order: &Order<'_>) -> Result<OrderMap> {
     let mut direct = HashMap::new();
     direct
         .try_reserve(layout.sheet_slots.len())
-        .map_err(|error| invalid(format!("cannot reserve sheet-order index: {error}")))?;
+        .map_err(|source| allocation("sheet-order index", source))?;
     for (old, slot) in layout.sheet_slots.iter().enumerate() {
         if direct.insert(slot.relationship_id.as_ref(), old).is_some() {
             return Err(invalid(format!(
@@ -789,20 +789,16 @@ fn validate_order(layout: &Layout, order: &Order<'_>) -> Result<OrderMap> {
 
     let mut seen = HashSet::new();
     seen.try_reserve(order.relationship_ids.len())
-        .map_err(|error| invalid(format!("cannot reserve sheet-order validation: {error}")))?;
+        .map_err(|source| allocation("sheet-order validation", source))?;
     let mut old_to_new = Vec::new();
     old_to_new
         .try_reserve_exact(order.relationship_ids.len())
-        .map_err(|error| {
-            invalid(format!(
-                "cannot reserve reverse sheet-order mapping: {error}"
-            ))
-        })?;
+        .map_err(|source| allocation("reverse sheet-order mapping", source))?;
     old_to_new.resize(order.relationship_ids.len(), 0usize);
     let mut new_to_old = Vec::new();
     new_to_old
         .try_reserve_exact(order.relationship_ids.len())
-        .map_err(|error| invalid(format!("cannot reserve sheet-order mapping: {error}")))?;
+        .map_err(|source| allocation("sheet-order mapping", source))?;
     for (new, relationship_id) in order.relationship_ids.iter().copied().enumerate() {
         if !seen.insert(relationship_id) {
             return Err(invalid(format!(
@@ -840,7 +836,7 @@ fn sheet_replacements(
     let mut updates = HashMap::<&str, Update<'_>>::new();
     updates
         .try_reserve(tabs.len().saturating_add(renames.len()))
-        .map_err(|error| invalid(format!("cannot reserve tab update index: {error}")))?;
+        .map_err(|source| allocation("tab update index", source))?;
     for tab in tabs {
         let update = updates.entry(tab.relationship_id).or_insert(Update {
             sheet: tab.sheet,

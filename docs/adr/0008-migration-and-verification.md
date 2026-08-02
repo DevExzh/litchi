@@ -2677,6 +2677,69 @@ and Agile profiles on that Word build. It does not certify Office edit/resave,
 PowerPoint or Excel UI behavior, AES-192/256 or SHA-2 profiles, Windows/web or
 older Office releases, or performance.
 
+## PPTX programmable-tag graph CRUD and typed allocation failures
+
+The canonical `litchi-pptx::tag` owner now carries direct presentation-root and
+common-slide-data programmable tags through the complete package graph instead
+of stopping at detached XML. Bounded singleton `load`, `put`, and `remove`
+operations move an owned `List`, derive or preserve Strict/Transitional
+dialect, validate candidate XML before commit, allocate relationship and part
+names with finite collision scans, and retain existing noncanonical part
+names. The direct `p:custDataLst/p:tags` anchor, its internal relationship, and
+its tag-list part change as one transaction while existing `p:custData`
+children remain intact and schema order is preserved.
+
+Owner preflight fails closed on duplicate or out-of-order common-slide-data
+children, on customer data placed after `p:tags`, and on any mismatch among
+the owner's Strict/Transitional namespace, the anchor's relationship namespace,
+the relationship type, and the tag-list part namespace. These failures occur
+before package mutation and preserve signatures and shared blobs.
+
+Replacement is byte-aware: an identical result preserves the original part
+allocation and package signatures. A shared target is forked and only the
+selected anchor is retargeted. Removal deletes a target only after a bounded
+package-wide inbound scan proves it orphaned, and repeated removal safely
+returns `None`. The high-level PPTX package hides raw identities behind short
+`tags`, `put_tags`, and `remove_tags` methods, with exact slide name as the
+common selector and checked slide position as the secondary path. It rejects a
+dirty legacy presentation writer because later materialization could replace
+the edited slide markup and relationships. Shape-level `nvPr` anchors remain
+distinct and are deliberately not flattened into slide results; typed shape
+authoring is pending, while the explicitly low-level relationship inventory
+continues to expose existing producer content.
+
+A native PowerPoint experiment caught the reason for this boundary. A
+relationship-only Litchi deck opened without a repair dialog, but PowerPoint
+silently removed the dangling relationship and tag part when the deck was
+edited and saved. In contrast, PowerPoint edited and resaved LibreOffice's
+`tdf103477.pptx` without removing any of its seven shape-anchored slide tag
+lists, and Litchi read all seven afterward.
+
+The corrected direct common-slide-data authoring then passed the same native
+macOS PowerPoint gate. PowerPoint opened
+`target/office-verification/pptx-tag-crud-anchored-generated.pptx` without a
+repair prompt, accepted a visible title edit, saved, closed, and reopened the
+deck cleanly. The PowerPoint-saved copy is
+`target/office-verification/pptx-tag-crud-anchored-powerpoint.pptx`; Litchi
+reverse-read both the edited title and
+`LITCHI_VERIFY=pptx-tag-crud-v1`. This verifies direct `p:cSld` tag persistence
+for that desktop build and workflow. It does not certify typed shape-tag
+authoring, other Office platforms or versions, or performance.
+
+The same safety pass replaces stringified capacity failures throughout the
+canonical XLSX owner with a typed `Allocation { resource, source }` error. All
+95 production fallible reservation sites now retain `TryReserveError`; the
+migration OOXML and XLSB seams preserve that source as well. The shared
+`litchi-core::Error` now carries the same typed allocation failure, so OOXML
+and CFB conversions no longer erase the allocator source at the umbrella API.
+This improves diagnostics without changing mutation ordering or making an
+unmeasured performance claim.
+
+Focused evidence is recorded after the corrected anchor implementation passes
+its canonical and facade tests, warning-denied Clippy, rustdoc, formatting, and
+diff validation. The previously green full-workspace gate is not repeated by
+explicit user direction.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

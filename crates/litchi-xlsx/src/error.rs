@@ -1,5 +1,7 @@
 //! Typed XLSX failures.
 
+use std::collections::TryReserveError;
+
 use thiserror::Error;
 
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
@@ -62,6 +64,15 @@ pub enum Error {
     /// An XLSX structural invariant is invalid.
     #[error("invalid XLSX structure: {0}")]
     Invalid(String),
+    /// A bounded XLSX operation could not reserve its required memory.
+    #[error("could not reserve memory for XLSX {resource}: {source}")]
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
+    },
     /// Two logical sheets would have the same locale-independent name.
     #[error(
         "sheet name '{name}' conflicts between positions {first} and {second} under Unicode caseless matching"
@@ -395,4 +406,31 @@ impl std::fmt::Display for EditBlock {
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+pub(crate) fn allocation(resource: &'static str, source: TryReserveError) -> Error {
+    Error::Allocation { resource, source }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error as _;
+
+    use super::{Error, allocation};
+
+    #[test]
+    fn allocation_preserves_resource_and_source() {
+        let mut values = Vec::<u8>::new();
+        let source = values
+            .try_reserve(usize::MAX)
+            .expect_err("usize::MAX must exceed Vec's maximum capacity");
+        let error = allocation("test buffer", source);
+
+        assert!(matches!(
+            &error,
+            Error::Allocation { resource, .. } if *resource == "test buffer"
+        ));
+        assert!(error.source().is_some());
+        assert!(error.to_string().contains("XLSX test buffer"));
+    }
 }

@@ -2,8 +2,9 @@
 use crate::encryption::{Limits, Mode};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
-use crate::pptx::presentation::{PptxChart, PptxTagList, Presentation};
+use crate::pptx::presentation::{PptxChart, Presentation};
 use crate::pptx::show_events::PptxSlideShowEvent;
+use crate::pptx::slide::Key as SlideKey;
 use crate::pptx::vba_project::{
     VbaProject, discover_vba_project, remove_vba_project as clear_presentation_vba,
     store_vba_project as store_presentation_vba_project,
@@ -18,6 +19,7 @@ use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::Part;
+use litchi_pptx::tag;
 use std::io::{Read, Seek};
 use std::path::Path;
 
@@ -717,12 +719,106 @@ impl Package {
         self.presentation()?.controls()
     }
 
-    /// Discover programmable tag-list parts reachable from presentation slides.
+    /// Read the programmable-tag list attached directly to one selected slide.
     ///
-    /// Tag names and values remain inert document strings and are never
-    /// evaluated, opened, followed as relationships, or executed.
-    pub fn tag_lists(&self) -> Result<Vec<PptxTagList>> {
-        self.presentation()?.tag_lists()
+    /// A producer-visible slide name is the ordinary selector and a checked
+    /// zero-based position is available for ordered workflows. Relationship
+    /// IDs and part names remain below this facade. The returned list owns its
+    /// bounded inert strings and retained extension attributes; tag values are
+    /// never interpreted.
+    ///
+    /// Shape-owned tag lists are intentionally not flattened into this result;
+    /// use the lower-level slide inventory when inspecting producer markup.
+    pub fn tags<'a>(&self, slide: impl Into<SlideKey<'a>>) -> Result<Option<tag::List>> {
+        self.ensure_tag_graph_current("tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        Ok(tag::load(&self.opc, &slide_name)?.map(tag::Source::into_list))
+    }
+
+    /// Put the direct programmable-tag list on one selected slide.
+    ///
+    /// The common path selects the slide by its producer-visible name. The
+    /// list is consumed by value and encoded without exposing relationship IDs
+    /// or part names.
+    ///
+    /// Existing content is replaced atomically and returned by value. `None`
+    /// means the selected slide did not previously own a direct tag list.
+    pub fn put_tags<'a>(
+        &mut self,
+        slide: impl Into<SlideKey<'a>>,
+        list: tag::List,
+    ) -> Result<Option<tag::List>> {
+        self.ensure_tag_graph_current("put_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        tag::put(&mut self.opc, &slide_name, list).map_err(Into::into)
+    }
+
+    /// Remove the direct tag list from one selected slide.
+    ///
+    /// Orphaned parts are collected only after a package-wide inbound-edge
+    /// scan proves that no other owner still references them.
+    ///
+    /// Returns `None` when the slide has no direct tag list, making repeated
+    /// removal safe and idempotent.
+    pub fn remove_tags<'a>(&mut self, slide: impl Into<SlideKey<'a>>) -> Result<Option<tag::List>> {
+        self.ensure_tag_graph_current("remove_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        tag::remove(&mut self.opc, &slide_name).map_err(Into::into)
+    }
+
+    fn ensure_tag_graph_current(&self, operation: &'static str) -> Result<()> {
+        if self
+            .mutable_pres
+            .as_ref()
+            .is_some_and(MutablePresentation::is_modified)
+        {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "the legacy writer has unflushed changes that could replace slide relationships; save and reopen before editing tags",
+            });
+        }
+        Ok(())
+    }
+
+    fn resolve_slide(&self, key: SlideKey<'_>) -> Result<PackURI> {
+        match key {
+            SlideKey::Index(index) => {
+                let presentation = self.presentation()?;
+                if let Some(slide) = presentation.slide(index)? {
+                    return Ok(slide.part().part().partname().clone());
+                }
+                Err(litchi_pptx::Error::SlideIndexOutOfBounds {
+                    index,
+                    len: presentation.slide_count()?,
+                }
+                .into())
+            },
+            SlideKey::Name(name) => {
+                let slides = self.presentation()?.slides()?;
+                let mut selected = None;
+                let mut matches = 0usize;
+                for slide in &slides {
+                    if slide.name()?.as_str() == name.as_ref() {
+                        matches = matches.saturating_add(1);
+                        if selected.is_none() {
+                            selected = Some(slide.part().part().partname().clone());
+                        }
+                    }
+                }
+                match (selected, matches) {
+                    (Some(part), 1) => Ok(part),
+                    (None, 0) => {
+                        Err(litchi_pptx::Error::SlideNameNotFound(name.into_owned()).into())
+                    },
+                    (_, matches) => Err(litchi_pptx::Error::AmbiguousSlideName {
+                        name: name.into_owned(),
+                        matches,
+                    }
+                    .into()),
+                }
+            },
+        }
     }
 
     /// Load typed presentation-view settings, if the package contains them.

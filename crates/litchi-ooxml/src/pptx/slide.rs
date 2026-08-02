@@ -11,6 +11,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use std::borrow::Cow;
 
 const STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideLayout";
@@ -18,22 +19,6 @@ const STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
 const STRICT_THEME_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
-
-fn tag_error(error: litchi_pptx::Error) -> OoxmlError {
-    match error {
-        litchi_pptx::Error::Opc(error) => OoxmlError::Opc(error),
-        litchi_pptx::Error::Xml(message) => OoxmlError::Xml(message),
-        litchi_pptx::Error::Invalid(message) => OoxmlError::InvalidFormat(message),
-        litchi_pptx::Error::ContentType { expected, actual } => OoxmlError::InvalidContentType {
-            expected,
-            got: actual,
-        },
-        litchi_pptx::Error::MarkupCompatibility(error) => error.into(),
-        litchi_pptx::Error::Decode(error) => error.into(),
-        error @ litchi_pptx::Error::Limit { .. } => OoxmlError::Pptx(error),
-        other => OoxmlError::InvalidFormat(other.to_string()),
-    }
-}
 
 fn resolve_picture_background(
     source_part: &dyn Part,
@@ -129,6 +114,43 @@ fn picture_background_reference(
     }
 
     Ok(None)
+}
+
+/// A developer-facing slide selector.
+///
+/// The common path uses the producer-visible slide name. A checked zero-based
+/// position remains available for ordered workflows; native slide IDs and
+/// relationship IDs are deliberately not accepted by the safe facade.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Key<'a> {
+    /// Select a slide by its `p:cSld@name` value.
+    Name(Cow<'a, str>),
+    /// Select a slide by its zero-based presentation position.
+    Index(usize),
+}
+
+impl<'a> From<&'a str> for Key<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Name(Cow::Borrowed(value))
+    }
+}
+
+impl From<String> for Key<'_> {
+    fn from(value: String) -> Self {
+        Self::Name(Cow::Owned(value))
+    }
+}
+
+impl<'a> From<&'a String> for Key<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::Name(Cow::Borrowed(value.as_str()))
+    }
+}
+
+impl From<usize> for Key<'_> {
+    fn from(value: usize) -> Self {
+        Self::Index(value)
+    }
 }
 
 /// A slide in a presentation.
@@ -243,15 +265,34 @@ impl<'a> Slide<'a> {
         &self.part
     }
 
-    /// Load all programmable tag-list parts related to this slide in stable
-    /// ascending relationship-ID order.
-    pub fn tag_lists(&self) -> Result<Vec<litchi_pptx::tag::Source>> {
+    /// Read the optional programmable-tag list attached directly to this slide.
+    ///
+    /// Shape-owned and unanchored relationships are not flattened into the
+    /// slide-level result.
+    pub fn tags(&self) -> Result<Option<litchi_pptx::tag::List>> {
         let package = self.package.ok_or_else(|| {
             crate::error::OoxmlError::InvalidFormat(
-                "slide tag lists require package-backed slide access".into(),
+                "slide tags require package-backed slide access".into(),
             )
         })?;
-        litchi_pptx::tag::discover(self.part.part(), package).map_err(tag_error)
+        Ok(
+            litchi_pptx::tag::load(package, self.part.part().partname())?
+                .map(litchi_pptx::tag::Source::into_list),
+        )
+    }
+
+    /// Inspect all tag relationships on this slide in stable relationship-ID
+    /// order, including shape-owned and unanchored producer markup.
+    ///
+    /// This is a low-level diagnostic inventory. Use [`Self::tags`] for the
+    /// semantic slide-level attachment.
+    pub fn tag_inventory(&self) -> Result<Vec<litchi_pptx::tag::Source>> {
+        let package = self.package.ok_or_else(|| {
+            crate::error::OoxmlError::InvalidFormat(
+                "slide tag inventory requires package-backed slide access".into(),
+            )
+        })?;
+        litchi_pptx::tag::discover(self.part.part(), package).map_err(Into::into)
     }
 
     /// Load typed audio and video pictures with their inert internal resources.
@@ -1255,10 +1296,11 @@ mod tests {
 
     #[test]
     fn tag_resource_limits_remain_typed_across_the_host_seam() {
-        let mapped = tag_error(litchi_pptx::Error::Limit {
+        let mapped: OoxmlError = litchi_pptx::Error::Limit {
             resource: "tag count",
             limit: 7,
-        });
+        }
+        .into();
         assert!(matches!(
             mapped,
             OoxmlError::Pptx(litchi_pptx::Error::Limit {

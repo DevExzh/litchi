@@ -1,5 +1,6 @@
 //! Error types for XLSB file parsing
 
+use std::collections::TryReserveError;
 use std::fmt;
 
 /// Result type alias for XLSB operations
@@ -49,7 +50,12 @@ pub enum XlsbError {
     /// Encoding error
     Encoding(String),
     /// A bounded host-side operation could not reserve required memory.
-    Allocation(&'static str),
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        source: TryReserveError,
+    },
     /// Shared DrawingML parsing error.
     Drawing(litchi_drawingml::Error),
     /// Shared host-neutral OOXML package-service error.
@@ -117,8 +123,8 @@ impl fmt::Display for XlsbError {
             XlsbError::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
             },
-            XlsbError::Allocation(resource) => {
-                write!(f, "allocation failed for {resource}")
+            XlsbError::Allocation { resource, source } => {
+                write!(f, "allocation failed for {resource}: {source}")
             },
             XlsbError::Drawing(error) => write!(f, "DrawingML error: {error}"),
             XlsbError::Common(error) => write!(f, "shared OOXML error: {error}"),
@@ -149,6 +155,7 @@ impl std::error::Error for XlsbError {
             XlsbError::Xml(e) => Some(e),
             XlsbError::Wire(e) => Some(e),
             XlsbError::Calc(e) => Some(e),
+            XlsbError::Allocation { source, .. } => Some(source),
             XlsbError::Drawing(e) => Some(e),
             XlsbError::Common(e) => Some(e),
             XlsbError::Vba(e) => Some(e),
@@ -248,12 +255,18 @@ impl From<crate::error::OoxmlError> for XlsbError {
             crate::error::OoxmlError::Docx(err) => XlsbError::Encoding(err.to_string()),
             crate::error::OoxmlError::Pptx(err) => XlsbError::Encoding(err.to_string()),
             crate::error::OoxmlError::Xlsb(err) => XlsbError::Wire(err),
+            crate::error::OoxmlError::Xlsx(litchi_xlsx::Error::Allocation { resource, source }) => {
+                XlsbError::Allocation { resource, source }
+            },
+            crate::error::OoxmlError::Xlsx(err) => XlsbError::Encoding(err.to_string()),
             #[cfg(feature = "encryption")]
             crate::error::OoxmlError::Crypto(err) => XlsbError::Crypto(err),
             crate::error::OoxmlError::Io(e) => XlsbError::Io(e),
             crate::error::OoxmlError::Common(err) => XlsbError::Common(err),
             crate::error::OoxmlError::Vba(err) => XlsbError::Vba(err),
-            crate::error::OoxmlError::Allocation(resource) => XlsbError::Allocation(resource),
+            crate::error::OoxmlError::Allocation { resource, source } => {
+                XlsbError::Allocation { resource, source }
+            },
             crate::error::OoxmlError::UnsafeEdit {
                 format,
                 operation,

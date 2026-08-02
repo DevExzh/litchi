@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use litchi_ooxml_common::web::Panes;
 
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 
 pub(crate) const MAX_BINDINGS: usize = 65_536;
 pub(crate) const MAX_STRING_BYTES: usize = 32_767;
@@ -163,7 +163,7 @@ impl Bindings {
         let string_bytes = checked_total(self.string_bytes, binding.string_bytes()?)?;
         self.values
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot grow worksheet web bindings: {error}")))?;
+            .map_err(|source| allocation("worksheet web bindings", source))?;
         self.values.push(binding);
         self.string_bytes = string_bytes;
         Ok(self)
@@ -345,11 +345,8 @@ impl<'a> Refs<'a> {
                 )));
             }
             bounded_nonempty(value, "MS-OWEXML binding appRef")?;
-            refs.try_reserve(1).map_err(|error| {
-                invalid(format!(
-                    "cannot grow MS-OWEXML binding reference set: {error}"
-                ))
-            })?;
+            refs.try_reserve(1)
+                .map_err(|source| allocation("MS-OWEXML binding reference set", source))?;
             if !refs.insert(value) {
                 return Err(invalid(format!(
                     "duplicate MS-OWEXML binding appRef '{value}'"
@@ -418,11 +415,8 @@ fn validate_values(values: &[Binding]) -> Result<usize> {
         )));
     }
     let mut seen = HashSet::new();
-    seen.try_reserve(values.len()).map_err(|error| {
-        invalid(format!(
-            "cannot reserve worksheet web-binding validation state: {error}"
-        ))
-    })?;
+    seen.try_reserve(values.len())
+        .map_err(|source| allocation("worksheet web-binding validation state", source))?;
     let mut string_bytes = 0usize;
     for value in values {
         value.validate()?;

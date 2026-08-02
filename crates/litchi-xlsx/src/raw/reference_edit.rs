@@ -12,7 +12,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, RenameBlock, Result, invalid};
+use crate::error::{Error, RenameBlock, Result, allocation, invalid};
 use crate::raw::formula;
 use crate::raw::namespace::relationship_attribute_value;
 
@@ -326,7 +326,7 @@ pub(crate) fn rewrite(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|error| invalid(format!("cannot reserve sheet-reference output: {error}")))?;
+        .map_err(|source| allocation("sheet-reference output", source))?;
     let mut cursor = 0usize;
     for replacement in replacements {
         output.extend_from_slice(&content[cursor..replacement.span.start]);

@@ -60,6 +60,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             println!("Text :\n{}", text);
         }
+        if let Some(list) = slide.tags()? {
+            println!("Slide tags:");
+            for tag in &list {
+                println!("  {} = {}", tag.name(), tag.value());
+            }
+        }
     }
 
     Ok(())

@@ -233,9 +233,9 @@ impl From<OleError> for litchi_core::Error {
     fn from(err: OleError) -> Self {
         match err {
             OleError::Io(e) => litchi_core::Error::Io(e),
-            OleError::Allocation { resource, source } => litchi_core::Error::Other(format!(
-                "could not reserve memory for CFB {resource}: {source}"
-            )),
+            OleError::Allocation { resource, source } => {
+                litchi_core::Error::Allocation { resource, source }
+            },
             OleError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             OleError::InvalidData(s) => litchi_core::Error::InvalidFormat(s),
             OleError::NotOleFile => litchi_core::Error::NotOfficeFile,

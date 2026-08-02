@@ -21,7 +21,6 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::Part;
 /// Main presentation object - the high-level API for working with presentations.
-use litchi_pptx::tag::{List as TagList, Source as TagSource};
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -143,57 +142,6 @@ impl PptxChart {
     #[inline]
     pub fn info(&self) -> &crate::pptx::parts::ChartInfo {
         &self.info
-    }
-}
-
-/// A programmable tag-list part discovered on a presentation slide.
-///
-/// Tag names and values are retained only as inert document strings. They are
-/// never interpreted as XML, paths, commands, or relationship targets.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxTagList {
-    slide_index: usize,
-    tag_list_index: usize,
-    value: TagSource,
-}
-
-impl PptxTagList {
-    /// Return the zero-based index of the slide that owns this tag-list part.
-    #[inline]
-    pub fn slide_index(&self) -> usize {
-        self.slide_index
-    }
-
-    /// Return the zero-based stable relationship-ID-order index on its slide.
-    ///
-    /// OPC relationship storage does not retain XML source order.
-    #[inline]
-    pub fn tag_list_index(&self) -> usize {
-        self.tag_list_index
-    }
-
-    /// Return the relationship ID from the owning slide to this tag-list part.
-    #[inline]
-    pub fn relationship_id(&self) -> &str {
-        self.value.rel()
-    }
-
-    /// Return the absolute OPC part name of this tag-list part.
-    #[inline]
-    pub fn part_name(&self) -> &str {
-        self.value.part().as_str()
-    }
-
-    /// Return the parsed inert programmable tags.
-    #[inline]
-    pub fn tag_list(&self) -> &TagList {
-        self.value.list()
-    }
-
-    /// Return the underlying slide-scoped source descriptor.
-    #[inline]
-    pub fn source(&self) -> &TagSource {
-        &self.value
     }
 }
 
@@ -608,7 +556,20 @@ impl<'a> Presentation<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn slide(&self, index: usize) -> Result<Option<Slide<'a>>> {
-        Ok(self.slides()?.into_iter().nth(index))
+        let slide_rids = self.part.slide_rids()?;
+        let Some(relationship_id) = slide_rids.get(index) else {
+            return Ok(None);
+        };
+        let slide = resolve_presentation_relationship(
+            self.part.part(),
+            self.package,
+            relationship_id,
+            &[rt::SLIDE, STRICT_SLIDE_RELATIONSHIP_TYPE],
+            "slide",
+            ct::PML_SLIDE,
+        )?;
+        let slide_part = SlidePart::from_part(slide)?;
+        Ok(Some(Slide::with_package(slide_part, self.package)))
     }
 
     // ========================================================================
@@ -1104,30 +1065,6 @@ impl<'a> Presentation<'a> {
     /// retained as document metadata and are never fetched.
     pub fn caption_tracks(&self) -> Result<Vec<crate::pptx::tracks::PresentationTrack>> {
         crate::pptx::tracks::load_presentation_tracks(self.package)
-    }
-
-    /// Discover programmable tag-list parts reachable from presentation slides.
-    ///
-    /// Slides retain presentation order; lists within each slide use stable
-    /// ascending relationship-ID order because OPC storage does not retain the
-    /// source `.rels` element order.
-    ///
-    /// Tag names and values remain inert document strings. This never follows
-    /// values as paths or relationships, evaluates markup, or executes commands.
-    pub fn tag_lists(&self) -> Result<Vec<PptxTagList>> {
-        let mut tag_lists = Vec::new();
-
-        for (slide_index, slide) in self.slides()?.iter().enumerate() {
-            tag_lists.extend(slide.tag_lists()?.into_iter().enumerate().map(
-                |(tag_list_index, value)| PptxTagList {
-                    slide_index,
-                    tag_list_index,
-                    value,
-                },
-            ));
-        }
-
-        Ok(tag_lists)
     }
 
     /// Load typed presentation-view settings, if the package contains them.

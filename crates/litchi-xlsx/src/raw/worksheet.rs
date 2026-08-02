@@ -17,7 +17,7 @@ use super::namespace::is_spreadsheetml_name;
 use super::strings::decode_spreadsheet_text;
 use crate::cell::{Cell, Date, ErrorValue, Number, Store, Stored, Text, Unknown, Value};
 use crate::column::{self, Assignments, Flags};
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 use crate::formula::{Cache, Formula, Kind};
 use crate::layout::{self, Defaults};
 use crate::row;
@@ -337,7 +337,7 @@ impl Parser {
         let mut cells = Vec::new();
         cells
             .try_reserve(parser.cells.len())
-            .map_err(|error| invalid(format!("cannot reserve sparse worksheet cells: {error}")))?;
+            .map_err(|source| allocation("sparse worksheet cells", source))?;
         let declared_extent = parser.declared_extent;
         let rows = parser.rows;
         let columns = column::resolve(parser.columns)?;
@@ -450,7 +450,7 @@ impl Parser {
             }
             self.merges
                 .try_reserve(1)
-                .map_err(|error| invalid(format!("cannot grow merged ranges: {error}")))?;
+                .map_err(|source| allocation("merged ranges", source))?;
             self.merges.push(range);
             return Ok(Context::Merge);
         }
@@ -919,7 +919,7 @@ impl Parser {
                     })?;
                 cell.formula
                     .try_reserve(value.len())
-                    .map_err(|error| invalid(format!("cannot grow worksheet formula: {error}")))?;
+                    .map_err(|source| allocation("worksheet formula", source))?;
                 cell.formula.push_str(value);
             },
             TextTarget::Value => {
@@ -930,7 +930,7 @@ impl Parser {
                     .ok_or_else(|| invalid("worksheet value text is too large"))?;
                 cell.value
                     .try_reserve(value.len())
-                    .map_err(|error| invalid(format!("cannot grow worksheet value: {error}")))?;
+                    .map_err(|source| allocation("worksheet value", source))?;
                 cell.value.push_str(value);
             },
             TextTarget::Inline => {
@@ -939,9 +939,9 @@ impl Parser {
                     .checked_add(value.len())
                     .filter(|length| *length <= MAX_ENCODED_CELL_BYTES)
                     .ok_or_else(|| invalid("worksheet inline text is too large"))?;
-                cell.inline.try_reserve(value.len()).map_err(|error| {
-                    invalid(format!("cannot grow worksheet inline text: {error}"))
-                })?;
+                cell.inline
+                    .try_reserve(value.len())
+                    .map_err(|source| allocation("worksheet inline text", source))?;
                 cell.inline.push_str(value);
             },
         }
@@ -1031,7 +1031,7 @@ impl Parser {
         });
         self.cells
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot grow sparse worksheet cells: {error}")))?;
+            .map_err(|source| allocation("sparse worksheet cells", source))?;
         self.cells.push(RawCell {
             address,
             style: cell.style,
@@ -1055,7 +1055,7 @@ impl Parser {
             .ok_or_else(|| invalid("missing worksheet row"))?;
         self.rows
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot grow sparse worksheet rows: {error}")))?;
+            .map_err(|source| allocation("sparse worksheet rows", source))?;
         self.rows.push(row::Stored::new(
             RowIndex::new(row.number - 1)?,
             row.properties,

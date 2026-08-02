@@ -1,4 +1,6 @@
 /// Error types for OOXML operations.
+use std::collections::TryReserveError;
+
 use thiserror::Error;
 
 /// Result type for OOXML operations.
@@ -48,6 +50,10 @@ pub enum OoxmlError {
     #[error("XLSB error: {0}")]
     Xlsb(#[from] litchi_xlsb::Error),
 
+    /// Canonical SpreadsheetML capability error.
+    #[error("XLSX error: {0}")]
+    Xlsx(#[from] litchi_xlsx::Error),
+
     /// Canonical bounded Office encrypted-package failure.
     #[cfg(feature = "encryption")]
     #[error("Office cryptography error: {0}")]
@@ -66,8 +72,14 @@ pub enum OoxmlError {
     Io(#[from] std::io::Error),
 
     /// A bounded host-side operation could not reserve required memory.
-    #[error("OOXML allocation failed for {0}")]
-    Allocation(&'static str),
+    #[error("OOXML allocation failed for {resource}: {source}")]
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
+    },
 
     /// Invalid URI
     #[error("Invalid URI: {0}")]
@@ -115,15 +127,22 @@ impl From<OoxmlError> for litchi_core::Error {
             OoxmlError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             OoxmlError::Drawing(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Docx(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::Pptx(litchi_pptx::Error::Allocation { resource, source }) => {
+                litchi_core::Error::Allocation { resource, source }
+            },
             OoxmlError::Pptx(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Xlsb(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::Xlsx(litchi_xlsx::Error::Allocation { resource, source }) => {
+                litchi_core::Error::Allocation { resource, source }
+            },
+            OoxmlError::Xlsx(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             #[cfg(feature = "encryption")]
             OoxmlError::Crypto(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Common(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Vba(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),
-            OoxmlError::Allocation(resource) => {
-                litchi_core::Error::Other(format!("OOXML allocation failed for {resource}"))
+            OoxmlError::Allocation { resource, source } => {
+                litchi_core::Error::Allocation { resource, source }
             },
             OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),
             OoxmlError::UnsafeEdit {
@@ -147,5 +166,34 @@ impl From<litchi_ooxml_common::MceError> for OoxmlError {
 impl From<litchi_ooxml_common::XmlError> for OoxmlError {
     fn from(error: litchi_ooxml_common::XmlError) -> Self {
         Self::Common(litchi_ooxml_common::Error::Decode(error))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error as _;
+
+    use super::OoxmlError;
+
+    #[test]
+    fn allocation_failure_retains_its_source() {
+        let mut bytes = Vec::<u8>::new();
+        let source = bytes
+            .try_reserve(usize::MAX)
+            .expect_err("usize::MAX cannot be a valid Vec capacity");
+        let error = OoxmlError::Allocation {
+            resource: "test plan",
+            source,
+        };
+
+        assert!(error.source().is_some());
+        assert!(error.to_string().contains("test plan"));
+
+        let core = litchi_core::Error::from(error);
+        assert!(matches!(
+            &core,
+            litchi_core::Error::Allocation { resource, .. } if *resource == "test plan"
+        ));
+        assert!(core.source().is_some());
     }
 }

@@ -518,20 +518,16 @@ impl Workbook {
         let invalid = |error: Box<dyn std::error::Error + Send + Sync>| {
             crate::error::OoxmlError::InvalidFormat(error.to_string())
         };
-        let package_refs = Refs::from_panes(panes).map_err(|error| invalid(Box::new(error)))?;
+        let package_refs = Refs::from_panes(panes)?;
         for (index, worksheet) in self.worksheets.iter().enumerate() {
             if let Some(bindings) = self.worksheet_web_binding_mutations.get(&index) {
-                package_refs
-                    .check(bindings)
-                    .map_err(|error| invalid(Box::new(error)))?;
+                package_refs.check(bindings)?;
                 continue;
             }
             let uri = self.worksheet_part_uri(worksheet).map_err(invalid)?;
             let part = self.package.get_part(&uri)?;
-            let bindings = raw_web::read(part.blob()).map_err(|error| invalid(Box::new(error)))?;
-            package_refs
-                .check(&bindings)
-                .map_err(|error| invalid(Box::new(error)))?;
+            let bindings = raw_web::read(part.blob())?;
+            package_refs.check(&bindings)?;
         }
         Ok(())
     }
@@ -2579,7 +2575,10 @@ impl Workbook {
         let mut originals = Vec::new();
         originals
             .try_reserve_exact(staged.len())
-            .map_err(|_| crate::error::OoxmlError::Allocation("worksheet restoration plan"))?;
+            .map_err(|source| crate::error::OoxmlError::Allocation {
+                resource: "worksheet restoration plan",
+                source,
+            })?;
         for (uri, original, replacement) in staged {
             self.package.get_part_mut(&uri)?.set_blob(replacement);
             originals.push((uri, original));

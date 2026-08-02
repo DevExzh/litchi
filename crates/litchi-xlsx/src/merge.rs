@@ -6,7 +6,7 @@ use std::iter::FusedIterator;
 
 use litchi_sheet::{Cell as Address, Rect};
 
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 
 /// One valid merged-range membership transition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,16 +113,16 @@ impl Index {
         let mut indices = Vec::new();
         indices
             .try_reserve_exact(ranges.len())
-            .map_err(|error| invalid(format!("cannot reserve merged-range indexes: {error}")))?;
+            .map_err(|source| allocation("merged-range indexes", source))?;
         indices.extend(0..count);
         let mut nodes = Vec::new();
         nodes
             .try_reserve_exact(ranges.len())
-            .map_err(|error| invalid(format!("cannot reserve merged-range tree: {error}")))?;
+            .map_err(|source| allocation("merged-range tree", source))?;
         let mut spans = Vec::new();
         spans
             .try_reserve_exact(ranges.len())
-            .map_err(|error| invalid(format!("cannot reserve merged-range spans: {error}")))?;
+            .map_err(|source| allocation("merged-range spans", source))?;
         let root = build(&ranges, indices, &mut nodes, &mut spans)?;
         Ok(Self {
             ranges: ranges.into_boxed_slice(),
@@ -207,15 +207,15 @@ fn build(
     let mut lower = Vec::new();
     lower
         .try_reserve_exact(lower_count)
-        .map_err(|error| invalid(format!("cannot reserve lower merge tree: {error}")))?;
+        .map_err(|source| allocation("lower merge tree", source))?;
     let mut spanning = Vec::new();
     spanning
         .try_reserve_exact(spanning_count)
-        .map_err(|error| invalid(format!("cannot reserve spanning merge tree: {error}")))?;
+        .map_err(|source| allocation("spanning merge tree", source))?;
     let mut upper = Vec::new();
     upper
         .try_reserve_exact(upper_count)
-        .map_err(|error| invalid(format!("cannot reserve upper merge tree: {error}")))?;
+        .map_err(|source| allocation("upper merge tree", source))?;
     for index in indices {
         let range = ranges
             .get(usize::try_from(index).map_err(|_| invalid("merge index does not fit usize"))?)

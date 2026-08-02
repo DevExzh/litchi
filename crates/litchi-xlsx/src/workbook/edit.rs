@@ -15,7 +15,9 @@ use crate::cell::{Cell, Content, Stored};
 use crate::column::{
     Flags as ColumnFlags, Outline, OutlineAt, Props as ColumnProps, State as ColumnState, WidthAt,
 };
-use crate::error::{EditBlock, Error, MergeEditBlock, RemoveBlock, Result, TabEditBlock, invalid};
+use crate::error::{
+    EditBlock, Error, MergeEditBlock, RemoveBlock, Result, TabEditBlock, allocation, invalid,
+};
 use crate::layout::{self, Defaults};
 use crate::raw;
 use crate::raw::worksheet::edit::{
@@ -427,7 +429,7 @@ fn project_merges(
     let mut projected = Vec::new();
     projected
         .try_reserve_exact(base.len())
-        .map_err(|error| invalid(format!("cannot reserve merged-range projection: {error}")))?;
+        .map_err(|source| allocation("merged-range projection", source))?;
     projected.extend_from_slice(base);
     for intent in intents {
         match intent {
@@ -454,9 +456,9 @@ fn project_merges(
                         reason: MergeEditBlock::FollowerContent { address },
                     });
                 }
-                projected.try_reserve(1).map_err(|error| {
-                    invalid(format!("cannot grow merged-range projection: {error}"))
-                })?;
+                projected
+                    .try_reserve(1)
+                    .map_err(|source| allocation("merged-range projection", source))?;
                 projected.push(range);
             },
             MergeIntent::Remove(range) => projected.retain(|candidate| *candidate != range),
@@ -468,7 +470,7 @@ fn project_merges(
     let mut remove = Vec::new();
     remove
         .try_reserve_exact(base.len())
-        .map_err(|error| invalid(format!("cannot reserve removed merged ranges: {error}")))?;
+        .map_err(|source| allocation("removed merged ranges", source))?;
     remove.extend(
         base.iter()
             .copied()
@@ -476,7 +478,7 @@ fn project_merges(
     );
     let mut add = Vec::new();
     add.try_reserve_exact(projected.len())
-        .map_err(|error| invalid(format!("cannot reserve added merged ranges: {error}")))?;
+        .map_err(|source| allocation("added merged ranges", source))?;
     add.extend(
         projected
             .iter()
@@ -489,7 +491,7 @@ fn project_merges(
     let mut changes = Vec::new();
     changes
         .try_reserve_exact(remove.len().saturating_add(add.len()))
-        .map_err(|error| invalid(format!("cannot reserve merged-range changes: {error}")))?;
+        .map_err(|source| allocation("merged-range changes", source))?;
     changes.extend(
         remove
             .iter()
@@ -1807,9 +1809,8 @@ impl FinalOrder {
         for (index, sheet) in added.iter().enumerate() {
             match sheet.placement {
                 Placement::Tail => {
-                    tail.try_reserve(1).map_err(|error| {
-                        invalid(format!("cannot reserve appended worksheet order: {error}"))
-                    })?;
+                    tail.try_reserve(1)
+                        .map_err(|source| allocation("appended worksheet order", source))?;
                     tail.push(index);
                 },
                 Placement::Before(anchor) | Placement::After(anchor) => {
@@ -1822,9 +1823,9 @@ impl FinalOrder {
                     } else {
                         &mut slots.after
                     };
-                    targets.try_reserve(1).map_err(|error| {
-                        invalid(format!("cannot reserve anchored worksheet order: {error}"))
-                    })?;
+                    targets
+                        .try_reserve(1)
+                        .map_err(|source| allocation("anchored worksheet order", source))?;
                     targets.push(index);
                 },
             }
@@ -1833,7 +1834,7 @@ impl FinalOrder {
         let mut targets = Vec::new();
         targets
             .try_reserve_exact(final_len)
-            .map_err(|error| invalid(format!("cannot reserve final worksheet order: {error}")))?;
+            .map_err(|source| allocation("final worksheet order", source))?;
         let mut push_base = |identity: usize| -> Result<()> {
             if identity >= base_len {
                 return Err(invalid("base worksheet order contains an unknown identity"));
@@ -1866,12 +1867,12 @@ impl FinalOrder {
         let mut base_positions = Vec::new();
         base_positions
             .try_reserve_exact(base_len)
-            .map_err(|error| invalid(format!("cannot reserve base tab positions: {error}")))?;
+            .map_err(|source| allocation("base tab positions", source))?;
         base_positions.resize(base_len, usize::MAX);
         let mut added_positions = Vec::new();
         added_positions
             .try_reserve_exact(added.len())
-            .map_err(|error| invalid(format!("cannot reserve new tab positions: {error}")))?;
+            .map_err(|source| allocation("new tab positions", source))?;
         added_positions.resize(added.len(), usize::MAX);
         for (position, target) in targets.iter().copied().enumerate() {
             let slot = match target {
@@ -2445,7 +2446,7 @@ impl Edit {
         let mut final_names = HashMap::<&str, usize>::new();
         final_names
             .try_reserve(final_len)
-            .map_err(|error| invalid(format!("cannot reserve final sheet-name index: {error}")))?;
+            .map_err(|source| allocation("final sheet-name index", source))?;
         for (position, target) in final_order.targets.iter().copied().enumerate() {
             let (name, key) = match target {
                 Target::Base(identity) => {
@@ -3173,11 +3174,7 @@ impl Edit {
             let mut property_order = Vec::new();
             property_order
                 .try_reserve_exact(final_order.len())
-                .map_err(|error| {
-                    invalid(format!(
-                        "cannot reserve extended-properties sheet order: {error}"
-                    ))
-                })?;
+                .map_err(|source| allocation("extended-properties sheet order", source))?;
             for target in final_order.targets.iter().copied() {
                 property_order.push(match target {
                     Target::Base(identity) => raw::properties_edit::Sheet::Existing(identity),
@@ -3362,9 +3359,7 @@ impl Edit {
                 let mut relationship_ids = Vec::new();
                 relationship_ids
                     .try_reserve_exact(final_order.len())
-                    .map_err(|error| {
-                        invalid(format!("cannot reserve final catalog order: {error}"))
-                    })?;
+                    .map_err(|source| allocation("final catalog order", source))?;
                 for target in final_order.targets.iter().copied() {
                     relationship_ids.push(match target {
                         Target::Base(identity) => base
@@ -3551,7 +3546,7 @@ impl Edit {
         let mut graph = Vec::new();
         graph
             .try_reserve(created.len().saturating_add(calculation_graph.len()))
-            .map_err(|error| invalid(format!("cannot reserve package graph changes: {error}")))?;
+            .map_err(|source| allocation("package graph changes", source))?;
         graph.extend(created.into_iter().map(|sheet| sheet.graph));
         graph.extend(calculation_graph);
 
@@ -3652,7 +3647,7 @@ impl Edit {
         }
         self.added
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot reserve worksheet creation: {error}")))?;
+            .map_err(|source| allocation("worksheet creation", source))?;
         let index = self.added.len();
         self.added.push(Added {
             name,
@@ -3746,7 +3741,7 @@ impl Edit {
             let mut positions = Vec::new();
             positions
                 .try_reserve_exact(len)
-                .map_err(|error| invalid(format!("cannot reserve tab-order plan: {error}")))?;
+                .map_err(|source| allocation("tab-order plan", source))?;
             positions.extend(0..len);
             self.order = Some(OrderPlan {
                 positions,
@@ -3774,7 +3769,7 @@ impl Edit {
         order
             .moves
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot reserve tab move: {error}")))?;
+            .map_err(|source| allocation("tab move", source))?;
         let identity = order.positions.remove(from);
         order.positions.insert(to, identity);
         order.moves.push(MoveIntent {
@@ -3801,7 +3796,7 @@ impl Edit {
         order
             .moves
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot reserve tab move: {error}")))?;
+            .map_err(|source| allocation("tab move", source))?;
         let identity = order.positions.remove(from);
         let anchor = order
             .positions
@@ -4231,7 +4226,7 @@ impl SheetEdit<'_> {
         let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
         intents
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot grow merged-range edit plan: {error}")))?;
+            .map_err(|source| allocation("merged-range edit plan", source))?;
         intents.push(MergeIntent::Add(range));
         Ok(self)
     }
@@ -4265,7 +4260,7 @@ impl SheetEdit<'_> {
         let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
         intents
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot grow merged-range edit plan: {error}")))?;
+            .map_err(|source| allocation("merged-range edit plan", source))?;
         intents.push(MergeIntent::Remove(range));
         Ok(self)
     }
@@ -4468,9 +4463,11 @@ impl NewSheet<'_> {
     pub fn merge<'b>(&mut self, area: impl Into<Area<'b>>) -> Result<&mut Self> {
         let range = area.into().resolve()?;
         ensure_merge_area(self.added.name.as_str(), range)?;
-        self.added.actions.merges.try_reserve(1).map_err(|error| {
-            invalid(format!("cannot grow new-sheet merged-range plan: {error}"))
-        })?;
+        self.added
+            .actions
+            .merges
+            .try_reserve(1)
+            .map_err(|source| allocation("new-sheet merged-range plan", source))?;
         self.added.actions.merges.push(MergeIntent::Add(range));
         Ok(self)
     }
@@ -4481,9 +4478,11 @@ impl NewSheet<'_> {
         let Some(range) = pending_merge(&[], &self.added.actions.merges, address) else {
             return Ok(self);
         };
-        self.added.actions.merges.try_reserve(1).map_err(|error| {
-            invalid(format!("cannot grow new-sheet merged-range plan: {error}"))
-        })?;
+        self.added
+            .actions
+            .merges
+            .try_reserve(1)
+            .map_err(|source| allocation("new-sheet merged-range plan", source))?;
         self.added.actions.merges.push(MergeIntent::Remove(range));
         Ok(self)
     }
@@ -5080,7 +5079,7 @@ fn commit_removals(edit: Edit) -> Result<Commit> {
     let mut changes = Vec::new();
     changes
         .try_reserve(removed.len().saturating_add(1))
-        .map_err(|error| invalid(format!("cannot reserve worksheet-removal changes: {error}")))?;
+        .map_err(|source| allocation("worksheet-removal changes", source))?;
     for position in &removed {
         let sheet = base
             .inner
@@ -5163,7 +5162,7 @@ fn commit_removals(edit: Edit) -> Result<Commit> {
     let mut graph = Vec::new();
     graph
         .try_reserve(removed.len().saturating_add(1))
-        .map_err(|error| invalid(format!("cannot reserve worksheet graph removals: {error}")))?;
+        .map_err(|source| allocation("worksheet graph removals", source))?;
     for position in &removed {
         let sheet = base
             .inner
@@ -5242,7 +5241,7 @@ fn verify_removed_defined_names(
     let mut expected = Vec::new();
     expected
         .try_reserve_exact(workbook.inner.defined_names.len())
-        .map_err(|error| invalid(format!("cannot reserve defined-name verification: {error}")))?;
+        .map_err(|source| allocation("defined-name verification", source))?;
     for name in &workbook.inner.defined_names {
         let scope = name
             .local_sheet_id
@@ -5386,7 +5385,7 @@ fn reachable_after_removal(
     let mut reachable = HashSet::<PackURI>::new();
     reachable
         .try_reserve(workbook.inner.package.part_count())
-        .map_err(|error| invalid(format!("cannot reserve reachable package graph: {error}")))?;
+        .map_err(|source| allocation("reachable package graph", source))?;
     let mut pending = Vec::<PackURI>::new();
     for relationship in workbook.inner.package.rels().iter() {
         if !relationship.is_external() {
@@ -5453,7 +5452,7 @@ fn validate_order_plan(order: &OrderPlan, len: usize) -> Result<()> {
     }
     let mut seen = Vec::new();
     seen.try_reserve_exact(len)
-        .map_err(|error| invalid(format!("cannot reserve tab-order validation: {error}")))?;
+        .map_err(|source| allocation("tab-order validation", source))?;
     seen.resize(len, false);
     for identity in &order.positions {
         let Some(slot) = seen.get_mut(*identity) else {
@@ -5468,7 +5467,7 @@ fn validate_order_plan(order: &OrderPlan, len: usize) -> Result<()> {
     let mut replay = Vec::new();
     replay
         .try_reserve_exact(len)
-        .map_err(|error| invalid(format!("cannot reserve tab-move replay: {error}")))?;
+        .map_err(|source| allocation("tab-move replay", source))?;
     replay.extend(0..len);
     for moved in &order.moves {
         if moved.from >= replay.len() || moved.to >= replay.len() {
@@ -5519,7 +5518,7 @@ fn verify_defined_name_scopes(
     let mut old_to_new = Vec::new();
     old_to_new
         .try_reserve_exact(base_len)
-        .map_err(|error| invalid(format!("cannot reserve defined-name scope map: {error}")))?;
+        .map_err(|source| allocation("defined-name scope map", source))?;
     old_to_new.resize(base_len, usize::MAX);
     for (new, target) in order.iter().copied().enumerate() {
         let Target::Base(old) = target else {
@@ -5738,13 +5737,13 @@ fn create_sheets(
     let mut used_sheet_ids = HashSet::new();
     used_sheet_ids
         .try_reserve(workbook.inner.sheets.len().saturating_add(added.len()))
-        .map_err(|error| invalid(format!("cannot reserve native sheet-ID index: {error}")))?;
+        .map_err(|source| allocation("native sheet-ID index", source))?;
     used_sheet_ids.extend(workbook.inner.sheets.iter().map(|sheet| sheet.native_id));
 
     let mut used_relationship_ids = HashSet::<String>::new();
     used_relationship_ids
         .try_reserve(main.rels().len().saturating_add(added.len()))
-        .map_err(|error| invalid(format!("cannot reserve relationship-ID index: {error}")))?;
+        .map_err(|source| allocation("relationship-ID index", source))?;
     used_relationship_ids.extend(
         main.rels()
             .iter()
@@ -5754,11 +5753,11 @@ fn create_sheets(
     let mut reserved_parts = Vec::<PackURI>::new();
     reserved_parts
         .try_reserve_exact(added.len())
-        .map_err(|error| invalid(format!("cannot reserve worksheet part names: {error}")))?;
+        .map_err(|source| allocation("worksheet part names", source))?;
     let mut created = Vec::new();
     created
         .try_reserve_exact(added.len())
-        .map_err(|error| invalid(format!("cannot reserve worksheet graph changes: {error}")))?;
+        .map_err(|source| allocation("worksheet graph changes", source))?;
 
     let mut next_sheet_id = 1u32;
     let mut next_relationship_id = 1u32;

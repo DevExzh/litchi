@@ -6,7 +6,7 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 
 #[derive(Debug)]
@@ -187,7 +187,7 @@ pub(crate) fn invalidate(content: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve(content.len().saturating_add(replacement.len()))
-        .map_err(|error| invalid(format!("cannot reserve workbook edit output: {error}")))?;
+        .map_err(|source| allocation("workbook edit output", source))?;
     output.extend_from_slice(&content[..start]);
     output.extend_from_slice(&replacement);
     output.extend_from_slice(&content[end..]);

@@ -8,7 +8,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 use crate::web::{Binding, Bindings, MAX_BINDINGS, MAX_STRING_BYTES};
 
 /// SpreadsheetML extension URI for worksheet web-extension bindings.
@@ -184,9 +184,9 @@ pub fn read(worksheet_xml: &[u8]) -> Result<Bindings> {
                     if values.len() >= MAX_BINDINGS {
                         return Err(invalid("too many worksheet web-extension bindings"));
                     }
-                    values.try_reserve(1).map_err(|error| {
-                        invalid(format!("cannot grow worksheet web bindings: {error}"))
-                    })?;
+                    values
+                        .try_reserve(1)
+                        .map_err(|source| allocation("worksheet web bindings", source))?;
                     values.push(Binding::new(app_ref, formula)?);
                 } else if namespace == X15_NAMESPACE.as_bytes()
                     && local == b"webExtensions"
@@ -265,11 +265,9 @@ pub fn replace(worksheet_xml: &[u8], bindings: &Bindings) -> Result<Vec<u8>> {
         return Err(invalid("worksheet web-extension wrapper exceeds XML limit"));
     }
     let mut wrapper = Vec::new();
-    wrapper.try_reserve_exact(wrapper_len).map_err(|error| {
-        invalid(format!(
-            "cannot reserve worksheet web-extension wrapper: {error}"
-        ))
-    })?;
+    wrapper
+        .try_reserve_exact(wrapper_len)
+        .map_err(|source| allocation("worksheet web-extension wrapper", source))?;
     wrapper.extend_from_slice(b"<extLst>");
     wrapper.extend_from_slice(&extension);
     wrapper.extend_from_slice(b"</extLst>");
@@ -289,7 +287,7 @@ fn push_formula(binding: &mut Option<(String, String, bool)>, value: &str) -> Re
     }
     formula
         .try_reserve(value.len())
-        .map_err(|error| invalid(format!("cannot grow web-extension range formula: {error}")))?;
+        .map_err(|source| allocation("web-extension range formula", source))?;
     formula.push_str(value);
     Ok(())
 }
@@ -315,7 +313,7 @@ fn write_for_namespace(bindings: &Bindings, spreadsheet_namespace: &str) -> Resu
 
     let mut xml = String::new();
     xml.try_reserve_exact(length)
-        .map_err(|error| invalid(format!("cannot reserve worksheet web XML: {error}")))?;
+        .map_err(|source| allocation("worksheet web XML", source))?;
     xml.push_str("<ext xmlns=\"");
     xml.push_str(spreadsheet_namespace);
     xml.push_str("\" uri=\"");
@@ -502,7 +500,7 @@ fn apply_edit(xml: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<Vec
     let mut output = Vec::new();
     output
         .try_reserve_exact(length)
-        .map_err(|error| invalid(format!("cannot reserve edited worksheet XML: {error}")))?;
+        .map_err(|source| allocation("edited worksheet XML", source))?;
     output.extend_from_slice(&xml[..range.start]);
     output.extend_from_slice(replacement);
     output.extend_from_slice(&xml[range.end..]);
@@ -513,7 +511,7 @@ fn copy_bytes(value: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(value.len())
-        .map_err(|error| invalid(format!("cannot copy worksheet XML: {error}")))?;
+        .map_err(|source| allocation("worksheet XML copy", source))?;
     output.extend_from_slice(value);
     Ok(output)
 }

@@ -7,7 +7,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use crate::cell::Text;
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
@@ -140,7 +140,7 @@ impl Parser {
         count_hint(element, b"count", decoder)?;
         self.strings
             .try_reserve(hint)
-            .map_err(|error| invalid(format!("cannot reserve shared-string table: {error}")))
+            .map_err(|source| allocation("shared-string table", source))
     }
 
     fn start(
@@ -220,7 +220,7 @@ impl Parser {
             .ok_or_else(|| invalid("shared-string encoded text is too large"))?;
         item.text
             .try_reserve(value.len())
-            .map_err(|error| invalid(format!("cannot grow shared-string text: {error}")))?;
+            .map_err(|source| allocation("shared-string text", source))?;
         item.text.push_str(value);
         Ok(())
     }
@@ -241,7 +241,7 @@ impl Parser {
         }
         self.strings
             .try_reserve(1)
-            .map_err(|error| invalid(format!("cannot grow shared-string table: {error}")))?;
+            .map_err(|source| allocation("shared-string table", source))?;
         self.strings.push(text.into());
         Ok(())
     }

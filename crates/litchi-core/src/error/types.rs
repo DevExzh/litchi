@@ -2,6 +2,8 @@
 //!
 //! This module provides a unified error type that encompasses errors from both
 //! OLE2 and OOXML parsing, presenting a consistent API to users.
+use std::collections::TryReserveError;
+
 use crate::binary::BinaryError;
 use thiserror::Error;
 
@@ -52,6 +54,16 @@ pub enum Error {
     /// Feature disabled at compile time
     #[error("Feature '{0}' is disabled. Enable it with --features {0}")]
     FeatureDisabled(String),
+
+    /// A bounded operation could not reserve its required memory.
+    #[error("allocation failed for {resource}: {source}")]
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
+    },
 
     /// Generic error
     #[error("{0}")]

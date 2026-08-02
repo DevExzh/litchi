@@ -163,6 +163,7 @@ pub(crate) mod slide_patch;
 pub use laser::{
     LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint, store_slide_laser_trace,
 };
+pub use litchi_pptx::tag;
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
     PlaceholderSpec, SlideLayoutKind, add_slide_layout, add_slide_master, remove_slide_layout,
@@ -222,7 +223,7 @@ pub use parts::{
     SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutReference, SlideMasterTextStyle,
     SlideMasterTextStyles, SlideSize,
 };
-pub use presentation::{PptxChart, PptxTagList, Presentation};
+pub use presentation::{PptxChart, Presentation};
 pub use presentation_properties::{
     BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget, OpaquePresentationExtension,
     PresentationColor, PresentationProperties, PresentationPropertyExtension, PrintColorMode,

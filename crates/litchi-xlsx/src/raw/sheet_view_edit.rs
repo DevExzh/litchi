@@ -13,7 +13,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, Result, TabEditBlock, invalid};
+use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -203,7 +203,7 @@ fn insert_views(source: &[u8], layout: &Layout) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(source.len().saturating_add(inserted.len()))
-        .map_err(|error| invalid(format!("cannot reserve sheet-view output: {error}")))?;
+        .map_err(|source| allocation("sheet-view output", source))?;
     output.extend_from_slice(&source[..at]);
     output.extend_from_slice(&inserted);
     output.extend_from_slice(&source[at..]);
