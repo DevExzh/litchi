@@ -2856,6 +2856,76 @@ checker now accepts 35 workspace packages and 107 direct internal dependencies
 with 14 explicit debt items. Per explicit user direction, the previously green
 full-workspace test run is not repeated for this ownership-only slice.
 
+## Checked BIFF8 formula references
+
+The legacy Excel writer no longer represents public cell and area tokens as
+raw `u16` coordinate tuples. `writer::formula::{Ref, Area}` keep their fields
+private, use `u16` for the exact zero-based BIFF8 row domain and `u8` for the
+exact `A..=IV` column domain, and expose concise checked construction and
+accessors. Every `Ptg` variant now uses its short contextual name without a
+compatibility alias; reference-bearing variants carry the checked values.
+
+The byte-oriented A1 scanner avoids the former temporary column string, uses
+checked arithmetic, accepts the last cell `IV65536`, and returns
+`InvalidCellReference` for `IW`, oversized columns, malformed rows, and
+arithmetic overflow. Production `unwrap` and `expect` calls were removed from
+the tokenizer path. Defined names preserve
+their established reversed-corner normalization while formula cells,
+conditional formats, data validation, and names share the same token boundary.
+
+All 42 focused formula tests pass, including exact relative-flag bytes and
+adversarial no-unwind cases. Public writer serialization returns the same typed
+error without unwinding, and the defined-name regression passes. Warning-denied
+Clippy and rustdoc, formatting, diff validation, and workspace lint are green.
+No parser-throughput or allocation improvement is inferred from these safety
+tests, and the previously green full-workspace suite is not repeated.
+
+## Atomic PowerPoint speaker-note deletion
+
+The opened-package facade now provides exact-name-first `remove_notes`, a
+checked numeric-position fallback, and all-slide `clear_notes`; the mutable
+authoring slide has an idempotent `clear_notes`. Relationship IDs and part
+names stay below the common path. Dirty legacy-writer state and invalid or
+ambiguous selectors fail before package mutation.
+
+Deletion indexes and validates the complete Strict or Transitional notes graph
+without copying notes, master, or theme payloads. It records actual stored OPC
+keys, rejects orphan, duplicate, malformed, or unexpectedly shared notes
+slides, and scans all inbound package edges. Slide owners are staged with
+shared built-in payload allocations and edited relationship collections before
+commit; only then are they replaced, exact notes parts removed, and signatures
+invalidated. Notes masters and themes remain available.
+
+Seven graph tests, one mutable-slide test, and four saved/reopened package tests
+pass. They cover semantic selection, idempotence, malformed and shared-edge
+atomicity, case-folded storage, retained shared infrastructure, and
+byte-identical slide XML. Warning-denied Clippy and rustdoc, formatting, diff
+validation, and workspace lint are green. Native PowerPoint open/resave and
+representative memory profiles remain separate evidence; no such compatibility
+or performance claim is made by this slice.
+
+## Core-properties reader ownership
+
+The host-neutral OPC core-properties reader moved from `litchi-ooxml` to the
+existing `litchi_ooxml_common::properties` owner. The only public entry is the
+contextual `properties::read(&OpcPackage)`; the migration-host module is
+deleted without a forwarding alias, and the document, presentation, XLSX, and
+XLSB facade adapters call the common owner directly.
+
+The reader keeps relationship-selected lookup, Transitional and Strict
+namespaces, OPC M4 restrictions, content-type checks, datetime normalization,
+entity decoding, and bounded retained text behind structured common errors.
+Both production `expect` paths were replaced by typed invalid-data results.
+This changes no package bytes and does not claim that the remaining
+umbrella-to-host dependency debt is resolved.
+
+All 13 focused property tests pass, including Apache POI conformance fixtures
+and a typed text-budget regression. Warning-denied Clippy and rustdoc pass for
+the common owner, host, and isolated facade; workspace lint and the executable
+boundary checks are green at 35 packages, 107 direct internal dependencies,
+and 14 explicit debt items. Per explicit user direction, the full-workspace
+test suite is not repeated.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

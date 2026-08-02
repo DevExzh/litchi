@@ -24,6 +24,9 @@ Office round trips.
 | [0009](0009-odf-detection-ownership.md) | ODF detection ownership and fuzz boundary |
 | [0010](0010-facade-archive-ownership.md) | Archive ownership below the facade |
 | [0011](0011-ooxml-physical-package-ownership.md) | Physical OPC package ownership below the OOXML migration host |
+| [0012](0012-biff8-formula-reference-types.md) | Checked BIFF8 formula references and panic-free encoding |
+| [0013](0013-pptx-notes-deletion.md) | Atomic, package-aware PowerPoint notes deletion |
+| [0014](0014-core-properties-reader-ownership.md) | Core-properties reader ownership in the OOXML common crate |
 
 ## Decision hierarchy
 
