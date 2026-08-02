@@ -1,8 +1,9 @@
 # Architecture Decision Records
 
-These records define the breaking Office API architecture accepted on 2026-07-31.
-They are normative for the refactor: code and examples that disagree with an
-accepted record must be changed or the record must be superseded explicitly.
+These records define the breaking Office API architecture begun on 2026-07-31
+and refined by focused decisions. They are normative for the refactor: code and
+examples that disagree with an accepted record must be changed or the record
+must be superseded explicitly.
 
 The records intentionally capture durable contracts rather than every design
 branch discussed during the architecture interview. Detailed choices follow the
@@ -20,6 +21,7 @@ Office round trips.
 | [0006](0006-validation-security-and-compatibility.md) | Preservation, validation, security, and compatibility |
 | [0007](0007-office-object-models.md) | Word, spreadsheet, presentation, and drawing models |
 | [0008](0008-migration-and-verification.md) | Buildable migration phases and evidence gates |
+| [0009](0009-odf-detection-ownership.md) | ODF detection ownership and fuzz boundary |
 
 ## Decision hierarchy
 

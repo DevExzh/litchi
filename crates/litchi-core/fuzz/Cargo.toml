@@ -11,7 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-litchi-core = { path = "..", features = ["odf"] }
+litchi-core = { path = ".." }
 
 [[bin]]
 name = "detect_format"

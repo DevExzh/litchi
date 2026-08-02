@@ -61,7 +61,7 @@ full = [
 ]
 # Format support features
 iwa = ["dep:litchi-iwa", "dep:soapberry-zip"]
-odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
+odf = ["dep:litchi-odf", "dep:soapberry-zip"]
 doc = ["dep:litchi-cfb", "dep:litchi-doc", "sign"]
 ppt = ["dep:litchi-cfb", "dep:litchi-ppt", "sign"]
 xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]

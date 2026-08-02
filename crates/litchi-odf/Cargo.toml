@@ -21,7 +21,7 @@ chrono        = { workspace = true }
 fast-float2   = { workspace = true }
 flate2        = { workspace = true }
 hmac          = { workspace = true }
-litchi-core   = { workspace = true, features = ["odf"] }
+litchi-core   = { workspace = true }
 memchr        = { workspace = true }
 p256          = { workspace = true }
 pbkdf2        = { workspace = true }

@@ -778,7 +778,8 @@ fn style_independent_text_count(
             && local.as_ref() == b"c"
         {
             let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())?;
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| Error::XmlError(error.to_string()))?;
             return value.parse().map(Some).map_err(|_| {
                 Error::InvalidFormat("invalid text:c count in header/footer".to_string())
             });

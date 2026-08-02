@@ -119,7 +119,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     }
 
     #[cfg(feature = "odf")]
-    if let Some(format) = litchi_core::detection::odf::detect_flat_odf_format(&bytes) {
+    if let Some(format) = litchi_odf::detect::flat(&bytes) {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
 
@@ -202,11 +202,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
                     // Read mimetype file to determine ODF format
                     if let Ok(mimetype) = archive.read_string("mimetype") {
                         // Use existing ODF detection logic
-                        if let Some(format) =
-                            litchi_core::detection::odf::detect_odf_format_from_mimetype(
-                                mimetype.as_bytes(),
-                            )
-                        {
+                        if let Some(format) = litchi_odf::detect::mime(mimetype.as_bytes()) {
                             return match format {
                                 FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
                                 FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),

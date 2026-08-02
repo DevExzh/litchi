@@ -304,6 +304,8 @@ pub mod coordinates;
 mod core;
 /// ODF data type conversions (Boolean, Date, DateTime, Duration)
 pub mod datatype;
+/// Best-effort detection for packaged and flat OpenDocument files.
+pub mod detect;
 pub mod drawing_fill_image;
 pub mod drawing_gradient;
 pub mod drawing_hatch;

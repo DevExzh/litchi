@@ -1,10 +1,8 @@
-//! Unified error types for Litchi library.
+//! Format-neutral error vocabulary shared by Litchi crates.
 //!
-//! This module provides a unified error type that encompasses errors from both
-//! OLE2 and OOXML parsing, presenting a consistent API to users.
+//! Concrete crates map parser and container failures at their own ownership
+//! boundary instead of adding dependency-specific conversions to core.
 
-// Submodule declarations
-pub mod conversions;
 pub mod types;
 
 // Re-exports

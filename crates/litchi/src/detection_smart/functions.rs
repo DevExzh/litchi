@@ -13,7 +13,7 @@ use litchi_core::detection::simd_utils::{check_office_signatures, signature_matc
 use litchi_core::detection::{rtf, utils};
 
 #[cfg(feature = "odf")]
-use litchi_core::detection::odf;
+use litchi_odf::detect as odf;
 
 /// Detect file format from a file path.
 ///
@@ -89,7 +89,7 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
     }
 
     #[cfg(feature = "odf")]
-    if let Some(result) = odf::detect_flat_odf_format(bytes) {
+    if let Some(result) = odf::flat(bytes) {
         return Some(result);
     }
 
@@ -113,7 +113,7 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 
         // Then try ODF detection
         #[cfg(feature = "odf")]
-        if let Some(result) = odf::detect_odf_format(bytes) {
+        if let Some(result) = odf::bytes(bytes) {
             return Some(result);
         }
 
@@ -213,7 +213,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
 
         // Try ODF
         #[cfg(feature = "odf")]
-        if let Some(result) = odf::detect_odf_format_from_reader(reader) {
+        if let Some(result) = odf::reader(reader) {
             return Some(result);
         }
 
@@ -229,7 +229,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         || header.starts_with(&[0xef, 0xbb, 0xbf])
     {
         let _ = reader.seek(std::io::SeekFrom::Start(0));
-        if let Some(result) = odf::detect_odf_format_from_reader(reader) {
+        if let Some(result) = odf::reader(reader) {
             return Some(result);
         }
     }

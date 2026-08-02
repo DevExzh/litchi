@@ -81,7 +81,7 @@ impl FlatOpenDocument {
 
     /// Validate flat OpenDocument XML from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let mimetype = litchi_core::detection::odf::detect_flat_odf_mimetype(&bytes)
+        let mimetype = crate::detect::flat_mime(&bytes)
             .ok_or_else(|| Error::InvalidFormat("invalid flat OpenDocument root".to_string()))?;
         let (family, template) = classify_mimetype(&mimetype).ok_or_else(|| {
             Error::InvalidFormat(format!("unsupported OpenDocument mimetype '{mimetype}'"))

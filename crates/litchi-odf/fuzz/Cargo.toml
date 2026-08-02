@@ -14,6 +14,13 @@ libfuzzer-sys = "0.4"
 litchi-odf = { path = ".." }
 
 [[bin]]
+name = "detect"
+path = "fuzz_targets/detect.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "parse_odt"
 path = "fuzz_targets/parse_odt.rs"
 test = false

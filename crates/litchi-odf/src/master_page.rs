@@ -195,7 +195,8 @@ fn required_style_attr(
             && name.as_ref() == local
         {
             let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())?
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| Error::XmlError(error.to_string()))?
                 .into_owned();
             if value.is_empty() {
                 return Err(invalid(format!(

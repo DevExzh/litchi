@@ -703,7 +703,7 @@ impl Document {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(feature = "doc", feature = "ooxml", feature = "rtf")))]
 mod tests {
     use super::*;
     use std::path::PathBuf;

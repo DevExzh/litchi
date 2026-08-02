@@ -11,5 +11,3 @@ pub fn find_in_buffer(buffer: &[u8], pattern: &[u8]) -> bool {
         .windows(pattern.len())
         .any(|window| window == pattern)
 }
-
-// Note: read_zip_file helper removed - use soapberry_zip::office::ArchiveReader::read() instead

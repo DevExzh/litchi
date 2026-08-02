@@ -165,13 +165,6 @@
   ],
   "migration_debt": [
     {
-      "order": 10,
-      "dependent": "litchi-core",
-      "dependency": "soapberry-zip",
-      "reason": "The pre-ADR core still owns ZIP-backed extraction code.",
-      "exit": "Move archive and package handling behind format/container crates, then remove this edge."
-    },
-    {
       "order": 31,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-vba",
@@ -319,14 +312,7 @@
       "soapberry-zip",
       "tokio"
     ],
-    "dependency_debt": [
-      {
-        "order": 2,
-        "name": "quick-xml",
-        "reason": "Pre-ADR format detection and helpers still parse XML in core.",
-        "exit": "Move XML parsing into format/common crates and leave only format-neutral contracts."
-      }
-    ],
+    "dependency_debt": [],
     "format_features": [
       "doc",
       "docx",
@@ -339,13 +325,6 @@
       "xlsb",
       "xlsx"
     ],
-    "feature_debt": [
-      {
-        "order": 3,
-        "name": "odf",
-        "reason": "Core still gates pre-ADR ODF detection code.",
-        "exit": "Move ODF detection into its format crate."
-      }
-    ]
+    "feature_debt": []
   }
 }

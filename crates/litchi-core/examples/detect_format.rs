@@ -6,12 +6,9 @@
 //!
 //! Run with:
 //! ```bash
-//! cargo run -p litchi-core --example detect_format --all-features -- <path>
-//! cargo run -p litchi-core --example detect_format --all-features -- test-data/ooxml/docx
+//! cargo run -p litchi-core --example detect_format -- <path>
+//! cargo run -p litchi-core --example detect_format -- test-data/ooxml/docx
 //! ```
-//!
-//! Without `--all-features`, ODF detection is stubbed and returns `None` when
-//! the `odf` feature is not enabled.
 
 use litchi_core::FileFormat;
 use litchi_core::detection::simd_utils::check_office_signatures;
@@ -98,12 +95,6 @@ fn format_label(bytes: &[u8], path: &Path) -> String {
     // RTF: matches `{\rtf` prefix (always available regardless of feature
     // flags — the helper itself has no `cfg` gate).
     if let Some(fmt) = litchi_core::detection::rtf::detect_rtf_format(bytes) {
-        return describe_format(fmt);
-    }
-
-    // ODF: requires reading the ZIP `mimetype` member. The `odf` feature
-    // gates the real implementation; the stub returns `None`.
-    if let Some(fmt) = litchi_core::detection::odf::detect_odf_format(bytes) {
         return describe_format(fmt);
     }
 

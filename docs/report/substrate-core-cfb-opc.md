@@ -2,6 +2,11 @@
 
 Branch reviewed: `refactor/workspace-split` against `main`.
 
+> Historical snapshot: this report records the initial workspace extraction.
+> As of ADR 0009 (2026-08-03), ODF detection, `quick-xml`, and
+> `soapberry-zip` have moved from `litchi-core` to `litchi-odf`; the core ODF
+> feature and dependency conversions described below no longer exist.
+
 ## 1. Scope
 
 New crates audited:
