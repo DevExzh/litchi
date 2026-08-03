@@ -34,17 +34,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for table in sheet.tables {
             println!(
                 "  table {:?}: {} rows x {} columns",
-                table.name, table.row_count, table.column_count
+                table.name(),
+                table.row_count(),
+                table.column_count()
             );
-            let mut comments = table.comments.iter().collect::<Vec<_>>();
+            let mut comments = table.iter_comments().collect::<Vec<_>>();
             comments.sort_by_key(|((row, column), _)| (*row, *column));
-            for (&(row, column), comment) in comments {
+            for ((row, column), comment) in comments {
                 println!("    comment ({row}, {column}) {:?}", comment.text);
             }
             if show_cells {
-                let mut cells = table.cells.iter().collect::<Vec<_>>();
+                let mut cells = table.iter_cells().collect::<Vec<_>>();
                 cells.sort_by_key(|((row, column), _)| (*row, *column));
-                for (&(row, column), value) in cells {
+                for ((row, column), value) in cells {
                     if !matches!(value, CellValue::Empty) {
                         println!("    ({row}, {column}) {value:?}");
                     }
@@ -52,9 +54,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
             let mut formulas = table
-                .cells
-                .iter()
-                .filter_map(|(&(row, column), value)| match value {
+                .iter_cells()
+                .filter_map(|((row, column), value)| match value {
                     CellValue::Formula(formula) => Some((row, column, formula)),
                     _ => None,
                 })

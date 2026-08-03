@@ -1729,7 +1729,7 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
         table.get_cell(0, 0),
         Some(&KeynoteTableCellValue::Text("Body".to_owned()))
     );
-    assert!(!table.cells.values().any(|value| matches!(
+    assert!(!table.iter_cells().any(|(_, value)| matches!(
         value,
         KeynoteTableCellValue::Text(text) if text == "Header" || text == "Footer"
     )));

@@ -1643,7 +1643,7 @@ mod tests {
         let added = sheets[0]
             .tables
             .iter()
-            .find(|candidate| candidate.name == table.name)
+            .find(|candidate| candidate.name() == table.name)
             .unwrap();
         assert_eq!(
             added.get_cell(0, 2),

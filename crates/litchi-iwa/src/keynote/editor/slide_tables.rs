@@ -162,11 +162,9 @@ pub struct KeynoteSlideTableInfo {
 #[derive(Debug, Clone)]
 pub struct KeynoteSlideTable {
     pub info: KeynoteSlideTableInfo,
-    pub cells: HashMap<(usize, usize), KeynoteTableCellValue>,
-    /// Comments indexed independently from cell values by `(row, column)`.
-    pub comments: HashMap<(usize, usize), KeynoteTableCellComment>,
-    /// Native merged-cell rectangles in formula-store order.
-    pub merges: Vec<KeynoteTableCellRegion>,
+    cells: HashMap<(usize, usize), KeynoteTableCellValue>,
+    comments: HashMap<(usize, usize), KeynoteTableCellComment>,
+    merges: Vec<KeynoteTableCellRegion>,
 }
 
 impl KeynoteSlideTable {
@@ -174,9 +172,42 @@ impl KeynoteSlideTable {
         self.cells.get(&(row, column))
     }
 
+    /// Iterate over materialized cells without exposing the backing map.
+    pub fn iter_cells(
+        &self,
+    ) -> impl Iterator<Item = ((usize, usize), &KeynoteTableCellValue)> + '_ {
+        self.cells
+            .iter()
+            .map(|(position, value)| (*position, value))
+    }
+
+    /// Return the number of materialized cells, including explicit empty cells.
+    pub fn cell_count(&self) -> usize {
+        self.cells.len()
+    }
+
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&KeynoteTableCellComment> {
         self.comments.get(&(row, column))
+    }
+
+    /// Iterate over cell comments without exposing the backing map.
+    pub fn iter_comments(
+        &self,
+    ) -> impl Iterator<Item = ((usize, usize), &KeynoteTableCellComment)> + '_ {
+        self.comments
+            .iter()
+            .map(|(position, comment)| (*position, comment))
+    }
+
+    /// Return the number of materialized cell comments.
+    pub fn comment_count(&self) -> usize {
+        self.comments.len()
+    }
+
+    /// Borrow native merged-cell rectangles in formula-store order.
+    pub fn merges(&self) -> &[KeynoteTableCellRegion] {
+        &self.merges
     }
 }
 
@@ -239,10 +270,11 @@ impl KeynoteEditor {
                     "Keynote object {model_object_id} has no native table model"
                 ))
             })?;
+        let (cells, comments) = table.into_parts();
         Ok(KeynoteSlideTable {
             info,
-            cells: table.cells,
-            comments: table.comments,
+            cells,
+            comments,
             merges: crate::numbers::editor::table_cell_merges_in_package(
                 self.package(),
                 model_object_id,

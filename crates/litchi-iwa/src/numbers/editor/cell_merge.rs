@@ -1344,7 +1344,7 @@ mod tests {
         let region = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
 
         editor.merge_table_cells(table_id, region).unwrap();
-        assert_eq!(editor.table(table_id).unwrap().merges, vec![region]);
+        assert_eq!(editor.table(table_id).unwrap().merges(), &[region]);
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.table_cell_merges(table_id).unwrap(), vec![region]);
         assert!(reopened.unmerge_table_cells(table_id, region).unwrap());
@@ -1667,8 +1667,11 @@ mod tests {
             .merge_slide_table_cells(0, table.model_object_id, region)
             .unwrap();
         assert_eq!(
-            editor.slide_table(0, table.model_object_id).unwrap().merges,
-            vec![region]
+            editor
+                .slide_table(0, table.model_object_id)
+                .unwrap()
+                .merges(),
+            &[region]
         );
         let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(

@@ -24,11 +24,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let copied = sheets
         .iter()
         .flat_map(|sheet| &sheet.tables)
-        .find(|table| table.name == created.name)
+        .find(|table| table.name() == created.name)
         .ok_or("duplicated table was not readable after save")?;
     println!(
         "duplicated table {:?} as {:?}: {} rows x {} columns",
-        source.name, copied.name, copied.row_count, copied.column_count
+        source.name,
+        copied.name(),
+        copied.row_count(),
+        copied.column_count()
     );
     Ok(())
 }

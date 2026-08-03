@@ -2497,7 +2497,7 @@ fn cross_table_formula_cells_write_owner_uid_ast_and_external_edges() {
     let host = sheets[0]
         .tables
         .iter()
-        .find(|table| table.name == "Table 1")
+        .find(|table| table.name() == "Table 1")
         .unwrap();
     assert_eq!(
         host.get_cell(3, 2),
@@ -2629,7 +2629,7 @@ fn whole_row_formula_ranges_round_trip_with_complete_external_edges() {
     let host = document.sheets().unwrap()[0]
         .tables
         .iter()
-        .find(|table| table.name == "Table 1")
+        .find(|table| table.name() == "Table 1")
         .unwrap()
         .clone();
     assert_eq!(
@@ -3853,7 +3853,7 @@ fn inserts_blank_table_row_and_shifts_cells_uids_headers_and_formulas() {
     let bytes = editor.to_bytes().unwrap();
     let document = NumbersDocument::from_bytes(&bytes).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!((table.row_count, table.column_count), (5, 4));
+    assert_eq!((table.row_count(), table.column_count()), (5, 4));
     assert_eq!(table.get_cell(1, 1), None);
     assert_eq!(
         table.get_cell(2, 1),
@@ -3958,7 +3958,7 @@ fn appends_blank_table_row_without_allocating_storage() {
         .unwrap();
     assert_eq!(editor.tables().unwrap()[0].rows, 5);
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(document.sheets().unwrap()[0].tables[0].row_count, 5);
+    assert_eq!(document.sheets().unwrap()[0].tables[0].row_count(), 5);
     let archive = editor
         .package()
         .archive("Index/CalculationEngine.iwa")
@@ -4758,7 +4758,7 @@ fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
     let bytes = editor.to_bytes().unwrap();
     let document = NumbersDocument::from_bytes(&bytes).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!((table.row_count, table.column_count), (4, 5));
+    assert_eq!((table.row_count(), table.column_count()), (4, 5));
     assert_eq!(table.get_cell(1, 1), None);
     assert_eq!(
         table.get_cell(1, 2),
@@ -5318,12 +5318,12 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
     assert_eq!(settings.header_column_count(), 0);
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!((table.row_count, table.column_count), (2, 3));
+    assert_eq!((table.row_count(), table.column_count()), (2, 3));
     assert_eq!(
         table.get_cell(0, 0),
         Some(&CellValue::Text("Body".to_owned()))
     );
-    assert!(!table.cells.values().any(|value| matches!(
+    assert!(!table.iter_cells().any(|(_, value)| matches!(
         value,
         CellValue::Text(text) if text == "Header" || text == "Footer"
     )));
@@ -5373,7 +5373,7 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
 
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!((table.row_count, table.column_count), (3, 4));
+    assert_eq!((table.row_count(), table.column_count()), (3, 4));
     assert_eq!(table.get_cell(1, 1), None);
     assert_eq!(
         table.get_cell(1, 2),
@@ -5388,7 +5388,7 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!((table.row_count, table.column_count), (3, 3));
+    assert_eq!((table.row_count(), table.column_count()), (3, 3));
     assert_eq!(
         table.get_cell(1, 1),
         Some(&CellValue::Formula("=7".to_owned()))
@@ -5416,7 +5416,7 @@ fn table_axis_delete_releases_comment_graphs() {
             TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
         assert!(list.entries.is_empty());
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        assert!(document.sheets().unwrap()[0].tables[0].comments.is_empty());
+        assert_eq!(document.sheets().unwrap()[0].tables[0].comment_count(), 0);
     }
 }
 
@@ -7736,7 +7736,7 @@ fn first_table_bootstrap_uses_the_target_sheet() {
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let sheets = document.sheets().unwrap();
     assert!(sheets[0].tables.is_empty());
-    assert_eq!(sheets[1].tables[0].name, "Target table");
+    assert_eq!(sheets[1].tables[0].name(), "Target table");
 }
 
 #[test]

@@ -193,12 +193,15 @@ pub fn extract_tables(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
     let tables = numbers_tables
         .into_iter()
         .map(|nt| {
-            let mut table = Table::new(nt.name.clone());
-            table.row_count = nt.row_count;
-            table.column_count = nt.column_count;
+            let (row_count, column_count) = nt.dimensions();
+            let table_name = nt.name().to_owned();
+            let (cells, _) = nt.into_parts();
+            let mut table = Table::new(table_name);
+            table.row_count = row_count;
+            table.column_count = column_count;
 
             // Convert cells from NumbersTable format to our CellValue format
-            for ((row, col), cell) in nt.cells {
+            for ((row, col), cell) in cells {
                 let cell_value = convert_numbers_cell_to_structured(cell);
                 table.cells.insert((row, col), cell_value);
             }

@@ -159,12 +159,9 @@ pub struct PagesTableInfo {
 pub struct PagesTable {
     /// Stable identity and dimensions of this table.
     pub info: PagesTableInfo,
-    /// Materialized non-empty cells indexed by `(row, column)`.
-    pub cells: HashMap<(usize, usize), PagesCellValue>,
-    /// Comments indexed independently from cell values by `(row, column)`.
-    pub comments: HashMap<(usize, usize), PagesTableCellComment>,
-    /// Native merged-cell rectangles in formula-store order.
-    pub merges: Vec<PagesTableCellRegion>,
+    cells: HashMap<(usize, usize), PagesCellValue>,
+    comments: HashMap<(usize, usize), PagesTableCellComment>,
+    merges: Vec<PagesTableCellRegion>,
 }
 
 impl PagesTable {
@@ -173,9 +170,40 @@ impl PagesTable {
         self.cells.get(&(row, column))
     }
 
+    /// Iterate over materialized cells without exposing the backing map.
+    pub fn iter_cells(&self) -> impl Iterator<Item = ((usize, usize), &PagesCellValue)> + '_ {
+        self.cells
+            .iter()
+            .map(|(position, value)| (*position, value))
+    }
+
+    /// Return the number of materialized cells, including explicit empty cells.
+    pub fn cell_count(&self) -> usize {
+        self.cells.len()
+    }
+
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&PagesTableCellComment> {
         self.comments.get(&(row, column))
+    }
+
+    /// Iterate over cell comments without exposing the backing map.
+    pub fn iter_comments(
+        &self,
+    ) -> impl Iterator<Item = ((usize, usize), &PagesTableCellComment)> + '_ {
+        self.comments
+            .iter()
+            .map(|(position, comment)| (*position, comment))
+    }
+
+    /// Return the number of materialized cell comments.
+    pub fn comment_count(&self) -> usize {
+        self.comments.len()
+    }
+
+    /// Borrow native merged-cell rectangles in formula-store order.
+    pub fn merges(&self) -> &[PagesTableCellRegion] {
+        &self.merges
     }
 }
 
@@ -222,10 +250,11 @@ impl PagesEditor {
                     "Pages object {model_object_id} has no native table model"
                 ))
             })?;
+        let (cells, comments) = table.into_parts();
         Ok(PagesTable {
             info,
-            cells: table.cells,
-            comments: table.comments,
+            cells,
+            comments,
             merges: crate::numbers::editor::table_cell_merges_in_package(
                 self.package(),
                 model_object_id,
@@ -4820,7 +4849,7 @@ mod tests {
             "Report 🙂\n".encode_utf16().count()
         );
         let model_id = info.model_object_id;
-        assert!(editor.table(model_id).unwrap().cells.is_empty());
+        assert_eq!(editor.table(model_id).unwrap().cell_count(), 0);
 
         assert_eq!(
             editor
@@ -5438,7 +5467,7 @@ mod tests {
             table.get_cell(0, 0),
             Some(&PagesCellValue::Text("Body".to_owned()))
         );
-        assert!(!table.cells.values().any(|value| matches!(
+        assert!(!table.iter_cells().any(|(_, value)| matches!(
             value,
             PagesCellValue::Text(text) if text == "Header" || text == "Footer"
         )));
@@ -5529,12 +5558,9 @@ mod tests {
         let inserted = editor.add_table(anchor, "Inserted", 4, 3).unwrap();
         assert_eq!(inserted.anchor_character_index, anchor);
         assert_eq!((inserted.rows, inserted.columns), (4, 3));
-        assert!(
-            editor
-                .table(inserted.model_object_id)
-                .unwrap()
-                .cells
-                .is_empty()
+        assert_eq!(
+            editor.table(inserted.model_object_id).unwrap().cell_count(),
+            0
         );
         let tables = editor.tables().unwrap();
         assert_eq!(tables.len(), 2);

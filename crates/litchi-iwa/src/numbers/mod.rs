@@ -22,7 +22,7 @@
 //! for sheet in sheets {
 //!     println!("Sheet: {}", sheet.name);
 //!     for table in &sheet.tables {
-//!         println!("  Table: {}", table.name);
+//!         println!("  Table: {}", table.name());
 //!         println!("{}", table.to_csv());
 //!     }
 //! }

@@ -259,7 +259,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cell = sheets
         .iter()
         .flat_map(|sheet| &sheet.tables)
-        .find(|table| table.name == table_name)
+        .find(|table| table.name() == table_name)
         .and_then(|table| table.get_cell(row, column));
     if let Some(cell) = cell {
         println!("saved {output}; cell ({row}, {column}) = {cell}");

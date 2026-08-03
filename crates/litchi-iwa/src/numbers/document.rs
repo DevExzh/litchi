@@ -166,7 +166,7 @@ impl NumbersDocument {
     ///     println!("Sheet: {}", sheet.name);
     ///     for table in &sheet.tables {
     ///         println!("  Table: {} ({}x{})",
-    ///             table.name, table.row_count, table.column_count);
+    ///             table.name(), table.row_count(), table.column_count());
     ///     }
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())

@@ -1800,19 +1800,19 @@ mod tests {
             tables[1].anchor_character_index,
             body.encode_utf16().count() + 1
         );
-        assert!(
+        assert_eq!(
             editor
                 .table(tables[0].model_object_id)
                 .unwrap()
-                .cells
-                .is_empty()
+                .cell_count(),
+            0
         );
-        assert!(
+        assert_eq!(
             editor
                 .table(tables[1].model_object_id)
                 .unwrap()
-                .cells
-                .is_empty()
+                .cell_count(),
+            0
         );
     }
 

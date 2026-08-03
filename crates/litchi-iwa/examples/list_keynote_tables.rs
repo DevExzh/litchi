@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 headers,
                 row_heights,
                 column_widths,
-                table.cells
+                table.iter_cells().collect::<Vec<_>>()
             );
         }
     }

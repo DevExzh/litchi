@@ -8,7 +8,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: inspect_pages_tables INPUT")?;
     let editor = PagesEditor::open(input)?;
     for table in editor.tables()? {
-        let cells = editor.table(table.model_object_id)?.cells;
+        let materialized = editor.table(table.model_object_id)?;
+        let cells = materialized.iter_cells().collect::<Vec<_>>();
         let headers = editor.table_header_settings(table.model_object_id)?;
         let title = editor.table_title_settings(table.model_object_id)?;
         let row_heights = (0..table.rows)

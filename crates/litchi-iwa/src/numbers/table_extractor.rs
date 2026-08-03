@@ -24,7 +24,7 @@
 //!
 //! let tables = extractor.extract_all_tables()?;
 //! for table in tables {
-//!     println!("Table: {}", table.name);
+//!     println!("Table: {}", table.name());
 //!     println!("{}", table.to_csv());
 //! }
 //! ```
@@ -171,9 +171,11 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Parse a TableModelArchive protobuf message
     fn parse_table_model(&self, table_model: tst::TableModelArchive) -> Result<NumbersTable> {
-        let mut table = NumbersTable::new(table_model.table_name.clone());
-        table.row_count = table_model.number_of_rows as usize;
-        table.column_count = table_model.number_of_columns as usize;
+        let mut table = NumbersTable::with_dimensions(
+            table_model.table_name.clone(),
+            table_model.number_of_rows as usize,
+            table_model.number_of_columns as usize,
+        );
 
         // Extract string table for cell text values
         // string_table is a required field, not Optional

@@ -32,17 +32,17 @@ impl NumbersSheet {
 
     /// Get a table by name
     pub fn get_table(&self, name: &str) -> Option<&NumbersTable> {
-        self.tables.iter().find(|t| t.name == name)
+        self.tables.iter().find(|t| t.name() == name)
     }
 
     /// Get a mutable reference to a table by name
     pub fn get_table_mut(&mut self, name: &str) -> Option<&mut NumbersTable> {
-        self.tables.iter_mut().find(|t| t.name == name)
+        self.tables.iter_mut().find(|t| t.name() == name)
     }
 
     /// Get all table names
     pub fn table_names(&self) -> Vec<String> {
-        self.tables.iter().map(|t| t.name.clone()).collect()
+        self.tables.iter().map(|t| t.name().to_owned()).collect()
     }
 
     /// Check if sheet is empty
@@ -59,7 +59,7 @@ impl NumbersSheet {
     pub fn total_cell_count(&self) -> usize {
         self.tables
             .iter()
-            .map(|t| t.row_count * t.column_count)
+            .map(|t| t.row_count() * t.column_count())
             .sum()
     }
 }
