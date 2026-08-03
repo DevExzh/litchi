@@ -7,6 +7,7 @@
 
 pub mod calculation_properties;
 pub mod cell;
+pub mod cell_watches;
 pub mod chain;
 pub mod column;
 pub mod connections;
@@ -30,6 +31,10 @@ pub use calculation_properties::{
     parse_workbook_calculation_properties,
 };
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
+pub use cell_watches::{
+    CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
+    parse_worksheet_cell_watches, write_worksheet_cell_watches,
+};
 pub use column::{Column, Columns, Width, WidthAt};
 pub use error::{
     ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, RemoveBlock, RenameBlock,

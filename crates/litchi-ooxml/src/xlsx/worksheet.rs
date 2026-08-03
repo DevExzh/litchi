@@ -16,7 +16,6 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use super::RichTextRun;
 use super::auto_filter::{AutoFilterDefinition, parse_auto_filter};
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
-use super::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
 use super::comments::parse_comments_xml;
 use super::conditional_formatting::{
     ConditionalFormatting as ParsedConditionalFormatting,
@@ -72,6 +71,7 @@ use super::{
         is_chart_user_shapes_relationship_type, parse_chart_from_xml,
     },
 };
+use litchi_xlsx::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::web::Bindings;
 

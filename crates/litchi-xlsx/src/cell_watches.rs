@@ -9,7 +9,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{OoxmlError, Result};
+use crate::error::{Result, invalid};
 use litchi_ooxml_common::mce::process_str;
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -433,10 +433,6 @@ fn validate_cell_reference(value: &str) -> Result<()> {
         )));
     }
     Ok(())
-}
-
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
 }
 
 #[cfg(test)]

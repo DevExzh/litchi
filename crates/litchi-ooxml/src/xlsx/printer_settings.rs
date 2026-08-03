@@ -199,14 +199,11 @@ pub fn store_worksheet_printer_settings(
             value.reference.relationship_id
         )));
     }
-    if package
-        .iter_parts()
-        .any(|part| part.partname() == &resource_uri)
-    {
-        return Err(invalid(format!(
-            "Printer Settings part '{resource_uri}' already exists"
-        )));
-    }
+    // OPC part names conflict when they are ASCII-case-equivalent or when one
+    // is a derived child of the other, not only when their spelling matches.
+    // Preflight this before changing the worksheet so a rejected publication
+    // leaves the package unchanged and retryable.
+    package.validate_new_part_name(&resource_uri)?;
     let actual = worksheet_conformance(worksheet.blob())?;
     if actual != conformance {
         return Err(invalid(
@@ -215,12 +212,12 @@ pub fn store_worksheet_printer_settings(
     }
     let updated = add_reference_to_worksheet(worksheet.blob(), &value.reference, conformance)?;
     let target = resource_uri.relative_ref(worksheet_name.base_uri());
-    package.get_part_mut(worksheet_name)?.set_blob(updated);
-    package.add_part(Box::new(BlobPart::new(
+    package.try_add_part(Box::new(BlobPart::new(
         resource_uri,
         PRINTER_CT.into(),
         value.resource.data.clone(),
-    )));
+    )))?;
+    package.get_part_mut(worksheet_name)?.set_blob(updated);
     package
         .get_part_mut(worksheet_name)?
         .rels_mut()
@@ -640,6 +637,53 @@ mod tests {
         .unwrap();
         let xml = std::str::from_utf8(package.get_part(&uri).unwrap().blob()).unwrap();
         assert!(xml.find("pageSetup").unwrap() < xml.find("headerFooter").unwrap());
+    }
+
+    #[test]
+    fn rejects_case_equivalent_part_without_mutating_for_retry() {
+        let (mut package, uri) = package(PrinterSettingsConformance::Transitional, "");
+        let equivalent = PackURI::new("/XL/printerSettings/printerSettings1.bin").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            equivalent.clone(),
+            PRINTER_CT.into(),
+            vec![0x01],
+        )));
+        let original_xml = package.get_part(&uri).unwrap().blob().to_vec();
+        let original_part_count = package.part_count();
+
+        let error = store_worksheet_printer_settings(
+            &mut package,
+            &uri,
+            &value(),
+            PrinterSettingsConformance::Transitional,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            OoxmlError::Opc(litchi_opc::error::OpcError::EquivalentPartNames { .. })
+        ));
+        assert_eq!(package.part_count(), original_part_count);
+        assert_eq!(package.get_part(&uri).unwrap().blob(), original_xml);
+        assert!(
+            load_worksheet_printer_settings(&package, &uri)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(package.get_part(&equivalent).unwrap().blob(), &[0x01]);
+
+        assert!(package.remove_part(&equivalent));
+        store_worksheet_printer_settings(
+            &mut package,
+            &uri,
+            &value(),
+            PrinterSettingsConformance::Transitional,
+        )
+        .unwrap();
+        assert!(
+            load_worksheet_printer_settings(&package, &uri)
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[test]

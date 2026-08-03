@@ -30,7 +30,6 @@
 pub mod active_x;
 pub mod auto_filter;
 pub mod cell;
-pub mod cell_watches;
 pub mod chart;
 pub mod chartsheet;
 mod comments;
@@ -101,6 +100,7 @@ pub use chartsheet::{
     write_chartsheet,
 };
 pub use litchi_xlsx::calculation_properties;
+pub use litchi_xlsx::cell_watches;
 pub use litchi_xlsx::sheet_calculation_properties;
 pub mod writer;
 
@@ -112,10 +112,6 @@ pub use auto_filter::{
     FilterValues, IconFilter, SortConditionDefinition, SortStateDefinition, Top10Filter,
 };
 pub use cell::Cell;
-pub use cell_watches::{
-    CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
-    parse_worksheet_cell_watches, write_worksheet_cell_watches,
-};
 pub use chart::{
     ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
     ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
@@ -152,6 +148,10 @@ pub use external_links::{
 pub use litchi_xlsx::calculation_properties::{
     WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
     parse_workbook_calculation_properties,
+};
+pub use litchi_xlsx::cell_watches::{
+    CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
+    parse_worksheet_cell_watches, write_worksheet_cell_watches,
 };
 pub use query_table::{
     QueryTable, QueryTableConformance, QueryTableExtensionAttribute, QueryTableExtensionList,

@@ -15,6 +15,8 @@
 use super::super::consts::*;
 use super::super::file::OleError;
 
+const MINI_STREAM_CUTOFF: usize = 4096;
+
 /// MiniFAT builder for small stream allocation
 ///
 /// Manages mini sector allocation and builds the Mini File Allocation Table
@@ -69,6 +71,14 @@ impl MiniFatBuilder {
     pub fn allocate_mini_chain(&mut self, data: &[u8]) -> Result<u32, OleError> {
         if data.is_empty() {
             return Ok(ENDOFCHAIN);
+        }
+        // MS-CFB 2.2/2.4 require streams at or above the 4,096-byte cutoff
+        // to use regular FAT sectors, never MiniFAT sectors.
+        if data.len() >= MINI_STREAM_CUTOFF {
+            return Err(OleError::InvalidData(
+                "CFB streams at or above the MiniFAT cutoff must use regular FAT sectors"
+                    .to_string(),
+            ));
         }
         if self.mini_sector_size == 0 {
             return Err(OleError::InvalidData(
@@ -283,6 +293,25 @@ mod tests {
 
         assert_eq!(checked_end(MAXREGSECT - 1, 1).unwrap(), MAXREGSECT);
         assert!(checked_end(MAXREGSECT, 1).is_err());
+    }
+
+    #[test]
+    fn allocation_rejects_ministream_cutoff_before_mutation() {
+        let mut minifat = MiniFatBuilder::new(64);
+        minifat.allocate_mini_chain(&[0xAA]).unwrap();
+        let prior_minifat = minifat.minifat().to_vec();
+        let prior_ministream = minifat.ministream_data().to_vec();
+        let prior_count = minifat.mini_sector_count();
+
+        assert!(
+            minifat
+                .allocate_mini_chain(&[0u8; MINI_STREAM_CUTOFF])
+                .is_err()
+        );
+
+        assert_eq!(minifat.minifat(), prior_minifat.as_slice());
+        assert_eq!(minifat.ministream_data(), prior_ministream.as_slice());
+        assert_eq!(minifat.mini_sector_count(), prior_count);
     }
 
     #[test]
