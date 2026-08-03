@@ -3891,12 +3891,13 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
         let model_object = model_archive.object(model_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Pages table model {model_id} is missing"))
         })?;
-        let models = model_object
-            .messages
-            .iter()
-            .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
-            .filter_map(|message| TableModelArchive::decode(message.data.as_slice()).ok())
-            .collect::<Vec<_>>();
+        let models = decode_table_models(
+            model_object
+                .messages
+                .iter()
+                .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_)),
+            model_id,
+        )?;
         let [model] = models.as_slice() else {
             return Err(Error::InvalidFormat(format!(
                 "Pages table model {model_id} must contain exactly one table-model payload"
@@ -3963,6 +3964,21 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
     }
     result.sort_by_key(|graph| graph.info.anchor_character_index);
     Ok(result)
+}
+
+fn decode_table_models<'a>(
+    messages: impl Iterator<Item = &'a RawMessage>,
+    model_id: u64,
+) -> Result<Vec<TableModelArchive>> {
+    messages
+        .map(|message| {
+            TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Pages table model {model_id} contains malformed table-model payload: {error}"
+                ))
+            })
+        })
+        .collect()
 }
 
 fn clone_body_table_attachment(
@@ -4086,6 +4102,7 @@ fn remove_table_object(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::RawMessage;
     use crate::numbers::CellValue;
     use crate::pages::PagesDocumentBuilder;
     use crate::table_cell_conditional_highlight::{
@@ -4100,6 +4117,21 @@ mod tests {
     };
 
     const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
+
+    #[test]
+    fn malformed_table_model_payload_is_reported() {
+        let messages = [RawMessage {
+            type_: TABLE_MODEL_MESSAGE_TYPES[0],
+            data: vec![0x80],
+        }];
+        let error = decode_table_models(messages.iter(), 41).expect_err("malformed payload");
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message)
+                if message.contains("Pages table model 41")
+                    && message.contains("malformed table-model payload")
+        ));
+    }
 
     #[test]
     fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() {
