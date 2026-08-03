@@ -12,8 +12,8 @@ use crate::{Error, IWorkPackage, Result};
 
 use super::position::TextRange;
 use super::storage_wire::{
-    STORAGE_MESSAGE_TYPES, StorageLocation, locate_storage as locate_native_storage,
-    text_utf16_len, validate_sorted_boundaries,
+    StorageLocation, locate_storage as locate_native_storage, text_utf16_len,
+    validate_sorted_boundaries,
 };
 
 pub(super) const SMART_FIELD_TABLE_FIELD: u32 = 11;
@@ -344,7 +344,7 @@ type TablePatch = (Option<Vec<u8>>, Option<u64>, Option<u64>);
 
 pub(super) fn patch_ranged_object_table<F>(
     package: &mut IWorkPackage,
-    archive_name: &str,
+    location: &StorageLocation,
     storage_id: u64,
     kind: RangedObjectTable,
     transform: F,
@@ -352,47 +352,80 @@ pub(super) fn patch_ranged_object_table<F>(
 where
     F: FnOnce(Option<&[u8]>, &tswp::StorageArchive) -> Result<TablePatch>,
 {
-    package.update_archive(archive_name, |archive| {
+    if location.object_id != storage_id {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage anchor {} does not match requested storage {storage_id}",
+            location.object_id
+        )));
+    }
+    package.update_archive(&location.archive_name, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| STORAGE_MESSAGE_TYPES.contains(&message.type_))
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+        if object.archive_info.identifier != Some(location.object_id) {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let storage = tswp::StorageArchive::decode(original.data.as_slice())?;
-        let tables = repeated_length_delimited_payloads(&original.data, kind.field())?;
-        if tables.len() > 1 {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} contains {} {} tables",
-                tables.len(),
-                kind.label()
+                "iWork text storage {storage_id} has an invalid archive identity"
             )));
         }
-        let (replacement, added, removed) = transform(tables.first().copied(), &storage)?;
-        let data = patch_length_delimited_field(
-            &original.data,
-            kind.field(),
-            !tables.is_empty(),
-            replacement.as_deref(),
-        )?;
+        if object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+            .is_none()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} is missing metadata for anchored message {}",
+                location.message_index
+            )));
+        }
+        let (message_type, data, added, removed) = {
+            let original = object.messages.get(location.message_index).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} is missing anchored message {}",
+                    location.message_index
+                ))
+            })?;
+            if original.type_ != location.message_type {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} anchored message {} changed type from {} to {}",
+                    location.message_index, location.message_type, original.type_
+                )));
+            }
+            let storage = tswp::StorageArchive::decode(original.data.as_slice())?;
+            let tables = repeated_length_delimited_payloads(&original.data, kind.field())?;
+            if tables.len() > 1 {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} contains {} {} tables",
+                    tables.len(),
+                    kind.label()
+                )));
+            }
+            let (replacement, added, removed) = transform(tables.first().copied(), &storage)?;
+            let data = patch_length_delimited_field(
+                &original.data,
+                kind.field(),
+                !tables.is_empty(),
+                replacement.as_deref(),
+            )?;
+            (original.type_, data, added, removed)
+        };
         object.replace_message(
-            *index,
+            location.message_index,
             RawMessage {
-                type_: original.type_,
+                type_: message_type,
                 data,
             },
         )?;
-        let info = &mut object.archive_info.message_infos[*index];
+        let info = object
+            .archive_info
+            .message_infos
+            .get_mut(location.message_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} is missing metadata for anchored message {}",
+                    location.message_index
+                ))
+            })?;
         if let Some(identifier) = added {
             if info.object_references.contains(&identifier) {
                 return Err(Error::InvalidFormat(format!(

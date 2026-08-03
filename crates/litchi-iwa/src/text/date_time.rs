@@ -109,7 +109,7 @@ fn add_date_time_field_in_place(
     let object = new_date_time_object(identifier, settings)?;
     patch_ranged_object_table(
         package,
-        &location.archive_name,
+        &location,
         storage_id,
         SMART_FIELD_TABLE,
         |table, storage| {
@@ -160,7 +160,7 @@ pub(crate) fn update_text_date_time_field(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         SMART_FIELD_TABLE,
         |table, storage| {
@@ -209,7 +209,7 @@ pub(crate) fn remove_text_date_time_field(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         SMART_FIELD_TABLE,
         |table, storage| {

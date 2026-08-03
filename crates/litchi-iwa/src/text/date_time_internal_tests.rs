@@ -1,5 +1,6 @@
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::RawMessage;
 use crate::pages::PagesEditor;
+use crate::protobuf::tswp;
 use crate::wire::{
     parse_wire_fields, patch_fixed64_field, patch_varint_field, repeated_length_delimited_payloads,
     transform_length_delimited_field,
@@ -11,7 +12,7 @@ use crate::text::date_time_types::{
     TextDateTimeLocaleIdentifier,
 };
 use crate::text::hyperlink_storage::SMART_FIELD_TABLE_FIELD;
-use crate::text::storage_wire::STORAGE_MESSAGE_TYPES;
+use prost::Message;
 
 const DATE_FIELD: u32 = 8;
 
@@ -40,12 +41,10 @@ fn whole_range() -> TextRange {
     TextRange::from_utf16_indexes(0, "Friday, July 17, 2026".encode_utf16().count()).unwrap()
 }
 
-fn storage_message_index(object: &ArchiveObject) -> usize {
-    object
-        .messages
-        .iter()
-        .position(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
+fn storage_message_index(package: &crate::IWorkPackage, storage_id: u64) -> usize {
+    locate_storage(package, storage_id, SMART_FIELD_TABLE)
         .unwrap()
+        .message_index
 }
 
 #[test]
@@ -55,21 +54,20 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
         .add_text_date_time_field(storage_id, whole_range(), settings(805_965_335.0))
         .unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id, SMART_FIELD_TABLE)
-        .unwrap()
-        .archive_name;
+    let location = locate_storage(&package, storage_id, SMART_FIELD_TABLE).unwrap();
+    let archive_name = location.archive_name.clone();
+    let message_index = location.message_index;
     package
         .update_archive(&archive_name, |archive| {
             let storage = archive.object_mut(storage_id).unwrap();
-            let index = storage_message_index(storage);
-            let original = &storage.messages[index];
+            let original = &storage.messages[message_index];
             let data = transform_length_delimited_field(
                 &original.data,
                 SMART_FIELD_TABLE_FIELD,
                 |table| patch_varint_field(table, 99, false, Some(7)),
             )?;
             storage.replace_message(
-                index,
+                message_index,
                 RawMessage {
                     type_: original.type_,
                     data,
@@ -97,9 +95,10 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
         .update_text_date_time_field(storage_id, field.id, whole_range(), settings(900_000_000.5))
         .unwrap();
     let package = editor.into_package();
+    let message_index = storage_message_index(&package, storage_id);
     let archive = package.archive(&archive_name).unwrap();
     let storage = archive.object(storage_id).unwrap();
-    let message = &storage.messages[storage_message_index(storage)];
+    let message = &storage.messages[message_index];
     let table =
         repeated_length_delimited_payloads(&message.data, SMART_FIELD_TABLE_FIELD).unwrap()[0];
     assert!(
@@ -122,6 +121,56 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
             .iter()
             .any(|wire| wire.number == 77)
     );
+}
+
+#[test]
+fn date_time_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
+    let (editor, storage_id) = fixture();
+    let mut package = editor.into_package();
+    let location = locate_storage(&package, storage_id, SMART_FIELD_TABLE).unwrap();
+    let style_data = tswp::ParagraphStyleArchive {
+        super_: crate::protobuf::tss::StyleArchive::default(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    package
+        .update_archive(&location.archive_name, |archive| {
+            archive
+                .object_mut(storage_id)
+                .unwrap()
+                .push_message(RawMessage {
+                    type_: 2_022,
+                    data: style_data.clone(),
+                })?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let field = editor
+        .add_text_date_time_field(storage_id, whole_range(), settings(805_965_335.0))
+        .unwrap();
+    editor
+        .update_text_date_time_field(storage_id, field.id, whole_range(), settings(900_000_000.5))
+        .unwrap();
+    editor
+        .remove_text_date_time_field(storage_id, field.id)
+        .unwrap();
+
+    let package = editor.into_package();
+    let location = locate_storage(&package, storage_id, SMART_FIELD_TABLE).unwrap();
+    let archive = package.archive(&location.archive_name).unwrap();
+    let object = archive.object(storage_id).unwrap();
+    assert_eq!(
+        object.messages[location.message_index].type_,
+        location.message_type
+    );
+    let sibling = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == 2_022 && message.data == style_data)
+        .unwrap();
+    assert_eq!(sibling.data, style_data);
 }
 
 #[test]

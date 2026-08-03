@@ -59,7 +59,7 @@ pub(crate) fn add_text_hyperlink(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         RangedObjectTable::SmartField,
         |table, storage| {
@@ -120,7 +120,7 @@ pub(crate) fn update_text_hyperlink(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         RangedObjectTable::SmartField,
         |table, storage| {
@@ -170,7 +170,7 @@ pub(crate) fn remove_text_hyperlink(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         RangedObjectTable::SmartField,
         |table, storage| {

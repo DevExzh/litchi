@@ -56,7 +56,7 @@ pub(crate) fn add_text_bookmark(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         BOOKMARK_TABLE,
         |table, storage| {
@@ -115,7 +115,7 @@ pub(crate) fn update_text_bookmark(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         BOOKMARK_TABLE,
         |table, storage| {
@@ -164,7 +164,7 @@ pub(crate) fn remove_text_bookmark(
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         BOOKMARK_TABLE,
         |table, storage| {
