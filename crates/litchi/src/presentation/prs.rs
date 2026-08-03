@@ -225,9 +225,8 @@ impl Presentation {
                 let slides = pres.slides().map_err(Error::from)?;
                 let mut texts = Vec::new();
                 for slide in slides {
-                    if let Ok(text) = slide.text()
-                        && !text.is_empty()
-                    {
+                    let text = slide.text().map_err(Error::from)?;
+                    if !text.is_empty() {
                         texts.push(text);
                     }
                 }
@@ -324,7 +323,7 @@ impl Presentation {
                     .iter()
                     .map(|s| {
                         let text = s.text().map_err(Error::from)?;
-                        let name = s.name().ok();
+                        let name = Some(s.name().map_err(Error::from)?);
                         Ok(Slide::Pptx(PptxSlideData { text, name }))
                     })
                     .collect()
@@ -479,13 +478,11 @@ impl Presentation {
 
             // For other formats, extract from slides (slower but works)
             let slides = self.slides()?;
-            Ok(slides
+            slides
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, slide)| {
-                    slide.text().ok().map(|text| (idx + 1, text.to_string()))
-                })
-                .collect())
+                .map(|(idx, slide)| slide.text().map(|text| (idx + 1, text.to_string())))
+                .collect()
         }
     }
 }

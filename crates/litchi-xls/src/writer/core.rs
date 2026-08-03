@@ -1509,6 +1509,11 @@ impl XlsWriter {
         value: f64,
         format_id: u16,
     ) -> XlsResult<()> {
+        if !value.is_finite() {
+            return Err(XlsError::InvalidData(
+                "cell number must be finite for BIFF8 serialization".to_string(),
+            ));
+        }
         let pos = CellPos::try_new(row, col)?;
         self.write_cell(sheet, pos, XlsCellValue::Number(value), format_id)
     }
@@ -4317,6 +4322,24 @@ mod tests {
 
         let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
         assert!(matches!(&cell.value, XlsCellValue::Number(n) if *n == 42.5));
+    }
+
+    #[test]
+    fn non_finite_cell_numbers_are_rejected_before_mutation() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                writer.write_number(sheet, 0, 0, value)
+            }));
+            assert!(matches!(
+                result,
+                Ok(Err(XlsError::InvalidData(message)))
+                    if message == "cell number must be finite for BIFF8 serialization"
+            ));
+            assert!(writer.worksheets[sheet].cells.is_empty());
+        }
     }
 
     #[test]
