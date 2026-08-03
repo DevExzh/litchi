@@ -172,7 +172,7 @@ impl Document {
     /// that prefer an explicitly fallible method name. It uses the typed
     /// object index and batches archive lookups.
     pub fn try_objects(&self) -> Result<Vec<ResolvedObject>> {
-        let object_ids = self.state.object_index.object_ids()?;
+        let object_ids = self.state.object_index.object_ids();
         self.state
             .object_index
             .resolve_many(&self.state.bundle, &object_ids)
@@ -225,9 +225,16 @@ impl Document {
         &self.state.object_index
     }
 
+    /// Borrow all validated object identities in deterministic numeric order.
+    pub fn object_id_iter(&self) -> impl Iterator<Item = ObjectId> + '_ {
+        self.state.object_index.iter_object_ids()
+    }
+
     /// Get all validated object identities in deterministic numeric order.
-    pub fn object_ids(&self) -> Result<Vec<ObjectId>> {
-        self.state.object_index.object_ids()
+    ///
+    /// Use [`Self::object_id_iter`] when an owned collection is unnecessary.
+    pub fn object_ids(&self) -> Vec<ObjectId> {
+        self.object_id_iter().collect()
     }
 
     /// Get the application type
@@ -310,7 +317,7 @@ impl Document {
 
     /// Get document statistics after resolving the indexed object set.
     pub fn stats(&self) -> Result<DocumentStats> {
-        let total_objects = self.state.object_index.object_ids()?.len();
+        let total_objects = self.state.object_index.object_count();
         let archives_count = self.state.bundle.iter_archives().count();
 
         let mut message_type_counts = HashMap::new();

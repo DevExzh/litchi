@@ -196,17 +196,22 @@ impl ObjectIndex {
         object_ids
     }
 
+    /// Borrow all validated object identities in deterministic numeric order.
+    ///
+    /// The index validates identities while it is built and stores this order
+    /// as a compact catalog, so traversal does not re-scan or re-sort the
+    /// backing hash map.
+    pub fn iter_object_ids(&self) -> impl Iterator<Item = ObjectId> + '_ {
+        self.ordered_ids.iter().copied()
+    }
+
     /// Get all indexed object identities in deterministic numeric order.
-    pub fn object_ids(&self) -> Result<Vec<ObjectId>> {
-        let mut object_ids: Vec<_> = self
-            .entries
-            .keys()
-            .copied()
-            .map(ObjectId::try_from)
-            .collect::<std::result::Result<_, _>>()
-            .map_err(|_| Error::Archive("object index contains a null object identifier".into()))?;
-        object_ids.sort_unstable();
-        Ok(object_ids)
+    ///
+    /// This is an owned convenience collection over [`Self::iter_object_ids`].
+    /// The index invariants make the operation infallible; callers that only
+    /// need to inspect the catalog should prefer the borrowed iterator.
+    pub fn object_ids(&self) -> Vec<ObjectId> {
+        self.iter_object_ids().collect()
     }
 
     /// Get typed object identities for one fragment in source order.
@@ -1092,7 +1097,8 @@ mod tests {
             index.entry(source).and_then(ObjectIndexEntry::object_id),
             Some(source)
         );
-        assert_eq!(index.object_ids().unwrap(), vec![source]);
+        assert_eq!(index.object_ids(), vec![source]);
+        assert_eq!(index.iter_object_ids().collect::<Vec<_>>(), vec![source]);
         assert_eq!(
             index.fragment_object_ids("Index/Test.iwa").unwrap(),
             Some(vec![source])
@@ -1138,6 +1144,13 @@ mod tests {
             .unwrap();
 
         assert_eq!(index.all_object_ids(), vec![10, 20, 30]);
+        assert_eq!(
+            index
+                .iter_object_ids()
+                .map(ObjectId::get)
+                .collect::<Vec<_>>(),
+            vec![10, 20, 30]
+        );
         assert_eq!(
             index
                 .all_entries()
