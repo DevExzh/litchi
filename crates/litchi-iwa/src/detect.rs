@@ -31,26 +31,173 @@ pub enum Format {
     Numbers,
 }
 
+/// Resource ceilings for one iWork detection attempt.
+///
+/// The defaults are conservative enough for untrusted input while allowing
+/// ordinary media-heavy documents. Callers may tighten any ceiling, but the
+/// checked constructor never permits a limit above the format-wide hard
+/// ceiling. Detection remains fail-closed when a limit is exceeded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_input_bytes: u64,
+    max_files: usize,
+    max_entry_size: u64,
+    max_total_size: u64,
+    max_iwa_stream_size: usize,
+}
+
+impl Limits {
+    /// Maximum input size accepted by the default safety profile.
+    pub const HARD_MAX_INPUT_BYTES: u64 = MAX_INPUT_BYTES;
+    /// Maximum ZIP member count accepted by the default safety profile.
+    pub const HARD_MAX_FILES: usize = ARCHIVE_LIMITS.max_files;
+    /// Maximum uncompressed ZIP member size accepted by the default profile.
+    pub const HARD_MAX_ENTRY_SIZE: u64 = ARCHIVE_LIMITS.max_entry_size;
+    /// Maximum aggregate uncompressed ZIP size accepted by the default profile.
+    pub const HARD_MAX_TOTAL_SIZE: u64 = ARCHIVE_LIMITS.max_total_size;
+    /// Maximum decompressed size of one IWA component.
+    pub const HARD_MAX_IWA_STREAM_SIZE: usize = SnappyStream::MAX_DECOMPRESSED_STREAM;
+
+    /// Construct checked detection ceilings.
+    pub fn new(
+        max_input_bytes: u64,
+        max_files: usize,
+        max_entry_size: u64,
+        max_total_size: u64,
+        max_iwa_stream_size: usize,
+    ) -> crate::Result<Self> {
+        if max_input_bytes == 0
+            || max_files == 0
+            || max_entry_size == 0
+            || max_total_size == 0
+            || max_iwa_stream_size == 0
+        {
+            return Err(crate::Error::InvalidFormat(
+                "iWork detection limits must be non-zero".to_owned(),
+            ));
+        }
+        if max_input_bytes > Self::HARD_MAX_INPUT_BYTES {
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork detection input limit exceeds {} bytes",
+                Self::HARD_MAX_INPUT_BYTES
+            )));
+        }
+        if max_files > Self::HARD_MAX_FILES {
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork detection file limit exceeds {} entries",
+                Self::HARD_MAX_FILES
+            )));
+        }
+        if max_entry_size > Self::HARD_MAX_ENTRY_SIZE {
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork detection entry limit exceeds {} bytes",
+                Self::HARD_MAX_ENTRY_SIZE
+            )));
+        }
+        if max_total_size > Self::HARD_MAX_TOTAL_SIZE {
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork detection total-size limit exceeds {} bytes",
+                Self::HARD_MAX_TOTAL_SIZE
+            )));
+        }
+        if max_iwa_stream_size > Self::HARD_MAX_IWA_STREAM_SIZE {
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork detection IWA limit exceeds {} bytes",
+                Self::HARD_MAX_IWA_STREAM_SIZE
+            )));
+        }
+
+        Ok(Self {
+            max_input_bytes,
+            max_files,
+            max_entry_size,
+            max_total_size,
+            max_iwa_stream_size,
+        })
+    }
+
+    /// Maximum complete input size accepted by this profile.
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
+    }
+
+    /// Maximum number of ZIP members indexed by one probe.
+    pub const fn max_files(self) -> usize {
+        self.max_files
+    }
+
+    /// Maximum declared uncompressed size of one ZIP member.
+    pub const fn max_entry_size(self) -> u64 {
+        self.max_entry_size
+    }
+
+    /// Maximum aggregate declared uncompressed ZIP size.
+    pub const fn max_total_size(self) -> u64 {
+        self.max_total_size
+    }
+
+    /// Maximum decompressed size of one IWA component.
+    pub const fn max_iwa_stream_size(self) -> usize {
+        self.max_iwa_stream_size
+    }
+
+    fn archive_limits(self) -> ArchiveLimits {
+        ArchiveLimits {
+            max_files: self.max_files,
+            max_entry_size: self.max_entry_size,
+            max_total_size: self.max_total_size,
+        }
+    }
+
+    fn snappy_limits(self) -> crate::Result<crate::snappy::SnappyLimits> {
+        crate::snappy::SnappyLimits::new(
+            self.max_iwa_stream_size
+                .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
+            self.max_iwa_stream_size,
+        )
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: MAX_INPUT_BYTES,
+            max_files: ARCHIVE_LIMITS.max_files,
+            max_entry_size: ARCHIVE_LIMITS.max_entry_size,
+            max_total_size: ARCHIVE_LIMITS.max_total_size,
+            max_iwa_stream_size: SnappyStream::MAX_DECOMPRESSED_STREAM,
+        }
+    }
+}
+
 /// Detect an iWork application from complete packaged bytes.
 ///
 /// ZIP and Snappy metadata are validated under explicit file-count and size
 /// limits. A package with conflicting application-root evidence is rejected.
 pub fn bytes(value: &[u8]) -> Option<Format> {
-    let archive = ArchiveReader::new_with_limits(value, ARCHIVE_LIMITS).ok()?;
-    match classify_archive(&archive, true) {
+    bytes_with_limits(value, Limits::default())
+}
+
+/// Detect an iWork application using caller-selected resource ceilings.
+pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Option<Format> {
+    if u64::try_from(value.len()).ok()? > limits.max_input_bytes {
+        return None;
+    }
+    let archive = ArchiveReader::new_with_limits(value, limits.archive_limits()).ok()?;
+    match classify_archive(&archive, true, limits) {
         Outcome::Found(format) => Some(format),
         Outcome::None | Outcome::Conflict => None,
     }
 }
 
-fn classify_archive(archive: &ArchiveReader<'_>, allow_nested: bool) -> Outcome {
+fn classify_archive(archive: &ArchiveReader<'_>, allow_nested: bool, limits: Limits) -> Outcome {
     if is_encrypted_iwork_archive(archive) {
         return Outcome::Conflict;
     }
 
     let marks = marks(archive.file_names());
     if marks.iwa {
-        return classify_direct_archive(archive, marks);
+        return classify_direct_archive(archive, marks, limits);
     }
     if !allow_nested {
         return Outcome::None;
@@ -65,14 +212,14 @@ fn classify_archive(archive: &ArchiveReader<'_>, allow_nested: bool) -> Outcome 
         Ok(data) => data,
         Err(_) => return Outcome::Conflict,
     };
-    let index = match ArchiveReader::new_with_limits(&index_data, ARCHIVE_LIMITS) {
+    let index = match ArchiveReader::new_with_limits(&index_data, limits.archive_limits()) {
         Ok(index) => index,
         Err(_) => return Outcome::Conflict,
     };
-    classify_archive(&index, false)
+    classify_archive(&index, false, limits)
 }
 
-fn classify_direct_archive(archive: &ArchiveReader<'_>, marks: Marks) -> Outcome {
+fn classify_direct_archive(archive: &ArchiveReader<'_>, marks: Marks, limits: Limits) -> Outcome {
     let mut documents = archive
         .file_names()
         .filter(|name| index_name(name) == Some("Document.iwa"));
@@ -87,7 +234,7 @@ fn classify_direct_archive(archive: &ArchiveReader<'_>, marks: Marks) -> Outcome
         Ok(data) => data,
         Err(_) => return Outcome::Conflict,
     };
-    let Some(format) = root_format(&data) else {
+    let Some(format) = root_format(&data, limits) else {
         return Outcome::Conflict;
     };
     if marks.accepts(format) {
@@ -97,8 +244,10 @@ fn classify_direct_archive(archive: &ArchiveReader<'_>, marks: Marks) -> Outcome
     }
 }
 
-fn root_format(data: &[u8]) -> Option<Format> {
-    let stream = SnappyStream::decompress(&mut Cursor::new(data)).ok()?;
+fn root_format(data: &[u8], limits: Limits) -> Option<Format> {
+    let stream =
+        SnappyStream::decompress_with_limits(&mut Cursor::new(data), limits.snappy_limits().ok()?)
+            .ok()?;
     let archive = Archive::parse(stream.data()).ok()?;
     let mut detected = None;
 
@@ -127,12 +276,18 @@ fn root_format(data: &[u8]) -> Option<Format> {
 /// Detect an iWork application from a seekable stream.
 ///
 /// Detection starts at byte zero and restores the caller's original cursor on
-/// every path. Streams larger than one GiB are rejected without being read.
+/// every path. Streams larger than the selected input ceiling are rejected
+/// without being read.
 pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
+    reader_with_limits(value, Limits::default())
+}
+
+/// Detect an iWork application from a seekable stream under explicit limits.
+pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Option<Format> {
     let original = value.stream_position().ok()?;
     let detected = (|| {
         let length = value.seek(SeekFrom::End(0)).ok()?;
-        if length > MAX_INPUT_BYTES {
+        if length > limits.max_input_bytes {
             return None;
         }
 
@@ -147,7 +302,7 @@ pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
         if value.read(&mut extra).ok()? != 0 {
             return None;
         }
-        bytes(&data)
+        bytes_with_limits(&data, limits)
     })();
     value.seek(SeekFrom::Start(original)).ok()?;
     detected
@@ -158,15 +313,20 @@ pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
 /// Symbolic links, conflicting markers, malformed `Index.zip` archives, and
 /// directory traversal errors fail closed.
 pub fn path(value: impl AsRef<Path>) -> Option<Format> {
+    path_with_limits(value, Limits::default())
+}
+
+/// Detect a packaged file or legacy directory bundle under explicit limits.
+pub fn path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Option<Format> {
     let value = value.as_ref();
     match kind(value)? {
-        Kind::File => reader(&mut File::open(value).ok()?),
-        Kind::Dir => directory(value),
+        Kind::File => reader_with_limits(&mut File::open(value).ok()?, limits),
+        Kind::Dir => directory(value, limits),
         Kind::Missing => None,
     }
 }
 
-fn directory(root: &Path) -> Option<Format> {
+fn directory(root: &Path, limits: Limits) -> Option<Format> {
     let mut evidence = classify(
         marker(root, "index.xml")?,
         marker(root, "index.apxl")?,
@@ -178,9 +338,8 @@ fn directory(root: &Path) -> Option<Format> {
 
     let index_zip = root.join("Index.zip");
     evidence = evidence.merge(match kind(&index_zip)? {
-        Kind::File => {
-            reader(&mut File::open(index_zip).ok()?).map_or(Outcome::Conflict, Outcome::Found)
-        },
+        Kind::File => reader_with_limits(&mut File::open(index_zip).ok()?, limits)
+            .map_or(Outcome::Conflict, Outcome::Found),
         Kind::Dir => Outcome::Conflict,
         Kind::Missing => Outcome::None,
     });
@@ -190,7 +349,7 @@ fn directory(root: &Path) -> Option<Format> {
 
     let index = root.join("Index");
     evidence = evidence.merge(match kind(&index)? {
-        Kind::Dir => directory_outcome(&index)?,
+        Kind::Dir => directory_outcome(&index, limits)?,
         Kind::File => Outcome::Conflict,
         Kind::Missing => Outcome::None,
     });
@@ -201,7 +360,7 @@ fn directory(root: &Path) -> Option<Format> {
     }
 }
 
-fn directory_outcome(index: &Path) -> Option<Outcome> {
+fn directory_outcome(index: &Path, limits: Limits) -> Option<Outcome> {
     let mut marks = Marks::default();
     let mut document = None;
     for entry in fs::read_dir(index).ok()? {
@@ -225,10 +384,14 @@ fn directory_outcome(index: &Path) -> Option<Outcome> {
     let Some(document) = document else {
         return Some(Outcome::Conflict);
     };
-    if fs::metadata(&document).ok()?.len() > ARCHIVE_LIMITS.max_entry_size {
+    let document_size = fs::metadata(&document).ok()?.len();
+    if document_size > limits.max_input_bytes || document_size > limits.max_entry_size {
         return Some(Outcome::Conflict);
     }
-    let Some(format) = fs::read(document).ok().and_then(|data| root_format(&data)) else {
+    let Some(format) = fs::read(document)
+        .ok()
+        .and_then(|data| root_format(&data, limits))
+    else {
         return Some(Outcome::Conflict);
     };
     Some(if marks.accepts(format) {
@@ -504,6 +667,48 @@ mod tests {
     }
 
     #[test]
+    fn checked_limits_preserve_defaults_and_bound_each_layer() {
+        let valid = document_package(Format::Pages, &[]);
+        let defaults = Limits::default();
+        assert_eq!(bytes_with_limits(&valid, defaults), Some(Format::Pages));
+        assert_eq!(defaults.max_input_bytes(), Limits::HARD_MAX_INPUT_BYTES);
+        assert_eq!(defaults.max_files(), Limits::HARD_MAX_FILES);
+        assert_eq!(defaults.max_entry_size(), Limits::HARD_MAX_ENTRY_SIZE);
+        assert_eq!(defaults.max_total_size(), Limits::HARD_MAX_TOTAL_SIZE);
+        assert_eq!(
+            defaults.max_iwa_stream_size(),
+            Limits::HARD_MAX_IWA_STREAM_SIZE
+        );
+
+        let input_bound = Limits::new(1, 1, 1, 1, 1).unwrap();
+        assert_eq!(bytes_with_limits(&valid, input_bound), None);
+
+        let stream_bound = Limits::new(
+            Limits::HARD_MAX_INPUT_BYTES,
+            Limits::HARD_MAX_FILES,
+            Limits::HARD_MAX_ENTRY_SIZE,
+            Limits::HARD_MAX_TOTAL_SIZE,
+            1,
+        )
+        .unwrap();
+        assert_eq!(bytes_with_limits(&valid, stream_bound), None);
+    }
+
+    #[test]
+    fn checked_limits_reject_zero_and_hard_ceiling_escapes() {
+        assert!(Limits::new(0, 1, 1, 1, 1).is_err());
+        assert!(Limits::new(1, 0, 1, 1, 1).is_err());
+        assert!(Limits::new(1, 1, 0, 1, 1).is_err());
+        assert!(Limits::new(1, 1, 1, 0, 1).is_err());
+        assert!(Limits::new(1, 1, 1, 1, 0).is_err());
+        assert!(Limits::new(Limits::HARD_MAX_INPUT_BYTES + 1, 1, 1, 1, 1).is_err());
+        assert!(Limits::new(1, Limits::HARD_MAX_FILES + 1, 1, 1, 1).is_err());
+        assert!(Limits::new(1, 1, Limits::HARD_MAX_ENTRY_SIZE + 1, 1, 1).is_err());
+        assert!(Limits::new(1, 1, 1, Limits::HARD_MAX_TOTAL_SIZE + 1, 1).is_err());
+        assert!(Limits::new(1, 1, 1, 1, Limits::HARD_MAX_IWA_STREAM_SIZE + 1).is_err());
+    }
+
+    #[test]
     fn reader_restores_nonzero_cursor_on_success_and_rejection() {
         let mut valid = Cursor::new(document_package(Format::Pages, &[]));
         valid.set_position(9);
@@ -554,6 +759,10 @@ mod tests {
         )?;
         fs::write(unpacked.join("Index/Slide-1.iwa"), [])?;
         assert_eq!(path(&unpacked), Some(Format::Keynote));
+
+        let tight = Limits::new(1, 1, 1, 1, 1).unwrap();
+        assert_eq!(path_with_limits(&packaged, tight), None);
+        assert_eq!(path_with_limits(&unpacked, tight), None);
         Ok(())
     }
 
