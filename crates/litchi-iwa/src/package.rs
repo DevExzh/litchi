@@ -10,7 +10,7 @@ use soapberry_zip::office::{ArchiveLimits, ArchiveReader, StreamingArchiveWriter
 use tempfile::NamedTempFile;
 
 use crate::archive::Archive;
-use crate::snappy::SnappyStream;
+use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
 use crate::{Error, Result};
 
@@ -31,12 +31,14 @@ use package_state::PackageState;
 #[derive(Debug, Clone, Default)]
 pub struct IWorkPackage {
     state: Arc<PackageState>,
+    limits: PackageLimits,
 }
 
 /// An immutable, cheaply shareable package snapshot.
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     state: Arc<PackageState>,
+    limits: PackageLimits,
 }
 
 /// Resource ceilings applied while ingesting one iWork package.
@@ -47,49 +49,114 @@ pub struct Snapshot {
 /// format-wide hard ceilings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PackageLimits {
+    max_input_bytes: u64,
     max_entries: usize,
     max_entry_bytes: u64,
     max_total_bytes: u64,
+    max_iwa_stream_bytes: usize,
 }
 
 impl PackageLimits {
+    /// Hard ceiling for bytes read from one package path or byte slice.
+    pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
     /// Hard ceiling for non-directory package members in one ZIP archive.
     pub const MAX_ENTRIES: usize = 100_000;
     /// Hard ceiling for one declared uncompressed package member.
     pub const MAX_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
     /// Hard ceiling for the declared uncompressed size of one ZIP archive.
     pub const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Hard ceiling for one decompressed IWA component.
+    pub const MAX_IWA_STREAM_BYTES: usize = SnappyStream::MAX_DECOMPRESSED_STREAM;
 
     /// Build checked package-ingress ceilings.
     pub fn new(max_entries: usize, max_entry_bytes: u64, max_total_bytes: u64) -> Result<Self> {
-        if max_entries == 0 || max_entry_bytes == 0 || max_total_bytes == 0 {
+        Self::new_with_limits(
+            Self::MAX_INPUT_BYTES,
+            max_entries,
+            max_entry_bytes,
+            max_total_bytes,
+            Self::MAX_IWA_STREAM_BYTES,
+        )
+    }
+
+    /// Build checked package-ingress ceilings, including filesystem and IWA
+    /// decompression budgets.
+    pub fn new_with_limits(
+        max_input_bytes: u64,
+        max_entries: usize,
+        max_entry_bytes: u64,
+        max_total_bytes: u64,
+        max_iwa_stream_bytes: usize,
+    ) -> Result<Self> {
+        let limits = Self {
+            max_input_bytes,
+            max_entries,
+            max_entry_bytes,
+            max_total_bytes,
+            max_iwa_stream_bytes,
+        };
+        limits.validate()
+    }
+
+    fn validate(self) -> Result<Self> {
+        if self.max_input_bytes == 0
+            || self.max_entries == 0
+            || self.max_entry_bytes == 0
+            || self.max_total_bytes == 0
+            || self.max_iwa_stream_bytes == 0
+        {
             return Err(Error::InvalidFormat(
                 "iWork package limits must be non-zero".to_owned(),
             ));
         }
-        if max_entries > Self::MAX_ENTRIES {
+        if self.max_input_bytes > Self::MAX_INPUT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork package input limit exceeds the {} byte hard ceiling",
+                Self::MAX_INPUT_BYTES
+            )));
+        }
+        if self.max_entries > Self::MAX_ENTRIES {
             return Err(Error::InvalidFormat(format!(
                 "iWork package entry limit exceeds the {} entry hard ceiling",
                 Self::MAX_ENTRIES
             )));
         }
-        if max_entry_bytes > Self::MAX_ENTRY_BYTES {
+        if self.max_entry_bytes > Self::MAX_ENTRY_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "iWork package entry limit exceeds the {} byte hard ceiling",
                 Self::MAX_ENTRY_BYTES
             )));
         }
-        if max_total_bytes > Self::MAX_TOTAL_BYTES {
+        if self.max_total_bytes > Self::MAX_TOTAL_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "iWork package total limit exceeds the {} byte hard ceiling",
                 Self::MAX_TOTAL_BYTES
             )));
         }
-        Ok(Self {
-            max_entries,
-            max_entry_bytes,
-            max_total_bytes,
-        })
+        if self.max_iwa_stream_bytes > Self::MAX_IWA_STREAM_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork package IWA stream limit exceeds the {} byte hard ceiling",
+                Self::MAX_IWA_STREAM_BYTES
+            )));
+        }
+        Ok(self)
+    }
+
+    /// Tighten the maximum bytes read from one package path or byte slice.
+    pub fn with_input_bytes(mut self, max_input_bytes: u64) -> Result<Self> {
+        self.max_input_bytes = max_input_bytes;
+        self.validate()
+    }
+
+    /// Tighten the maximum decompressed size of one IWA component.
+    pub fn with_iwa_stream_bytes(mut self, max_iwa_stream_bytes: usize) -> Result<Self> {
+        self.max_iwa_stream_bytes = max_iwa_stream_bytes;
+        self.validate()
+    }
+
+    /// Maximum bytes read from one package path or byte slice.
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
     }
 
     /// Maximum number of non-directory members accepted in one archive.
@@ -107,6 +174,11 @@ impl PackageLimits {
         self.max_total_bytes
     }
 
+    /// Maximum decompressed size of one IWA component.
+    pub const fn max_iwa_stream_bytes(self) -> usize {
+        self.max_iwa_stream_bytes
+    }
+
     fn archive_limits(self) -> ArchiveLimits {
         ArchiveLimits {
             max_files: self.max_entries,
@@ -114,14 +186,45 @@ impl PackageLimits {
             max_total_size: self.max_total_bytes,
         }
     }
+
+    fn snappy_limits(self) -> Result<SnappyLimits> {
+        SnappyLimits::new(
+            self.max_iwa_stream_bytes
+                .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
+            self.max_iwa_stream_bytes,
+        )
+        .map_err(|error| Error::Snappy(error.to_string()))
+    }
+
+    fn check_input_size(self, size: u64, label: &str) -> Result<()> {
+        if size > self.max_input_bytes {
+            return Err(Error::InvalidFormat(format!(
+                "{label} is {size} bytes, exceeding the {} byte limit",
+                self.max_input_bytes
+            )));
+        }
+        Ok(())
+    }
+
+    fn check_iwa_stream_size(self, size: usize) -> Result<()> {
+        if size > self.max_iwa_stream_bytes {
+            return Err(Error::Snappy(format!(
+                "IWA stream is {size} bytes, exceeding the {} byte limit",
+                self.max_iwa_stream_bytes
+            )));
+        }
+        Ok(())
+    }
 }
 
 impl Default for PackageLimits {
     fn default() -> Self {
         Self {
+            max_input_bytes: Self::MAX_INPUT_BYTES,
             max_entries: Self::MAX_ENTRIES,
             max_entry_bytes: Self::MAX_ENTRY_BYTES,
             max_total_bytes: Self::MAX_TOTAL_BYTES,
+            max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
         }
     }
 }
@@ -137,6 +240,9 @@ impl IWorkPackage {
 
     /// Open a package from a path under caller-selected ingress ceilings.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: PackageLimits) -> Result<Self> {
+        let path = path.as_ref();
+        let size = std::fs::metadata(path)?.len();
+        limits.check_input_size(size, "iWork package input")?;
         Self::from_bytes_with_limits(&std::fs::read(path)?, limits)
     }
 
@@ -149,6 +255,10 @@ impl IWorkPackage {
     /// The same ceilings are applied to the outer ZIP and, when present, the
     /// embedded legacy `Index.zip` archive.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
+        let input_size = u64::try_from(bytes.len()).map_err(|_| {
+            Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
+        })?;
+        limits.check_input_size(input_size, "iWork package input")?;
         let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
             .map_err(|error| Error::Bundle(format!("Failed to open iWork ZIP: {error}")))?;
         if is_encrypted_iwork_archive(&archive) {
@@ -161,10 +271,10 @@ impl IWorkPackage {
         {
             return Self::from_legacy_bundle(&archive, &index_name, limits);
         }
-        Self::from_flat_archive(&archive)
+        Self::from_flat_archive(&archive, limits)
     }
 
-    fn from_flat_archive(archive: &ArchiveReader<'_>) -> Result<Self> {
+    fn from_flat_archive(archive: &ArchiveReader<'_>, limits: PackageLimits) -> Result<Self> {
         let mut entries = Vec::new();
         let mut seen = HashSet::new();
         for name in archive.file_names() {
@@ -181,6 +291,7 @@ impl IWorkPackage {
         }
         Ok(Self {
             state: Arc::new(PackageState::from_entries(entries)),
+            limits,
         })
     }
 
@@ -201,6 +312,10 @@ impl IWorkPackage {
                 "Failed to read legacy package index {index_name}: {error}"
             ))
         })?;
+        let index_size = u64::try_from(index_data.len()).map_err(|_| {
+            Error::InvalidFormat("legacy package index length does not fit u64".to_owned())
+        })?;
+        limits.check_input_size(index_size, "legacy iWork Index.zip")?;
         let index = ArchiveReader::new_with_limits(&index_data, limits.archive_limits()).map_err(
             |error| {
                 Error::Bundle(format!(
@@ -246,6 +361,7 @@ impl IWorkPackage {
         }
         Ok(Self {
             state: Arc::new(PackageState::from_entries(entries)),
+            limits,
         })
     }
 
@@ -257,10 +373,16 @@ impl IWorkPackage {
         self.state.entries.is_empty()
     }
 
+    /// Return the resource profile retained for lazy archive reads and edits.
+    pub const fn limits(&self) -> PackageLimits {
+        self.limits
+    }
+
     /// Capture an immutable package snapshot without copying package entries.
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             state: Arc::clone(&self.state),
+            limits: self.limits,
         }
     }
 
@@ -362,7 +484,10 @@ impl IWorkPackage {
                 "package entry {normalized} is a legacy operation log, not an IWA object archive"
             )));
         }
-        let stream = SnappyStream::decompress(&mut std::io::Cursor::new(compressed))?;
+        let stream = SnappyStream::decompress_with_limits(
+            &mut std::io::Cursor::new(compressed),
+            self.limits.snappy_limits()?,
+        )?;
         Archive::parse(stream.data())
     }
 
@@ -375,7 +500,9 @@ impl IWorkPackage {
                 "Package entry {normalized} is not an IWA component"
             )));
         }
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        let data = archive.to_bytes()?;
+        self.limits.check_iwa_stream_size(data.len())?;
+        let compressed = SnappyStream::compress(&data)?;
         self.insert_entry(normalized, compressed)
     }
 
@@ -486,6 +613,11 @@ impl Snapshot {
         self.state.entries.is_empty()
     }
 
+    /// Return the resource profile retained by this immutable snapshot.
+    pub const fn limits(&self) -> PackageLimits {
+        self.limits
+    }
+
     /// Enumerate package members in preserved source order.
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
         self.state.entries.iter().map(|(name, _)| name.as_str())
@@ -502,6 +634,7 @@ impl Snapshot {
     pub fn edit(&self) -> IWorkPackage {
         IWorkPackage {
             state: Arc::clone(&self.state),
+            limits: self.limits,
         }
     }
 
@@ -653,16 +786,101 @@ mod tests {
     #[test]
     fn package_limits_are_checked_and_exposed() {
         let limits = PackageLimits::new(7, 11, 23).unwrap();
+        assert_eq!(limits.max_input_bytes(), PackageLimits::MAX_INPUT_BYTES);
         assert_eq!(limits.max_entries(), 7);
         assert_eq!(limits.max_entry_bytes(), 11);
         assert_eq!(limits.max_total_bytes(), 23);
+        assert_eq!(
+            limits.max_iwa_stream_bytes(),
+            PackageLimits::MAX_IWA_STREAM_BYTES
+        );
 
         assert!(PackageLimits::new(0, 1, 1).is_err());
         assert!(PackageLimits::new(1, 0, 1).is_err());
         assert!(PackageLimits::new(1, 1, 0).is_err());
+        assert!(
+            PackageLimits::new_with_limits(
+                0,
+                PackageLimits::MAX_ENTRIES,
+                PackageLimits::MAX_ENTRY_BYTES,
+                PackageLimits::MAX_TOTAL_BYTES,
+                PackageLimits::MAX_IWA_STREAM_BYTES,
+            )
+            .is_err()
+        );
+        assert!(
+            PackageLimits::new_with_limits(PackageLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1,)
+                .is_err()
+        );
+        assert!(
+            PackageLimits::new_with_limits(
+                PackageLimits::MAX_INPUT_BYTES,
+                1,
+                1,
+                1,
+                PackageLimits::MAX_IWA_STREAM_BYTES + 1,
+            )
+            .is_err()
+        );
         assert!(PackageLimits::new(PackageLimits::MAX_ENTRIES + 1, 1, 1).is_err());
         assert!(PackageLimits::new(1, PackageLimits::MAX_ENTRY_BYTES + 1, 1).is_err());
         assert!(PackageLimits::new(1, 1, PackageLimits::MAX_TOTAL_BYTES + 1).is_err());
+
+        let tightened = limits
+            .with_input_bytes(31)
+            .unwrap()
+            .with_iwa_stream_bytes(47)
+            .unwrap();
+        assert_eq!(tightened.max_input_bytes(), 31);
+        assert_eq!(tightened.max_iwa_stream_bytes(), 47);
+        assert!(limits.with_input_bytes(0).is_err());
+        assert!(limits.with_iwa_stream_bytes(0).is_err());
+    }
+
+    #[test]
+    fn package_limits_bound_file_input_and_lazy_iwa_decompression() {
+        let decompressed = archive().to_bytes().unwrap();
+        assert!(decompressed.len() > 8);
+        let compressed = SnappyStream::compress(&decompressed).unwrap();
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("Index/Document.iwa", &compressed)
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let input_limits = PackageLimits::new(
+            10,
+            PackageLimits::MAX_ENTRY_BYTES,
+            PackageLimits::MAX_TOTAL_BYTES,
+        )
+        .unwrap()
+        .with_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
+        .unwrap();
+        let error = IWorkPackage::from_bytes_with_limits(&bytes, input_limits).unwrap_err();
+        assert!(error.to_string().contains("iWork package input"));
+
+        let stream_limits = PackageLimits::new(
+            10,
+            PackageLimits::MAX_ENTRY_BYTES,
+            PackageLimits::MAX_TOTAL_BYTES,
+        )
+        .unwrap()
+        .with_iwa_stream_bytes(8)
+        .unwrap();
+        let mut package = IWorkPackage::from_bytes_with_limits(&bytes, stream_limits).unwrap();
+        assert_eq!(package.limits(), stream_limits);
+        assert_eq!(package.snapshot().limits(), stream_limits);
+        let error = package.archive("Index/Document.iwa").unwrap_err();
+        assert!(error.to_string().contains("Snappy block expands"));
+        let error = package
+            .replace_archive("Index/Other.iwa", &archive())
+            .unwrap_err();
+        assert!(error.to_string().contains("IWA stream is"));
+
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), &bytes).unwrap();
+        let error = IWorkPackage::open_with_limits(file.path(), input_limits).unwrap_err();
+        assert!(error.to_string().contains("iWork package input"));
     }
 
     #[test]
@@ -754,6 +972,8 @@ mod tests {
 
         let snapshot = package.snapshot();
         let mut edit = snapshot.edit();
+        assert_eq!(snapshot.limits(), package.limits());
+        assert_eq!(edit.limits(), package.limits());
         assert_eq!(
             snapshot.entry("Data/original"),
             Some(b"original".as_slice())
