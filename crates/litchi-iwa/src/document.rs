@@ -348,15 +348,14 @@ mod tests {
 
     #[test]
     fn test_application_detection() {
-        // Test Keynote detection (should work with current registry)
-        let keynote_types = vec![101, 102, 103]; // KN.* types
+        // Use IDs that are unique to Keynote's registry entries. Shared IDs
+        // cannot safely identify document ownership.
+        let keynote_types = vec![145, 146, 147, 148];
         let keynote_result = detect_application(&keynote_types);
-        assert!(keynote_result.is_some()); // Should detect some application
+        assert_eq!(keynote_result, Some(Application::Keynote));
 
-        // Test with mixed types
-        let mixed_types = vec![1, 1, 1, 101]; // Mostly common types, one Keynote type
-        let mixed_result = detect_application(&mixed_types);
-        assert!(mixed_result.is_some()); // Should detect something
+        // Shared and application-overlapping IDs fail closed.
+        assert_eq!(detect_application(&[1, 1, 1, 101]), None);
 
         // Test empty input
         assert_eq!(detect_application(&[]), None);

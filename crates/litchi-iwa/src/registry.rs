@@ -33,7 +33,7 @@ impl FromStr for Application {
 }
 
 /// Message type information
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MessageType {
     /// Human-readable name of the message type
     pub name: &'static str,
@@ -43,7 +43,7 @@ pub struct MessageType {
 
 /// Global registry of message types
 pub struct MessageRegistry {
-    types: HashMap<u32, MessageType>,
+    types: HashMap<u32, Vec<MessageType>>,
 }
 
 impl Default for MessageRegistry {
@@ -62,21 +62,45 @@ impl MessageRegistry {
 
     /// Register a message type
     pub fn register(&mut self, id: u32, name: &'static str, application: Application) {
-        self.types.insert(id, MessageType { name, application });
+        self.types
+            .entry(id)
+            .or_default()
+            .push(MessageType { name, application });
     }
 
-    /// Look up a message type by ID
+    /// Look up a message type when the numeric ID is unambiguous.
+    ///
+    /// iWork reuses numeric message IDs across application namespaces. An
+    /// ambiguous ID therefore has no safe single result and returns `None`.
     pub fn lookup(&self, id: u32) -> Option<&MessageType> {
-        self.types.get(&id)
+        self.types
+            .get(&id)
+            .and_then(|types| (types.len() == 1).then_some(&types[0]))
+    }
+
+    /// Return every registered definition for a numeric message ID.
+    pub fn lookup_all(&self, id: u32) -> &[MessageType] {
+        self.types.get(&id).map_or(&[], Vec::as_slice)
     }
 
     /// Get all message types for a specific application
     pub fn types_for_application(&self, app: Application) -> Vec<(u32, &MessageType)> {
-        self.types
+        let mut types = self
+            .types
             .iter()
-            .filter(|(_, mt)| mt.application == app)
-            .map(|(id, mt)| (*id, mt))
-            .collect()
+            .flat_map(|(id, definitions)| {
+                definitions
+                    .iter()
+                    .filter(move |definition| definition.application == app)
+                    .map(|definition| (*id, definition))
+            })
+            .collect::<Vec<_>>();
+        types.sort_unstable_by(|(left_id, left), (right_id, right)| {
+            left_id
+                .cmp(right_id)
+                .then_with(|| left.name.cmp(right.name))
+        });
+        types
     }
 }
 
@@ -239,26 +263,50 @@ pub fn get_message_type(id: u32) -> Option<&'static MessageType> {
     MESSAGE_REGISTRY.lookup(id)
 }
 
+/// Get every registered message definition for a numeric ID.
+pub fn get_message_types(id: u32) -> &'static [MessageType] {
+    MESSAGE_REGISTRY.lookup_all(id)
+}
+
 /// Get all message types for a specific application
 pub fn get_message_types_for_app(app: Application) -> Vec<(u32, &'static MessageType)> {
     MESSAGE_REGISTRY.types_for_application(app)
 }
 
-/// Attempt to determine application type from a collection of message types
+/// Attempt to determine an application from numeric message IDs.
+///
+/// This is intentionally conservative. Shared definitions are ignored, each
+/// numeric ID contributes at most once per application, and a tie is treated as
+/// ambiguity. Callers that need document ownership must use validated root
+/// `DocumentArchive` evidence instead.
 pub fn detect_application(message_type_ids: &[u32]) -> Option<Application> {
-    let mut app_counts = std::collections::HashMap::new();
+    let applications = [
+        Application::Pages,
+        Application::Keynote,
+        Application::Numbers,
+    ];
+    let mut app_counts = [0usize; 3];
 
     for &id in message_type_ids {
-        if let Some(msg_type) = get_message_type(id) {
-            *app_counts.entry(msg_type.application).or_insert(0) += 1;
+        let definitions = get_message_types(id);
+        for (index, application) in applications.into_iter().enumerate() {
+            if definitions
+                .iter()
+                .any(|definition| definition.application == application)
+            {
+                app_counts[index] += 1;
+            }
         }
     }
 
-    // Return the application with the most message types
+    let maximum = app_counts.into_iter().max().unwrap_or(0);
+    if maximum == 0 || app_counts.iter().filter(|count| **count == maximum).count() != 1 {
+        return None;
+    }
     app_counts
-        .into_iter()
-        .max_by_key(|&(_, count)| count)
-        .map(|(app, _)| app)
+        .iter()
+        .position(|count| *count == maximum)
+        .map(|index| applications[index])
 }
 
 /// Detect the owning iWork application from the root `DocumentArchive` payload.
@@ -423,30 +471,66 @@ mod tests {
 
     #[test]
     fn test_message_type_lookup() {
-        // Test that we can look up known message types
-        let archive_info = get_message_type(1);
-        assert!(archive_info.is_some());
-
-        // Test Keynote types
-        let kn_show = get_message_type(101);
-        assert!(kn_show.is_some());
-
-        // Test that we can look up message types (basic functionality)
-        assert!(get_message_type(1).is_some());
+        // Numeric IDs are intentionally shared by multiple application
+        // namespaces, so a single-definition lookup must fail closed.
+        assert!(get_message_type(1).is_none());
+        assert!(get_message_type(101).is_none());
+        assert!(get_message_types(1).len() > 1);
+        assert!(get_message_types(101).len() > 1);
+        assert_eq!(
+            get_message_type(8).map(|message| message.application),
+            Some(Application::Keynote)
+        );
         assert!(get_message_type(999).is_none()); // Non-existent type
+
+        let pages = get_message_types_for_app(Application::Pages);
+        assert!(
+            pages
+                .iter()
+                .any(|(_, message)| message.name == "TP.DocumentArchive")
+        );
+        let keynote = get_message_types_for_app(Application::Keynote);
+        assert!(
+            keynote
+                .iter()
+                .any(|(_, message)| message.name == "KN.ShowArchive")
+        );
+    }
+
+    #[test]
+    fn registry_retains_colliding_definitions_without_overwriting() {
+        let mut registry = MessageRegistry::new();
+        registry.register(7, "TP.DocumentArchive", Application::Pages);
+        registry.register(7, "TN.DocumentArchive", Application::Numbers);
+
+        assert!(registry.lookup(7).is_none());
+        assert_eq!(
+            registry.lookup_all(7),
+            &[
+                MessageType {
+                    name: "TP.DocumentArchive",
+                    application: Application::Pages,
+                },
+                MessageType {
+                    name: "TN.DocumentArchive",
+                    application: Application::Numbers,
+                },
+            ]
+        );
     }
 
     #[test]
     fn test_application_detection() {
-        // Test Keynote detection
-        let keynote_ids = vec![101, 102, 103]; // KN.ShowArchive, KN.SlideArchive, etc.
-        let keynote_result = detect_application(&keynote_ids);
-        assert!(keynote_result.is_some()); // Should detect some application
+        // These IDs are shared by every concrete application namespace and
+        // must not be used as an ownership guess.
+        assert_eq!(detect_application(&[101, 102, 103]), None);
+        assert_eq!(detect_application(&[1, 2, 3]), None);
 
-        // Test with common types
-        let common_ids = vec![1, 2, 3]; // Common types
-        let common_result = detect_application(&common_ids);
-        assert!(common_result.is_some()); // Should detect some application
+        // A set containing only Keynote-specific IDs remains inferable.
+        assert_eq!(
+            detect_application(&[145, 146, 147, 148]),
+            Some(Application::Keynote)
+        );
 
         // Test empty input
         assert_eq!(detect_application(&[]), None);
