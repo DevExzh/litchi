@@ -9,6 +9,7 @@ use std::fs;
 use std::io::Read;
 use std::ops::Range;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 use prost::Message;
 use sha1::{Digest, Sha1};
@@ -240,12 +241,36 @@ enum MediaSource {
 /// Read-only media access for directory bundles, package files, and bytes.
 #[derive(Debug, Clone)]
 pub struct MediaManager {
+    state: Arc<MediaManagerState>,
+}
+
+#[derive(Debug)]
+struct MediaManagerState {
     source: MediaSource,
     assets: HashMap<String, MediaAsset>,
     limits: MediaLimits,
 }
 
 impl MediaManager {
+    fn from_parts(
+        source: MediaSource,
+        assets: HashMap<String, MediaAsset>,
+        limits: MediaLimits,
+    ) -> Self {
+        Self {
+            state: Arc::new(MediaManagerState {
+                source,
+                assets,
+                limits,
+            }),
+        }
+    }
+
+    /// Return another handle to the same immutable media snapshot.
+    pub fn snapshot(&self) -> Self {
+        self.clone()
+    }
+
     /// Open a directory bundle or a single-file `.pages`, `.numbers`, or `.key` package.
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         Self::new_with_limits(path, MediaLimits::default())
@@ -270,19 +295,15 @@ impl MediaManager {
         if metadata.is_dir() {
             let mut assets = HashMap::new();
             Self::scan_directory_bundle(&path, &mut assets, limits)?;
-            Ok(Self {
-                source: MediaSource::Directory(path),
+            Ok(Self::from_parts(
+                MediaSource::Directory(path),
                 assets,
                 limits,
-            })
+            ))
         } else if metadata.is_file() {
             let package = IWorkPackage::open(&path)?;
             let assets = Self::scan_package(&package, limits)?;
-            Ok(Self {
-                source: MediaSource::File(path),
-                assets,
-                limits,
-            })
+            Ok(Self::from_parts(MediaSource::File(path), assets, limits))
         } else {
             Err(Error::Bundle(format!(
                 "Media source is not a regular file or directory: {}",
@@ -309,11 +330,11 @@ impl MediaManager {
     /// Create read-only media access from a package under explicit limits.
     pub fn from_package_with_limits(package: IWorkPackage, limits: MediaLimits) -> Result<Self> {
         let assets = Self::scan_package(&package, limits)?;
-        Ok(Self {
-            source: MediaSource::Package(package),
+        Ok(Self::from_parts(
+            MediaSource::Package(package),
             assets,
             limits,
-        })
+        ))
     }
 
     fn scan_directory_bundle(
@@ -408,20 +429,21 @@ impl MediaManager {
     }
 
     pub fn assets(&self) -> &HashMap<String, MediaAsset> {
-        &self.assets
+        &self.state.assets
     }
 
     /// Return the checked resource profile used by this manager.
-    pub const fn limits(&self) -> MediaLimits {
-        self.limits
+    pub fn limits(&self) -> MediaLimits {
+        self.state.limits
     }
 
     pub fn get(&self, filename: &str) -> Option<&MediaAsset> {
-        self.assets.get(filename)
+        self.state.assets.get(filename)
     }
 
     pub fn assets_by_type(&self, media_type: MediaType) -> Vec<&MediaAsset> {
-        self.assets
+        self.state
+            .assets
             .values()
             .filter(|asset| asset.media_type == media_type)
             .collect()
@@ -444,23 +466,23 @@ impl MediaManager {
         let asset = self
             .get(filename)
             .ok_or_else(|| Error::Bundle(format!("Media asset not found: {filename}")))?;
-        if asset.size > self.limits.max_asset_bytes {
+        if asset.size > self.state.limits.max_asset_bytes {
             return Err(Error::Bundle(format!(
                 "Media asset {filename} is {} bytes, exceeding the configured {}-byte limit",
-                asset.size, self.limits.max_asset_bytes
+                asset.size, self.state.limits.max_asset_bytes
             )));
         }
-        match &self.source {
+        match &self.state.source {
             MediaSource::Directory(root) => {
                 let path = root.join(&asset.path);
                 let file = fs::File::open(&path)?;
                 let size = file.metadata()?.len();
-                if size > self.limits.max_asset_bytes {
+                if size > self.state.limits.max_asset_bytes {
                     return Err(Error::Bundle(format!(
                         "Media asset {} grew to {} bytes, exceeding the configured {}-byte limit",
                         path.display(),
                         size,
-                        self.limits.max_asset_bytes
+                        self.state.limits.max_asset_bytes
                     )));
                 }
                 let capacity = usize::try_from(size).map_err(|_| {
@@ -477,22 +499,25 @@ impl MediaManager {
                         path.display()
                     ))
                 })?;
-                file.take(self.limits.max_asset_bytes.saturating_add(1))
+                file.take(self.state.limits.max_asset_bytes.saturating_add(1))
                     .read_to_end(&mut data)?;
-                if u64::try_from(data.len()).unwrap_or(u64::MAX) > self.limits.max_asset_bytes {
+                if u64::try_from(data.len()).unwrap_or(u64::MAX) > self.state.limits.max_asset_bytes
+                {
                     return Err(Error::Bundle(format!(
                         "Media asset {} exceeded the configured {}-byte limit while reading",
                         path.display(),
-                        self.limits.max_asset_bytes
+                        self.state.limits.max_asset_bytes
                     )));
                 }
                 Ok(data)
             },
             MediaSource::File(path) => {
                 let package = IWorkPackage::open(path)?;
-                extract_package_entry(&package, asset, self.limits)
+                extract_package_entry(&package, asset, self.state.limits)
             },
-            MediaSource::Package(package) => extract_package_entry(package, asset, self.limits),
+            MediaSource::Package(package) => {
+                extract_package_entry(package, asset, self.state.limits)
+            },
         }
     }
 
@@ -503,10 +528,10 @@ impl MediaManager {
 
     pub fn stats(&self) -> MediaStats {
         let mut stats = MediaStats {
-            total_count: self.assets.len(),
+            total_count: self.state.assets.len(),
             ..MediaStats::default()
         };
-        for asset in self.assets.values() {
+        for asset in self.state.assets.values() {
             stats.total_size = stats.total_size.saturating_add(asset.size);
             match asset.media_type {
                 MediaType::Image => stats.image_count += 1,
@@ -1753,6 +1778,24 @@ mod tests {
         assert_eq!(
             disk.extract("image-7.png").unwrap(),
             memory.extract("image-7.png").unwrap()
+        );
+    }
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn media_manager_snapshots_are_shared_and_thread_safe() {
+        assert_send_sync::<MediaManager>();
+
+        let package = synthetic_package();
+        let manager = MediaManager::from_package(package).unwrap();
+        let snapshot = manager.snapshot();
+
+        assert!(Arc::ptr_eq(&manager.state, &snapshot.state));
+        assert_eq!(snapshot.stats(), manager.stats());
+        assert_eq!(
+            snapshot.extract("image-7.png").unwrap(),
+            manager.extract("image-7.png").unwrap()
         );
     }
 
