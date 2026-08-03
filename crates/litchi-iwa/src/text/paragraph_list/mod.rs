@@ -16,8 +16,8 @@ mod variation;
 
 use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
 use crate::text::style_registry::{
-    insert_private_style, object_archive_name, register_private_style, register_style_reference,
-    unregister_owner_reference_if_unused,
+    insert_private_style, object_archive, object_archive_name, register_private_style,
+    register_style_reference, unregister_owner_reference_if_unused,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -73,8 +73,8 @@ pub(crate) fn preset_style_id(
     stylesheet_id: u64,
     preset: ParagraphList,
 ) -> Result<Option<u64>> {
-    let archive_name = object_archive_name(package, stylesheet_id)?;
-    native::find_preset_style(package, &archive_name, stylesheet_id, preset)
+    let (_, archive) = object_archive(package, stylesheet_id)?;
+    native::find_preset_style_in_archive(&archive, stylesheet_id, preset)
 }
 
 pub(crate) fn paragraph_list(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphList> {

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use prost::Message;
 
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::protobuf::tswp::list_style_archive::{LabelGeometry, LabelType, NumberType};
 use crate::protobuf::{tsp, tss, tswp};
 use crate::text::storage_wire::locate_text_storages;
@@ -1429,6 +1429,14 @@ pub(super) fn find_preset_style(
     preset: ParagraphList,
 ) -> Result<Option<u64>> {
     let archive = package.archive(archive_name)?;
+    find_preset_style_in_archive(&archive, stylesheet_id, preset)
+}
+
+pub(super) fn find_preset_style_in_archive(
+    archive: &Archive,
+    stylesheet_id: u64,
+    preset: ParagraphList,
+) -> Result<Option<u64>> {
     let mut identifiers = Vec::new();
     for object in &archive.objects {
         let Some(identifier) = object.archive_info.identifier else {
@@ -1603,6 +1611,22 @@ mod tests {
         let mut invalid = canonical_archive(ParagraphList::Bullet);
         invalid.strings[0] = "-".to_owned();
         assert!(paragraph_list(&invalid).is_err());
+    }
+
+    #[test]
+    fn preset_lookup_reuses_one_parsed_archive() {
+        let archive = Archive {
+            objects: vec![style_object(10, 3, ParagraphList::Bullet).unwrap()],
+        };
+
+        assert_eq!(
+            find_preset_style_in_archive(&archive, 3, ParagraphList::Bullet).unwrap(),
+            Some(10)
+        );
+        assert_eq!(
+            find_preset_style_in_archive(&archive, 3, ParagraphList::Numbered).unwrap(),
+            None
+        );
     }
 
     #[test]
