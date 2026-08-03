@@ -94,8 +94,11 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     use litchi_core::detection::FileFormat;
     use litchi_core::detection::simd_utils::check_office_signatures;
 
-    // Quick signature checks (first 4-8 bytes)
-    if bytes.len() < 8 {
+    // Quick signature checks. ZIP has a complete four-byte local-file
+    // signature, RTF has a five-byte prefix, and OLE2 is checked only after
+    // the classifier proves its full eight-byte signature. Do not make the
+    // reusable detector stricter than the shared signature contract.
+    if bytes.len() < 4 {
         return None;
     }
 
@@ -184,6 +187,25 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod short_signature_tests {
+    use super::detect_format_smart;
+
+    #[test]
+    fn short_zip_candidate_is_rejected_without_short_read_failure() {
+        assert!(detect_format_smart(b"PK\x03\x04".to_vec()).is_none());
+    }
+
+    #[cfg(feature = "rtf")]
+    #[test]
+    fn minimal_rtf_signature_is_retained_for_the_rtf_owner() {
+        match detect_format_smart(br#"{\rtf"#.to_vec()) {
+            Some(super::DetectedFormat::Rtf(bytes)) => assert_eq!(bytes, br#"{\rtf"#),
+            _ => panic!("minimal RTF signature was not retained"),
+        }
+    }
 }
 
 #[cfg(all(test, feature = "odf"))]

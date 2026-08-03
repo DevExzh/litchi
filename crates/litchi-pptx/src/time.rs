@@ -270,7 +270,13 @@ impl Offset {
                 max: MAX_BYTES,
             });
         }
-        let extended_source = (source_len > MAX_BYTES).then(|| value.clone());
+        // Unit-bearing spellings are already rejected above. For an extended
+        // unitless spelling, retain only whether the original bytes were
+        // canonical instead of cloning the source just for a later equality
+        // check. The parser is bounded, but this path is still exercised for
+        // every producer value over MAX_BYTES.
+        let extended_source_is_canonical =
+            source_len <= MAX_BYTES || is_canonical_millisecond_spelling(&value);
         value.truncate(unit_start);
 
         let (fraction_digits, decimal_index) = validate_number(&value)?;
@@ -280,7 +286,11 @@ impl Offset {
 
         let leading_zeroes = value.bytes().take_while(|byte| *byte == b'0').count();
         if leading_zeroes == value.len() {
-            return enforce_extended_canonical(Self::ZERO, extended_source);
+            return enforce_extended_canonical(
+                Self::ZERO,
+                source_len,
+                extended_source_is_canonical,
+            );
         }
         if leading_zeroes != 0 {
             value.drain(..leading_zeroes);
@@ -299,7 +309,7 @@ impl Offset {
                 max: MAX_CANONICAL_BYTES,
             });
         }
-        enforce_extended_canonical(offset, extended_source)
+        enforce_extended_canonical(offset, source_len, extended_source_is_canonical)
     }
 
     fn from_digits(mut digits: String, multiplier: u8, mut exponent: i32) -> Self {
@@ -462,17 +472,45 @@ fn validate_number(value: &str) -> Result<(usize, Option<usize>), ParseError> {
 
 fn enforce_extended_canonical(
     offset: Offset,
-    extended_source: Option<String>,
+    source_len: usize,
+    source_is_canonical: bool,
 ) -> Result<Offset, ParseError> {
-    if let Some(source) = extended_source
-        && source != offset.as_str()
-    {
+    if source_len > MAX_BYTES && !source_is_canonical {
         return Err(ParseError::TooLong {
-            len: source.len(),
+            len: source_len,
             max: MAX_BYTES,
         });
     }
     Ok(offset)
+}
+
+/// Return whether a validated unitless value already has the canonical
+/// millisecond spelling emitted by [`Offset::as_str`].
+///
+/// This deliberately checks lexical shape only. The numeric grammar is still
+/// validated by [`validate_number`], preserving its error precedence for
+/// malformed extended input while avoiding an owned copy of the source.
+fn is_canonical_millisecond_spelling(value: &str) -> bool {
+    if value == "0" {
+        return true;
+    }
+
+    let (whole, fraction) = value
+        .split_once('.')
+        .map_or((value, None), |(whole, fraction)| (whole, Some(fraction)));
+    if whole.is_empty()
+        || (whole != "0" && whole.starts_with('0'))
+        || !whole.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return false;
+    }
+
+    let Some(fraction) = fraction else {
+        return true;
+    };
+    !fraction.is_empty()
+        && fraction.bytes().all(|byte| byte.is_ascii_digit())
+        && !fraction.ends_with('0')
 }
 
 fn normalize_trailing_zeroes(digits: &mut String, exponent: &mut i32) {
@@ -607,6 +645,27 @@ mod tests {
         assert!(matches!(
             Offset::parse(&format!("0{}", "9".repeat(MAX_BYTES))),
             Err(ParseError::TooLong { .. })
+        ));
+    }
+
+    #[test]
+    fn extended_unitless_values_keep_only_canonical_spellings() {
+        let canonical = format!("1{}", "0".repeat(MAX_BYTES));
+        assert_eq!(canonical.len(), MAX_BYTES + 1);
+        assert_eq!(Offset::parse(&canonical).unwrap().as_str(), canonical);
+
+        let canonical_fraction = format!("0.{}1", "0".repeat(MAX_BYTES - 2));
+        assert_eq!(canonical_fraction.len(), MAX_BYTES + 1);
+        assert_eq!(
+            Offset::parse(&canonical_fraction).unwrap().as_str(),
+            canonical_fraction
+        );
+
+        let noncanonical = format!("0{}", "1".repeat(MAX_BYTES));
+        assert!(matches!(
+            Offset::parse(&noncanonical),
+            Err(ParseError::TooLong { len, max })
+                if len == MAX_BYTES + 1 && max == MAX_BYTES
         ));
     }
 

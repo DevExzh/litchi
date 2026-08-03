@@ -695,7 +695,12 @@ fn parse_child(
         && element.local_name().as_ref() == b"matchSrc"
         && chunk.match_source.is_none()
     {
-        chunk.match_source = Some(parse_on_off(element, decoder, resolver)?);
+        chunk.match_source = Some(parse_on_off(
+            element,
+            decoder,
+            resolver,
+            is_transitional_word_namespace(namespace),
+        )?);
         return Ok(());
     }
     Err(Error::Invalid("altChunk has invalid child content".into()))
@@ -744,6 +749,7 @@ fn parse_on_off(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     resolver: &NamespaceResolver,
+    allow_legacy_values: bool,
 ) -> Result<bool> {
     let mut value = None;
     for attribute in element.attributes() {
@@ -766,8 +772,10 @@ fn parse_on_off(
         );
     }
     match value.as_deref() {
-        None | Some("true" | "1" | "on") => Ok(true),
-        Some("false" | "0" | "off") => Ok(false),
+        None | Some("true" | "1") => Ok(true),
+        Some("false" | "0") => Ok(false),
+        Some("on") if allow_legacy_values => Ok(true),
+        Some("off") if allow_legacy_values => Ok(false),
         Some(value) => Err(Error::Invalid(format!("invalid matchSrc value '{value}'"))),
     }
 }
@@ -787,6 +795,13 @@ fn is_word_namespace(namespace: &ResolveResult<'_>) -> bool {
         namespace,
         ResolveResult::Bound(Namespace(uri))
             if *uri == TRANSITIONAL_WORD_NAMESPACE || *uri == STRICT_WORD_NAMESPACE
+    )
+}
+
+fn is_transitional_word_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(uri)) if *uri == TRANSITIONAL_WORD_NAMESPACE
     )
 }
 
@@ -859,13 +874,47 @@ mod tests {
 
     #[test]
     fn scans_strict_and_transitional_anchors_in_source_order() {
-        let xml = br#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:q="http://purl.oclc.org/ooxml/officeDocument/relationships"><s:body><s:altChunk q:id="first"><s:altChunkPr><s:matchSrc s:val="off"/></s:altChunkPr></s:altChunk><s:altChunk q:id="second"/></s:body></s:document>"#;
+        let xml = br#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:q="http://purl.oclc.org/ooxml/officeDocument/relationships"><s:body><s:altChunk q:id="first"><s:altChunkPr><s:matchSrc s:val="0"/></s:altChunkPr></s:altChunk><s:altChunk q:id="second"/></s:body></s:document>"#;
         let chunks = scan(xml).unwrap().into_values().collect::<Vec<_>>();
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].relationship().as_str(), "first");
         assert_eq!(chunks[0].match_source(), Some(false));
         assert_eq!(chunks[1].relationship().as_str(), "second");
         assert_eq!(chunks[1].match_source(), None);
+    }
+
+    #[test]
+    fn enforces_conformance_specific_match_source_values() {
+        const STRICT_WORD: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+        const TRANSITIONAL_WORD: &str =
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        const STRICT_RELATIONSHIPS: &str =
+            "http://purl.oclc.org/ooxml/officeDocument/relationships";
+        const TRANSITIONAL_RELATIONSHIPS: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        let document = |word_namespace: &str, relationship_namespace: &str, value: &str| {
+            format!(
+                r#"<w:document xmlns:w="{word_namespace}" xmlns:r="{relationship_namespace}"><w:body><w:altChunk r:id="chunk"><w:altChunkPr><w:matchSrc w:val="{value}"/></w:altChunkPr></w:altChunk></w:body></w:document>"#
+            )
+        };
+
+        for value in ["true", "1", "false", "0"] {
+            assert!(
+                scan(document(STRICT_WORD, STRICT_RELATIONSHIPS, value).as_bytes()).is_ok(),
+                "{value}"
+            );
+        }
+        for value in ["on", "off"] {
+            assert!(
+                scan(document(STRICT_WORD, STRICT_RELATIONSHIPS, value).as_bytes()).is_err(),
+                "Strict unexpectedly accepted {value}"
+            );
+            assert!(
+                scan(document(TRANSITIONAL_WORD, TRANSITIONAL_RELATIONSHIPS, value).as_bytes())
+                    .is_ok(),
+                "Transitional rejected {value}"
+            );
+        }
     }
 
     #[test]

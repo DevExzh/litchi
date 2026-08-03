@@ -28,6 +28,14 @@ fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
     OoxmlError::Xml(error.to_string())
 }
 
+fn checked_output_size(size: Option<usize>) -> Result<usize> {
+    let size = size.ok_or_else(|| limit("updated slide XML bytes"))?;
+    if size > MAX_SLIDE_XML_BYTES {
+        return Err(limit("updated slide XML bytes"));
+    }
+    Ok(size)
+}
+
 /// The slide's PresentationML namespace URI (transitional or Strict).
 pub(crate) fn slide_dialect(xml: &[u8]) -> Result<&'static str> {
     let mut reader = NsReader::from_reader(xml);
@@ -161,7 +169,20 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
         let open = element
             .strip_suffix(b"/>")
             .ok_or_else(|| invalid("slide extension list is not an empty element"))?;
-        let mut output = Vec::with_capacity(xml.len() + fragment.len() + 16);
+        let removed_len = end
+            .checked_sub(start)
+            .ok_or_else(|| invalid("slide XML extension-list offsets are out of order"))?;
+        let replacement_len = open
+            .len()
+            .checked_add(1)
+            .and_then(|size| size.checked_add(fragment.len()))
+            .and_then(|size| size.checked_add(b"</p:extLst>".len()));
+        let size = checked_output_size(
+            xml.len()
+                .checked_sub(removed_len)
+                .and_then(|size| size.checked_add(replacement_len?)),
+        )?;
+        let mut output = Vec::with_capacity(size);
         output.extend_from_slice(&xml[..start]);
         output.extend_from_slice(open);
         output.extend_from_slice(b">");
@@ -171,20 +192,51 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
         return Ok(output);
     }
     if let Some(position) = ext_lst_end {
-        let mut output = Vec::with_capacity(xml.len() + fragment.len());
+        let size = checked_output_size(xml.len().checked_add(fragment.len()))?;
+        let mut output = Vec::with_capacity(size);
         output.extend_from_slice(&xml[..position]);
         output.extend_from_slice(fragment.as_bytes());
         output.extend_from_slice(&xml[position..]);
         return Ok(output);
     }
     // No extension list: create one before the slide end tag.
-    let mut output = Vec::with_capacity(xml.len() + fragment.len() + 24);
+    let dialect = slide_dialect(xml)?;
+    let size = checked_output_size(
+        xml.len()
+            .checked_add(b"<p:extLst xmlns:p=\"".len())
+            .and_then(|size| size.checked_add(dialect.len()))
+            .and_then(|size| size.checked_add(b"\">".len()))
+            .and_then(|size| size.checked_add(fragment.len()))
+            .and_then(|size| size.checked_add(b"</p:extLst>".len())),
+    )?;
+    let mut output = Vec::with_capacity(size);
     output.extend_from_slice(&xml[..root_end]);
     output.extend_from_slice(b"<p:extLst xmlns:p=\"");
-    output.extend_from_slice(slide_dialect(xml)?.as_bytes());
+    output.extend_from_slice(dialect.as_bytes());
     output.extend_from_slice(b"\">");
     output.extend_from_slice(fragment.as_bytes());
     output.extend_from_slice(b"</p:extLst>");
     output.extend_from_slice(&xml[root_end..]);
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+
+    #[test]
+    fn rejects_a_patch_that_would_exceed_the_slide_xml_budget() {
+        let xml = format!(r#"<p:sld xmlns:p="{PML}"></p:sld>"#);
+        let fragment = "x".repeat(MAX_SLIDE_XML_BYTES);
+
+        let error = insert_extension_fragment(xml.as_bytes(), &fragment).unwrap_err();
+
+        assert!(matches!(
+            error,
+            OoxmlError::InvalidFormat(message)
+                if message == "updated slide XML bytes exceeds the supported safety limit"
+        ));
+    }
 }

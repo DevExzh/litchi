@@ -26,6 +26,15 @@ impl Formula {
                 "formula expression must be non-empty and omit the leading '='",
             ));
         }
+        if let Some(character) = text
+            .chars()
+            .find(|&character| !is_xml_10_character(character))
+        {
+            return Err(invalid(format!(
+                "formula contains XML 1.0-forbidden character U+{:04X}",
+                character as u32
+            )));
+        }
         if text.chars().count() > MAX_FORMULA_CHARACTERS {
             return Err(invalid(format!(
                 "formula exceeds {MAX_FORMULA_CHARACTERS} characters"
@@ -60,6 +69,13 @@ impl Formula {
     pub fn cached(&self) -> Option<&Cache> {
         self.cached.as_ref()
     }
+}
+
+const fn is_xml_10_character(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || (character >= '\u{20}' && character <= '\u{D7FF}')
+        || (character >= '\u{E000}' && character <= '\u{FFFD}')
+        || (character >= '\u{10000}' && character <= '\u{10FFFF}')
 }
 
 /// Semantic formula form.
@@ -158,5 +174,12 @@ mod tests {
         assert!(Formula::new("  \t").is_err());
         assert!(Formula::new("=SUM(A1:A3)").is_err());
         assert!(Formula::new("x".repeat(MAX_FORMULA_CHARACTERS + 1)).is_err());
+    }
+
+    #[test]
+    fn explicit_formula_construction_rejects_xml_forbidden_characters() {
+        assert!(Formula::new("SUM(A1,\u{1})").is_err());
+        assert!(Formula::new("IF(A1=\"\t\",1,0)").is_ok());
+        assert!(Formula::new("SUM(😀,A1)").is_ok());
     }
 }

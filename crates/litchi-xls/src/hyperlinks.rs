@@ -5,9 +5,6 @@ use crate::error::{XlsError, XlsResult};
 pub const RECORD_TYPE: u16 = 0x01B8;
 pub const TOOLTIP_RECORD_TYPE: u16 = 0x0800;
 
-const STANDARD_HLINK_CLSID: [u8; 16] = [
-    0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9, 0x0B,
-];
 const URL_MONIKER_CLSID: [u8; 16] = [
     0xE0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9, 0x0B,
 ];
@@ -261,9 +258,9 @@ pub fn parse_hlink_record(data: &[u8]) -> XlsResult<XlsHyperlink> {
     let mut cursor = Cursor::new(data);
     let range = cursor.range()?;
     let class_id = cursor.guid()?;
-    if class_id != STANDARD_HLINK_CLSID {
-        return invalid("HLink contains an unsupported hyperlink CLSID".to_string());
-    }
+    // MS-XLS 2.4.140 defines hlinkClsid as the producer CLSID and does not
+    // constrain it to the standard hyperlink class. Keep the value for
+    // diagnostics and preserve hyperlinks emitted by other COM producers.
     let version = cursor.u32()?;
     if version != 2 {
         return invalid(format!("HLink stream version must be 2, got {version}"));
@@ -613,6 +610,12 @@ fn invalid<T>(message: String) -> XlsResult<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_HLINK_CLSID: [u8; 16] = [
+        0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9,
+        0x0B,
+    ];
+
     fn range(data: &mut Vec<u8>, row: u16, column: u16) {
         for value in [row, row, column, column] {
             data.extend_from_slice(&value.to_le_bytes());
@@ -627,7 +630,7 @@ mod tests {
     fn base(flags: u32) -> Vec<u8> {
         let mut data = Vec::new();
         range(&mut data, 4, 0);
-        data.extend_from_slice(&STANDARD_HLINK_CLSID);
+        data.extend_from_slice(&TEST_HLINK_CLSID);
         data.extend_from_slice(&2u32.to_le_bytes());
         data.extend_from_slice(&flags.to_le_bytes());
         data
@@ -701,10 +704,7 @@ mod tests {
         );
     }
     #[test]
-    fn rejects_bad_guid_flags_range_and_url_tail() {
-        let mut data = url_link();
-        data[8] ^= 1;
-        assert!(parse_hlink_record(&data).is_err());
+    fn rejects_bad_flags_range_and_url_tail() {
         let mut data = url_link();
         data[31] = 0x80;
         assert!(parse_hlink_record(&data).is_err());
@@ -716,6 +716,18 @@ mod tests {
         let last = data.len() - 24;
         data[last] ^= 1;
         assert!(parse_hlink_record(&data).is_err());
+    }
+
+    #[test]
+    fn accepts_and_retains_nonstandard_hlink_producer_clsid() {
+        let mut data = url_link();
+        let producer_clsid = [0xA5; 16];
+        data[8..24].copy_from_slice(&producer_clsid);
+
+        let link = parse_hlink_record(&data).unwrap();
+
+        assert_eq!(link.class_id(), &producer_clsid);
+        assert_eq!(link.address(), Some("https://example.com"));
     }
     #[test]
     fn reads_poi_hyperlink_fixtures() {
