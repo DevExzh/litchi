@@ -164,24 +164,29 @@ pub(crate) fn replace_image_adjustments(
         let message_index = *message_index;
         let original = object.messages[message_index].data.as_slice();
         let image = tsd::ImageArchive::decode(original)?;
-        if image_adjustments_from_archive(&image)? == adjustments {
-            return Ok(());
-        }
-
+        let current = image_adjustments_from_archive(&image)?;
+        let has_adjustments = image.image_adjustments.is_some();
         let native = image.image_adjustments.unwrap_or_default();
-        let current_payload = if image.image_adjustments.is_some() {
-            let payloads = repeated_length_delimited_payloads(original, IMAGE_ADJUSTMENTS_FIELD)?;
-            let [payload] = payloads.as_slice() else {
+        let payloads = repeated_length_delimited_payloads(original, IMAGE_ADJUSTMENTS_FIELD)?;
+        let current_payload = match (has_adjustments, payloads.as_slice()) {
+            (false, []) => &[][..],
+            (true, [payload]) => *payload,
+            (true, []) => {
+                return Err(Error::InvalidFormat(format!(
+                    "{context} {image_id} has image adjustments without a raw payload"
+                )));
+            },
+            _ => {
                 return Err(Error::InvalidFormat(format!(
                     "{context} {image_id} must have exactly one image-adjustments payload"
                 )));
-            };
-            *payload
-        } else {
-            &[]
+            },
         };
         let patched_adjustments =
             patch_image_adjustments_payload(current_payload, &native, adjustments)?;
+        if current == adjustments {
+            return Ok(());
+        }
         let replacement =
             (!patched_adjustments.is_empty()).then_some(patched_adjustments.as_slice());
         let data = patch_length_delimited_field(
@@ -248,6 +253,9 @@ fn patch_image_adjustments_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{Archive, ArchiveObject};
+
+    const TEST_ARCHIVE_NAME: &str = "Index/Image.iwa";
 
     #[test]
     fn adjustment_values_reject_invalid_native_percentages() {
@@ -306,6 +314,81 @@ mod tests {
         let restored =
             patch_image_adjustments_payload(&changed, &changed_native, baseline).unwrap();
         assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn no_op_adjustment_updates_reject_duplicate_raw_fields_transactionally() {
+        let native = tsd::ImageAdjustmentsArchive {
+            exposure: Some(0.25),
+            saturation: Some(-0.5),
+            enhance: Some(true),
+            ..Default::default()
+        };
+        let requested = ImageAdjustments {
+            exposure: Some(ImageAdjustment::new(0.25).unwrap()),
+            saturation: Some(ImageAdjustment::new(-0.5).unwrap()),
+            enhancement: Some(ImageEnhancement::Enabled),
+        };
+
+        let mut duplicate_outer = tsd::ImageArchive::default().encode_to_vec();
+        let payload = native.encode_to_vec();
+        crate::wire::append_length_delimited_field(
+            &mut duplicate_outer,
+            IMAGE_ADJUSTMENTS_FIELD,
+            &payload,
+        )
+        .unwrap();
+        crate::wire::append_length_delimited_field(
+            &mut duplicate_outer,
+            IMAGE_ADJUSTMENTS_FIELD,
+            &payload,
+        )
+        .unwrap();
+        assert_duplicate_rejected(duplicate_outer, requested);
+
+        let mut duplicate_inner = native.encode_to_vec();
+        duplicate_inner.extend(crate::varint::encode_varint(
+            (u64::from(EXPOSURE_FIELD) << 3) | 5,
+        ));
+        duplicate_inner.extend(native.exposure.unwrap().to_bits().to_le_bytes());
+        let mut image = tsd::ImageArchive::default().encode_to_vec();
+        crate::wire::append_length_delimited_field(
+            &mut image,
+            IMAGE_ADJUSTMENTS_FIELD,
+            &duplicate_inner,
+        )
+        .unwrap();
+        assert_duplicate_rejected(image, requested);
+    }
+
+    fn assert_duplicate_rejected(data: Vec<u8>, requested: ImageAdjustments) {
+        let mut package = package_with_image(data);
+        let before = package.entry(TEST_ARCHIVE_NAME).unwrap().to_vec();
+        assert!(
+            replace_image_adjustments(&mut package, TEST_ARCHIVE_NAME, 1, "test image", requested,)
+                .is_err()
+        );
+        assert_eq!(package.entry(TEST_ARCHIVE_NAME).unwrap(), before.as_slice());
+    }
+
+    fn package_with_image(data: Vec<u8>) -> IWorkPackage {
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: IMAGE_ARCHIVE_MESSAGE_TYPE,
+                        data,
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(TEST_ARCHIVE_NAME, &archive)
+            .unwrap();
+        package
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
