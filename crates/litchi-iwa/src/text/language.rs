@@ -13,8 +13,7 @@ use crate::{Error, IWorkPackage, Result};
 use super::language_types::{TextLanguage, TextLanguageRun};
 use super::position::TextPosition;
 use super::storage_wire::{
-    STORAGE_MESSAGE_TYPES, StorageLocation, locate_storage as locate_native_storage,
-    validate_sorted_boundaries,
+    StorageLocation, locate_storage as locate_native_storage, validate_sorted_boundaries,
 };
 
 const LANGUAGE_TABLE_FIELD: u32 = 19;
@@ -70,8 +69,8 @@ pub(crate) fn set_text_language(
     if text_language(package, storage_id, position)? == *language {
         return Ok(());
     }
-    let archive_name = locate_storage(package, storage_id)?.archive_name;
-    patch_language(package, &archive_name, storage_id, position, language)?;
+    let location = locate_storage(package, storage_id)?;
+    patch_language(package, &location, storage_id, position, language)?;
     if text_language(package, storage_id, position)? != *language {
         return Err(Error::InvalidFormat(
             "iWork text-language update failed validation".to_owned(),
@@ -102,7 +101,7 @@ pub(crate) fn remove_text_language_boundary(
     {
         return Ok(false);
     }
-    remove_boundary(package, &location.archive_name, storage_id, position)?;
+    remove_boundary(package, &location, storage_id, position)?;
     if text_languages(package, storage_id)?
         .iter()
         .any(|run| run.position == position)
@@ -122,7 +121,7 @@ pub(crate) fn reset_text_languages(package: &mut IWorkPackage, storage_id: u64) 
     if !location.table_present {
         return Ok(false);
     }
-    patch_language_table(package, &location.archive_name, storage_id, |_, _| Ok(None))?;
+    patch_language_table(package, &location, storage_id, |_, _| Ok(None))?;
     if !text_languages(package, storage_id)?.is_empty() {
         return Err(Error::InvalidFormat(
             "iWork text-language reset failed validation".to_owned(),
@@ -160,12 +159,12 @@ fn language_entries(
 
 fn patch_language(
     package: &mut IWorkPackage,
-    archive_name: &str,
+    location: &StorageLocation,
     storage_id: u64,
     position: TextPosition,
     language: &TextLanguage,
 ) -> Result<()> {
-    patch_language_table(package, archive_name, storage_id, |table, storage| {
+    patch_language_table(package, location, storage_id, |table, storage| {
         require_text_boundary(storage_id, position, &storage.text)?;
         match table {
             Some(table) => patch_existing_table(table, position, language).map(Some),
@@ -176,11 +175,11 @@ fn patch_language(
 
 fn remove_boundary(
     package: &mut IWorkPackage,
-    archive_name: &str,
+    location: &StorageLocation,
     storage_id: u64,
     position: TextPosition,
 ) -> Result<()> {
-    patch_language_table(package, archive_name, storage_id, |table, storage| {
+    patch_language_table(package, location, storage_id, |table, storage| {
         require_text_boundary(storage_id, position, &storage.text)?;
         let table = table.ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -208,30 +207,32 @@ fn remove_boundary(
 
 fn patch_language_table<F>(
     package: &mut IWorkPackage,
-    archive_name: &str,
+    location: &StorageLocation,
     storage_id: u64,
     transform: F,
 ) -> Result<()>
 where
     F: FnOnce(Option<&[u8]>, &StorageArchive) -> Result<Option<Vec<u8>>>,
 {
-    package.update_archive(archive_name, |archive| {
+    package.update_archive(&location.archive_name, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| STORAGE_MESSAGE_TYPES.contains(&message.type_))
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+        if object.archive_info.identifier != Some(location.object_id) {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
+                "iWork text storage {storage_id} changed archive identity"
             )));
-        };
-        let original = &object.messages[*index];
+        }
+        let original = object.messages.get(location.message_index).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} lost its resolved message"
+            ))
+        })?;
+        if original.type_ != location.message_type {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} changed its resolved message type"
+            )));
+        }
         let storage = StorageArchive::decode(original.data.as_slice())?;
         let tables = repeated_length_delimited_payloads(&original.data, LANGUAGE_TABLE_FIELD)?;
         if tables.len() > 1 {
@@ -248,7 +249,7 @@ where
             replacement.as_deref(),
         )?;
         object.replace_message(
-            *index,
+            location.message_index,
             RawMessage {
                 type_: original.type_,
                 data,
@@ -373,15 +374,8 @@ mod tests {
         (pages.into_package(), storage_id, archive_name)
     }
 
-    fn storage_message_index(object: &crate::archive::ArchiveObject) -> usize {
-        object
-            .messages
-            .iter()
-            .position(|message| {
-                STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                    && StorageArchive::decode(message.data.as_slice()).is_ok()
-            })
-            .unwrap()
+    fn storage_message_index(package: &IWorkPackage, storage_id: u64) -> usize {
+        locate_storage(package, storage_id).unwrap().message_index
     }
 
     #[test]
@@ -402,11 +396,11 @@ mod tests {
     #[test]
     fn language_updates_preserve_unknown_table_and_entry_fields() {
         let (mut package, storage_id, archive_name) = fixture();
+        let message_index = storage_message_index(&package, storage_id);
         package
             .update_archive(&archive_name, |archive| {
                 let object = archive.object_mut(storage_id).unwrap();
-                let index = storage_message_index(object);
-                let original = &object.messages[index];
+                let original = &object.messages[message_index];
                 let data = crate::wire::transform_length_delimited_field(
                     &original.data,
                     LANGUAGE_TABLE_FIELD,
@@ -423,7 +417,7 @@ mod tests {
                     },
                 )?;
                 object.replace_message(
-                    index,
+                    message_index,
                     RawMessage {
                         type_: original.type_,
                         data,
@@ -443,9 +437,10 @@ mod tests {
             .unwrap();
         let package = editor.into_package();
         let location = locate_storage(&package, storage_id).unwrap();
+        let message_index = storage_message_index(&package, storage_id);
         let archive = package.archive(&location.archive_name).unwrap();
         let object = archive.object(storage_id).unwrap();
-        let message = &object.messages[storage_message_index(object)];
+        let message = &object.messages[message_index];
         let tables =
             repeated_length_delimited_payloads(&message.data, LANGUAGE_TABLE_FIELD).unwrap();
         assert!(
@@ -464,19 +459,64 @@ mod tests {
     }
 
     #[test]
+    fn language_updates_use_the_resolved_storage_with_a_2022_style_sibling() {
+        let (mut package, storage_id, archive_name) = fixture();
+        let style_data = tswp::ParagraphStyleArchive {
+            super_: crate::protobuf::tss::StyleArchive::default(),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        package
+            .update_archive(&archive_name, |archive| {
+                archive
+                    .object_mut(storage_id)
+                    .unwrap()
+                    .push_message(RawMessage {
+                        type_: 2_022,
+                        data: style_data.clone(),
+                    })?;
+                Ok(())
+            })
+            .unwrap();
+
+        let mut editor = super::super::IWorkTextEditor::from_package(package);
+        editor
+            .set_text_language(
+                storage_id,
+                TextPosition::from_utf16_index(6).unwrap(),
+                TextLanguage::tag("fr").unwrap(),
+            )
+            .unwrap();
+        let package = editor.into_package();
+        let location = locate_storage(&package, storage_id).unwrap();
+        let archive = package.archive(&location.archive_name).unwrap();
+        let object = archive.object(storage_id).unwrap();
+        assert_eq!(
+            object.messages[location.message_index].type_,
+            location.message_type
+        );
+        let sibling = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == 2_022)
+            .unwrap();
+        assert_eq!(sibling.data, style_data);
+    }
+
+    #[test]
     fn duplicate_language_tables_fail_without_mutation() {
         let (mut package, storage_id, archive_name) = fixture();
+        let message_index = storage_message_index(&package, storage_id);
         package
             .update_archive(&archive_name, |archive| {
                 let object = archive.object_mut(storage_id).unwrap();
-                let index = storage_message_index(object);
-                let original = &object.messages[index];
+                let original = &object.messages[message_index];
                 let table =
                     repeated_length_delimited_payloads(&original.data, LANGUAGE_TABLE_FIELD)?[0];
                 let mut data = original.data.clone();
                 append_length_delimited_field(&mut data, LANGUAGE_TABLE_FIELD, table)?;
                 object.replace_message(
-                    index,
+                    message_index,
                     RawMessage {
                         type_: original.type_,
                         data,
