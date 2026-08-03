@@ -1285,7 +1285,7 @@ fn build_formula_reference_maps(bundle: &Bundle) -> FormulaReferenceMaps {
         }
     }
 
-    for archive in bundle.archives().values() {
+    for (_, archive) in bundle.iter_archives() {
         for object in &archive.objects {
             for message in &object.messages {
                 if message.type_ == 6383
@@ -1375,8 +1375,8 @@ fn render_category_reference(
 
 fn find_bundle_object(bundle: &Bundle, identifier: u64) -> Option<&crate::archive::ArchiveObject> {
     bundle
-        .archives()
-        .values()
+        .iter_archives()
+        .map(|(_, archive)| archive)
         .find_map(|archive| archive.object(identifier))
 }
 

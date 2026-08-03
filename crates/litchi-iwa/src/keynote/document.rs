@@ -242,8 +242,8 @@ impl KeynoteDocument {
     fn bundle_object(&self, identifier: u64) -> Option<&crate::archive::ArchiveObject> {
         self.state
             .bundle
-            .archives()
-            .values()
+            .iter_archives()
+            .map(|(_, archive)| archive)
             .find_map(|archive| archive.object(identifier))
     }
 

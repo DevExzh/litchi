@@ -73,15 +73,9 @@ impl ObjectIndex {
     pub fn from_bundle(bundle: &Bundle) -> Result<Self> {
         let mut index = Self::new();
 
-        // Parse archives by name so fragment and reverse-reference order does
-        // not depend on the backing HashMap's randomized iteration order.
-        let mut archive_names: Vec<_> =
-            bundle.archives().keys().map(|name| name.as_str()).collect();
-        archive_names.sort_unstable();
-        for archive_name in archive_names {
-            let archive = bundle.get_archive(archive_name).ok_or_else(|| {
-                Error::Bundle(format!("bundle archive disappeared: {archive_name}"))
-            })?;
+        // Bundle traversal is already sorted at ingress, so fragment and
+        // reverse-reference order do not depend on randomized map storage.
+        for (archive_name, archive) in bundle.iter_archives() {
             index.parse_archive(archive_name, archive)?;
         }
 

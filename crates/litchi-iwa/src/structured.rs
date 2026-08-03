@@ -336,8 +336,8 @@ pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
 
 fn bundle_object(bundle: &Bundle, identifier: u64) -> Option<&crate::archive::ArchiveObject> {
     bundle
-        .archives()
-        .values()
+        .iter_archives()
+        .map(|(_, archive)| archive)
         .find_map(|archive| archive.object(identifier))
 }
 

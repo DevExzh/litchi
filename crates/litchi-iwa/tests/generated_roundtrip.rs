@@ -81,8 +81,8 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     );
     let bundle_snapshot = document.bundle().snapshot();
     assert_eq!(
-        bundle_snapshot.archives().len(),
-        document.bundle().archives().len()
+        bundle_snapshot.iter_archives().count(),
+        document.bundle().iter_archives().count()
     );
     document.text()?;
     document.extract_structured_data()?;

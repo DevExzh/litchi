@@ -284,7 +284,7 @@ impl Document {
     /// Get document statistics after resolving the indexed object set.
     pub fn stats(&self) -> Result<DocumentStats> {
         let total_objects = self.state.object_index.object_ids()?.len();
-        let archives_count = self.state.bundle.archives().len();
+        let archives_count = self.state.bundle.iter_archives().count();
 
         let mut message_type_counts = HashMap::new();
         for object in self.objects()? {
@@ -323,9 +323,8 @@ fn media_profiles(limits: BundleLimits) -> Result<(MediaLimits, PackageLimits)> 
 
 fn detect_bundle_application(bundle: &Bundle) -> Option<Application> {
     bundle
-        .archives()
-        .iter()
-        .filter(|(name, _)| name.ends_with("/Document.iwa") || name.as_str() == "Document.iwa")
+        .iter_archives()
+        .filter(|(name, _)| name.ends_with("/Document.iwa") || *name == "Document.iwa")
         .flat_map(|(_, archive)| &archive.objects)
         .filter(|object| object.archive_info.identifier == Some(1))
         .flat_map(|object| &object.messages)

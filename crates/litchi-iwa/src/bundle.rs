@@ -179,7 +179,11 @@ struct BundleState {
     /// Path to the bundle directory
     bundle_path: PathBuf,
     /// Parsed IWA archives from Index.zip
-    archives: HashMap<String, Archive>,
+    ///
+    /// The vector is sorted once at ingress. Keeping the names beside their
+    /// archive values avoids exposing the parser's lookup map and avoids a
+    /// second owned name catalog solely for deterministic traversal.
+    archives: Vec<(String, Archive)>,
     /// Metadata from Metadata/ directory
     metadata: BundleMetadata,
 }
@@ -435,7 +439,7 @@ impl Bundle {
     ///
     /// let data = fs::read("document.pages")?;
     /// let bundle = Bundle::from_bytes(&data)?;
-    /// println!("Archives: {}", bundle.archives().len());
+    /// println!("Archives: {}", bundle.iter_archives().count());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -554,6 +558,8 @@ impl Bundle {
         archives: HashMap<String, Archive>,
         metadata: BundleMetadata,
     ) -> Self {
+        let mut archives: Vec<_> = archives.into_iter().collect();
+        archives.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
         Self {
             state: Arc::new(BundleState {
                 bundle_path,
@@ -565,19 +571,21 @@ impl Bundle {
 
     /// Enumerate archives in deterministic lexicographic name order.
     ///
-    /// The returned vector owns only the ordering allocation; archive names
-    /// and archive values remain borrowed from this bundle. This is the
-    /// preferred collection view for selectors, diagnostics, and other
-    /// consumers that must not depend on `HashMap` iteration order.
-    pub fn archives_in_order(&self) -> Vec<(&str, &Archive)> {
-        let mut archives: Vec<_> = self
-            .state
+    /// The iterator borrows the immutable catalog and performs no allocation.
+    /// This is the preferred collection view for selectors, diagnostics, and
+    /// other consumers that must not depend on parser storage details.
+    pub fn iter_archives(&self) -> impl Iterator<Item = (&str, &Archive)> {
+        self.state
             .archives
             .iter()
             .map(|(name, archive)| (name.as_str(), archive))
-            .collect();
-        archives.sort_unstable_by_key(|(name, _)| *name);
-        archives
+    }
+
+    /// Collect the deterministic archive view into a caller-owned vector.
+    ///
+    /// Use [`Self::iter_archives`] when a borrowed traversal is sufficient.
+    pub fn archives_in_order(&self) -> Vec<(&str, &Archive)> {
+        self.iter_archives().collect()
     }
 
     /// Capture a cheap immutable snapshot that shares all parsed bundle state.
@@ -753,17 +761,14 @@ impl Bundle {
         versions
     }
 
-    /// Get all archives in the bundle.
-    ///
-    /// This compatibility view exposes the internal lookup map. Callers that
-    /// need stable traversal order should use [`Self::archives_in_order`].
-    pub fn archives(&self) -> &HashMap<String, Archive> {
-        &self.state.archives
-    }
-
     /// Get a specific archive by name
     pub fn get_archive(&self, name: &str) -> Option<&Archive> {
-        self.state.archives.get(name)
+        let position = self
+            .state
+            .archives
+            .binary_search_by(|(archive_name, _)| archive_name.as_str().cmp(name))
+            .ok()?;
+        Some(&self.state.archives[position].1)
     }
 
     /// Get bundle metadata
@@ -792,7 +797,7 @@ impl Bundle {
 
         let mut identifiers = HashSet::new();
         let mut total_objects = 0usize;
-        for (archive_name, archive) in self.archives_in_order() {
+        for (archive_name, archive) in self.iter_archives() {
             if archive.objects.is_empty() {
                 report.push(
                     BundleValidationSeverity::Warning,
@@ -883,8 +888,8 @@ impl Bundle {
         let has_any_objects = self
             .state
             .archives
-            .values()
-            .any(|archive| !archive.objects.is_empty());
+            .iter()
+            .any(|(_, archive)| !archive.objects.is_empty());
 
         !has_any_objects
     }
@@ -895,13 +900,12 @@ impl Bundle {
         let total_objects: usize = self
             .state
             .archives
-            .values()
-            .map(|archive| archive.objects.len())
+            .iter()
+            .map(|(_, archive)| archive.objects.len())
             .sum();
 
         let largest_archive = self
-            .archives_in_order()
-            .into_iter()
+            .iter_archives()
             .max_by(|(left_name, left_archive), (right_name, right_archive)| {
                 left_archive
                     .objects
@@ -922,7 +926,7 @@ impl Bundle {
     pub fn extract_text(&self) -> Result<String> {
         let mut text_parts = Vec::new();
 
-        for (_, archive) in self.archives_in_order() {
+        for (_, archive) in self.iter_archives() {
             for object in &archive.objects {
                 text_parts.extend(object.extract_text());
             }
@@ -935,7 +939,7 @@ impl Bundle {
     /// Get all objects across all archives in archive-name/source-object order.
     pub fn all_objects(&self) -> Vec<(&str, &ArchiveObject)> {
         let mut objects = Vec::new();
-        for (archive_name, archive) in self.archives_in_order() {
+        for (archive_name, archive) in self.iter_archives() {
             for object in &archive.objects {
                 objects.push((archive_name, object));
             }
@@ -947,7 +951,7 @@ impl Bundle {
     pub fn find_objects_by_type(&self, message_type: u32) -> Vec<(&str, &ArchiveObject)> {
         let mut matching_objects = Vec::new();
 
-        for (archive_name, archive) in self.archives_in_order() {
+        for (archive_name, archive) in self.iter_archives() {
             for object in &archive.objects {
                 if object.messages.iter().any(|msg| msg.type_ == message_type) {
                     matching_objects.push((archive_name, object));
@@ -1152,7 +1156,7 @@ mod tests {
 
         // Verify bundle has expected structure
         assert!(
-            !bundle.archives().is_empty(),
+            bundle.iter_archives().next().is_some(),
             "Bundle should contain archives"
         );
 
@@ -1190,7 +1194,7 @@ mod tests {
 
         // Verify bundle has expected structure
         assert!(
-            !bundle.archives().is_empty(),
+            bundle.iter_archives().next().is_some(),
             "Bundle should contain archives"
         );
 

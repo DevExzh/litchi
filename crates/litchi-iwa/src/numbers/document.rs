@@ -181,8 +181,8 @@ impl NumbersDocument {
             let object = self
                 .state
                 .bundle
-                .archives()
-                .values()
+                .iter_archives()
+                .map(|(_, archive)| archive)
                 .find_map(|archive| archive.object(reference.identifier))
                 .ok_or_else(|| {
                     Error::InvalidFormat(format!(
