@@ -45,12 +45,15 @@ pub struct Snapshot {
 ///
 /// A commit owns the callback's result together with the immutable snapshot
 /// produced after the candidate edit passed package-state validation. The
-/// source snapshot used to start the edit is never mutated.
+/// source snapshot used to start the edit is never mutated. The commit also
+/// retains a source-checked, reversible package patch whose entry payloads
+/// continue to share the snapshots' copy-on-write allocations.
 #[must_use = "a commit contains the published snapshot"]
 #[derive(Debug)]
 pub struct Commit<T> {
     value: T,
     snapshot: Snapshot,
+    patch: Patch,
 }
 
 impl<T> Commit<T> {
@@ -64,9 +67,214 @@ impl<T> Commit<T> {
         &self.snapshot
     }
 
+    /// Borrow the reversible package patch produced by this commit.
+    pub fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
     /// Consume the commit and return its result and published snapshot.
     pub fn into_parts(self) -> (T, Snapshot) {
         (self.value, self.snapshot)
+    }
+
+    /// Consume the commit and return its result, snapshot, and patch.
+    pub fn into_parts_with_patch(self) -> (T, Snapshot, Patch) {
+        (self.value, self.snapshot, self.patch)
+    }
+}
+
+/// The kind of one package-entry change in a reversible patch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryChangeKind {
+    /// An entry is present only in the committed snapshot.
+    Added,
+    /// An entry is present only in the source snapshot.
+    Removed,
+    /// An entry exists in both snapshots but its bytes differ.
+    Replaced,
+}
+
+/// Deterministic metadata for one changed package entry.
+///
+/// The patch retains the actual before/after bytes through shared snapshots;
+/// this public summary deliberately exposes only bounded metadata so
+/// inspecting a patch never copies a media payload into a second allocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryChange {
+    name: String,
+    kind: EntryChangeKind,
+    before_position: Option<usize>,
+    after_position: Option<usize>,
+    before_len: Option<usize>,
+    after_len: Option<usize>,
+}
+
+impl EntryChange {
+    /// Return the normalized package entry name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the entry change kind.
+    pub const fn kind(&self) -> EntryChangeKind {
+        self.kind
+    }
+
+    /// Return the source position, if the entry existed before the edit.
+    pub const fn before_position(&self) -> Option<usize> {
+        self.before_position
+    }
+
+    /// Return the committed position, if the entry exists after the edit.
+    pub const fn after_position(&self) -> Option<usize> {
+        self.after_position
+    }
+
+    /// Return the source byte length, if the entry existed before the edit.
+    pub const fn before_len(&self) -> Option<usize> {
+        self.before_len
+    }
+
+    /// Return the committed byte length, if the entry exists after the edit.
+    pub const fn after_len(&self) -> Option<usize> {
+        self.after_len
+    }
+
+    fn inverse(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            kind: match self.kind {
+                EntryChangeKind::Added => EntryChangeKind::Removed,
+                EntryChangeKind::Removed => EntryChangeKind::Added,
+                EntryChangeKind::Replaced => EntryChangeKind::Replaced,
+            },
+            before_position: self.after_position,
+            after_position: self.before_position,
+            before_len: self.after_len,
+            after_len: self.before_len,
+        }
+    }
+}
+
+/// A source-checked, reversible in-memory patch between package snapshots.
+///
+/// The patch owns only cheap snapshot clones and compact entry metadata. It
+/// does not duplicate unchanged or changed entry bytes. Applying it to a
+/// different snapshot first checks the complete ordered entry state, so a
+/// stale or unrelated package cannot silently receive the replacement state.
+#[derive(Debug, Clone)]
+pub struct Patch {
+    source: Snapshot,
+    target: Snapshot,
+    changes: Box<[EntryChange]>,
+}
+
+impl Patch {
+    /// Version of the in-memory patch representation.
+    pub const VERSION: u16 = 1;
+
+    /// Return the in-memory patch representation version.
+    pub const fn version(&self) -> u16 {
+        Self::VERSION
+    }
+
+    /// Return deterministic entry-level change metadata.
+    pub fn changes(&self) -> &[EntryChange] {
+        &self.changes
+    }
+
+    /// Return the number of changed package entries.
+    pub fn len(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Return whether the edit changed no package entries.
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Build the inverse patch without copying package payloads.
+    pub fn inverse(&self) -> Self {
+        Self {
+            source: self.target.clone(),
+            target: self.source.clone(),
+            changes: self
+                .changes
+                .iter()
+                .rev()
+                .map(EntryChange::inverse)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        }
+    }
+
+    /// Apply this patch to a matching immutable package snapshot.
+    ///
+    /// The source snapshot is never mutated. A source with the same ordered
+    /// entry names and bytes may be independently opened; source limits are
+    /// retained and rechecked before the resulting snapshot is returned.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        if !same_entries(source, &self.source) {
+            return Err(Error::InvalidFormat(
+                "iWork package patch source does not match".to_owned(),
+            ));
+        }
+        source.validate()?;
+
+        let target = Snapshot {
+            state: Arc::clone(&self.target.state),
+            limits: source.limits,
+        };
+        target.validate()?;
+        Ok(target)
+    }
+
+    fn between(source: Snapshot, target: Snapshot) -> Self {
+        let mut changes = Vec::new();
+
+        for (before_position, (name, before_data)) in source.state.entries.iter().enumerate() {
+            let Some(after_position) = target.state.position(name) else {
+                changes.push(EntryChange {
+                    name: name.clone(),
+                    kind: EntryChangeKind::Removed,
+                    before_position: Some(before_position),
+                    after_position: None,
+                    before_len: Some(before_data.len()),
+                    after_len: None,
+                });
+                continue;
+            };
+            let after_data = &target.state.entries[after_position].1;
+            if before_data != after_data {
+                changes.push(EntryChange {
+                    name: name.clone(),
+                    kind: EntryChangeKind::Replaced,
+                    before_position: Some(before_position),
+                    after_position: Some(after_position),
+                    before_len: Some(before_data.len()),
+                    after_len: Some(after_data.len()),
+                });
+            }
+        }
+
+        for (after_position, (name, after_data)) in target.state.entries.iter().enumerate() {
+            if source.state.position(name).is_none() {
+                changes.push(EntryChange {
+                    name: name.clone(),
+                    kind: EntryChangeKind::Added,
+                    before_position: None,
+                    after_position: Some(after_position),
+                    before_len: None,
+                    after_len: Some(after_data.len()),
+                });
+            }
+        }
+
+        Self {
+            source,
+            target,
+            changes: changes.into_boxed_slice(),
+        }
     }
 }
 
@@ -808,6 +1016,11 @@ impl Snapshot {
         self.edit().validate()
     }
 
+    /// Apply a source-checked package patch without mutating this snapshot.
+    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+        patch.apply(self)
+    }
+
     /// Start a mutable copy-on-write edit from this snapshot.
     pub fn edit(&self) -> IWorkPackage {
         IWorkPackage {
@@ -829,9 +1042,11 @@ impl Snapshot {
         let mut candidate = self.edit();
         let value = edit(&mut candidate)?;
         candidate.validate_state()?;
+        let snapshot = candidate.snapshot();
         Ok(Commit {
             value,
-            snapshot: candidate.snapshot(),
+            patch: Patch::between(self.clone(), snapshot.clone()),
+            snapshot,
         })
     }
 
@@ -888,6 +1103,10 @@ impl Snapshot {
     pub fn archive(&self, name: &str) -> Result<Archive> {
         self.edit().archive(name)
     }
+}
+
+fn same_entries(left: &Snapshot, right: &Snapshot) -> bool {
+    left.state.entries == right.state.entries
 }
 
 fn insert_unique_archive_entry(
@@ -1260,6 +1479,13 @@ mod tests {
         })?;
 
         assert_eq!(commit.value(), &2);
+        assert_eq!(commit.patch().version(), Patch::VERSION);
+        assert_eq!(commit.patch().len(), 1);
+        let change = &commit.patch().changes()[0];
+        assert_eq!(change.name(), "Data/changed");
+        assert_eq!(change.kind(), EntryChangeKind::Added);
+        assert_eq!(change.after_position(), Some(1));
+        assert_eq!(change.after_len(), Some(7));
         assert_eq!(source.len(), 1);
         assert_eq!(source.entry("Data/changed"), None);
         assert_eq!(commit.snapshot().len(), 2);
@@ -1267,6 +1493,32 @@ mod tests {
             commit.snapshot().entry("Data/changed"),
             Some(b"changed".as_slice())
         );
+
+        let replayed = source.apply(commit.patch())?;
+        assert_eq!(replayed.entry("Data/changed"), Some(b"changed".as_slice()));
+        let reverted = replayed.apply(&commit.patch().inverse())?;
+        assert_eq!(reverted.entry("Data/changed"), None);
+        assert_eq!(
+            reverted.entry("Data/original"),
+            Some(b"original".as_slice())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn package_patch_rejects_a_stale_source() -> crate::Result<()> {
+        let mut package = IWorkPackage::new();
+        package.insert_entry("Data/original", b"original".to_vec())?;
+        let source = package.snapshot();
+        let commit = source.edit_with(|edit| {
+            edit.insert_entry("Data/changed", b"changed".to_vec())?;
+            Ok(())
+        })?;
+
+        let mut stale = IWorkPackage::new();
+        stale.insert_entry("Data/original", b"different".to_vec())?;
+        let error = stale.snapshot().apply(commit.patch()).unwrap_err();
+        assert!(error.to_string().contains("patch source does not match"));
         Ok(())
     }
 
