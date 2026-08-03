@@ -4823,3 +4823,100 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
         before.as_slice()
     );
 }
+
+#[test]
+fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() {
+    let mut pages = PagesEditor::create_with_text("Rename anchor").unwrap();
+    let text_box = pages
+        .add_text_box(
+            11,
+            "Named style",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let body = pages
+        .text_box_named_paragraph_styles(text_box.drawable_object_id)
+        .unwrap()
+        .into_iter()
+        .find(|style| style.name() == "Body")
+        .unwrap()
+        .id();
+    let created = pages
+        .create_text_box_named_paragraph_style(
+            text_box.drawable_object_id,
+            body,
+            ParagraphStyleName::new("Rename source").unwrap(),
+        )
+        .unwrap();
+    let storage_id = text_box.storage.object_id;
+    let mut package = pages.into_package();
+    let location = native::locate_style(&package, created.id().get()).unwrap();
+    let sibling_data = vec![0x98, 0x06, 0x09];
+    package
+        .update_archive(&location.archive_name, |archive| {
+            let object = archive.object_mut(location.object_id).unwrap();
+            object.messages.insert(
+                location.message_index,
+                RawMessage {
+                    type_: 2_023,
+                    data: sibling_data.clone(),
+                },
+            );
+            object.archive_info.message_infos.insert(
+                location.message_index,
+                MessageInfo::new(
+                    2_023,
+                    u32::try_from(sibling_data.len()).expect("test payload fits u32"),
+                ),
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    let renamed = super::rename_named_paragraph_style(
+        &mut package,
+        storage_id,
+        created.id(),
+        ParagraphStyleName::new("Rename target").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(renamed.name(), "Rename target");
+    let style_after = native::locate_style(&package, created.id().get()).unwrap();
+    assert_eq!(style_after.message_index, location.message_index + 1);
+    let archive = package.archive(&style_after.archive_name).unwrap();
+    let object = archive.object(style_after.object_id).unwrap();
+    assert_eq!(object.messages[location.message_index].data, sibling_data);
+    assert_eq!(
+        object.archive_info.message_infos[location.message_index].type_,
+        2_023
+    );
+
+    let mut stale = package.clone();
+    stale
+        .update_archive(&style_after.archive_name, |archive| {
+            let object = archive.object_mut(style_after.object_id).unwrap();
+            object.replace_message(
+                style_after.message_index,
+                RawMessage {
+                    type_: 99_999,
+                    data: style_after.message.data.clone(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = stale.to_bytes().unwrap();
+    assert!(
+        super::super::paragraph_style_rename::rename_at_location(
+            &mut stale,
+            &style_after,
+            "Must not publish",
+        )
+        .is_err()
+    );
+    assert_eq!(stale.to_bytes().unwrap(), before);
+}

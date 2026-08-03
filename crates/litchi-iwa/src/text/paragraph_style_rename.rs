@@ -7,7 +7,6 @@ use crate::{Error, IWorkPackage, Result};
 use super::paragraph_alignment::native;
 use super::paragraph_following_style::{NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName};
 
-const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const STYLE_SUPER_FIELD: u32 = 1;
 const STYLE_NAME_FIELD: u32 = 1;
 
@@ -37,40 +36,7 @@ pub(super) fn rename_named_paragraph_style(
 
     let location = native::locate_style(package, target.get())?;
     let mut staged = package.clone();
-    staged.update_archive(&location.archive_name, |archive| {
-        let object = archive.object_mut(target.get()).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork paragraph style {} is missing", target.get()))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter_map(|(index, message)| {
-                (message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE).then_some(index)
-            })
-            .collect::<Vec<_>>();
-        let [message_index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {} must have exactly one paragraph-style payload",
-                target.get()
-            )));
-        };
-        let message_index = *message_index;
-        let data = patch_nested_length_delimited_field(
-            &object.messages[message_index].data,
-            &[STYLE_SUPER_FIELD, STYLE_NAME_FIELD],
-            location.style.super_.name.is_some(),
-            Some(name.as_str().as_bytes()),
-        )?;
-        object.replace_message(
-            message_index,
-            RawMessage {
-                type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
-                data,
-            },
-        )?;
-        Ok(())
-    })?;
+    rename_at_location(&mut staged, &location, name.as_str())?;
 
     let renamed = NamedParagraphStyle::new(target, name.as_str().to_owned())?;
     let matches = native::named_paragraph_styles(&staged, first_style_id)?
@@ -84,4 +50,70 @@ pub(super) fn rename_named_paragraph_style(
     }
     *package = staged;
     Ok(renamed)
+}
+
+pub(super) fn rename_at_location(
+    package: &mut IWorkPackage,
+    location: &native::ParagraphStyleLocation,
+    name: &str,
+) -> Result<()> {
+    package.update_archive(&location.archive_name, |archive| {
+        let object = archive.object_mut(location.object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork paragraph style {} is missing",
+                location.object_id
+            ))
+        })?;
+        if object.archive_info.identifier != Some(location.object_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {} object identity changed unexpectedly",
+                location.object_id
+            )));
+        }
+        let Some(message) = object.messages.get(location.message_index) else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {} anchored payload index {} is missing",
+                location.object_id, location.message_index
+            )));
+        };
+        if message.type_ != location.message_type || message.data != location.message.data {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {} anchored payload changed unexpectedly",
+                location.object_id
+            )));
+        }
+        let Some(info) = object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+        else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {} anchored metadata index {} is missing",
+                location.object_id, location.message_index
+            )));
+        };
+        let message_length = u32::try_from(message.data.len()).map_err(|_| {
+            Error::InvalidFormat("paragraph style payload exceeds u32 length".to_owned())
+        })?;
+        if info.type_ != location.message_type || info.length != message_length {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {} anchored metadata changed unexpectedly",
+                location.object_id
+            )));
+        }
+        let data = patch_nested_length_delimited_field(
+            &message.data,
+            &[STYLE_SUPER_FIELD, STYLE_NAME_FIELD],
+            location.style.super_.name.is_some(),
+            Some(name.as_bytes()),
+        )?;
+        object.replace_message(
+            location.message_index,
+            RawMessage {
+                type_: location.message_type,
+                data,
+            },
+        )?;
+        Ok(())
+    })
 }
