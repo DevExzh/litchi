@@ -2,12 +2,13 @@
 
 use prost::Message;
 
-use crate::archive::RawMessage;
+use crate::archive::{Archive, RawMessage};
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::{tsp, tss};
+use crate::text::storage_wire::update_parsed_archive;
 use crate::wire::{
     append_repeated_length_delimited_field, patch_nested_length_delimited_field,
     patch_nested_varint_field,
@@ -52,7 +53,11 @@ pub(super) fn create_named_paragraph_style(
     }
 
     let source_id = source.get();
-    let source_location = native::locate_style(package, source_id)?;
+    let native::LocatedParagraphStyle {
+        location: source_location,
+        archive: source_archive,
+        package_revision,
+    } = native::locate_style_with_archive(package, source_id)?;
     let stylesheet_id = native::stylesheet_id(&source_location.style, source_id)?;
     let stylesheet_archive_name = object_archive_name(package, stylesheet_id)?;
     if source_location.archive_name != stylesheet_archive_name {
@@ -64,22 +69,23 @@ pub(super) fn create_named_paragraph_style(
     let new_style_id = next_object_identifier(package)?;
     let style_identifier = format!("{GENERATED_STYLE_IDENTIFIER_PREFIX}{new_style_id}");
     let new_style = clone_named_style(
-        package,
-        &stylesheet_archive_name,
-        source_id,
+        &source_archive,
+        &source_location,
         new_style_id,
         name.as_str(),
         &style_identifier,
     )?;
 
     let mut staged = package.clone();
-    insert_named_style(
+    insert_named_style_with_archive(
         &mut staged,
         &stylesheet_archive_name,
         stylesheet_id,
         new_style_id,
         &style_identifier,
         new_style,
+        source_archive,
+        package_revision,
     )?;
     for location in &theme_locations {
         append_theme_preset(&mut staged, location, stylesheet_id, new_style_id)?;
@@ -171,14 +177,13 @@ pub(super) fn locate_themes(
 }
 
 fn clone_named_style(
-    package: &IWorkPackage,
-    archive_name: &str,
-    source_id: u64,
+    archive: &Archive,
+    source_location: &native::ParagraphStyleLocation,
     new_id: u64,
     name: &str,
     style_identifier: &str,
 ) -> Result<crate::archive::ArchiveObject> {
-    let archive = package.archive(archive_name)?;
+    let source_id = source_location.object_id;
     let source = archive.object(source_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork paragraph style {source_id} is missing"))
     })?;
@@ -196,7 +201,7 @@ fn clone_named_style(
         )));
     };
     let message_index = *message_index;
-    let decoded = &native::locate_style(package, source_id)?.style;
+    let decoded = &source_location.style;
     let mut data = patch_nested_length_delimited_field(
         &source.messages[message_index].data,
         &[STYLE_SUPER_FIELD, STYLE_NAME_FIELD],
@@ -229,77 +234,92 @@ fn clone_named_style(
     Ok(cloned)
 }
 
-fn insert_named_style(
+fn insert_named_style_with_archive(
     package: &mut IWorkPackage,
     archive_name: &str,
     stylesheet_id: u64,
     style_id: u64,
     style_identifier: &str,
     style: crate::archive::ArchiveObject,
+    archive: Archive,
+    package_revision: u64,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let stylesheet = archive.object_mut(stylesheet_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork stylesheet {stylesheet_id} is missing"))
-        })?;
-        let indexes = stylesheet
-            .messages
-            .iter()
-            .enumerate()
-            .filter_map(|(index, message)| {
-                (message.type_ == STYLESHEET_MESSAGE_TYPE).then_some(index)
-            })
-            .collect::<Vec<_>>();
-        let [message_index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork stylesheet {stylesheet_id} must have exactly one stylesheet payload"
-            )));
-        };
-        let message_index = *message_index;
-        let decoded =
-            tss::StylesheetArchive::decode(stylesheet.messages[message_index].data.as_slice())?;
-        if decoded
-            .styles
-            .iter()
-            .any(|value| value.identifier == style_id)
-            || decoded
-                .identifier_to_style_map
-                .iter()
-                .any(|entry| entry.identifier == style_identifier)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "iWork stylesheet already contains paragraph style {style_id}"
-            )));
-        }
-        let reference = tsp::Reference {
-            identifier: style_id,
-            ..Default::default()
-        };
-        let entry = tss::stylesheet_archive::IdentifiedStyleEntry {
-            identifier: style_identifier.to_owned(),
-            style: reference,
-        };
-        let data = append_repeated_length_delimited_field(
-            &stylesheet.messages[message_index].data,
-            STYLESHEET_STYLES_FIELD,
-            &reference.encode_to_vec(),
-        )?;
-        let data = append_repeated_length_delimited_field(
-            &data,
-            STYLESHEET_IDENTIFIER_MAP_FIELD,
-            &entry.encode_to_vec(),
-        )?;
-        stylesheet.replace_message(
-            message_index,
-            RawMessage {
-                type_: STYLESHEET_MESSAGE_TYPE,
-                data,
-            },
-        )?;
-        stylesheet.archive_info.message_infos[message_index]
-            .object_references
-            .push(style_id);
-        archive.insert_object(style)
+    if package.mutation_revision() != package_revision {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} package changed unexpectedly"
+        )));
+    }
+    update_parsed_archive(package, archive_name, archive, |archive| {
+        insert_named_style_in_archive(archive, stylesheet_id, style_id, style_identifier, style)
     })
+}
+
+fn insert_named_style_in_archive(
+    archive: &mut Archive,
+    stylesheet_id: u64,
+    style_id: u64,
+    style_identifier: &str,
+    style: crate::archive::ArchiveObject,
+) -> Result<()> {
+    let stylesheet = archive.object_mut(stylesheet_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork stylesheet {stylesheet_id} is missing"))
+    })?;
+    let indexes = stylesheet
+        .messages
+        .iter()
+        .enumerate()
+        .filter_map(|(index, message)| (message.type_ == STYLESHEET_MESSAGE_TYPE).then_some(index))
+        .collect::<Vec<_>>();
+    let [message_index] = indexes.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork stylesheet {stylesheet_id} must have exactly one stylesheet payload"
+        )));
+    };
+    let message_index = *message_index;
+    let decoded =
+        tss::StylesheetArchive::decode(stylesheet.messages[message_index].data.as_slice())?;
+    if decoded
+        .styles
+        .iter()
+        .any(|value| value.identifier == style_id)
+        || decoded
+            .identifier_to_style_map
+            .iter()
+            .any(|entry| entry.identifier == style_identifier)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "iWork stylesheet already contains paragraph style {style_id}"
+        )));
+    }
+    let reference = tsp::Reference {
+        identifier: style_id,
+        ..Default::default()
+    };
+    let entry = tss::stylesheet_archive::IdentifiedStyleEntry {
+        identifier: style_identifier.to_owned(),
+        style: reference,
+    };
+    let data = append_repeated_length_delimited_field(
+        &stylesheet.messages[message_index].data,
+        STYLESHEET_STYLES_FIELD,
+        &reference.encode_to_vec(),
+    )?;
+    let data = append_repeated_length_delimited_field(
+        &data,
+        STYLESHEET_IDENTIFIER_MAP_FIELD,
+        &entry.encode_to_vec(),
+    )?;
+    stylesheet.replace_message(
+        message_index,
+        RawMessage {
+            type_: STYLESHEET_MESSAGE_TYPE,
+            data,
+        },
+    )?;
+    stylesheet.archive_info.message_infos[message_index]
+        .object_references
+        .push(style_id);
+    archive.insert_object(style)
 }
 
 fn append_theme_preset(

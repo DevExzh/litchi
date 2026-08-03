@@ -135,7 +135,7 @@ pub(crate) struct ParagraphStyleLocation {
 pub(crate) struct LocatedParagraphStyle {
     pub(crate) location: ParagraphStyleLocation,
     pub(crate) archive: Archive,
-    package_revision: u64,
+    pub(crate) package_revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
