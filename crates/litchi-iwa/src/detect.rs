@@ -423,8 +423,18 @@ fn directory(root: &Path, limits: Limits) -> crate::Result<Option<Format>> {
 fn directory_outcome(index: &Path, limits: Limits) -> crate::Result<Outcome> {
     let mut marks = Marks::default();
     let mut document = None;
+    let mut entry_count = 0usize;
     for entry in fs::read_dir(index)? {
         let entry = entry?;
+        entry_count = entry_count.checked_add(1).ok_or_else(|| {
+            crate::Error::InvalidFormat("iWork index entry count overflow".to_owned())
+        })?;
+        if entry_count > limits.max_files {
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork index directory contains more than the {} entry limit",
+                limits.max_files
+            )));
+        }
         let kind = entry.file_type()?;
         if kind.is_symlink() {
             return Err(crate::Error::InvalidFormat(format!(
@@ -853,6 +863,27 @@ mod tests {
         let tight = Limits::new(1, 1, 1, 1, 1).unwrap();
         assert!(path_with_limits(&packaged, tight).is_err());
         assert!(path_with_limits(&unpacked, tight).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn unpacked_index_entry_count_is_bounded_before_document_read() -> std::io::Result<()> {
+        let temp = Temp::new()?;
+        let unpacked = temp.0.join("bounded.pages");
+        fs::create_dir_all(unpacked.join("Index"))?;
+        fs::write(unpacked.join("Index/Document.iwa"), document(Format::Pages))?;
+        fs::write(unpacked.join("Index/Extra.iwa"), [])?;
+
+        let limits = Limits::new(
+            Limits::HARD_MAX_INPUT_BYTES,
+            1,
+            Limits::HARD_MAX_ENTRY_SIZE,
+            Limits::HARD_MAX_TOTAL_SIZE,
+            Limits::HARD_MAX_IWA_STREAM_SIZE,
+        )
+        .unwrap();
+        let error = path_with_limits(&unpacked, limits).unwrap_err();
+        assert!(error.to_string().contains("more than the 1 entry limit"));
         Ok(())
     }
 
