@@ -57,7 +57,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-sort
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-sort
 
