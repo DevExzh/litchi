@@ -10,7 +10,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{OoxmlError, Result};
+use crate::error::{Result, invalid};
 use litchi_ooxml_common::mce::process_str;
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -327,10 +327,6 @@ fn is_main_namespace(namespace: &[u8]) -> bool {
 
 fn is_namespace_declaration(name: &[u8]) -> bool {
     name == b"xmlns" || name.starts_with(b"xmlns:")
-}
-
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
 }
 
 #[cfg(test)]

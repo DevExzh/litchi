@@ -62,7 +62,6 @@ pub mod shape_geometry;
 pub mod shapes;
 mod shared_formula;
 pub mod shared_strings;
-pub mod sheet_calculation_properties;
 pub mod sheet_format;
 pub mod sheet_properties;
 pub mod sheet_protection;
@@ -102,6 +101,7 @@ pub use chartsheet::{
     write_chartsheet,
 };
 pub use litchi_xlsx::calculation_properties;
+pub use litchi_xlsx::sheet_calculation_properties;
 pub mod writer;
 
 // Re-export main types for convenience
@@ -187,6 +187,10 @@ pub use ignored_errors::{
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
 pub use litchi_drawingml::geom::Preset;
+pub use litchi_xlsx::sheet_calculation_properties::{
+    WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
+    parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
+};
 pub use litchi_xlsx::web;
 pub use named_sheet_view::{
     NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewDifferentialFormat,
@@ -231,10 +235,6 @@ pub use shapes::{
     load_shapes, load_worksheet_shapes, parse_drawing_shapes,
 };
 pub use shared_strings::SharedStrings;
-pub use sheet_calculation_properties::{
-    WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
-    parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
-};
 pub use sheet_format::{WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties};
 pub use sheet_properties::{
     WorksheetPageSetupProperties, WorksheetSheetProperties, WorksheetSynchronizationReference,

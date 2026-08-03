@@ -17,6 +17,7 @@ mod outline;
 pub mod raw;
 pub mod row;
 pub mod sheet;
+pub mod sheet_calculation_properties;
 pub mod style;
 pub mod web;
 mod workbook;
@@ -37,6 +38,10 @@ pub use litchi_sheet::{
 };
 pub use outline::{Outline, OutlineAt};
 pub use row::{Height, HeightAt, Row, Rows};
+pub use sheet_calculation_properties::{
+    WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
+    parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
+};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
