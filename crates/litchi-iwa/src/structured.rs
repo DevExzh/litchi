@@ -17,30 +17,68 @@ use crate::shapes::text_extractor::ShapeTextExtractor;
 /// Represents a table extracted from a Numbers document
 #[derive(Debug, Clone)]
 pub struct Table {
-    /// Table name
-    pub name: String,
-    /// Number of rows
-    pub row_count: usize,
-    /// Number of columns
-    pub column_count: usize,
-    /// Cell data (row, column) -> value
-    pub cells: HashMap<(usize, usize), CellValue>,
+    name: String,
+    row_count: usize,
+    column_count: usize,
+    cells: HashMap<(usize, usize), CellValue>,
 }
 
 impl Table {
     /// Create a new empty table
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
-            name,
+            name: name.into(),
             row_count: 0,
             column_count: 0,
             cells: HashMap::new(),
         }
     }
 
+    /// Create a table with dimensions declared by the source document.
+    fn with_dimensions(name: impl Into<String>, row_count: usize, column_count: usize) -> Self {
+        Self {
+            name: name.into(),
+            row_count,
+            column_count,
+            cells: HashMap::new(),
+        }
+    }
+
+    /// Borrow the table name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the number of addressable rows.
+    pub const fn row_count(&self) -> usize {
+        self.row_count
+    }
+
+    /// Return the number of addressable columns.
+    pub const fn column_count(&self) -> usize {
+        self.column_count
+    }
+
+    /// Return the table dimensions as `(rows, columns)`.
+    pub const fn dimensions(&self) -> (usize, usize) {
+        (self.row_count, self.column_count)
+    }
+
     /// Get a cell value at the specified position
     pub fn get_cell(&self, row: usize, col: usize) -> Option<&CellValue> {
         self.cells.get(&(row, col))
+    }
+
+    /// Iterate over materialized cells without exposing the backing map.
+    pub fn iter_cells(&self) -> impl Iterator<Item = ((usize, usize), &CellValue)> + '_ {
+        self.cells
+            .iter()
+            .map(|(position, value)| (*position, value))
+    }
+
+    /// Return the number of materialized cells, including explicit empty cells.
+    pub fn cell_count(&self) -> usize {
+        self.cells.len()
     }
 
     /// Set a cell value at the specified position
@@ -196,14 +234,12 @@ pub fn extract_tables(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
             let (row_count, column_count) = nt.dimensions();
             let table_name = nt.name().to_owned();
             let (cells, _) = nt.into_parts();
-            let mut table = Table::new(table_name);
-            table.row_count = row_count;
-            table.column_count = column_count;
+            let mut table = Table::with_dimensions(table_name, row_count, column_count);
 
             // Convert cells from NumbersTable format to our CellValue format
             for ((row, col), cell) in cells {
                 let cell_value = convert_numbers_cell_to_structured(cell);
-                table.cells.insert((row, col), cell_value);
+                table.set_cell(row, col, cell_value);
             }
 
             table
@@ -510,7 +546,7 @@ impl StructuredData {
 
         // Add table names
         for table in &self.tables {
-            all_text.push(format!("Table: {}", table.name));
+            all_text.push(format!("Table: {}", table.name()));
         }
 
         // Add slide content
@@ -534,17 +570,20 @@ mod tests {
     #[test]
     fn test_table_creation() {
         let mut table = Table::new("Test Table".to_string());
-        assert_eq!(table.name, "Test Table");
-        assert_eq!(table.row_count, 0);
-        assert_eq!(table.column_count, 0);
+        assert_eq!(table.name(), "Test Table");
+        assert_eq!(table.row_count(), 0);
+        assert_eq!(table.column_count(), 0);
 
         table.set_cell(0, 0, CellValue::Text("Header 1".to_string()));
         table.set_cell(0, 1, CellValue::Text("Header 2".to_string()));
         table.set_cell(1, 0, CellValue::Number(42.0));
         table.set_cell(1, 1, CellValue::Boolean(true));
 
-        assert_eq!(table.row_count, 2);
-        assert_eq!(table.column_count, 2);
+        assert_eq!(table.row_count(), 2);
+        assert_eq!(table.column_count(), 2);
+        assert_eq!(table.dimensions(), (2, 2));
+        assert_eq!(table.cell_count(), 4);
+        assert_eq!(table.iter_cells().count(), 4);
 
         let csv = table.to_csv();
         assert!(csv.contains("Header 1"));

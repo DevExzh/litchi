@@ -107,7 +107,7 @@
 //!
 //! for table in &structured.tables {
 //!     let csv = table.to_csv();
-//!     println!("Table: {}\n{}", table.name, csv);
+//!     println!("Table: {}\n{}", table.name(), csv);
 //! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```

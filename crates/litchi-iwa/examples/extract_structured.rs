@@ -58,7 +58,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "--- table: {} ({} rows x {} cols) ---",
-        first.name, first.row_count, first.column_count
+        first.name(),
+        first.row_count(),
+        first.column_count()
     );
     let csv = first.to_csv();
     if csv.is_empty() {
