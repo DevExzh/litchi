@@ -106,6 +106,13 @@ impl ObjectIndex {
                 ))
             })?;
 
+            if let Some(existing) = self.entries.get(&identifier) {
+                return Err(Error::Archive(format!(
+                    "object {identifier} occurs in archives {} and {archive_name}",
+                    existing.fragment_name
+                )));
+            }
+
             // Determine object type from first message
             let object_type = object.messages.first().map(|msg| msg.type_).unwrap_or(0);
 
@@ -1545,6 +1552,47 @@ mod tests {
                 ObjectId::try_from(2).unwrap()
             ]
         );
+    }
+
+    #[test]
+    fn rejects_object_ids_repeated_across_archives() {
+        let object = |message_type| {
+            ArchiveObject::new(
+                7,
+                vec![RawMessage {
+                    type_: message_type,
+                    data: Vec::new(),
+                }],
+            )
+            .unwrap()
+        };
+        let mut package = crate::IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/B.iwa",
+                &Archive {
+                    objects: vec![object(42)],
+                },
+            )
+            .unwrap();
+        package
+            .replace_archive(
+                "Index/A.iwa",
+                &Archive {
+                    objects: vec![object(43)],
+                },
+            )
+            .unwrap();
+
+        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let error = ObjectIndex::from_bundle(&bundle).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Archive(message)
+                if message.contains("object 7")
+                    && message.contains("Index/A.iwa")
+                    && message.contains("Index/B.iwa")
+        ));
     }
 
     #[test]
