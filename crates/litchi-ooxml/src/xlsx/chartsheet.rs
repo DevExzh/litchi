@@ -7,7 +7,7 @@ use crate::xlsx::printer_settings::{
 };
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -68,6 +68,7 @@ const MAX_VML_DRAWING_BYTES: usize = 16 * 1024 * 1024;
 const MAX_TOTAL_RESOURCE_BYTES: usize = 128 * 1024 * 1024;
 const MAX_NODES: usize = 500_000;
 const MAX_DEPTH: usize = 256;
+const MAX_NAMESPACE_BINDINGS: usize = 4096;
 const MAX_STRING_BYTES: usize = 4 * 1024 * 1024;
 const MAX_VIEWS: usize = 256;
 const MAX_CUSTOM_VIEWS: usize = 1024;
@@ -80,6 +81,10 @@ const MAX_CHART_USER_SHAPES_BYTES: usize = 8 * 1024 * 1024;
 const MAX_CHART_USER_SHAPE_IMAGES: usize = 256;
 const MAX_CHART_USER_SHAPE_IMAGE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_CHART_DIRECT_IMAGES: usize = 256;
+// ChartEx relationships are limited by the bounded direct-image, companion,
+// and single-resource families owned by this module.  The chartEx schema
+// permits one externalData package relationship (MS-ODRAWXML 2.24).
+const MAX_CHART_RELATIONSHIPS: usize = MAX_CHART_DIRECT_IMAGES + (MAX_CHART_STYLE_PARTS * 2) + 3;
 const MAX_CHART_THEME_OVERRIDE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_CHART_THEME_IMAGES: usize = 256;
 const MAX_CHART_EMBEDDED_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
@@ -926,7 +931,11 @@ fn parse_extension_list(
         if child.children.len() != 1 {
             return Err(invalid("ext requires exactly one wildcard child"));
         }
-        let payload_xml = canonical_extension_payload_node(&child.children[0], conformance)?;
+        let payload = child
+            .children
+            .first()
+            .ok_or_else(|| invalid("extension payload is missing its root"))?;
+        let payload_xml = canonical_extension_payload_node(payload, conformance)?;
         total = total
             .checked_add(payload_xml.len())
             .ok_or_else(|| limit("retained extension bytes"))?;
@@ -990,7 +999,7 @@ fn parse_views(node: &Node) -> Result<Vec<ChartSheetView>> {
     if node.children.len() > MAX_VIEWS {
         return Err(limit("view count"));
     }
-    let mut views = Vec::new();
+    let mut views = Vec::with_capacity(node.children.len());
     for child in &node.children {
         if child.name != "sheetView" || !is_core(&child.namespace) {
             return Err(invalid("sheetViews contains an unsupported child"));
@@ -1181,7 +1190,7 @@ fn parse_header_footer(node: &Node) -> Result<ChartSheetHeaderFooter> {
 /// Deterministically serializes one complete Chartsheet part.
 pub fn write_chartsheet(value: &ChartSheet, conformance: ChartSheetConformance) -> Result<Vec<u8>> {
     validate_chartsheet(value)?;
-    let mut out = Vec::new();
+    let mut out = BoundedXml::new(MAX_XML_BYTES);
     out.extend_from_slice(b"<x:chartsheet xmlns:x=\"");
     escape(&mut out, conformance.sml());
     out.extend_from_slice(b"\" xmlns:r=\"");
@@ -1369,13 +1378,10 @@ pub fn write_chartsheet(value: &ChartSheet, conformance: ChartSheetConformance) 
         out.extend_from_slice(b"</x:extLst>");
     }
     out.extend_from_slice(b"</x:chartsheet>");
-    if out.len() > MAX_XML_BYTES {
-        return Err(limit("serialized XML bytes"));
-    }
-    Ok(out)
+    out.finish("serialized XML bytes")
 }
 
-fn write_relationship_leaf(out: &mut Vec<u8>, name: &str, id: &str) {
+fn write_relationship_leaf<T: XmlOutput>(out: &mut T, name: &str, id: &str) {
     out.extend_from_slice(b"<x:");
     out.extend_from_slice(name.as_bytes());
     attr(out, "r:id", id);
@@ -1493,7 +1499,8 @@ pub fn load_chartsheet(
     };
     let known_relationships = known_chartsheet_relationship_ids(&chartsheet);
     let extension_ids = extension_relationship_ids(&chartsheet, conformance)?;
-    let mut extension_relationships = Vec::new();
+    let mut extension_relationships =
+        Vec::with_capacity(extension_ids.len().min(MAX_EXTENSION_RELATIONSHIPS));
     for id in extension_ids.difference(&known_relationships) {
         if extension_relationships.len() >= MAX_EXTENSION_RELATIONSHIPS {
             return Err(limit("extension relationship count"));
@@ -1537,7 +1544,7 @@ pub fn load_chartsheet(
             "bounded chartsheet drawing has unsupported or unreferenced relationships",
         ));
     }
-    let mut charts = Vec::new();
+    let mut charts = Vec::with_capacity(chart_references.len());
     let mut total = drawing_part.blob().len();
     for vml in [&legacy_drawing, &legacy_header_footer_drawing]
         .into_iter()
@@ -1657,6 +1664,9 @@ fn load_chart_resource(
         },
         DrawingChartKind::Extended => {
             require_content_type(part, CHART_EX_CT, "chartEx")?;
+            if part.rels().len() > MAX_CHART_RELATIONSHIPS {
+                return Err(limit("chartEx relationship count"));
+            }
             let references = validate_chart_ex_relationships(part.blob(), conformance)?;
             add_resource(
                 total,
@@ -1664,8 +1674,12 @@ fn load_chart_resource(
                 MAX_CHART_EX_BYTES,
                 "chartEx bytes",
             )?;
-            let (mut styles, mut color_styles, mut user_shapes, mut outbound_resources) =
-                (Vec::new(), Vec::new(), None, Vec::new());
+            let (mut styles, mut color_styles, mut user_shapes, mut outbound_resources) = (
+                Vec::with_capacity(MAX_CHART_STYLE_PARTS.min(part.rels().len())),
+                Vec::with_capacity(MAX_CHART_STYLE_PARTS.min(part.rels().len())),
+                None,
+                Vec::with_capacity(part.rels().len()),
+            );
             let (mut theme_seen, mut package_seen) = (false, false);
             for relationship in part.rels().iter() {
                 if relationship.reltype() == conformance.chart_user_shapes_rel() {
@@ -1850,7 +1864,10 @@ fn load_chart_user_shapes_resource(
     if referenced.len() > MAX_CHART_USER_SHAPE_IMAGES {
         return Err(limit("chart user-shape image count"));
     }
-    if part.rels().iter().count() != referenced.len() {
+    if part.rels().len() > MAX_CHART_USER_SHAPE_IMAGES {
+        return Err(limit("chart user-shape relationship count"));
+    }
+    if part.rels().len() != referenced.len() {
         return Err(invalid(
             "chartUserShapes image relationships are missing or orphaned",
         ));
@@ -1963,7 +1980,10 @@ fn load_chart_theme_override_resource(
     if referenced.len() > MAX_CHART_THEME_IMAGES {
         return Err(limit("themeOverride image count"));
     }
-    if part.rels().iter().count() != referenced.len() {
+    if part.rels().len() > MAX_CHART_THEME_IMAGES {
+        return Err(limit("themeOverride relationship count"));
+    }
+    if part.rels().len() != referenced.len() {
         return Err(invalid(
             "themeOverride image relationships are missing or orphaned",
         ));
@@ -2038,6 +2058,18 @@ pub fn store_chartsheet(
     conformance: ChartSheetConformance,
 ) -> Result<()> {
     validate_package_value(value, conformance)?;
+    let mut staged = package.clone();
+    store_chartsheet_inner(&mut staged, workbook_name, value, conformance)?;
+    *package = staged;
+    Ok(())
+}
+
+fn store_chartsheet_inner(
+    package: &mut OpcPackage,
+    workbook_name: &PackURI,
+    value: &ChartSheetPackage,
+    conformance: ChartSheetConformance,
+) -> Result<()> {
     let workbook = package.get_part(workbook_name)?;
     require_workbook(workbook)?;
     let workbook_root = parse_document(workbook.blob(), MAX_XML_BYTES)?;
@@ -2072,12 +2104,10 @@ pub fn store_chartsheet(
     let printer_uri = value
         .printer_settings
         .as_ref()
-        .map(|settings| {
+        .map(|settings| -> Result<PackURI> {
             let uri = PackURI::new(&settings.resource.part_name).map_err(OoxmlError::InvalidUri)?;
             validate_printer_settings_uri(&uri)?;
-            if package.iter_parts().any(|part| part.partname() == &uri) {
-                return Err(invalid(format!("part '{uri}' already exists")));
-            }
+            package.validate_new_part_name(&uri)?;
             Ok(uri)
         })
         .transpose()?;
@@ -2157,50 +2187,51 @@ pub fn store_chartsheet(
     package
         .get_part_mut(workbook_name)?
         .set_blob(updated_workbook);
-    package.add_part(Box::new(BlobPart::new(
+    package.try_add_part(Box::new(BlobPart::new(
         chartsheet_uri.clone(),
         CHARTSHEET_CT.into(),
         chartsheet_xml,
-    )));
-    package.add_part(Box::new(BlobPart::new(
+    )))?;
+    package.try_add_part(Box::new(BlobPart::new(
         drawing_uri.clone(),
         value.drawing.content_type.clone(),
         value.drawing.data.clone(),
-    )));
+    )))?;
     if let (Some(resource), Some(uri)) = (&value.legacy_drawing, &legacy_uri) {
-        package.add_part(Box::new(BlobPart::new(
+        package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),
             resource.content_type.clone(),
             resource.data.clone(),
-        )));
+        )))?;
     }
     if let (Some(resource), Some(uri)) = (&value.legacy_header_footer_drawing, &legacy_hf_uri) {
-        package.add_part(Box::new(BlobPart::new(
+        package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),
             resource.content_type.clone(),
             resource.data.clone(),
-        )));
+        )))?;
     }
     if let (Some(picture), Some(uri)) = (&value.background_picture, &picture_uri) {
-        package.add_part(Box::new(BlobPart::new(
+        package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),
             picture.content_type.as_str().into(),
             picture.data.clone(),
-        )));
+        )))?;
     }
     if let (Some(settings), Some(uri)) = (&value.printer_settings, &printer_uri) {
-        package.add_part(Box::new(BlobPart::new(
+        package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),
             PRINTER_CT.into(),
             settings.resource.data.clone(),
-        )));
+        )))?;
     }
     for chart in &value.drawing.charts {
-        package.add_part(Box::new(BlobPart::new(
-            chart_uris[&chart.relationship_id].clone(),
+        let chart_uri = staged_uri(&chart_uris, &chart.relationship_id, "chart")?;
+        package.try_add_part(Box::new(BlobPart::new(
+            chart_uri,
             chart.content_type.clone(),
             chart.data.clone(),
-        )));
+        )))?;
         if let ChartSheetChartResourceKind::Extended {
             styles,
             color_styles,
@@ -2209,30 +2240,39 @@ pub fn store_chartsheet(
         } = &chart.kind
         {
             for companion in styles.iter().chain(color_styles) {
-                package.add_part(Box::new(BlobPart::new(
-                    companion_uris[&(
+                let companion_uri = staged_uri(
+                    &companion_uris,
+                    &(
                         chart.relationship_id.clone(),
                         companion.relationship_id.clone(),
-                    )]
-                        .clone(),
+                    ),
+                    "chart companion",
+                )?;
+                package.try_add_part(Box::new(BlobPart::new(
+                    companion_uri,
                     companion.content_type.clone(),
                     companion.data.clone(),
-                )));
+                )))?;
             }
             if let Some(user_shapes) = user_shapes {
-                package.add_part(Box::new(BlobPart::new(
-                    user_shape_uris[&chart.relationship_id].clone(),
+                let user_shape_uri =
+                    staged_uri(&user_shape_uris, &chart.relationship_id, "chart user-shape")?;
+                package.try_add_part(Box::new(BlobPart::new(
+                    user_shape_uri,
                     user_shapes.content_type.clone(),
                     user_shapes.data.clone(),
-                )));
+                )))?;
                 for image in &user_shapes.images {
-                    package.add_part(Box::new(BlobPart::new(
-                        user_shape_image_uris
-                            [&(chart.relationship_id.clone(), image.relationship_id.clone())]
-                            .clone(),
+                    let image_uri = staged_uri(
+                        &user_shape_image_uris,
+                        &(chart.relationship_id.clone(), image.relationship_id.clone()),
+                        "chart user-shape image",
+                    )?;
+                    package.try_add_part(Box::new(BlobPart::new(
+                        image_uri,
                         image.content_type.as_str().into(),
                         image.data.clone(),
-                    )));
+                    )))?;
                 }
             }
             for resource in outbound_resources {
@@ -2240,103 +2280,103 @@ pub fn store_chartsheet(
                     chart.relationship_id.clone(),
                     resource.relationship_id().to_owned(),
                 );
-                let uri = outbound_uris[&key].clone();
+                let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                 match resource {
-                    ChartSheetChartOutboundResource::Image(image) => package.add_part(Box::new(
-                        BlobPart::new(uri, image.content_type.as_str().into(), image.data.clone()),
-                    )),
-                    ChartSheetChartOutboundResource::ThemeOverride(theme) => {
-                        package.add_part(Box::new(BlobPart::new(
+                    ChartSheetChartOutboundResource::Image(image) => {
+                        package.try_add_part(Box::new(BlobPart::new(
                             uri,
+                            image.content_type.as_str().into(),
+                            image.data.clone(),
+                        )))?
+                    },
+                    ChartSheetChartOutboundResource::ThemeOverride(theme) => {
+                        package.try_add_part(Box::new(BlobPart::new(
+                            uri.clone(),
                             theme.content_type.clone(),
                             theme.data.clone(),
-                        )));
+                        )))?;
                         for image in &theme.images {
-                            let image_uri = theme_image_uris[&(
-                                chart.relationship_id.clone(),
-                                theme.relationship_id.clone(),
-                                image.relationship_id.clone(),
-                            )]
-                                .clone();
-                            package.add_part(Box::new(BlobPart::new(
+                            let image_uri = staged_uri(
+                                &theme_image_uris,
+                                &(
+                                    chart.relationship_id.clone(),
+                                    theme.relationship_id.clone(),
+                                    image.relationship_id.clone(),
+                                ),
+                                "themeOverride image",
+                            )?;
+                            package.try_add_part(Box::new(BlobPart::new(
                                 image_uri,
                                 image.content_type.as_str().into(),
                                 image.data.clone(),
-                            )));
+                            )))?;
                         }
                     },
-                    ChartSheetChartOutboundResource::EmbeddedPackage(embedded) => {
-                        package.add_part(Box::new(BlobPart::new(
+                    ChartSheetChartOutboundResource::EmbeddedPackage(embedded) => package
+                        .try_add_part(Box::new(BlobPart::new(
                             uri,
                             embedded.content_type.as_str().into(),
                             embedded.data.clone(),
-                        )))
-                    },
+                        )))?,
                 }
             }
         }
     }
-    package
-        .get_part_mut(workbook_name)?
-        .rels_mut()
-        .add_relationship(
-            conformance.chartsheet_rel().into(),
-            chartsheet_uri.relative_ref(workbook_name.base_uri()),
-            value.entry.workbook_relationship_id.clone(),
-            false,
-        );
-    package
-        .get_part_mut(&chartsheet_uri)?
-        .rels_mut()
-        .add_relationship(
-            conformance.drawing_rel().into(),
-            drawing_uri.relative_ref(chartsheet_uri.base_uri()),
-            value.chartsheet.drawing_relationship_id.clone(),
-            false,
-        );
+    add_relationship_checked(
+        package,
+        workbook_name,
+        conformance.chartsheet_rel(),
+        chartsheet_uri.relative_ref(workbook_name.base_uri()),
+        value.entry.workbook_relationship_id.clone(),
+        TargetMode::Internal,
+    )?;
+    add_relationship_checked(
+        package,
+        &chartsheet_uri,
+        conformance.drawing_rel(),
+        drawing_uri.relative_ref(chartsheet_uri.base_uri()),
+        value.chartsheet.drawing_relationship_id.clone(),
+        TargetMode::Internal,
+    )?;
     if let (Some(resource), Some(uri)) = (&value.legacy_drawing, &legacy_uri) {
-        package
-            .get_part_mut(&chartsheet_uri)?
-            .rels_mut()
-            .add_relationship(
-                conformance.vml_drawing_rel().into(),
-                uri.relative_ref(chartsheet_uri.base_uri()),
-                resource.relationship_id.clone(),
-                false,
-            );
+        add_relationship_checked(
+            package,
+            &chartsheet_uri,
+            conformance.vml_drawing_rel(),
+            uri.relative_ref(chartsheet_uri.base_uri()),
+            resource.relationship_id.clone(),
+            TargetMode::Internal,
+        )?;
     }
     if let (Some(resource), Some(uri)) = (&value.legacy_header_footer_drawing, &legacy_hf_uri) {
-        package
-            .get_part_mut(&chartsheet_uri)?
-            .rels_mut()
-            .add_relationship(
-                conformance.vml_drawing_rel().into(),
-                uri.relative_ref(chartsheet_uri.base_uri()),
-                resource.relationship_id.clone(),
-                false,
-            );
+        add_relationship_checked(
+            package,
+            &chartsheet_uri,
+            conformance.vml_drawing_rel(),
+            uri.relative_ref(chartsheet_uri.base_uri()),
+            resource.relationship_id.clone(),
+            TargetMode::Internal,
+        )?;
     }
     if let (Some(picture), Some(uri)) = (&value.background_picture, &picture_uri) {
-        package
-            .get_part_mut(&chartsheet_uri)?
-            .rels_mut()
-            .add_relationship(
-                conformance.image_rel().into(),
-                uri.relative_ref(chartsheet_uri.base_uri()),
-                picture.relationship_id.clone(),
-                false,
-            );
+        add_relationship_checked(
+            package,
+            &chartsheet_uri,
+            conformance.image_rel(),
+            uri.relative_ref(chartsheet_uri.base_uri()),
+            picture.relationship_id.clone(),
+            TargetMode::Internal,
+        )?;
     }
     if let (Some(settings), Some(uri)) = (&value.printer_settings, &printer_uri) {
-        package
-            .get_part_mut(&chartsheet_uri)?
-            .rels_mut()
-            .add_relationship(
-                conformance.printer_rel().into(),
-                uri.relative_ref(chartsheet_uri.base_uri()),
-                settings.relationship_id.clone(),
-                false,
-            );
+        add_relationship_checked(
+            package,
+            &chartsheet_uri,
+            conformance.printer_rel(),
+            uri.relative_ref(chartsheet_uri.base_uri()),
+            settings.relationship_id.clone(),
+            TargetMode::Internal,
+        )?;
     }
     for relationship in &value.extension_relationships {
         let (target, external) = match &relationship.target {
@@ -2348,30 +2388,33 @@ pub fn store_chartsheet(
             ),
             ChartSheetExtensionRelationshipTarget::External { target } => (target.clone(), true),
         };
-        package
-            .get_part_mut(&chartsheet_uri)?
-            .rels_mut()
-            .add_relationship(
-                relationship.relationship_type.clone(),
-                target,
-                relationship.relationship_id.clone(),
-                external,
-            );
+        add_relationship_checked(
+            package,
+            &chartsheet_uri,
+            &relationship.relationship_type,
+            target,
+            relationship.relationship_id.clone(),
+            if external {
+                TargetMode::External
+            } else {
+                TargetMode::Internal
+            },
+        )?;
     }
     for chart in &value.drawing.charts {
         let relationship_type = match &chart.kind {
             ChartSheetChartResourceKind::Classic => conformance.chart_rel(),
             ChartSheetChartResourceKind::Extended { .. } => CHART_EX_REL,
         };
-        package
-            .get_part_mut(&drawing_uri)?
-            .rels_mut()
-            .add_relationship(
-                relationship_type.into(),
-                chart_uris[&chart.relationship_id].relative_ref(drawing_uri.base_uri()),
-                chart.relationship_id.clone(),
-                false,
-            );
+        let chart_uri = staged_uri(&chart_uris, &chart.relationship_id, "chart")?;
+        add_relationship_checked(
+            package,
+            &drawing_uri,
+            relationship_type,
+            chart_uri.relative_ref(drawing_uri.base_uri()),
+            chart.relationship_id.clone(),
+            TargetMode::Internal,
+        )?;
         if let ChartSheetChartResourceKind::Extended {
             styles,
             color_styles,
@@ -2384,41 +2427,48 @@ pub fn store_chartsheet(
                 (color_styles, CHART_COLOR_STYLE_REL),
             ] {
                 for companion in companions {
-                    let uri = &companion_uris[&(
-                        chart.relationship_id.clone(),
-                        companion.relationship_id.clone(),
-                    )];
-                    package
-                        .get_part_mut(&chart_uris[&chart.relationship_id])?
-                        .rels_mut()
-                        .add_relationship(
-                            relationship_type.into(),
-                            uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),
+                    let uri = staged_uri(
+                        &companion_uris,
+                        &(
+                            chart.relationship_id.clone(),
                             companion.relationship_id.clone(),
-                            false,
-                        );
+                        ),
+                        "chart companion",
+                    )?;
+                    add_relationship_checked(
+                        package,
+                        &chart_uri,
+                        relationship_type,
+                        uri.relative_ref(chart_uri.base_uri()),
+                        companion.relationship_id.clone(),
+                        TargetMode::Internal,
+                    )?;
                 }
             }
             if let Some(user_shapes) = user_shapes {
-                let uri = &user_shape_uris[&chart.relationship_id];
-                package
-                    .get_part_mut(&chart_uris[&chart.relationship_id])?
-                    .rels_mut()
-                    .add_relationship(
-                        conformance.chart_user_shapes_rel().into(),
-                        uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),
-                        user_shapes.relationship_id.clone(),
-                        false,
-                    );
+                let uri = staged_uri(&user_shape_uris, &chart.relationship_id, "chart user-shape")?;
+                add_relationship_checked(
+                    package,
+                    &chart_uri,
+                    conformance.chart_user_shapes_rel(),
+                    uri.relative_ref(chart_uri.base_uri()),
+                    user_shapes.relationship_id.clone(),
+                    TargetMode::Internal,
+                )?;
                 for image in &user_shapes.images {
-                    let image_uri = &user_shape_image_uris
-                        [&(chart.relationship_id.clone(), image.relationship_id.clone())];
-                    package.get_part_mut(uri)?.rels_mut().add_relationship(
-                        conformance.image_rel().into(),
+                    let image_uri = staged_uri(
+                        &user_shape_image_uris,
+                        &(chart.relationship_id.clone(), image.relationship_id.clone()),
+                        "chart user-shape image",
+                    )?;
+                    add_relationship_checked(
+                        package,
+                        &uri,
+                        conformance.image_rel(),
                         image_uri.relative_ref(uri.base_uri()),
                         image.relationship_id.clone(),
-                        false,
-                    );
+                        TargetMode::Internal,
+                    )?;
                 }
             }
             for resource in outbound_resources {
@@ -2426,7 +2476,7 @@ pub fn store_chartsheet(
                     chart.relationship_id.clone(),
                     resource.relationship_id().to_owned(),
                 );
-                let uri = &outbound_uris[&key];
+                let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                 let relationship_type = match resource {
                     ChartSheetChartOutboundResource::Image(_) => conformance.image_rel(),
                     ChartSheetChartOutboundResource::ThemeOverride(_) => {
@@ -2436,28 +2486,33 @@ pub fn store_chartsheet(
                         conformance.package_rel()
                     },
                 };
-                package
-                    .get_part_mut(&chart_uris[&chart.relationship_id])?
-                    .rels_mut()
-                    .add_relationship(
-                        relationship_type.into(),
-                        uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),
-                        resource.relationship_id().to_owned(),
-                        false,
-                    );
+                add_relationship_checked(
+                    package,
+                    &chart_uri,
+                    relationship_type,
+                    uri.relative_ref(chart_uri.base_uri()),
+                    resource.relationship_id().to_owned(),
+                    TargetMode::Internal,
+                )?;
                 if let ChartSheetChartOutboundResource::ThemeOverride(theme) = resource {
                     for image in &theme.images {
-                        let image_uri = &theme_image_uris[&(
-                            chart.relationship_id.clone(),
-                            theme.relationship_id.clone(),
-                            image.relationship_id.clone(),
-                        )];
-                        package.get_part_mut(uri)?.rels_mut().add_relationship(
-                            conformance.image_rel().into(),
+                        let image_uri = staged_uri(
+                            &theme_image_uris,
+                            &(
+                                chart.relationship_id.clone(),
+                                theme.relationship_id.clone(),
+                                image.relationship_id.clone(),
+                            ),
+                            "themeOverride image",
+                        )?;
+                        add_relationship_checked(
+                            package,
+                            &uri,
+                            conformance.image_rel(),
                             image_uri.relative_ref(uri.base_uri()),
                             image.relationship_id.clone(),
-                            false,
-                        );
+                            TargetMode::Internal,
+                        )?;
                     }
                 }
             }
@@ -2485,9 +2540,17 @@ fn validate_package_value(
             "drawing chart references and chart resources differ",
         ));
     }
+    let reference_ids = references
+        .iter()
+        .map(|reference| reference.relationship_id.as_str())
+        .collect::<HashSet<_>>();
+    let mut chart_ids = HashSet::with_capacity(value.drawing.charts.len());
     let mut resources = BTreeMap::new();
     let mut total = value.drawing.data.len();
     for chart in &value.drawing.charts {
+        if !chart_ids.insert(chart.relationship_id.as_str()) {
+            return Err(invalid("duplicate chart resource relationship ID"));
+        }
         let reference = references
             .iter()
             .find(|reference| reference.relationship_id == chart.relationship_id)
@@ -2498,6 +2561,11 @@ fn validate_package_value(
                 ))
             })?;
         validate_chart_resource_value(chart, reference, conformance, &mut total, &mut resources)?;
+    }
+    if chart_ids != reference_ids {
+        return Err(invalid(
+            "drawing chart references and chart resources are not a bijection",
+        ));
     }
     validate_vml_pair(
         value.chartsheet.legacy_drawing_relationship_id.as_deref(),
@@ -3312,7 +3380,9 @@ fn insert_workbook_entry(
         match event {
             Event::Start(element) => {
                 let core = matches!(namespace, ResolveResult::Bound(Namespace(v)) if v == conformance.sml().as_bytes());
-                depth += 1;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| limit("workbook XML depth"))?;
                 if core
                     && element.local_name().as_ref() == b"sheets"
                     && sheets_depth.replace(depth).is_some()
@@ -3346,10 +3416,16 @@ fn insert_workbook_entry(
     if size > MAX_XML_BYTES {
         return Err(limit("updated workbook bytes"));
     }
+    let prefix = xml
+        .get(..position)
+        .ok_or_else(|| invalid("invalid workbook XML insertion offset"))?;
+    let suffix = xml
+        .get(position..)
+        .ok_or_else(|| invalid("invalid workbook XML insertion offset"))?;
     let mut out = Vec::with_capacity(size);
-    out.extend_from_slice(&xml[..position]);
+    out.extend_from_slice(prefix);
     out.extend_from_slice(&fragment);
-    out.extend_from_slice(&xml[position..]);
+    out.extend_from_slice(suffix);
     Ok(out)
 }
 
@@ -3399,7 +3475,7 @@ fn canonical_extension_payload_node(
     conformance: ChartSheetConformance,
 ) -> Result<Vec<u8>> {
     let mut namespaces = BTreeSet::new();
-    collect_namespaces(node, &mut namespaces);
+    collect_namespaces(node, &mut namespaces)?;
     let mut prefixes = BTreeMap::new();
     if namespaces.remove(conformance.sml()) {
         prefixes.insert(conformance.sml().to_owned(), "x".to_owned());
@@ -3415,22 +3491,26 @@ fn canonical_extension_payload_node(
     {
         prefixes.insert(namespace, format!("e{index}"));
     }
-    let mut out = Vec::new();
+    let mut out = BoundedXml::new(MAX_EXTENSION_PAYLOAD_BYTES);
     write_canonical_node(&mut out, node, &prefixes, true)?;
-    if out.len() > MAX_EXTENSION_PAYLOAD_BYTES {
-        return Err(limit("extension payload bytes"));
-    }
-    Ok(out)
+    out.finish("extension payload bytes")
 }
 
-fn collect_namespaces(node: &Node, namespaces: &mut BTreeSet<String>) {
+fn collect_namespaces(node: &Node, namespaces: &mut BTreeSet<String>) -> Result<()> {
     namespaces.insert(node.namespace.clone());
+    if namespaces.len() > MAX_NAMESPACE_BINDINGS {
+        return Err(limit("canonical namespace count"));
+    }
     for attribute in &node.attributes {
         namespaces.insert(attribute.namespace.clone());
+        if namespaces.len() > MAX_NAMESPACE_BINDINGS {
+            return Err(limit("canonical namespace count"));
+        }
     }
     for child in &node.children {
-        collect_namespaces(child, namespaces);
+        collect_namespaces(child, namespaces)?;
     }
+    Ok(())
 }
 fn qualified_name(
     namespace: &str,
@@ -3448,8 +3528,8 @@ fn qualified_name(
         .ok_or_else(|| invalid("missing canonical namespace prefix"))?;
     Ok(format!("{prefix}:{name}"))
 }
-fn write_canonical_node(
-    out: &mut Vec<u8>,
+fn write_canonical_node<T: XmlOutput>(
+    out: &mut T,
     node: &Node,
     prefixes: &BTreeMap<String, String>,
     root: bool,
@@ -3483,7 +3563,11 @@ fn write_canonical_node(
         match content {
             NodeContent::Text(value) => escape_text(out, value),
             NodeContent::Child(index) => {
-                write_canonical_node(out, &node.children[*index], prefixes, false)?
+                let child = node
+                    .children
+                    .get(*index)
+                    .ok_or_else(|| invalid("invalid canonical XML child index"))?;
+                write_canonical_node(out, child, prefixes, false)?
             },
         }
     }
@@ -3520,7 +3604,12 @@ fn extension_relationship_ids(
     if let Some(list) = &value.extension_list {
         for extension in &list.extensions {
             let node = parse_document(&extension.payload_xml, MAX_EXTENSION_PAYLOAD_BYTES)?;
-            collect_extension_relationship_ids(&node, conformance.rel(), &mut ids)?;
+            collect_extension_relationship_ids(
+                &node,
+                conformance.rel(),
+                &mut ids,
+                MAX_EXTENSION_RELATIONSHIPS,
+            )?;
         }
     }
     Ok(ids)
@@ -3529,15 +3618,19 @@ fn collect_extension_relationship_ids(
     node: &Node,
     relationship_namespace: &str,
     ids: &mut BTreeSet<String>,
+    max_ids: usize,
 ) -> Result<()> {
     for attribute in &node.attributes {
         if attribute.namespace == relationship_namespace {
             validate_id(&attribute.value)?;
+            if !ids.contains(&attribute.value) && ids.len() >= max_ids {
+                return Err(limit("relationship reference count"));
+            }
             ids.insert(attribute.value.clone());
         }
     }
     for child in &node.children {
-        collect_extension_relationship_ids(child, relationship_namespace, ids)?;
+        collect_extension_relationship_ids(child, relationship_namespace, ids, max_ids)?;
     }
     Ok(())
 }
@@ -3671,13 +3764,19 @@ fn collect_drawing_chart_references(
                     "chartEx graphicData requires exactly one cx:chart child",
                 ));
             }
-            let chart = &node.children[0];
+            let chart = node
+                .children
+                .first()
+                .ok_or_else(|| invalid("chartEx graphicData is missing its chart"))?;
             if chart.namespace != CHART_EX || chart.name != "chart" {
                 return Err(invalid("chartEx graphicData has an invalid root child"));
             }
             leaf(chart, "chartEx drawing reference")?;
             whitespace(chart)?;
             no_attributes(chart, &[(conformance.rel(), "id")])?;
+            if references.len() >= MAX_CHARTS {
+                return Err(limit("chart count"));
+            }
             references.push(DrawingChartReference {
                 relationship_id: required(chart, conformance.rel(), "id")?.to_owned(),
                 kind: DrawingChartKind::Extended,
@@ -3686,6 +3785,9 @@ fn collect_drawing_chart_references(
         }
     }
     if node.namespace == conformance.chart() && node.name == "chart" {
+        if references.len() >= MAX_CHARTS {
+            return Err(limit("chart count"));
+        }
         references.push(DrawingChartReference {
             relationship_id: required(node, conformance.rel(), "id")?.to_owned(),
             kind: DrawingChartKind::Classic,
@@ -3735,7 +3837,12 @@ fn validate_chart_user_shapes_xml(
         ));
     }
     let mut ids = BTreeSet::new();
-    collect_extension_relationship_ids(&root, conformance.rel(), &mut ids)?;
+    collect_extension_relationship_ids(
+        &root,
+        conformance.rel(),
+        &mut ids,
+        MAX_CHART_USER_SHAPE_IMAGES,
+    )?;
     Ok(ids)
 }
 #[derive(Default)]
@@ -3788,6 +3895,11 @@ fn collect_chart_ex_relationships(
                         "chartEx externalData has an unsupported relationship attribute",
                     ));
                 }
+                if !references.images.contains(&attribute.value)
+                    && references.images.len() >= MAX_CHART_DIRECT_IMAGES
+                {
+                    return Err(limit("chartEx direct image reference count"));
+                }
                 references.images.insert(attribute.value.clone());
             }
         }
@@ -3816,7 +3928,7 @@ fn validate_theme_override_xml(
         ));
     }
     let mut ids = BTreeSet::new();
-    collect_extension_relationship_ids(&root, conformance.rel(), &mut ids)?;
+    collect_extension_relationship_ids(&root, conformance.rel(), &mut ids, MAX_CHART_THEME_IMAGES)?;
     Ok(ids)
 }
 
@@ -3836,7 +3948,7 @@ fn parse_document_with_capabilities(
         max_input_bytes: max_bytes,
         max_output_bytes: max_bytes,
         max_depth: MAX_DEPTH,
-        max_namespace_bindings: 4096,
+        max_namespace_bindings: MAX_NAMESPACE_BINDINGS,
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
     };
@@ -3852,7 +3964,9 @@ fn parse_document_with_capabilities(
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                nodes += 1;
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit("XML node count"))?;
                 if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
                     return Err(limit("XML structure"));
                 }
@@ -4206,10 +4320,32 @@ fn new_uri(package: &OpcPackage, value: &str, prefix: &str) -> Result<PackURI> {
     if !uri.as_str().starts_with(prefix) {
         return Err(invalid(format!("part '{uri}' is outside {prefix}")));
     }
-    if package.iter_parts().any(|part| part.partname() == &uri) {
-        return Err(invalid(format!("part '{uri}' already exists")));
-    }
+    package.validate_new_part_name(&uri)?;
     Ok(uri)
+}
+fn staged_uri<K: Ord>(uris: &BTreeMap<K, PackURI>, key: &K, label: &str) -> Result<PackURI> {
+    uris.get(key)
+        .cloned()
+        .ok_or_else(|| invalid(format!("missing staged {label} URI")))
+}
+fn add_relationship_checked(
+    package: &mut OpcPackage,
+    source: &PackURI,
+    relationship_type: &str,
+    target: String,
+    relationship_id: String,
+    target_mode: TargetMode,
+) -> Result<()> {
+    package
+        .get_part_mut(source)?
+        .rels_mut()
+        .try_add_relationship(
+            relationship_type.to_owned(),
+            target,
+            relationship_id,
+            target_mode,
+        )?;
+    Ok(())
 }
 fn add_resource(total: &mut usize, size: usize, individual: usize, name: &str) -> Result<()> {
     if size > individual {
@@ -4224,29 +4360,89 @@ fn add_resource(total: &mut usize, size: usize, individual: usize, name: &str) -
         Ok(())
     }
 }
-fn bool_attr_opt(out: &mut Vec<u8>, name: &str, value: Option<bool>) {
+
+trait XmlOutput {
+    fn push(&mut self, value: u8);
+    fn extend_from_slice(&mut self, value: &[u8]);
+}
+
+impl XmlOutput for Vec<u8> {
+    fn push(&mut self, value: u8) {
+        Vec::push(self, value);
+    }
+
+    fn extend_from_slice(&mut self, value: &[u8]) {
+        Vec::extend_from_slice(self, value);
+    }
+}
+
+struct BoundedXml {
+    bytes: Vec<u8>,
+    max: usize,
+    overflowed: bool,
+}
+
+impl BoundedXml {
+    fn new(max: usize) -> Self {
+        Self {
+            bytes: Vec::with_capacity(max.min(8192)),
+            max,
+            overflowed: false,
+        }
+    }
+
+    fn finish(self, label: &str) -> Result<Vec<u8>> {
+        if self.overflowed {
+            Err(limit(label))
+        } else {
+            Ok(self.bytes)
+        }
+    }
+}
+
+impl XmlOutput for BoundedXml {
+    fn push(&mut self, value: u8) {
+        if self.bytes.len() < self.max {
+            self.bytes.push(value);
+        } else {
+            self.overflowed = true;
+        }
+    }
+
+    fn extend_from_slice(&mut self, value: &[u8]) {
+        let remaining = self.max.saturating_sub(self.bytes.len());
+        if value.len() > remaining {
+            self.overflowed = true;
+            self.bytes.extend_from_slice(&value[..remaining]);
+        } else {
+            self.bytes.extend_from_slice(value);
+        }
+    }
+}
+
+fn bool_attr_opt<T: XmlOutput>(out: &mut T, name: &str, value: Option<bool>) {
     if let Some(value) = value {
         attr(out, name, if value { "1" } else { "0" });
     }
 }
-fn u32_attr_opt(out: &mut Vec<u8>, name: &str, value: Option<u32>) {
+fn u32_attr_opt<T: XmlOutput>(out: &mut T, name: &str, value: Option<u32>) {
     if let Some(value) = value {
         attr(out, name, &value.to_string());
     }
 }
-fn attr_opt(out: &mut Vec<u8>, name: &str, value: Option<&str>) {
+fn attr_opt<T: XmlOutput>(out: &mut T, name: &str, value: Option<&str>) {
     if let Some(value) = value {
         attr(out, name, value);
     }
 }
-fn attr(out: &mut Vec<u8>, name: &str, value: &str) {
+fn attr<T: XmlOutput>(out: &mut T, name: &str, value: &str) {
     out.push(b' ');
     out.extend_from_slice(name.as_bytes());
     out.extend_from_slice(b"=\"");
     escape(out, value);
     out.push(b'\"');
 }
-fn escape(out: &mut Vec<u8>, value: &str) {
+fn escape<T: XmlOutput>(out: &mut T, value: &str) {
     for c in value.chars() {
         match c {
             '&' => out.extend_from_slice(b"&amp;"),
@@ -4262,7 +4458,7 @@ fn escape(out: &mut Vec<u8>, value: &str) {
         }
     }
 }
-fn escape_text(out: &mut Vec<u8>, value: &str) {
+fn escape_text<T: XmlOutput>(out: &mut T, value: &str) {
     for c in value.chars() {
         match c {
             '&' => out.extend_from_slice(b"&amp;"),
@@ -5704,6 +5900,69 @@ mod tests {
                 .get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap())
                 .is_err()
         );
+    }
+    #[test]
+    fn store_is_atomic_when_new_candidate_parts_conflict_case_insensitively() {
+        let conformance = ChartSheetConformance::Transitional;
+        let (mut package, workbook) = base_package(conformance);
+        let original_workbook = package.get_part(&workbook).unwrap().blob().to_vec();
+        let mut bad = value(conformance);
+        bad.drawing.data = format!(
+            "<xdr:wsDr xmlns:xdr=\"{XDR}\" xmlns:c=\"{CHART}\" xmlns:r=\"{REL}\"><c:chart r:id=\"rIdChart\"/><c:chart r:id=\"rIdChart2\"/></xdr:wsDr>"
+        )
+        .into_bytes();
+        let mut second = bad.drawing.charts[0].clone();
+        second.relationship_id = "rIdChart2".into();
+        second.part_name = "/xl/charts/CHART1.xml".into();
+        bad.drawing.charts.push(second);
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            store_chartsheet(&mut package, &workbook, &bad, conformance)
+        }));
+        assert!(result.is_ok(), "store_chartsheet panicked");
+        assert!(result.unwrap().is_err());
+        assert_eq!(package.part_count(), 1);
+        assert_eq!(
+            package.get_part(&workbook).unwrap().blob(),
+            original_workbook
+        );
+        assert!(
+            package
+                .get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap())
+                .is_err()
+        );
+    }
+    #[test]
+    fn store_rejects_non_bijective_drawing_chart_resources() {
+        let conformance = ChartSheetConformance::Transitional;
+        let (mut package, workbook) = base_package(conformance);
+        let mut bad = value(conformance);
+        bad.drawing.data = format!(
+            "<xdr:wsDr xmlns:xdr=\"{XDR}\" xmlns:c=\"{CHART}\" xmlns:r=\"{REL}\"><c:chart r:id=\"rIdChart\"/><c:chart r:id=\"rIdChart2\"/></xdr:wsDr>"
+        )
+        .into_bytes();
+        let mut second = bad.drawing.charts[0].clone();
+        second.part_name = "/xl/charts/chart2.xml".into();
+        bad.drawing.charts.push(second);
+
+        assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
+        assert_eq!(package.part_count(), 1);
+        assert!(
+            package
+                .get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap())
+                .is_err()
+        );
+    }
+    #[test]
+    fn drawing_chart_reference_cap_is_checked_before_retention_grows() {
+        let conformance = ChartSheetConformance::Transitional;
+        let mut xml =
+            format!("<xdr:wsDr xmlns:xdr=\"{XDR}\" xmlns:c=\"{CHART}\" xmlns:r=\"{REL}\">");
+        for index in 0..=MAX_CHARTS {
+            xml.push_str(&format!("<c:chart r:id=\"rIdChart{index}\"/>"));
+        }
+        xml.push_str("</xdr:wsDr>");
+        assert!(drawing_chart_references(xml.as_bytes(), conformance).is_err());
     }
     #[test]
     fn rejects_malformed_caps_and_graphs() {

@@ -82,11 +82,19 @@ pub struct NonPartMember {
 
 impl NonPartMember {
     /// Record a ZIP item that was not promoted to a part.
-    pub(crate) fn new(name: &str, reason: NonPartReason) -> Self {
-        Self {
-            name: name.to_string(),
+    pub(crate) fn new(name: &str, reason: NonPartReason) -> Result<Self> {
+        let mut owned_name = String::new();
+        owned_name
+            .try_reserve(name.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC non-part member name",
+                source,
+            })?;
+        owned_name.push_str(name);
+        Ok(Self {
+            name: owned_name,
             reason,
-        }
+        })
     }
 
     /// The raw ZIP item name, without a leading slash.
@@ -110,7 +118,10 @@ pub(crate) fn part_name_for_member(member_name: &str) -> Option<PackURI> {
     if member_name.len() > MAX_PART_NAME_BYTES {
         return None;
     }
-    let mut absolute = String::with_capacity(member_name.len() + 1);
+    let mut absolute = String::new();
+    absolute
+        .try_reserve(member_name.len().checked_add(1)?)
+        .ok()?;
     absolute.push('/');
     absolute.push_str(member_name);
     PackURI::new(absolute).ok()
@@ -133,18 +144,39 @@ pub(crate) struct PartNameIndex {
 }
 
 impl PartNameIndex {
-    /// Create an index sized for a typical Office package.
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Self {
-            names: Vec::with_capacity(capacity),
-            by_folded: HashMap::with_capacity(capacity),
-            descendant_by_folded_ancestor: HashMap::with_capacity(capacity),
-        }
+    /// Create an index with fallible capacity planning for untrusted ZIP data.
+    pub(crate) fn try_with_capacity(capacity: usize) -> Result<Self> {
+        let mut names = Vec::new();
+        names
+            .try_reserve_exact(capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC part-name index",
+                source,
+            })?;
+        let mut by_folded = HashMap::new();
+        by_folded
+            .try_reserve(capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC folded part-name index",
+                source,
+            })?;
+        let mut descendant_by_folded_ancestor = HashMap::new();
+        descendant_by_folded_ancestor
+            .try_reserve(capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC part-name ancestor index",
+                source,
+            })?;
+        Ok(Self {
+            names,
+            by_folded,
+            descendant_by_folded_ancestor,
+        })
     }
 
     /// Accept a part name, rejecting it when it conflicts with one already held.
     pub(crate) fn insert(&mut self, partname: &PackURI) -> Result<()> {
-        let folded = partname.as_str().to_ascii_lowercase();
+        let folded = ascii_lowercase(partname.as_str())?;
 
         if let Some(existing) = self
             .by_folded
@@ -186,16 +218,69 @@ impl PartNameIndex {
             ));
         }
 
+        let mut ancestors = Vec::new();
+        let ancestor_count = folded.match_indices('/').skip(1).count();
+        ancestors
+            .try_reserve_exact(ancestor_count)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC part-name ancestors",
+                source,
+            })?;
+        for (boundary, _) in folded.match_indices('/').skip(1) {
+            let mut ancestor = String::new();
+            ancestor
+                .try_reserve(boundary)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "OPC part-name ancestor",
+                    source,
+                })?;
+            ancestor.push_str(&folded[..boundary]);
+            ancestors.push(ancestor);
+        }
+
+        self.names
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC part-name index",
+                source,
+            })?;
+        self.by_folded
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC folded part-name index",
+                source,
+            })?;
+        self.descendant_by_folded_ancestor
+            .try_reserve(ancestors.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC part-name ancestor index",
+                source,
+            })?;
+
         let at = self.names.len();
         self.names.push(partname.clone());
-        for (boundary, _) in folded.match_indices('/').skip(1) {
+        for ancestor in ancestors {
             self.descendant_by_folded_ancestor
-                .entry(folded[..boundary].to_string())
+                .entry(ancestor)
                 .or_insert(at);
         }
         self.by_folded.insert(folded, at);
         Ok(())
     }
+}
+
+fn ascii_lowercase(value: &str) -> Result<String> {
+    let mut lower = String::new();
+    lower
+        .try_reserve(value.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC folded part name",
+            source,
+        })?;
+    for character in value.chars() {
+        lower.push(character.to_ascii_lowercase());
+    }
+    Ok(lower)
 }
 
 /// Build the error for a rejected part-name pair.
@@ -234,7 +319,7 @@ mod tests {
 
     #[test]
     fn accepts_distinct_names_and_rejects_the_three_conflicts() {
-        let mut index = PartNameIndex::with_capacity(4);
+        let mut index = PartNameIndex::try_with_capacity(4).unwrap();
         index.insert(&uri("/word/document.xml")).unwrap();
         index.insert(&uri("/word/documents.xml")).unwrap();
         index.insert(&uri("/word/media/image1.png")).unwrap();
@@ -255,7 +340,7 @@ mod tests {
 
     #[test]
     fn detects_derived_names_declared_in_either_order() {
-        let mut index = PartNameIndex::with_capacity(2);
+        let mut index = PartNameIndex::try_with_capacity(2).unwrap();
         index.insert(&uri("/xl/theme/theme1.xml")).unwrap();
         assert!(matches!(
             index.insert(&uri("/xl/THEME")),
@@ -265,8 +350,16 @@ mod tests {
 
     #[test]
     fn sibling_folders_sharing_a_prefix_do_not_conflict() {
-        let mut index = PartNameIndex::with_capacity(2);
+        let mut index = PartNameIndex::try_with_capacity(2).unwrap();
         index.insert(&uri("/xl/worksheets/sheet1.xml")).unwrap();
         index.insert(&uri("/xl/worksheetsExtra.xml")).unwrap();
+    }
+
+    #[test]
+    fn capacity_planning_is_fallible() {
+        assert!(matches!(
+            PartNameIndex::try_with_capacity(usize::MAX),
+            Err(OpcError::Allocation { .. })
+        ));
     }
 }

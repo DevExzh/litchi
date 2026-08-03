@@ -7,6 +7,7 @@ use chrono::{DateTime, Duration, Utc};
 use litchi_codepage::Mbcs;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Read, Seek};
 
 const PROPERTY_SET_HEADER_SIZE: usize = 28;
@@ -19,6 +20,166 @@ const DEFAULT_CODEPAGE: u16 = 1252;
 const UNICODE_CODEPAGE: u16 = 1200;
 const PID_DICTIONARY: u32 = 0;
 const PID_CODEPAGE: u32 = 1;
+const PID_LOCALE: u32 = 0x8000_0000;
+const PID_BEHAVIOR: u32 = 0x8000_0003;
+const MAX_NAMED_PROPERTY_ID: u32 = 0x7fff_ffff;
+
+fn try_vec_with_capacity<T>(capacity: usize, resource: &'static str) -> Result<Vec<T>, OleError> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(capacity)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    Ok(values)
+}
+
+fn try_hash_map_with_capacity<K, V>(
+    capacity: usize,
+    resource: &'static str,
+) -> Result<HashMap<K, V>, OleError>
+where
+    K: Eq + Hash,
+{
+    let mut values = HashMap::new();
+    values
+        .try_reserve(capacity)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    Ok(values)
+}
+
+fn try_hash_set_with_capacity<T>(
+    capacity: usize,
+    resource: &'static str,
+) -> Result<HashSet<T>, OleError>
+where
+    T: Eq + Hash,
+{
+    let mut values = HashSet::new();
+    values
+        .try_reserve(capacity)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    Ok(values)
+}
+
+fn try_clone_vec<T: Clone>(source: &[T], resource: &'static str) -> Result<Vec<T>, OleError> {
+    let mut values = try_vec_with_capacity(source.len(), resource)?;
+    values.extend(source.iter().cloned());
+    Ok(values)
+}
+
+fn try_copy_bytes(source: &[u8], resource: &'static str) -> Result<Vec<u8>, OleError> {
+    let mut values = try_vec_with_capacity(source.len(), resource)?;
+    values.extend_from_slice(source);
+    Ok(values)
+}
+
+fn try_clone_string(source: &str, resource: &'static str) -> Result<String, OleError> {
+    let mut value = String::new();
+    value
+        .try_reserve_exact(source.len())
+        .map_err(|source| OleError::allocation(resource, source))?;
+    value.push_str(source);
+    Ok(value)
+}
+
+fn try_zeroed_vec(len: usize, resource: &'static str) -> Result<Vec<u8>, OleError> {
+    let mut values = try_vec_with_capacity(len, resource)?;
+    values.resize(len, 0);
+    Ok(values)
+}
+
+fn reserve_bytes(
+    output: &mut Vec<u8>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<(), OleError> {
+    output
+        .len()
+        .checked_add(additional)
+        .ok_or_else(|| invalid("serialized property size overflow"))?;
+    output
+        .try_reserve(additional)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    Ok(())
+}
+
+fn append_bytes(
+    output: &mut Vec<u8>,
+    bytes: &[u8],
+    resource: &'static str,
+) -> Result<(), OleError> {
+    reserve_bytes(output, bytes.len(), resource)?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn append_u16(output: &mut Vec<u8>, value: u16, resource: &'static str) -> Result<(), OleError> {
+    append_bytes(output, &value.to_le_bytes(), resource)
+}
+
+fn append_u32(output: &mut Vec<u8>, value: u32, resource: &'static str) -> Result<(), OleError> {
+    append_bytes(output, &value.to_le_bytes(), resource)
+}
+
+fn append_u64(output: &mut Vec<u8>, value: u64, resource: &'static str) -> Result<(), OleError> {
+    append_bytes(output, &value.to_le_bytes(), resource)
+}
+
+fn try_path_refs(path: &[String]) -> Result<Vec<&str>, OleError> {
+    let mut refs = try_vec_with_capacity(path.len(), "property-set stream path")?;
+    refs.extend(path.iter().map(String::as_str));
+    Ok(refs)
+}
+
+fn checked_u32(value: usize, description: &str) -> Result<u32, OleError> {
+    u32::try_from(value).map_err(|_| invalid(format!("{description} exceeds u32")))
+}
+
+fn checked_add(value: usize, additional: usize, description: &str) -> Result<usize, OleError> {
+    value
+        .checked_add(additional)
+        .ok_or_else(|| invalid(format!("{description} overflow")))
+}
+
+fn checked_mul(value: usize, multiplier: usize, description: &str) -> Result<usize, OleError> {
+    value
+        .checked_mul(multiplier)
+        .ok_or_else(|| invalid(format!("{description} overflow")))
+}
+
+fn align4_len(value: usize, description: &str) -> Result<usize, OleError> {
+    checked_add(value, 3, description).map(|value| value & !3)
+}
+
+fn valid_property_identifier(identifier: u32) -> bool {
+    matches!(
+        identifier,
+        PID_DICTIONARY | PID_CODEPAGE | PID_LOCALE | PID_BEHAVIOR
+    ) || (2..=MAX_NAMED_PROPERTY_ID).contains(&identifier)
+}
+
+fn valid_named_property_identifier(identifier: u32) -> bool {
+    (2..=MAX_NAMED_PROPERTY_ID).contains(&identifier)
+}
+
+#[derive(Clone, Copy)]
+struct AsciiInsensitive<'a>(&'a str);
+
+impl PartialEq for AsciiInsensitive<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq_ignore_ascii_case(other.0)
+    }
+}
+
+impl Eq for AsciiInsensitive<'_> {}
+
+impl Hash for AsciiInsensitive<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_usize(self.0.len());
+        for byte in self.0.bytes() {
+            state.write_u8(byte.to_ascii_lowercase());
+        }
+    }
+}
 
 /// A serialized OLE GUID. The byte representation is preserved exactly as stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -149,13 +310,20 @@ impl PropertySet {
     }
 
     pub fn add(&mut self, identifier: u32, value: PropertyValue) -> Result<(), OleError> {
-        if matches!(identifier, PID_DICTIONARY | PID_CODEPAGE)
+        if !valid_property_identifier(identifier)
+            || matches!(identifier, PID_DICTIONARY | PID_CODEPAGE)
             || self.properties.contains_key(&identifier)
         {
             return Err(invalid(format!(
                 "Duplicate or reserved property identifier {identifier}"
             )));
         }
+        self.properties
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("property values", source))?;
+        self.property_order
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("property order", source))?;
         self.properties.insert(identifier, value);
         self.property_order.push(identifier);
         Ok(())
@@ -168,6 +336,11 @@ impl PropertySet {
         value: PropertyValue,
     ) -> Result<(), OleError> {
         validate_property_name(&name)?;
+        if !valid_named_property_identifier(identifier) {
+            return Err(invalid(format!(
+                "Named property identifier {identifier} is outside the normal property range"
+            )));
+        }
         if self
             .dictionary
             .values()
@@ -175,7 +348,30 @@ impl PropertySet {
         {
             return Err(invalid(format!("Duplicate property name '{name}'")));
         }
-        self.add(identifier, value)?;
+        if self.properties.contains_key(&identifier) {
+            return Err(invalid(format!(
+                "Duplicate or reserved property identifier {identifier}"
+            )));
+        }
+        self.properties
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("property values", source))?;
+        self.property_order
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("property order", source))?;
+        self.dictionary
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("property dictionary", source))?;
+        self.dictionary_order
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("dictionary order", source))?;
+        if !self.property_order.contains(&PID_DICTIONARY) {
+            self.property_order
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("property order", source))?;
+        }
+        self.properties.insert(identifier, value);
+        self.property_order.push(identifier);
         self.dictionary.insert(identifier, name);
         self.dictionary_order.push(identifier);
         if !self.property_order.contains(&PID_DICTIONARY) {
@@ -233,7 +429,7 @@ impl PropertySet {
     }
 
     pub fn rename(&mut self, identifier: u32, name: String) -> Result<(), OleError> {
-        if identifier == PID_CODEPAGE {
+        if identifier == PID_CODEPAGE || !valid_named_property_identifier(identifier) {
             return Err(invalid("PID 1 cannot be a named property"));
         }
         validate_property_name(&name)?;
@@ -247,6 +443,21 @@ impl PropertySet {
         if !self.properties.contains_key(&identifier) {
             return Err(invalid(format!("Property {identifier} does not exist")));
         }
+        if !self.dictionary.contains_key(&identifier) {
+            self.dictionary
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("property dictionary", source))?;
+        }
+        if !self.dictionary_order.contains(&identifier) {
+            self.dictionary_order
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("dictionary order", source))?;
+        }
+        if !self.property_order.contains(&PID_DICTIONARY) {
+            self.property_order
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("property order", source))?;
+        }
         self.dictionary.insert(identifier, name);
         if !self.dictionary_order.contains(&identifier) {
             self.dictionary_order.push(identifier);
@@ -258,14 +469,21 @@ impl PropertySet {
     }
 
     pub fn reorder(&mut self, order: &[u32]) -> Result<(), OleError> {
-        let current = self.property_order.iter().copied().collect::<HashSet<_>>();
-        let proposed = order.iter().copied().collect::<HashSet<_>>();
+        let current = try_hash_set_with_capacity(self.property_order.len(), "property order set")?;
+        let mut current = current;
+        for identifier in self.property_order.iter().copied() {
+            current.insert(identifier);
+        }
+        let mut proposed = try_hash_set_with_capacity(order.len(), "property reorder set")?;
+        for identifier in order.iter().copied() {
+            proposed.insert(identifier);
+        }
         if current != proposed || proposed.len() != order.len() {
             return Err(invalid(
                 "Property reorder must contain every identifier exactly once",
             ));
         }
-        self.property_order = order.to_vec();
+        self.property_order = try_clone_vec(order, "property order")?;
         Ok(())
     }
 
@@ -367,6 +585,84 @@ pub enum PropertyValue {
     Unknown { variant_type: u16, data: Vec<u8> },
 }
 
+fn try_clone_property_value(value: &PropertyValue) -> Result<PropertyValue, OleError> {
+    Ok(match value {
+        PropertyValue::Empty => PropertyValue::Empty,
+        PropertyValue::Null => PropertyValue::Null,
+        PropertyValue::I1(value) => PropertyValue::I1(*value),
+        PropertyValue::UI1(value) => PropertyValue::UI1(*value),
+        PropertyValue::I2(value) => PropertyValue::I2(*value),
+        PropertyValue::UI2(value) => PropertyValue::UI2(*value),
+        PropertyValue::I4(value) => PropertyValue::I4(*value),
+        PropertyValue::UI4(value) => PropertyValue::UI4(*value),
+        PropertyValue::I8(value) => PropertyValue::I8(*value),
+        PropertyValue::UI8(value) => PropertyValue::UI8(*value),
+        PropertyValue::Int(value) => PropertyValue::Int(*value),
+        PropertyValue::UInt(value) => PropertyValue::UInt(*value),
+        PropertyValue::R4(value) => PropertyValue::R4(*value),
+        PropertyValue::R8(value) => PropertyValue::R8(*value),
+        PropertyValue::Currency(value) => PropertyValue::Currency(*value),
+        PropertyValue::Date(value) => PropertyValue::Date(*value),
+        PropertyValue::Bstr(value) => {
+            PropertyValue::Bstr(try_clone_string(value, "property value string")?)
+        },
+        PropertyValue::Error(value) => PropertyValue::Error(*value),
+        PropertyValue::Bool(value) => PropertyValue::Bool(*value),
+        PropertyValue::Decimal(value) => PropertyValue::Decimal(*value),
+        PropertyValue::Lpstr(value) => {
+            PropertyValue::Lpstr(try_clone_string(value, "property value string")?)
+        },
+        PropertyValue::Lpwstr(value) => {
+            PropertyValue::Lpwstr(try_clone_string(value, "property value string")?)
+        },
+        PropertyValue::Filetime(value) => PropertyValue::Filetime(*value),
+        PropertyValue::Blob(value) => {
+            PropertyValue::Blob(try_copy_bytes(value, "property value blob")?)
+        },
+        PropertyValue::Clipboard { format, data } => PropertyValue::Clipboard {
+            format: *format,
+            data: try_copy_bytes(data, "property value clipboard data")?,
+        },
+        PropertyValue::Clsid(value) => PropertyValue::Clsid(*value),
+        PropertyValue::Vector(values) => {
+            let mut cloned = try_vec_with_capacity(values.len(), "property value vector")?;
+            for value in values {
+                cloned.push(try_clone_property_value(value)?);
+            }
+            PropertyValue::Vector(cloned)
+        },
+        PropertyValue::Unknown { variant_type, data } => PropertyValue::Unknown {
+            variant_type: *variant_type,
+            data: try_copy_bytes(data, "unknown property value")?,
+        },
+    })
+}
+
+fn try_clone_property_set(section: &PropertySet) -> Result<PropertySet, OleError> {
+    let mut dictionary =
+        try_hash_map_with_capacity(section.dictionary.len(), "property dictionary")?;
+    for (identifier, name) in &section.dictionary {
+        dictionary.insert(
+            *identifier,
+            try_clone_string(name, "property dictionary name")?,
+        );
+    }
+
+    let mut properties = try_hash_map_with_capacity(section.properties.len(), "property values")?;
+    for (identifier, value) in &section.properties {
+        properties.insert(*identifier, try_clone_property_value(value)?);
+    }
+
+    Ok(PropertySet {
+        format_identifier: section.format_identifier,
+        codepage: section.codepage,
+        dictionary,
+        properties,
+        property_order: try_clone_vec(&section.property_order, "property order")?,
+        dictionary_order: try_clone_vec(&section.dictionary_order, "dictionary order")?,
+    })
+}
+
 impl PropertySetStream {
     pub fn new(section: PropertySet) -> Self {
         Self {
@@ -405,13 +701,18 @@ impl PropertySetStream {
             .ok_or_else(|| invalid("Property Set descriptor table overflow"))?;
         checked_range(data, 0, descriptor_end, "descriptor table")?;
 
-        let mut descriptors = Vec::with_capacity(section_count);
-        let mut format_ids = HashSet::with_capacity(section_count);
-        let mut offsets = HashSet::with_capacity(section_count);
+        let mut descriptors = try_vec_with_capacity(section_count, "property-set descriptors")?;
+        let mut format_ids = try_hash_set_with_capacity(section_count, "property-set format IDs")?;
+        let mut offsets = try_hash_set_with_capacity(section_count, "property-set offsets")?;
         for index in 0..section_count {
-            let descriptor = PROPERTY_SET_HEADER_SIZE + index * SECTION_DESCRIPTOR_SIZE;
+            let descriptor = checked_add(
+                PROPERTY_SET_HEADER_SIZE,
+                checked_mul(index, SECTION_DESCRIPTOR_SIZE, "section descriptor")?,
+                "section descriptor",
+            )?;
             let format_identifier = read_guid(data, descriptor, "section format identifier")?;
-            let offset = usize::try_from(read_u32(data, descriptor + 16, "section offset")?)
+            let offset_field = checked_add(descriptor, 16, "section descriptor")?;
+            let offset = usize::try_from(read_u32(data, offset_field, "section offset")?)
                 .map_err(|_| invalid("Property Set section offset is too large"))?;
             if offset < descriptor_end || offset % 4 != 0 || offset >= data.len() {
                 return Err(invalid(format!(
@@ -430,16 +731,14 @@ impl PropertySetStream {
             descriptors.push((format_identifier, offset, end));
         }
 
-        let mut ranges: Vec<(usize, usize)> = descriptors
-            .iter()
-            .map(|(_, start, end)| (*start, *end))
-            .collect();
+        let mut ranges = try_vec_with_capacity(descriptors.len(), "property-set section ranges")?;
+        ranges.extend(descriptors.iter().map(|(_, start, end)| (*start, *end)));
         ranges.sort_unstable();
         if ranges.windows(2).any(|pair| pair[1].0 < pair[0].1) {
             return Err(invalid("Property Set sections overlap"));
         }
 
-        let mut sections = Vec::with_capacity(section_count);
+        let mut sections = try_vec_with_capacity(section_count, "property-set sections")?;
         for (format_identifier, start, end) in descriptors {
             sections.push(parse_section(&data[start..end], format_identifier)?);
         }
@@ -465,6 +764,9 @@ impl PropertySetStream {
         if self.sections.len() == 2 || self.section(section.format_identifier).is_some() {
             return Err(invalid("Duplicate or excess Property Set section"));
         }
+        self.sections
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("property-set sections", source))?;
         self.sections.push(section);
         Ok(())
     }
@@ -476,19 +778,24 @@ impl PropertySetStream {
         Some(self.sections.remove(index))
     }
     pub fn reorder_sections(&mut self, order: &[PropertySetGuid]) -> Result<(), OleError> {
-        if order.len() != self.sections.len()
-            || order.iter().copied().collect::<HashSet<_>>().len() != order.len()
-        {
+        if order.len() != self.sections.len() {
             return Err(invalid("Section reorder is incomplete or duplicated"));
         }
-        let mut reordered = Vec::with_capacity(order.len());
+        let mut proposed = try_hash_set_with_capacity(order.len(), "section reorder set")?;
+        for identifier in order.iter().copied() {
+            proposed.insert(identifier);
+        }
+        if proposed.len() != order.len() {
+            return Err(invalid("Section reorder is incomplete or duplicated"));
+        }
+        let mut reordered = try_vec_with_capacity(order.len(), "property-set sections")?;
         for id in order {
             let index = self
                 .sections
                 .iter()
                 .position(|section| section.format_identifier == *id)
                 .ok_or_else(|| invalid("Section reorder references an unknown format ID"))?;
-            reordered.push(self.sections[index].clone())
+            reordered.push(try_clone_property_set(&self.sections[index])?);
         }
         self.sections = reordered;
         Ok(())
@@ -545,7 +852,8 @@ pub struct OlePropertySetEditor {
 
 impl OlePropertySetEditor {
     pub fn new(bytes: Vec<u8>) -> Result<Self, OleError> {
-        let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
+        let original = try_copy_bytes(&bytes, "property-set editor source")?;
+        let mut ole = OleFile::open(Cursor::new(bytes))?;
         let paths = ole.list_streams();
         if paths.iter().flatten().any(|name| {
             matches!(
@@ -557,16 +865,14 @@ impl OlePropertySetEditor {
                 "Property Set mutation is not permitted on encrypted or signed containers",
             ));
         }
-        let mut streams = Vec::with_capacity(paths.len());
+        let mut streams = try_vec_with_capacity(paths.len(), "property-set editor streams")?;
         for path in paths {
-            let data = {
-                let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
-                ole.open_stream(&refs)?
-            };
+            let refs = try_path_refs(&path)?;
+            let data = ole.open_stream(&refs)?;
             streams.push((path, data));
         }
         Ok(Self {
-            original: bytes,
+            original,
             streams,
             staged: HashMap::new(),
         })
@@ -576,7 +882,10 @@ impl OlePropertySetEditor {
         let Some(stream) = self.load_stream(kind)? else {
             return Ok(None);
         };
-        Ok(stream.section(kind.format_id()).cloned())
+        stream
+            .section(kind.format_id())
+            .map(try_clone_property_set)
+            .transpose()
     }
 
     pub fn update<F>(&mut self, kind: StandardPropertySet, edit: F) -> Result<(), OleError>
@@ -596,13 +905,13 @@ impl OlePropertySetEditor {
         }
         let section = stream
             .section_mut(kind.format_id())
-            .expect("section inserted");
-        let mut candidate = section.clone();
+            .ok_or_else(|| invalid("Property Set section was not available after insertion"))?;
+        let mut candidate = try_clone_property_set(section)?;
         edit(&mut candidate)?;
         validate_section(&candidate)?;
         *section = candidate;
         let bytes = stream.to_bytes()?;
-        self.staged.insert(kind.path().to_string(), Some(bytes));
+        self.stage(kind, Some(bytes))?;
         Ok(())
     }
 
@@ -629,12 +938,13 @@ impl OlePropertySetEditor {
             return Ok(None);
         };
         if kind == StandardPropertySet::UserDefinedProperties {
-            let mut stream = self.load_stream(kind)?.expect("property existed");
+            let mut stream = self
+                .load_stream(kind)?
+                .ok_or_else(|| invalid("Property Set stream disappeared during removal"))?;
             stream.remove_section(USER_DEFINED_PROPERTIES_FMTID);
-            self.staged
-                .insert(kind.path().to_string(), Some(stream.to_bytes()?));
+            self.stage(kind, Some(stream.to_bytes()?))?;
         } else {
-            self.staged.insert(kind.path().to_string(), None);
+            self.stage(kind, None)?;
         }
         Ok(Some(previous))
     }
@@ -644,28 +954,48 @@ impl OlePropertySetEditor {
             return Ok(self.original);
         }
         let mut writer = OleWriter::new();
-        let mut written = HashSet::new();
-        for (path, data) in self.streams {
-            let key = path.last().cloned().unwrap_or_default();
-            let replacement = self.staged.get(&key);
+        let written_capacity = self
+            .streams
+            .len()
+            .checked_add(self.staged.len())
+            .ok_or_else(|| invalid("written Property Set stream count overflow"))?;
+        let mut written = try_hash_set_with_capacity(written_capacity, "written streams")?;
+        for (path, data) in &self.streams {
+            let key = path.last().map(String::as_str).unwrap_or_default();
+            let replacement = self.staged.get(key);
             if replacement.is_some_and(Option::is_none) {
                 continue;
             }
-            let bytes = replacement.and_then(Option::as_ref).unwrap_or(&data);
-            let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let bytes = replacement.and_then(Option::as_ref).unwrap_or(data);
+            let refs = try_path_refs(path)?;
             writer.create_stream(&refs, bytes)?;
             written.insert(key);
         }
         for (path, replacement) in &self.staged {
-            if !written.contains(path)
+            if !written.contains(path.as_str())
                 && let Some(data) = replacement
             {
-                writer.create_stream(&[path], data)?;
+                writer.create_stream(&[path.as_str()], data)?;
             }
         }
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output)?;
         Ok(output.into_inner())
+    }
+
+    fn stage(
+        &mut self,
+        kind: StandardPropertySet,
+        replacement: Option<Vec<u8>>,
+    ) -> Result<(), OleError> {
+        let key = try_clone_string(kind.path(), "staged property-set stream path")?;
+        if !self.staged.contains_key(kind.path()) {
+            self.staged
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("staged property-set streams", source))?;
+        }
+        self.staged.insert(key, replacement);
+        Ok(())
     }
 
     fn load_stream(
@@ -699,24 +1029,25 @@ fn validate_section(section: &PropertySet) -> Result<(), OleError> {
     if section.properties.len() > MAX_PROPERTY_COUNT {
         return Err(invalid("Property count exceeds safety limit"));
     }
-    if section
-        .dictionary
-        .values()
-        .collect::<Vec<_>>()
-        .iter()
-        .enumerate()
-        .any(|(index, name)| {
-            section
-                .dictionary
-                .values()
-                .skip(index + 1)
-                .any(|other| name.eq_ignore_ascii_case(other))
-        })
-    {
-        return Err(invalid("Duplicate dictionary property name"));
+    for identifier in section.properties.keys() {
+        if !valid_property_identifier(*identifier) {
+            return Err(invalid(format!(
+                "Property identifier {identifier} is outside the Property Set range"
+            )));
+        }
     }
+    let mut names =
+        try_hash_set_with_capacity(section.dictionary.len(), "property dictionary names")?;
     for (identifier, name) in &section.dictionary {
+        if !valid_named_property_identifier(*identifier) {
+            return Err(invalid(format!(
+                "Dictionary property identifier {identifier} is outside the normal range"
+            )));
+        }
         validate_property_name(name)?;
+        if !names.insert(AsciiInsensitive(name)) {
+            return Err(invalid("Duplicate dictionary property name"));
+        }
         if !section.properties.contains_key(identifier) {
             return Err(invalid("Dictionary references a missing property"));
         }
@@ -735,55 +1066,66 @@ fn serialize_property_set_stream(stream: &PropertySetStream) -> Result<Vec<u8>, 
             "Property Set must have version zero and one or two sections",
         ));
     }
-    let mut ids = HashSet::new();
+    let mut ids = try_hash_set_with_capacity(stream.sections.len(), "property-set format IDs")?;
     for section in &stream.sections {
         if !ids.insert(section.format_identifier) {
             return Err(invalid("Duplicate section format identifier"));
         }
         validate_section(section)?
     }
-    let descriptor_end = PROPERTY_SET_HEADER_SIZE + stream.sections.len() * SECTION_DESCRIPTOR_SIZE;
-    let mut sections = Vec::new();
+    let descriptor_end = checked_add(
+        PROPERTY_SET_HEADER_SIZE,
+        checked_mul(
+            stream.sections.len(),
+            SECTION_DESCRIPTOR_SIZE,
+            "Property Set descriptor table",
+        )?,
+        "Property Set descriptor table",
+    )?;
+    let mut sections = try_vec_with_capacity(stream.sections.len(), "serialized sections")?;
     for section in &stream.sections {
         sections.push(serialize_section(section)?)
     }
-    let mut offsets = Vec::new();
-    let mut cursor = align4_len(descriptor_end);
+    let descriptor_size = align4_len(descriptor_end, "Property Set descriptor table")?;
+    let mut offsets = try_vec_with_capacity(sections.len(), "section offsets")?;
+    let mut cursor = descriptor_size;
     for section in &sections {
         offsets.push(cursor);
         cursor = align4_len(
-            cursor
-                .checked_add(section.len())
-                .ok_or_else(|| invalid("Property Set size overflow"))?,
-        )
+            checked_add(cursor, section.len(), "Property Set size")?,
+            "Property Set size",
+        )?;
     }
-    let mut out = vec![0u8; align4_len(descriptor_end)];
+    let mut out = try_zeroed_vec(cursor, "serialized Property Set stream")?;
     out[0..2].copy_from_slice(&0xfffeu16.to_le_bytes());
     out[2..4].copy_from_slice(&stream.version.to_le_bytes());
     out[4..8].copy_from_slice(&stream.system_identifier.to_le_bytes());
     out[8..24].copy_from_slice(stream.class_identifier.as_bytes());
-    out[24..28].copy_from_slice(&(stream.sections.len() as u32).to_le_bytes());
+    out[24..28]
+        .copy_from_slice(&checked_u32(stream.sections.len(), "section count")?.to_le_bytes());
     for (index, section) in stream.sections.iter().enumerate() {
-        let base = PROPERTY_SET_HEADER_SIZE + index * SECTION_DESCRIPTOR_SIZE;
+        let base = checked_add(
+            PROPERTY_SET_HEADER_SIZE,
+            checked_mul(index, SECTION_DESCRIPTOR_SIZE, "section descriptor")?,
+            "section descriptor",
+        )?;
         out[base..base + 16].copy_from_slice(section.format_identifier.as_bytes());
-        out[base + 16..base + 20].copy_from_slice(
-            &u32::try_from(offsets[index])
-                .map_err(|_| invalid("Section offset overflow"))?
-                .to_le_bytes(),
-        )
+        out[base + 16..base + 20]
+            .copy_from_slice(&checked_u32(offsets[index], "Section offset")?.to_le_bytes())
     }
-    for (index, section) in sections.into_iter().enumerate() {
-        out.resize(offsets[index], 0);
-        out.extend_from_slice(&section);
-        while !out.len().is_multiple_of(4) {
-            out.push(0)
-        }
+    for (index, section) in sections.iter().enumerate() {
+        let start = offsets[index];
+        let end = checked_add(start, section.len(), "Property Set section")?;
+        out[start..end].copy_from_slice(section);
     }
     Ok(out)
 }
 
 fn serialize_section(section: &PropertySet) -> Result<Vec<u8>, OleError> {
-    let mut order = section.property_order.clone();
+    let mut order = try_clone_vec(&section.property_order, "property order")?;
+    order
+        .try_reserve(section.properties.len())
+        .map_err(|source| OleError::allocation("property order", source))?;
     if !section.dictionary.is_empty() && !order.contains(&PID_DICTIONARY) {
         order.insert(0, PID_DICTIONARY)
     }
@@ -796,11 +1138,23 @@ fn serialize_section(section: &PropertySet) -> Result<Vec<u8>, OleError> {
         *id == PID_DICTIONARY && !section.dictionary.is_empty()
             || section.properties.contains_key(id)
     });
-    if order.iter().copied().collect::<HashSet<_>>().len() != order.len() {
+    let mut order_ids = try_hash_set_with_capacity(order.len(), "property order set")?;
+    for identifier in order.iter().copied() {
+        order_ids.insert(identifier);
+    }
+    if order_ids.len() != order.len() {
         return Err(invalid("Duplicate property order identifier"));
     }
-    let table_end = SECTION_HEADER_SIZE + order.len() * PROPERTY_DESCRIPTOR_SIZE;
-    let mut values = Vec::new();
+    let table_end = checked_add(
+        SECTION_HEADER_SIZE,
+        checked_mul(
+            order.len(),
+            PROPERTY_DESCRIPTOR_SIZE,
+            "property descriptor table",
+        )?,
+        "property descriptor table",
+    )?;
+    let mut values = try_vec_with_capacity(order.len(), "serialized property values")?;
     let codepage = section.codepage.unwrap_or(CodePage::WINDOWS_1252).id();
     for id in &order {
         values.push(if *id == PID_DICTIONARY {
@@ -813,75 +1167,91 @@ fn serialize_section(section: &PropertySet) -> Result<Vec<u8>, OleError> {
             serialize_typed(value, codepage)?
         })
     }
-    let mut offsets = Vec::new();
-    let mut cursor = align4_len(table_end);
+    let table_size = align4_len(table_end, "property descriptor table")?;
+    let mut offsets = try_vec_with_capacity(values.len(), "property offsets")?;
+    let mut cursor = table_size;
     for value in &values {
         offsets.push(cursor);
         cursor = align4_len(
-            cursor
-                .checked_add(value.len())
-                .ok_or_else(|| invalid("Section size overflow"))?,
-        )
+            checked_add(cursor, value.len(), "Property Set section size")?,
+            "Property Set section size",
+        )?;
     }
-    let mut out = vec![0u8; align4_len(table_end)];
-    out[4..8].copy_from_slice(&(order.len() as u32).to_le_bytes());
+    let mut out = try_zeroed_vec(cursor, "serialized Property Set section")?;
+    out[4..8].copy_from_slice(&checked_u32(order.len(), "property count")?.to_le_bytes());
     for (index, id) in order.iter().enumerate() {
-        let base = SECTION_HEADER_SIZE + index * PROPERTY_DESCRIPTOR_SIZE;
+        let base = checked_add(
+            SECTION_HEADER_SIZE,
+            checked_mul(index, PROPERTY_DESCRIPTOR_SIZE, "property descriptor")?,
+            "property descriptor",
+        )?;
         out[base..base + 4].copy_from_slice(&id.to_le_bytes());
-        out[base + 4..base + 8].copy_from_slice(
-            &u32::try_from(offsets[index])
-                .map_err(|_| invalid("Property offset overflow"))?
-                .to_le_bytes(),
-        )
+        out[base + 4..base + 8]
+            .copy_from_slice(&checked_u32(offsets[index], "Property offset")?.to_le_bytes())
     }
-    for (index, value) in values.into_iter().enumerate() {
-        out.resize(offsets[index], 0);
-        out.extend_from_slice(&value);
-        while !out.len().is_multiple_of(4) {
-            out.push(0)
-        }
+    for (index, value) in values.iter().enumerate() {
+        let start = offsets[index];
+        let end = checked_add(start, value.len(), "Property Set value")?;
+        out[start..end].copy_from_slice(value);
     }
-    let section_len = u32::try_from(out.len()).map_err(|_| invalid("Section length overflow"))?;
+    let section_len = checked_u32(out.len(), "Section length")?;
     out[0..4].copy_from_slice(&section_len.to_le_bytes());
     Ok(out)
 }
 
 fn serialize_dictionary(section: &PropertySet, codepage: u16) -> Result<Vec<u8>, OleError> {
-    let mut order = section.dictionary_order.clone();
+    let mut order = try_clone_vec(&section.dictionary_order, "dictionary order")?;
+    order
+        .try_reserve(section.dictionary.len())
+        .map_err(|source| OleError::allocation("dictionary order", source))?;
     for id in section.dictionary.keys() {
         if !order.contains(id) {
             order.push(*id)
         }
     }
     order.retain(|id| section.dictionary.contains_key(id));
-    if order.iter().copied().collect::<HashSet<_>>().len() != order.len() {
+    let mut order_ids = try_hash_set_with_capacity(order.len(), "dictionary order set")?;
+    for identifier in order.iter().copied() {
+        order_ids.insert(identifier);
+    }
+    if order_ids.len() != order.len() {
         return Err(invalid("Duplicate dictionary order identifier"));
     }
-    let mut out = (order.len() as u32).to_le_bytes().to_vec();
+    let mut out = try_vec_with_capacity(4, "serialized property dictionary")?;
+    append_u32(
+        &mut out,
+        checked_u32(order.len(), "dictionary entry count")?,
+        "serialized property dictionary",
+    )?;
     for id in order {
-        let name = &section.dictionary[&id];
-        out.extend_from_slice(&id.to_le_bytes());
+        let name = section
+            .dictionary
+            .get(&id)
+            .ok_or_else(|| invalid(format!("Dictionary order references missing PID {id}")))?;
+        append_u32(&mut out, id, "serialized property dictionary")?;
         if codepage == UNICODE_CODEPAGE {
-            let units = name.encode_utf16().collect::<Vec<_>>();
-            out.extend_from_slice(
-                &u32::try_from(units.len() + 1)
-                    .map_err(|_| invalid("Dictionary name too long"))?
-                    .to_le_bytes(),
-            );
-            for unit in units {
-                out.extend_from_slice(&unit.to_le_bytes())
+            let units = checked_add(name.encode_utf16().count(), 1, "Dictionary name length")?;
+            let byte_len = checked_mul(units, 2, "Dictionary name length")?;
+            append_u32(
+                &mut out,
+                checked_u32(units, "Dictionary name length")?,
+                "serialized property dictionary",
+            )?;
+            reserve_bytes(&mut out, byte_len, "serialized property dictionary")?;
+            for unit in name.encode_utf16() {
+                out.extend_from_slice(&unit.to_le_bytes());
             }
             out.extend_from_slice(&0u16.to_le_bytes());
-            while !out.len().is_multiple_of(4) {
-                out.push(0)
-            }
+            pad4(&mut out)?;
         } else {
             let bytes = encode_ansi(name, codepage)?;
-            out.extend_from_slice(
-                &u32::try_from(bytes.len() + 1)
-                    .map_err(|_| invalid("Dictionary name too long"))?
-                    .to_le_bytes(),
-            );
+            let byte_len = checked_add(bytes.len(), 1, "Dictionary name length")?;
+            append_u32(
+                &mut out,
+                checked_u32(byte_len, "Dictionary name length")?,
+                "serialized property dictionary",
+            )?;
+            reserve_bytes(&mut out, byte_len, "serialized property dictionary")?;
             out.extend_from_slice(&bytes);
             out.push(0)
         }
@@ -890,14 +1260,14 @@ fn serialize_dictionary(section: &PropertySet, codepage: u16) -> Result<Vec<u8>,
 }
 
 fn serialize_typed(value: &PropertyValue, codepage: u16) -> Result<Vec<u8>, OleError> {
-    let mut out = Vec::new();
+    let mut out = try_vec_with_capacity(4, "serialized property value")?;
     append_typed(&mut out, value, codepage)?;
     Ok(out)
 }
 fn append_typed(out: &mut Vec<u8>, value: &PropertyValue, codepage: u16) -> Result<(), OleError> {
     let vt = variant_type(value);
-    out.extend_from_slice(&vt.to_le_bytes());
-    out.extend_from_slice(&0u16.to_le_bytes());
+    append_u16(out, vt, "serialized property value")?;
+    append_u16(out, 0, "serialized property value")?;
     append_body(out, value, codepage)?;
     Ok(())
 }
@@ -936,82 +1306,125 @@ fn variant_type(value: &PropertyValue) -> u16 {
 fn append_body(out: &mut Vec<u8>, value: &PropertyValue, codepage: u16) -> Result<(), OleError> {
     match value {
         PropertyValue::Empty | PropertyValue::Null => {},
-        PropertyValue::I1(v) => out.push(*v as u8),
-        PropertyValue::UI1(v) => out.push(*v),
-        PropertyValue::I2(v) => out.extend_from_slice(&v.to_le_bytes()),
-        PropertyValue::UI2(v) => out.extend_from_slice(&v.to_le_bytes()),
-        PropertyValue::I4(v) | PropertyValue::Int(v) => out.extend_from_slice(&v.to_le_bytes()),
+        PropertyValue::I1(v) => append_bytes(out, &[*v as u8], "serialized property value")?,
+        PropertyValue::UI1(v) => append_bytes(out, &[*v], "serialized property value")?,
+        PropertyValue::I2(v) => append_bytes(out, &v.to_le_bytes(), "serialized property value")?,
+        PropertyValue::UI2(v) => append_bytes(out, &v.to_le_bytes(), "serialized property value")?,
+        PropertyValue::I4(v) | PropertyValue::Int(v) => {
+            append_bytes(out, &v.to_le_bytes(), "serialized property value")?
+        },
         PropertyValue::UI4(v) | PropertyValue::UInt(v) | PropertyValue::Error(v) => {
-            out.extend_from_slice(&v.to_le_bytes())
+            append_u32(out, *v, "serialized property value")?
         },
         PropertyValue::I8(v) | PropertyValue::Currency(v) => {
-            out.extend_from_slice(&v.to_le_bytes())
+            append_bytes(out, &v.to_le_bytes(), "serialized property value")?
         },
         PropertyValue::UI8(v) | PropertyValue::Filetime(v) => {
-            out.extend_from_slice(&v.to_le_bytes())
+            append_u64(out, *v, "serialized property value")?
         },
-        PropertyValue::R4(v) => out.extend_from_slice(&v.to_bits().to_le_bytes()),
+        PropertyValue::R4(v) => append_u32(out, v.to_bits(), "serialized property value")?,
         PropertyValue::R8(v) | PropertyValue::Date(v) => {
-            out.extend_from_slice(&v.to_bits().to_le_bytes())
+            append_u64(out, v.to_bits(), "serialized property value")?
         },
-        PropertyValue::Bool(v) => {
-            out.extend_from_slice(&(if *v { -1i16 } else { 0 }).to_le_bytes())
-        },
-        PropertyValue::Decimal(v) => out.extend_from_slice(v),
+        PropertyValue::Bool(v) => append_bytes(
+            out,
+            &(if *v { -1i16 } else { 0 }).to_le_bytes(),
+            "serialized property value",
+        )?,
+        PropertyValue::Decimal(v) => append_bytes(out, v, "serialized property value")?,
         PropertyValue::Bstr(v) | PropertyValue::Lpstr(v) => {
             append_codepage_string(out, v, codepage)?
         },
         PropertyValue::Lpwstr(v) => {
-            let units = v.encode_utf16().collect::<Vec<_>>();
-            out.extend_from_slice(&(units.len() as u32 + 1).to_le_bytes());
-            for unit in units {
-                out.extend_from_slice(&unit.to_le_bytes())
+            let units = checked_add(v.encode_utf16().count(), 1, "LPWSTR length")?;
+            let byte_len = checked_mul(units, 2, "LPWSTR length")?;
+            append_u32(
+                out,
+                checked_u32(units, "LPWSTR length")?,
+                "serialized property value",
+            )?;
+            reserve_bytes(out, byte_len, "serialized property value")?;
+            for unit in v.encode_utf16() {
+                out.extend_from_slice(&unit.to_le_bytes());
             }
-            out.extend_from_slice(&0u16.to_le_bytes())
+            out.extend_from_slice(&0u16.to_le_bytes());
         },
         PropertyValue::Blob(v) => {
-            out.extend_from_slice(&(v.len() as u32).to_le_bytes());
-            out.extend_from_slice(v);
-            pad4(out)
+            append_u32(
+                out,
+                checked_u32(v.len(), "Blob size")?,
+                "serialized property value",
+            )?;
+            append_bytes(out, v, "serialized property value")?;
+            pad4(out)?;
         },
         PropertyValue::Clipboard { format, data } => {
-            out.extend_from_slice(&(data.len() as u32 + 4).to_le_bytes());
-            out.extend_from_slice(&format.to_le_bytes());
-            out.extend_from_slice(data);
-            pad4(out)
+            let size = checked_add(data.len(), 4, "Clipboard size")?;
+            append_u32(
+                out,
+                checked_u32(size, "Clipboard size")?,
+                "serialized property value",
+            )?;
+            append_bytes(out, &format.to_le_bytes(), "serialized property value")?;
+            append_bytes(out, data, "serialized property value")?;
+            pad4(out)?;
         },
-        PropertyValue::Clsid(v) => out.extend_from_slice(v.as_bytes()),
+        PropertyValue::Clsid(v) => append_bytes(out, v.as_bytes(), "serialized property value")?,
         PropertyValue::Vector(values) => {
             if values.len() > MAX_VECTOR_ELEMENTS {
                 return Err(invalid("Vector exceeds safety limit"));
             }
-            out.extend_from_slice(&(values.len() as u32).to_le_bytes());
+            append_u32(
+                out,
+                checked_u32(values.len(), "Vector element count")?,
+                "serialized property value",
+            )?;
             for value in values {
                 append_typed(out, value, codepage)?;
-                pad4(out)
+                pad4(out)?;
             }
         },
-        PropertyValue::Unknown { data, .. } => out.extend_from_slice(data),
+        PropertyValue::Unknown { data, .. } => {
+            append_bytes(out, data, "serialized property value")?
+        },
     }
     Ok(())
 }
 fn append_codepage_string(out: &mut Vec<u8>, value: &str, codepage: u16) -> Result<(), OleError> {
-    let mut bytes = if codepage == UNICODE_CODEPAGE {
-        value
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect::<Vec<_>>()
-    } else {
-        encode_ansi(value, codepage)?
-    };
     if codepage == UNICODE_CODEPAGE {
-        bytes.extend_from_slice(&[0, 0])
+        let units = checked_add(value.encode_utf16().count(), 1, "CodePageString length")?;
+        let byte_len = checked_mul(units, 2, "CodePageString length")?;
+        append_u32(
+            out,
+            checked_u32(byte_len, "CodePageString length")?,
+            "serialized CodePageString",
+        )?;
+        reserve_bytes(out, byte_len, "serialized CodePageString")?;
+        for unit in value.encode_utf16() {
+            out.extend_from_slice(&unit.to_le_bytes());
+        }
+        out.extend_from_slice(&[0, 0]);
     } else {
-        bytes.push(0)
+        let bytes = encode_ansi(value, codepage)?;
+        let byte_len = checked_add(bytes.len(), 1, "CodePageString length")?;
+        append_u32(
+            out,
+            checked_u32(byte_len, "CodePageString length")?,
+            "serialized CodePageString",
+        )?;
+        reserve_bytes(out, byte_len, "serialized CodePageString")?;
+        out.extend_from_slice(&bytes);
+        out.push(0);
     }
-    out.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
-    out.extend_from_slice(&bytes);
-    pad4(out);
+    pad4(out)?;
+    Ok(())
+}
+fn pad4(out: &mut Vec<u8>) -> Result<(), OleError> {
+    let padding = (4 - (out.len() & 3)) & 3;
+    reserve_bytes(out, padding, "serialized property padding")?;
+    for _ in 0..padding {
+        out.push(0);
+    }
     Ok(())
 }
 fn encode_ansi(value: &str, codepage: u16) -> Result<Vec<u8>, OleError> {
@@ -1020,15 +1433,6 @@ fn encode_ansi(value: &str, codepage: u16) -> Result<Vec<u8>, OleError> {
         .map(Cow::into_owned)
         .map_err(|error| invalid(error.to_string()))
 }
-fn align4_len(value: usize) -> usize {
-    (value + 3) & !3
-}
-fn pad4(out: &mut Vec<u8>) {
-    while !out.len().is_multiple_of(4) {
-        out.push(0)
-    }
-}
-
 impl<R: Read + Seek> OleFile<R> {
     /// Strictly parse a Property Set stream at `path`.
     pub fn property_set_stream(&mut self, path: &[&str]) -> Result<PropertySetStream, OleError> {
@@ -1045,7 +1449,7 @@ impl<R: Read + Seek> OleFile<R> {
                     .sections
                     .first()
                     .ok_or_else(|| invalid("SummaryInformation has no section"))?;
-                extract_summary_info(&mut metadata, section);
+                extract_summary_info(&mut metadata, section)?;
             },
             Err(OleError::StreamNotFound) => {},
             Err(error) => return Err(error),
@@ -1056,18 +1460,21 @@ impl<R: Read + Seek> OleFile<R> {
                     .sections
                     .first()
                     .ok_or_else(|| invalid("DocumentSummaryInformation has no section"))?;
-                extract_document_summary_info(&mut metadata, section);
+                extract_document_summary_info(&mut metadata, section)?;
                 for custom_section in stream.sections.iter().skip(1) {
+                    metadata
+                        .custom_properties
+                        .try_reserve(custom_section.dictionary.len())
+                        .map_err(|source| OleError::allocation("custom properties", source))?;
                     for (name, value) in custom_section.named_properties() {
-                        if metadata
-                            .custom_properties
-                            .insert(name.to_string(), value.clone())
-                            .is_some()
-                        {
+                        if metadata.custom_properties.contains_key(name) {
                             return Err(invalid(format!(
                                 "Duplicate custom property name '{name}'"
                             )));
                         }
+                        let name = try_clone_string(name, "custom property name")?;
+                        let value = try_clone_property_value(value)?;
+                        metadata.custom_properties.insert(name, value);
                     }
                 }
             },
@@ -1102,13 +1509,23 @@ fn parse_section(data: &[u8], format_identifier: PropertySetGuid) -> Result<Prop
         return Err(invalid("Property table exceeds its section"));
     }
 
-    let mut identifiers = HashSet::with_capacity(property_count);
-    let mut offsets = HashSet::with_capacity(property_count);
-    let mut descriptors = Vec::with_capacity(property_count);
+    let mut identifiers = try_hash_set_with_capacity(property_count, "property identifiers")?;
+    let mut offsets = try_hash_set_with_capacity(property_count, "property offsets")?;
+    let mut descriptors = try_vec_with_capacity(property_count, "property descriptors")?;
     for index in 0..property_count {
-        let descriptor = SECTION_HEADER_SIZE + index * PROPERTY_DESCRIPTOR_SIZE;
+        let descriptor = checked_add(
+            SECTION_HEADER_SIZE,
+            checked_mul(index, PROPERTY_DESCRIPTOR_SIZE, "property descriptor")?,
+            "property descriptor",
+        )?;
         let identifier = read_u32(data, descriptor, "property identifier")?;
-        let offset = usize::try_from(read_u32(data, descriptor + 4, "property offset")?)
+        if !valid_property_identifier(identifier) {
+            return Err(invalid(format!(
+                "Property identifier {identifier} is outside the Property Set range"
+            )));
+        }
+        let offset_field = checked_add(descriptor, 4, "property descriptor")?;
+        let offset = usize::try_from(read_u32(data, offset_field, "property offset")?)
             .map_err(|_| invalid("Property offset is too large"))?;
         // Older Office producers emit valid properties at non-DWORD offsets.
         // Bounds and uniqueness remain mandatory, but alignment is advisory.
@@ -1163,7 +1580,8 @@ fn parse_section(data: &[u8], format_identifier: PropertySetGuid) -> Result<Prop
         Some((offset, bytes)) => parse_dictionary(bytes, effective_codepage, offset)?,
         None => (HashMap::new(), Vec::new()),
     };
-    let mut properties = HashMap::with_capacity(property_count.saturating_sub(1));
+    let mut properties =
+        try_hash_map_with_capacity(property_count.saturating_sub(1), "property values")?;
     if let Some(value) = codepage_value {
         properties.insert(PID_CODEPAGE, value);
     }
@@ -1182,17 +1600,18 @@ fn parse_section(data: &[u8], format_identifier: PropertySetGuid) -> Result<Prop
         })?;
         properties.insert(*identifier, value);
     }
-    Ok(PropertySet {
+    let mut property_order = try_vec_with_capacity(descriptors.len(), "property order")?;
+    property_order.extend(descriptors.iter().map(|(_, identifier)| *identifier));
+    let section = PropertySet {
         format_identifier,
         codepage,
         dictionary,
         properties,
-        property_order: descriptors
-            .iter()
-            .map(|(_, identifier)| *identifier)
-            .collect(),
+        property_order,
         dictionary_order,
-    })
+    };
+    validate_section(&section)?;
+    Ok(section)
 }
 
 fn parse_dictionary(
@@ -1203,13 +1622,23 @@ fn parse_dictionary(
     let mut reader = ValueReader::new(data, property_offset);
     let count = usize::try_from(reader.read_u32("dictionary count")?)
         .map_err(|_| invalid("Dictionary count is too large"))?;
+    if count > MAX_PROPERTY_COUNT {
+        return Err(invalid(format!(
+            "Dictionary count {count} exceeds the safety limit"
+        )));
+    }
     if count > reader.remaining_len() / 8 {
         return Err(invalid("Dictionary count exceeds its property range"));
     }
-    let mut dictionary = HashMap::with_capacity(count);
-    let mut order = Vec::with_capacity(count);
+    let mut dictionary = try_hash_map_with_capacity(count, "property dictionary")?;
+    let mut order = try_vec_with_capacity(count, "dictionary order")?;
     for _ in 0..count {
         let identifier = reader.read_u32("dictionary property identifier")?;
+        if !valid_named_property_identifier(identifier) {
+            return Err(invalid(format!(
+                "Dictionary property identifier {identifier} is outside the normal range"
+            )));
+        }
         let length = usize::try_from(reader.read_u32("dictionary string length")?)
             .map_err(|_| invalid("Dictionary string length is too large"))?;
         if length == 0 {
@@ -1257,11 +1686,19 @@ fn parse_typed_property(
     if read_u16(data, 2, "property reserved field")? != 0 {
         return Err(invalid("Typed property reserved field must be zero"));
     }
-    let mut reader = ValueReader::new(&data[4..], property_offset + 4);
+    let value_offset = property_offset
+        .checked_add(4)
+        .ok_or_else(|| invalid("Property value offset overflow"))?;
+    let mut reader = ValueReader::new(&data[4..], value_offset);
     let value = parse_value_body(&mut reader, variant_type, codepage, 0)?;
-    if reader.remaining_len() <= 3 {
-        // Some producers retain up to three opaque bytes after a zero-length
-        // top-level value. The property offset table still bounds the value.
+    let allows_opaque_tail = matches!(
+        variant_type,
+        VT_EMPTY | VT_NULL | VT_BSTR | VT_LPSTR | VT_LPWSTR
+    );
+    if reader.remaining_len() <= 3 && allows_opaque_tail {
+        // Some producers retain up to three opaque bytes after a top-level
+        // value, especially when a non-DWORD property offset is used. The
+        // property offset table still bounds the value.
         reader.take_remaining();
     } else {
         reader
@@ -1295,7 +1732,7 @@ fn parse_value_body(
             }
             return Ok(PropertyValue::Unknown {
                 variant_type,
-                data: reader.take_remaining().to_vec(),
+                data: try_copy_bytes(reader.take_remaining(), "unknown vector property")?,
             });
         }
         return parse_vector(reader, base_type, codepage, depth + 1);
@@ -1330,13 +1767,15 @@ fn parse_value_body(
             depth == 0,
         )?)),
         VT_ERROR => Ok(PropertyValue::Error(reader.read_u32("ERROR value")?)),
+        // Office producers sometimes use 1 for TRUE even though VARIANT_BOOL
+        // conventionally uses -1. Preserve the established nonzero mapping.
         VT_BOOL => Ok(PropertyValue::Bool(reader.read_i16("BOOL value")? != 0)),
-        VT_DECIMAL => Ok(PropertyValue::Decimal(
-            reader
-                .take(16, "DECIMAL value")?
-                .try_into()
-                .expect("checked fixed-size slice"),
-        )),
+        VT_DECIMAL => {
+            let raw = reader.take(16, "DECIMAL value")?;
+            let mut value = [0u8; 16];
+            value.copy_from_slice(raw);
+            Ok(PropertyValue::Decimal(value))
+        },
         VT_LPSTR => Ok(PropertyValue::Lpstr(read_codepage_string(
             reader,
             codepage,
@@ -1352,7 +1791,7 @@ fn parse_value_body(
         VT_BLOB | VT_BLOB_OBJECT => {
             let size = usize::try_from(reader.read_u32("blob size")?)
                 .map_err(|_| invalid("Blob size is too large"))?;
-            let blob = reader.take(size, "blob data")?.to_vec();
+            let blob = try_copy_bytes(reader.take(size, "blob data")?, "blob data")?;
             reader.align4(depth == 0, "blob padding")?;
             Ok(PropertyValue::Blob(blob))
         },
@@ -1363,22 +1802,23 @@ fn parse_value_body(
                 return Err(invalid("Clipboard size must include its format field"));
             }
             let format = reader.read_i32("clipboard format")?;
-            let payload = reader.take(size - 4, "clipboard data")?.to_vec();
+            let payload =
+                try_copy_bytes(reader.take(size - 4, "clipboard data")?, "clipboard data")?;
             reader.align4(depth == 0, "clipboard padding")?;
             Ok(PropertyValue::Clipboard {
                 format,
                 data: payload,
             })
         },
-        VT_CLSID => Ok(PropertyValue::Clsid(PropertySetGuid::from_bytes(
-            reader
-                .take(16, "CLSID value")?
-                .try_into()
-                .expect("checked fixed-size slice"),
-        ))),
+        VT_CLSID => {
+            let raw = reader.take(16, "CLSID value")?;
+            let mut value = [0u8; 16];
+            value.copy_from_slice(raw);
+            Ok(PropertyValue::Clsid(PropertySetGuid::from_bytes(value)))
+        },
         _ if depth == 0 => Ok(PropertyValue::Unknown {
             variant_type,
-            data: reader.take_remaining().to_vec(),
+            data: try_copy_bytes(reader.take_remaining(), "unknown property value")?,
         }),
         _ => Err(invalid(format!(
             "Unsupported nested property variant 0x{variant_type:04x}"
@@ -1410,7 +1850,7 @@ fn parse_vector(
     if base_type == VT_VARIANT && count > reader.remaining_len() / 4 {
         return Err(invalid("Variant vector count exceeds its property range"));
     }
-    let mut values = Vec::with_capacity(count);
+    let mut values = try_vec_with_capacity(count, "property vector")?;
     for _ in 0..count {
         let value = if base_type == VT_VARIANT {
             let nested_type = reader.read_u16("variant vector element type")?;
@@ -1529,20 +1969,40 @@ fn decode_utf16(data: &[u8], description: &str) -> Result<String, OleError> {
     if !data.len().is_multiple_of(2) {
         return Err(invalid(format!("{description} has an odd byte length")));
     }
-    let units: Vec<u16> = data
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-        .collect();
-    String::from_utf16(&units)
-        .map_err(|_| invalid(format!("{description} contains invalid UTF-16")))
+    let mut utf8_len = 0usize;
+    for decoded in std::char::decode_utf16(
+        data.chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
+    ) {
+        let character =
+            decoded.map_err(|_| invalid(format!("{description} contains invalid UTF-16")))?;
+        utf8_len = checked_add(utf8_len, character.len_utf8(), description)?;
+    }
+    let mut value = String::new();
+    value
+        .try_reserve_exact(utf8_len)
+        .map_err(|source| OleError::allocation("decoded UTF-16 string", source))?;
+    for decoded in std::char::decode_utf16(
+        data.chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
+    ) {
+        let character =
+            decoded.map_err(|_| invalid(format!("{description} contains invalid UTF-16")))?;
+        value.push(character);
+    }
+    Ok(value)
 }
 
 fn decode_ansi(data: &[u8], codepage: u16, description: &str) -> Result<String, OleError> {
     let page = Mbcs::require(u32::from(codepage))
         .map_err(|error| invalid(format!("Could not decode {description}: {error}")))?;
-    page.decode(data)
-        .map(Cow::into_owned)
-        .map_err(|error| invalid(format!("Could not decode {description}: {error}")))
+    let decoded = page
+        .decode(data)
+        .map_err(|error| invalid(format!("Could not decode {description}: {error}")))?;
+    match decoded {
+        Cow::Borrowed(value) => try_clone_string(value, "decoded ANSI string"),
+        Cow::Owned(value) => Ok(value),
+    }
 }
 
 struct ValueReader<'a> {
@@ -1600,30 +2060,26 @@ impl<'a> ValueReader<'a> {
 
     fn read_u32(&mut self, description: &str) -> Result<u32, OleError> {
         let bytes = self.take(4, description)?;
-        Ok(u32::from_le_bytes(
-            bytes.try_into().expect("checked fixed-size slice"),
-        ))
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     fn read_i32(&mut self, description: &str) -> Result<i32, OleError> {
         let bytes = self.take(4, description)?;
-        Ok(i32::from_le_bytes(
-            bytes.try_into().expect("checked fixed-size slice"),
-        ))
+        Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     fn read_u64(&mut self, description: &str) -> Result<u64, OleError> {
         let bytes = self.take(8, description)?;
-        Ok(u64::from_le_bytes(
-            bytes.try_into().expect("checked fixed-size slice"),
-        ))
+        Ok(u64::from_le_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        ]))
     }
 
     fn read_i64(&mut self, description: &str) -> Result<i64, OleError> {
         let bytes = self.take(8, description)?;
-        Ok(i64::from_le_bytes(
-            bytes.try_into().expect("checked fixed-size slice"),
-        ))
+        Ok(i64::from_le_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        ]))
     }
 
     fn align4(&mut self, top_level: bool, description: &str) -> Result<(), OleError> {
@@ -1633,7 +2089,11 @@ impl<'a> ValueReader<'a> {
             .ok_or_else(|| invalid(format!("{description} position overflow")))?;
         let padding = (4 - (absolute_position & 3)) & 3;
         let available = padding.min(self.remaining_len());
-        let candidate = &self.data[self.position..self.position + available];
+        let end = self
+            .position
+            .checked_add(available)
+            .ok_or_else(|| invalid(format!("{description} range overflow")))?;
+        let candidate = &self.data[self.position..end];
         let consumed = if top_level {
             // Top-level property offsets are authoritative. Several Office
             // producers omit filler or write nonzero filler between values.
@@ -1677,17 +2137,14 @@ fn read_u16(data: &[u8], offset: usize, description: &str) -> Result<u16, OleErr
 
 fn read_u32(data: &[u8], offset: usize, description: &str) -> Result<u32, OleError> {
     let bytes = checked_range(data, offset, 4, description)?;
-    Ok(u32::from_le_bytes(
-        bytes.try_into().expect("checked fixed-size slice"),
-    ))
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
 fn read_guid(data: &[u8], offset: usize, description: &str) -> Result<PropertySetGuid, OleError> {
-    Ok(PropertySetGuid::from_bytes(
-        checked_range(data, offset, 16, description)?
-            .try_into()
-            .expect("checked fixed-size slice"),
-    ))
+    let bytes = checked_range(data, offset, 16, description)?;
+    let mut guid = [0u8; 16];
+    guid.copy_from_slice(bytes);
+    Ok(PropertySetGuid::from_bytes(guid))
 }
 
 fn invalid(message: impl Into<String>) -> OleError {
@@ -1706,18 +2163,18 @@ fn filetime_to_duration(filetime: u64) -> Option<Duration> {
     Some(Duration::nanoseconds(i64::try_from(nanos).ok()?))
 }
 
-fn extract_summary_info(metadata: &mut OleMetadata, section: &PropertySet) {
+fn extract_summary_info(metadata: &mut OleMetadata, section: &PropertySet) -> Result<(), OleError> {
     if let Some(codepage) = section.codepage {
         metadata.codepage = Some(u32::from(codepage.id()));
     }
-    metadata.title = section.property(2).and_then(extract_string);
-    metadata.subject = section.property(3).and_then(extract_string);
-    metadata.author = section.property(4).and_then(extract_string);
-    metadata.keywords = section.property(5).and_then(extract_string);
-    metadata.comments = section.property(6).and_then(extract_string);
-    metadata.template = section.property(7).and_then(extract_string);
-    metadata.last_saved_by = section.property(8).and_then(extract_string);
-    metadata.revision_number = section.property(9).and_then(extract_string);
+    metadata.title = extract_string(section.property(2))?;
+    metadata.subject = extract_string(section.property(3))?;
+    metadata.author = extract_string(section.property(4))?;
+    metadata.keywords = extract_string(section.property(5))?;
+    metadata.comments = extract_string(section.property(6))?;
+    metadata.template = extract_string(section.property(7))?;
+    metadata.last_saved_by = extract_string(section.property(8))?;
+    metadata.revision_number = extract_string(section.property(9))?;
     if let Some(PropertyValue::Filetime(value)) = section.property(10) {
         metadata.edit_time = filetime_to_duration(*value);
     }
@@ -1733,27 +2190,35 @@ fn extract_summary_info(metadata: &mut OleMetadata, section: &PropertySet) {
     metadata.num_pages = section.property(14).and_then(nonnegative_i4);
     metadata.num_words = section.property(15).and_then(nonnegative_i4);
     metadata.num_chars = section.property(16).and_then(nonnegative_i4);
-    metadata.creating_application = section.property(18).and_then(extract_string);
+    metadata.creating_application = extract_string(section.property(18))?;
     if let Some(PropertyValue::I4(value)) = section.property(19) {
         metadata.security = Some(*value as u32);
     }
+    Ok(())
 }
 
-fn extract_document_summary_info(metadata: &mut OleMetadata, section: &PropertySet) {
+fn extract_document_summary_info(
+    metadata: &mut OleMetadata,
+    section: &PropertySet,
+) -> Result<(), OleError> {
     if metadata.codepage.is_none() {
         metadata.codepage = section.codepage.map(|page| u32::from(page.id()));
     }
-    metadata.category = section.property(2).and_then(extract_string);
-    metadata.manager = section.property(14).and_then(extract_string);
-    metadata.company = section.property(15).and_then(extract_string);
+    metadata.category = extract_string(section.property(2))?;
+    metadata.manager = extract_string(section.property(14))?;
+    metadata.company = extract_string(section.property(15))?;
+    Ok(())
 }
 
-fn extract_string(value: &PropertyValue) -> Option<String> {
+fn extract_string(value: Option<&PropertyValue>) -> Result<Option<String>, OleError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
     match value {
         PropertyValue::Bstr(value) | PropertyValue::Lpstr(value) | PropertyValue::Lpwstr(value) => {
-            Some(value.clone())
+            Ok(Some(try_clone_string(value, "metadata string")?))
         },
-        _ => None,
+        _ => Ok(None),
     }
 }
 

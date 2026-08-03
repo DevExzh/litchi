@@ -7,10 +7,13 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::{Decoder, XmlVersion};
-use std::collections::HashMap;
+use std::collections::{HashMap, TryReserveError};
 use std::fmt;
 
 const MAX_CONTENT_TYPE_ENTRIES: usize = 65_536;
+const MAX_CONTENT_TYPES_XML_BYTES: usize = 8 * 1024 * 1024;
+const MAX_XML_EVENTS: usize = 1_000_000;
+const MAX_XML_DEPTH: usize = 256;
 
 /// A content type conforming to the MIME grammar required by OPC.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -124,17 +127,32 @@ pub(crate) struct ContentTypeMap {
 
 impl ContentTypeMap {
     pub(crate) fn from_xml(xml: &[u8]) -> Result<Self> {
+        if xml.len() > MAX_CONTENT_TYPES_XML_BYTES {
+            return Err(OpcError::InvalidContentTypesManifest(format!(
+                "manifest exceeds {MAX_CONTENT_TYPES_XML_BYTES} bytes"
+            )));
+        }
         let mut map = Self {
             defaults: HashMap::new(),
             overrides: HashMap::new(),
         };
         let mut reader = NsReader::from_reader(xml);
         reader.config_mut().trim_text(true);
+        reader.config_mut().check_end_names = true;
         let mut depth = 0usize;
         let mut root_seen = false;
         let mut entry_count = 0usize;
+        let mut events = 0usize;
 
         loop {
+            events = events.checked_add(1).ok_or_else(|| {
+                OpcError::InvalidContentTypesManifest("XML event count overflow".to_string())
+            })?;
+            if events > MAX_XML_EVENTS {
+                return Err(OpcError::InvalidContentTypesManifest(format!(
+                    "manifest exceeds {MAX_XML_EVENTS} XML events"
+                )));
+            }
             let decoder = reader.decoder();
             let (resolved_namespace, event) = reader.read_resolved_event()?;
             match event {
@@ -153,6 +171,11 @@ impl ContentTypeMap {
                             "XML nesting depth overflow".to_string(),
                         )
                     })?;
+                    if depth > MAX_XML_DEPTH {
+                        return Err(OpcError::InvalidContentTypesManifest(format!(
+                            "XML nesting exceeds {MAX_XML_DEPTH} levels"
+                        )));
+                    }
                 },
                 Event::Empty(element) => inspect_element(
                     &mut map,
@@ -213,6 +236,9 @@ impl ContentTypeMap {
         if self.defaults.contains_key(&key) {
             return Err(OpcError::DuplicateContentTypeDefault(extension));
         }
+        self.defaults
+            .try_reserve(1)
+            .map_err(|source| allocation("OPC default content types", source))?;
         self.defaults.insert(key, content_type);
         Ok(())
     }
@@ -225,6 +251,9 @@ impl ContentTypeMap {
                 candidate: partname.to_string(),
             });
         }
+        self.overrides
+            .try_reserve(1)
+            .map_err(|source| allocation("OPC content type overrides", source))?;
         self.overrides.insert(key, (partname, content_type));
         Ok(())
     }
@@ -344,6 +373,10 @@ fn validate_extension(extension: &str) -> Result<()> {
     Ok(())
 }
 
+fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
+    OpcError::Allocation { resource, source }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432,6 +465,25 @@ mod tests {
         assert!(matches!(
             ContentTypeMap::from_xml(xml.as_bytes()),
             Err(OpcError::InvalidPackUri(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_oversized_and_event_bomb_manifests() {
+        let oversized = vec![b' '; MAX_CONTENT_TYPES_XML_BYTES + 1];
+        assert!(matches!(
+            ContentTypeMap::from_xml(&oversized),
+            Err(OpcError::InvalidContentTypesManifest(_))
+        ));
+
+        let mut bomb = format!(r#"<Types xmlns="{NS}">"#);
+        for _ in 0..MAX_XML_EVENTS {
+            bomb.push_str("<!--x-->");
+        }
+        bomb.push_str("</Types>");
+        assert!(matches!(
+            ContentTypeMap::from_xml(bomb.as_bytes()),
+            Err(OpcError::InvalidContentTypesManifest(_))
         ));
     }
 }

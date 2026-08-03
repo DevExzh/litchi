@@ -16,7 +16,7 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, TryReserveError};
 
 /// Serialized part with its content and relationships.
 ///
@@ -167,6 +167,13 @@ const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
 /// package could otherwise name an unbounded number of phantom parts and make
 /// the traversal run for as long as its relationship manifests allow.
 const MAX_RELATIONSHIP_GRAPH_NODES: usize = 100_000;
+const MAX_PHYSICAL_MEMBERS: usize = 100_000;
+const MAX_CONTENT_TYPES_XML_BYTES: usize = 8 * 1024 * 1024;
+const MAX_RELATIONSHIPS_XML_BYTES: usize = 8 * 1024 * 1024;
+const MAX_XML_EVENTS: usize = 1_000_000;
+const MAX_XML_DEPTH: usize = 256;
+const MAX_RELATIONSHIP_ATTRIBUTE_BYTES: usize = 64 * 1024;
+const MAX_RELATIONSHIP_TARGET_BYTES: usize = 4 * 1024;
 
 /// Whether a ZIP error reports a missing member rather than a damaged one.
 fn is_member_missing(error: &soapberry_zip::Error) -> bool {
@@ -197,6 +204,11 @@ impl PackageReader {
         // Phase 1: Decompress and parse content types (on-demand)
         let content_types_member = Self::locate_content_types_member(archive)?;
         let content_types_xml = archive.read(content_types_member)?;
+        if content_types_xml.len() > MAX_CONTENT_TYPES_XML_BYTES {
+            return Err(OpcError::InvalidContentTypesManifest(format!(
+                "manifest exceeds {MAX_CONTENT_TYPES_XML_BYTES} bytes"
+            )));
+        }
         let content_types = ContentTypeMap::from_xml(&content_types_xml)?;
 
         // Phase 2: Get package-level relationships (on-demand decompression)
@@ -205,7 +217,15 @@ impl PackageReader {
 
         // Phase 3: Load every physical part. Relationship traversal alone is
         // insufficient because OPC permits parts with no incoming relationship.
+        if archive.len() > MAX_PHYSICAL_MEMBERS {
+            return Err(OpcError::ZipError(format!(
+                "OPC archive contains more than {MAX_PHYSICAL_MEMBERS} members"
+            )));
+        }
         let mut non_part_members = Vec::new();
+        non_part_members
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC non-part members", source))?;
         let sparts = Self::load_parts_lazy(
             archive,
             content_types_member,
@@ -253,14 +273,29 @@ impl PackageReader {
         base_uri: &str,
         source_uri: Option<&str>,
     ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
+        if rels_xml.len() > MAX_RELATIONSHIPS_XML_BYTES {
+            return Err(OpcError::InvalidRelationshipsManifest(format!(
+                "relationships manifest exceeds {MAX_RELATIONSHIPS_XML_BYTES} bytes"
+            )));
+        }
         let mut srels = SmallVec::new();
         let mut reader = NsReader::from_reader(rels_xml);
         reader.config_mut().trim_text(true);
+        reader.config_mut().check_end_names = true;
         let mut depth = 0usize;
         let mut root_seen = false;
-        let mut ids = std::collections::HashSet::new();
+        let mut ids = HashSet::new();
+        let mut events = 0usize;
 
         loop {
+            events = events.checked_add(1).ok_or_else(|| {
+                OpcError::InvalidRelationshipsManifest("XML event count overflow".to_string())
+            })?;
+            if events > MAX_XML_EVENTS {
+                return Err(OpcError::InvalidRelationshipsManifest(format!(
+                    "relationships manifest exceeds {MAX_XML_EVENTS} XML events"
+                )));
+            }
             let decoder = reader.decoder();
             let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
                 OpcError::InvalidRelationshipsManifest(format!("XML parse error: {error}"))
@@ -283,6 +318,11 @@ impl PackageReader {
                             "XML nesting depth overflow".to_string(),
                         )
                     })?;
+                    if depth > MAX_XML_DEPTH {
+                        return Err(OpcError::InvalidRelationshipsManifest(format!(
+                            "XML nesting exceeds {MAX_XML_DEPTH} levels"
+                        )));
+                    }
                 },
                 Event::Empty(element) => inspect_relationship_element(
                     &mut srels,
@@ -346,11 +386,18 @@ impl PackageReader {
         let rels_path = rels_uri.membername();
 
         match archive.read(rels_path) {
-            Ok(rels_xml) => Self::parse_rels_xml_with_source(
-                &rels_xml,
-                source_uri.base_uri(),
-                Some(source_uri.as_str()),
-            ),
+            Ok(rels_xml) => {
+                if rels_xml.len() > MAX_RELATIONSHIPS_XML_BYTES {
+                    return Err(OpcError::InvalidRelationshipsManifest(format!(
+                        "relationships manifest exceeds {MAX_RELATIONSHIPS_XML_BYTES} bytes"
+                    )));
+                }
+                Self::parse_rels_xml_with_source(
+                    &rels_xml,
+                    source_uri.base_uri(),
+                    Some(source_uri.as_str()),
+                )
+            },
             Err(error) if is_member_missing(&error) => Ok(SmallVec::new()),
             Err(error) => Err(error.into()),
         }
@@ -378,8 +425,11 @@ impl PackageReader {
         let mut relationships = Self::walk_relationship_graph(archive, pkg_srels)?;
 
         // Phase 2 and 3: classify members, then admit the survivors as parts.
-        let mut index = PartNameIndex::with_capacity(archive.len());
-        let mut typed_parts: Vec<(PackURI, String)> = Vec::with_capacity(archive.len());
+        let mut index = PartNameIndex::try_with_capacity(archive.len())?;
+        let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
+        typed_parts
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC typed parts", source))?;
         for member_name in archive.file_names() {
             if member_name.is_empty()
                 || member_name.ends_with('/')
@@ -398,7 +448,7 @@ impl PackageReader {
                 non_part_members.push(NonPartMember::new(
                     member_name,
                     NonPartReason::UnmappablePartName,
-                ));
+                )?);
                 continue;
             };
 
@@ -416,7 +466,7 @@ impl PackageReader {
                         non_part_members.push(NonPartMember::new(
                             member_name,
                             NonPartReason::UntypedAndUnreferenced,
-                        ));
+                        )?);
                         continue;
                     },
                     Err(error) => return Err(error),
@@ -433,17 +483,28 @@ impl PackageReader {
         }
 
         // Phase 4: parallel decompression of every admitted part.
-        let member_names: Vec<&str> = typed_parts
-            .iter()
-            .map(|(partname, _)| partname.membername())
-            .collect();
-        let mut decompressed = HashMap::with_capacity(member_names.len());
+        let mut member_names = Vec::new();
+        member_names
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC member-name batch", source))?;
+        member_names.extend(
+            typed_parts
+                .iter()
+                .map(|(partname, _)| partname.membername()),
+        );
+        let mut decompressed = HashMap::new();
+        decompressed
+            .try_reserve(typed_parts.len())
+            .map_err(|source| allocation("OPC decompressed parts", source))?;
         for (member_name, result) in archive.read_many_parallel_results(&member_names) {
             decompressed.insert(member_name.to_string(), result?);
         }
 
         // Phase 5: build SerializedPart structures (take ownership, no cloning)
-        let mut sparts = Vec::with_capacity(typed_parts.len());
+        let mut sparts = Vec::new();
+        sparts
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC serialized parts", source))?;
         for (partname, content_type) in typed_parts {
             let srels = match relationships.remove(partname.as_str()) {
                 Some(srels) => srels,
@@ -476,7 +537,13 @@ impl PackageReader {
         pkg_srels: &[SerializedRelationship],
     ) -> Result<HashMap<String, SmallVec<[SerializedRelationship; 8]>>> {
         let mut visited: HashMap<String, SmallVec<[SerializedRelationship; 8]>> = HashMap::new();
-        let mut work_queue: Vec<PackURI> = Vec::with_capacity(pkg_srels.len());
+        visited
+            .try_reserve(pkg_srels.len())
+            .map_err(|source| allocation("OPC relationship graph", source))?;
+        let mut work_queue: Vec<PackURI> = Vec::new();
+        work_queue
+            .try_reserve(pkg_srels.len())
+            .map_err(|source| allocation("OPC relationship work queue", source))?;
         for srel in pkg_srels {
             Self::enqueue_target(srel, &mut visited, &mut work_queue)?;
         }
@@ -502,6 +569,11 @@ impl PackageReader {
             return Ok(());
         }
         let partname = srel.target_partname()?;
+        if partname.as_str().len() > MAX_RELATIONSHIP_TARGET_BYTES {
+            return Err(OpcError::InvalidRelationship(format!(
+                "internal relationship target exceeds {MAX_RELATIONSHIP_TARGET_BYTES} bytes"
+            )));
+        }
         if visited.contains_key(partname.as_str()) {
             return Ok(());
         }
@@ -510,6 +582,12 @@ impl PackageReader {
                 "package refers to more than {MAX_RELATIONSHIP_GRAPH_NODES} distinct part names"
             )));
         }
+        visited
+            .try_reserve(1)
+            .map_err(|source| allocation("OPC relationship graph", source))?;
+        work_queue
+            .try_reserve(1)
+            .map_err(|source| allocation("OPC relationship work queue", source))?;
         visited.insert(partname.to_string(), SmallVec::new());
         work_queue.push(partname);
         Ok(())
@@ -593,7 +671,7 @@ const MAX_RELATIONSHIPS_PER_PART: usize = 65_536;
 #[allow(clippy::too_many_arguments)]
 fn inspect_relationship_element(
     relationships: &mut SmallVec<[SerializedRelationship; 8]>,
-    ids: &mut std::collections::HashSet<String>,
+    ids: &mut HashSet<String>,
     resolved_namespace: &ResolveResult<'_>,
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::Decoder,
@@ -642,16 +720,24 @@ fn inspect_relationship_element(
                 "invalid Relationship attribute: {error}"
             ))
         })?;
-        let value = || {
-            attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map(|value| value.to_string())
-        };
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map(|value| value.to_string())
+            .map_err(|error| {
+                OpcError::InvalidRelationshipsManifest(format!(
+                    "invalid Relationship attribute value: {error}"
+                ))
+            })?;
+        if value.len() > MAX_RELATIONSHIP_ATTRIBUTE_BYTES {
+            return Err(OpcError::InvalidRelationshipsManifest(format!(
+                "Relationship attribute exceeds {MAX_RELATIONSHIP_ATTRIBUTE_BYTES} bytes"
+            )));
+        }
         match attribute.key.as_ref() {
-            b"Id" => id = Some(value()?),
-            b"Type" => relationship_type = Some(value()?),
-            b"Target" => target = Some(value()?),
-            b"TargetMode" => target_mode = TargetMode::parse(&value()?)?,
+            b"Id" => id = Some(value),
+            b"Type" => relationship_type = Some(value),
+            b"Target" => target = Some(value),
+            b"TargetMode" => target_mode = TargetMode::parse(&value)?,
             b"xmlns" => {},
             name if name.starts_with(b"xmlns:") => {},
             _ => {
@@ -669,6 +755,8 @@ fn inspect_relationship_element(
             "relationship Id '{id}' is not an XML ID"
         )));
     }
+    ids.try_reserve(1)
+        .map_err(|source| allocation("OPC relationship IDs", source))?;
     if !ids.insert(id.clone()) {
         return Err(OpcError::DuplicateRelationshipId(id));
     }
@@ -680,6 +768,11 @@ fn inspect_relationship_element(
             "relationship Type or Target is not a valid URI reference".to_string(),
         ));
     }
+    relationships.try_reserve(1).map_err(|source| {
+        OpcError::InvalidRelationshipsManifest(format!(
+            "unable to reserve relationship storage: {source}"
+        ))
+    })?;
     relationships.push(SerializedRelationship {
         base_uri: base_uri.to_string(),
         source_uri: source_uri.map(str::to_string),
@@ -739,6 +832,10 @@ fn is_core_properties_relationship(relationship_type: &str) -> bool {
         "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"
             | "http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties"
     )
+}
+
+fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
+    OpcError::Allocation { resource, source }
 }
 
 #[cfg(test)]
@@ -919,6 +1016,27 @@ mod tests {
         assert!(matches!(
             PackageReader::parse_rels_xml(duplicate.as_bytes(), "/word"),
             Err(OpcError::DuplicateRelationshipId(id)) if id == "rId1"
+        ));
+    }
+
+    #[test]
+    fn relationship_manifests_have_bounded_input_and_event_work() {
+        let oversized = vec![b' '; MAX_RELATIONSHIPS_XML_BYTES + 1];
+        assert!(matches!(
+            PackageReader::parse_rels_xml(&oversized, "/word"),
+            Err(OpcError::InvalidRelationshipsManifest(_))
+        ));
+
+        let mut bomb = String::from(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
+        );
+        for _ in 0..MAX_XML_EVENTS {
+            bomb.push_str("<!--x-->");
+        }
+        bomb.push_str("</Relationships>");
+        assert!(matches!(
+            PackageReader::parse_rels_xml(bomb.as_bytes(), "/word"),
+            Err(OpcError::InvalidRelationshipsManifest(_))
         ));
     }
 

@@ -1,4 +1,6 @@
 //! Error types for OPC package operations
+use std::collections::TryReserveError;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -90,6 +92,16 @@ pub enum OpcError {
 
     #[error("Attribute error: {0}")]
     AttrError(String),
+
+    /// A bounded package operation could not reserve its required memory.
+    #[error("OPC allocation failed for {resource}: {source}")]
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
+    },
 }
 
 impl From<soapberry_zip::Error> for OpcError {
@@ -116,6 +128,9 @@ impl From<OpcError> for litchi_core::Error {
             OpcError::ZipError(e) => litchi_core::Error::ZipError(e.to_string()),
             OpcError::XmlError(s) => litchi_core::Error::XmlError(s),
             OpcError::PartNotFound(s) => litchi_core::Error::ComponentNotFound(s),
+            OpcError::Allocation { resource, source } => {
+                litchi_core::Error::Allocation { resource, source }
+            },
             _ => litchi_core::Error::Other(err.to_string()),
         }
     }
