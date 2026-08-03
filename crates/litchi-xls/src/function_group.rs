@@ -8,6 +8,11 @@ pub(crate) const FN_GROUP_NAME_RECORD_TYPE: u16 = 0x009a;
 pub(crate) const BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE: u16 = 0x009c;
 pub(crate) const FN_GRP12_RECORD_TYPE: u16 = 0x0898;
 
+const FN_GRP12_HEADER_LEN: usize = 12;
+const UNICODE_STRING_HEADER_LEN: usize = 3;
+const MAX_FUNCTION_CATEGORY_NAME_LENGTH: usize = 32;
+const MAX_FUNCTION_CATEGORIES: usize = 256;
+
 /// The built-in function category set recorded by BIFF8.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XlsBuiltInFunctionCategories {
@@ -94,7 +99,7 @@ impl FunctionGroupCollector {
                         found: data.len(),
                     });
                 }
-                self.built_in = Some(match read_u16(data, 0) {
+                self.built_in = Some(match read_u16(data, 0)? {
                     14 => XlsBuiltInFunctionCategories::Fourteen,
                     16 => XlsBuiltInFunctionCategories::Sixteen,
                     17 => XlsBuiltInFunctionCategories::SeventeenCompatibility,
@@ -124,20 +129,31 @@ impl FunctionGroupCollector {
                 if self.built_in.is_none() {
                     return invalid(record_type, "FnGrp12 appears without BuiltInFnGroupCount");
                 }
-                if data.len() < 15 {
+                if data.len() < FN_GRP12_HEADER_LEN + UNICODE_STRING_HEADER_LEN {
                     return Err(XlsError::InvalidLength {
-                        expected: 15,
+                        expected: FN_GRP12_HEADER_LEN + UNICODE_STRING_HEADER_LEN,
                         found: data.len(),
                     });
                 }
-                if read_u16(data, 0) != FN_GRP12_RECORD_TYPE
-                    || read_u16(data, 2) != 0
-                    || data[4..12].iter().any(|byte| *byte != 0)
+                let reserved = data
+                    .get(4..FN_GRP12_HEADER_LEN)
+                    .ok_or(XlsError::InvalidLength {
+                        expected: FN_GRP12_HEADER_LEN,
+                        found: data.len(),
+                    })?;
+                if read_u16(data, 0)? != FN_GRP12_RECORD_TYPE
+                    || read_u16(data, 2)? != 0
+                    || reserved.iter().any(|byte| *byte != 0)
                 {
                     return invalid(record_type, "FnGrp12 future-record header is invalid");
                 }
-                self.extended
-                    .push(parse_unicode_string(record_type, &data[12..])?);
+                let name = data
+                    .get(FN_GRP12_HEADER_LEN..)
+                    .ok_or(XlsError::InvalidLength {
+                        expected: FN_GRP12_HEADER_LEN,
+                        found: data.len(),
+                    })?;
+                self.extended.push(parse_unicode_string(record_type, name)?);
             },
             _ => {
                 return invalid(record_type, "unsupported function-group record");
@@ -148,7 +164,14 @@ impl FunctionGroupCollector {
 
     fn validate_resource_bounds(&self, record_type: u16) -> XlsResult<()> {
         let built_in = self.built_in.map_or(0, XlsBuiltInFunctionCategories::count) as usize;
-        if built_in + self.classic.len() + self.extended.len() > 256 {
+        let total = built_in
+            .checked_add(self.classic.len())
+            .and_then(|total| total.checked_add(self.extended.len()))
+            .ok_or_else(|| XlsError::InvalidRecord {
+                record_type,
+                message: "function category count overflows usize".to_string(),
+            })?;
+        if total > MAX_FUNCTION_CATEGORIES {
             return invalid(record_type, "function category count exceeds 256");
         }
         Ok(())
@@ -164,7 +187,12 @@ impl FunctionGroupCollector {
                 "function categories lack BuiltInFnGroupCount",
             );
         };
-        let classic_limit = 32usize - usize::from(built_in.count());
+        let classic_limit = 32usize
+            .checked_sub(usize::from(built_in.count()))
+            .ok_or_else(|| XlsError::InvalidRecord {
+                record_type: BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE,
+                message: "built-in function category count exceeds the classic range".to_string(),
+            })?;
         if self.classic.len() > classic_limit {
             return invalid(
                 FN_GROUP_NAME_RECORD_TYPE,
@@ -177,7 +205,15 @@ impl FunctionGroupCollector {
                 "FnGrp12 categories must begin at category index 32",
             );
         }
-        let mut unique = HashSet::with_capacity(self.classic.len() + self.extended.len());
+        let unique_capacity = self
+            .classic
+            .len()
+            .checked_add(self.extended.len())
+            .ok_or_else(|| XlsError::InvalidRecord {
+                record_type: FN_GROUP_NAME_RECORD_TYPE,
+                message: "function category count overflows usize".to_string(),
+            })?;
+        let mut unique = HashSet::with_capacity(unique_capacity);
         for name in self.classic.iter().chain(&self.extended) {
             if !unique.insert(name) {
                 return invalid(
@@ -198,44 +234,76 @@ impl FunctionGroupCollector {
 }
 
 fn parse_unicode_string(record_type: u16, data: &[u8]) -> XlsResult<String> {
-    if data.len() < 3 {
+    if data.len() < UNICODE_STRING_HEADER_LEN {
         return Err(XlsError::InvalidLength {
-            expected: 3,
+            expected: UNICODE_STRING_HEADER_LEN,
             found: data.len(),
         });
     }
-    let character_count = usize::from(read_u16(data, 0));
-    if character_count > 32 {
+    let character_count = usize::from(read_u16(data, 0)?);
+    if character_count > MAX_FUNCTION_CATEGORY_NAME_LENGTH {
         return invalid(record_type, "function category name exceeds 32 characters");
     }
-    let flags = data[2];
+    let flags = data.get(2).copied().ok_or(XlsError::InvalidLength {
+        expected: UNICODE_STRING_HEADER_LEN,
+        found: data.len(),
+    })?;
     if flags & !1 != 0 {
         return invalid(record_type, "XLUnicodeString reserved flags must be zero");
     }
     let wide = flags == 1;
-    let expected = 3 + character_count * if wide { 2 } else { 1 };
+    let character_bytes = character_count
+        .checked_mul(if wide { 2 } else { 1 })
+        .ok_or_else(|| XlsError::InvalidRecord {
+            record_type,
+            message: "function category name byte length overflows usize".to_string(),
+        })?;
+    let expected = UNICODE_STRING_HEADER_LEN
+        .checked_add(character_bytes)
+        .ok_or_else(|| XlsError::InvalidRecord {
+            record_type,
+            message: "function category record length overflows usize".to_string(),
+        })?;
     if data.len() != expected {
         return Err(XlsError::InvalidLength {
             expected,
             found: data.len(),
         });
     }
+    let encoded = data
+        .get(UNICODE_STRING_HEADER_LEN..)
+        .ok_or(XlsError::InvalidLength {
+            expected: UNICODE_STRING_HEADER_LEN,
+            found: data.len(),
+        })?;
     if wide {
-        let units = data[3..]
+        let units = encoded
             .chunks_exact(2)
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-            .collect::<Vec<_>>();
+            .map(|chunk| read_u16(chunk, 0))
+            .collect::<XlsResult<Vec<_>>>()?;
         String::from_utf16(&units).map_err(|error| XlsError::InvalidRecord {
             record_type,
             message: format!("invalid UTF-16 function category name: {error}"),
         })
     } else {
-        Ok(data[3..].iter().map(|byte| char::from(*byte)).collect())
+        Ok(encoded.iter().map(|byte| char::from(*byte)).collect())
     }
 }
 
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes([data[offset], data[offset + 1]])
+fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
+    let end = offset.checked_add(2).ok_or(XlsError::InvalidLength {
+        expected: 2,
+        found: data.len(),
+    })?;
+    let bytes = data.get(offset..end).ok_or(XlsError::InvalidLength {
+        expected: end,
+        found: data.len(),
+    })?;
+    let bytes = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        expected: 2,
+        found: bytes.len(),
+    })?;
+    Ok(u16::from_le_bytes(bytes))
 }
 
 fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
@@ -315,5 +383,27 @@ mod tests {
             .feed_record(FN_GROUP_NAME_RECORD_TYPE, &[1, 0, 0, b'A'])
             .unwrap();
         assert!(collector.finish().is_err());
+    }
+
+    #[test]
+    fn rejects_truncated_and_overflowing_fixed_width_reads() {
+        assert!(read_u16(&[], 0).is_err());
+        assert!(read_u16(&[], usize::MAX).is_err());
+
+        let mut collector = FunctionGroupCollector::new();
+        assert!(
+            collector
+                .feed_record(BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE, &[14])
+                .is_err()
+        );
+
+        collector
+            .feed_record(BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE, &[14, 0])
+            .unwrap();
+        assert!(
+            collector
+                .feed_record(FN_GRP12_RECORD_TYPE, &[0; 14])
+                .is_err()
+        );
     }
 }

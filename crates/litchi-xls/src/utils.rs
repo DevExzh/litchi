@@ -3,7 +3,6 @@
 use crate::error::{XlsError, XlsResult};
 use crate::records::{FormulaValue, XlsEncoding};
 use litchi_core::binary;
-use zerocopy::{FromBytes, LE, U16};
 
 /// Parse a BIFF8 `ShortXLUnicodeString`.
 ///
@@ -37,11 +36,7 @@ pub fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<Str
         // UTF-16LE
         let utf16: Vec<u16> = string_data
             .chunks_exact(2)
-            .map(|chunk| {
-                U16::<LE>::read_from_bytes(chunk)
-                    .map(|v| v.get())
-                    .unwrap_or(0)
-            })
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&utf16)
             .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))
@@ -81,11 +76,7 @@ pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<St
     if high_byte {
         let utf16_data: Vec<u16> = string_data
             .chunks_exact(2)
-            .map(|chunk| {
-                U16::<LE>::read_from_bytes(chunk)
-                    .map(|v| v.get())
-                    .unwrap_or(0)
-            })
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&utf16_data)
             .map_err(|error| XlsError::Encoding(format!("UTF-16 decoding error: {error}")))

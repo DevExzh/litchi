@@ -41,7 +41,6 @@ mod drawing;
 pub mod external_links;
 pub mod format;
 pub mod header_footer;
-pub mod ignored_errors;
 pub mod named_sheet_view;
 mod namespace;
 pub mod ole_objects;
@@ -100,6 +99,7 @@ pub use chartsheet::{
 };
 pub use litchi_xlsx::calculation_properties;
 pub use litchi_xlsx::cell_watches;
+pub use litchi_xlsx::ignored_errors;
 pub use litchi_xlsx::scenarios;
 pub use litchi_xlsx::sheet_calculation_properties;
 pub mod writer;
@@ -182,11 +182,11 @@ pub use format::{
 pub use header_footer::{
     HeaderFooterSectionKind, HeaderFooterText, WorksheetHeaderFooter, parse_worksheet_header_footer,
 };
-pub use ignored_errors::{
+pub use litchi_drawingml::geom::Preset;
+pub use litchi_xlsx::ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
-pub use litchi_drawingml::geom::Preset;
 pub use litchi_xlsx::sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
     parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,

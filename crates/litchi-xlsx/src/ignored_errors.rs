@@ -1,7 +1,7 @@
 //! Immutable XLSX worksheet ignored-error read model.
 
-use crate::error::{OoxmlError, Result};
-use crate::xlsx::namespace::is_spreadsheetml_name;
+use crate::error::{Error, Result};
+use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
@@ -723,12 +723,14 @@ fn reject_unsafe_event(event: &Event<'_>) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    invalid(format!("invalid worksheet ignoredErrors XML: {error}"))
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(format!(
+        "invalid worksheet ignoredErrors XML: {error}"
+    )))
 }
 
 #[cfg(test)]

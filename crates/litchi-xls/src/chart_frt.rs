@@ -52,9 +52,21 @@ const CAT_LAB_MAX_OFFSET: u16 = 1000;
 /// Flag bit of the `CatLab` bitfield: `cAutoCatLabelReal` (MS-XLS 2.4.38).
 const CAT_LAB_AUTO_LABEL: u16 = 1;
 
-/// Read a little-endian `u16` from a fixed offset (length checked by caller).
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(data[offset..offset + 2].try_into().expect("length checked"))
+/// Read a little-endian `u16` from a fixed offset.
+fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
+    let end = offset.checked_add(2).ok_or(XlsError::InvalidLength {
+        expected: 2,
+        found: data.len(),
+    })?;
+    let bytes = data.get(offset..end).ok_or(XlsError::InvalidLength {
+        expected: end,
+        found: data.len(),
+    })?;
+    let [first, second] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        expected: 2,
+        found: bytes.len(),
+    })?;
+    Ok(u16::from_le_bytes([first, second]))
 }
 
 /// Validate the `rt` field of an `FrtHeaderOld` and the payload length.
@@ -65,7 +77,7 @@ fn validate_frt_header_old(data: &[u8], record_type: u16, expected_len: usize) -
             found: data.len(),
         });
     }
-    if read_u16(data, 0) != record_type {
+    if read_u16(data, 0)? != record_type {
         return Err(XlsError::InvalidRecord {
             record_type,
             message: "FrtHeaderOld.rt mismatch".to_string(),
@@ -196,12 +208,12 @@ impl XlsChartFrtInfo {
                 found: data.len(),
             });
         }
-        if read_u16(data, 0) != CHART_FRT_INFO_RECORD_TYPE {
+        if read_u16(data, 0)? != CHART_FRT_INFO_RECORD_TYPE {
             return Err(invalid("ChartFrtInfo FrtHeaderOld.rt mismatch".to_string()));
         }
         let originator = XlsChartFrtVersion::from_byte(data[4], CHART_FRT_INFO_RECORD_TYPE)?;
         let writer = XlsChartFrtVersion::from_byte(data[5], CHART_FRT_INFO_RECORD_TYPE)?;
-        let count = read_u16(data, 6) as usize;
+        let count = usize::from(read_u16(data, 6)?);
         if count != writer.expected_range_count() {
             return Err(invalid(format!(
                 "ChartFrtInfo cCFRTID {count} disagrees with the writer version"
@@ -218,8 +230,8 @@ impl XlsChartFrtInfo {
         for index in 0..count {
             let offset = CHART_FRT_INFO_BASE_LEN + index * C_FRT_ID_LEN;
             ranges.push(XlsChartFutureRecordRange::new(
-                read_u16(data, offset),
-                read_u16(data, offset + 2),
+                read_u16(data, offset)?,
+                read_u16(data, offset + 2)?,
             )?);
         }
         Ok(Self {
@@ -317,15 +329,15 @@ impl XlsCatLab {
     /// Parse a `CatLab` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
         validate_frt_header_old(data, CAT_LAB_RECORD_TYPE, CAT_LAB_LEN)?;
-        let offset = read_u16(data, 4);
+        let offset = read_u16(data, 4)?;
         if offset > CAT_LAB_MAX_OFFSET {
             return Err(XlsError::InvalidRecord {
                 record_type: CAT_LAB_RECORD_TYPE,
                 message: format!("CatLab wOffset {offset} exceeds {CAT_LAB_MAX_OFFSET}"),
             });
         }
-        let alignment = XlsCatLabAlignment::from_u16(read_u16(data, 6))?;
-        let flags = read_u16(data, 8);
+        let alignment = XlsCatLabAlignment::from_u16(read_u16(data, 6)?)?;
+        let flags = read_u16(data, 8)?;
         // Bytes 10..12 are reserved (MUST be zero) and MUST be ignored.
         Ok(Self {
             offset,
@@ -468,12 +480,12 @@ impl XlsStartBlock {
         validate_frt_header_old(data, START_BLOCK_RECORD_TYPE, START_BLOCK_LEN)?;
         Ok(Self {
             object_kind: XlsChartBlockObjectKind::from_u16(
-                read_u16(data, 4),
+                read_u16(data, 4)?,
                 START_BLOCK_RECORD_TYPE,
             )?,
-            object_context: read_u16(data, 6),
-            object_instance1: read_u16(data, 8),
-            object_instance2: read_u16(data, 10),
+            object_context: read_u16(data, 6)?,
+            object_instance1: read_u16(data, 8)?,
+            object_instance2: read_u16(data, 10)?,
         })
     }
 
@@ -512,7 +524,7 @@ impl XlsEndBlock {
         // Bytes 6..12 are undefined (unused1..3) and MUST be ignored.
         Ok(Self {
             object_kind: XlsChartBlockObjectKind::from_u16(
-                read_u16(data, 4),
+                read_u16(data, 4)?,
                 END_BLOCK_RECORD_TYPE,
             )?,
         })
@@ -582,6 +594,12 @@ mod tests {
         data.extend_from_slice(&kind.to_le_bytes());
         data.extend_from_slice(&[0; 6]);
         data
+    }
+
+    #[test]
+    fn fixed_width_reads_reject_truncation_and_offset_overflow() {
+        assert!(read_u16(&[0], 0).is_err());
+        assert!(read_u16(&[], usize::MAX).is_err());
     }
 
     #[test]

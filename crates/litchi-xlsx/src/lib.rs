@@ -13,6 +13,7 @@ pub mod column;
 pub mod connections;
 mod error;
 pub mod formula;
+pub mod ignored_errors;
 pub mod layout;
 pub mod merge;
 mod outline;
@@ -42,6 +43,10 @@ pub use error::{
     Result, RowEditBlock, TabEditBlock,
 };
 pub use formula::Formula;
+pub use ignored_errors::{
+    IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
+    WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
+};
 pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };

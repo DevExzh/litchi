@@ -30,7 +30,6 @@ use super::data_validation::{
 use super::drawing::parse_drawing_xml;
 use super::format::{CellFill, CellFont, CellFormat};
 use super::header_footer::{WorksheetHeaderFooter, parse_worksheet_header_footer};
-use super::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::outline_properties::WorksheetOutlineProperties;
 use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
@@ -71,6 +70,7 @@ use super::{
     },
 };
 use litchi_xlsx::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
+use litchi_xlsx::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};
 use litchi_xlsx::web::Bindings;
