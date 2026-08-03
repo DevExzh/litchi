@@ -61,18 +61,12 @@ pub(super) fn apply_named_paragraph_style(
     let current_is_named = current.style.id().get() == storage.style_id;
     let target_location = native::locate_style(package, target.get())?;
     let mut staged = package.clone();
-    storage::patch_style_reference(
-        &mut staged,
-        &storage.archive_name,
-        storage_id,
-        storage.style_id,
-        target.get(),
-    )?;
+    storage::patch_style_reference(&mut staged, &storage, storage.style_id, target.get())?;
 
     if !current_is_named && native::is_exclusive(package, storage.style_id)? {
         remove_exclusive_variation(
             &mut staged,
-            &storage.archive_name,
+            &storage.wire.archive_name,
             storage.style_id,
             current.style.id(),
             target,
@@ -80,13 +74,13 @@ pub(super) fn apply_named_paragraph_style(
     } else {
         register_style_reference(
             &mut staged,
-            &storage.archive_name,
+            &storage.wire.archive_name,
             &target_location.archive_name,
             target.get(),
         )?;
         unregister_owner_reference_if_unused(
             &mut staged,
-            &storage.archive_name,
+            &storage.wire.archive_name,
             &current_location.archive_name,
             storage.style_id,
         )?;

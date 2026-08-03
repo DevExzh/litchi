@@ -822,8 +822,7 @@ fn set_property(
             let mut staged = package.clone();
             storage::patch_style_reference(
                 &mut staged,
-                &storage.archive_name,
-                storage_id,
+                &storage,
                 storage.style_id,
                 parent_style_id,
             )?;
@@ -836,7 +835,7 @@ fn set_property(
             )?;
             unregister_private_style(
                 &mut staged,
-                &storage.archive_name,
+                &storage.wire.archive_name,
                 &style.archive_name,
                 storage.style_id,
                 Some(parent_style_id),
@@ -867,13 +866,7 @@ fn set_property(
     let new_style =
         native::variation_object(new_style_id, storage.style_id, stylesheet_id, overrides)?;
     let mut staged = package.clone();
-    storage::patch_style_reference(
-        &mut staged,
-        &storage.archive_name,
-        storage_id,
-        storage.style_id,
-        new_style_id,
-    )?;
+    storage::patch_style_reference(&mut staged, &storage, storage.style_id, new_style_id)?;
     insert_style_variation(
         &mut staged,
         &style.archive_name,
@@ -884,7 +877,7 @@ fn set_property(
     )?;
     register_private_style(
         &mut staged,
-        &storage.archive_name,
+        &storage.wire.archive_name,
         &style.archive_name,
         new_style_id,
     )?;
@@ -913,13 +906,7 @@ fn reset_property(
     let expected = inherited_property(package, parent_style_id, kind)?;
     let mut staged = package.clone();
     if overrides.is_empty() {
-        storage::patch_style_reference(
-            &mut staged,
-            &storage.archive_name,
-            storage_id,
-            storage.style_id,
-            parent_style_id,
-        )?;
+        storage::patch_style_reference(&mut staged, &storage, storage.style_id, parent_style_id)?;
         remove_style_variation(
             &mut staged,
             &style.archive_name,
@@ -929,7 +916,7 @@ fn reset_property(
         )?;
         unregister_private_style(
             &mut staged,
-            &storage.archive_name,
+            &storage.wire.archive_name,
             &style.archive_name,
             storage.style_id,
             Some(parent_style_id),

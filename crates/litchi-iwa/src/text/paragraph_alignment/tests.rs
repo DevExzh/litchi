@@ -23,7 +23,6 @@ use crate::text::{
     TextStrikethrough, TextStyle, TextUnderline,
 };
 
-const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const SOURCE_PAGES_OBJECT_TITLE_STYLE_ID: u64 = 121;
 
 #[test]
@@ -4473,19 +4472,13 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
         .unwrap();
     let storage_id = created.storage.object_id;
     let mut package = pages.into_package();
-    let archive_name = storage::locate(&package, storage_id).unwrap().archive_name;
+    let location = storage::locate(&package, storage_id).unwrap();
+    let archive_name = location.wire.archive_name.clone();
     package
         .update_archive(&archive_name, |archive| {
             let object = archive.object_mut(storage_id).unwrap();
-            let index = object
-                .messages
-                .iter()
-                .position(|message| {
-                    STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                        && tswp::StorageArchive::decode(message.data.as_slice()).is_ok()
-                })
-                .unwrap();
-            let message_type = object.messages[index].type_;
+            let index = location.wire.message_index;
+            let message_type = location.wire.message_type;
             let mut text_storage =
                 tswp::StorageArchive::decode(object.messages[index].data.as_slice()).unwrap();
             let mut second = text_storage.table_para_style.as_ref().unwrap().entries[0];
@@ -4636,4 +4629,109 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
+    let mut pages = PagesEditor::create_with_text("Alignment").unwrap();
+    let created = pages
+        .add_text_box(
+            9,
+            "Paragraph style",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let storage_id = created.storage.object_id;
+    let mut package = pages.into_package();
+    let location = storage::locate(&package, storage_id).unwrap();
+    let style_data = tswp::ParagraphStyleArchive {
+        super_: crate::protobuf::tss::StyleArchive::default(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    package
+        .update_archive(&location.wire.archive_name, |archive| {
+            archive
+                .object_mut(storage_id)
+                .unwrap()
+                .push_message(RawMessage {
+                    type_: 2_022,
+                    data: style_data.clone(),
+                })?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkTextEditor::from_package(package);
+    editor
+        .set_paragraph_alignment(storage_id, TextAlignment::Center)
+        .unwrap();
+    editor
+        .set_paragraph_alignment(storage_id, TextAlignment::Right)
+        .unwrap();
+    assert!(editor.reset_paragraph_alignment(storage_id).unwrap());
+
+    let package = editor.into_package();
+    let location = storage::locate(&package, storage_id).unwrap();
+    let archive = package.archive(&location.wire.archive_name).unwrap();
+    let object = archive.object(storage_id).unwrap();
+    assert_eq!(
+        object.messages[location.wire.message_index].type_,
+        location.wire.message_type
+    );
+    let sibling = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == 2_022 && message.data == style_data)
+        .unwrap();
+    assert_eq!(sibling.data, style_data);
+}
+
+#[test]
+fn paragraph_style_anchor_rejects_a_stale_message_type_transactionally() {
+    let mut pages = PagesEditor::create_with_text("Alignment").unwrap();
+    let created = pages
+        .add_text_box(
+            9,
+            "Paragraph style",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let storage_id = created.storage.object_id;
+    let mut package = pages.into_package();
+    let location = storage::locate(&package, storage_id).unwrap();
+    let archive_name = location.wire.archive_name.clone();
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(storage_id).unwrap();
+            let original = object.messages[location.wire.message_index].clone();
+            object.replace_message(
+                location.wire.message_index,
+                RawMessage {
+                    type_: 99_999,
+                    data: original.data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    assert!(
+        storage::patch_style_reference(
+            &mut package,
+            &location,
+            location.style_id,
+            location.style_id + 1,
+        )
+        .is_err()
+    );
+    assert_eq!(package.to_bytes().unwrap(), before);
 }
