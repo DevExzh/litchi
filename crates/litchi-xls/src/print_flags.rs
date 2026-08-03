@@ -54,7 +54,7 @@ impl XlsPrintRowCol {
                 found: data.len(),
             });
         }
-        let value = u16::from_le_bytes(data[0..2].try_into().expect("length checked"));
+        let value = litchi_core::binary::read_u16_le_at(data, 0)?;
         // Boolean (MS-XLS 2.5.14): only 0x0000 and 0x0001 are legal.
         match value {
             0x0000 => Ok(Self {
@@ -101,7 +101,7 @@ impl XlsGridSet {
                 found: data.len(),
             });
         }
-        let flags = u16::from_le_bytes(data[0..2].try_into().expect("length checked"));
+        let flags = litchi_core::binary::read_u16_le_at(data, 0)?;
         Ok(Self { flags })
     }
 

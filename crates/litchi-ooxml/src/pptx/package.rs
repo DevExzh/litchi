@@ -1860,7 +1860,7 @@ impl Package {
         // Built-in OPC parts retain immutable payloads behind `Arc`, so this
         // transaction copies bounded graph metadata rather than package bytes.
         let package_before = self.opc.clone();
-        let result = (|| {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<T> {
             let presentation_staged = self.materialize_presentation()?;
 
             // Font publication may inspect the complete writer model and is
@@ -1881,13 +1881,17 @@ impl Package {
                 self.font_sync_pending = false;
             }
             Ok(value)
-        })();
+        }));
 
         match result {
-            Ok(value) => Ok(value),
-            Err(error) => {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(error)) => {
                 self.opc = package_before;
                 Err(error)
+            },
+            Err(payload) => {
+                self.opc = package_before;
+                std::panic::resume_unwind(payload);
             },
         }
     }
@@ -1938,7 +1942,8 @@ impl Package {
         let Some(presentation) = self.mutable_pres.take() else {
             return Ok(false);
         };
-        let result = (|| {
+        let package_before = self.opc.clone();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<()> {
             // The legacy writer replaces presentation.xml and its
             // relationships. Detach the typed graph first, then republish it
             // after materialization so source payload allocations are moved
@@ -1949,10 +1954,16 @@ impl Package {
                 litchi_pptx::font::put(&mut self.opc, fonts)?;
             }
             Ok(())
-        })();
+        }));
 
         self.mutable_pres = Some(presentation);
-        result.map(|()| true)
+        match result {
+            Ok(result) => result.map(|()| true),
+            Err(payload) => {
+                self.opc = package_before;
+                std::panic::resume_unwind(payload);
+            },
+        }
     }
 
     /// Update presentation parts with modified data.
@@ -2735,6 +2746,42 @@ mod tests {
         assert_eq!(
             reopened.props().and_then(|props| props.title.as_deref()),
             Some("Retry title")
+        );
+    }
+
+    #[test]
+    fn panicking_publication_restores_package_and_retains_dirty_intent() {
+        let presentation_uri = PackURI::new("/ppt/presentation.xml").unwrap();
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        package.put_props(Props::new().title("Panic retry title"));
+        let original = package.opc.get_part(&presentation_uri).unwrap().blob_arc();
+
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = package.write_with::<()>(|_| {
+                panic!("injected publication panic");
+            });
+        }));
+        assert!(panic.is_err());
+
+        let restored = package.opc.get_part(&presentation_uri).unwrap().blob_arc();
+        assert!(std::sync::Arc::ptr_eq(&original, &restored));
+        assert!(
+            package
+                .mutable_pres
+                .as_ref()
+                .is_some_and(MutablePresentation::is_modified)
+        );
+        assert!(package.properties.is_dirty());
+
+        let file = NamedTempFile::with_suffix(".pptx").unwrap();
+        package.save(file.path()).unwrap();
+        assert_eq!(
+            Package::open(file.path())
+                .unwrap()
+                .props()
+                .and_then(|props| props.title.as_deref()),
+            Some("Panic retry title")
         );
     }
 

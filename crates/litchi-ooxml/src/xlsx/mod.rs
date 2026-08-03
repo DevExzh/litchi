@@ -29,7 +29,6 @@
 
 pub mod active_x;
 pub mod auto_filter;
-pub mod calculation_properties;
 pub mod cell;
 pub mod cell_watches;
 pub mod chart;
@@ -102,6 +101,7 @@ pub use chartsheet::{
     ChartSheetWebSourceType, PageOrientation, load_chartsheet, parse_chartsheet, store_chartsheet,
     write_chartsheet,
 };
+pub use litchi_xlsx::calculation_properties;
 pub mod writer;
 
 // Re-export main types for convenience
@@ -110,10 +110,6 @@ pub use auto_filter::{
     CustomFilters, DateGroupItem, DateTimeGrouping, DynamicFilter, DynamicFilterType,
     FilterColumnDefinition, FilterColumnPayload, FilterIconSet, FilterItem, FilterRange,
     FilterValues, IconFilter, SortConditionDefinition, SortStateDefinition, Top10Filter,
-};
-pub use calculation_properties::{
-    WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
-    parse_workbook_calculation_properties,
 };
 pub use cell::Cell;
 pub use cell_watches::{
@@ -152,6 +148,10 @@ pub use external_links::{
     ExternalLinkEntry, ExternalLinkKind, ExternalOleItem, ExternalOleItemSource, ExternalOleLink,
     ExternalOleTarget, ExternalRow, ExternalSheetData, ExternalWorkbookLink,
     ExternalWorkbookTarget,
+};
+pub use litchi_xlsx::calculation_properties::{
+    WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
+    parse_workbook_calculation_properties,
 };
 pub use query_table::{
     QueryTable, QueryTableConformance, QueryTableExtensionAttribute, QueryTableExtensionList,

@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod calculation_properties;
 pub mod cell;
 pub mod chain;
 pub mod column;
@@ -20,6 +21,10 @@ pub mod style;
 pub mod web;
 mod workbook;
 
+pub use calculation_properties::{
+    WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
+    parse_workbook_calculation_properties,
+};
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
 pub use column::{Column, Columns, Width, WidthAt};
 pub use error::{

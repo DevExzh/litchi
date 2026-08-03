@@ -5,8 +5,6 @@
 //! workbook is opened. This module parses and serializes the element; it never
 //! triggers a recalculation itself.
 
-use std::fmt::Write;
-
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -15,8 +13,9 @@ use quick_xml::reader::NsReader;
 use crate::error::{OoxmlError, Result};
 use litchi_ooxml_common::mce::process_str;
 
-const TRANSITIONAL_MAIN: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT_MAIN: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+const MAX_DEPTH: usize = 256;
 
 /// Namespace form used when serializing a `sheetCalcPr` fragment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,8 +27,8 @@ pub enum WorksheetSheetCalculationPropertiesConformance {
 impl WorksheetSheetCalculationPropertiesConformance {
     fn main_namespace(self) -> &'static str {
         match self {
-            Self::Transitional => std::str::from_utf8(TRANSITIONAL_MAIN).unwrap(),
-            Self::Strict => std::str::from_utf8(STRICT_MAIN).unwrap(),
+            Self::Transitional => TRANSITIONAL_MAIN,
+            Self::Strict => STRICT_MAIN,
         }
     }
 }
@@ -54,6 +53,7 @@ impl WorksheetSheetCalculationProperties {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scope {
     Worksheet,
+    SheetCalculationProperties,
     Other,
 }
 
@@ -73,9 +73,14 @@ pub fn parse_worksheet_sheet_calculation_properties(
     let processed = process_str(source)?;
     let mut reader = NsReader::from_reader(processed.as_bytes());
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut scopes = Vec::new();
     let mut properties: Option<WorksheetSheetCalculationProperties> = None;
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
 
     loop {
         let (resolved, event) = reader
@@ -84,6 +89,18 @@ pub fn parse_worksheet_sheet_calculation_properties(
         let namespace = namespace_kind(resolved)?;
         match event {
             Event::Start(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if scopes.is_empty() && root_seen {
+                    return Err(invalid("worksheet XML contains multiple roots"));
+                }
+                let next_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML depth overflow"))?;
+                if next_depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
                 let scope = begin_element(
                     &reader,
                     &element,
@@ -91,39 +108,113 @@ pub fn parse_worksheet_sheet_calculation_properties(
                     scopes.last().copied(),
                     &mut properties,
                 )?;
+                if scopes.is_empty() {
+                    root_seen = true;
+                }
+                depth = next_depth;
                 scopes.push(scope);
             },
             Event::Empty(element) => {
-                begin_element(
-                    &reader,
-                    &element,
-                    namespace,
-                    scopes.last().copied(),
-                    &mut properties,
-                )?;
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if scopes.is_empty() {
+                    if root_seen {
+                        return Err(invalid("worksheet XML contains multiple roots"));
+                    }
+                    begin_element(&reader, &element, namespace, None, &mut properties)?;
+                    root_seen = true;
+                    root_closed = true;
+                } else {
+                    begin_element(
+                        &reader,
+                        &element,
+                        namespace,
+                        scopes.last().copied(),
+                        &mut properties,
+                    )?;
+                }
             },
-            Event::End(_) => {
-                scopes
+            Event::End(element) => {
+                let scope = scopes
                     .pop()
                     .ok_or_else(|| invalid("unexpected worksheet end element"))?;
+                match scope {
+                    Scope::Worksheet => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"worksheet"
+                        {
+                            return Err(invalid("mismatched worksheet end element"));
+                        }
+                        root_closed = true;
+                    },
+                    Scope::SheetCalculationProperties => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"sheetCalcPr"
+                        {
+                            return Err(invalid("mismatched sheetCalcPr end element"));
+                        }
+                    },
+                    Scope::Other => {},
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("worksheet XML depth underflow"))?;
             },
-            Event::Text(text)
-                if matches!(scopes.last(), Some(Scope::Other))
-                    && scopes.len() == 2
-                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
-            {
-                // sheetCalcPr was already consumed as a scope-2 Other element
-                // only when it carried children, which is rejected below.
+            Event::Text(text) => {
+                let whitespace = text.as_ref().iter().all(u8::is_ascii_whitespace);
+                if scopes.is_empty() {
+                    if !whitespace {
+                        return Err(invalid("worksheet XML text is outside root"));
+                    }
+                } else if matches!(scopes.last(), Some(Scope::SheetCalculationProperties))
+                    && !whitespace
+                {
+                    return Err(invalid("sheetCalcPr must be a leaf element"));
+                }
             },
-            Event::DocType(_) => {
-                return Err(invalid("worksheet XML cannot contain a document type"));
+            Event::CData(_) => {
+                if scopes.is_empty() {
+                    return Err(invalid("worksheet XML CDATA is outside root"));
+                }
+                if matches!(scopes.last(), Some(Scope::SheetCalculationProperties)) {
+                    return Err(invalid("sheetCalcPr must be a leaf element"));
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if scopes.is_empty() {
+                    return Err(invalid("worksheet XML entity is outside root"));
+                }
+                if matches!(scopes.last(), Some(Scope::SheetCalculationProperties)) {
+                    return Err(invalid("sheetCalcPr must be a leaf element"));
+                }
+                let name = reference
+                    .decode()
+                    .map_err(|error| invalid(format!("invalid worksheet XML entity: {error}")))?;
+                if reference
+                    .resolve_char_ref()
+                    .map_err(|error| invalid(format!("invalid worksheet XML entity: {error}")))?
+                    .is_none()
+                    && !matches!(name.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot")
+                {
+                    return Err(invalid("custom XML entities are rejected"));
+                }
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
             _ => {},
         }
         buffer.clear();
     }
-    if !scopes.is_empty() {
+    if !root_seen || !root_closed || depth != 0 || !scopes.is_empty() {
         return Err(invalid("unterminated worksheet XML"));
     }
     Ok(properties)
@@ -157,7 +248,10 @@ fn begin_element(
                 return Err(invalid("duplicate worksheet sheetCalcPr element"));
             }
             *properties = Some(parse_sheet_calc_pr_attributes(reader, element)?);
-            Ok(Scope::Other)
+            Ok(Scope::SheetCalculationProperties)
+        },
+        Some(Scope::SheetCalculationProperties) => {
+            Err(invalid("sheetCalcPr must be a leaf element"))
         },
         Some(Scope::Other) => Ok(Scope::Other),
     }
@@ -168,7 +262,7 @@ fn parse_sheet_calc_pr_attributes(
     element: &BytesStart<'_>,
 ) -> Result<WorksheetSheetCalculationProperties> {
     let mut full_calc_on_load = None;
-    for attribute in element.attributes() {
+    for attribute in element.attributes().with_checks(true) {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid sheetCalcPr attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -202,13 +296,10 @@ pub fn write_worksheet_sheet_calculation_properties(
     value: &WorksheetSheetCalculationProperties,
     conformance: WorksheetSheetCalculationPropertiesConformance,
 ) -> String {
-    let mut xml = String::new();
-    write!(
-        xml,
-        "<sheetCalcPr xmlns=\"{}\"",
-        conformance.main_namespace()
-    )
-    .unwrap();
+    let mut xml = String::with_capacity(64 + conformance.main_namespace().len());
+    xml.push_str("<sheetCalcPr xmlns=\"");
+    xml.push_str(conformance.main_namespace());
+    xml.push('"');
     if value.full_calc_on_load {
         xml.push_str(" fullCalcOnLoad=\"1\"");
     }
@@ -231,7 +322,7 @@ fn namespace_kind(result: ResolveResult<'_>) -> Result<NamespaceKind> {
 }
 
 fn is_main_namespace(namespace: &[u8]) -> bool {
-    namespace == TRANSITIONAL_MAIN || namespace == STRICT_MAIN
+    namespace == TRANSITIONAL_MAIN.as_bytes() || namespace == STRICT_MAIN.as_bytes()
 }
 
 fn is_namespace_declaration(name: &[u8]) -> bool {
@@ -257,6 +348,12 @@ mod tests {
 
     #[test]
     fn parses_full_calc_on_load_and_default() {
+        let empty = format!(r#"<worksheet xmlns="{NS}"/>"#);
+        assert!(
+            parse_worksheet_sheet_calculation_properties(empty.as_bytes())
+                .unwrap()
+                .is_none()
+        );
         assert!(
             parse(r#"<sheetCalcPr fullCalcOnLoad="1"/>"#)
                 .unwrap()
@@ -302,6 +399,35 @@ mod tests {
             assert!(parse(child).is_err(), "expected rejection for {child}");
         }
         assert!(parse("<sheetCalcPr/><sheetCalcPr/>").is_err());
+    }
+
+    #[test]
+    fn rejects_leaf_content_and_malformed_document_state() {
+        for child in [
+            "<sheetCalcPr><extension/></sheetCalcPr>",
+            "<sheetCalcPr>unexpected</sheetCalcPr>",
+            "<sheetCalcPr><![CDATA[unexpected]]></sheetCalcPr>",
+        ] {
+            assert!(parse(child).is_err(), "expected rejection for {child}");
+        }
+
+        let mismatched_end = format!(r#"<worksheet xmlns="{NS}"><sheetCalcPr/></wrong>"#,);
+        assert!(parse_worksheet_sheet_calculation_properties(mismatched_end.as_bytes()).is_err());
+
+        let multiple_roots = format!(
+            r#"<worksheet xmlns="{NS}"><sheetData/></worksheet><worksheet xmlns="{NS}"><sheetData/></worksheet>"#,
+        );
+        assert!(parse_worksheet_sheet_calculation_properties(multiple_roots.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn rejects_excessive_worksheet_nesting() {
+        let mut xml = format!(r#"<worksheet xmlns="{NS}">"#);
+        xml.push_str(&"<extension>".repeat(MAX_DEPTH));
+        xml.push_str(&"</extension>".repeat(MAX_DEPTH));
+        xml.push_str("</worksheet>");
+
+        assert!(parse_worksheet_sheet_calculation_properties(xml.as_bytes()).is_err());
     }
 
     #[test]

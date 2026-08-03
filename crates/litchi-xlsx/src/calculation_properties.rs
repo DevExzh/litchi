@@ -1,7 +1,7 @@
-//! Immutable XLSX workbook calculation-properties read model.
+//! Immutable workbook calculation-properties read model.
 
-use crate::error::{OoxmlError, Result};
-use crate::xlsx::namespace::is_spreadsheetml_name;
+use crate::error::{Error, Result, invalid};
+use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -384,12 +384,10 @@ fn reject_unsafe_event(event: &Event<'_>) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
-}
-
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    invalid(format!("invalid workbook calcPr XML: {error}"))
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(format!(
+        "invalid workbook calcPr XML: {error}"
+    )))
 }
 
 #[cfg(test)]
