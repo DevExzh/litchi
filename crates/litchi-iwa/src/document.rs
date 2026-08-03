@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::bundle::Bundle;
+use crate::bundle::{Bundle, BundleLimits};
 use crate::media::{MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject};
 use crate::ref_graph::ObjectId;
@@ -46,8 +46,13 @@ struct DocumentState {
 impl Document {
     /// Open an iWork document from a bundle path
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_with_limits(path, BundleLimits::default())
+    }
+
+    /// Open an iWork document under caller-selected bundle ingress ceilings.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let path_ref = path.as_ref();
-        let bundle = Bundle::open(path_ref)?;
+        let bundle = Bundle::open_with_limits(path_ref, limits)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         // Application ownership is established only by the validated root
@@ -85,7 +90,12 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let bundle = Bundle::from_bytes(bytes)?;
+        Self::from_bytes_with_limits(bytes, BundleLimits::default())
+    }
+
+    /// Open an iWork document from bytes under caller-selected bundle limits.
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+        let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
         let media_manager = MediaManager::from_bytes(bytes).ok();
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 

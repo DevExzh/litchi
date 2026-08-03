@@ -12,16 +12,165 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use plist::Value;
-use soapberry_zip::office::ArchiveReader;
+use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
 
 use crate::archive::{Archive, ArchiveObject};
-use crate::zip_utils::parse_iwa_files_from_archive;
+use crate::snappy::{SnappyLimits, SnappyStream};
+use crate::zip_utils::parse_iwa_files_from_archive_with_limits;
 use crate::{Error, Result};
 
 /// Represents an iWork document bundle
 #[derive(Debug, Clone)]
 pub struct Bundle {
     state: Arc<BundleState>,
+}
+
+/// Resource ceilings for one parsed iWork bundle.
+///
+/// The profile bounds the bytes read from a filesystem path, ZIP central
+/// directory metadata, every nested `Index.zip`, and each decompressed IWA
+/// component. Limits can only be tightened below the hard format ceilings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BundleLimits {
+    max_input_bytes: u64,
+    max_entries: usize,
+    max_entry_bytes: u64,
+    max_total_bytes: u64,
+    max_iwa_stream_bytes: usize,
+}
+
+impl BundleLimits {
+    /// Hard ceiling for bytes read from one bundle file or `Index.zip`.
+    pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Hard ceiling for non-directory ZIP members in one archive.
+    pub const MAX_ENTRIES: usize = 100_000;
+    /// Hard ceiling for one declared uncompressed ZIP member.
+    pub const MAX_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
+    /// Hard ceiling for the declared uncompressed size of one ZIP archive.
+    pub const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Hard ceiling for one decompressed IWA component.
+    pub const MAX_IWA_STREAM_BYTES: usize = SnappyStream::MAX_DECOMPRESSED_STREAM;
+
+    /// Build checked bundle-ingress ceilings.
+    pub fn new(
+        max_input_bytes: u64,
+        max_entries: usize,
+        max_entry_bytes: u64,
+        max_total_bytes: u64,
+        max_iwa_stream_bytes: usize,
+    ) -> Result<Self> {
+        if max_input_bytes == 0
+            || max_entries == 0
+            || max_entry_bytes == 0
+            || max_total_bytes == 0
+            || max_iwa_stream_bytes == 0
+        {
+            return Err(Error::InvalidFormat(
+                "iWork bundle limits must be non-zero".to_owned(),
+            ));
+        }
+        if max_input_bytes > Self::MAX_INPUT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork bundle input limit exceeds the {} byte hard ceiling",
+                Self::MAX_INPUT_BYTES
+            )));
+        }
+        if max_entries > Self::MAX_ENTRIES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork bundle entry limit exceeds the {} entry hard ceiling",
+                Self::MAX_ENTRIES
+            )));
+        }
+        if max_entry_bytes > Self::MAX_ENTRY_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork bundle entry limit exceeds the {} byte hard ceiling",
+                Self::MAX_ENTRY_BYTES
+            )));
+        }
+        if max_total_bytes > Self::MAX_TOTAL_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork bundle total limit exceeds the {} byte hard ceiling",
+                Self::MAX_TOTAL_BYTES
+            )));
+        }
+        if max_iwa_stream_bytes > Self::MAX_IWA_STREAM_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork IWA stream limit exceeds the {} byte hard ceiling",
+                Self::MAX_IWA_STREAM_BYTES
+            )));
+        }
+
+        Ok(Self {
+            max_input_bytes,
+            max_entries,
+            max_entry_bytes,
+            max_total_bytes,
+            max_iwa_stream_bytes,
+        })
+    }
+
+    /// Maximum bytes read from one bundle file or nested index.
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
+    }
+
+    /// Maximum number of non-directory ZIP members in one archive.
+    pub const fn max_entries(self) -> usize {
+        self.max_entries
+    }
+
+    /// Maximum declared uncompressed size of one ZIP member.
+    pub const fn max_entry_bytes(self) -> u64 {
+        self.max_entry_bytes
+    }
+
+    /// Maximum declared uncompressed size of one ZIP archive.
+    pub const fn max_total_bytes(self) -> u64 {
+        self.max_total_bytes
+    }
+
+    /// Maximum decompressed size of one IWA component.
+    pub const fn max_iwa_stream_bytes(self) -> usize {
+        self.max_iwa_stream_bytes
+    }
+
+    pub(crate) fn archive_limits(self) -> ArchiveLimits {
+        ArchiveLimits {
+            max_files: self.max_entries,
+            max_entry_size: self.max_entry_bytes,
+            max_total_size: self.max_total_bytes,
+        }
+    }
+
+    pub(crate) fn snappy_limits(self) -> Result<SnappyLimits> {
+        SnappyLimits::new(
+            self.max_iwa_stream_bytes
+                .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
+            self.max_iwa_stream_bytes,
+        )
+    }
+
+    pub(crate) fn check_input_size(self, size: u64, label: &str) -> Result<()> {
+        if size > self.max_input_bytes {
+            return Err(Error::InvalidFormat(format!(
+                "{label} is {size} bytes, exceeding the {} byte limit",
+                self.max_input_bytes
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl Default for BundleLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_entries: Self::MAX_ENTRIES,
+            max_entry_bytes: Self::MAX_ENTRY_BYTES,
+            max_total_bytes: Self::MAX_TOTAL_BYTES,
+            max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -37,6 +186,11 @@ struct BundleState {
 impl Bundle {
     /// Open an iWork bundle from a path (directory or zip file)
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_with_limits(path, BundleLimits::default())
+    }
+
+    /// Open an iWork bundle under caller-selected ingress ceilings.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let bundle_path = path.as_ref().to_path_buf();
 
         let metadata = fs::symlink_metadata(&bundle_path).map_err(|error| {
@@ -54,10 +208,10 @@ impl Bundle {
         }
         if metadata.is_dir() {
             // Traditional bundle directory structure
-            Self::open_directory_bundle(&bundle_path)
+            Self::open_directory_bundle(&bundle_path, limits)
         } else if metadata.is_file() {
             // Single file bundle (zip archive)
-            Self::open_file_bundle(&bundle_path)
+            Self::open_file_bundle(&bundle_path, limits)
         } else {
             Err(Error::Bundle(format!(
                 "Bundle path is not a regular file or directory: {}",
@@ -91,8 +245,18 @@ impl Bundle {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, BundleLimits::default())
+    }
+
+    /// Open a single-file bundle from bytes under caller-selected limits.
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+        let input_size = u64::try_from(bytes.len()).map_err(|_| {
+            Error::InvalidFormat("iWork bundle input length does not fit u64".to_owned())
+        })?;
+        limits.check_input_size(input_size, "iWork bundle input")?;
+
         // Parse the ZIP archive directly from bytes
-        let archives = Self::parse_zip_bytes(bytes)?;
+        let archives = Self::parse_zip_bytes(bytes, limits)?;
 
         // For single-file bundles, metadata is typically embedded
         let metadata = BundleMetadata {
@@ -117,10 +281,20 @@ impl Bundle {
     /// This method parses the archive and its IWA members from the supplied
     /// bytes; it does not accept or reuse a previously parsed archive owner.
     pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_archive_bytes_with_limits(bytes, BundleLimits::default())
+    }
+
+    /// Parse a ZIP archive from bytes under caller-selected ingress ceilings.
+    pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+        let input_size = u64::try_from(bytes.len()).map_err(|_| {
+            Error::InvalidFormat("iWork bundle input length does not fit u64".to_owned())
+        })?;
+        limits.check_input_size(input_size, "iWork bundle input")?;
+
         // Parse IWA files from the ZIP archive
-        let archive = ArchiveReader::new(bytes)
+        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive: {}", e)))?;
-        let archives = parse_iwa_files_from_archive(&archive)?;
+        let archives = parse_iwa_files_from_archive_with_limits(&archive, limits)?;
 
         // For single-file bundles, metadata is typically embedded
         let metadata = BundleMetadata {
@@ -141,12 +315,12 @@ impl Bundle {
     }
 
     /// Open a traditional directory-based bundle
-    fn open_directory_bundle(bundle_path: &Path) -> Result<Self> {
+    fn open_directory_bundle(bundle_path: &Path, limits: BundleLimits) -> Result<Self> {
         // Check for required bundle structure
         Self::validate_bundle_structure(bundle_path)?;
 
         // Parse Index.zip
-        let archives = Self::parse_index_zip(bundle_path)?;
+        let archives = Self::parse_index_zip(bundle_path, limits)?;
 
         // Parse metadata
         let metadata = Self::parse_metadata(bundle_path)?;
@@ -159,9 +333,9 @@ impl Bundle {
     }
 
     /// Open a single-file bundle (zip archive)
-    fn open_file_bundle(bundle_path: &Path) -> Result<Self> {
+    fn open_file_bundle(bundle_path: &Path, limits: BundleLimits) -> Result<Self> {
         // Parse the zip file directly
-        let archives = Self::parse_zip_bundle(bundle_path)?;
+        let archives = Self::parse_zip_bundle(bundle_path, limits)?;
 
         // For single-file bundles, metadata is typically embedded
         let metadata = BundleMetadata {
@@ -241,32 +415,38 @@ impl Bundle {
     }
 
     /// Parse Index.zip and extract all IWA files
-    fn parse_index_zip(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
+    fn parse_index_zip(
+        bundle_path: &Path,
+        limits: BundleLimits,
+    ) -> Result<HashMap<String, Archive>> {
         let index_zip_path = bundle_path.join("Index.zip");
-        let data = fs::read(&index_zip_path).map_err(Error::Io)?;
+        let data = read_bounded_file(&index_zip_path, limits, "iWork Index.zip")?;
 
-        let archive = ArchiveReader::new(&data)
+        let archive = ArchiveReader::new_with_limits(&data, limits.archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
 
-        parse_iwa_files_from_archive(&archive)
+        parse_iwa_files_from_archive_with_limits(&archive, limits)
     }
 
     /// Parse a single-file bundle (zip archive) and extract all IWA files
-    fn parse_zip_bundle(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
-        let data = fs::read(bundle_path).map_err(Error::Io)?;
+    fn parse_zip_bundle(
+        bundle_path: &Path,
+        limits: BundleLimits,
+    ) -> Result<HashMap<String, Archive>> {
+        let data = read_bounded_file(bundle_path, limits, "iWork bundle")?;
 
-        let archive = ArchiveReader::new(&data)
+        let archive = ArchiveReader::new_with_limits(&data, limits.archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
 
-        parse_iwa_files_from_archive(&archive)
+        parse_iwa_files_from_archive_with_limits(&archive, limits)
     }
 
     /// Parse a ZIP archive from raw bytes and extract all IWA files
-    fn parse_zip_bytes(bytes: &[u8]) -> Result<HashMap<String, Archive>> {
-        let archive = ArchiveReader::new(bytes)
+    fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<HashMap<String, Archive>> {
+        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive from bytes: {}", e)))?;
 
-        parse_iwa_files_from_archive(&archive)
+        parse_iwa_files_from_archive_with_limits(&archive, limits)
     }
 
     /// Parse metadata from Metadata/ directory
@@ -652,6 +832,12 @@ fn ensure_regular_file(path: &Path, label: &str) -> Result<()> {
     }
 }
 
+fn read_bounded_file(path: &Path, limits: BundleLimits, label: &str) -> Result<Vec<u8>> {
+    let size = fs::metadata(path)?.len();
+    limits.check_input_size(size, label)?;
+    fs::read(path).map_err(Error::Io)
+}
+
 fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() => Err(Error::Bundle(format!(
@@ -788,6 +974,52 @@ mod tests {
         );
         assert_eq!(metadata.latest_build_version(), Some("7029"));
         assert_eq!(metadata.document_identifier(), None);
+    }
+
+    #[test]
+    fn bundle_limits_are_checked_and_bound_nested_iwa_decompression() -> crate::Result<()> {
+        let limits = BundleLimits::new(7, 11, 13, 17, 19)?;
+        assert_eq!(limits.max_input_bytes(), 7);
+        assert_eq!(limits.max_entries(), 11);
+        assert_eq!(limits.max_entry_bytes(), 13);
+        assert_eq!(limits.max_total_bytes(), 17);
+        assert_eq!(limits.max_iwa_stream_bytes(), 19);
+        assert!(BundleLimits::new(0, 1, 1, 1, 1).is_err());
+        assert!(BundleLimits::new(1, 1, 1, 1, 0).is_err());
+        assert!(BundleLimits::new(BundleLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1).is_err());
+
+        let compressed = SnappyStream::compress(&[0_u8; 64])?;
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("Index/Document.iwa", &compressed)
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let tight_stream = BundleLimits::new(
+            bytes.len() as u64,
+            BundleLimits::MAX_ENTRIES,
+            BundleLimits::MAX_ENTRY_BYTES,
+            BundleLimits::MAX_TOTAL_BYTES,
+            8,
+        )?;
+        let error = Bundle::from_bytes_with_limits(&bytes, tight_stream).unwrap_err();
+        assert!(error.to_string().contains("Snappy block expands"));
+
+        let tight_input = BundleLimits::new(
+            (bytes.len() - 1) as u64,
+            BundleLimits::MAX_ENTRIES,
+            BundleLimits::MAX_ENTRY_BYTES,
+            BundleLimits::MAX_TOTAL_BYTES,
+            BundleLimits::MAX_IWA_STREAM_BYTES,
+        )?;
+        let error = Bundle::from_bytes_with_limits(&bytes, tight_input).unwrap_err();
+        assert!(error.to_string().contains("iWork bundle input"));
+
+        let file = tempfile::NamedTempFile::new()?;
+        fs::write(file.path(), &bytes)?;
+        let error = Bundle::open_with_limits(file.path(), tight_input).unwrap_err();
+        assert!(error.to_string().contains("iWork bundle is"));
+        Ok(())
     }
 
     #[test]

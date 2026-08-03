@@ -11,6 +11,7 @@ use std::io::Cursor;
 use soapberry_zip::office::ArchiveReader;
 
 use crate::archive::Archive;
+use crate::bundle::BundleLimits;
 use crate::package::is_calculation_engine_entry_name;
 use crate::snappy::SnappyStream;
 use crate::{Error, Result};
@@ -42,6 +43,14 @@ use crate::{Error, Result};
 pub fn parse_iwa_files_from_archive(
     archive: &ArchiveReader<'_>,
 ) -> Result<HashMap<String, Archive>> {
+    parse_iwa_files_from_archive_with_limits(archive, BundleLimits::default())
+}
+
+/// Parse IWA files from a ZIP archive under caller-selected resource limits.
+pub fn parse_iwa_files_from_archive_with_limits(
+    archive: &ArchiveReader<'_>,
+    limits: BundleLimits,
+) -> Result<HashMap<String, Archive>> {
     if is_encrypted_iwork_archive(archive) {
         return Err(Error::InvalidFormat(
             "password-protected iWork documents are not supported".to_owned(),
@@ -49,7 +58,7 @@ pub fn parse_iwa_files_from_archive(
     }
 
     if archive.file_names().any(|name| name.ends_with(".iwa")) {
-        return parse_direct_iwa_files(archive);
+        return parse_direct_iwa_files(archive, limits);
     }
 
     let Some(index_name) = nested_index_zip_name(archive)? else {
@@ -60,12 +69,17 @@ pub fn parse_iwa_files_from_archive(
             "Failed to read legacy package index {index_name}: {error}"
         ))
     })?;
-    let index = ArchiveReader::new(&index_data).map_err(|error| {
-        Error::Bundle(format!(
-            "Failed to open legacy package index {index_name}: {error}"
-        ))
+    let index_size = u64::try_from(index_data.len()).map_err(|_| {
+        Error::InvalidFormat("legacy iWork package index length does not fit u64".to_owned())
     })?;
-    let archives = parse_direct_iwa_files(&index)?;
+    limits.check_input_size(index_size, "legacy iWork Index.zip")?;
+    let index =
+        ArchiveReader::new_with_limits(&index_data, limits.archive_limits()).map_err(|error| {
+            Error::Bundle(format!(
+                "Failed to open legacy package index {index_name}: {error}"
+            ))
+        })?;
+    let archives = parse_direct_iwa_files(&index, limits)?;
     if archives.is_empty() {
         return Err(Error::InvalidFormat(format!(
             "legacy package index {index_name} contains no IWA components"
@@ -74,7 +88,10 @@ pub fn parse_iwa_files_from_archive(
     Ok(archives)
 }
 
-fn parse_direct_iwa_files(archive: &ArchiveReader<'_>) -> Result<HashMap<String, Archive>> {
+fn parse_direct_iwa_files(
+    archive: &ArchiveReader<'_>,
+    limits: BundleLimits,
+) -> Result<HashMap<String, Archive>> {
     let mut archives = HashMap::new();
 
     for name in archive.file_names() {
@@ -96,7 +113,8 @@ fn parse_direct_iwa_files(archive: &ArchiveReader<'_>) -> Result<HashMap<String,
 
             // Decompress IWA file
             let mut cursor = Cursor::new(&compressed_data);
-            let decompressed = SnappyStream::decompress(&mut cursor)?;
+            let decompressed =
+                SnappyStream::decompress_with_limits(&mut cursor, limits.snappy_limits()?)?;
 
             // Parse archive
             let iwa_archive = Archive::parse(decompressed.data())?;
