@@ -589,6 +589,16 @@ impl IWorkPackage {
         Ok(())
     }
 
+    /// Validate the staged package state without encoding it.
+    ///
+    /// This is the explicit validation boundary for callers that use the
+    /// low-level [`Self::entry_mut`] escape hatch. It performs the same
+    /// package-member and aggregate budget checks used by serialization, but
+    /// does not allocate a ZIP buffer or publish any output.
+    pub fn validate(&self) -> Result<()> {
+        self.validate_state().map(|_| ())
+    }
+
     /// Encode the package as a ZIP using stored members and the original order.
     ///
     /// Pages and Numbers use a leading `Index/Document.iwa` for package type
@@ -788,6 +798,14 @@ impl Snapshot {
         let name = normalize_entry_name(name);
         let position = self.state.position(name)?;
         Some(self.state.entries[position].1.as_slice())
+    }
+
+    /// Validate this immutable snapshot without creating serialized output.
+    ///
+    /// The check borrows the shared package state and applies the same
+    /// resource and entry-name invariants as [`IWorkPackage::validate`].
+    pub fn validate(&self) -> Result<()> {
+        self.edit().validate()
     }
 
     /// Start a mutable copy-on-write edit from this snapshot.
@@ -1105,6 +1123,24 @@ mod tests {
         package.entry_mut("Data/asset").unwrap().push(5);
         let error = package.to_bytes().unwrap_err();
         assert!(error.to_string().contains("member"));
+    }
+
+    #[test]
+    fn explicit_validation_checks_escape_hatches_without_mutating_snapshots() {
+        let limits = PackageLimits::new(1, 4, 4).unwrap();
+        let mut package = empty_package_with_limits(limits);
+        package
+            .insert_entry("Data/asset", vec![1, 2, 3, 4])
+            .unwrap();
+        let snapshot = package.snapshot();
+
+        assert!(package.validate().is_ok());
+        assert!(snapshot.validate().is_ok());
+
+        package.entry_mut("Data/asset").unwrap().push(5);
+        assert!(package.validate().is_err());
+        assert!(snapshot.validate().is_ok());
+        assert_eq!(snapshot.entry("Data/asset"), Some([1, 2, 3, 4].as_slice()));
     }
 
     #[test]
