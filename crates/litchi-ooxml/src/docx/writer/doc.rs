@@ -1449,7 +1449,8 @@ impl MutableDocument {
         chunk: Chunk,
         namespace: Conformance,
     ) -> Result<()> {
-        self.body.insert_alt(index, chunk, namespace)?;
+        let position = self.body.insert_alt(index, chunk, namespace)?;
+        shift_toc_index_on_insert(&mut self.toc_config, position);
         self.modified = true;
         Ok(())
     }
@@ -1468,7 +1469,8 @@ impl MutableDocument {
 
     /// Remove an alternative-format anchor.
     pub(crate) fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
-        let old = self.body.remove_alt(index)?;
+        let (position, old) = self.body.remove_alt(index)?;
+        shift_toc_index_on_remove(&mut self.toc_config, position);
         self.modified = true;
         Ok(old)
     }
@@ -2262,7 +2264,7 @@ impl DocumentBody {
             .collect()
     }
 
-    fn insert_alt(&mut self, index: usize, chunk: Chunk, namespace: Conformance) -> Result<()> {
+    fn insert_alt(&mut self, index: usize, chunk: Chunk, namespace: Conformance) -> Result<usize> {
         let positions = self.alt_positions();
         if index > positions.len() {
             return Err(OoxmlError::InvalidFormat(format!(
@@ -2276,7 +2278,7 @@ impl DocumentBody {
         let xml = chunk.xml(namespace);
         self.elements
             .insert(position, BodyElement::PreservedAlt(xml, chunk));
-        Ok(())
+        Ok(position)
     }
 
     fn replace_alt(&mut self, index: usize, chunk: Chunk, namespace: Conformance) -> Result<Chunk> {
@@ -2298,7 +2300,7 @@ impl DocumentBody {
         }
     }
 
-    fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
+    fn remove_alt(&mut self, index: usize) -> Result<(usize, Chunk)> {
         let position = self.alt_positions().get(index).copied().ok_or_else(|| {
             OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
         })?;
@@ -2308,7 +2310,7 @@ impl DocumentBody {
             ));
         }
         match self.elements.remove(position) {
-            BodyElement::PreservedAlt(_, chunk) => Ok(chunk),
+            BodyElement::PreservedAlt(_, chunk) => Ok((position, chunk)),
             other => {
                 self.elements.insert(position, other);
                 Err(OoxmlError::InvalidFormat(
@@ -3057,6 +3059,21 @@ mod tests {
         let mut doc = MutableDocument::new();
         doc.add_paragraph_with_text("Hello, World!");
         assert_eq!(doc.paragraph_count(), 1);
+    }
+
+    #[test]
+    fn removing_alt_chunk_keeps_pending_toc_insertion_in_bounds() {
+        let mut doc = MutableDocument::new();
+        let chunk = Chunk::new(litchi_docx::alt::Rel::new("rIdAlt1").unwrap(), None);
+        doc.insert_alt(0, chunk, Conformance::Transitional).unwrap();
+        doc.add_toc(TableOfContents::new()).unwrap();
+
+        doc.remove_alt(0).unwrap();
+        doc.generate_toc_if_needed().unwrap();
+
+        assert!(doc.alts().is_empty());
+        assert_eq!(doc.paragraph_count(), 1);
+        assert!(doc.to_xml().unwrap().contains("TOC"));
     }
 
     #[test]

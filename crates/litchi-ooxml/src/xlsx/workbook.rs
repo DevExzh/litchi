@@ -1267,6 +1267,21 @@ impl Workbook {
         Ok(())
     }
 
+    /// Rebuild all read-side caches from the currently published package.
+    ///
+    /// Writer materialization replaces workbook and worksheet parts before the
+    /// final sink accepts the candidate. If a later validation or sink step
+    /// fails, restoring only the package graph would leave these caches
+    /// describing the unpublished candidate instead of the retryable source.
+    fn reload_read_side_caches(&mut self) -> SheetResult<()> {
+        self.shared_strings = SharedStrings::default();
+        self.styles = Styles::default();
+        self.load_workbook_info()?;
+        self.load_shared_strings()?;
+        self.load_styles()?;
+        Ok(())
+    }
+
     fn related_workbook_part_uri(
         &self,
         relationship_types: &[&str],
@@ -2454,14 +2469,15 @@ impl Workbook {
             .map(|d| d.is_modified())
             .unwrap_or(false);
 
+        let package_before_materialization = should_update.then(|| self.package.clone());
+        let mut materialized_worksheet_web_binding_indexes = Vec::new();
+
         if should_update {
             // Take mutable_data temporarily to avoid borrow issues. Keep a
-            // package snapshot until every materialization step has passed so
-            // a malformed companion part or writer output cannot consume the
+            // package snapshot through the complete publication attempt so a
+            // malformed companion part or writer output cannot consume the
             // retryable edit state or publish a half-rebuilt package.
-            let package_before_materialization = self.package.clone();
             if let Some(mut mutable_data) = self.mutable_data.take() {
-                let mut worksheet_web_binding_indexes = Vec::new();
                 let materialization = (|| -> SheetResult<()> {
                     let worksheet_web_bindings = (0..self.worksheets.len())
                         .filter(|index| self.is_spreadsheetml_worksheet(*index))
@@ -2475,7 +2491,7 @@ impl Workbook {
                         .into_iter()
                         .flatten()
                         .collect::<Vec<_>>();
-                    worksheet_web_binding_indexes
+                    materialized_worksheet_web_binding_indexes
                         .extend(worksheet_web_bindings.iter().map(|(index, _)| *index));
                     // The mutable writer rebuilds workbook and worksheet relationship
                     // collections. Detach inert companion parts first so old targets
@@ -2585,21 +2601,17 @@ impl Workbook {
                 })();
 
                 if let Err(error) = materialization {
-                    self.package = package_before_materialization;
+                    let Some(package_before) = package_before_materialization.as_ref() else {
+                        return Err("missing XLSX materialization snapshot".into());
+                    };
+                    self.package = package_before.clone();
                     self.mutable_data = Some(mutable_data);
                     // Materialization reparses the newly written workbook
                     // before publishing it. If that reparse fails after one
                     // cache was refreshed, rebuild all read-side caches from
                     // the restored source package so the retry sees one
                     // coherent snapshot rather than a mixed state.
-                    self.shared_strings = SharedStrings::default();
-                    self.styles = Styles::default();
-                    let rollback = (|| -> SheetResult<()> {
-                        self.load_workbook_info()?;
-                        self.load_shared_strings()?;
-                        self.load_styles()?;
-                        Ok(())
-                    })();
+                    let rollback = self.reload_read_side_caches();
                     if let Err(rollback_error) = rollback {
                         return Err(format!(
                             "XLSX materialization failed ({error}); restoring the source caches also failed ({rollback_error})"
@@ -2609,31 +2621,53 @@ impl Workbook {
                     return Err(error);
                 }
 
-                for index in worksheet_web_binding_indexes {
-                    self.worksheet_web_binding_mutations.remove(&index);
-                }
                 self.mutable_data = Some(mutable_data);
             }
         }
 
-        let staged = self.stage_worksheet_mutations()?;
+        let staged = match self.stage_worksheet_mutations() {
+            Ok(staged) => staged,
+            Err(error) => {
+                if let Some(package_before) = package_before_materialization.as_ref() {
+                    self.package = package_before.clone();
+                    if let Err(rollback_error) = self.reload_read_side_caches() {
+                        return Err(format!(
+                            "XLSX worksheet staging failed ({error}); restoring the source caches also failed ({rollback_error})"
+                        )
+                        .into());
+                    }
+                }
+                return Err(error);
+            },
+        };
         if !should_update && !self.properties.is_dirty() && staged.is_empty() {
             return write(&self.package);
         }
 
         let mut originals = Vec::new();
-        originals
-            .try_reserve_exact(staged.len())
-            .map_err(|source| crate::error::OoxmlError::Allocation {
-                resource: "worksheet restoration plan",
-                source,
-            })?;
+        if let Err(source) = originals.try_reserve_exact(staged.len()) {
+            let error: Box<dyn std::error::Error + Send + Sync> =
+                Box::new(crate::error::OoxmlError::Allocation {
+                    resource: "worksheet restoration plan",
+                    source,
+                });
+            if let Some(package_before) = package_before_materialization.as_ref() {
+                self.package = package_before.clone();
+                if let Err(rollback_error) = self.reload_read_side_caches() {
+                    return Err(format!(
+                        "XLSX worksheet restoration planning failed ({error}); restoring the source caches also failed ({rollback_error})"
+                    )
+                    .into());
+                }
+            }
+            return Err(error);
+        }
 
         // The late save phase is transactional. Cloning the OPC graph shares
         // built-in immutable part payloads through `Arc`; custom `Part`
         // implementations retain their own clone policy. A failed sink leaves
         // both the package and the dirty properties slot ready for a retry.
-        let package_before = self.package.clone();
+        let package_before = package_before_materialization.unwrap_or_else(|| self.package.clone());
         let result = (|| {
             // Extended properties describe the materialized writer model.
             // Metadata-only and worksheet-overlay saves must retain an
@@ -2663,9 +2697,20 @@ impl Workbook {
         })();
 
         match result {
-            Ok(value) => Ok(value),
+            Ok(value) => {
+                for index in materialized_worksheet_web_binding_indexes {
+                    self.worksheet_web_binding_mutations.remove(&index);
+                }
+                Ok(value)
+            },
             Err(error) => {
                 self.package = package_before;
+                if should_update && let Err(rollback_error) = self.reload_read_side_caches() {
+                    return Err(format!(
+                        "XLSX publication failed ({error}); restoring the source caches also failed ({rollback_error})"
+                    )
+                    .into());
+                }
                 Err(error)
             },
         }
@@ -4623,6 +4668,127 @@ mod tests {
             &app_before,
             &workbook.package.get_part(&app).unwrap().blob_arc()
         ));
+    }
+
+    #[test]
+    fn materialized_late_failure_restores_source_graph_and_read_caches() {
+        let mut workbook = Workbook::create().unwrap();
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "retryable materialization");
+
+        let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        let worksheet_before = workbook
+            .package
+            .get_part(&worksheet_uri)
+            .unwrap()
+            .blob_arc();
+        let worksheet_names_before = workbook.worksheet_names.clone();
+
+        let error = workbook
+            .write_with::<()>(|_| Err("injected post-materialization failure".into()))
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("injected post-materialization failure")
+        );
+        assert!(std::sync::Arc::ptr_eq(
+            &worksheet_before,
+            &workbook
+                .package
+                .get_part(&worksheet_uri)
+                .unwrap()
+                .blob_arc()
+        ));
+        assert_eq!(workbook.worksheet_names, worksheet_names_before);
+        assert!(
+            workbook
+                .mutable_data
+                .as_ref()
+                .is_some_and(|data| data.is_modified())
+        );
+
+        let output = workbook
+            .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
+            .unwrap();
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn materialized_late_failure_retains_worksheet_binding_mutation() {
+        let mut workbook = Workbook::create().unwrap();
+        workbook
+            .package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+            .unwrap()
+            .set_blob(
+                include_bytes!("../../../../test-data/ooxml/web_extensions/worksheet_bindings.xml")
+                    .to_vec(),
+            );
+        assert!(workbook.remove_worksheet_web_bindings(0).unwrap());
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "retryable binding mutation");
+        assert!(workbook.worksheet_web_binding_mutations.contains_key(&0));
+
+        let error = workbook
+            .write_with::<()>(|_| Err("injected binding publication failure".into()))
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("injected binding publication failure")
+        );
+        assert!(workbook.worksheet_web_binding_mutations.contains_key(&0));
+        assert!(workbook.write_with(|_| Ok(())).is_ok());
+    }
+
+    #[test]
+    fn materialized_staging_failure_restores_source_graph() {
+        let mut workbook = Workbook::create().unwrap();
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "retryable staging");
+        let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        let worksheet_before = workbook
+            .package
+            .get_part(&worksheet_uri)
+            .unwrap()
+            .blob_arc();
+        workbook
+            .worksheet_data_validation_mutations
+            .insert(usize::MAX, Vec::new());
+        let sink_called = std::cell::Cell::new(false);
+
+        let error = workbook
+            .write_with::<()>(|_| {
+                sink_called.set(true);
+                Ok(())
+            })
+            .unwrap_err();
+        assert!(!sink_called.get());
+        assert!(error.to_string().contains("Worksheet index out of bounds"));
+        assert!(std::sync::Arc::ptr_eq(
+            &worksheet_before,
+            &workbook
+                .package
+                .get_part(&worksheet_uri)
+                .unwrap()
+                .blob_arc()
+        ));
+        assert!(
+            workbook
+                .mutable_data
+                .as_ref()
+                .is_some_and(|data| data.is_modified())
+        );
+
+        workbook.worksheet_data_validation_mutations.clear();
+        assert!(workbook.write_with(|_| Ok(())).is_ok());
     }
 
     #[test]

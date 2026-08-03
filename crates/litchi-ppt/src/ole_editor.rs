@@ -14,6 +14,7 @@ const EX_OBJ_LIST: u16 = 1033;
 const USER_EDIT: u16 = 4085;
 const PERSIST_FULL: u16 = 6001;
 const PERSIST_INCREMENTAL: u16 = 6002;
+const MAX_NESTED_RECORD_DEPTH: usize = 256;
 
 /// Appends a new PPT incremental edit; existing persisted bytes never move.
 #[derive(Clone)]
@@ -381,24 +382,40 @@ fn mapping_chain(document: &[u8], mut edit_offset: u32) -> Result<(BTreeMap<u32,
 }
 
 fn replace_nested_record(record: &[u8], target: u16, replacement: &[u8]) -> Result<Vec<u8>> {
+    replace_nested_record_at_depth(record, target, replacement, 0)?
+        .ok_or_else(|| PptError::Corrupted("ExObjList not found in Document container".into()))
+}
+
+fn replace_nested_record_at_depth(
+    record: &[u8],
+    target: u16,
+    replacement: &[u8],
+    depth: usize,
+) -> Result<Option<Vec<u8>>> {
+    if depth >= MAX_NESTED_RECORD_DEPTH {
+        return Err(PptError::Corrupted(
+            "PPT record nesting exceeds the safety limit".into(),
+        ));
+    }
     if type_of(record)? == target {
-        return Ok(replacement.to_vec());
+        return Ok(Some(replacement.to_vec()));
     }
     let version = u16::from_le_bytes([record[0], record[1]]) & 0xF;
     if version != 0xF {
-        return Err(PptError::Corrupted(
-            "ExObjList not found in Document container".into(),
-        ));
+        return Ok(None);
     }
     let mut data = Vec::new();
     let mut offset = 8usize;
     let mut found = false;
     while offset < record.len() {
         let child = record_slice(record, offset)?;
-        if (type_of(child)? == target || (u16::from_le_bytes([child[0], child[1]]) & 0xF) == 0xF)
-            && let Ok(changed) = replace_nested_record(child, target, replacement)
+        let child_type = type_of(child)?;
+        let child_is_container = u16::from_le_bytes([child[0], child[1]]) & 0xF == 0xF;
+        if (child_type == target || child_is_container)
+            && let Some(changed) =
+                replace_nested_record_at_depth(child, target, replacement, depth + 1)?
         {
-            found |= changed != child;
+            found = true;
             data.extend_from_slice(&changed);
             offset += child.len();
             continue;
@@ -407,14 +424,12 @@ fn replace_nested_record(record: &[u8], target: u16, replacement: &[u8]) -> Resu
         offset += child.len();
     }
     if !found {
-        return Err(PptError::Corrupted(
-            "ExObjList not found in Document container".into(),
-        ));
+        return Ok(None);
     }
     let mut output = record[..4].to_vec();
     output.extend_from_slice(&(data.len() as u32).to_le_bytes());
     output.extend_from_slice(&data);
-    Ok(output)
+    Ok(Some(output))
 }
 
 fn record_slice(data: &[u8], offset: usize) -> Result<&[u8]> {
@@ -473,6 +488,27 @@ mod tests {
                 .any(|value| value == replacement)
         );
         assert!(!rewritten.windows(old.len()).any(|value| value == old));
+    }
+
+    #[test]
+    fn rejects_excessive_nested_records_without_stack_exhaustion() {
+        let mut document = ppt_record(0x000F, EX_OBJ_LIST, b"old");
+        for _ in 0..=MAX_NESTED_RECORD_DEPTH {
+            document = ppt_record(0x000F, 1000, &document);
+        }
+
+        let error = replace_nested_record(
+            &document,
+            EX_OBJ_LIST,
+            &ppt_record(0x000F, EX_OBJ_LIST, b"new"),
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            PptError::Corrupted(message)
+                if message == "PPT record nesting exceeds the safety limit"
+        ));
     }
 
     #[test]
