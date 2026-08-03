@@ -4,7 +4,7 @@
 //! This registry provides mappings from type IDs to message names for different applications.
 
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, fmt, str::FromStr};
 
 /// Application type for iWork documents
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -19,16 +19,95 @@ pub enum Application {
     Common,
 }
 
-impl FromStr for Application {
-    type Err = &'static str;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "pages" => Ok(Self::Pages),
-            "keynote" => Ok(Self::Keynote),
-            "numbers" => Ok(Self::Numbers),
-            "common" => Ok(Self::Common),
-            _ => Err("Invalid input"),
+impl Application {
+    /// Return the stable lowercase name used by configuration and diagnostics.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pages => "pages",
+            Self::Keynote => "keynote",
+            Self::Numbers => "numbers",
+            Self::Common => "common",
         }
+    }
+
+    /// Return whether this is one of the three concrete iWork applications.
+    pub const fn is_concrete(self) -> bool {
+        !matches!(self, Self::Common)
+    }
+}
+
+impl fmt::Display for Application {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Error returned when a string does not name a supported iWork application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ApplicationParseError;
+
+impl fmt::Display for ApplicationParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("unknown iWork application")
+    }
+}
+
+impl std::error::Error for ApplicationParseError {}
+
+impl FromStr for Application {
+    type Err = ApplicationParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("pages") {
+            Ok(Self::Pages)
+        } else if s.eq_ignore_ascii_case("keynote") {
+            Ok(Self::Keynote)
+        } else if s.eq_ignore_ascii_case("numbers") {
+            Ok(Self::Numbers)
+        } else if s.eq_ignore_ascii_case("common") {
+            Ok(Self::Common)
+        } else {
+            Err(ApplicationParseError)
+        }
+    }
+}
+
+/// Error returned when a numeric message ID has more than one definition in
+/// the requested registry scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MessageLookupError {
+    /// Multiple definitions match the ID, so selecting one would be unsafe.
+    Ambiguous {
+        /// The numeric protobuf message ID.
+        id: u32,
+        /// `None` for the complete registry, or the application scope used.
+        application: Option<Application>,
+    },
+}
+
+impl fmt::Display for MessageLookupError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ambiguous {
+                id,
+                application: Some(application),
+            } => write!(
+                formatter,
+                "message type ID {id} is ambiguous for {application}"
+            ),
+            Self::Ambiguous {
+                id,
+                application: None,
+            } => write!(formatter, "message type ID {id} is ambiguous"),
+        }
+    }
+}
+
+impl std::error::Error for MessageLookupError {}
+
+impl MessageLookupError {
+    fn ambiguous(id: u32, application: Option<Application>) -> Self {
+        Self::Ambiguous { id, application }
     }
 }
 
@@ -78,9 +157,44 @@ impl MessageRegistry {
             .and_then(|types| (types.len() == 1).then_some(&types[0]))
     }
 
+    /// Look up a message type and distinguish absence from ambiguity.
+    pub fn lookup_unique(&self, id: u32) -> Result<Option<&MessageType>, MessageLookupError> {
+        let mut definitions = self.lookup_all(id).iter();
+        let Some(definition) = definitions.next() else {
+            return Ok(None);
+        };
+        if definitions.next().is_some() {
+            return Err(MessageLookupError::ambiguous(id, None));
+        }
+        Ok(Some(definition))
+    }
+
     /// Return every registered definition for a numeric message ID.
     pub fn lookup_all(&self, id: u32) -> &[MessageType] {
         self.types.get(&id).map_or(&[], Vec::as_slice)
+    }
+
+    /// Look up the unique definition for an application-scoped message ID.
+    ///
+    /// A numeric ID may be shared by applications, while an application can
+    /// still have only one definition for that ID. Missing definitions return
+    /// `Ok(None)` and multiple definitions return a typed ambiguity error.
+    pub fn lookup_for_application(
+        &self,
+        id: u32,
+        application: Application,
+    ) -> Result<Option<&MessageType>, MessageLookupError> {
+        let mut definitions = self
+            .lookup_all(id)
+            .iter()
+            .filter(|definition| definition.application == application);
+        let Some(definition) = definitions.next() else {
+            return Ok(None);
+        };
+        if definitions.next().is_some() {
+            return Err(MessageLookupError::ambiguous(id, Some(application)));
+        }
+        Ok(Some(definition))
     }
 
     /// Get all message types for a specific application
@@ -263,9 +377,24 @@ pub fn get_message_type(id: u32) -> Option<&'static MessageType> {
     MESSAGE_REGISTRY.lookup(id)
 }
 
+/// Strictly look up one message definition by numeric ID.
+pub fn get_message_type_unique(
+    id: u32,
+) -> Result<Option<&'static MessageType>, MessageLookupError> {
+    MESSAGE_REGISTRY.lookup_unique(id)
+}
+
 /// Get every registered message definition for a numeric ID.
 pub fn get_message_types(id: u32) -> &'static [MessageType] {
     MESSAGE_REGISTRY.lookup_all(id)
+}
+
+/// Strictly look up one message definition within an application namespace.
+pub fn get_message_type_for_app(
+    id: u32,
+    application: Application,
+) -> Result<Option<&'static MessageType>, MessageLookupError> {
+    MESSAGE_REGISTRY.lookup_for_application(id, application)
 }
 
 /// Get all message types for a specific application
@@ -477,9 +606,33 @@ mod tests {
         assert!(get_message_type(101).is_none());
         assert!(get_message_types(1).len() > 1);
         assert!(get_message_types(101).len() > 1);
+        assert!(matches!(
+            get_message_type_unique(1),
+            Err(MessageLookupError::Ambiguous {
+                id: 1,
+                application: None
+            })
+        ));
         assert_eq!(
             get_message_type(8).map(|message| message.application),
             Some(Application::Keynote)
+        );
+        assert_eq!(
+            get_message_type_unique(8)
+                .unwrap()
+                .map(|message| message.name),
+            Some("KN.BuildArchive")
+        );
+        assert_eq!(
+            get_message_type_for_app(7, Application::Pages)
+                .unwrap()
+                .map(|message| message.name),
+            Some("TP.ImageArchive")
+        );
+        assert!(
+            get_message_type_for_app(999, Application::Pages)
+                .unwrap()
+                .is_none()
         );
         assert!(get_message_type(999).is_none()); // Non-existent type
 
@@ -504,6 +657,20 @@ mod tests {
         registry.register(7, "TN.DocumentArchive", Application::Numbers);
 
         assert!(registry.lookup(7).is_none());
+        assert!(matches!(
+            registry.lookup_unique(7),
+            Err(MessageLookupError::Ambiguous {
+                id: 7,
+                application: None
+            })
+        ));
+        assert_eq!(
+            registry
+                .lookup_for_application(7, Application::Pages)
+                .unwrap()
+                .map(|message| message.name),
+            Some("TP.DocumentArchive")
+        );
         assert_eq!(
             registry.lookup_all(7),
             &[
@@ -582,6 +749,10 @@ mod tests {
         assert_eq!(Application::from_str("Pages"), Ok(Application::Pages));
         assert_eq!(Application::from_str("keynote"), Ok(Application::Keynote));
         assert_eq!(Application::from_str("numbers"), Ok(Application::Numbers));
-        assert_eq!(Application::from_str("unknown"), Err("Invalid input"));
+        assert_eq!(Application::from_str("unknown"), Err(ApplicationParseError));
+        assert_eq!(Application::Pages.as_str(), "pages");
+        assert_eq!(Application::Pages.to_string(), "pages");
+        assert!(Application::Pages.is_concrete());
+        assert!(!Application::Common.is_concrete());
     }
 }
