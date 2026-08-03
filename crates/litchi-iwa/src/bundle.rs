@@ -6,7 +6,8 @@
 //! - `Metadata/`: Document metadata and properties
 //! - Preview images at root level
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -181,6 +182,199 @@ struct BundleState {
     archives: HashMap<String, Archive>,
     /// Metadata from Metadata/ directory
     metadata: BundleMetadata,
+}
+
+/// Severity attached to one deterministic bundle validation finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BundleValidationSeverity {
+    /// The bundle can still be consumed, but the producer emitted an unusual
+    /// or incomplete structure.
+    Warning,
+    /// The bundle violates an invariant required by the safe facade.
+    Error,
+}
+
+impl fmt::Display for BundleValidationSeverity {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Warning => "warning",
+            Self::Error => "error",
+        })
+    }
+}
+
+/// Stable code identifying one bundle validation rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BundleValidationCode {
+    /// No IWA archives were found in the bundle.
+    EmptyBundle,
+    /// An individual IWA archive contains no objects.
+    EmptyArchive,
+    /// No objects were found across any archive.
+    NoObjects,
+    /// An object has no archive identifier.
+    MissingObjectIdentifier,
+    /// An object uses the protobuf null identifier.
+    NullObjectIdentifier,
+    /// An object identifier occurs more than once in the bundle.
+    DuplicateObjectIdentifier,
+    /// Archive metadata and payload counts differ.
+    MessageInfoCountMismatch,
+    /// A message's declared length differs from its payload length.
+    MessageLengthMismatch,
+}
+
+impl fmt::Display for BundleValidationCode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::EmptyBundle => "empty-bundle",
+            Self::EmptyArchive => "empty-archive",
+            Self::NoObjects => "no-objects",
+            Self::MissingObjectIdentifier => "missing-object-identifier",
+            Self::NullObjectIdentifier => "null-object-identifier",
+            Self::DuplicateObjectIdentifier => "duplicate-object-identifier",
+            Self::MessageInfoCountMismatch => "message-info-count-mismatch",
+            Self::MessageLengthMismatch => "message-length-mismatch",
+        })
+    }
+}
+
+/// One structured, source-located bundle validation finding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BundleValidationIssue {
+    severity: BundleValidationSeverity,
+    code: BundleValidationCode,
+    archive_name: Option<String>,
+    object_id: Option<u64>,
+}
+
+impl BundleValidationIssue {
+    /// Return the finding severity.
+    pub const fn severity(&self) -> BundleValidationSeverity {
+        self.severity
+    }
+
+    /// Return the stable validation rule code.
+    pub const fn code(&self) -> BundleValidationCode {
+        self.code
+    }
+
+    /// Return the deterministic archive location, when applicable.
+    pub fn archive_name(&self) -> Option<&str> {
+        self.archive_name.as_deref()
+    }
+
+    /// Return the native object identifier, when applicable.
+    pub const fn object_id(&self) -> Option<u64> {
+        self.object_id
+    }
+}
+
+impl fmt::Display for BundleValidationIssue {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}: {}", self.severity, self.code)?;
+        if let Some(archive_name) = &self.archive_name {
+            write!(formatter, " archive={archive_name}")?;
+        }
+        if let Some(object_id) = self.object_id {
+            write!(formatter, " object={object_id}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Bounded, deterministic validation output for one parsed iWork bundle.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BundleValidationReport {
+    issues: Vec<BundleValidationIssue>,
+    truncated: bool,
+}
+
+impl BundleValidationReport {
+    /// Maximum number of findings retained by one report.
+    pub const MAX_ISSUES: usize = 4096;
+
+    /// Return findings in stable archive/object/source order.
+    pub fn issues(&self) -> &[BundleValidationIssue] {
+        &self.issues
+    }
+
+    /// Return whether the scan completed without hitting the diagnostic cap.
+    pub const fn is_complete(&self) -> bool {
+        !self.truncated
+    }
+
+    /// Return whether no errors were found and the scan completed.
+    pub fn is_valid(&self) -> bool {
+        !self.truncated
+            && self
+                .issues
+                .iter()
+                .all(|issue| !matches!(issue.severity, BundleValidationSeverity::Error))
+    }
+
+    /// Return whether at least one error finding was retained.
+    pub fn has_errors(&self) -> bool {
+        self.issues
+            .iter()
+            .any(|issue| issue.severity == BundleValidationSeverity::Error)
+    }
+
+    /// Count retained findings of one severity.
+    pub fn count(&self, severity: BundleValidationSeverity) -> usize {
+        self.issues
+            .iter()
+            .filter(|issue| issue.severity == severity)
+            .count()
+    }
+
+    /// Convert this report to the crate's compatibility result API.
+    pub fn as_result(&self) -> Result<()> {
+        if self.is_valid() {
+            Ok(())
+        } else {
+            Err(Error::Bundle(self.to_string()))
+        }
+    }
+
+    fn push(
+        &mut self,
+        severity: BundleValidationSeverity,
+        code: BundleValidationCode,
+        archive_name: Option<&str>,
+        object_id: Option<u64>,
+    ) {
+        if self.issues.len() >= Self::MAX_ISSUES {
+            self.truncated = true;
+            return;
+        }
+        self.issues.push(BundleValidationIssue {
+            severity,
+            code,
+            archive_name: archive_name.map(str::to_owned),
+            object_id,
+        });
+    }
+}
+
+impl fmt::Display for BundleValidationReport {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_valid() && self.issues.is_empty() {
+            return formatter.write_str("bundle validation passed");
+        }
+        write!(
+            formatter,
+            "bundle validation found {} issue(s)",
+            self.issues.len()
+        )?;
+        if self.truncated {
+            formatter.write_str(" (report truncated)")?;
+        }
+        for issue in &self.issues {
+            write!(formatter, "; {issue}")?;
+        }
+        Ok(())
+    }
 }
 
 impl Bundle {
@@ -573,41 +767,100 @@ impl Bundle {
         &self.state.bundle_path
     }
 
-    /// Validate the bundle structure and integrity
-    ///
-    /// Performs comprehensive validation including:
-    /// - Checking for required archives
-    /// - Verifying IWA file format correctness
-    /// - Detecting corrupted or incomplete data
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` if validation passes
-    /// * `Err(Error)` with detailed error message if validation fails
-    pub fn validate(&self) -> Result<()> {
-        // Check that we have at least one archive
+    /// Return a bounded, deterministic validation report without mutating the
+    /// bundle or emitting diagnostics to the process-wide stderr stream.
+    pub fn validation_report(&self) -> BundleValidationReport {
+        let mut report = BundleValidationReport::default();
         if self.state.archives.is_empty() {
-            return Err(Error::Bundle(
-                "Bundle contains no archives - may be corrupted or empty".to_string(),
-            ));
+            report.push(
+                BundleValidationSeverity::Error,
+                BundleValidationCode::EmptyBundle,
+                None,
+                None,
+            );
+            return report;
         }
 
-        // Verify each archive has at least one object
-        let mut total_objects = 0;
+        let mut identifiers = HashSet::new();
+        let mut total_objects = 0usize;
         for (archive_name, archive) in self.archives_in_order() {
             if archive.objects.is_empty() {
-                eprintln!("Warning: Archive '{}' contains no objects", archive_name);
+                report.push(
+                    BundleValidationSeverity::Warning,
+                    BundleValidationCode::EmptyArchive,
+                    Some(archive_name),
+                    None,
+                );
             }
-            total_objects += archive.objects.len();
+
+            total_objects = total_objects.saturating_add(archive.objects.len());
+            for object in &archive.objects {
+                let object_id = object.archive_info.identifier;
+                match object_id {
+                    None => report.push(
+                        BundleValidationSeverity::Error,
+                        BundleValidationCode::MissingObjectIdentifier,
+                        Some(archive_name),
+                        None,
+                    ),
+                    Some(0) => report.push(
+                        BundleValidationSeverity::Error,
+                        BundleValidationCode::NullObjectIdentifier,
+                        Some(archive_name),
+                        Some(0),
+                    ),
+                    Some(identifier) => {
+                        if !identifiers.insert(identifier) {
+                            report.push(
+                                BundleValidationSeverity::Error,
+                                BundleValidationCode::DuplicateObjectIdentifier,
+                                Some(archive_name),
+                                Some(identifier),
+                            );
+                        }
+                    },
+                }
+
+                if object.archive_info.message_infos.len() != object.messages.len() {
+                    report.push(
+                        BundleValidationSeverity::Error,
+                        BundleValidationCode::MessageInfoCountMismatch,
+                        Some(archive_name),
+                        object_id,
+                    );
+                }
+                for (message_info, message) in object
+                    .archive_info
+                    .message_infos
+                    .iter()
+                    .zip(&object.messages)
+                {
+                    if usize::try_from(message_info.length).ok() != Some(message.data.len()) {
+                        report.push(
+                            BundleValidationSeverity::Error,
+                            BundleValidationCode::MessageLengthMismatch,
+                            Some(archive_name),
+                            object_id,
+                        );
+                    }
+                }
+            }
         }
 
         if total_objects == 0 {
-            return Err(Error::Bundle(
-                "Bundle contains no objects across all archives - may be corrupted".to_string(),
-            ));
+            report.push(
+                BundleValidationSeverity::Error,
+                BundleValidationCode::NoObjects,
+                None,
+                None,
+            );
         }
+        report
+    }
 
-        Ok(())
+    /// Validate the bundle structure and integrity without side effects.
+    pub fn validate(&self) -> Result<()> {
+        self.validation_report().as_result()
     }
 
     /// Check if the bundle appears to be corrupted
@@ -1152,5 +1405,108 @@ mod tests {
             Some(("Index/A.iwa".to_owned(), 2))
         );
         Ok(())
+    }
+
+    #[test]
+    fn validation_report_is_structured_and_deterministic() -> Result<()> {
+        let empty = Archive {
+            objects: Vec::new(),
+        };
+        let mut length_mismatch = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 7,
+                data: vec![1],
+            }],
+        )?;
+        length_mismatch.archive_info.message_infos[0].length = 9;
+        let mut duplicate = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 8,
+                data: Vec::new(),
+            }],
+        )?;
+        duplicate.archive_info.message_infos.clear();
+
+        let bundle = Bundle::from_parts(
+            PathBuf::from("<test>"),
+            HashMap::from([
+                (
+                    "Index/C.iwa".to_owned(),
+                    Archive {
+                        objects: vec![duplicate],
+                    },
+                ),
+                ("Index/A.iwa".to_owned(), empty),
+                (
+                    "Index/B.iwa".to_owned(),
+                    Archive {
+                        objects: vec![length_mismatch],
+                    },
+                ),
+            ]),
+            BundleMetadata::default(),
+        );
+
+        let report = bundle.validation_report();
+        let findings: Vec<_> = report
+            .issues()
+            .iter()
+            .map(|issue| (issue.code(), issue.archive_name(), issue.object_id()))
+            .collect();
+        assert_eq!(
+            findings,
+            vec![
+                (
+                    BundleValidationCode::EmptyArchive,
+                    Some("Index/A.iwa"),
+                    None
+                ),
+                (
+                    BundleValidationCode::MessageLengthMismatch,
+                    Some("Index/B.iwa"),
+                    Some(1)
+                ),
+                (
+                    BundleValidationCode::DuplicateObjectIdentifier,
+                    Some("Index/C.iwa"),
+                    Some(1)
+                ),
+                (
+                    BundleValidationCode::MessageInfoCountMismatch,
+                    Some("Index/C.iwa"),
+                    Some(1)
+                ),
+            ]
+        );
+        assert_eq!(report.count(BundleValidationSeverity::Warning), 1);
+        assert_eq!(report.count(BundleValidationSeverity::Error), 3);
+        assert!(report.is_complete());
+        assert!(!report.is_valid());
+        assert!(bundle.validate().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn validation_report_is_bounded() {
+        let archives = (0..=BundleValidationReport::MAX_ISSUES)
+            .map(|index| {
+                (
+                    format!("Index/{index:04}.iwa"),
+                    Archive {
+                        objects: Vec::new(),
+                    },
+                )
+            })
+            .collect();
+        let bundle =
+            Bundle::from_parts(PathBuf::from("<test>"), archives, BundleMetadata::default());
+
+        let report = bundle.validation_report();
+        assert_eq!(report.issues().len(), BundleValidationReport::MAX_ISSUES);
+        assert!(!report.is_complete());
+        assert!(!report.is_valid());
+        assert!(report.as_result().is_err());
     }
 }

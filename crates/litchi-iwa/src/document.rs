@@ -213,6 +213,17 @@ impl Document {
         &self.state.bundle
     }
 
+    /// Return a bounded, deterministic validation report for this snapshot.
+    pub fn validation_report(&self) -> crate::bundle::BundleValidationReport {
+        self.state.bundle.validation_report()
+    }
+
+    /// Validate this immutable snapshot without mutating it or emitting
+    /// process-wide diagnostics.
+    pub fn validate(&self) -> Result<()> {
+        self.validation_report().as_result()
+    }
+
     /// Get document metadata
     pub fn metadata(&self) -> &crate::bundle::BundleMetadata {
         self.state.bundle.metadata()
@@ -478,6 +489,8 @@ mod tests {
 
         let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert_eq!(document.application(), Application::Common);
+        assert!(document.validate().is_ok());
+        assert!(document.validation_report().is_valid());
     }
 
     #[test]
