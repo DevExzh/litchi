@@ -159,6 +159,7 @@ pub struct ReferenceGraph {
 #[derive(Debug, Clone)]
 pub struct ReferenceGraphSnapshot {
     state: Arc<GraphState>,
+    ordered_ids: Arc<[ObjectId]>,
 }
 
 /// Allocation-free iterator over validated object IDs in one edge list.
@@ -222,8 +223,11 @@ impl ReferenceGraph {
 
     /// Freeze the current graph into a cheap immutable snapshot.
     pub fn snapshot(&self) -> ReferenceGraphSnapshot {
+        let ordered_ids: Arc<[ObjectId]> =
+            Arc::from(object_ids_in_order(&self.state).into_boxed_slice());
         ReferenceGraphSnapshot {
             state: Arc::clone(&self.state),
+            ordered_ids,
         }
     }
 
@@ -634,12 +638,23 @@ impl ReferenceGraphSnapshot {
             .collect()
     }
 
+    /// Iterate over every object ID in deterministic numeric order.
+    ///
+    /// The order is materialized once when the snapshot is created, so this
+    /// view performs no allocation or sorting and remains stable for the
+    /// lifetime of the immutable snapshot.
+    pub fn iter_object_ids(&self) -> ObjectIdIter<'_> {
+        ObjectIdIter {
+            inner: self.ordered_ids.iter(),
+        }
+    }
+
     /// Get all object IDs in deterministic numeric order.
     ///
-    /// The snapshot shares its graph storage, while this explicit collection
-    /// allocates only the sorted result vector.
+    /// The snapshot shares its graph storage and immutable ID catalog, while
+    /// this explicit collection allocates only the result vector.
     pub fn object_ids(&self) -> Vec<ObjectId> {
-        object_ids_in_order(&self.state)
+        self.ordered_ids.to_vec()
     }
 
     /// Check whether a cycle is reachable from `object_id`.
@@ -661,13 +676,13 @@ impl ReferenceGraphSnapshot {
     /// Return the number of non-null objects in the snapshot.
     #[inline]
     pub fn len(&self) -> usize {
-        object_count(&self.state)
+        self.ordered_ids.len()
     }
 
     /// Return whether the snapshot contains no non-null object references.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.state.incoming_refs.is_empty() && self.state.outgoing_refs.is_empty()
+        self.ordered_ids.is_empty()
     }
 
     /// Return the number of stored non-duplicate edges with non-null endpoints.
@@ -862,6 +877,10 @@ mod tests {
         assert_eq!(snapshot.reachable(one), vec![one, two]);
         assert!(!snapshot.has_cycle_from(one));
         assert_eq!(snapshot.all_object_ids(), HashSet::from([one, two]));
+        assert_eq!(
+            snapshot.iter_object_ids().collect::<Vec<_>>(),
+            vec![one, two]
+        );
         assert_eq!(snapshot.object_ids(), vec![one, two]);
         assert_eq!(snapshot.len(), 2);
         assert_eq!(snapshot.edge_count(), 1);
