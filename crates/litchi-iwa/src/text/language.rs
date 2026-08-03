@@ -13,7 +13,9 @@ use crate::{Error, IWorkPackage, Result};
 use super::language_types::{TextLanguage, TextLanguageRun};
 use super::position::TextPosition;
 use super::storage_wire::{
-    StorageLocation, locate_storage as locate_native_storage, validate_sorted_boundaries,
+    LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
+    locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
+    validate_sorted_boundaries,
 };
 
 const LANGUAGE_TABLE_FIELD: u32 = 19;
@@ -45,7 +47,8 @@ pub(crate) fn text_language(
     storage_id: u64,
     position: TextPosition,
 ) -> Result<TextLanguage> {
-    let location = locate_storage(package, storage_id)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
+    let location = &located.location;
     require_text_boundary(storage_id, position, &location.storage.text)?;
     let entries = language_entries(storage_id, &location.storage, location.table_present)?;
     validate_entries(storage_id, entries, &location.storage.text)?;
@@ -69,8 +72,8 @@ pub(crate) fn set_text_language(
     if text_language(package, storage_id, position)? == *language {
         return Ok(());
     }
-    let location = locate_storage(package, storage_id)?;
-    patch_language(package, &location, storage_id, position, language)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
+    patch_language(package, located, storage_id, position, language)?;
     if text_language(package, storage_id, position)? != *language {
         return Err(Error::InvalidFormat(
             "iWork text-language update failed validation".to_owned(),
@@ -91,7 +94,8 @@ pub(crate) fn remove_text_language_boundary(
                 .to_owned(),
         ));
     }
-    let location = locate_storage(package, storage_id)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
+    let location = &located.location;
     require_text_boundary(storage_id, position, &location.storage.text)?;
     let entries = language_entries(storage_id, &location.storage, location.table_present)?;
     validate_entries(storage_id, entries, &location.storage.text)?;
@@ -101,7 +105,7 @@ pub(crate) fn remove_text_language_boundary(
     {
         return Ok(false);
     }
-    remove_boundary(package, &location, storage_id, position)?;
+    remove_boundary(package, located, storage_id, position)?;
     if text_languages(package, storage_id)?
         .iter()
         .any(|run| run.position == position)
@@ -115,13 +119,14 @@ pub(crate) fn remove_text_language_boundary(
 
 /// Remove the entire explicit language table.
 pub(crate) fn reset_text_languages(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
-    let location = locate_storage(package, storage_id)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
+    let location = &located.location;
     let entries = language_entries(storage_id, &location.storage, location.table_present)?;
     validate_entries(storage_id, entries, &location.storage.text)?;
     if !location.table_present {
         return Ok(false);
     }
-    patch_language_table(package, &location, storage_id, |_, _| Ok(None))?;
+    patch_language_table(package, located, storage_id, |_, _| Ok(None))?;
     if !text_languages(package, storage_id)?.is_empty() {
         return Err(Error::InvalidFormat(
             "iWork text-language reset failed validation".to_owned(),
@@ -138,6 +143,17 @@ fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLoca
         )));
     }
     Ok(location)
+}
+
+fn locate_storage_with_archive(package: &IWorkPackage, storage_id: u64) -> Result<LocatedStorage> {
+    let located =
+        locate_native_storage_with_archive(package, storage_id, LANGUAGE_TABLE_FIELD, "language")?;
+    if located.location.storage.table_language.is_some() != located.location.table_present {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} language-table wire state is inconsistent"
+        )));
+    }
+    Ok(located)
 }
 
 fn language_entries(
@@ -159,12 +175,12 @@ fn language_entries(
 
 fn patch_language(
     package: &mut IWorkPackage,
-    location: &StorageLocation,
+    located: LocatedStorage,
     storage_id: u64,
     position: TextPosition,
     language: &TextLanguage,
 ) -> Result<()> {
-    patch_language_table(package, location, storage_id, |table, storage| {
+    patch_language_table(package, located, storage_id, |table, storage| {
         require_text_boundary(storage_id, position, &storage.text)?;
         match table {
             Some(table) => patch_existing_table(table, position, language).map(Some),
@@ -175,11 +191,11 @@ fn patch_language(
 
 fn remove_boundary(
     package: &mut IWorkPackage,
-    location: &StorageLocation,
+    located: LocatedStorage,
     storage_id: u64,
     position: TextPosition,
 ) -> Result<()> {
-    patch_language_table(package, location, storage_id, |table, storage| {
+    patch_language_table(package, located, storage_id, |table, storage| {
         require_text_boundary(storage_id, position, &storage.text)?;
         let table = table.ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -207,14 +223,16 @@ fn remove_boundary(
 
 fn patch_language_table<F>(
     package: &mut IWorkPackage,
-    location: &StorageLocation,
+    located: LocatedStorage,
     storage_id: u64,
     transform: F,
 ) -> Result<()>
 where
     F: FnOnce(Option<&[u8]>, &StorageArchive) -> Result<Option<Vec<u8>>>,
 {
-    package.update_archive(&location.archive_name, |archive| {
+    let LocatedStorage { location, archive } = located;
+    let archive_name = location.archive_name.clone();
+    update_parsed_archive(package, &archive_name, archive, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
