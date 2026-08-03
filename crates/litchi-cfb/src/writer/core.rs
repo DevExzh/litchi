@@ -7,9 +7,9 @@
 /// # Architecture
 ///
 /// The writer accumulates a complete logical model in memory before serialization.
-/// `write_to` and `save` write directly to their destination, so a sink failure can
-/// leave partial output; callers that require filesystem replacement semantics must
-/// finalize through an atomic temporary-file layer.
+/// `write_to` writes directly to its sink and can leave partial output after a sink
+/// failure. `save` stages the serialized bytes in a sibling temporary file and
+/// atomically replaces its destination only after serialization succeeds.
 ///
 /// # Stream Allocation vs Directory Ordering
 ///
@@ -65,10 +65,27 @@ use super::fat::FatBuilder;
 use super::header::HeaderBuilder;
 use super::minifat::MiniFatBuilder;
 use std::collections::HashMap;
+use std::ffi::OsString;
+use std::fs::{self, File, OpenOptions};
 use std::hash::Hash;
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{self, BufWriter, ErrorKind, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const V3_MAX_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_TEMP_FILE_ATTEMPTS: usize = 128;
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(windows)]
+const MOVEFILE_REPLACE_EXISTING: u32 = 0x0000_0001;
+#[cfg(windows)]
+const MOVEFILE_WRITE_THROUGH: u32 = 0x0000_0008;
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn MoveFileExW(existing_file_name: *const u16, new_file_name: *const u16, flags: u32) -> i32;
+}
 
 #[derive(Debug, Clone, Copy)]
 struct StreamPlan {
@@ -731,10 +748,93 @@ impl OleWriter {
     /// # Ok::<(), litchi_cfb::OleError>(())
     /// ```
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), OleError> {
-        let file = std::fs::File::create(path)?;
-        let mut buffered = std::io::BufWriter::new(file);
-        self.write_to(&mut buffered)?;
-        buffered.flush()?;
+        let path = path.as_ref();
+        let (temporary_path, file) = create_sibling_temp_file(path)?;
+
+        let result = (|| {
+            let mut buffered = BufWriter::new(file);
+            self.write_to(&mut buffered)?;
+            buffered.flush()?;
+            buffered.get_ref().sync_all()?;
+            drop(buffered);
+
+            atomic_replace(&temporary_path, path)?;
+            Ok(())
+        })();
+
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary_path);
+        }
+
+        result
+    }
+}
+
+fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
+    let file_name = path.file_name().ok_or_else(|| {
+        OleError::Io(io::Error::new(
+            ErrorKind::InvalidInput,
+            "CFB output path must name a file",
+        ))
+    })?;
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+
+    for _ in 0..MAX_TEMP_FILE_ATTEMPTS {
+        let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let mut temporary_name = OsString::from(".");
+        temporary_name.push(file_name);
+        temporary_name.push(format!(".litchi-cfb-{}-{counter}.tmp", std::process::id()));
+        let temporary_path = parent.join(temporary_name);
+
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary_path)
+        {
+            Ok(file) => return Ok((temporary_path, file)),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.into()),
+        }
+    }
+
+    Err(OleError::Io(io::Error::new(
+        ErrorKind::AlreadyExists,
+        "could not allocate a unique sibling temporary file for CFB output",
+    )))
+}
+
+#[cfg(not(windows))]
+fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
+    fs::rename(temporary_path, destination)
+}
+
+#[cfg(windows)]
+fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let temporary_path: Vec<u16> = temporary_path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let destination: Vec<u16> = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+
+    // MoveFileExW replaces an existing file on the same volume without the
+    // remove-then-rename gap that would make an overwrite non-atomic.
+    let replaced = unsafe {
+        MoveFileExW(
+            temporary_path.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if replaced == 0 {
+        Err(io::Error::last_os_error())
+    } else {
         Ok(())
     }
 }
@@ -1036,6 +1136,43 @@ mod tests {
         writer.write_to(&mut output).unwrap();
 
         assert_eq!(&output.into_inner()[..MAGIC.len()], MAGIC);
+    }
+
+    #[test]
+    fn save_preserves_existing_destination_when_serialization_fails() {
+        let destination = std::env::temp_dir().join(format!(
+            "litchi-cfb-serialization-failure-{}-{}.ole",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let original = b"keep this destination intact";
+        std::fs::write(&destination, original).unwrap();
+
+        let mut writer = OleWriter::new();
+        // Bypass the public path validation to exercise a serialization error
+        // after save has already created its sibling temporary file.
+        writer.streams.push((Vec::new(), Vec::new()));
+
+        let error = writer.save(&destination).unwrap_err();
+        assert!(error.to_string().contains("stream path must not be empty"));
+        assert_eq!(std::fs::read(&destination).unwrap(), original);
+
+        let temporary_prefix = format!(
+            ".{}.litchi-cfb-",
+            destination.file_name().unwrap().to_string_lossy()
+        );
+        let temporary_exists = std::fs::read_dir(destination.parent().unwrap())
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(&temporary_prefix)
+            });
+        assert!(!temporary_exists);
+
+        std::fs::remove_file(destination).unwrap();
     }
 
     #[test]

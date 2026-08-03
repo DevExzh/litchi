@@ -6,6 +6,21 @@
 use super::super::file::OleFile;
 use super::core::OleWriter;
 use std::io::Cursor;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TEST_DIRECTORY_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn create_test_directory(label: &str) -> PathBuf {
+    let id = TEST_DIRECTORY_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!("litchi-cfb-{label}-{}-{id}", std::process::id()));
+    std::fs::create_dir(&path).unwrap();
+    path
+}
+
+fn remove_test_directory(path: &Path) {
+    std::fs::remove_dir(path).unwrap();
+}
 
 #[test]
 fn test_write_simple_ole_file() {
@@ -376,6 +391,43 @@ fn test_write_to_file() {
 
     // Clean up
     let _ = fs::remove_file(&temp_path);
+}
+
+#[test]
+fn test_save_atomically_overwrites_existing_file() {
+    let directory = create_test_directory("overwrite");
+    let destination = directory.join("document.ole");
+    std::fs::write(&destination, b"old contents").unwrap();
+
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Document"], b"new contents")
+        .unwrap();
+    writer.save(&destination).unwrap();
+
+    let mut ole = OleFile::open(std::fs::File::open(&destination).unwrap()).unwrap();
+    assert_eq!(ole.open_stream(&["Document"]).unwrap(), b"new contents");
+    assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+
+    std::fs::remove_file(&destination).unwrap();
+    remove_test_directory(&directory);
+}
+
+#[test]
+fn test_save_preserves_directory_when_atomic_replace_fails() {
+    let directory = create_test_directory("replace-failure");
+    let destination = directory.join("document.ole");
+    std::fs::create_dir(&destination).unwrap();
+
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Document"], b"contents").unwrap();
+
+    assert!(writer.save(&destination).is_err());
+    assert!(destination.is_dir());
+    assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+
+    remove_test_directory(&destination);
+    remove_test_directory(&directory);
 }
 
 #[test]
