@@ -6,6 +6,56 @@
 //! returns `None`, so malformed or unsupported expressions remain lossless.
 
 use super::external_link::{XlsExternalLinks, XlsExternalNameBody};
+use std::fmt::{self, Write as _};
+
+const MAX_FORMULA_TOKEN_BYTES: usize = 1024 * 1024;
+const MAX_FORMULA_STACK_ENTRIES: usize = 16 * 1024;
+const MAX_RENDERED_FORMULA_BYTES: usize = 8 * 1024 * 1024;
+
+/// Fallible, bounded text assembly for inert formula rendering.
+struct BoundedText {
+    value: String,
+}
+
+impl BoundedText {
+    fn new() -> Self {
+        Self {
+            value: String::new(),
+        }
+    }
+
+    fn push_str(&mut self, value: &str) -> Result<(), ()> {
+        self.write_str(value).map_err(|_| ())
+    }
+
+    fn finish(self) -> String {
+        self.value
+    }
+}
+
+impl fmt::Write for BoundedText {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        let length = self
+            .value
+            .len()
+            .checked_add(value.len())
+            .ok_or(fmt::Error)?;
+        if length > MAX_RENDERED_FORMULA_BYTES {
+            return Err(fmt::Error);
+        }
+        self.value
+            .try_reserve(value.len())
+            .map_err(|_| fmt::Error)?;
+        self.value.push_str(value);
+        Ok(())
+    }
+}
+
+fn render_text(arguments: fmt::Arguments<'_>) -> Result<String, ()> {
+    let mut text = BoundedText::new();
+    fmt::write(&mut text, arguments).map_err(|_| ())?;
+    Ok(text.finish())
+}
 
 /// Workbook-global context needed to resolve BIFF `ixti` sheet references.
 #[derive(Debug, Default)]
@@ -122,7 +172,7 @@ impl FormulaContext {
             .get(usize::from(reference.sup_book))
             .and_then(|names| names.get(name_index))
         {
-            return Some(name.clone());
+            return render_text(format_args!("{name}")).ok();
         }
         if reference.first_sheet != -2 || reference.last_sheet != -2 {
             return None;
@@ -130,10 +180,10 @@ impl FormulaContext {
         let name = self.defined_names.get(name_index)?.as_ref()?;
         match name.sheet_index {
             Some(sheet_index) => {
-                let sheet_name = escape_formula_name(self.sheet_names.get(sheet_index)?);
-                Some(format!("'{sheet_name}'!{}", name.name))
+                let sheet_name = escape_formula_name(self.sheet_names.get(sheet_index)?)?;
+                render_text(format_args!("'{sheet_name}'!{}", name.name)).ok()
             },
-            None => Some(name.name.clone()),
+            None => render_text(format_args!("{}", name.name)).ok(),
         }
     }
 
@@ -145,28 +195,25 @@ impl FormulaContext {
             SupBookKind::Internal => {
                 let first_name = self.sheet_names.get(first)?;
                 let last_name = self.sheet_names.get(last)?;
-                let name = if first == last {
-                    escape_formula_name(first_name)
+                let first_name = escape_formula_name(first_name)?;
+                let last_name = escape_formula_name(last_name)?;
+                if first == last {
+                    render_text(format_args!("'{first_name}'!")).ok()
                 } else {
-                    format!(
-                        "{}:{}",
-                        escape_formula_name(first_name),
-                        escape_formula_name(last_name)
-                    )
-                };
-                Some(format!("'{name}'!"))
+                    render_text(format_args!("'{first_name}:{last_name}'!")).ok()
+                }
             },
             SupBookKind::External(external) => {
                 let first_name = external.sheet_names.get(first)?;
                 let last_name = external.sheet_names.get(last)?;
-                let workbook = external.workbook.replace('[', "(").replace(']', ")");
-                let workbook = escape_formula_name(&workbook);
-                let first_name = escape_formula_name(first_name);
+                let workbook = normalize_external_workbook(&external.workbook)?;
+                let workbook = escape_formula_name(&workbook)?;
+                let first_name = escape_formula_name(first_name)?;
                 if first == last {
-                    Some(format!("'[{workbook}]{first_name}'!"))
+                    render_text(format_args!("'[{workbook}]{first_name}'!")).ok()
                 } else {
-                    let last_name = escape_formula_name(last_name);
-                    Some(format!("'[{workbook}]{first_name}:{last_name}'!"))
+                    let last_name = escape_formula_name(last_name)?;
+                    render_text(format_args!("'[{workbook}]{first_name}:{last_name}'!")).ok()
                 }
             },
             SupBookKind::Other => None,
@@ -174,8 +221,28 @@ impl FormulaContext {
     }
 }
 
-fn escape_formula_name(name: &str) -> String {
-    name.replace('\'', "''")
+fn escape_formula_name(name: &str) -> Option<String> {
+    let mut value = BoundedText::new();
+    for character in name.chars() {
+        if character == '\'' {
+            value.push_str("''").ok()?;
+        } else {
+            fmt::Write::write_char(&mut value, character).ok()?;
+        }
+    }
+    Some(value.finish())
+}
+
+fn normalize_external_workbook(value: &str) -> Option<String> {
+    let mut output = BoundedText::new();
+    for character in value.chars() {
+        match character {
+            '[' => output.push_str("(").ok()?,
+            ']' => output.push_str(")").ok()?,
+            character => fmt::Write::write_char(&mut output, character).ok()?,
+        }
+    }
+    Some(output.finish())
 }
 
 fn parse_external_sup_book(data: &[u8]) -> Option<ExternalSupBook> {
@@ -276,8 +343,14 @@ fn decode_sup_book_url(encoded: &str) -> Option<String> {
 
 /// Render a BIFF8 formula token stream in A1 notation.
 pub(crate) fn render_formula(tokens: &[u8], context: Option<&FormulaContext>) -> Option<String> {
+    if tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+        return None;
+    }
     let mut decoder = FormulaDecoder::new(tokens, context, None);
-    decoder.decode().ok().map(|formula| format!("={formula}"))
+    decoder
+        .decode()
+        .ok()
+        .and_then(|formula| render_text(format_args!("={formula}")).ok())
 }
 
 /// Render a shared formula template at a particular formula-cell origin.
@@ -287,8 +360,14 @@ pub(crate) fn render_shared_formula(
     row: u16,
     column: u16,
 ) -> Option<String> {
+    if tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+        return None;
+    }
     let mut decoder = FormulaDecoder::new(tokens, context, Some((row, column)));
-    decoder.decode().ok().map(|formula| format!("={formula}"))
+    decoder
+        .decode()
+        .ok()
+        .and_then(|formula| render_text(format_args!("={formula}")).ok())
 }
 
 /// Return the shared/array formula anchor encoded by a standalone `PtgExp`.
@@ -306,6 +385,7 @@ struct FormulaDecoder<'a> {
     data: &'a [u8],
     pos: usize,
     stack: Vec<String>,
+    stack_bytes: usize,
     name_x_operands: Vec<usize>,
     context: Option<&'a FormulaContext>,
     shared_origin: Option<(u16, u16)>,
@@ -321,6 +401,7 @@ impl<'a> FormulaDecoder<'a> {
             data,
             pos: 0,
             stack: Vec::new(),
+            stack_bytes: 0,
             name_x_operands: Vec::new(),
             context,
             shared_origin,
@@ -344,7 +425,53 @@ impl<'a> FormulaDecoder<'a> {
         if self.stack.len() != 1 {
             return Err(());
         }
-        self.stack.pop().ok_or(())
+        self.pop()
+    }
+
+    fn push_text(&mut self, value: String) -> Result<(), ()> {
+        if self.stack.len() >= MAX_FORMULA_STACK_ENTRIES {
+            return Err(());
+        }
+        let stack_bytes = self.stack_bytes.checked_add(value.len()).ok_or(())?;
+        if stack_bytes > MAX_RENDERED_FORMULA_BYTES {
+            return Err(());
+        }
+        self.stack.try_reserve(1).map_err(|_| ())?;
+        self.stack.push(value);
+        self.stack_bytes = stack_bytes;
+        Ok(())
+    }
+
+    fn push_rendered(&mut self, arguments: fmt::Arguments<'_>) -> Result<(), ()> {
+        self.push_text(render_text(arguments)?)
+    }
+
+    fn push_quoted(&mut self, value: &str) -> Result<(), ()> {
+        let mut text = BoundedText::new();
+        fmt::Write::write_char(&mut text, '"').map_err(|_| ())?;
+        for character in value.chars() {
+            if character == '"' {
+                text.push_str("\"\"")?;
+            } else {
+                fmt::Write::write_char(&mut text, character).map_err(|_| ())?;
+            }
+        }
+        fmt::Write::write_char(&mut text, '"').map_err(|_| ())?;
+        self.push_text(text.finish())
+    }
+
+    fn truncate_stack(&mut self, start: usize) -> Result<(), ()> {
+        if start > self.stack.len() {
+            return Err(());
+        }
+        let removed = self.stack[start..]
+            .iter()
+            .try_fold(0usize, |total, value| {
+                total.checked_add(value.len()).ok_or(())
+            })?;
+        self.stack.truncate(start);
+        self.stack_bytes = self.stack_bytes.checked_sub(removed).ok_or(())?;
+        Ok(())
     }
 
     fn decode_base(&mut self, opcode: u8) -> Result<(), ()> {
@@ -369,18 +496,12 @@ impl<'a> FormulaDecoder<'a> {
             0x14 => self.unary_suffix("%"),
             0x15 => {
                 let value = self.pop()?;
-                self.stack.push(format!("({value})"));
-                Ok(())
+                self.push_rendered(format_args!("({value})"))
             },
-            0x16 => {
-                self.stack.push(String::new());
-                Ok(())
-            },
+            0x16 => self.push_text(String::new()),
             0x17 => {
                 let value = self.formula_string()?;
-                self.stack
-                    .push(format!("\"{}\"", value.replace('"', "\"\"")));
-                Ok(())
+                self.push_quoted(&value)
             },
             0x19 => self.attribute(),
             0x1c => {
@@ -394,8 +515,7 @@ impl<'a> FormulaDecoder<'a> {
                     0x2a => "#N/A",
                     _ => return Err(()),
                 };
-                self.stack.push(error.to_string());
-                Ok(())
+                self.push_text(error.to_owned())
             },
             0x1d => {
                 let value = match self.byte()? {
@@ -403,21 +523,18 @@ impl<'a> FormulaDecoder<'a> {
                     1 => "TRUE",
                     _ => return Err(()),
                 };
-                self.stack.push(value.to_string());
-                Ok(())
+                self.push_text(value.to_owned())
             },
             0x1e => {
                 let value = self.u16()?;
-                self.stack.push(value.to_string());
-                Ok(())
+                self.push_rendered(format_args!("{value}"))
             },
             0x1f => {
                 let value = self.f64()?;
                 if !value.is_finite() {
                     return Err(());
                 }
-                self.stack.push(value.to_string());
-                Ok(())
+                self.push_rendered(format_args!("{value}"))
             },
             _ => Err(()),
         }
@@ -455,15 +572,13 @@ impl<'a> FormulaDecoder<'a> {
                     .context
                     .and_then(|context| context.defined_name(index))
                     .ok_or(())?;
-                self.stack.push(name.to_string());
-                Ok(())
+                self.push_text(name.to_owned())
             },
             0x24 => {
                 let row = self.u16()?;
                 let col = self.u16()?;
                 let (row, col) = resolve_shared_reference(row, col, self.shared_origin)?;
-                self.stack.push(cell_reference(row, col)?);
-                Ok(())
+                self.push_text(cell_reference(row, col)?)
             },
             0x25 => {
                 let first_row = self.u16()?;
@@ -476,8 +591,7 @@ impl<'a> FormulaDecoder<'a> {
                     resolve_shared_reference(last_row, last_col, self.shared_origin)?;
                 let first = cell_reference(first_row, first_col)?;
                 let last = cell_reference(last_row, last_col)?;
-                self.stack.push(format!("{first}:{last}"));
-                Ok(())
+                self.push_rendered(format_args!("{first}:{last}"))
             },
             // Memory tokens carry evaluator bookkeeping and do not contribute
             // an expression operand.
@@ -488,8 +602,7 @@ impl<'a> FormulaDecoder<'a> {
                 let col = self.u16()?;
                 let origin = self.shared_origin.ok_or(())?;
                 let (row, col) = resolve_shared_reference(row, col, Some(origin))?;
-                self.stack.push(cell_reference(row, col)?);
-                Ok(())
+                self.push_text(cell_reference(row, col)?)
             },
             0x2d => {
                 let first_row = self.u16()?;
@@ -503,8 +616,7 @@ impl<'a> FormulaDecoder<'a> {
                     resolve_shared_reference(last_row, last_col, Some(origin))?;
                 let first = cell_reference(first_row, first_col)?;
                 let last = cell_reference(last_row, last_col)?;
-                self.stack.push(format!("{first}:{last}"));
-                Ok(())
+                self.push_rendered(format_args!("{first}:{last}"))
             },
             0x39 => {
                 let extern_sheet = self.u16()?;
@@ -516,9 +628,9 @@ impl<'a> FormulaDecoder<'a> {
                     .context
                     .and_then(|context| context.name_x(extern_sheet, name_index))
                     .ok_or(())?;
+                self.name_x_operands.try_reserve(1).map_err(|_| ())?;
                 self.name_x_operands.push(self.stack.len());
-                self.stack.push(name);
-                Ok(())
+                self.push_text(name)
             },
             0x3a => {
                 let extern_sheet = self.u16()?;
@@ -530,8 +642,7 @@ impl<'a> FormulaDecoder<'a> {
                     .and_then(|context| context.sheet_prefix(extern_sheet))
                     .ok_or(())?;
                 let reference = cell_reference(row, col)?;
-                self.stack.push(format!("{prefix}{reference}"));
-                Ok(())
+                self.push_rendered(format_args!("{prefix}{reference}"))
             },
             0x3b => {
                 let extern_sheet = self.u16()?;
@@ -549,8 +660,7 @@ impl<'a> FormulaDecoder<'a> {
                     .ok_or(())?;
                 let first = cell_reference(first_row, first_col)?;
                 let last = cell_reference(last_row, last_col)?;
-                self.stack.push(format!("{prefix}{first}:{last}"));
-                Ok(())
+                self.push_rendered(format_args!("{prefix}{first}:{last}"))
             },
             0x3c => {
                 let extern_sheet = self.u16()?;
@@ -559,8 +669,7 @@ impl<'a> FormulaDecoder<'a> {
                     .context
                     .and_then(|context| context.sheet_prefix(extern_sheet))
                     .ok_or(())?;
-                self.stack.push(format!("{prefix}#REF!"));
-                Ok(())
+                self.push_rendered(format_args!("{prefix}#REF!"))
             },
             0x3d => {
                 let extern_sheet = self.u16()?;
@@ -569,8 +678,7 @@ impl<'a> FormulaDecoder<'a> {
                     .context
                     .and_then(|context| context.sheet_prefix(extern_sheet))
                     .ok_or(())?;
-                self.stack.push(format!("{prefix}#REF!"));
-                Ok(())
+                self.push_rendered(format_args!("{prefix}#REF!"))
             },
             _ => Err(()),
         }
@@ -597,20 +705,17 @@ impl<'a> FormulaDecoder<'a> {
     fn binary(&mut self, operator: &str) -> Result<(), ()> {
         let right = self.pop()?;
         let left = self.pop()?;
-        self.stack.push(format!("({left}{operator}{right})"));
-        Ok(())
+        self.push_rendered(format_args!("({left}{operator}{right})"))
     }
 
     fn unary_prefix(&mut self, operator: &str) -> Result<(), ()> {
         let operand = self.pop()?;
-        self.stack.push(format!("{operator}{operand}"));
-        Ok(())
+        self.push_rendered(format_args!("{operator}{operand}"))
     }
 
     fn unary_suffix(&mut self, operator: &str) -> Result<(), ()> {
         let operand = self.pop()?;
-        self.stack.push(format!("{operand}{operator}"));
-        Ok(())
+        self.push_rendered(format_args!("{operand}{operator}"))
     }
 
     fn function(&mut self, name: &str, count: usize) -> Result<(), ()> {
@@ -619,9 +724,18 @@ impl<'a> FormulaDecoder<'a> {
         }
         let start = self.stack.len() - count;
         self.name_x_operands.retain(|operand| *operand < start);
-        let args = self.stack.split_off(start);
-        self.stack.push(format!("{name}({})", args.join(",")));
-        Ok(())
+        let mut output = BoundedText::new();
+        output.push_str(name)?;
+        output.push_str("(")?;
+        for (index, argument) in self.stack[start..].iter().enumerate() {
+            if index != 0 {
+                output.push_str(",")?;
+            }
+            output.push_str(argument)?;
+        }
+        output.push_str(")")?;
+        self.truncate_stack(start)?;
+        self.push_text(output.finish())
     }
 
     fn external_function(&mut self, count: usize) -> Result<(), ()> {
@@ -633,12 +747,20 @@ impl<'a> FormulaDecoder<'a> {
             return Err(());
         }
         self.name_x_operands.retain(|operand| *operand < start);
-        let operands = self.stack.split_off(start);
-        let mut operands = operands.into_iter();
-        let name = operands.next().ok_or(())?;
-        let args = operands.collect::<Vec<_>>();
-        self.stack.push(format!("{name}({})", args.join(",")));
-        Ok(())
+        let operands = self.stack.get(start..).ok_or(())?;
+        let name = operands.first().ok_or(())?;
+        let mut output = BoundedText::new();
+        output.push_str(name)?;
+        output.push_str("(")?;
+        for (index, argument) in operands.iter().skip(1).enumerate() {
+            if index != 0 {
+                output.push_str(",")?;
+            }
+            output.push_str(argument)?;
+        }
+        output.push_str(")")?;
+        self.truncate_stack(start)?;
+        self.push_text(output.finish())
     }
 
     fn formula_string(&mut self) -> Result<String, ()> {
@@ -647,24 +769,33 @@ impl<'a> FormulaDecoder<'a> {
         if flags & !0x01 != 0 {
             return Err(());
         }
+        let mut output = BoundedText::new();
         if flags & 0x01 == 0 {
             let bytes = self.take(count)?;
-            Ok(bytes.iter().map(|byte| char::from(*byte)).collect())
+            for &byte in bytes {
+                fmt::Write::write_char(&mut output, char::from(byte)).map_err(|_| ())?;
+            }
         } else {
             let byte_count = count.checked_mul(2).ok_or(())?;
             let bytes = self.take(byte_count)?;
-            let units: Vec<u16> = bytes
-                .chunks_exact(2)
-                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-                .collect();
-            String::from_utf16(&units).map_err(|_| ())
+            for result in char::decode_utf16(
+                bytes
+                    .chunks_exact(2)
+                    .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
+            ) {
+                let character = result.map_err(|_| ())?;
+                fmt::Write::write_char(&mut output, character).map_err(|_| ())?;
+            }
         }
+        Ok(output.finish())
     }
 
     fn pop(&mut self) -> Result<String, ()> {
         let index = self.stack.len().checked_sub(1).ok_or(())?;
         self.name_x_operands.retain(|operand| *operand != index);
-        self.stack.pop().ok_or(())
+        let value = self.stack.pop().ok_or(())?;
+        self.stack_bytes = self.stack_bytes.checked_sub(value.len()).ok_or(())?;
+        Ok(value)
     }
 
     fn byte(&mut self) -> Result<u8, ()> {
@@ -759,7 +890,10 @@ include!("formula_function_metadata.rs");
 
 #[cfg(test)]
 mod tests {
-    use super::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
+    use super::{
+        FormulaContext, MAX_FORMULA_STACK_ENTRIES, MAX_FORMULA_TOKEN_BYTES, ptg_exp_anchor,
+        render_formula, render_shared_formula,
+    };
 
     #[test]
     fn renders_constants_operators_and_references() {
@@ -806,6 +940,21 @@ mod tests {
         assert_eq!(render_formula(&[0x3a, 0, 0, 0, 0, 0, 0], None), None);
         assert_eq!(render_formula(&[0x1f, 0, 0], None), None);
         assert_eq!(render_formula(&[0x1e, 1, 0, 0x1e, 2, 0], None), None);
+    }
+
+    #[test]
+    fn rejects_oversized_token_streams_and_operand_stacks() {
+        let oversized = vec![0x16; MAX_FORMULA_TOKEN_BYTES + 1];
+        assert_eq!(render_formula(&oversized, None), None);
+
+        let too_many_operands = vec![0x16; MAX_FORMULA_STACK_ENTRIES + 1];
+        assert_eq!(render_formula(&too_many_operands, None), None);
+    }
+
+    #[test]
+    fn decodes_surrogate_pairs_without_allocating_a_unit_buffer() {
+        let tokens = [0x17, 0x02, 0x01, 0x3d, 0xd8, 0x00, 0xde];
+        assert_eq!(render_formula(&tokens, None).as_deref(), Some("=\"😀\""));
     }
 
     #[test]
