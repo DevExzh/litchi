@@ -4312,12 +4312,19 @@ fn reads_current_slide_layout_from_theme_relationship() {
     assert_eq!(
         slides[0].layout,
         Some(KeynoteSlideLayoutInfo {
-            id: KeynoteSlideLayoutId(30),
+            id: KeynoteSlideLayoutId::new(30).unwrap(),
             name: "Title & Bullets".to_owned(),
             is_default: true,
         })
     );
     assert_eq!(slides[1].layout, None);
+}
+
+#[test]
+fn slide_layout_ids_reject_null_and_round_trip_nonzero_values() {
+    assert_eq!(KeynoteSlideLayoutId::new(0), None);
+    let id = KeynoteSlideLayoutId::new(37).expect("nonzero layout IDs are valid");
+    assert_eq!(id.as_u64(), 37);
 }
 
 #[test]
@@ -4994,13 +5001,13 @@ fn slide_layout_update_rejects_invalid_inputs_without_mutation() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_slide_layout(2, KeynoteSlideLayoutId(37))
+            .set_slide_layout(2, KeynoteSlideLayoutId::new(37).unwrap())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(
         editor
-            .set_slide_layout(0, KeynoteSlideLayoutId(999))
+            .set_slide_layout(0, KeynoteSlideLayoutId::new(999).unwrap())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -5026,7 +5033,7 @@ fn slide_layout_update_hides_a_retained_placeholder_missing_from_the_layout() {
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
     editor
-        .set_slide_layout(0, KeynoteSlideLayoutId(37))
+        .set_slide_layout(0, KeynoteSlideLayoutId::new(37).unwrap())
         .unwrap();
     let slide = &editor.slides().unwrap()[0];
     assert_eq!(slide.is_body_visible, Some(false));
@@ -5064,7 +5071,7 @@ fn slide_layout_update_rejects_ambiguous_wire_fields_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_slide_layout(0, KeynoteSlideLayoutId(37))
+            .set_slide_layout(0, KeynoteSlideLayoutId::new(37).unwrap())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -5127,7 +5134,7 @@ fn creates_empty_slide_from_typed_theme_layout_transactionally() {
     assert_eq!(
         layouts,
         [KeynoteSlideLayoutInfo {
-            id: KeynoteSlideLayoutId(30),
+            id: KeynoteSlideLayoutId::new(30).unwrap(),
             name: "Title & Bullets".to_owned(),
             is_default: true,
         }]
@@ -5136,7 +5143,11 @@ fn creates_empty_slide_from_typed_theme_layout_transactionally() {
 
     let before = editor.to_bytes().unwrap();
     assert!(editor.insert_slide(3, layouts[0].id).is_err());
-    assert!(editor.insert_slide(1, KeynoteSlideLayoutId(999)).is_err());
+    assert!(
+        editor
+            .insert_slide(1, KeynoteSlideLayoutId::new(999).unwrap())
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
 
     let created = editor.insert_slide(1, layouts[0].id).unwrap();

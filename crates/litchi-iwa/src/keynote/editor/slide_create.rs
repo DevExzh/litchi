@@ -9,7 +9,7 @@ mod wire;
 
 use component::register_created_slide;
 use graph::{find_note_source, take_identifier, template_clone_object_ids};
-use layout::{LayoutCatalog, default_layout_node_id, read_layout_graph, resolve_layout};
+use layout::{LayoutCatalog, read_layout_graph, resolve_layout};
 use wire::{clear_user_guides, insert_slide_node, materialize_slide_object, prepare_slide_number};
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -26,18 +26,7 @@ impl KeynoteEditor {
     pub fn default_slide_layout(&self) -> Result<KeynoteSlideLayoutId> {
         let graph = ObjectGraph::read(self.package())?;
         let layout_graph = read_layout_graph(&graph)?;
-        let identifier = default_layout_node_id(&layout_graph.theme)?;
-        if !layout_graph
-            .theme
-            .templates
-            .iter()
-            .any(|reference| reference.identifier == identifier)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote default layout node {identifier} is not in the theme layout list"
-            )));
-        }
-        Ok(KeynoteSlideLayoutId(identifier))
+        LayoutCatalog::read(&graph, &layout_graph.theme)?.default_layout()
     }
 
     /// Append a fresh, empty slide using a theme layout.
@@ -61,18 +50,19 @@ impl KeynoteEditor {
         }
         let graph = ObjectGraph::read(self.package())?;
         let layout_graph = read_layout_graph(&graph)?;
+        let layout_id = layout.as_u64();
         if !layout_graph
             .theme
             .templates
             .iter()
-            .any(|reference| reference.identifier == layout.0)
+            .any(|reference| reference.identifier == layout_id)
         {
             return Err(Error::ParseError(format!(
                 "Keynote theme has no slide layout {}",
-                layout.0
+                layout_id
             )));
         }
-        let resolved = resolve_layout(&graph, layout.0)?;
+        let resolved = resolve_layout(&graph, layout_id)?;
         let template_archive = self.package().archive(&resolved.archive_name)?;
         let layout_media_roots = slide_layout_media::template_media_roots(
             &graph,

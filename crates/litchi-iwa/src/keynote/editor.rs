@@ -20,6 +20,7 @@ use crate::package_metadata::{
     set_package_last_object_identifier,
 };
 use crate::protobuf::{kn, tsd, tsp, tss, tswp};
+use crate::ref_graph::ObjectId;
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
@@ -114,11 +115,19 @@ pub enum KeynoteSlideTextPlaceholder {
 
 /// Stable identity of a slide layout in the presentation theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeynoteSlideLayoutId(u64);
+pub struct KeynoteSlideLayoutId(ObjectId);
 
 impl KeynoteSlideLayoutId {
+    /// Construct a layout identity, rejecting Keynote's null reference sentinel.
+    pub const fn new(raw: u64) -> Option<Self> {
+        match ObjectId::new(raw) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
     pub fn as_u64(self) -> u64 {
-        self.0
+        self.0.get()
     }
 }
 

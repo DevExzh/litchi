@@ -44,6 +44,11 @@ impl LayoutCatalog {
                     reference.identifier
                 )));
             }
+            let id = KeynoteSlideLayoutId::new(reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Keynote theme contains a null layout node reference".to_owned(),
+                )
+            })?;
             let layout = resolve_layout(graph, reference.identifier)?;
             let name = layout
                 .slide
@@ -55,11 +60,11 @@ impl LayoutCatalog {
                         layout.slide_id
                     ))
                 })?;
-            let is_default = reference.identifier == default;
+            let is_default = id.as_u64() == default.as_u64();
             found_default |= is_default;
             let index = infos.len();
             infos.push(KeynoteSlideLayoutInfo {
-                id: KeynoteSlideLayoutId(reference.identifier),
+                id,
                 name,
                 is_default,
             });
@@ -72,7 +77,8 @@ impl LayoutCatalog {
         }
         if !found_default {
             return Err(Error::InvalidFormat(format!(
-                "Keynote default layout node {default} is not in the theme layout list"
+                "Keynote default layout node {} is not in the theme layout list",
+                default.as_u64()
             )));
         }
         Ok(Self {
@@ -92,6 +98,16 @@ impl LayoutCatalog {
                 Error::InvalidFormat(format!(
                     "Keynote theme has no layout for template slide {template_slide_id}"
                 ))
+            })
+    }
+
+    pub(in crate::keynote::editor) fn default_layout(&self) -> Result<KeynoteSlideLayoutId> {
+        self.infos
+            .iter()
+            .find(|layout| layout.is_default)
+            .map(|layout| layout.id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Keynote theme has no valid default slide layout".to_owned())
             })
     }
 
@@ -116,13 +132,17 @@ pub(in crate::keynote::editor) fn read_layout_graph(graph: &ObjectGraph) -> Resu
     })
 }
 
-pub(super) fn default_layout_node_id(theme: &kn::ThemeArchive) -> Result<u64> {
-    theme
+pub(super) fn default_layout_node_id(theme: &kn::ThemeArchive) -> Result<KeynoteSlideLayoutId> {
+    let reference = theme
         .default_template_slide_node_reference
         .as_ref()
         .or(theme.default_template_slide_node.as_ref())
-        .map(|reference| reference.identifier)
-        .ok_or_else(|| Error::InvalidFormat("Keynote theme has no default slide layout".to_owned()))
+        .ok_or_else(|| {
+            Error::InvalidFormat("Keynote theme has no default slide layout".to_owned())
+        })?;
+    KeynoteSlideLayoutId::new(reference.identifier).ok_or_else(|| {
+        Error::InvalidFormat("Keynote theme default layout node reference is null".to_owned())
+    })
 }
 
 pub(in crate::keynote::editor) fn resolve_layout(
@@ -164,7 +184,8 @@ fn is_template_slide_archive(archive_name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_template_slide_archive;
+    use super::{default_layout_node_id, is_template_slide_archive};
+    use crate::protobuf::{kn, tsp};
 
     #[test]
     fn accepts_generated_and_keynote_normalized_template_component_names() {
@@ -174,5 +195,15 @@ mod tests {
         assert!(!is_template_slide_archive("Index/TemplateSlide-copy.iwa"));
         assert!(!is_template_slide_archive("Index/Slide-8.iwa"));
         assert!(!is_template_slide_archive("Data/TemplateSlide-8.iwa"));
+    }
+
+    #[test]
+    fn rejects_null_default_layout_references() {
+        let theme = kn::ThemeArchive {
+            default_template_slide_node: Some(tsp::Reference::default()),
+            ..Default::default()
+        };
+
+        assert!(default_layout_node_id(&theme).is_err());
     }
 }

@@ -45,18 +45,19 @@ impl KeynoteEditor {
 
         let graph = ObjectGraph::read(self.package())?;
         let layout_graph = read_layout_graph(&graph)?;
+        let layout_id = layout.as_u64();
         if !layout_graph
             .theme
             .templates
             .iter()
-            .any(|reference| reference.identifier == layout.0)
+            .any(|reference| reference.identifier == layout_id)
         {
             return Err(Error::ParseError(format!(
                 "Keynote theme has no slide layout {}",
-                layout.0
+                layout_id
             )));
         }
-        let target = resolve_layout(&graph, layout.0)?;
+        let target = resolve_layout(&graph, layout_id)?;
         let target_node: kn::SlideNodeArchive = graph.decode_type(
             target.node_id,
             SLIDE_NODE_MESSAGE_TYPE,
