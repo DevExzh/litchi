@@ -143,7 +143,7 @@ impl PagesDocument {
         let Some(object) = self
             .state
             .object_index
-            .resolve_id(&self.state.bundle, reference.identifier)?
+            .resolve_ref_id(&self.state.bundle, reference.identifier)?
         else {
             return Err(Error::InvalidFormat(format!(
                 "Pages body storage object {} is missing",

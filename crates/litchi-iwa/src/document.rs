@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use crate::bundle::{Bundle, BundleLimits};
 use crate::media::{MediaLimits, MediaManager, MediaStats};
-use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::object_index::{ObjectIndex, ResolvedObject, ResolvedObjectRef};
 use crate::package::PackageLimits;
 use crate::ref_graph::ObjectId;
 use crate::registry::{Application, detect_application_from_document};
@@ -185,6 +185,29 @@ impl Document {
             .resolve(&self.state.bundle, object_id)
     }
 
+    /// Borrow one indexed object from this immutable document snapshot.
+    ///
+    /// The returned view retains no cloned archive metadata or message
+    /// payloads and cannot outlive this document borrow. Use [`Self::object`]
+    /// when an owned result must be retained independently.
+    pub fn object_view(&self, object_id: ObjectId) -> Result<Option<ResolvedObjectRef<'_>>> {
+        self.state
+            .object_index
+            .resolve_ref(&self.state.bundle, object_id)
+    }
+
+    /// Borrow all indexed objects in deterministic object-ID order.
+    ///
+    /// This is the preferred traversal path for read-only extraction. The
+    /// returned views borrow this immutable document snapshot and therefore do
+    /// not duplicate archive payload allocations.
+    pub fn object_views(&self) -> Result<Vec<ResolvedObjectRef<'_>>> {
+        let object_ids = self.state.object_index.object_ids()?;
+        self.state
+            .object_index
+            .resolve_many_refs(&self.state.bundle, &object_ids)
+    }
+
     /// Get an object by its legacy raw numeric ID.
     #[deprecated(note = "use object(ObjectId) for checked identity semantics")]
     pub fn get_object(&self, id: u64) -> Result<Option<ResolvedObject>> {
@@ -285,8 +308,8 @@ impl Document {
         let archives_count = self.state.bundle.iter_archives().count();
 
         let mut message_type_counts = HashMap::new();
-        for object in self.objects()? {
-            for &msg_type in &object.message_types() {
+        for object in self.object_views()? {
+            for msg_type in object.message_types() {
                 *message_type_counts.entry(msg_type).or_insert(0) += 1;
             }
         }
@@ -488,6 +511,16 @@ mod tests {
         assert_eq!(document.application(), Application::Common);
         assert!(document.validate().is_ok());
         assert!(document.validation_report().is_valid());
+
+        let object_id = ObjectId::try_from(1).unwrap();
+        let views = document.object_views().unwrap();
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].id(), object_id);
+        assert_eq!(views[0].primary_message_type(), Some(101));
+        assert_eq!(
+            document.object_view(object_id).unwrap().unwrap().id(),
+            object_id
+        );
     }
 
     #[test]

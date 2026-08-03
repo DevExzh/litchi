@@ -17,7 +17,7 @@
 
 use crate::Result;
 use crate::bundle::Bundle;
-use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::object_index::{ObjectIndex, ResolvedObjectRef};
 use crate::protobuf::tsd;
 use prost::Message;
 
@@ -44,7 +44,7 @@ impl<'a> ShapeTextExtractor<'a> {
         let shape_entries = self.object_index.find_objects_by_type(3004);
 
         for entry in shape_entries {
-            if let Some(resolved) = self.object_index.resolve(self.bundle, entry.id())?
+            if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
                 && let Some(text) = self.extract_text_from_shape(&resolved)?
             {
                 all_text.push(text);
@@ -54,7 +54,7 @@ impl<'a> ShapeTextExtractor<'a> {
         // Also check ImageArchive (3005) which can have text overlays
         let image_entries = self.object_index.find_objects_by_type(3005);
         for entry in image_entries {
-            if let Some(resolved) = self.object_index.resolve(self.bundle, entry.id())?
+            if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
                 && let Some(text) = self.extract_text_from_shape(&resolved)?
             {
                 all_text.push(text);
@@ -64,7 +64,7 @@ impl<'a> ShapeTextExtractor<'a> {
         // Check GroupArchive (3008) for nested text
         let group_entries = self.object_index.find_objects_by_type(3008);
         for entry in group_entries {
-            if let Some(resolved) = self.object_index.resolve(self.bundle, entry.id())? {
+            if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())? {
                 all_text.extend(self.extract_text_from_group(&resolved)?);
             }
         }
@@ -73,8 +73,8 @@ impl<'a> ShapeTextExtractor<'a> {
     }
 
     /// Extract text from a single shape object
-    fn extract_text_from_shape(&self, object: &ResolvedObject) -> Result<Option<String>> {
-        for msg in &object.messages {
+    fn extract_text_from_shape(&self, object: &ResolvedObjectRef<'_>) -> Result<Option<String>> {
+        for msg in object.messages {
             if (msg.type_ == 3004 || msg.type_ == 3005)
                 && let Ok(shape) = tsd::ShapeArchive::decode(&*msg.data)
             {
@@ -86,10 +86,10 @@ impl<'a> ShapeTextExtractor<'a> {
     }
 
     /// Extract text from a group of shapes
-    fn extract_text_from_group(&self, object: &ResolvedObject) -> Result<Vec<String>> {
+    fn extract_text_from_group(&self, object: &ResolvedObjectRef<'_>) -> Result<Vec<String>> {
         let mut texts = Vec::new();
 
-        for msg in &object.messages {
+        for msg in object.messages {
             if msg.type_ == 3008
                 && let Ok(group) = tsd::GroupArchive::decode(&*msg.data)
             {
@@ -134,9 +134,9 @@ impl<'a> ShapeTextExtractor<'a> {
 
     /// Extract text from a referenced object (used for group children)
     fn extract_text_from_referenced_object(&self, object_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_id(self.bundle, object_id)? {
+        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, object_id)? {
             // Check if it's a shape
-            for msg in &resolved.messages {
+            for msg in resolved.messages {
                 if (msg.type_ == 3004 || msg.type_ == 3005)
                     && let Ok(shape) = tsd::ShapeArchive::decode(&*msg.data)
                 {
@@ -155,7 +155,7 @@ impl<'a> ShapeTextExtractor<'a> {
     // when we implement full object graph traversal for shape text
     #[allow(dead_code)]
     fn _extract_text_from_storage_ref(&self, storage_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_id(self.bundle, storage_id)? {
+        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, storage_id)? {
             return self.extract_text_from_storage_object(&resolved);
         }
 
@@ -163,8 +163,11 @@ impl<'a> ShapeTextExtractor<'a> {
     }
 
     /// Extract text from a TSWP.StorageArchive object
-    fn extract_text_from_storage_object(&self, object: &ResolvedObject) -> Result<Option<String>> {
-        for msg in &object.messages {
+    fn extract_text_from_storage_object(
+        &self,
+        object: &ResolvedObjectRef<'_>,
+    ) -> Result<Option<String>> {
+        for msg in object.messages {
             // TSWP storage types range from 2001-2022
             if msg.type_ >= 2001
                 && msg.type_ <= 2022
@@ -180,7 +183,7 @@ impl<'a> ShapeTextExtractor<'a> {
 
     /// Extract text from a specific shape by object ID
     pub fn extract_text_from_shape_id(&self, shape_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_id(self.bundle, shape_id)? {
+        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, shape_id)? {
             return self.extract_text_from_shape(&resolved);
         }
 

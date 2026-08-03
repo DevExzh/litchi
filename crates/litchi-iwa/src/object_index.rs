@@ -421,8 +421,29 @@ impl ObjectIndex {
         self.resolve(bundle, object_id)
     }
 
-    /// Resolve an object through the validated identity API.
-    pub fn resolve(&self, bundle: &Bundle, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
+    /// Borrow a protobuf wire identifier for crate-internal readers.
+    pub(crate) fn resolve_ref_id<'a>(
+        &self,
+        bundle: &'a Bundle,
+        object_id: u64,
+    ) -> Result<Option<ResolvedObjectRef<'a>>> {
+        let Some(object_id) = ObjectId::new(object_id) else {
+            return Ok(None);
+        };
+        self.resolve_ref(bundle, object_id)
+    }
+
+    /// Borrow an indexed object directly from the supplied bundle.
+    ///
+    /// The returned view borrows the bundle's immutable archive storage, so
+    /// resolving an object does not clone its archive metadata or message
+    /// payloads. The view cannot outlive `bundle`; use [`Self::resolve`] when
+    /// an owned result must be retained after the bundle is dropped.
+    pub fn resolve_ref<'a>(
+        &self,
+        bundle: &'a Bundle,
+        object_id: ObjectId,
+    ) -> Result<Option<ResolvedObjectRef<'a>>> {
         let Some(entry) = self.entry(object_id) else {
             return Ok(None);
         };
@@ -434,18 +455,21 @@ impl ObjectIndex {
             )));
         };
 
-        // Find the object in the archive
-        for object in &archive.objects {
-            if object.archive_info.identifier == Some(object_id.get()) {
-                return Ok(Some(ResolvedObject {
-                    id: object_id,
-                    archive_info: object.archive_info.clone(),
-                    messages: object.messages.clone(),
-                }));
-            }
-        }
+        Ok(archive
+            .objects
+            .iter()
+            .find(|object| object.archive_info.identifier == Some(object_id.get()))
+            .map(|object| ResolvedObjectRef {
+                id: object_id,
+                archive_info: &object.archive_info,
+                messages: &object.messages,
+            }))
+    }
 
-        Ok(None)
+    /// Resolve an object through the validated identity API.
+    pub fn resolve(&self, bundle: &Bundle, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
+        self.resolve_ref(bundle, object_id)
+            .map(|object| object.map(ResolvedObjectRef::into_owned))
     }
     /// Batch resolve multiple object references
     ///
@@ -480,6 +504,59 @@ impl ObjectIndex {
         bundle: &Bundle,
         object_ids: &[ObjectId],
     ) -> Result<Vec<ResolvedObject>> {
+        self.resolve_many_refs_inner(bundle, object_ids)
+            .map(|objects| {
+                objects
+                    .into_iter()
+                    .map(ResolvedObjectRef::into_owned)
+                    .collect()
+            })
+    }
+
+    /// Borrow multiple indexed objects in the caller's request order.
+    ///
+    /// Archive lookups are grouped by fragment, while the returned views
+    /// borrow the original bundle and retain no duplicate payload allocation.
+    /// Duplicate typed IDs are rejected just like [`Self::resolve_many`].
+    pub fn resolve_many_refs<'a>(
+        &self,
+        bundle: &'a Bundle,
+        object_ids: &[ObjectId],
+    ) -> Result<Vec<ResolvedObjectRef<'a>>> {
+        let mut requested = HashSet::with_capacity(object_ids.len());
+        for object_id in object_ids {
+            if !requested.insert(*object_id) {
+                return Err(Error::Archive(format!(
+                    "object {object_id:?} occurs more than once in a batch"
+                )));
+            }
+            if !self.contains(*object_id) {
+                return Err(Error::Archive(format!(
+                    "object {} is not present in the object index",
+                    object_id.get()
+                )));
+            }
+        }
+
+        let resolved = self.resolve_many_refs_inner(bundle, object_ids)?;
+        let resolved_ids: HashSet<_> = resolved.iter().map(ResolvedObjectRef::id).collect();
+        if let Some(missing) = object_ids
+            .iter()
+            .find(|object_id| !resolved_ids.contains(object_id))
+        {
+            return Err(Error::Bundle(format!(
+                "object {} could not be resolved from the bundle",
+                missing.get()
+            )));
+        }
+        Ok(resolved)
+    }
+
+    fn resolve_many_refs_inner<'a>(
+        &self,
+        bundle: &'a Bundle,
+        object_ids: &[ObjectId],
+    ) -> Result<Vec<ResolvedObjectRef<'a>>> {
         // Group object IDs by their archive to minimize archive lookups
         let mut objects_by_archive: std::collections::HashMap<&str, HashSet<ObjectId>> =
             std::collections::HashMap::new();
@@ -503,10 +580,10 @@ impl ObjectIndex {
                         && let Ok(object_id) = ObjectId::try_from(obj_id)
                         && ids.contains(&object_id)
                     {
-                        let resolved = ResolvedObject {
+                        let resolved = ResolvedObjectRef {
                             id: object_id,
-                            archive_info: object.archive_info.clone(),
-                            messages: object.messages.clone(),
+                            archive_info: &object.archive_info,
+                            messages: &object.messages,
                         };
                         if resolved_by_id.insert(object_id, resolved).is_some() {
                             return Err(Error::Archive(format!(
@@ -530,33 +607,12 @@ impl ObjectIndex {
         bundle: &Bundle,
         object_ids: &[ObjectId],
     ) -> Result<Vec<ResolvedObject>> {
-        let mut requested = HashSet::with_capacity(object_ids.len());
-        for object_id in object_ids {
-            if !requested.insert(*object_id) {
-                return Err(Error::Archive(format!(
-                    "object {object_id:?} occurs more than once in a batch"
-                )));
-            }
-            if !self.contains(*object_id) {
-                return Err(Error::Archive(format!(
-                    "object {} is not present in the object index",
-                    object_id.get()
-                )));
-            }
-        }
-
-        let resolved = self.resolve_many_inner(bundle, object_ids)?;
-        let resolved_ids: HashSet<_> = resolved.iter().map(ResolvedObject::id).collect();
-        if let Some(missing) = object_ids
-            .iter()
-            .find(|object_id| !resolved_ids.contains(object_id))
-        {
-            return Err(Error::Bundle(format!(
-                "object {} could not be resolved from the bundle",
-                missing.get()
-            )));
-        }
-        Ok(resolved)
+        self.resolve_many_refs(bundle, object_ids).map(|objects| {
+            objects
+                .into_iter()
+                .map(ResolvedObjectRef::into_owned)
+                .collect()
+        })
     }
 
     /// Resolve an object and its typed dependency closure.
@@ -667,6 +723,53 @@ pub struct ResolvedObject {
     pub archive_info: crate::archive::ArchiveInfo,
     /// Raw message data
     pub messages: Vec<RawMessage>,
+}
+
+/// A borrowed view of an indexed object and its immutable payloads.
+///
+/// The view is tied to the [`crate::Bundle`] used for resolution. It is the
+/// allocation-free read path for traversal and extraction; callers that need
+/// an owned value can consume it with [`Self::into_owned`].
+#[derive(Debug, Clone, Copy)]
+pub struct ResolvedObjectRef<'a> {
+    /// Validated object identifier.
+    id: ObjectId,
+    /// Borrowed archive information.
+    pub archive_info: &'a crate::archive::ArchiveInfo,
+    /// Borrowed raw message data.
+    pub messages: &'a [RawMessage],
+}
+
+impl ResolvedObjectRef<'_> {
+    /// Return the validated object identity.
+    pub const fn id(&self) -> ObjectId {
+        self.id
+    }
+
+    /// Return the validated object identity, if the compatibility payload is
+    /// non-null.
+    pub const fn object_id(&self) -> Option<ObjectId> {
+        Some(self.id)
+    }
+
+    /// Get the primary message type without allocating.
+    pub fn primary_message_type(&self) -> Option<u32> {
+        self.messages.first().map(|message| message.type_)
+    }
+
+    /// Iterate over message types without cloning the message payloads.
+    pub fn message_types(&self) -> impl Iterator<Item = u32> + '_ {
+        self.messages.iter().map(|message| message.type_)
+    }
+
+    /// Clone the borrowed payloads into the legacy owned representation.
+    pub fn into_owned(self) -> ResolvedObject {
+        ResolvedObject {
+            id: self.id,
+            archive_info: self.archive_info.clone(),
+            messages: self.messages.to_vec(),
+        }
+    }
 }
 
 impl ResolvedObject {
@@ -976,6 +1079,22 @@ mod tests {
             .unwrap();
         let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
         let index = ObjectIndex::from_bundle(&bundle).unwrap();
+
+        let typed_ids = [
+            ObjectId::try_from(2).unwrap(),
+            ObjectId::try_from(1).unwrap(),
+        ];
+        let borrowed = index.resolve_many_refs(&bundle, &typed_ids).unwrap();
+        assert_eq!(
+            borrowed
+                .iter()
+                .map(ResolvedObjectRef::id)
+                .collect::<Vec<_>>(),
+            typed_ids
+        );
+        assert_eq!(borrowed[0].primary_message_type(), Some(42));
+        assert_eq!(borrowed[0].message_types().collect::<Vec<_>>(), vec![42]);
+        assert_eq!(borrowed[0].messages[0].data, Vec::<u8>::new());
 
         let resolved = index.resolve_objects(&bundle, &[2, 1]).unwrap();
         assert_eq!(

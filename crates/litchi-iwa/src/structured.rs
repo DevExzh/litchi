@@ -304,7 +304,7 @@ pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
             }
         }
         if let Some(note) = archive.note
-            && let Some(note_object) = object_index.resolve_id(bundle, note.identifier)?
+            && let Some(note_object) = object_index.resolve_ref_id(bundle, note.identifier)?
         {
             for message in note_object.messages {
                 let Ok(note) = crate::protobuf::kn::NoteArchive::decode(message.data.as_slice())
@@ -312,9 +312,9 @@ pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                     continue;
                 };
                 if let Some(storage) = object_index
-                    .resolve_id(bundle, note.contained_storage.identifier)?
+                    .resolve_ref_id(bundle, note.contained_storage.identifier)?
                     .and_then(|object| {
-                        object.messages.into_iter().find_map(|message| {
+                        object.messages.iter().find_map(|message| {
                             crate::protobuf::tswp::StorageArchive::decode(message.data.as_slice())
                                 .ok()
                         })
@@ -348,7 +348,7 @@ fn drawable_text(
 ) -> Result<Option<String>> {
     use prost::Message;
 
-    let Some(drawable) = object_index.resolve_id(bundle, identifier)? else {
+    let Some(drawable) = object_index.resolve_ref_id(bundle, identifier)? else {
         return Ok(None);
     };
     let storage_id = drawable.messages.iter().find_map(|message| {
@@ -365,7 +365,7 @@ fn drawable_text(
     let Some(storage_id) = storage_id else {
         return Ok(None);
     };
-    let Some(storage_object) = object_index.resolve_id(bundle, storage_id)? else {
+    let Some(storage_object) = object_index.resolve_ref_id(bundle, storage_id)? else {
         return Ok(None);
     };
     for message in storage_object.messages {
@@ -406,7 +406,7 @@ pub fn extract_sections(bundle: &Bundle, object_index: &ObjectIndex) -> Result<V
     let mut section = Section::new(0);
     if let Some(reference) = document.body_storage {
         let object = object_index
-            .resolve_id(bundle, reference.identifier)?
+            .resolve_ref_id(bundle, reference.identifier)?
             .ok_or_else(|| {
                 crate::Error::InvalidFormat(format!(
                     "Pages body storage object {} is missing",

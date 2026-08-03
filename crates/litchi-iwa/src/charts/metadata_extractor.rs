@@ -29,7 +29,7 @@ use crate::Result;
 use crate::bundle::Bundle;
 use crate::charts::options::read_chart_non_style_title;
 use crate::charts::{ChartKind, IWorkChartArchive};
-use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::object_index::{ObjectIndex, ResolvedObjectRef};
 use crate::protobuf::tsch;
 use prost::Message;
 
@@ -95,7 +95,7 @@ impl<'a> ChartMetadataExtractor<'a> {
             let chart_entries = self.object_index.find_objects_by_type(chart_type);
 
             for entry in chart_entries {
-                if let Some(resolved) = self.object_index.resolve(self.bundle, entry.id())?
+                if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
                     && let Some(metadata) = self.extract_chart_metadata(&resolved)?
                 {
                     charts.push(metadata);
@@ -107,8 +107,11 @@ impl<'a> ChartMetadataExtractor<'a> {
     }
 
     /// Extract metadata from a single chart object
-    fn extract_chart_metadata(&self, object: &ResolvedObject) -> Result<Option<ChartMetadata>> {
-        for message in &object.messages {
+    fn extract_chart_metadata(
+        &self,
+        object: &ResolvedObjectRef<'_>,
+    ) -> Result<Option<ChartMetadata>> {
+        for message in object.messages {
             match message.type_ {
                 CHART_DRAWABLE_MESSAGE_TYPE => {
                     let drawable = IWorkChartArchive::decode(&message.data)?;
@@ -168,7 +171,7 @@ impl<'a> ChartMetadataExtractor<'a> {
         };
         let Some(resolved) = self
             .object_index
-            .resolve_id(self.bundle, reference.identifier)?
+            .resolve_ref_id(self.bundle, reference.identifier)?
         else {
             return Ok(None);
         };
@@ -193,7 +196,7 @@ impl<'a> ChartMetadataExtractor<'a> {
 
     /// Extract metadata from a specific chart by object ID
     pub fn extract_chart_by_id(&self, chart_id: u64) -> Result<Option<ChartMetadata>> {
-        if let Some(resolved) = self.object_index.resolve_id(self.bundle, chart_id)? {
+        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, chart_id)? {
             return self.extract_chart_metadata(&resolved);
         }
 

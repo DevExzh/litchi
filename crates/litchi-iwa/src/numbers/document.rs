@@ -245,7 +245,7 @@ impl NumbersDocument {
         let resolved = self
             .state
             .object_index
-            .resolve_id(&self.state.bundle, drawable_id)?
+            .resolve_ref_id(&self.state.bundle, drawable_id)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers sheet references missing drawable object {drawable_id}"
@@ -253,7 +253,7 @@ impl NumbersDocument {
             })?;
         // Protobuf decoding is permissive, so accept a TableInfoArchive only
         // when its model reference resolves to a typed TableModelArchive.
-        for message in &resolved.messages {
+        for message in resolved.messages {
             let Ok(table_info) =
                 crate::protobuf::tst::TableInfoArchive::decode(message.data.as_slice())
             else {
@@ -263,7 +263,7 @@ impl NumbersDocument {
             let Some(model) = self
                 .state
                 .object_index
-                .resolve_id(&self.state.bundle, table_model_id)?
+                .resolve_ref_id(&self.state.bundle, table_model_id)?
             else {
                 continue;
             };
@@ -291,7 +291,7 @@ impl NumbersDocument {
         if let Some(resolved) = self
             .state
             .object_index
-            .resolve_id(&self.state.bundle, table_model_id)?
+            .resolve_ref_id(&self.state.bundle, table_model_id)?
             && let Some(table) = extractor.extract_table_from_object(&resolved)?
         {
             return Ok(table);

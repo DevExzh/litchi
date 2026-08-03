@@ -227,9 +227,11 @@ impl KeynoteEditor {
         let bytes = self.package().to_bytes()?;
         let bundle = Bundle::from_bytes(&bytes)?;
         let index = ObjectIndex::from_bundle(&bundle)?;
-        let object = index.resolve_id(&bundle, model_object_id)?.ok_or_else(|| {
-            Error::InvalidFormat(format!("Keynote table model {model_object_id} is missing"))
-        })?;
+        let object = index
+            .resolve_ref_id(&bundle, model_object_id)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote table model {model_object_id} is missing"))
+            })?;
         let table = TableDataExtractor::new(&bundle, &index)
             .extract_table_from_object(&object)?
             .ok_or_else(|| {
