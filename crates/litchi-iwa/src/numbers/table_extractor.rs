@@ -125,20 +125,20 @@ impl<'a> TableDataExtractor<'a> {
         let mut tables = Vec::new();
 
         // Find all TableModelArchive objects (message type 6000 or 6001)
-        let table_entries = self.object_index.find_objects_by_type(6000);
+        let table_entries = self.object_index.iter_entries_by_type(6000);
         tables.extend(self.extract_tables_from_entries(table_entries)?);
 
-        let table_entries = self.object_index.find_objects_by_type(6001);
+        let table_entries = self.object_index.iter_entries_by_type(6001);
         tables.extend(self.extract_tables_from_entries(table_entries)?);
 
         Ok(tables)
     }
 
     /// Extract tables from object index entries
-    fn extract_tables_from_entries(
-        &self,
-        entries: Vec<&crate::object_index::ObjectIndexEntry>,
-    ) -> Result<Vec<NumbersTable>> {
+    fn extract_tables_from_entries<'entry, I>(&self, entries: I) -> Result<Vec<NumbersTable>>
+    where
+        I: IntoIterator<Item = &'entry crate::object_index::ObjectIndexEntry>,
+    {
         let mut tables = Vec::new();
 
         for entry in entries {

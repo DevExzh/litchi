@@ -47,6 +47,11 @@ impl ObjectIndexEntry {
 pub struct ObjectIndex {
     /// Map from object ID to index entry
     entries: Arc<HashMap<u64, ObjectIndexEntry>>,
+    /// Object identities in deterministic numeric order.
+    ///
+    /// Keeping this compact order catalog beside the hash map lets readers
+    /// traverse entries without allocating and sorting a temporary vector.
+    ordered_ids: Arc<Vec<ObjectId>>,
     /// Map from fragment name to list of object IDs
     fragment_objects: Arc<HashMap<String, Vec<u64>>>,
     /// Reference graph tracking object dependencies
@@ -64,6 +69,7 @@ impl ObjectIndex {
     pub fn new() -> Self {
         Self {
             entries: Arc::new(HashMap::new()),
+            ordered_ids: Arc::new(Vec::new()),
             fragment_objects: Arc::new(HashMap::new()),
             reference_graph: ReferenceGraph::new(),
         }
@@ -128,6 +134,7 @@ impl ObjectIndex {
             };
 
             Arc::make_mut(&mut self.entries).insert(identifier, entry);
+            Arc::make_mut(&mut self.ordered_ids).push(object_id);
             Arc::make_mut(&mut self.fragment_objects)
                 .entry(archive_name.to_string())
                 .or_default()
@@ -153,6 +160,7 @@ impl ObjectIndex {
                 reference_extraction::extract(object_id, object, &mut self.reference_graph)?;
             }
         }
+        Arc::make_mut(&mut self.ordered_ids).sort_unstable();
         Ok(())
     }
 
@@ -212,22 +220,30 @@ impl ObjectIndex {
             .transpose()
     }
 
-    /// Get all entries in deterministic numeric object-ID order.
+    /// Borrow all entries in deterministic numeric object-ID order.
+    pub fn iter_entries(&self) -> impl Iterator<Item = &ObjectIndexEntry> {
+        self.ordered_ids
+            .iter()
+            .filter_map(|object_id| self.entries.get(&object_id.get()))
+    }
+
+    /// Get entries of one type in deterministic numeric object-ID order.
+    pub fn iter_entries_by_type(
+        &self,
+        object_type: u32,
+    ) -> impl Iterator<Item = &ObjectIndexEntry> {
+        self.iter_entries()
+            .filter(move |entry| entry.object_type == object_type)
+    }
+
+    /// Collect all entries in deterministic numeric object-ID order.
     pub fn all_entries(&self) -> Vec<&ObjectIndexEntry> {
-        let mut entries: Vec<_> = self.entries.values().collect();
-        entries.sort_unstable_by_key(|entry| entry.id());
-        entries
+        self.iter_entries().collect()
     }
 
     /// Find objects by type in deterministic numeric object-ID order.
     pub fn find_objects_by_type(&self, object_type: u32) -> Vec<&ObjectIndexEntry> {
-        let mut entries: Vec<_> = self
-            .entries
-            .values()
-            .filter(|entry| entry.object_type == object_type)
-            .collect();
-        entries.sort_unstable_by_key(|entry| entry.id());
-        entries
+        self.iter_entries_by_type(object_type).collect()
     }
 
     /// Get the reference graph for advanced queries
@@ -809,6 +825,7 @@ mod tests {
     fn test_object_index_creation() {
         let index = ObjectIndex::new();
         assert!(index.entries.is_empty());
+        assert!(index.ordered_ids.is_empty());
         assert!(index.fragment_objects.is_empty());
     }
 
@@ -834,6 +851,7 @@ mod tests {
 
         let snapshot = index.clone();
         assert!(Arc::ptr_eq(&index.entries, &snapshot.entries));
+        assert!(Arc::ptr_eq(&index.ordered_ids, &snapshot.ordered_ids));
         assert!(Arc::ptr_eq(
             &index.fragment_objects,
             &snapshot.fragment_objects
@@ -860,6 +878,7 @@ mod tests {
         assert_eq!(index.object_count(), 1);
         assert_eq!(edited.object_count(), 2);
         assert!(!Arc::ptr_eq(&index.entries, &edited.entries));
+        assert!(!Arc::ptr_eq(&index.ordered_ids, &edited.ordered_ids));
         assert!(!Arc::ptr_eq(
             &index.fragment_objects,
             &edited.fragment_objects
@@ -1035,6 +1054,20 @@ mod tests {
                 .map(|entry| entry.id().get())
                 .collect::<Vec<_>>(),
             vec![10, 20, 30]
+        );
+        assert_eq!(
+            index
+                .iter_entries()
+                .map(|entry| entry.id().get())
+                .collect::<Vec<_>>(),
+            vec![10, 20, 30]
+        );
+        assert_eq!(
+            index
+                .iter_entries_by_type(7)
+                .map(|entry| entry.id().get())
+                .collect::<Vec<_>>(),
+            vec![10, 30]
         );
         assert_eq!(
             index

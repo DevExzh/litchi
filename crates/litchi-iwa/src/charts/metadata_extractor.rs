@@ -92,7 +92,7 @@ impl<'a> ChartMetadataExtractor<'a> {
         let mut charts = Vec::new();
 
         for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
-            let chart_entries = self.object_index.find_objects_by_type(chart_type);
+            let chart_entries = self.object_index.iter_entries_by_type(chart_type);
 
             for entry in chart_entries {
                 if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
@@ -214,7 +214,7 @@ impl<'a> ChartMetadataExtractor<'a> {
         let mut count = 0;
 
         for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
-            count += self.object_index.find_objects_by_type(chart_type).len();
+            count += self.object_index.iter_entries_by_type(chart_type).count();
         }
 
         Ok(count)

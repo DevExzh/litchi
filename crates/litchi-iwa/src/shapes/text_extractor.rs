@@ -41,7 +41,7 @@ impl<'a> ShapeTextExtractor<'a> {
         let mut all_text = Vec::new();
 
         // Find all ShapeArchive objects (message type 3004)
-        let shape_entries = self.object_index.find_objects_by_type(3004);
+        let shape_entries = self.object_index.iter_entries_by_type(3004);
 
         for entry in shape_entries {
             if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
@@ -52,7 +52,7 @@ impl<'a> ShapeTextExtractor<'a> {
         }
 
         // Also check ImageArchive (3005) which can have text overlays
-        let image_entries = self.object_index.find_objects_by_type(3005);
+        let image_entries = self.object_index.iter_entries_by_type(3005);
         for entry in image_entries {
             if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
                 && let Some(text) = self.extract_text_from_shape(&resolved)?
@@ -62,7 +62,7 @@ impl<'a> ShapeTextExtractor<'a> {
         }
 
         // Check GroupArchive (3008) for nested text
-        let group_entries = self.object_index.find_objects_by_type(3008);
+        let group_entries = self.object_index.iter_entries_by_type(3008);
         for entry in group_entries {
             if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())? {
                 all_text.extend(self.extract_text_from_group(&resolved)?);
