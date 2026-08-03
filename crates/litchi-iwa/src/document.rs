@@ -14,6 +14,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::bundle::Bundle;
 use crate::media::{MediaManager, MediaStats};
@@ -24,8 +25,13 @@ use crate::text::TextExtractor;
 use crate::{Error, Result};
 
 /// Unified iWork document interface
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Document {
+    state: Arc<DocumentState>,
+}
+
+#[derive(Debug)]
+struct DocumentState {
     /// The underlying bundle
     bundle: Bundle,
     /// Object index for cross-referencing
@@ -59,12 +65,12 @@ impl Document {
         // Try to create media manager (may fail for single-file bundles)
         let media_manager = MediaManager::new(path_ref).ok();
 
-        Ok(Document {
+        Ok(Self::from_parts(
             bundle,
             object_index,
             application,
             media_manager,
-        })
+        ))
     }
 
     /// Open an iWork document from raw bytes
@@ -103,12 +109,33 @@ impl Document {
             .or_else(|| detect_application(&all_message_types))
             .unwrap_or(Application::Common);
 
-        Ok(Document {
+        Ok(Self::from_parts(
             bundle,
             object_index,
             application,
             media_manager,
-        })
+        ))
+    }
+
+    fn from_parts(
+        bundle: Bundle,
+        object_index: ObjectIndex,
+        application: Application,
+        media_manager: Option<MediaManager>,
+    ) -> Self {
+        Self {
+            state: Arc::new(DocumentState {
+                bundle,
+                object_index,
+                application,
+                media_manager,
+            }),
+        }
+    }
+
+    /// Capture a cheap immutable snapshot that shares all parsed document state.
+    pub fn snapshot(&self) -> Self {
+        self.clone()
     }
 
     /// Get the document's text content
@@ -117,18 +144,20 @@ impl Document {
     /// processes TSWP storage objects across all iWork applications.
     pub fn text(&self) -> Result<String> {
         let mut extractor = TextExtractor::new();
-        extractor.extract_from_bundle(&self.bundle)?;
+        extractor.extract_from_bundle(&self.state.bundle)?;
         Ok(extractor.get_text())
     }
 
     /// Get all objects in the document
     pub fn objects(&self) -> Vec<ResolvedObject> {
-        self.object_index
+        self.state
+            .object_index
             .all_object_ids()
             .iter()
             .filter_map(|&id| {
-                self.object_index
-                    .resolve_object(&self.bundle, id)
+                self.state
+                    .object_index
+                    .resolve_object(&self.state.bundle, id)
                     .ok()
                     .flatten()
             })
@@ -137,37 +166,40 @@ impl Document {
 
     /// Get an object by ID
     pub fn get_object(&self, id: u64) -> Result<Option<ResolvedObject>> {
-        self.object_index.resolve_object(&self.bundle, id)
+        self.state
+            .object_index
+            .resolve_object(&self.state.bundle, id)
     }
 
     /// Get the application type
     pub fn application(&self) -> Application {
-        self.application
+        self.state.application
     }
 
     /// Get the underlying bundle
     pub fn bundle(&self) -> &Bundle {
-        &self.bundle
+        &self.state.bundle
     }
 
     /// Get document metadata
     pub fn metadata(&self) -> &crate::bundle::BundleMetadata {
-        self.bundle.metadata()
+        self.state.bundle.metadata()
     }
 
     /// Get the media manager (if available)
     pub fn media_manager(&self) -> Option<&MediaManager> {
-        self.media_manager.as_ref()
+        self.state.media_manager.as_ref()
     }
 
     /// Get media statistics
     pub fn media_stats(&self) -> Option<MediaStats> {
-        self.media_manager.as_ref().map(|m| m.stats())
+        self.state.media_manager.as_ref().map(|m| m.stats())
     }
 
     /// Extract a media asset by filename
     pub fn extract_media(&self, filename: &str) -> Result<Vec<u8>> {
         let manager = self
+            .state
             .media_manager
             .as_ref()
             .ok_or_else(|| Error::Bundle("Media manager not available".to_string()))?;
@@ -179,13 +211,13 @@ impl Document {
     /// This returns tables, slides, sections, and other structured content
     /// depending on the document type (Numbers, Keynote, or Pages).
     pub fn extract_structured_data(&self) -> Result<StructuredData> {
-        structured::extract_all(&self.bundle, &self.object_index)
+        structured::extract_all(&self.state.bundle, &self.state.object_index)
     }
 
     /// Get document statistics
     pub fn stats(&self) -> DocumentStats {
-        let total_objects = self.object_index.all_object_ids().len();
-        let archives_count = self.bundle.archives().len();
+        let total_objects = self.state.object_index.all_object_ids().len();
+        let archives_count = self.state.bundle.archives().len();
 
         let mut message_type_counts = HashMap::new();
         for object in self.objects() {
@@ -200,7 +232,7 @@ impl Document {
             total_objects,
             archives_count,
             message_type_counts,
-            application: self.application,
+            application: self.state.application,
             media_stats,
         }
     }
@@ -276,6 +308,13 @@ impl DocumentStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn documents_are_send_and_sync() {
+        assert_send_sync::<Document>();
+    }
 
     #[test]
     fn test_document_stats() {

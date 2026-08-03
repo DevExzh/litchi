@@ -64,9 +64,16 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
 
     let document = Document::open(path)?;
     assert_send_sync::<litchi_iwa::Bundle>();
+    assert_send_sync::<litchi_iwa::Document>();
     assert_eq!(document.application(), application);
     assert_eq!(document.stats().application, application);
     assert!(document.stats().total_objects > 0);
+    let document_snapshot = document.snapshot();
+    assert_eq!(document_snapshot.application(), document.application());
+    assert_eq!(
+        document_snapshot.stats().total_objects,
+        document.stats().total_objects
+    );
     let bundle_snapshot = document.bundle().snapshot();
     assert_eq!(
         bundle_snapshot.archives().len(),
