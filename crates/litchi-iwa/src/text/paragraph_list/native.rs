@@ -8,6 +8,7 @@ use prost::Message;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::tswp::list_style_archive::{LabelGeometry, LabelType, NumberType};
 use crate::protobuf::{tsp, tss, tswp};
+use crate::text::storage_wire::locate_text_storages;
 use crate::wire::{
     patch_length_delimited_field, patch_varint_field, rewrite_repeated_fixed32_fields,
     rewrite_repeated_length_delimited_fields, rewrite_repeated_varint_fields,
@@ -20,7 +21,6 @@ use super::types::{
 };
 
 const LIST_STYLE_MESSAGE_TYPE: u32 = 2_023;
-const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const LIST_LEVEL_COUNT: usize = 9;
 const OVERRIDE_COUNT_FIELD: u32 = 10;
@@ -1391,33 +1391,35 @@ fn patch_direct_bullet_strings(data: &[u8], style_id: u64, strings: &[String]) -
 }
 
 pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
-    let mut storage_references = 0usize;
+    let storage_references = locate_text_storages(package)?
+        .into_iter()
+        .map(|location| {
+            location
+                .storage
+                .table_list_style
+                .iter()
+                .flat_map(|table| &table.entries)
+                .filter(|entry| {
+                    entry
+                        .object
+                        .as_ref()
+                        .is_some_and(|reference| reference.identifier == style_id)
+                })
+                .count()
+        })
+        .sum::<usize>();
+
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
             for message in &object.messages {
-                if STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                    && let Ok(storage) = tswp::StorageArchive::decode(message.data.as_slice())
-                {
-                    storage_references += storage
-                        .table_list_style
-                        .iter()
-                        .flat_map(|table| &table.entries)
-                        .filter(|entry| {
-                            entry
-                                .object
-                                .as_ref()
-                                .is_some_and(|reference| reference.identifier == style_id)
-                        })
-                        .count();
-                }
-                if message.type_ == LIST_STYLE_MESSAGE_TYPE
-                    && let Ok(style) = tswp::ListStyleArchive::decode(message.data.as_slice())
-                    && style
+                if message.type_ == LIST_STYLE_MESSAGE_TYPE && {
+                    let style = tswp::ListStyleArchive::decode(message.data.as_slice())?;
+                    style
                         .super_
                         .parent
                         .as_ref()
                         .is_some_and(|parent| parent.identifier == style_id)
-                {
+                } {
                     return Ok(false);
                 }
             }
@@ -1816,6 +1818,29 @@ mod tests {
                 .strings,
             strings
         );
+    }
+
+    #[test]
+    fn exclusivity_rejects_malformed_recognized_storage() {
+        let object = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 2_001,
+                data: vec![0x80],
+            }],
+        )
+        .unwrap();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/One.iwa",
+                &crate::archive::Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        assert!(is_exclusive(&package, 42).is_err());
     }
 
     #[test]

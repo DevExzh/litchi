@@ -108,11 +108,16 @@ fn resolve_object_storage(
         if !STORAGE_MESSAGE_TYPES.contains(&message.type_) {
             continue;
         }
-        let storage = StorageArchive::decode(message.data.as_slice()).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "iWork text storage {object_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
-            ))
-        })?;
+        let Some(storage) = decode_storage_payload(
+            object_id,
+            archive_name,
+            message_index,
+            message.type_,
+            &message.data,
+        )?
+        else {
+            continue;
+        };
         if found.is_some() {
             return Err(Error::InvalidFormat(format!(
                 "iWork text storage {object_id} must have exactly one writable payload"
@@ -140,6 +145,30 @@ fn resolve_object_storage(
         });
     }
     Ok(found)
+}
+
+fn decode_storage_payload(
+    object_id: u64,
+    archive_name: &str,
+    message_index: usize,
+    message_type: u32,
+    data: &[u8],
+) -> Result<Option<StorageArchive>> {
+    match StorageArchive::decode(data) {
+        Ok(storage) => Ok(Some(storage)),
+        Err(_error)
+            if message_type == 2_022
+                && crate::protobuf::tswp::ParagraphStyleArchive::decode(data).is_ok() =>
+        {
+            // Numbers reuses the native 2022 message type for paragraph styles.
+            // A valid paragraph-style payload is not a text storage and must not
+            // be rejected by a package-wide storage discovery pass.
+            Ok(None)
+        },
+        Err(error) => Err(Error::InvalidFormat(format!(
+            "iWork text storage {object_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
+        ))),
+    }
 }
 
 pub(super) fn require_text_boundary(storage_id: u64, position: u32, text: &[String]) -> Result<()> {
@@ -238,5 +267,32 @@ mod tests {
 
         assert!(locate_text_storage(&package, 42).is_err());
         assert!(locate_text_storages(&package).is_err());
+    }
+
+    #[test]
+    fn ignores_numbers_paragraph_style_using_storage_message_type() {
+        let style = crate::protobuf::tswp::ParagraphStyleArchive {
+            super_: crate::protobuf::tss::StyleArchive::default(),
+            ..Default::default()
+        };
+        let object = ArchiveObject::new(
+            43,
+            vec![RawMessage {
+                type_: 2_022,
+                data: style.encode_to_vec(),
+            }],
+        )
+        .unwrap();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/DocumentStylesheet.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        assert!(locate_text_storages(&package).unwrap().is_empty());
     }
 }
