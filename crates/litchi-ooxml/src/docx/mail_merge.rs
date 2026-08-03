@@ -22,6 +22,7 @@ const MAX_RELATIONSHIP_ID_BYTES: usize = 1024;
 const MAX_FIELD_MAPS: usize = 16_384;
 const MAX_RECIPIENTS: usize = 1_000_000;
 const MAX_UNIQUE_TAG_BYTES: usize = 1024 * 1024;
+const MAX_ATTRIBUTES_PER_NODE: usize = 256;
 
 /// Opaque mail-merge source to relate from `settings.xml`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -882,7 +883,7 @@ fn parse_mail_merge(node: &Node) -> Result<MailMergeSettings> {
             },
             14 => value.check_errors = decimal(child, "checkErrors")?,
             15 => value.odso = Some(parse_odso(child)?),
-            _ => unreachable!(),
+            _ => return Err(invalid("mailMerge child index is out of range")),
         }
     }
     validate_model(&value)?;
@@ -952,7 +953,7 @@ fn parse_odso(node: &Node) -> Result<MailMergeDataSourceObject> {
                 value.field_maps.push(parse_field_map(child)?);
             },
             7 => value.recipient_data_relationship_id = Some(relationship_id(child)?),
-            _ => unreachable!(),
+            _ => return Err(invalid("odso child index is out of range")),
         }
     }
     Ok(value)
@@ -1023,7 +1024,7 @@ fn parse_field_map(node: &Node) -> Result<MailMergeFieldMap> {
                     Some(bounded_string(required_val(child)?, "field-map language")?)
             },
             5 => value.dynamic_address = on_off(child)?,
-            _ => unreachable!(),
+            _ => return Err(invalid("fieldMapData child index is out of range")),
         }
     }
     Ok(value)
@@ -1081,7 +1082,7 @@ fn parse_recipient(node: &Node) -> Result<MailMergeRecipient> {
                 recipient.column = Some(number);
             },
             2 => recipient.unique_tag = Some(strict_base64(&required_val(child)?)?),
-            _ => unreachable!(),
+            _ => return Err(invalid("recipientData child index is out of range")),
         }
     }
     Ok(recipient)
@@ -1328,6 +1329,7 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
         .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
     let mut nodes = 0usize;
@@ -1422,13 +1424,21 @@ fn make_node(
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
         let raw = attribute.key.as_ref();
+        if raw.len() > MAX_STRING_BYTES || attribute.value.len() > MAX_STRING_BYTES {
+            return Err(invalid("mail-merge XML attribute is too large"));
+        }
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
             continue;
         }
+        if attributes.len() >= MAX_ATTRIBUTES_PER_NODE {
+            return Err(invalid(
+                "mail-merge XML has too many attributes on one node",
+            ));
+        }
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         attributes.push(Attribute {
-            namespace: own_namespace(namespace),
-            local: String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned(),
+            namespace: own_namespace(namespace)?,
+            local: owned_name(attribute.key.local_name().as_ref(), "attribute name")?,
             value: attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                 .map_err(|error| OoxmlError::Xml(error.to_string()))?
@@ -1436,24 +1446,32 @@ fn make_node(
         });
     }
     Ok(Node {
-        namespace: own_namespace(namespace),
-        local: String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
+        namespace: own_namespace(namespace)?,
+        local: owned_name(element.local_name().as_ref(), "element name")?,
         attributes,
         children: Vec::new(),
         has_text: false,
     })
 }
 
-fn own_namespace(namespace: ResolveResult<'_>) -> OwnedNamespace {
+fn own_namespace(namespace: ResolveResult<'_>) -> Result<OwnedNamespace> {
     match namespace {
         ResolveResult::Bound(Namespace(value)) => {
-            OwnedNamespace::Bound(String::from_utf8_lossy(value).into_owned())
+            Ok(OwnedNamespace::Bound(owned_name(value, "namespace name")?))
         },
-        ResolveResult::Unbound => OwnedNamespace::Unbound,
-        ResolveResult::Unknown(prefix) => {
-            OwnedNamespace::Unknown(String::from_utf8_lossy(&prefix).into_owned())
-        },
+        ResolveResult::Unbound => Ok(OwnedNamespace::Unbound),
+        ResolveResult::Unknown(prefix) => Ok(OwnedNamespace::Unknown(owned_name(
+            &prefix,
+            "namespace prefix",
+        )?)),
     }
+}
+
+fn owned_name(value: &[u8], description: &str) -> Result<String> {
+    if value.len() > MAX_STRING_BYTES {
+        return Err(invalid(format!("mail-merge {description} is too large")));
+    }
+    Ok(String::from_utf8_lossy(value).into_owned())
 }
 
 fn append_node(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
@@ -1685,6 +1703,22 @@ mod tests {
             r#"<w:recipients xmlns:w="{W}"><w:recipientData><w:uniqueTag w:val="AQ="/></w:recipientData></w:recipients>"#
         );
         assert!(MailMergeRecipients::extract_from_xml(recipients.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn rejects_mismatched_end_tags_and_oversized_attributes() {
+        let mismatched = format!(r#"<w:settings xmlns:w="{W}"><w:mailMerge></w:settings>"#);
+        assert!(parse_settings_mail_merge(mismatched.as_bytes()).is_err());
+
+        let oversized_value = "x".repeat(MAX_STRING_BYTES + 1);
+        let oversized = format!(
+            r#"<w:settings xmlns:w="{W}"><w:mailMerge><w:query w:val="{oversized_value}"/></w:mailMerge></w:settings>"#
+        );
+        assert!(matches!(
+            parse_settings_mail_merge(oversized.as_bytes()),
+            Err(OoxmlError::InvalidFormat(message))
+                if message == "mail-merge XML attribute is too large"
+        ));
     }
 
     #[test]

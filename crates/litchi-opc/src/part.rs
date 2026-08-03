@@ -316,7 +316,7 @@ impl XmlPart {
         }
 
         let mut reader = self.reader();
-        let mut in_target_element = false;
+        let mut target_depth = 0usize;
         let mut text_content = String::new();
 
         // Use memchr for fast element name matching
@@ -324,26 +324,31 @@ impl XmlPart {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
+                Ok(Event::Start(ref e))
                     // Fast byte-level comparison
-                    if e.local_name().as_ref() == element_name_bytes => {
-                        in_target_element = true;
+                    if target_depth == 0 && e.local_name().as_ref() == element_name_bytes => {
+                        target_depth = 1;
                     },
-                Ok(Event::Text(e)) if in_target_element => {
+                Ok(Event::Start(_)) if target_depth > 0 => {
+                    target_depth = target_depth.saturating_add(1);
+                },
+                // A self-closing target has no text and must not make unrelated
+                // following text appear to belong to it.
+                Ok(Event::Empty(_)) => {},
+                Ok(Event::Text(e)) if target_depth > 0 => {
                     // Efficiently decode text without unnecessary allocation
                     let text = std::str::from_utf8(e.as_ref())?;
                     text_content.push_str(text);
                 },
-                Ok(Event::End(ref e))
-                    if e.local_name().as_ref() == element_name_bytes => {
-                        in_target_element = false;
-                        if !text_content.is_empty() {
-                            // Cache the result
-                            self.element_cache
-                                .insert(element_name.to_string(), text_content.clone());
-                            return Ok(Some(text_content));
-                        }
-                    },
+                Ok(Event::End(_)) if target_depth > 0 => {
+                    target_depth -= 1;
+                    if target_depth == 0 && !text_content.is_empty() {
+                        // Cache the result
+                        self.element_cache
+                            .insert(element_name.to_string(), text_content.clone());
+                        return Ok(Some(text_content));
+                    }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
                 _ => {},
@@ -518,6 +523,15 @@ mod tests {
         part.set_content_type("application/example+xml".to_string())
             .unwrap();
         assert_eq!(part.content_type(), "application/example+xml");
+    }
+
+    #[test]
+    fn extract_text_ignores_self_closing_targets_and_nested_elements() {
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        let xml = b"<root><text/><other>ignored</other><text><run>Kept</run></text></root>";
+        let mut part = XmlPart::new(partname, "application/xml".to_string(), xml.to_vec());
+
+        assert_eq!(part.extract_text("text").unwrap(), Some("Kept".to_string()));
     }
 
     #[test]

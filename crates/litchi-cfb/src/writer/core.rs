@@ -65,6 +65,7 @@ use super::fat::FatBuilder;
 use super::header::HeaderBuilder;
 use super::minifat::MiniFatBuilder;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::io::{Seek, SeekFrom, Write};
 
 const V3_MAX_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
@@ -277,7 +278,7 @@ impl OleWriter {
             return Ok(());
         }
 
-        let owned_path = own_path(path)?;
+        let owned_path = own_path(path, "stream path", "stream path component")?;
         self.streams
             .try_reserve(1)
             .map_err(|source| OleError::allocation("stream table", source))?;
@@ -318,7 +319,7 @@ impl OleWriter {
     ///
     /// * `Result<(), OleError>` - Success or error if stream doesn't exist
     pub fn delete_stream(&mut self, path: &[&str]) -> Result<(), OleError> {
-        let owned_path: Vec<String> = path.iter().map(|s| s.to_string()).collect();
+        let owned_path = own_path(path, "stream path", "stream path component")?;
 
         if let Some(pos) = self.streams.iter().position(|(p, _)| p == &owned_path) {
             self.streams.remove(pos);
@@ -350,7 +351,8 @@ impl OleWriter {
             return Err(OleError::InvalidData("Empty path".to_string()));
         }
 
-        let owned_path: Vec<String> = path.iter().map(|s| s.to_string()).collect();
+        let owned_path = own_path(path, "storage path", "storage path component")?;
+        reserve_hash_map_entry(&mut self.storages, &owned_path, 1, "storage table")?;
         self.storages.insert(owned_path, ());
 
         Ok(())
@@ -361,7 +363,7 @@ impl OleWriter {
     /// `path` must identify a storage previously registered with
     /// [`Self::create_storage`]. CLSIDs are encoded in CFB byte order.
     pub fn set_storage_clsid(&mut self, path: &[&str], clsid: [u8; 16]) -> Result<(), OleError> {
-        let owned_path: Vec<String> = path.iter().map(|component| component.to_string()).collect();
+        let owned_path = own_path(path, "storage path", "storage path component")?;
         if !self.storages.contains_key(&owned_path) {
             return Err(OleError::InvalidData(format!(
                 "CFB storage path {owned_path:?} does not exist"
@@ -370,6 +372,12 @@ impl OleWriter {
         if clsid == [0; 16] {
             self.storage_clsids.remove(&owned_path);
         } else {
+            reserve_hash_map_entry(
+                &mut self.storage_clsids,
+                &owned_path,
+                1,
+                "storage CLSID table",
+            )?;
             self.storage_clsids.insert(owned_path, clsid);
         }
         Ok(())
@@ -391,7 +399,7 @@ impl OleWriter {
     /// of child streams and storages is planned for a future enhancement
     /// when nested storage support is added.
     pub fn delete_storage(&mut self, path: &[&str]) -> Result<(), OleError> {
-        let owned_path: Vec<String> = path.iter().map(|s| s.to_string()).collect();
+        let owned_path = own_path(path, "storage path", "storage path component")?;
 
         if self.storages.remove(&owned_path).is_none() {
             return Err(OleError::InvalidFormat("Storage not found".to_string()));
@@ -722,20 +730,40 @@ impl OleWriter {
     }
 }
 
-fn own_path(path: &[&str]) -> Result<Vec<String>, OleError> {
+fn own_path(
+    path: &[&str],
+    path_resource: &'static str,
+    component_resource: &'static str,
+) -> Result<Vec<String>, OleError> {
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(path.len())
-        .map_err(|source| OleError::allocation("stream path", source))?;
+        .map_err(|source| OleError::allocation(path_resource, source))?;
     for component in path {
         let mut value = String::new();
         value
             .try_reserve_exact(component.len())
-            .map_err(|source| OleError::allocation("stream path component", source))?;
+            .map_err(|source| OleError::allocation(component_resource, source))?;
         value.push_str(component);
         owned.push(value);
     }
     Ok(owned)
+}
+
+fn reserve_hash_map_entry<K, V>(
+    map: &mut HashMap<K, V>,
+    key: &K,
+    additional: usize,
+    resource: &'static str,
+) -> Result<(), OleError>
+where
+    K: Eq + Hash,
+{
+    if map.contains_key(key) {
+        return Ok(());
+    }
+    map.try_reserve(additional)
+        .map_err(|source| OleError::allocation(resource, source))
 }
 
 fn validate_stream_size(
@@ -1062,5 +1090,24 @@ mod tests {
             }
         ));
         assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn path_table_reservation_reports_overflow_without_mutation() {
+        let mut table = HashMap::<Vec<String>, ()>::new();
+        let key = vec!["Storage".to_string()];
+
+        let error =
+            reserve_hash_map_entry(&mut table, &key, usize::MAX, "test path table").unwrap_err();
+
+        assert!(matches!(
+            error,
+            OleError::Allocation {
+                resource: "test path table",
+                ..
+            }
+        ));
+        assert!(table.is_empty());
+        assert!(!table.contains_key(&key));
     }
 }
