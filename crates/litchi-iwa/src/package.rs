@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::{Component, Path};
 use std::sync::Arc;
 
-use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+use soapberry_zip::office::{ArchiveLimits, ArchiveReader, StreamingArchiveWriter};
 use tempfile::NamedTempFile;
 
 use crate::archive::Archive;
@@ -39,17 +39,117 @@ pub struct Snapshot {
     state: Arc<PackageState>,
 }
 
+/// Resource ceilings applied while ingesting one iWork package.
+///
+/// The limits cover every ZIP archive opened during ingress, including a
+/// legacy nested `Index.zip`. They bound central-directory metadata before
+/// package members are materialized and can only be tightened below the
+/// format-wide hard ceilings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PackageLimits {
+    max_entries: usize,
+    max_entry_bytes: u64,
+    max_total_bytes: u64,
+}
+
+impl PackageLimits {
+    /// Hard ceiling for non-directory package members in one ZIP archive.
+    pub const MAX_ENTRIES: usize = 100_000;
+    /// Hard ceiling for one declared uncompressed package member.
+    pub const MAX_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
+    /// Hard ceiling for the declared uncompressed size of one ZIP archive.
+    pub const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+    /// Build checked package-ingress ceilings.
+    pub fn new(max_entries: usize, max_entry_bytes: u64, max_total_bytes: u64) -> Result<Self> {
+        if max_entries == 0 || max_entry_bytes == 0 || max_total_bytes == 0 {
+            return Err(Error::InvalidFormat(
+                "iWork package limits must be non-zero".to_owned(),
+            ));
+        }
+        if max_entries > Self::MAX_ENTRIES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork package entry limit exceeds the {} entry hard ceiling",
+                Self::MAX_ENTRIES
+            )));
+        }
+        if max_entry_bytes > Self::MAX_ENTRY_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork package entry limit exceeds the {} byte hard ceiling",
+                Self::MAX_ENTRY_BYTES
+            )));
+        }
+        if max_total_bytes > Self::MAX_TOTAL_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "iWork package total limit exceeds the {} byte hard ceiling",
+                Self::MAX_TOTAL_BYTES
+            )));
+        }
+        Ok(Self {
+            max_entries,
+            max_entry_bytes,
+            max_total_bytes,
+        })
+    }
+
+    /// Maximum number of non-directory members accepted in one archive.
+    pub const fn max_entries(self) -> usize {
+        self.max_entries
+    }
+
+    /// Maximum declared uncompressed size of one member.
+    pub const fn max_entry_bytes(self) -> u64 {
+        self.max_entry_bytes
+    }
+
+    /// Maximum declared uncompressed size of one archive.
+    pub const fn max_total_bytes(self) -> u64 {
+        self.max_total_bytes
+    }
+
+    fn archive_limits(self) -> ArchiveLimits {
+        ArchiveLimits {
+            max_files: self.max_entries,
+            max_entry_size: self.max_entry_bytes,
+            max_total_size: self.max_total_bytes,
+        }
+    }
+}
+
+impl Default for PackageLimits {
+    fn default() -> Self {
+        Self {
+            max_entries: Self::MAX_ENTRIES,
+            max_entry_bytes: Self::MAX_ENTRY_BYTES,
+            max_total_bytes: Self::MAX_TOTAL_BYTES,
+        }
+    }
+}
+
 impl IWorkPackage {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::from_bytes(&std::fs::read(path)?)
+        Self::open_with_limits(path, PackageLimits::default())
+    }
+
+    /// Open a package from a path under caller-selected ingress ceilings.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: PackageLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(&std::fs::read(path)?, limits)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let archive = ArchiveReader::new(bytes)
+        Self::from_bytes_with_limits(bytes, PackageLimits::default())
+    }
+
+    /// Parse a package under caller-selected ingress ceilings.
+    ///
+    /// The same ceilings are applied to the outer ZIP and, when present, the
+    /// embedded legacy `Index.zip` archive.
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
+        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
             .map_err(|error| Error::Bundle(format!("Failed to open iWork ZIP: {error}")))?;
         if is_encrypted_iwork_archive(&archive) {
             return Err(Error::InvalidFormat(
@@ -59,7 +159,7 @@ impl IWorkPackage {
         if !archive.file_names().any(|name| name.ends_with(".iwa"))
             && let Some(index_name) = nested_index_zip_name(&archive)?
         {
-            return Self::from_legacy_bundle(&archive, &index_name);
+            return Self::from_legacy_bundle(&archive, &index_name, limits);
         }
         Self::from_flat_archive(&archive)
     }
@@ -88,7 +188,11 @@ impl IWorkPackage {
     /// flat package representation used by the rest of the mutable API. The
     /// IWA members come first and all non-directory assets are retained with
     /// the legacy bundle prefix removed.
-    fn from_legacy_bundle(archive: &ArchiveReader<'_>, index_name: &str) -> Result<Self> {
+    fn from_legacy_bundle(
+        archive: &ArchiveReader<'_>,
+        index_name: &str,
+        limits: PackageLimits,
+    ) -> Result<Self> {
         let prefix = index_name.strip_suffix("Index.zip").ok_or_else(|| {
             Error::InvalidFormat(format!("invalid legacy package index name: {index_name}"))
         })?;
@@ -97,11 +201,13 @@ impl IWorkPackage {
                 "Failed to read legacy package index {index_name}: {error}"
             ))
         })?;
-        let index = ArchiveReader::new(&index_data).map_err(|error| {
-            Error::Bundle(format!(
-                "Failed to open legacy package index {index_name}: {error}"
-            ))
-        })?;
+        let index = ArchiveReader::new_with_limits(&index_data, limits.archive_limits()).map_err(
+            |error| {
+                Error::Bundle(format!(
+                    "Failed to open legacy package index {index_name}: {error}"
+                ))
+            },
+        )?;
 
         let mut entries = Vec::new();
         let mut seen = HashSet::new();
@@ -542,6 +648,66 @@ mod tests {
             .write_stored("mac.numbers/Metadata/Properties.plist", b"plist")
             .unwrap();
         outer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn package_limits_are_checked_and_exposed() {
+        let limits = PackageLimits::new(7, 11, 23).unwrap();
+        assert_eq!(limits.max_entries(), 7);
+        assert_eq!(limits.max_entry_bytes(), 11);
+        assert_eq!(limits.max_total_bytes(), 23);
+
+        assert!(PackageLimits::new(0, 1, 1).is_err());
+        assert!(PackageLimits::new(1, 0, 1).is_err());
+        assert!(PackageLimits::new(1, 1, 0).is_err());
+        assert!(PackageLimits::new(PackageLimits::MAX_ENTRIES + 1, 1, 1).is_err());
+        assert!(PackageLimits::new(1, PackageLimits::MAX_ENTRY_BYTES + 1, 1).is_err());
+        assert!(PackageLimits::new(1, 1, PackageLimits::MAX_TOTAL_BYTES + 1).is_err());
+    }
+
+    #[test]
+    fn package_limits_reject_flat_archive_metadata_before_materialization() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Data/asset", b"asset").unwrap();
+        writer.write_stored("Metadata/other", b"other").unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let one_entry = PackageLimits::new(
+            1,
+            PackageLimits::MAX_ENTRY_BYTES,
+            PackageLimits::MAX_TOTAL_BYTES,
+        )
+        .unwrap();
+        assert!(IWorkPackage::from_bytes_with_limits(&bytes, one_entry).is_err());
+
+        let small_entry = PackageLimits::new(10, 4, PackageLimits::MAX_TOTAL_BYTES).unwrap();
+        assert!(IWorkPackage::from_bytes_with_limits(&bytes, small_entry).is_err());
+    }
+
+    #[test]
+    fn package_limits_apply_to_legacy_nested_index_zip() {
+        let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
+        let mut index = StreamingArchiveWriter::new();
+        index
+            .write_stored("Index/Document.iwa", &compressed)
+            .unwrap();
+        index
+            .write_stored("Index/Metadata.iwa", &compressed)
+            .unwrap();
+        let index = index.finish_to_bytes().unwrap();
+
+        let mut outer = StreamingArchiveWriter::new();
+        outer.write_stored("mac.pages/Index.zip", &index).unwrap();
+        let bytes = outer.finish_to_bytes().unwrap();
+
+        let one_entry = PackageLimits::new(
+            1,
+            PackageLimits::MAX_ENTRY_BYTES,
+            PackageLimits::MAX_TOTAL_BYTES,
+        )
+        .unwrap();
+        let error = IWorkPackage::from_bytes_with_limits(&bytes, one_entry).unwrap_err();
+        assert!(error.to_string().contains("legacy package index"));
     }
 
     #[test]
