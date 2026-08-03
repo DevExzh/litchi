@@ -195,6 +195,17 @@ impl Bundle {
         }
     }
 
+    fn archives_in_order(&self) -> Vec<(&str, &Archive)> {
+        let mut archives: Vec<_> = self
+            .state
+            .archives
+            .iter()
+            .map(|(name, archive)| (name.as_str(), archive))
+            .collect();
+        archives.sort_unstable_by_key(|(name, _)| *name);
+        archives
+    }
+
     /// Capture a cheap immutable snapshot that shares all parsed bundle state.
     pub fn snapshot(&self) -> Self {
         self.clone()
@@ -403,7 +414,7 @@ impl Bundle {
 
         // Verify each archive has at least one object
         let mut total_objects = 0;
-        for (archive_name, archive) in &self.state.archives {
+        for (archive_name, archive) in self.archives_in_order() {
             if archive.objects.is_empty() {
                 eprintln!("Warning: Archive '{}' contains no objects", archive_name);
             }
@@ -447,11 +458,16 @@ impl Bundle {
             .sum();
 
         let largest_archive = self
-            .state
-            .archives
-            .iter()
-            .max_by_key(|(_, archive)| archive.objects.len())
-            .map(|(name, archive)| (name.clone(), archive.objects.len()));
+            .archives_in_order()
+            .into_iter()
+            .max_by(|(left_name, left_archive), (right_name, right_archive)| {
+                left_archive
+                    .objects
+                    .len()
+                    .cmp(&right_archive.objects.len())
+                    .then_with(|| right_name.cmp(left_name))
+            })
+            .map(|(name, archive)| (name.to_owned(), archive.objects.len()));
 
         BundleStats {
             archive_count,
@@ -460,11 +476,11 @@ impl Bundle {
         }
     }
 
-    /// Extract all text content from the bundle
+    /// Extract all text content from the bundle in deterministic archive order.
     pub fn extract_text(&self) -> Result<String> {
         let mut text_parts = Vec::new();
 
-        for archive in self.state.archives.values() {
+        for (_, archive) in self.archives_in_order() {
             for object in &archive.objects {
                 text_parts.extend(object.extract_text());
             }
@@ -474,25 +490,25 @@ impl Bundle {
         Ok(text_parts.join("\n"))
     }
 
-    /// Get all objects across all archives
+    /// Get all objects across all archives in archive-name/source-object order.
     pub fn all_objects(&self) -> Vec<(&str, &ArchiveObject)> {
         let mut objects = Vec::new();
-        for (archive_name, archive) in &self.state.archives {
+        for (archive_name, archive) in self.archives_in_order() {
             for object in &archive.objects {
-                objects.push((archive_name.as_str(), object));
+                objects.push((archive_name, object));
             }
         }
         objects
     }
 
-    /// Find objects by message type
+    /// Find objects by message type in archive-name/source-object order.
     pub fn find_objects_by_type(&self, message_type: u32) -> Vec<(&str, &ArchiveObject)> {
         let mut matching_objects = Vec::new();
 
-        for (archive_name, archive) in &self.state.archives {
+        for (archive_name, archive) in self.archives_in_order() {
             for object in &archive.objects {
                 if object.messages.iter().any(|msg| msg.type_ == message_type) {
-                    matching_objects.push((archive_name.as_str(), object));
+                    matching_objects.push((archive_name, object));
                 }
             }
         }
@@ -655,6 +671,7 @@ fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{Archive, ArchiveObject, RawMessage};
     use std::fs;
 
     #[test]
@@ -825,5 +842,83 @@ mod tests {
     #[test]
     fn bundles_are_send_and_sync() {
         assert_send_sync::<Bundle>();
+    }
+
+    #[test]
+    fn bundle_queries_are_deterministic_across_archive_hash_map_order() -> Result<()> {
+        let archive_a = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 7,
+                        data: Vec::new(),
+                    }],
+                )?,
+                ArchiveObject::new(
+                    3,
+                    vec![RawMessage {
+                        type_: 8,
+                        data: Vec::new(),
+                    }],
+                )?,
+            ],
+        };
+        let archive_z = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: 7,
+                        data: Vec::new(),
+                    }],
+                )?,
+                ArchiveObject::new(
+                    4,
+                    vec![RawMessage {
+                        type_: 9,
+                        data: Vec::new(),
+                    }],
+                )?,
+            ],
+        };
+        let bundle = Bundle::from_parts(
+            PathBuf::from("<test>"),
+            HashMap::from([
+                ("Index/Z.iwa".to_owned(), archive_z),
+                ("Index/A.iwa".to_owned(), archive_a),
+            ]),
+            BundleMetadata::default(),
+        );
+
+        let object_order: Vec<_> = bundle
+            .all_objects()
+            .into_iter()
+            .map(|(archive, object)| (archive, object.archive_info.identifier))
+            .collect();
+        assert_eq!(
+            object_order,
+            vec![
+                ("Index/A.iwa", Some(1)),
+                ("Index/A.iwa", Some(3)),
+                ("Index/Z.iwa", Some(2)),
+                ("Index/Z.iwa", Some(4)),
+            ]
+        );
+
+        let matching_order: Vec<_> = bundle
+            .find_objects_by_type(7)
+            .into_iter()
+            .map(|(archive, object)| (archive, object.archive_info.identifier))
+            .collect();
+        assert_eq!(
+            matching_order,
+            vec![("Index/A.iwa", Some(1)), ("Index/Z.iwa", Some(2))]
+        );
+        assert_eq!(
+            bundle.stats().largest_archive,
+            Some(("Index/A.iwa".to_owned(), 2))
+        );
+        Ok(())
     }
 }
