@@ -1,6 +1,6 @@
 //! Shared formatting types for XLSX (used in both reading and writing).
 
-use super::styles::border::Border;
+use super::styles::{Alignment, border::Border};
 
 /// Cell format information.
 #[derive(Debug, Clone, Default)]
@@ -9,6 +9,8 @@ pub struct CellFormat {
     pub fill: Option<CellFill>,
     pub border: Option<Border>,
     pub number_format: Option<String>,
+    /// Typed cell alignment shared by the reader and writer facades.
+    pub alignment: Option<Alignment>,
 }
 
 /// Font properties for a cell.
@@ -188,6 +190,7 @@ mod tests {
         assert!(format.fill.is_none());
         assert!(format.border.is_none());
         assert!(format.number_format.is_none());
+        assert!(format.alignment.is_none());
     }
 
     #[test]

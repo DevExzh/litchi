@@ -3396,6 +3396,55 @@ interpretation of that one RGB bottom-side combination. Neither artifact is an
 Office-resave fidelity test, a version matrix, coverage of the remaining line,
 color, logical-edge, diagonal, or chart variants, or measured performance.
 
+## Typed fixed-domain continuation and native Office evidence
+
+The next fixed-domain slice removes four more stringly or weakly bounded
+facades. SpreadsheetML alignment now uses
+`alignment::{Horizontal, Vertical, Rotation, Reading, Indent, Alignment}` from
+parser through shared `CellFormat`, resolved worksheet reads, exact XF
+deduplication, and writing. PresentationML modern-comment `complete` is the
+checked, niche-encoded `Progress` value rather than `Option<String>`.
+WordprocessingML section numbering, note placement, page-border color, and art
+styles use `ChapterSep`, separate `FootnotePos`/`EndnotePos` domains,
+`BorderColor`, and `PageBorderArt`. DrawingML diagram identifiers and relation
+kinds use `Id`, `PointType`, and `ConnectionType`, with concise semantic CRUD,
+Office's shared one-parent rule for `parOf` and `presParOf`, cascading removal,
+and a preflighted canonical writer. The diagram codec explicitly does not claim
+lossless round-tripping of rich XML outside its modeled subset.
+
+Focused Rust evidence covers all DrawingML targets, DOCX section parsing and
+writing, XLSX style parsing/writing and exact deduplication, PPTX modern-comment
+unit and package CRUD tests, and compilation of the affected public examples.
+Malformed fixed tokens, out-of-range percentages and alignment scalars,
+cross-domain note positions, invalid identifiers, graph conflicts, XML control
+characters, and aggregate diagram-output limits are rejected before
+publication. These are correctness and API-shape gates, not allocation,
+latency, throughput, or cache measurements.
+
+Computer Use opened the generated
+`target/office-verification/typed-alignment/xlsx_comprehensive_features.xlsx`
+(SHA-256
+`9e3ff40cf45d5a539832595acb2e87831cfd4f6afa3aa0b2aff0edc8ad08485e`)
+in desktop Microsoft Excel for macOS without a repair, recovery, or
+compatibility dialog. The retained `styles.xml` contains one header alignment
+with `horizontal="center"`, `vertical="center"`, and `wrapText="1"`; with A1
+selected, Excel's accessibility tree reported Center, Middle Align, and Wrap
+Text as active. This verifies native interpretation of that one authored
+alignment combination only.
+
+A second generated artifact,
+`target/office-verification/typed-docx-section/comprehensive_test.docx`
+(SHA-256
+`b1f71cfdd4f83ddf20dc7262a1aab38470652a90b4539871b3992462e2f17200`),
+passed ZIP integrity and contains canonical `pageBottom`, `docEnd`, and blue
+double-edge `1F4E78` section values. Desktop Microsoft Word for macOS opened
+the exact file without a repair or recovery dialog, visibly rendered the page
+border, placed both footnotes at the bottom of page 4, and placed both endnotes
+at the document end on page 5. Word did label the document **Compatibility
+Mode**, so this is deliberately not recorded as a no-compatibility-mode gate.
+Neither native probe includes an Office edit/resave, reverse-read of an Office
+copy, other domain variants or Office builds, or performance evidence.
+
 ## Failure-atomic PPTX publication and owned font buffers
 
 PPTX save preparation now treats legacy-writer materialization, optional font

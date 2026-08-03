@@ -5,12 +5,32 @@
 //! cell formats) used in an Excel workbook.
 
 use crate::xlsx::format::{CellFill, CellFillPatternType, CellFont, CellFormat};
+use crate::xlsx::styles::Alignment;
 use crate::xlsx::styles::border::{Border, Color, Conformance, Side};
 use litchi_core::sheet::Result as SheetResult;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 use std::sync::Arc;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CellXf {
+    font_id: usize,
+    fill_id: usize,
+    border_id: usize,
+    num_fmt_id: usize,
+    alignment: Option<Alignment>,
+}
+
+impl CellXf {
+    const DEFAULT: Self = Self {
+        font_id: 0,
+        fill_id: 0,
+        border_id: 0,
+        num_fmt_id: 0,
+        alignment: None,
+    };
+}
 
 /// Builder for generating styles.xml content.
 ///
@@ -34,10 +54,10 @@ pub struct StylesBuilder {
     number_formats: Vec<String>,
     /// Number format lookup (format string -> index)
     number_format_map: HashMap<String, usize>,
-    /// Cell formats (XF records) - index -> (font_id, fill_id, border_id, num_fmt_id)
-    cell_formats: Vec<(usize, usize, usize, usize)>,
+    /// Cell format records in publication order.
+    cell_formats: Vec<CellXf>,
     /// Cell format lookup by resolved resource identity.
-    cell_format_map: HashMap<(usize, usize, usize, usize), usize>,
+    cell_format_map: HashMap<CellXf, usize>,
 }
 
 impl StylesBuilder {
@@ -99,8 +119,8 @@ impl StylesBuilder {
         builder.border_map.insert(border, 0);
 
         // Add default cell format (style index 0)
-        builder.cell_formats.push((0, 0, 0, 0)); // font=0, fill=0, border=0, numFmt=0
-        builder.cell_format_map.insert((0, 0, 0, 0), 0);
+        builder.cell_formats.push(CellXf::DEFAULT);
+        builder.cell_format_map.insert(CellXf::DEFAULT, 0);
 
         builder
     }
@@ -137,7 +157,13 @@ impl StylesBuilder {
             0 // General format
         };
 
-        let key = (font_id, fill_id, border_id, num_fmt_id);
+        let key = CellXf {
+            font_id,
+            fill_id,
+            border_id,
+            num_fmt_id,
+            alignment: format.alignment,
+        };
         if let Some(&index) = self.cell_format_map.get(&key) {
             return index;
         }
@@ -277,29 +303,34 @@ impl StylesBuilder {
         write!(xml, r#"<cellXfs count="{}">"#, self.cell_formats.len())
             .map_err(|e| format!("XML write error: {}", e))?;
 
-        for (font_id, fill_id, border_id, num_fmt_id) in &self.cell_formats {
+        for format in &self.cell_formats {
             write!(
                 xml,
                 r#"<xf numFmtId="{}" fontId="{}" fillId="{}" borderId="{}""#,
-                num_fmt_id, font_id, fill_id, border_id
+                format.num_fmt_id, format.font_id, format.fill_id, format.border_id
             )
             .map_err(|e| format!("XML write error: {}", e))?;
 
             // Add applyXXX attributes if non-default
-            if *font_id != 0 {
+            if format.font_id != 0 {
                 xml.push_str(r#" applyFont="1""#);
             }
-            if *fill_id != 0 {
+            if format.fill_id != 0 {
                 xml.push_str(r#" applyFill="1""#);
             }
-            if *border_id != 0 {
+            if format.border_id != 0 {
                 xml.push_str(r#" applyBorder="1""#);
             }
-            if *num_fmt_id != 0 {
+            if format.num_fmt_id != 0 {
                 xml.push_str(r#" applyNumberFormat="1""#);
             }
-
-            xml.push_str("/>");
+            if let Some(alignment) = format.alignment {
+                xml.push_str(r#" applyAlignment="1">"#);
+                Self::write_alignment(&mut xml, alignment, conformance)?;
+                xml.push_str("</xf>");
+            } else {
+                xml.push_str("/>");
+            }
         }
 
         xml.push_str("</cellXfs>");
@@ -374,6 +405,60 @@ impl StylesBuilder {
         }
 
         xml.push_str("</patternFill></fill>");
+        Ok(())
+    }
+
+    /// Write the complete typed `CT_CellAlignment` attribute set.
+    fn write_alignment(
+        xml: &mut String,
+        alignment: Alignment,
+        conformance: Conformance,
+    ) -> SheetResult<()> {
+        if conformance == Conformance::Strict
+            && alignment
+                .text_rotation
+                .is_some_and(|rotation| rotation.is_contextual())
+        {
+            return Err(
+                "context-dependent text rotation 254 requires transitional SpreadsheetML".into(),
+            );
+        }
+
+        xml.push_str("<alignment");
+        if let Some(horizontal) = alignment.horizontal {
+            write!(xml, r#" horizontal="{}""#, horizontal.as_str())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        if let Some(vertical) = alignment.vertical {
+            write!(xml, r#" vertical="{}""#, vertical.as_str())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        if let Some(rotation) = alignment.text_rotation {
+            write!(xml, r#" textRotation="{}""#, rotation.get())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        if alignment.wrap_text {
+            xml.push_str(r#" wrapText="1""#);
+        }
+        if let Some(indent) = alignment.indent {
+            write!(xml, r#" indent="{}""#, indent.get())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        if let Some(relative_indent) = alignment.relative_indent {
+            write!(xml, r#" relativeIndent="{relative_indent}""#)
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        if alignment.justify_last_line {
+            xml.push_str(r#" justifyLastLine="1""#);
+        }
+        if alignment.shrink_to_fit {
+            xml.push_str(r#" shrinkToFit="1""#);
+        }
+        if let Some(reading_order) = alignment.reading_order {
+            write!(xml, r#" readingOrder="{}""#, reading_order.get())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        xml.push_str("/>");
         Ok(())
     }
 
@@ -539,6 +624,7 @@ impl Default for StylesBuilder {
 mod tests {
     use super::*;
     use crate::xlsx::styles::Styles;
+    use crate::xlsx::styles::alignment::{Horizontal, Indent, Reading, Rotation, Vertical};
     use crate::xlsx::styles::border::{Diagonal, Dir, Line, Tint};
 
     #[test]
@@ -686,5 +772,92 @@ mod tests {
             ..CellFormat::default()
         });
         assert!(builder.to_xml().is_err());
+    }
+
+    #[test]
+    fn typed_alignment_round_trips_every_supported_field() {
+        let alignment = Alignment {
+            horizontal: Some(Horizontal::CenterContinuous),
+            vertical: Some(Vertical::Distributed),
+            text_rotation: Some(Rotation::stacked()),
+            wrap_text: true,
+            indent: Some(Indent::new(255)),
+            relative_indent: Some(-7),
+            justify_last_line: true,
+            shrink_to_fit: true,
+            reading_order: Some(Reading::RightToLeft),
+        };
+        let mut builder = StylesBuilder::new();
+        builder.add_cell_format(&CellFormat {
+            alignment: Some(alignment),
+            ..CellFormat::default()
+        });
+
+        for conformance in [Conformance::Transitional, Conformance::Strict] {
+            let xml = builder.to_xml_in(conformance).unwrap();
+            assert!(xml.contains(r#"applyAlignment="1""#));
+            assert!(xml.contains(r#"horizontal="centerContinuous""#));
+            assert!(xml.contains(r#"vertical="distributed""#));
+            assert!(xml.contains(r#"textRotation="255""#));
+            assert!(xml.contains(r#"indent="255""#));
+            assert!(xml.contains(r#"relativeIndent="-7""#));
+            assert!(xml.contains(r#"readingOrder="2""#));
+
+            let parsed = Styles::parse(&xml).unwrap();
+            assert_eq!(parsed.cell_xfs[1].alignment, Some(alignment));
+        }
+    }
+
+    #[test]
+    fn contextual_rotation_is_transitional_only() {
+        let mut builder = StylesBuilder::new();
+        builder.add_cell_format(&CellFormat {
+            alignment: Some(Alignment {
+                text_rotation: Some(Rotation::contextual()),
+                ..Alignment::new()
+            }),
+            ..CellFormat::default()
+        });
+
+        let xml = builder.to_xml_in(Conformance::Transitional).unwrap();
+        assert!(xml.contains(r#"textRotation="254""#));
+        assert_eq!(
+            Styles::parse(&xml).unwrap().cell_xfs[1].alignment,
+            Some(Alignment {
+                text_rotation: Some(Rotation::contextual()),
+                ..Alignment::new()
+            })
+        );
+
+        let error = builder.to_xml_in(Conformance::Strict).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("context-dependent text rotation 254")
+        );
+    }
+
+    #[test]
+    fn alignment_participates_in_exact_cell_format_deduplication() {
+        let mut builder = StylesBuilder::new();
+        let left = CellFormat {
+            alignment: Some(Alignment::horizontal(Horizontal::Left)),
+            ..CellFormat::default()
+        };
+        let right = CellFormat {
+            alignment: Some(Alignment::horizontal(Horizontal::Right)),
+            ..CellFormat::default()
+        };
+
+        let left_id = builder.add_cell_format(&left);
+        assert_eq!(builder.add_cell_format(&left), left_id);
+        assert_ne!(builder.add_cell_format(&right), left_id);
+        assert_ne!(
+            builder.add_cell_format(&CellFormat::default()),
+            builder.add_cell_format(&CellFormat {
+                alignment: Some(Alignment::new()),
+                ..CellFormat::default()
+            })
+        );
     }
 }

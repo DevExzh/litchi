@@ -114,12 +114,47 @@ impl SectionHeaderFooterReference {
 }
 
 /// Page-numbering settings for a section.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionPageNumbering {
     pub format: PageNumberFormat,
     pub start: Option<u32>,
     pub chapter_style: Option<u8>,
-    pub chapter_separator: Option<String>,
+    pub chapter_separator: Option<ChapterSep>,
+}
+
+/// Separator rendered between chapter and page numbers (`ST_ChapterSep`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChapterSep {
+    Hyphen,
+    Period,
+    Colon,
+    EmDash,
+    EnDash,
+}
+
+impl ChapterSep {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Hyphen => "hyphen",
+            Self::Period => "period",
+            Self::Colon => "colon",
+            Self::EmDash => "emDash",
+            Self::EnDash => "enDash",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "hyphen" => Ok(Self::Hyphen),
+            "period" => Ok(Self::Period),
+            "colon" => Ok(Self::Colon),
+            "emDash" => Ok(Self::EmDash),
+            "enDash" => Ok(Self::EnDash),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid chapter separator '{value}'"
+            ))),
+        }
+    }
 }
 
 /// One explicitly sized newspaper-style column.
@@ -180,14 +215,107 @@ impl NoteNumberRestart {
     }
 }
 
-/// Footnote/endnote numbering options within a section.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SectionNoteProperties {
+/// Footnote positioning location (`ST_FtnPos`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FootnotePos {
+    PageBottom,
+    BeneathText,
+    SectionEnd,
+    DocumentEnd,
+}
+
+/// Endnote positioning location (`ST_EdnPos`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EndnotePos {
+    SectionEnd,
+    DocumentEnd,
+}
+
+trait NotePos: Copy {
+    fn parse(value: &str) -> Result<Self>;
+    fn as_str(self) -> &'static str;
+}
+
+impl NotePos for FootnotePos {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "pageBottom" => Ok(Self::PageBottom),
+            "beneathText" => Ok(Self::BeneathText),
+            "sectEnd" => Ok(Self::SectionEnd),
+            "docEnd" => Ok(Self::DocumentEnd),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid footnote position '{value}'"
+            ))),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::PageBottom => "pageBottom",
+            Self::BeneathText => "beneathText",
+            Self::SectionEnd => "sectEnd",
+            Self::DocumentEnd => "docEnd",
+        }
+    }
+}
+
+impl NotePos for EndnotePos {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "sectEnd" => Ok(Self::SectionEnd),
+            "docEnd" => Ok(Self::DocumentEnd),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid endnote position '{value}'"
+            ))),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::SectionEnd => "sectEnd",
+            Self::DocumentEnd => "docEnd",
+        }
+    }
+}
+
+/// Footnote numbering and placement within a section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Footnotes {
     pub format: PageNumberFormat,
     pub start: Option<u32>,
     pub restart: Option<NoteNumberRestart>,
-    /// Schema token such as `pageBottom`, `beneathText`, `sectEnd`, or `docEnd`.
-    pub position: Option<String>,
+    pub position: Option<FootnotePos>,
+}
+
+impl Default for Footnotes {
+    fn default() -> Self {
+        Self {
+            format: PageNumberFormat::Decimal,
+            start: None,
+            restart: None,
+            position: None,
+        }
+    }
+}
+
+/// Endnote numbering and placement within a section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Endnotes {
+    pub format: PageNumberFormat,
+    pub start: Option<u32>,
+    pub restart: Option<NoteNumberRestart>,
+    pub position: Option<EndnotePos>,
+}
+
+impl Default for Endnotes {
+    fn default() -> Self {
+        Self {
+            format: PageNumberFormat::Decimal,
+            start: None,
+            restart: None,
+            position: None,
+        }
+    }
 }
 
 /// Text flow for a section.
@@ -277,14 +405,245 @@ const MAX_PAGE_BORDER_ART_SIZE: u32 = 1638;
 /// Maximum page-border spacing from text or page edge in points
 /// (`w:space` on `CT_Border` is limited to 31, ECMA-376 §17.6.16).
 const MAX_PAGE_BORDER_SPACE: u32 = 31;
-/// Maximum length of a page-border art style name.
-const MAX_PAGE_BORDER_ART_NAME_LEN: usize = 64;
+
+macro_rules! define_page_border_art {
+    ($($variant:ident => $token:literal),+ $(,)?) => {
+        /// Fixed page-border artwork domain from `ST_Border`.
+        ///
+        /// The 164 variants follow Word's complete `0x40..=0xE3` page-art
+        /// range in `[MS-DOC]` section 2.9.22. The schema's separate `custom`
+        /// sentinel is intentionally excluded because Word treats it as a
+        /// corrupt document (`[MS-OI29500]` section 2.1.528(d)).
+        #[repr(u8)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum PageBorderArt {
+            $($variant),+
+        }
+
+        impl PageBorderArt {
+            /// Every page-border artwork value in schema order.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// Return the exact `ST_Border` XML token.
+            pub const fn token(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $token),+
+                }
+            }
+
+            /// Return Word's `BrcType` page-art code (`0x40..=0xE3`).
+            pub const fn code(self) -> u8 {
+                self as u8 + 0x40
+            }
+        }
+
+        impl std::str::FromStr for PageBorderArt {
+            type Err = OoxmlError;
+
+            fn from_str(value: &str) -> Result<Self> {
+                match value {
+                    $($token => Ok(Self::$variant)),+,
+                    _ => Err(OoxmlError::InvalidFormat(format!(
+                        "invalid page border artwork '{value}'"
+                    ))),
+                }
+            }
+        }
+
+        impl std::fmt::Display for PageBorderArt {
+            fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str(self.token())
+            }
+        }
+
+        impl TryFrom<u8> for PageBorderArt {
+            type Error = OoxmlError;
+
+            fn try_from(value: u8) -> Result<Self> {
+                value
+                    .checked_sub(0x40)
+                    .and_then(|index| Self::ALL.get(usize::from(index)))
+                    .copied()
+                    .ok_or_else(|| OoxmlError::InvalidFormat(format!(
+                        "invalid page border artwork code {value:#04X}"
+                    )))
+            }
+        }
+    };
+}
+
+define_page_border_art! {
+    Apples => "apples",
+    ArchedScallops => "archedScallops",
+    BabyPacifier => "babyPacifier",
+    BabyRattle => "babyRattle",
+    Balloons3Colors => "balloons3Colors",
+    BalloonsHotAir => "balloonsHotAir",
+    BasicBlackDashes => "basicBlackDashes",
+    BasicBlackDots => "basicBlackDots",
+    BasicBlackSquares => "basicBlackSquares",
+    BasicThinLines => "basicThinLines",
+    BasicWhiteDashes => "basicWhiteDashes",
+    BasicWhiteDots => "basicWhiteDots",
+    BasicWhiteSquares => "basicWhiteSquares",
+    BasicWideInline => "basicWideInline",
+    BasicWideMidline => "basicWideMidline",
+    BasicWideOutline => "basicWideOutline",
+    Bats => "bats",
+    Birds => "birds",
+    BirdsFlight => "birdsFlight",
+    Cabins => "cabins",
+    CakeSlice => "cakeSlice",
+    CandyCorn => "candyCorn",
+    CelticKnotwork => "celticKnotwork",
+    CertificateBanner => "certificateBanner",
+    ChainLink => "chainLink",
+    ChampagneBottle => "champagneBottle",
+    CheckedBarBlack => "checkedBarBlack",
+    CheckedBarColor => "checkedBarColor",
+    Checkered => "checkered",
+    ChristmasTree => "christmasTree",
+    CirclesLines => "circlesLines",
+    CirclesRectangles => "circlesRectangles",
+    ClassicalWave => "classicalWave",
+    Clocks => "clocks",
+    Compass => "compass",
+    Confetti => "confetti",
+    ConfettiGrays => "confettiGrays",
+    ConfettiOutline => "confettiOutline",
+    ConfettiStreamers => "confettiStreamers",
+    ConfettiWhite => "confettiWhite",
+    CornerTriangles => "cornerTriangles",
+    CouponCutoutDashes => "couponCutoutDashes",
+    CouponCutoutDots => "couponCutoutDots",
+    CrazyMaze => "crazyMaze",
+    CreaturesButterfly => "creaturesButterfly",
+    CreaturesFish => "creaturesFish",
+    CreaturesInsects => "creaturesInsects",
+    CreaturesLadyBug => "creaturesLadyBug",
+    CrossStitch => "crossStitch",
+    Cup => "cup",
+    DecoArch => "decoArch",
+    DecoArchColor => "decoArchColor",
+    DecoBlocks => "decoBlocks",
+    DiamondsGray => "diamondsGray",
+    DoubleD => "doubleD",
+    DoubleDiamonds => "doubleDiamonds",
+    Earth1 => "earth1",
+    Earth2 => "earth2",
+    EclipsingSquares1 => "eclipsingSquares1",
+    EclipsingSquares2 => "eclipsingSquares2",
+    EggsBlack => "eggsBlack",
+    Fans => "fans",
+    Film => "film",
+    Firecrackers => "firecrackers",
+    FlowersBlockPrint => "flowersBlockPrint",
+    FlowersDaisies => "flowersDaisies",
+    FlowersModern1 => "flowersModern1",
+    FlowersModern2 => "flowersModern2",
+    FlowersPansy => "flowersPansy",
+    FlowersRedRose => "flowersRedRose",
+    FlowersRoses => "flowersRoses",
+    FlowersTeacup => "flowersTeacup",
+    FlowersTiny => "flowersTiny",
+    Gems => "gems",
+    GingerbreadMan => "gingerbreadMan",
+    Gradient => "gradient",
+    Handmade1 => "handmade1",
+    Handmade2 => "handmade2",
+    HeartBalloon => "heartBalloon",
+    HeartGray => "heartGray",
+    Hearts => "hearts",
+    HeebieJeebies => "heebieJeebies",
+    Holly => "holly",
+    HouseFunky => "houseFunky",
+    Hypnotic => "hypnotic",
+    IceCreamCones => "iceCreamCones",
+    LightBulb => "lightBulb",
+    Lightning1 => "lightning1",
+    Lightning2 => "lightning2",
+    MapPins => "mapPins",
+    MapleLeaf => "mapleLeaf",
+    MapleMuffins => "mapleMuffins",
+    Marquee => "marquee",
+    MarqueeToothed => "marqueeToothed",
+    Moons => "moons",
+    Mosaic => "mosaic",
+    MusicNotes => "musicNotes",
+    Northwest => "northwest",
+    Ovals => "ovals",
+    Packages => "packages",
+    PalmsBlack => "palmsBlack",
+    PalmsColor => "palmsColor",
+    PaperClips => "paperClips",
+    Papyrus => "papyrus",
+    PartyFavor => "partyFavor",
+    PartyGlass => "partyGlass",
+    Pencils => "pencils",
+    People => "people",
+    PeopleWaving => "peopleWaving",
+    PeopleHats => "peopleHats",
+    Poinsettias => "poinsettias",
+    PostageStamp => "postageStamp",
+    Pumpkin1 => "pumpkin1",
+    PushPinNote2 => "pushPinNote2",
+    PushPinNote1 => "pushPinNote1",
+    Pyramids => "pyramids",
+    PyramidsAbove => "pyramidsAbove",
+    Quadrants => "quadrants",
+    Rings => "rings",
+    Safari => "safari",
+    Sawtooth => "sawtooth",
+    SawtoothGray => "sawtoothGray",
+    ScaredCat => "scaredCat",
+    Seattle => "seattle",
+    ShadowedSquares => "shadowedSquares",
+    SharksTeeth => "sharksTeeth",
+    ShorebirdTracks => "shorebirdTracks",
+    Skyrocket => "skyrocket",
+    SnowflakeFancy => "snowflakeFancy",
+    Snowflakes => "snowflakes",
+    Sombrero => "sombrero",
+    Southwest => "southwest",
+    Stars => "stars",
+    StarsTop => "starsTop",
+    Stars3d => "stars3d",
+    StarsBlack => "starsBlack",
+    StarsShadowed => "starsShadowed",
+    Sun => "sun",
+    Swirligig => "swirligig",
+    TornPaper => "tornPaper",
+    TornPaperBlack => "tornPaperBlack",
+    Trees => "trees",
+    TriangleParty => "triangleParty",
+    Triangles => "triangles",
+    Tribal1 => "tribal1",
+    Tribal2 => "tribal2",
+    Tribal3 => "tribal3",
+    Tribal4 => "tribal4",
+    Tribal5 => "tribal5",
+    Tribal6 => "tribal6",
+    TwistedLines1 => "twistedLines1",
+    TwistedLines2 => "twistedLines2",
+    Vine => "vine",
+    Waveline => "waveline",
+    WeavingAngles => "weavingAngles",
+    WeavingBraid => "weavingBraid",
+    WeavingRibbon => "weavingRibbon",
+    WeavingStrips => "weavingStrips",
+    WhiteFlowers => "whiteFlowers",
+    Woodwork => "woodwork",
+    XIllusions => "xIllusions",
+    ZanyTriangles => "zanyTriangles",
+    ZigZag => "zigZag",
+    ZigZagStitch => "zigZagStitch",
+}
 
 /// Page-border style (`ST_Border`, ECMA-376 §17.18.2).
 ///
-/// Line styles map to the fixed `ST_Border` tokens; border artwork uses
-/// [`PageBorderStyle::Art`] with the art token preserved verbatim.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Line styles map directly to fixed tokens; artwork is closed over
+/// [`PageBorderArt`] and cannot carry arbitrary strings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PageBorderStyle {
     Nil,
     None,
@@ -313,12 +672,11 @@ pub enum PageBorderStyle {
     ThreeDEngrave,
     Outset,
     Inset,
-    /// Border artwork token such as `apples` or `starsTop`.
-    Art(String),
+    Art(PageBorderArt),
 }
 
 impl PageBorderStyle {
-    fn as_str(&self) -> &str {
+    fn as_str(self) -> &'static str {
         match self {
             Self::Nil => "nil",
             Self::None => "none",
@@ -347,7 +705,7 @@ impl PageBorderStyle {
             Self::ThreeDEngrave => "threeDEngrave",
             Self::Outset => "outset",
             Self::Inset => "inset",
-            Self::Art(name) => name.as_str(),
+            Self::Art(art) => art.token(),
         }
     }
 
@@ -380,18 +738,14 @@ impl PageBorderStyle {
             "threeDEngrave" => Self::ThreeDEngrave,
             "outset" => Self::Outset,
             "inset" => Self::Inset,
-            art if !art.is_empty()
-                && art.len() <= MAX_PAGE_BORDER_ART_NAME_LEN
-                && art.bytes().all(|byte| byte.is_ascii_alphanumeric()) =>
-            {
-                Self::Art(art.to_string())
-            },
-            _ => {
-                return Err(OoxmlError::InvalidFormat(format!(
-                    "invalid page border style '{value}'"
-                )));
-            },
+            art => Self::Art(art.parse()?),
         })
+    }
+}
+
+impl From<PageBorderArt> for PageBorderStyle {
+    fn from(value: PageBorderArt) -> Self {
+        Self::Art(value)
     }
 }
 
@@ -476,22 +830,64 @@ impl PageBorderZOrder {
     }
 }
 
+/// Page-border color (`ST_HexColor`), represented without heap allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BorderColor {
+    Auto,
+    Rgb([u8; 3]),
+}
+
+impl BorderColor {
+    /// Creates an explicit red-green-blue color.
+    pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
+        Self::Rgb([red, green, blue])
+    }
+
+    /// Returns the RGB components, or `None` for automatic color selection.
+    pub const fn components(self) -> Option<[u8; 3]> {
+        match self {
+            Self::Auto => None,
+            Self::Rgb(components) => Some(components),
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        if value == "auto" {
+            return Ok(Self::Auto);
+        }
+        if value.len() != 6 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "invalid page border color '{value}'"
+            )));
+        }
+        let component = |range| {
+            u8::from_str_radix(&value[range], 16).map_err(|_| {
+                OoxmlError::InvalidFormat(format!("invalid page border color '{value}'"))
+            })
+        };
+        Ok(Self::rgb(
+            component(0..2)?,
+            component(2..4)?,
+            component(4..6)?,
+        ))
+    }
+}
+
 /// One page-border edge (`CT_Border`, ECMA-376 §17.6.16).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionPageBorder {
     pub style: PageBorderStyle,
     /// Border size in eighths of a point for line styles, points for art.
     pub size: Option<u32>,
     /// Border offset space in points (`0..=31`).
     pub space: Option<u32>,
-    /// Border color as `RRGGBB` hex or `auto`.
-    pub color: Option<String>,
+    pub color: Option<BorderColor>,
     pub shadow: bool,
     pub frame: bool,
 }
 
 /// Section page-border settings (`CT_PageBorders`, ECMA-376 §17.6.16).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionPageBorders {
     pub offset_from: PageBorderOffsetFrom,
     pub z_order: PageBorderZOrder,
@@ -617,8 +1013,8 @@ pub struct SectionProperties {
     pub footers: Vec<SectionHeaderFooterReference>,
     pub page_numbering: Option<SectionPageNumbering>,
     pub columns: Option<SectionColumns>,
-    pub footnotes: Option<SectionNoteProperties>,
-    pub endnotes: Option<SectionNoteProperties>,
+    pub footnotes: Option<Footnotes>,
+    pub endnotes: Option<Endnotes>,
     pub text_direction: Option<SectionTextDirection>,
     pub document_grid: Option<SectionDocumentGrid>,
     pub form_protection: bool,
@@ -789,8 +1185,8 @@ impl SectionProperties {
             match name.as_str() {
                 "headerReference" => properties.headers.push(parse_header_footer(&raw)?),
                 "footerReference" => properties.footers.push(parse_header_footer(&raw)?),
-                "footnotePr" => properties.footnotes = Some(parse_note_properties(&raw)?),
-                "endnotePr" => properties.endnotes = Some(parse_note_properties(&raw)?),
+                "footnotePr" => properties.footnotes = Some(parse_footnotes(&raw)?),
+                "endnotePr" => properties.endnotes = Some(parse_endnotes(&raw)?),
                 "type" => {
                     let value = required_attr(&raw, b"val")?;
                     properties.start_type =
@@ -932,14 +1328,6 @@ impl SectionProperties {
                         "page border space {space} exceeds the {MAX_PAGE_BORDER_SPACE} limit"
                     )));
                 }
-                if let Some(color) = &border.color
-                    && !(color == "auto"
-                        || (color.len() == 6 && color.bytes().all(|byte| byte.is_ascii_hexdigit())))
-                {
-                    return Err(OoxmlError::InvalidFormat(format!(
-                        "invalid page border color '{color}'"
-                    )));
-                }
             }
         }
         if self.printer_settings_relationship_id.as_deref() == Some("") {
@@ -960,12 +1348,12 @@ impl SectionProperties {
         write_references(xml, "headerReference", &self.headers, rels, true)?;
         write_references(xml, "footerReference", &self.footers, rels, false)?;
         if let Some(note) = &self.footnotes {
-            write_note_properties(xml, "footnotePr", note)?;
+            write_footnotes(xml, note)?;
         } else if rels.is_some_and(|rels| rels.get_footnotes_id().is_some()) {
             xml.push_str("<w:footnotePr><w:numFmt w:val=\"decimal\"/></w:footnotePr>");
         }
         if let Some(note) = &self.endnotes {
-            write_note_properties(xml, "endnotePr", note)?;
+            write_endnotes(xml, note)?;
         } else if rels.is_some_and(|rels| rels.get_endnotes_id().is_some()) {
             xml.push_str("<w:endnotePr><w:numFmt w:val=\"decimal\"/></w:endnotePr>");
         }
@@ -1311,7 +1699,7 @@ fn parse_page_numbering(xml: &str) -> Result<SectionPageNumbering> {
                     .map_err(|_| OoxmlError::InvalidFormat("invalid chapter style".into()))
             })
             .transpose()?,
-        chapter_separator: attr(&attrs, "chapSep").map(ToOwned::to_owned),
+        chapter_separator: attr(&attrs, "chapSep").map(ChapterSep::parse).transpose()?,
     })
 }
 
@@ -1370,8 +1758,16 @@ fn direct_nested_children(xml: &str) -> Result<Vec<(String, String)>> {
     ))
 }
 
-fn parse_note_properties(xml: &str) -> Result<SectionNoteProperties> {
-    let mut result = SectionNoteProperties {
+#[derive(Debug, Clone, Copy)]
+struct ParsedNote<P> {
+    format: PageNumberFormat,
+    start: Option<u32>,
+    restart: Option<NoteNumberRestart>,
+    position: Option<P>,
+}
+
+fn parse_note_properties<P: NotePos>(xml: &str) -> Result<ParsedNote<P>> {
+    let mut result = ParsedNote {
         format: PageNumberFormat::Decimal,
         start: None,
         restart: None,
@@ -1383,7 +1779,7 @@ fn parse_note_properties(xml: &str) -> Result<SectionNoteProperties> {
             "numFmt" => result.format = PageNumberFormat::parse(&value)?,
             "numStart" => result.start = Some(parse_u32(&value, "note number start")?),
             "numRestart" => result.restart = Some(NoteNumberRestart::parse(&value)?),
-            "pos" => result.position = Some(value),
+            "pos" => result.position = Some(P::parse(&value)?),
             _ => {
                 return Err(OoxmlError::InvalidFormat(format!(
                     "invalid note property '{name}'"
@@ -1392,6 +1788,26 @@ fn parse_note_properties(xml: &str) -> Result<SectionNoteProperties> {
         }
     }
     Ok(result)
+}
+
+fn parse_footnotes(xml: &str) -> Result<Footnotes> {
+    let parsed = parse_note_properties(xml)?;
+    Ok(Footnotes {
+        format: parsed.format,
+        start: parsed.start,
+        restart: parsed.restart,
+        position: parsed.position,
+    })
+}
+
+fn parse_endnotes(xml: &str) -> Result<Endnotes> {
+    let parsed = parse_note_properties(xml)?;
+    Ok(Endnotes {
+        format: parsed.format,
+        start: parsed.start,
+        restart: parsed.restart,
+        position: parsed.position,
+    })
 }
 
 fn parse_grid(xml: &str) -> Result<SectionDocumentGrid> {
@@ -1468,7 +1884,7 @@ fn parse_page_border(xml: &str) -> Result<SectionPageBorder> {
         space: attr(&attrs, "space")
             .map(|value| parse_u32(value, "page border space"))
             .transpose()?,
-        color: attr(&attrs, "color").map(ToOwned::to_owned),
+        color: attr(&attrs, "color").map(BorderColor::parse).transpose()?,
         shadow: on_off("shadow"),
         frame: on_off("frame"),
     })
@@ -1553,30 +1969,55 @@ fn write_references(
     Ok(())
 }
 
-fn write_note_properties(
+fn write_note_properties<P: NotePos>(
     xml: &mut String,
     element: &str,
-    note: &SectionNoteProperties,
+    format: PageNumberFormat,
+    start: Option<u32>,
+    restart: Option<NoteNumberRestart>,
+    position: Option<P>,
 ) -> Result<()> {
     write!(
         xml,
         "<w:{element}><w:numFmt w:val=\"{}\"/>",
-        note.format.as_str()
+        format.as_str()
     )
     .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-    if let Some(start) = note.start {
+    if let Some(start) = start {
         write!(xml, "<w:numStart w:val=\"{start}\"/>")
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
-    if let Some(restart) = note.restart {
+    if let Some(restart) = restart {
         write!(xml, "<w:numRestart w:val=\"{}\"/>", restart.as_str())
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
-    if let Some(position) = &note.position {
-        write!(xml, "<w:pos w:val=\"{}\"/>", escape(position))
+    if let Some(position) = position {
+        write!(xml, "<w:pos w:val=\"{}\"/>", position.as_str())
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     write!(xml, "</w:{element}>").map_err(|error| OoxmlError::Xml(error.to_string()))
+}
+
+fn write_footnotes(xml: &mut String, note: &Footnotes) -> Result<()> {
+    write_note_properties(
+        xml,
+        "footnotePr",
+        note.format,
+        note.start,
+        note.restart,
+        note.position,
+    )
+}
+
+fn write_endnotes(xml: &mut String, note: &Endnotes) -> Result<()> {
+    write_note_properties(
+        xml,
+        "endnotePr",
+        note.format,
+        note.start,
+        note.restart,
+        note.position,
+    )
 }
 
 fn write_page_numbering(xml: &mut String, numbering: &SectionPageNumbering) -> Result<()> {
@@ -1589,8 +2030,8 @@ fn write_page_numbering(xml: &mut String, numbering: &SectionPageNumbering) -> R
         write!(xml, " w:chapStyle=\"{style}\"")
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
-    if let Some(separator) = &numbering.chapter_separator {
-        write!(xml, " w:chapSep=\"{}\"", escape(separator))
+    if let Some(separator) = numbering.chapter_separator {
+        write!(xml, " w:chapSep=\"{}\"", separator.as_str())
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     xml.push_str("/>");
@@ -1682,9 +2123,14 @@ fn write_page_border(xml: &mut String, name: &str, border: &SectionPageBorder) -
     if let Some(space) = border.space {
         write!(xml, " w:space=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
-    if let Some(color) = &border.color {
-        write!(xml, " w:color=\"{}\"", escape(color))
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(color) = border.color {
+        match color {
+            BorderColor::Auto => xml.push_str(" w:color=\"auto\""),
+            BorderColor::Rgb([red, green, blue]) => {
+                write!(xml, " w:color=\"{red:02X}{green:02X}{blue:02X}\"")
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            },
+        }
     }
     if border.shadow {
         xml.push_str(" w:shadow=\"1\"");
@@ -1753,7 +2199,7 @@ mod tests {
 
     #[test]
     fn page_layout_properties_round_trip() {
-        let xml = r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/><w:paperSrc w:first="1" w:other="260"/><w:pgBorders w:offsetFrom="text" w:zOrder="front" w:display="firstPage"><w:top w:val="double" w:sz="8" w:space="24" w:color="FF0000" w:shadow="1"/><w:bottom w:val="starsTop" w:sz="120" w:space="4" w:color="auto" w:frame="true"/></w:pgBorders><w:lnNumType w:countBy="5" w:start="0" w:distance="240" w:restart="newSection"/><w:pgNumType w:fmt="lowerRoman" w:start="3"/><w:cols w:num="2"/><w:vAlign w:val="both"/><w:titlePg/><w:bidi/><w:rtlGutter/><w:printerSettings r:id="rId9"/></w:sectPr>"#;
+        let xml = r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/><w:paperSrc w:first="1" w:other="260"/><w:pgBorders w:offsetFrom="text" w:zOrder="front" w:display="firstPage"><w:top w:val="double" w:sz="8" w:space="24" w:color="ff0000" w:shadow="1"/><w:bottom w:val="starsTop" w:sz="120" w:space="4" w:color="auto" w:frame="true"/></w:pgBorders><w:lnNumType w:countBy="5" w:start="0" w:distance="240" w:restart="newSection"/><w:pgNumType w:fmt="lowerRoman" w:start="3"/><w:cols w:num="2"/><w:vAlign w:val="both"/><w:titlePg/><w:bidi/><w:rtlGutter/><w:printerSettings r:id="rId9"/></w:sectPr>"#;
         let section = SectionProperties::from_xml(xml).unwrap();
         assert_eq!(
             section.paper_source,
@@ -1770,13 +2216,13 @@ mod tests {
         assert_eq!(top.style, PageBorderStyle::Double);
         assert_eq!(top.size, Some(8));
         assert_eq!(top.space, Some(24));
-        assert_eq!(top.color.as_deref(), Some("FF0000"));
+        assert_eq!(top.color, Some(BorderColor::rgb(255, 0, 0)));
         assert!(top.shadow);
         assert!(!top.frame);
         let bottom = borders.bottom.as_ref().unwrap();
-        assert_eq!(bottom.style, PageBorderStyle::Art("starsTop".to_string()));
+        assert_eq!(bottom.style, PageBorderStyle::Art(PageBorderArt::StarsTop));
         assert_eq!(bottom.size, Some(120));
-        assert_eq!(bottom.color.as_deref(), Some("auto"));
+        assert_eq!(bottom.color, Some(BorderColor::Auto));
         assert!(bottom.frame);
         assert!(borders.left.is_none() && borders.right.is_none());
         assert_eq!(
@@ -1802,6 +2248,7 @@ mod tests {
 
         let mut output = String::new();
         section.write_xml(&mut output, None).unwrap();
+        assert!(output.contains("w:color=\"FF0000\""));
         let reparsed = SectionProperties::from_xml(&output).unwrap();
         assert_eq!(reparsed.paper_source, section.paper_source);
         assert_eq!(reparsed.page_borders, section.page_borders);
@@ -1838,6 +2285,65 @@ mod tests {
     }
 
     #[test]
+    fn typed_chapter_and_note_domains_round_trip() {
+        let xml = r#"<w:sectPr><w:footnotePr><w:numFmt w:val="lowerRoman"/><w:numStart w:val="2"/><w:numRestart w:val="eachPage"/><w:pos w:val="beneathText"/></w:footnotePr><w:endnotePr><w:numFmt w:val="upperLetter"/><w:pos w:val="docEnd"/></w:endnotePr><w:pgNumType w:fmt="decimal" w:chapStyle="1" w:chapSep="emDash"/></w:sectPr>"#;
+        let section = SectionProperties::from_xml(xml).unwrap();
+        assert_eq!(
+            section.footnotes,
+            Some(Footnotes {
+                format: PageNumberFormat::LowerRoman,
+                start: Some(2),
+                restart: Some(NoteNumberRestart::EachPage),
+                position: Some(FootnotePos::BeneathText),
+            })
+        );
+        assert_eq!(
+            section.endnotes,
+            Some(Endnotes {
+                format: PageNumberFormat::UpperLetter,
+                position: Some(EndnotePos::DocumentEnd),
+                ..Endnotes::default()
+            })
+        );
+        assert_eq!(
+            section
+                .page_numbering
+                .as_ref()
+                .and_then(|numbering| numbering.chapter_separator),
+            Some(ChapterSep::EmDash)
+        );
+
+        let mut output = String::new();
+        section.write_xml(&mut output, None).unwrap();
+        let reparsed = SectionProperties::from_xml(&output).unwrap();
+        assert_eq!(reparsed.footnotes, section.footnotes);
+        assert_eq!(reparsed.endnotes, section.endnotes);
+        assert_eq!(reparsed.page_numbering, section.page_numbering);
+    }
+
+    #[test]
+    fn rejects_unknown_chapter_and_note_domain_values() {
+        assert!(
+            SectionProperties::from_xml(
+                "<w:sectPr><w:pgNumType w:fmt=\"decimal\" w:chapSep=\"slash\"/></w:sectPr>"
+            )
+            .is_err()
+        );
+        assert!(
+            SectionProperties::from_xml(
+                "<w:sectPr><w:footnotePr><w:pos w:val=\"middle\"/></w:footnotePr></w:sectPr>"
+            )
+            .is_err()
+        );
+        assert!(
+            SectionProperties::from_xml(
+                "<w:sectPr><w:endnotePr><w:pos w:val=\"pageBottom\"/></w:endnotePr></w:sectPr>"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn page_border_style_enum_round_trips() {
         let styles = [
             PageBorderStyle::Nil,
@@ -1871,10 +2377,38 @@ mod tests {
         for style in &styles {
             assert_eq!(&PageBorderStyle::parse(style.as_str()).unwrap(), style);
         }
+        assert_eq!(std::mem::size_of::<PageBorderArt>(), 1);
+        assert_eq!(PageBorderArt::ALL.len(), 164);
+        for (index, art) in PageBorderArt::ALL.iter().enumerate() {
+            assert_eq!(art.token().parse::<PageBorderArt>().unwrap(), *art);
+            assert_eq!(PageBorderStyle::parse(art.token()).unwrap(), (*art).into());
+            assert_eq!(art.to_string(), art.token());
+            let code = 0x40 + u8::try_from(index).unwrap();
+            assert_eq!(art.code(), code);
+            assert_eq!(PageBorderArt::try_from(code).unwrap(), *art);
+        }
+        assert!(PageBorderArt::try_from(0x3F).is_err());
+        assert!(PageBorderArt::try_from(0xE4).is_err());
         assert_eq!(
             PageBorderStyle::parse("apples").unwrap(),
-            PageBorderStyle::Art("apples".to_string())
+            PageBorderStyle::Art(PageBorderArt::Apples)
         );
+        for invalid in [
+            "custom",
+            "earth3",
+            "triangle1",
+            "triangle2",
+            "triangleCircle1",
+            "triangleCircle2",
+            "shapes1",
+            "shapes2",
+            "unknownArt",
+        ] {
+            assert!(
+                PageBorderStyle::parse(invalid).is_err(),
+                "accepted {invalid}"
+            );
+        }
         assert!(PageBorderStyle::parse("not a style!").is_err());
         assert!(PageBorderStyle::parse("").is_err());
     }

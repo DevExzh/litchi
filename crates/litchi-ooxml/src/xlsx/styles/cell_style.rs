@@ -1,6 +1,8 @@
 //! Cell style format records.
 
 use super::Alignment;
+#[cfg(test)]
+use super::alignment::Horizontal;
 
 /// Cell style information.
 ///
@@ -130,7 +132,7 @@ mod tests {
             fill_id: Some(2),
             border_id: Some(0),
             xf_id: Some(0),
-            alignment: Some(Alignment::with_alignment(Some("center".to_string()), None)),
+            alignment: Some(Alignment::horizontal(Horizontal::Center)),
             apply_number_format: true,
             apply_font: true,
             apply_fill: true,

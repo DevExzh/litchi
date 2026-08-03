@@ -8,7 +8,11 @@ use litchi::ooxml::Props;
 use litchi::ooxml::xlsx::{
     Border, CellFill, CellFillPatternType, CellFont, CellFormat, ConditionalFormatType,
     HeaderFooter, Workbook,
-    styles::border::{Color, Line, Side},
+    styles::{
+        Alignment,
+        alignment::{Horizontal, Vertical},
+        border::{Color, Line, Side},
+    },
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -65,7 +69,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 bottom: Some(Side::new(Line::Thick).with_color(Color::rgb(0, 0, 0))),
                 ..Border::default()
             }),
-            number_format: None,
+            alignment: Some(Alignment {
+                horizontal: Some(Horizontal::Center),
+                vertical: Some(Vertical::Center),
+                wrap_text: true,
+                ..Alignment::new()
+            }),
+            ..CellFormat::default()
         };
 
         for col in 1..=4 {
@@ -305,7 +315,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("✅ Successfully created xlsx_comprehensive_features.xlsx");
     println!("The file demonstrates:");
     println!("  - Cell values and formulas");
-    println!("  - Cell formatting (fonts, fills, borders)");
+    println!("  - Cell formatting (fonts, fills, borders, typed alignment)");
     println!("  - Merged cells");
     println!("  - Column widths and freeze panes");
     println!("  - Hyperlinks (external and internal)");

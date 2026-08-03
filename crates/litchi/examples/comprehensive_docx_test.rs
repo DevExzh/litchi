@@ -14,8 +14,9 @@
 
 use litchi::ooxml::Props;
 use litchi::ooxml::docx::{
-    ListType, MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation,
-    ParagraphAlignment, TableOfContents, UnderlineStyle, Watermark,
+    BorderColor, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType, MutableDocument,
+    MutableTheme, Package, PageBorderStyle, PageNumberFormat, PageOrientation, ParagraphAlignment,
+    SectionPageBorder, SectionPageBorders, TableOfContents, UnderlineStyle, Watermark,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -501,6 +502,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Margins: 1 inch (1440 TWIPs) on all sides",
         "Page width: 12240 TWIPs",
         "Page height: 15840 TWIPs",
+        "Footnotes: page bottom; endnotes: document end",
+        "Page border: typed blue double line",
     ];
 
     for setting in &settings {
@@ -510,6 +513,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Configure section
+    let page_border = SectionPageBorder {
+        style: PageBorderStyle::Double,
+        size: Some(8),
+        space: Some(24),
+        color: Some(BorderColor::rgb(31, 78, 120)),
+        shadow: false,
+        frame: false,
+    };
     let section = doc.section_mut();
     section.page_width = 12240;
     section.page_height = 15840;
@@ -518,6 +529,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     section.margin_left = 1440;
     section.margin_right = 1440;
     section.orientation = PageOrientation::Portrait;
+    section.footnotes = Some(Footnotes {
+        position: Some(FootnotePos::PageBottom),
+        ..Footnotes::default()
+    });
+    section.endnotes = Some(Endnotes {
+        position: Some(EndnotePos::DocumentEnd),
+        ..Endnotes::default()
+    });
+    section.page_borders = Some(SectionPageBorders {
+        top: Some(page_border),
+        left: Some(page_border),
+        bottom: Some(page_border),
+        right: Some(page_border),
+        ..SectionPageBorders::default()
+    });
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PART 10: VERIFICATION SUMMARY

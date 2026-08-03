@@ -1832,6 +1832,7 @@ impl<'a> Worksheet<'a> {
             fill,
             border,
             number_format,
+            alignment: style.alignment,
         })
     }
 

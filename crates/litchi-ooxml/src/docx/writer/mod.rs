@@ -34,12 +34,12 @@ pub use note::Note;
 
 // Re-export section types
 pub use section::{
-    DocumentGridType, LineNumberRestart, NoteNumberRestart, PageBorderDisplay,
-    PageBorderOffsetFrom, PageBorderStyle, PageBorderZOrder, PageNumberFormat, PageOrientation,
-    SectionColumn, SectionColumns, SectionDocumentGrid, SectionHeaderFooterPart,
-    SectionHeaderFooterReference, SectionLineNumbering, SectionNoteProperties, SectionPageBorder,
-    SectionPageBorders, SectionPageNumbering, SectionPaperSource, SectionProperties,
-    SectionTextDirection, SectionVerticalAlignment,
+    BorderColor, ChapterSep, DocumentGridType, EndnotePos, Endnotes, FootnotePos, Footnotes,
+    LineNumberRestart, NoteNumberRestart, PageBorderArt, PageBorderDisplay, PageBorderOffsetFrom,
+    PageBorderStyle, PageBorderZOrder, PageNumberFormat, PageOrientation, SectionColumn,
+    SectionColumns, SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference,
+    SectionLineNumbering, SectionPageBorder, SectionPageBorders, SectionPageNumbering,
+    SectionPaperSource, SectionProperties, SectionTextDirection, SectionVerticalAlignment,
 };
 
 // Re-export smart-tag types

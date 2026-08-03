@@ -2,11 +2,13 @@
 
 use std::collections::HashMap;
 
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+use super::alignment::{Horizontal, Indent, Reading, Rotation, Vertical};
 use super::border::{Color, Dir, Line, Rgb, Side, Tint};
 use super::{Alignment, Border, CellStyle, Fill, Font, NumberFormat, Styles};
 use crate::error::{OoxmlError, Result};
@@ -724,7 +726,16 @@ fn parse_xf(
         let decoder = reader.decoder();
         let (namespace, event) = resolved_event(reader, "xf")?;
         match event {
-            Event::Start(element) | Event::Empty(element)
+            Event::Start(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"alignment") =>
+            {
+                if style.alignment.is_some() {
+                    return Err(invalid("duplicate cell alignment"));
+                }
+                style.alignment = Some(parse_alignment(&element, decoder)?);
+                finish_alignment(reader)?;
+            },
+            Event::Empty(element)
                 if is_spreadsheetml_name(namespace, element.name(), b"alignment") =>
             {
                 if style.alignment.is_some() {
@@ -737,6 +748,23 @@ fn parse_xf(
             },
             Event::Eof => return Err(unterminated("xf")),
             _ => {},
+        }
+    }
+}
+
+fn finish_alignment(reader: &mut XmlReader<'_>) -> Result<()> {
+    loop {
+        let (namespace, event) = resolved_event(reader, "alignment")?;
+        match event {
+            Event::End(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"alignment") =>
+            {
+                return Ok(());
+            },
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            Event::Comment(_) => {},
+            Event::Eof => return Err(unterminated("alignment")),
+            _ => return Err(invalid("cell alignment must not contain content")),
         }
     }
 }
@@ -768,49 +796,87 @@ fn parse_xf_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Cel
 }
 
 fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignment> {
-    let horizontal = optional_string(element, b"horizontal", decoder)?;
-    if let Some(value) = &horizontal
-        && !matches!(
-            value.as_str(),
-            "general"
-                | "left"
-                | "center"
-                | "right"
-                | "fill"
-                | "justify"
-                | "centerContinuous"
-                | "distributed"
-        )
-    {
-        return Err(invalid(format!("invalid horizontal alignment '{value}'")));
+    let mut alignment = Alignment::new();
+    let mut seen = 0u16;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let qualified = attribute.key.as_ref();
+        if qualified == b"xmlns" || qualified.starts_with(b"xmlns:") {
+            continue;
+        }
+        let local = attribute.key.local_name();
+        if attribute.key.prefix().is_some() {
+            return Err(unsupported_alignment_attribute(qualified));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match local.as_ref() {
+            b"horizontal" => {
+                mark_property(&mut seen, 1, "horizontal alignment")?;
+                alignment.horizontal = Some(
+                    value
+                        .parse::<Horizontal>()
+                        .map_err(|_| invalid(format!("invalid horizontal alignment '{value}'")))?,
+                );
+            },
+            b"vertical" => {
+                mark_property(&mut seen, 2, "vertical alignment")?;
+                alignment.vertical = Some(
+                    value
+                        .parse::<Vertical>()
+                        .map_err(|_| invalid(format!("invalid vertical alignment '{value}'")))?,
+                );
+            },
+            b"textRotation" => {
+                mark_property(&mut seen, 4, "text rotation")?;
+                alignment.text_rotation = Some(
+                    Rotation::try_from(parse_u32_value(&value, "text rotation")?)
+                        .map_err(|error| invalid(error.to_string()))?,
+                );
+            },
+            b"wrapText" => {
+                mark_property(&mut seen, 8, "wrapText")?;
+                alignment.wrap_text = parse_bool_value(&value, "wrapText")?;
+            },
+            b"indent" => {
+                mark_property(&mut seen, 16, "alignment indent")?;
+                alignment.indent = Some(
+                    Indent::try_from(parse_u32_value(&value, "alignment indent")?)
+                        .map_err(|error| invalid(error.to_string()))?,
+                );
+            },
+            b"relativeIndent" => {
+                mark_property(&mut seen, 32, "relative alignment indent")?;
+                alignment.relative_indent =
+                    Some(parse_i32_value(&value, "relative alignment indent")?);
+            },
+            b"justifyLastLine" => {
+                mark_property(&mut seen, 64, "justifyLastLine")?;
+                alignment.justify_last_line = parse_bool_value(&value, "justifyLastLine")?;
+            },
+            b"shrinkToFit" => {
+                mark_property(&mut seen, 128, "shrinkToFit")?;
+                alignment.shrink_to_fit = parse_bool_value(&value, "shrinkToFit")?;
+            },
+            b"readingOrder" => {
+                mark_property(&mut seen, 256, "reading order")?;
+                alignment.reading_order = Some(
+                    Reading::try_from(parse_u32_value(&value, "reading order")?)
+                        .map_err(|error| invalid(error.to_string()))?,
+                );
+            },
+            _ => return Err(unsupported_alignment_attribute(qualified)),
+        }
     }
-    let vertical = optional_string(element, b"vertical", decoder)?;
-    if let Some(value) = &vertical
-        && !matches!(
-            value.as_str(),
-            "top" | "center" | "bottom" | "justify" | "distributed"
-        )
-    {
-        return Err(invalid(format!("invalid vertical alignment '{value}'")));
-    }
-    let text_rotation = optional_u32(element, b"textRotation", decoder, "text rotation")?;
-    if text_rotation.is_some_and(|value| value > 180 && value != 255) {
-        return Err(invalid("text rotation must be 0..=180 or 255"));
-    }
-    let reading_order = optional_u32(element, b"readingOrder", decoder, "reading order")?;
-    if reading_order.is_some_and(|value| value > 2) {
-        return Err(invalid("reading order must be 0, 1, or 2"));
-    }
-    Ok(Alignment {
-        horizontal,
-        vertical,
-        text_rotation,
-        wrap_text: optional_bool(element, b"wrapText", decoder, "wrapText")?.unwrap_or(false),
-        indent: optional_u32(element, b"indent", decoder, "alignment indent")?,
-        shrink_to_fit: optional_bool(element, b"shrinkToFit", decoder, "shrinkToFit")?
-            .unwrap_or(false),
-        reading_order,
-    })
+    Ok(alignment)
+}
+
+fn unsupported_alignment_attribute(name: &[u8]) -> OoxmlError {
+    invalid(format!(
+        "unsupported cell alignment attribute '{}'",
+        String::from_utf8_lossy(name)
+    ))
 }
 
 fn parse_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<String>> {
@@ -925,12 +991,16 @@ fn optional_bool(
     description: &str,
 ) -> Result<Option<bool>> {
     optional_string(element, name, decoder)?
-        .map(|value| match value.as_str() {
-            "1" | "true" => Ok(true),
-            "0" | "false" => Ok(false),
-            _ => Err(invalid(format!("invalid {description} boolean '{value}'"))),
-        })
+        .map(|value| parse_bool_value(&value, description))
         .transpose()
+}
+
+fn parse_bool_value(value: &str, description: &str) -> Result<bool> {
+    match value.trim() {
+        "1" | "true" => Ok(true),
+        "0" | "false" => Ok(false),
+        _ => Err(invalid(format!("invalid {description} boolean '{value}'"))),
+    }
 }
 
 fn required_string(
@@ -968,12 +1038,22 @@ fn optional_u32(
     description: &str,
 ) -> Result<Option<u32>> {
     optional_string(element, name, decoder)?
-        .map(|value| {
-            value
-                .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
-        })
+        .map(|value| parse_u32_value(&value, description))
         .transpose()
+}
+
+fn parse_u32_value(value: &str, description: &str) -> Result<u32> {
+    value
+        .trim()
+        .parse::<u32>()
+        .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+}
+
+fn parse_i32_value(value: &str, description: &str) -> Result<i32> {
+    value
+        .trim()
+        .parse::<i32>()
+        .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
 }
 
 fn required_f64(
@@ -995,6 +1075,7 @@ fn optional_f64(
     optional_string(element, name, decoder)?
         .map(|value| {
             value
+                .trim()
                 .parse::<f64>()
                 .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
         })
@@ -1100,8 +1181,11 @@ mod tests {
                 <s:cellStyleXfs count="1"><s:xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></s:cellStyleXfs>
                 <s:cellXfs count="2"><s:xf numFmtId="164" fontId="0" fillId="1" borderId="0"
                     xfId="0" applyNumberFormat="true" applyFont="0" applyFill="1" applyBorder="1"
-                    applyAlignment="1" quotePrefix="false"><s:alignment horizontal="center" vertical="top"
-                    textRotation="45" wrapText="1" indent="2" shrinkToFit="0" readingOrder="2"/></s:xf><s:xf/></s:cellXfs>
+                    applyAlignment="1" quotePrefix="false"><s:alignment xmlns:a="urn:alignment-test"
+                    horizontal="center" vertical="top"
+                    textRotation=" 45 " wrapText=" true " indent=" 2 " relativeIndent=" -1 "
+                    justifyLastLine=" 1 " shrinkToFit=" 0 " readingOrder=" 2 ">
+                    <!-- alignment is an empty-content type --></s:alignment></s:xf><s:xf/></s:cellXfs>
                 <f:fonts><f:font/></f:fonts>
             </s:styleSheet>"#
         );
@@ -1144,8 +1228,15 @@ mod tests {
         assert!(!styles.cell_xfs[0].apply_font);
         assert_eq!(
             styles.cell_xfs[0].alignment.as_ref().unwrap().reading_order,
-            Some(2)
+            Some(Reading::RightToLeft)
         );
+        let alignment = styles.cell_xfs[0].alignment.unwrap();
+        assert_eq!(alignment.horizontal, Some(Horizontal::Center));
+        assert_eq!(alignment.vertical, Some(Vertical::Top));
+        assert_eq!(alignment.text_rotation.unwrap().get(), 45);
+        assert_eq!(alignment.indent, Some(Indent::new(2)));
+        assert_eq!(alignment.relative_indent, Some(-1));
+        assert!(alignment.justify_last_line);
     }
 
     #[test]
@@ -1230,6 +1321,36 @@ mod tests {
             ),
             &format!(
                 r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment textRotation="200"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment horizontal="middle"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment vertical="baseline"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment readingOrder="3"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment indent="256"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment relativeIndent="2147483648"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment horizontal="center" typo="left"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}" xmlns:f="urn:foreign"><cellXfs><xf><alignment f:horizontal="center"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment horizontal="left" horizontal="right"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment><child/></alignment></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment>text</alignment></xf></cellXfs></styleSheet>"#
             ),
             &format!(r#"<styleSheet xmlns="{S}"><fonts><font>"#),
         ];

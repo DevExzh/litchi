@@ -24,7 +24,7 @@ pub mod definition;
 pub mod model;
 
 pub use data::{
-    DiagramConnection, DiagramConnectionType, DiagramDataModel, DiagramPoint, DiagramPointType,
+    Conformance, Connection, ConnectionType, DiagramDataModel, Id, IdError, Point, PointType,
 };
 pub use definition::{DiagramCategory, DiagramDefinition};
 pub use model::{

@@ -3,7 +3,7 @@ use litchi_ooxml::pptx::comments::{
     PresentationComments, SlideCommentList,
 };
 use litchi_ooxml::pptx::modern_comment_authors::ModernCommentAuthor;
-use litchi_ooxml::pptx::modern_comments::{ModernComment, ModernCommentReply};
+use litchi_ooxml::pptx::modern_comments::{ModernComment, ModernCommentReply, Progress};
 use litchi_ooxml::pptx::{
     add_modern_comment, add_modern_comment_author, add_modern_comment_reply,
     add_presentation_comment, add_presentation_comment_author, find_modern_comment,
@@ -314,8 +314,16 @@ fn modern_author_comment_and_reply_crud_is_graph_checked() {
     update_modern_comment(&mut package, &slide, COMMENT_A, |comment| {
         comment.title = Some("updated".into());
         comment.assigned_to = Some(vec![AUTHOR_B.into()]);
+        comment.complete = Some(Progress::new(75).unwrap());
     })
     .unwrap();
+    assert_eq!(
+        find_modern_comment(&package, &slide, COMMENT_A)
+            .unwrap()
+            .unwrap()
+            .complete,
+        Some(Progress::new(75).unwrap())
+    );
     update_modern_comment_reply(&mut package, &slide, COMMENT_A, REPLY_A, |reply| {
         reply.created = "2026-07-19T12:02:00Z".into();
     })

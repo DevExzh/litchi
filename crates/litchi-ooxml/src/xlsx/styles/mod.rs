@@ -31,7 +31,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-mod alignment;
+pub mod alignment;
 pub mod border;
 mod cell_style;
 mod fill;

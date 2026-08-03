@@ -139,6 +139,44 @@ unknown tokens fail parsing, incompatible edge conventions fail writing, and
 full-value resource equality plus resolved cell-format keys prevent hash
 collisions from aliasing distinct borders.
 
+SpreadsheetML cell alignment follows the same rule in the sibling
+`xlsx::styles::alignment` module. `Horizontal` and `Vertical` are closed enums;
+`Rotation`, `Reading`, and `Indent` are compact checked scalars; and
+`Alignment` exposes public typed fields so ordinary authoring remains concise
+with `..Alignment::new()`. The complete modeled alignment value participates in
+shared-XF equality and therefore cannot disappear during resource
+deduplication. Microsoft's context-dependent rotation value is represented
+explicitly and rejected when writing Strict SpreadsheetML rather than leaking
+an unexplained integer or string through the facade.
+
+PresentationML modern-comment completion uses `Progress`, a private
+`NonZeroU32` offset representation for the inclusive Office range
+`0..=100_000` thousandths of one percent. `Progress::new` accepts an ordinary
+whole percentage, `from_thousandths` is the precise lower-level constructor,
+and `Option<Progress>` remains four bytes. Parsing accepts only the specified
+percentage lexical forms and Office's numeric form; writing emits canonical
+numeric thousandths without allocating a temporary string.
+
+WordprocessingML section options use separate types where two visually similar
+wire domains are not interchangeable. `ChapterSep` closes the page-number
+separator domain; `Footnotes` and `Endnotes` carry distinct `FootnotePos` and
+`EndnotePos` enums so an endnote cannot be assigned a footnote-only position;
+and `BorderColor::{Auto, Rgb([u8; 3])}` replaces hexadecimal strings without a
+heap allocation. Page-border artwork is a closed `PageBorderArt` value carried
+by `PageBorderStyle::Art`, not an arbitrary token. Copyable option structs use
+public fields and `Default` only where struct-update syntax cannot create an
+invalid domain value.
+
+The DrawingML diagram data model uses `Id::{Number(i32), Guid([u8; 16])}` for
+the complete `ST_ModelId` union and the concise `Point`, `PointType`,
+`Connection`, and `ConnectionType` names inside `diagram::data`. Transition and
+presentation metadata lives in the enum variant that requires it. Semantic
+CRUD rejects duplicate identifiers and parent conflicts and cascades removal
+of dependent transitions. Publication validates the graph, XML characters,
+and aggregate output budget before touching a caller's sink. This writer is an
+explicit fresh/canonical modeled-subset API: a parsed part containing unmodeled
+rich XML must not be serialized through it under a lossless-edit claim.
+
 The standard permits `bubble3D` directly under `bubbleChart`, but desktop
 Microsoft Excel rejects that placement as documented by MS-OE376 section
 2.1.1458(b). The reader therefore accepts the standard form and projects its

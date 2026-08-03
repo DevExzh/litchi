@@ -12,6 +12,9 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::num::NonZeroU32;
+use std::str::FromStr;
 
 pub const MODERN_COMMENT_CONTENT_TYPE: &str = "application/vnd.ms-powerpoint.comments+xml";
 pub const MODERN_COMMENT_RELATIONSHIP_TYPE: &str =
@@ -28,6 +31,7 @@ const MAX_NODES: usize = 250_000;
 const MAX_COMMENTS: usize = 100_000;
 const MAX_REPLIES: usize = 100_000;
 const MAX_STRING_BYTES: usize = 1024 * 1024;
+const MAX_PROGRESS_THOUSANDTHS: u32 = 100_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModernCommentNamespaceDeclaration {
@@ -59,6 +63,124 @@ impl ModernCommentStatus {
             Self::Resolved => "resolved",
             Self::Closed => "closed",
         }
+    }
+}
+
+/// Completion progress for a modern PowerPoint comment task.
+///
+/// The stored integer is thousandths of one percent, matching the Office
+/// representation documented by `[MS-OI29500]` section 2.1.1331. Values are
+/// constrained to `0..=100_000`, the range of
+/// `s:ST_PositiveFixedPercentage` used by `[MS-PPTX]` section 2.16.
+/// Its private offset encoding also keeps `Option<Progress>` at four bytes.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Progress(NonZeroU32);
+
+impl Progress {
+    /// No progress (`0%`).
+    pub const ZERO: Self = Self(NonZeroU32::MIN);
+    /// Complete (`100%`).
+    pub const FULL: Self = match NonZeroU32::new(MAX_PROGRESS_THOUSANDTHS + 1) {
+        Some(value) => Self(value),
+        None => Self::ZERO,
+    };
+
+    /// Construct progress from a whole percentage in `0..=100`.
+    pub fn new(percent: u32) -> Result<Self> {
+        if percent <= 100 {
+            Self::from_thousandths(percent * 1_000)
+        } else {
+            Err(invalid(format!(
+                "modern-comment progress {percent}% exceeds 100%"
+            )))
+        }
+    }
+
+    /// Construct progress from Office's thousandths-of-a-percent units.
+    pub fn from_thousandths(value: u32) -> Result<Self> {
+        if value <= MAX_PROGRESS_THOUSANDTHS {
+            NonZeroU32::new(value + 1).map(Self).ok_or_else(|| {
+                invalid("modern-comment progress could not be represented compactly")
+            })
+        } else {
+            Err(invalid(format!(
+                "modern-comment progress {value} exceeds {MAX_PROGRESS_THOUSANDTHS} thousandths"
+            )))
+        }
+    }
+
+    /// Return Office's thousandths-of-a-percent representation.
+    #[inline]
+    pub const fn thousandths(self) -> u32 {
+        self.0.get() - 1
+    }
+
+    fn parse_percent(value: &str) -> Result<Self> {
+        let (whole, fraction) = value
+            .split_once('.')
+            .map_or((value, None), |(whole, fraction)| (whole, Some(fraction)));
+        let valid_whole = !whole.is_empty()
+            && whole.len() <= 3
+            && whole.bytes().all(|byte| byte.is_ascii_digit())
+            && (whole.len() < 3 || whole == "100");
+        let valid_fraction = fraction.is_none_or(|fraction| {
+            (1..=2).contains(&fraction.len()) && fraction.bytes().all(|byte| byte.is_ascii_digit())
+        });
+        if !valid_whole || !valid_fraction {
+            return Err(invalid(format!(
+                "invalid positive fixed percentage '{value}%'"
+            )));
+        }
+
+        let whole = whole
+            .parse::<u32>()
+            .map_err(|_| invalid(format!("invalid positive fixed percentage '{value}%'")))?;
+        let fractional_thousandths = match fraction {
+            Some(fraction) => {
+                let mut digits = fraction.bytes().map(|digit| u32::from(digit - b'0'));
+                let tenths = digits.next().ok_or_else(|| {
+                    invalid(format!("invalid positive fixed percentage '{value}%'"))
+                })?;
+                tenths * 100 + digits.next().unwrap_or_default() * 10
+            },
+            None => 0,
+        };
+        let thousandths = whole * 1_000 + fractional_thousandths;
+        Self::from_thousandths(thousandths)
+            .map_err(|_| invalid(format!("invalid positive fixed percentage '{value}%'")))
+    }
+}
+
+impl FromStr for Progress {
+    type Err = OoxmlError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        if let Some(percent) = value.strip_suffix('%') {
+            return Self::parse_percent(percent);
+        }
+        let digits = value.strip_prefix('+').unwrap_or(value);
+        if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(invalid(format!(
+                "invalid positive fixed percentage '{value}'"
+            )));
+        }
+        let thousandths = value
+            .parse::<u32>()
+            .map_err(|_| invalid(format!("invalid positive fixed percentage '{value}'")))?;
+        Self::from_thousandths(thousandths)
+    }
+}
+
+impl fmt::Display for Progress {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.thousandths(), formatter)
+    }
+}
+
+impl Default for Progress {
+    fn default() -> Self {
+        Self::ZERO
     }
 }
 
@@ -108,8 +230,8 @@ pub struct ModernComment {
     pub due_date: Option<String>,
     /// `None` distinguishes omission from a present empty list.
     pub assigned_to: Option<Vec<String>>,
-    /// Original valid `ST_PositiveFixedPercentage` lexical value.
-    pub complete: Option<String>,
+    /// Completion progress. `None` retains omission and the schema default `0%`.
+    pub complete: Option<Progress>,
     pub title: Option<String>,
     pub namespace_declarations: Vec<ModernCommentNamespaceDeclaration>,
     pub anchors: Vec<ModernCommentAnchor>,
@@ -380,10 +502,13 @@ fn parse_comment_list(xml: &[u8]) -> Result<ModernCommentList> {
                     root_seen = true;
                     FrameKind::Root
                 } else {
+                    let parent = stack
+                        .last_mut()
+                        .ok_or_else(|| invalid("modern Comment child is missing its parent"))?;
                     child_frame(
                         &mut comments,
                         &mut reply_count,
-                        stack.last_mut().expect("nonempty stack"),
+                        parent,
                         &element,
                         decoder,
                         &namespace,
@@ -694,10 +819,10 @@ fn parse_comment_attributes(
                 .collect::<Result<Vec<_>>>()
         })
         .transpose()?;
-    let complete = attributes.get("complete").cloned();
-    if let Some(value) = &complete {
-        validate_percentage(value)?;
-    }
+    let complete = attributes
+        .get("complete")
+        .map(|value| value.parse())
+        .transpose()?;
     Ok(ModernComment {
         id,
         author_id,
@@ -841,9 +966,6 @@ fn validate_model(value: &ModernCommentList) -> Result<()> {
                 validate_guid(id)?;
             }
         }
-        if let Some(value) = &comment.complete {
-            validate_percentage(value)?;
-        }
         validate_optional_string(comment.title.as_deref())?;
         validate_namespaces(&comment.namespace_declarations, None)?;
         validate_namespaces(&comment.reply_list_namespace_declarations, None)?;
@@ -893,7 +1015,7 @@ fn write_comment(out: &mut Vec<u8>, prefix: &str, comment: &ModernComment) {
         write_attr(out, "assignedTo", &values.join(" "));
     }
     if let Some(value) = &comment.complete {
-        write_attr(out, "complete", value);
+        write_u32_attr(out, "complete", value.thousandths());
     }
     if let Some(value) = &comment.title {
         write_attr(out, "title", value);
@@ -1107,25 +1229,6 @@ fn validate_date_time(value: &str) -> Result<()> {
     }
 }
 
-fn validate_percentage(value: &str) -> Result<()> {
-    let valid = if let Some(number) = value.strip_suffix('%') {
-        !number.is_empty()
-            && !number.contains(['e', 'E'])
-            && number
-                .parse::<f64>()
-                .is_ok_and(|number| number.is_finite() && (0.0..=100.0).contains(&number))
-    } else {
-        value.parse::<u32>().is_ok_and(|number| number <= 100_000)
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(invalid(format!(
-            "invalid positive fixed percentage '{value}'"
-        )))
-    }
-}
-
 fn validate_optional_string(value: Option<&str>) -> Result<()> {
     if let Some(value) = value {
         bounded(value)?;
@@ -1236,6 +1339,25 @@ fn write_attr(out: &mut Vec<u8>, name: &str, value: &str) {
     out.extend_from_slice(name.as_bytes());
     out.extend_from_slice(b"=\"");
     escape(out, value);
+    out.push(b'"');
+}
+
+fn write_u32_attr(out: &mut Vec<u8>, name: &str, value: u32) {
+    out.push(b' ');
+    out.extend_from_slice(name.as_bytes());
+    out.extend_from_slice(b"=\"");
+    let mut digits = [0; 10];
+    let mut cursor = digits.len();
+    let mut remaining = value;
+    loop {
+        cursor -= 1;
+        digits[cursor] = b'0' + (remaining % 10) as u8;
+        remaining /= 10;
+        if remaining == 0 {
+            break;
+        }
+    }
+    out.extend_from_slice(&digits[cursor..]);
     out.push(b'"');
 }
 
@@ -1821,6 +1943,10 @@ mod tests {
             r#"<p188:cmLst xmlns:p188="{P188}" xmlns:pc="{PC}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:x="urn:payload"><p188:cm id="{COMMENT}" authorId="{AUTHOR}" status="resolved" created="2026-07-19T12:00:00+08:00" assignedTo="{AUTHOR}" complete="50%" title="Review"><pc:sldMkLst><pc:sldMk/></pc:sldMkLst><p188:pos x="10" y="-20"/><p188:replyLst><p188:reply id="{REPLY}" authorId="{AUTHOR}" created="2026-07-19T12:01:00+08:00"><p188:txBody><a:bodyPr/><a:lstStyle/><a:p/></p188:txBody><p188:extLst><p:ext uri="{{A}}"><x:data relationship="rId999"/></p:ext></p188:extLst></p188:reply></p188:replyLst><p188:extLst><p:ext uri="{{B}}"><x:payload r:id="rId666" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/></p:ext></p188:extLst></p188:cm></p188:cmLst>"#
         );
         let expected = ModernCommentList::parse(xml.as_bytes()).unwrap();
+        assert_eq!(
+            expected.comments[0].complete,
+            Some(Progress::new(50).unwrap())
+        );
         let mut package = package();
         let mut part = value();
         part.comments = expected.clone();
@@ -1843,6 +1969,49 @@ mod tests {
                 .rels()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn progress_is_bounded_typed_and_written_in_office_units() {
+        assert_eq!(
+            std::mem::size_of::<Option<Progress>>(),
+            std::mem::size_of::<u32>()
+        );
+        assert_eq!(Progress::ZERO.thousandths(), 0);
+        assert_eq!(Progress::FULL.thousandths(), 100_000);
+        assert_eq!(Progress::new(25).unwrap().thousandths(), 25_000);
+        assert_eq!(
+            Progress::from_thousandths(50_250).unwrap().to_string(),
+            "50250"
+        );
+        assert!(Progress::new(101).is_err());
+        assert!(Progress::from_thousandths(100_001).is_err());
+
+        let xml = format!(
+            r#"<p188:cmLst xmlns:p188="{P188}"><p188:cm id="{COMMENT}" authorId="{AUTHOR}" created="2024-12-30T20:26:06.503" complete="50.25%"/></p188:cmLst>"#
+        );
+        let parsed = ModernCommentList::parse(xml.as_bytes()).unwrap();
+        assert_eq!(
+            parsed.comments[0].complete,
+            Some(Progress::from_thousandths(50_250).unwrap())
+        );
+        let serialized = parsed.to_xml().unwrap();
+        assert!(
+            serialized
+                .windows(b"complete=\"50250\"".len())
+                .any(|window| window == b"complete=\"50250\"")
+        );
+        assert_eq!(ModernCommentList::parse(&serialized).unwrap(), parsed);
+
+        for complete in ["-1%", "100.01%", "50.123%", "1e2%", "100001", ""] {
+            let xml = format!(
+                r#"<p188:cmLst xmlns:p188="{P188}"><p188:cm id="{COMMENT}" authorId="{AUTHOR}" created="2024-12-30T20:26:06.503" complete="{complete}"/></p188:cmLst>"#
+            );
+            assert!(
+                ModernCommentList::parse(xml.as_bytes()).is_err(),
+                "accepted invalid progress {complete:?}"
+            );
+        }
     }
 
     #[test]

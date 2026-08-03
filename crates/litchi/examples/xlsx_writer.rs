@@ -11,7 +11,10 @@
 /// - Save the workbook
 ///
 /// Usage: cargo run --example xlsx_writer -- <output-file.xlsx>
-use litchi::ooxml::xlsx::{CellFill, CellFillPatternType, CellFont, CellFormat, Workbook};
+use litchi::ooxml::xlsx::styles::alignment::{Horizontal, Vertical};
+use litchi::ooxml::xlsx::{
+    Alignment, CellFill, CellFillPatternType, CellFont, CellFormat, Workbook,
+};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -77,8 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             fg_color: Some("FFD3D3D3".to_string()), // Light gray
             bg_color: None,
         }),
-        border: None,
-        number_format: None,
+        ..CellFormat::default()
     };
 
     for col in 0..4 {
@@ -96,9 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             underline: false,
             color: None,
         }),
-        fill: None,
-        border: None,
-        number_format: None,
+        ..CellFormat::default()
     };
 
     sheet1.set_cell_format(4, 0, total_format.clone());
@@ -137,9 +137,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             underline: false,
             color: Some("FF0000FF".to_string()), // Blue
         }),
-        fill: None,
-        border: None,
-        number_format: None,
+        alignment: Some(Alignment::both(Horizontal::Center, Vertical::Center)),
+        ..CellFormat::default()
     };
     sheet2.set_cell_format(0, 0, title_format);
 
