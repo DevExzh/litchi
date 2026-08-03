@@ -44,7 +44,6 @@ use super::query_table::{
     QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
     parse_query_table,
 };
-use super::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};
 use super::sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, parse_worksheet_sheet_calculation_properties,
 };
@@ -73,6 +72,7 @@ use super::{
 };
 use litchi_xlsx::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
 use litchi_xlsx::raw::web as raw_web;
+use litchi_xlsx::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};
 use litchi_xlsx::web::Bindings;
 
 /// Information about a worksheet

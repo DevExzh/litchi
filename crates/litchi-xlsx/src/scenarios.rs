@@ -4,22 +4,23 @@
 //! can swap into the model. This module parses and serializes the worksheet
 //! `scenarios` collection without evaluating any scenario.
 
-use std::fmt::Write;
-
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{OoxmlError, Result};
+use crate::error::{Result, invalid};
 use litchi_ooxml_common::mce::process_str;
 
-const TRANSITIONAL_MAIN: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT_MAIN: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const MAX_SCENARIOS: usize = 65_535;
 const MAX_INPUT_CELLS: usize = 65_536;
 const MAX_SQREF_ITEMS: usize = 32_767;
 const MAX_XSTRING_CHARS: usize = 32_767;
+const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 256;
+const MAX_EVENTS: usize = 1_000_000;
 const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;
 
@@ -33,8 +34,8 @@ pub enum WorksheetScenarioConformance {
 impl WorksheetScenarioConformance {
     fn main_namespace(self) -> &'static str {
         match self {
-            Self::Transitional => std::str::from_utf8(TRANSITIONAL_MAIN).unwrap(),
-            Self::Strict => std::str::from_utf8(STRICT_MAIN).unwrap(),
+            Self::Transitional => TRANSITIONAL_MAIN,
+            Self::Strict => STRICT_MAIN,
         }
     }
 }
@@ -279,23 +280,53 @@ enum NamespaceKind {
 
 /// Parses the direct worksheet `scenarios` child after applying shared MCE processing.
 pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<WorksheetScenarios>> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("worksheet XML exceeds safety limit"));
+    }
     let source = std::str::from_utf8(xml)
         .map_err(|error| invalid(format!("worksheet XML is not UTF-8: {error}")))?;
     let processed = process_str(source)?;
+    if processed.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML exceeds safety limit"));
+    }
     let mut reader = NsReader::from_reader(processed.as_bytes());
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut scopes = Vec::new();
     let mut state: Option<ScenariosBuilder> = None;
     let mut seen_scenarios = false;
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
+    let mut events = 0usize;
 
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("worksheet XML exceeds event limit"));
+        }
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("invalid worksheet XML: {error}")))?;
         let namespace = namespace_kind(resolved)?;
         match event {
             Event::Start(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if scopes.is_empty() && root_seen {
+                    return Err(invalid("worksheet XML contains multiple roots"));
+                }
+                let next_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML depth overflow"))?;
+                if next_depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
                 let scope = begin_element(
                     &reader,
                     &element,
@@ -304,24 +335,83 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<WorksheetScenarios
                     &mut state,
                     &mut seen_scenarios,
                 )?;
+                if scopes.is_empty() {
+                    root_seen = true;
+                }
+                depth = next_depth;
                 scopes.push(scope);
             },
             Event::Empty(element) => {
-                let scope = begin_element(
-                    &reader,
-                    &element,
-                    namespace,
-                    scopes.last().copied(),
-                    &mut state,
-                    &mut seen_scenarios,
-                )?;
-                end_scope(scope, &mut state)?;
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if scopes.is_empty() {
+                    if root_seen {
+                        return Err(invalid("worksheet XML contains multiple roots"));
+                    }
+                    let scope = begin_element(
+                        &reader,
+                        &element,
+                        namespace,
+                        None,
+                        &mut state,
+                        &mut seen_scenarios,
+                    )?;
+                    end_scope(scope, &mut state)?;
+                    root_seen = true;
+                    root_closed = true;
+                } else {
+                    let scope = begin_element(
+                        &reader,
+                        &element,
+                        namespace,
+                        scopes.last().copied(),
+                        &mut state,
+                        &mut seen_scenarios,
+                    )?;
+                    end_scope(scope, &mut state)?;
+                }
             },
-            Event::End(_) => {
+            Event::End(element) => {
                 let scope = scopes
                     .pop()
                     .ok_or_else(|| invalid("unexpected worksheet end element"))?;
+                match scope {
+                    Scope::Worksheet => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"worksheet"
+                        {
+                            return Err(invalid("mismatched worksheet end element"));
+                        }
+                        root_closed = true;
+                    },
+                    Scope::Scenarios => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"scenarios"
+                        {
+                            return Err(invalid("mismatched scenarios end element"));
+                        }
+                    },
+                    Scope::Scenario => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"scenario"
+                        {
+                            return Err(invalid("mismatched scenario end element"));
+                        }
+                    },
+                    Scope::InputCells => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"inputCells"
+                        {
+                            return Err(invalid("mismatched inputCells end element"));
+                        }
+                    },
+                    Scope::Other => {},
+                }
                 end_scope(scope, &mut state)?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("worksheet XML depth underflow"))?;
             },
             Event::Text(text)
                 if matches!(
@@ -331,6 +421,12 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<WorksheetScenarios
             {
                 return Err(invalid("scenarios family cannot contain text"));
             },
+            Event::Text(text)
+                if matches!(scopes.last(), Some(Scope::Worksheet))
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("worksheet cannot contain direct text"));
+            },
             Event::CData(text)
                 if matches!(
                     scopes.last(),
@@ -339,15 +435,32 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<WorksheetScenarios
             {
                 return Err(invalid("scenarios family cannot contain CDATA"));
             },
-            Event::DocType(_) => {
-                return Err(invalid("worksheet XML cannot contain a document type"));
+            Event::CData(_) if matches!(scopes.last(), Some(Scope::Worksheet)) => {
+                return Err(invalid("worksheet cannot contain direct CDATA"));
+            },
+            Event::Text(text)
+                if scopes.is_empty() && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("worksheet XML text is outside root"));
+            },
+            Event::CData(_) if scopes.is_empty() => {
+                return Err(invalid("worksheet XML CDATA is outside root"));
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
             _ => {},
         }
         buffer.clear();
     }
-    if !scopes.is_empty() {
+    if !root_seen || !root_closed || depth != 0 || !scopes.is_empty() {
         return Err(invalid("unterminated worksheet XML"));
     }
     state.map(finish_builder).transpose()
@@ -644,12 +757,14 @@ pub fn write_worksheet_scenarios(
         )));
     }
     let mut xml = String::new();
-    write!(xml, "<scenarios xmlns=\"{}\"", conformance.main_namespace()).unwrap();
+    xml.push_str("<scenarios xmlns=\"");
+    xml.push_str(conformance.main_namespace());
+    xml.push('"');
     if let Some(current) = value.current {
-        write!(xml, " current=\"{current}\"").unwrap();
+        write_u32_attribute(&mut xml, "current", current);
     }
     if let Some(show) = value.show {
-        write!(xml, " show=\"{show}\"").unwrap();
+        write_u32_attribute(&mut xml, "show", show);
     }
     if !value.ranges.is_empty() {
         xml.push_str(" sqref=\"");
@@ -668,7 +783,7 @@ pub fn write_worksheet_scenarios(
         write_true_attribute(&mut xml, "locked", scenario.locked);
         write_true_attribute(&mut xml, "hidden", scenario.hidden);
         if let Some(count) = scenario.count {
-            write!(xml, " count=\"{count}\"").unwrap();
+            write_u32_attribute(&mut xml, "count", count);
         }
         if let Some(user) = &scenario.user {
             write_attribute(&mut xml, "user", user);
@@ -688,7 +803,7 @@ pub fn write_worksheet_scenarios(
             write_true_attribute(&mut xml, "undone", cell.undone);
             write_attribute(&mut xml, "val", &cell.value);
             if let Some(number_format_id) = cell.number_format_id {
-                write!(xml, " numFmtId=\"{number_format_id}\"").unwrap();
+                write_u32_attribute(&mut xml, "numFmtId", number_format_id);
             }
             xml.push_str("/>");
         }
@@ -700,12 +815,24 @@ pub fn write_worksheet_scenarios(
 
 fn write_true_attribute(xml: &mut String, name: &str, value: bool) {
     if value {
-        write!(xml, " {name}=\"1\"").unwrap();
+        xml.push(' ');
+        xml.push_str(name);
+        xml.push_str("=\"1\"");
     }
 }
 
+fn write_u32_attribute(xml: &mut String, name: &str, value: u32) {
+    xml.push(' ');
+    xml.push_str(name);
+    xml.push_str("=\"");
+    xml.push_str(&value.to_string());
+    xml.push('"');
+}
+
 fn write_attribute(xml: &mut String, name: &str, value: &str) {
-    write!(xml, " {name}=\"").unwrap();
+    xml.push(' ');
+    xml.push_str(name);
+    xml.push_str("=\"");
     for character in value.chars() {
         match character {
             '&' => xml.push_str("&amp;"),
@@ -734,7 +861,7 @@ fn namespace_kind(result: ResolveResult<'_>) -> Result<NamespaceKind> {
 }
 
 fn is_main_namespace(namespace: &[u8]) -> bool {
-    namespace == TRANSITIONAL_MAIN || namespace == STRICT_MAIN
+    namespace == TRANSITIONAL_MAIN.as_bytes() || namespace == STRICT_MAIN.as_bytes()
 }
 
 fn is_namespace_declaration(name: &[u8]) -> bool {
@@ -839,10 +966,6 @@ fn validate_cell_reference(value: &str, name: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -938,6 +1061,35 @@ mod tests {
             ))
             .is_err()
         );
+    }
+
+    #[test]
+    fn rejects_malformed_document_boundaries_and_excessive_depth() {
+        for xml in [
+            format!(r#"<worksheet xmlns="{NS}"/><worksheet xmlns="{NS}"/>"#),
+            format!(r#"text<worksheet xmlns="{NS}"></worksheet>"#),
+            format!(r#"<worksheet xmlns="{NS}">text</worksheet>"#),
+            format!(r#"<worksheet xmlns="{NS}"></worksheet>tail"#),
+            format!(r#"<worksheet xmlns="{NS}"><![CDATA[data]]></worksheet>"#),
+            format!(
+                r#"<worksheet xmlns="{NS}"><scenarios><scenario name="s"/></scenarios></worksheet><?pi?>"#
+            ),
+        ] {
+            assert!(
+                parse_worksheet_scenarios(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = format!(r#"<worksheet xmlns="{NS}">"#);
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_worksheet_scenarios(xml.as_bytes()).is_err());
     }
 
     #[test]

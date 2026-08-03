@@ -29,6 +29,8 @@ pub(crate) const CRT_LAYOUT_12_A_RECORD_TYPE: u16 = 0x08A7;
 
 /// Size in bytes of an `FrtHeader` (MS-XLS 2.5.135).
 const FRT_HEADER_LEN: usize = 12;
+/// Size in bytes of the reserved tail of an `FrtHeader`.
+const FRT_HEADER_RESERVED_LEN: usize = FRT_HEADER_LEN - 4;
 /// `FrtFlags` bits that MUST be zero in an `FrtHeader` (MS-XLS 2.5.135):
 /// `fFrtRef` and `fFrtAlert`.
 const FRT_FLAGS_FORBIDDEN: u16 = 0x0003;
@@ -46,6 +48,67 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     XlsError::InvalidRecord {
         record_type,
         message: message.into(),
+    }
+}
+
+/// Bounded reader for the fixed-width fields in `CrtLayout12` and
+/// `CrtLayout12A`.
+///
+/// The records have fixed layouts, but keeping the cursor checked here makes
+/// the field readers safe if a caller or a future layout change ever bypasses
+/// the public exact-length checks. The cursor advances only after a complete
+/// field has been obtained.
+struct LayoutReader<'a> {
+    data: &'a [u8],
+    offset: usize,
+    record_type: u16,
+}
+
+impl<'a> LayoutReader<'a> {
+    fn new(data: &'a [u8], record_type: u16) -> Self {
+        Self {
+            data,
+            offset: 0,
+            record_type,
+        }
+    }
+
+    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+        let end = self.offset.checked_add(N).ok_or_else(|| {
+            invalid(
+                self.record_type,
+                "chart layout field offset overflows usize",
+            )
+        })?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(XlsError::InvalidLength {
+                expected: end,
+                found: self.data.len(),
+            })?;
+        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+            expected: N,
+            found: bytes.len(),
+        })?;
+        self.offset = end;
+        Ok(value)
+    }
+
+    fn read_u16(&mut self) -> XlsResult<u16> {
+        Ok(u16::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_i16(&mut self) -> XlsResult<i16> {
+        Ok(i16::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_u32(&mut self) -> XlsResult<u32> {
+        Ok(u32::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_f64(&mut self) -> XlsResult<f64> {
+        Ok(f64::from_le_bytes(self.read_bytes()?))
     }
 }
 
@@ -94,29 +157,19 @@ struct LayoutModes {
 }
 
 impl LayoutModes {
-    fn parse(data: &[u8], offset: usize, record_type: u16) -> XlsResult<Self> {
-        let mode = |index: usize| {
-            XlsCrtLayout12Mode::parse(
-                u16::from_le_bytes([data[offset + index], data[offset + index + 1]]),
-                record_type,
-            )
-        };
-        let xnum = |index: usize| {
-            f64::from_le_bytes(
-                data[offset + index..offset + index + 8]
-                    .try_into()
-                    .expect("sized"),
-            )
+    fn parse(reader: &mut LayoutReader<'_>) -> XlsResult<Self> {
+        let mode = |reader: &mut LayoutReader<'_>| {
+            XlsCrtLayout12Mode::parse(reader.read_u16()?, reader.record_type)
         };
         Ok(Self {
-            x_mode: mode(0)?,
-            y_mode: mode(2)?,
-            width_mode: mode(4)?,
-            height_mode: mode(6)?,
-            x: xnum(8),
-            y: xnum(16),
-            dx: xnum(24),
-            dy: xnum(32),
+            x_mode: mode(reader)?,
+            y_mode: mode(reader)?,
+            width_mode: mode(reader)?,
+            height_mode: mode(reader)?,
+            x: reader.read_f64()?,
+            y: reader.read_f64()?,
+            dx: reader.read_f64()?,
+            dy: reader.read_f64()?,
         })
     }
 
@@ -132,14 +185,18 @@ impl LayoutModes {
 
 /// Validate an `FrtHeader` (MS-XLS 2.5.135): the `rt` field and the
 /// `fFrtRef`/`fFrtAlert` bits that MUST be zero.
-fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> XlsResult<u16> {
-    if u16::from_le_bytes([data[0], data[1]]) != record_type {
+fn validate_frt_header(
+    reader: &mut LayoutReader<'_>,
+    record_type: u16,
+    name: &str,
+) -> XlsResult<u16> {
+    if reader.read_u16()? != record_type {
         return Err(invalid(
             record_type,
             format!("{name} FrtHeader.rt mismatch"),
         ));
     }
-    let flags = u16::from_le_bytes([data[2], data[3]]);
+    let flags = reader.read_u16()?;
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
         return Err(invalid(
             record_type,
@@ -179,14 +236,15 @@ impl XlsCrtLayout12 {
                 found: data.len(),
             });
         }
-        let frt_flags = validate_frt_header(data, CRT_LAYOUT_12_RECORD_TYPE, "CrtLayout12")?;
+        let mut reader = LayoutReader::new(data, CRT_LAYOUT_12_RECORD_TYPE);
+        let frt_flags = validate_frt_header(&mut reader, CRT_LAYOUT_12_RECORD_TYPE, "CrtLayout12")?;
         Ok(Self {
             frt_flags,
-            frt_reserved: data[4..FRT_HEADER_LEN].try_into().expect("length checked"),
-            checksum: u32::from_le_bytes(data[12..16].try_into().expect("length checked")),
-            flags: u16::from_le_bytes([data[16], data[17]]),
-            modes: LayoutModes::parse(data, 18, CRT_LAYOUT_12_RECORD_TYPE)?,
-            reserved2: u16::from_le_bytes([data[58], data[59]]),
+            frt_reserved: reader.read_bytes::<FRT_HEADER_RESERVED_LEN>()?,
+            checksum: reader.read_u32()?,
+            flags: reader.read_u16()?,
+            modes: LayoutModes::parse(&mut reader)?,
+            reserved2: reader.read_u16()?,
         })
     }
 
@@ -298,8 +356,11 @@ impl XlsCrtLayout12A {
                 found: data.len(),
             });
         }
-        let frt_flags = validate_frt_header(data, CRT_LAYOUT_12_A_RECORD_TYPE, "CrtLayout12A")?;
-        let checksum = u32::from_le_bytes(data[12..16].try_into().expect("length checked"));
+        let mut reader = LayoutReader::new(data, CRT_LAYOUT_12_A_RECORD_TYPE);
+        let frt_flags =
+            validate_frt_header(&mut reader, CRT_LAYOUT_12_A_RECORD_TYPE, "CrtLayout12A")?;
+        let frt_reserved = reader.read_bytes::<FRT_HEADER_RESERVED_LEN>()?;
+        let checksum = reader.read_u32()?;
         // MS-XLS 2.4.67: dwCheckSum MUST be 0x00000000 or 0x00000001.
         if checksum > 1 {
             return Err(invalid(
@@ -307,18 +368,17 @@ impl XlsCrtLayout12A {
                 format!("CrtLayout12A dwCheckSum {checksum:#X} is not 0x00000000 or 0x00000001"),
             ));
         }
-        let i16_at = |index: usize| i16::from_le_bytes([data[index], data[index + 1]]);
         Ok(Self {
             frt_flags,
-            frt_reserved: data[4..FRT_HEADER_LEN].try_into().expect("length checked"),
+            frt_reserved,
             checksum,
-            flags: u16::from_le_bytes([data[16], data[17]]),
-            x_top_left: i16_at(18),
-            y_top_left: i16_at(20),
-            x_bottom_right: i16_at(22),
-            y_bottom_right: i16_at(24),
-            modes: LayoutModes::parse(data, 26, CRT_LAYOUT_12_A_RECORD_TYPE)?,
-            reserved2: u16::from_le_bytes([data[66], data[67]]),
+            flags: reader.read_u16()?,
+            x_top_left: reader.read_i16()?,
+            y_top_left: reader.read_i16()?,
+            x_bottom_right: reader.read_i16()?,
+            y_bottom_right: reader.read_i16()?,
+            modes: LayoutModes::parse(&mut reader)?,
+            reserved2: reader.read_u16()?,
         })
     }
 
@@ -464,6 +524,21 @@ mod tests {
         }
         data.extend_from_slice(&[0; 2]);
         data
+    }
+
+    #[test]
+    fn layout_modes_rejects_truncated_and_overflowing_reads() {
+        let mut truncated = LayoutReader::new(&[0; 39], CRT_LAYOUT_12_RECORD_TYPE);
+        assert!(LayoutModes::parse(&mut truncated).is_err());
+        assert_eq!(truncated.offset, 32);
+
+        let mut overflowing = LayoutReader {
+            data: &[],
+            offset: usize::MAX,
+            record_type: CRT_LAYOUT_12_RECORD_TYPE,
+        };
+        assert!(LayoutModes::parse(&mut overflowing).is_err());
+        assert_eq!(overflowing.offset, usize::MAX);
     }
 
     #[test]

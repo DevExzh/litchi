@@ -19,6 +19,9 @@ const MAX_RETAINED_EXTENSION_BYTES: usize = 4 * 1024 * 1024;
 const MAX_EXTENSION_URI_BYTES: usize = 1024;
 const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;
+const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 256;
+const MAX_EVENTS: usize = 1_000_000;
 
 /// One of the nine independent error conditions that a user may suppress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -119,14 +122,25 @@ struct Parser {
     extension_list_start: usize,
     collection_phase: u8,
     retained_extension_bytes: usize,
+    root_seen: bool,
+    root_closed: bool,
 }
 
 /// Parse the worksheet's direct `ignoredErrors` collection.
 pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<WorksheetIgnoredErrors>> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("ignoredErrors worksheet XML exceeds size limit"));
+    }
     let processed =
         process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    if processed.xml.len() > MAX_XML_BYTES {
+        return Err(invalid(
+            "processed ignoredErrors worksheet XML exceeds size limit",
+        ));
+    }
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut parser = Parser {
         stack: Vec::new(),
         collection: None,
@@ -136,8 +150,18 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<WorksheetIgno
         extension_list_start: 0,
         collection_phase: 0,
         retained_extension_bytes: 0,
+        root_seen: false,
+        root_closed: false,
     };
+    let mut events = 0usize;
+    let mut declaration_seen = false;
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("ignoredErrors XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("ignoredErrors XML exceeds event limit"));
+        }
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         reject_unsafe_event(&event)?;
@@ -167,11 +191,43 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<WorksheetIgno
             {
                 return Err(invalid("unexpected CDATA in ignoredErrors"));
             },
+            Event::Text(text)
+                if matches!(parser.parent(), Context::Worksheet)
+                    && !text.decode().map_err(xml_error)?.trim().is_empty() =>
+            {
+                return Err(invalid(
+                    "worksheet cannot contain direct ignoredErrors text",
+                ));
+            },
+            Event::CData(_) if matches!(parser.parent(), Context::Worksheet) => {
+                return Err(invalid(
+                    "worksheet cannot contain direct ignoredErrors CDATA",
+                ));
+            },
+            Event::Text(text)
+                if parser.stack.is_empty()
+                    && !text.decode().map_err(xml_error)?.trim().is_empty() =>
+            {
+                return Err(invalid("ignoredErrors XML text is outside root"));
+            },
+            Event::CData(_) if parser.stack.is_empty() => {
+                return Err(invalid("ignoredErrors XML CDATA is outside root"));
+            },
+            Event::Decl(_) => {
+                if parser.root_seen || declaration_seen {
+                    return Err(invalid("invalid ignoredErrors XML declaration position"));
+                }
+                declaration_seen = true;
+            },
             Event::Eof => break,
             _ => {},
         }
     }
-    if parser.capture.is_some() || !parser.stack.is_empty() {
+    if parser.capture.is_some()
+        || !parser.stack.is_empty()
+        || !parser.root_seen
+        || !parser.root_closed
+    {
         return Err(invalid("unterminated ignoredErrors XML"));
     }
     Ok(parser.collection)
@@ -191,8 +247,17 @@ impl Parser {
     ) -> Result<()> {
         let local = element.local_name();
         let core = is_spreadsheetml_name(namespace, element.name(), local.as_ref());
-        if self.stack.is_empty() && (!core || local.as_ref() != b"worksheet") {
-            return Err(invalid("ignoredErrors parser requires a worksheet root"));
+        if self.stack.is_empty() {
+            if self.root_closed || self.root_seen {
+                return Err(invalid("ignoredErrors XML contains multiple roots"));
+            }
+            if !core || local.as_ref() != b"worksheet" {
+                return Err(invalid("ignoredErrors parser requires a worksheet root"));
+            }
+            self.root_seen = true;
+        }
+        if self.stack.len() >= MAX_DEPTH {
+            return Err(invalid("ignoredErrors XML nesting is too deep"));
         }
         match (self.parent(), core, local.as_ref()) {
             (Context::Outside, true, b"worksheet") => self.stack.push(Context::Worksheet),
@@ -243,7 +308,11 @@ impl Parser {
         let local = element.local_name();
         let core = is_spreadsheetml_name(namespace, element.name(), local.as_ref());
         if self.stack.is_empty() {
-            return Err(invalid("worksheet root cannot be empty"));
+            return Err(if self.root_seen || self.root_closed {
+                invalid("ignoredErrors XML contains multiple roots")
+            } else {
+                invalid("worksheet root cannot be empty")
+            });
         }
         match (self.parent(), core, local.as_ref()) {
             (Context::Worksheet, true, b"ignoredErrors") => {
@@ -287,7 +356,11 @@ impl Parser {
             Context::Collection if local == b"ignoredErrors" => self.finish_collection(),
             Context::ExtensionList if local == b"extLst" => self.finish_extension_list(),
             Context::IgnoredError if local == b"ignoredError" => Ok(()),
-            Context::Worksheet | Context::Outside => Ok(()),
+            Context::Worksheet if local == b"worksheet" => {
+                self.root_closed = true;
+                Ok(())
+            },
+            Context::Outside => Ok(()),
             _ => Err(invalid("mismatched ignoredErrors end element")),
         }
     }
@@ -377,7 +450,15 @@ impl Parser {
             .as_mut()
             .ok_or_else(|| invalid("missing extension capture"))?;
         match &event {
-            Event::Start(_) => capture.depth += 1,
+            Event::Start(_) => {
+                capture.depth = capture
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("extension capture depth overflow"))?;
+                if capture.depth > MAX_DEPTH {
+                    return Err(invalid("ignoredErrors extension nesting is too deep"));
+                }
+            },
             Event::End(_) => {
                 capture.depth = capture
                     .depth
@@ -741,6 +822,31 @@ mod tests {
             .map(|index| format!(r#"<ignoredError sqref="A{}"/>"#, index + 1))
             .collect::<String>();
         assert!(parse(&format!("<ignoredErrors>{entries}</ignoredErrors>")).is_err());
+    }
+
+    #[test]
+    fn rejects_multiple_roots_direct_text_and_excessive_depth() {
+        for xml in [
+            format!(r#"<worksheet xmlns="{NS}"/><worksheet xmlns="{NS}"/>"#),
+            format!(r#"text<worksheet xmlns="{NS}"></worksheet>"#),
+            format!(r#"<worksheet xmlns="{NS}">text</worksheet>"#),
+            format!(r#"<worksheet xmlns="{NS}"></worksheet>tail"#),
+        ] {
+            assert!(
+                parse_worksheet_ignored_errors(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = format!(r#"<worksheet xmlns="{NS}">"#);
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_worksheet_ignored_errors(xml.as_bytes()).is_err());
     }
 
     fn fixture(bytes: &[u8]) -> WorksheetIgnoredErrors {

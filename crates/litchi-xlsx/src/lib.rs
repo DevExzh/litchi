@@ -18,6 +18,7 @@ pub mod merge;
 mod outline;
 pub mod raw;
 pub mod row;
+pub mod scenarios;
 pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod style;
@@ -46,6 +47,11 @@ pub use litchi_sheet::{
 };
 pub use outline::{Outline, OutlineAt};
 pub use row::{Height, HeightAt, Row, Rows};
+pub use scenarios::{
+    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,
+    WorksheetScenarioInputCell, WorksheetScenarios, parse_worksheet_scenarios,
+    write_worksheet_scenarios,
+};
 pub use sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
     parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,

@@ -56,7 +56,6 @@ pub mod print_options;
 pub mod printer_settings;
 pub mod query_table;
 pub mod revisions;
-pub mod scenarios;
 pub mod shape_geometry;
 pub mod shapes;
 mod shared_formula;
@@ -101,6 +100,7 @@ pub use chartsheet::{
 };
 pub use litchi_xlsx::calculation_properties;
 pub use litchi_xlsx::cell_watches;
+pub use litchi_xlsx::scenarios;
 pub use litchi_xlsx::sheet_calculation_properties;
 pub mod writer;
 
@@ -153,6 +153,11 @@ pub use litchi_xlsx::cell_watches::{
     CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
     parse_worksheet_cell_watches, write_worksheet_cell_watches,
 };
+pub use litchi_xlsx::scenarios::{
+    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,
+    WorksheetScenarioInputCell, WorksheetScenarios, parse_worksheet_scenarios,
+    write_worksheet_scenarios,
+};
 pub use query_table::{
     QueryTable, QueryTableConformance, QueryTableExtensionAttribute, QueryTableExtensionList,
     QueryTableField, QueryTableGrowShrinkType, QueryTableIconSet, QueryTableRefresh,
@@ -168,11 +173,6 @@ pub use revisions::{
     RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, WorkbookRevisions,
     load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
     store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
-};
-pub use scenarios::{
-    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,
-    WorksheetScenarioInputCell, WorksheetScenarios, parse_worksheet_scenarios,
-    write_worksheet_scenarios,
 };
 // Re-export shared formatting types
 pub use format::{
