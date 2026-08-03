@@ -346,12 +346,22 @@ impl Defaults {
         }
     }
 
+    /// Explicit producer-stored highest row outline level, if present.
+    pub const fn stored_row_outline(&self) -> Option<Outline> {
+        self.row_outline
+    }
+
     /// Producer-reported highest column outline level.
     pub const fn column_outline(&self) -> Outline {
         match self.column_outline {
             Some(value) => value,
             None => Outline::NONE,
         }
+    }
+
+    /// Explicit producer-stored highest column outline level, if present.
+    pub const fn stored_column_outline(&self) -> Option<Outline> {
+        self.column_outline
     }
 
     /// Typographic descent in pixels at 100% worksheet zoom.
@@ -382,5 +392,33 @@ mod tests {
         assert_eq!(std::mem::size_of::<Option<Height>>(), 8);
         assert_eq!(std::mem::size_of::<Option<Width>>(), 8);
         assert_eq!(std::mem::size_of::<Option<Descent>>(), 8);
+    }
+
+    #[test]
+    fn outline_accessors_preserve_explicit_zero_attribute_presence() {
+        let explicit_zero = Defaults {
+            base_width: None,
+            width: None,
+            height: Height::new(15.0).expect("valid default height"),
+            descent: None,
+            row_outline: Some(Outline::NONE),
+            column_outline: Some(Outline::NONE),
+            flags: Flags::empty(),
+            present: Flags::empty(),
+        };
+        let absent = Defaults {
+            row_outline: None,
+            column_outline: None,
+            ..explicit_zero.clone()
+        };
+
+        assert_eq!(explicit_zero.row_outline(), Outline::NONE);
+        assert_eq!(explicit_zero.column_outline(), Outline::NONE);
+        assert_eq!(absent.row_outline(), Outline::NONE);
+        assert_eq!(absent.column_outline(), Outline::NONE);
+        assert_eq!(explicit_zero.stored_row_outline(), Some(Outline::NONE));
+        assert_eq!(explicit_zero.stored_column_outline(), Some(Outline::NONE));
+        assert_eq!(absent.stored_row_outline(), None);
+        assert_eq!(absent.stored_column_outline(), None);
     }
 }
