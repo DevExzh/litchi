@@ -396,7 +396,7 @@ fn parse_attributes(
                 },
                 b"advTm" => {
                     reject_duplicate(&mut seen_after, "advTm")?;
-                    after = Some(parse_ms(value, "automatic-advance delay")?);
+                    after = Some(parse_advance_ms(value)?);
                 },
                 _ => {},
             }
@@ -480,7 +480,15 @@ fn parse_speed(value: &str) -> Result<Speed> {
 
 fn parse_ms(value: &str, field: &str) -> Result<Ms> {
     let digits = value.strip_suffix("ms").unwrap_or(value);
-    let parsed = digits
+    parse_bounded_ms(digits, field)
+}
+
+fn parse_advance_ms(value: &str) -> Result<Ms> {
+    parse_bounded_ms(value, "automatic-advance delay")
+}
+
+fn parse_bounded_ms(value: &str, field: &str) -> Result<Ms> {
+    let parsed = value
         .parse::<u64>()
         .map_err(|_| Error::Invalid(format!("invalid {field} '{value}'")))?;
     let parsed = u32::try_from(parsed)

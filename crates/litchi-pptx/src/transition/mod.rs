@@ -164,6 +164,34 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unit_suffix_on_integer_timed_advance() {
+        let xml = transition_xml(r#"<p:fade/>"#).replacen(
+            "<p:transition>",
+            r#"<p:transition advTm="750ms">"#,
+            1,
+        );
+        assert!(matches!(
+            read(xml.as_bytes()),
+            Err(Error::Invalid(message)) if message.contains("automatic-advance delay")
+        ));
+
+        let xml = transition_xml(r#"<p:fade/>"#).replacen(
+            "<p:transition>",
+            r#"<p:transition advTm="2147483647">"#,
+            1,
+        );
+        assert_eq!(
+            read(xml.as_bytes())
+                .unwrap()
+                .unwrap()
+                .after()
+                .unwrap()
+                .get(),
+            i32::MAX as u32
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_effects() {
         let xml = transition_xml("<p:fade/><p:cut/>");
         assert!(matches!(
