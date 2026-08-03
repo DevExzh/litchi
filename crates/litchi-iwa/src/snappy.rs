@@ -10,6 +10,8 @@ use std::io::{self, Cursor, Read};
 
 use crate::Error;
 
+const SNAPPY_FRAME_HEADER_SIZE: usize = 4;
+
 /// Caller-selectable decompression ceilings for one iWork Snappy stream.
 ///
 /// The constructor only accepts limits at or below the format-wide hard
@@ -19,6 +21,9 @@ use crate::Error;
 pub struct SnappyLimits {
     max_uncompressed_chunk: usize,
     max_decompressed_stream: usize,
+    max_compressed_chunk: usize,
+    max_compressed_stream: usize,
+    max_frames: usize,
 }
 
 impl SnappyLimits {
@@ -52,7 +57,60 @@ impl SnappyLimits {
         Ok(Self {
             max_uncompressed_chunk,
             max_decompressed_stream,
+            max_compressed_chunk: SnappyStream::MAX_COMPRESSED_CHUNK,
+            max_compressed_stream: SnappyStream::MAX_COMPRESSED_STREAM,
+            max_frames: SnappyStream::MAX_FRAMES,
         })
+    }
+
+    /// Tighten the compressed-input framing limits.
+    ///
+    /// The aggregate compressed-stream limit includes every four-byte frame
+    /// header, and the frame count includes zero-length frames. These checks
+    /// happen before a frame payload is read or allocated.
+    pub fn with_input_limits(
+        mut self,
+        max_compressed_chunk: usize,
+        max_compressed_stream: usize,
+        max_frames: usize,
+    ) -> Result<Self, Error> {
+        if max_compressed_chunk == 0 || max_compressed_stream == 0 || max_frames == 0 {
+            return Err(Error::Snappy(
+                "Snappy input limits must be non-zero".to_owned(),
+            ));
+        }
+        if max_compressed_chunk > SnappyStream::MAX_COMPRESSED_CHUNK {
+            return Err(Error::Snappy(format!(
+                "Snappy compressed chunk limit exceeds the {} byte hard ceiling",
+                SnappyStream::MAX_COMPRESSED_CHUNK
+            )));
+        }
+        if max_compressed_stream > SnappyStream::MAX_COMPRESSED_STREAM {
+            return Err(Error::Snappy(format!(
+                "Snappy compressed stream limit exceeds the {} byte hard ceiling",
+                SnappyStream::MAX_COMPRESSED_STREAM
+            )));
+        }
+        if max_frames > SnappyStream::MAX_FRAMES {
+            return Err(Error::Snappy(format!(
+                "Snappy frame limit exceeds the {} frame hard ceiling",
+                SnappyStream::MAX_FRAMES
+            )));
+        }
+        let minimum_stream_for_chunk =
+            SNAPPY_FRAME_HEADER_SIZE
+                .checked_add(max_compressed_chunk)
+                .ok_or_else(|| Error::Snappy("Snappy input limit overflow".to_owned()))?;
+        if max_compressed_stream < minimum_stream_for_chunk {
+            return Err(Error::Snappy(
+                "Snappy compressed stream limit cannot hold one configured frame".to_owned(),
+            ));
+        }
+
+        self.max_compressed_chunk = max_compressed_chunk;
+        self.max_compressed_stream = max_compressed_stream;
+        self.max_frames = max_frames;
+        Ok(self)
     }
 
     /// Maximum uncompressed size accepted for one block.
@@ -64,6 +122,21 @@ impl SnappyLimits {
     pub const fn max_decompressed_stream(self) -> usize {
         self.max_decompressed_stream
     }
+
+    /// Maximum compressed payload accepted for one frame.
+    pub const fn max_compressed_chunk(self) -> usize {
+        self.max_compressed_chunk
+    }
+
+    /// Maximum compressed bytes accepted for one stream, including headers.
+    pub const fn max_compressed_stream(self) -> usize {
+        self.max_compressed_stream
+    }
+
+    /// Maximum number of frames accepted for one stream.
+    pub const fn max_frames(self) -> usize {
+        self.max_frames
+    }
 }
 
 impl Default for SnappyLimits {
@@ -71,6 +144,9 @@ impl Default for SnappyLimits {
         Self {
             max_uncompressed_chunk: SnappyStream::MAX_UNCOMPRESSED_CHUNK,
             max_decompressed_stream: SnappyStream::MAX_DECOMPRESSED_STREAM,
+            max_compressed_chunk: SnappyStream::MAX_COMPRESSED_CHUNK,
+            max_compressed_stream: SnappyStream::MAX_COMPRESSED_STREAM,
+            max_frames: SnappyStream::MAX_FRAMES,
         }
     }
 }
@@ -89,6 +165,12 @@ impl SnappyStream {
     pub const MAX_UNCOMPRESSED_CHUNK: usize = 64 * 1024 * 1024;
     /// Maximum total size accepted for one decompressed IWA component.
     pub const MAX_DECOMPRESSED_STREAM: usize = 512 * 1024 * 1024;
+    /// Maximum compressed payload accepted for one framed block.
+    pub const MAX_COMPRESSED_CHUNK: usize = 0x00ff_ffff;
+    /// Maximum compressed size accepted for one stream, including headers.
+    pub const MAX_COMPRESSED_STREAM: usize = 2 * 1024 * 1024 * 1024;
+    /// Maximum number of frames accepted for one stream, including empty frames.
+    pub const MAX_FRAMES: usize = 1_000_000;
     /// Block size emitted by the serializer.
     pub const WRITE_CHUNK_SIZE: usize = 64 * 1024;
 
@@ -110,6 +192,8 @@ impl SnappyStream {
     ) -> Result<Self, Error> {
         let mut decompressed = Vec::new();
         let mut decoder = Decoder::new();
+        let mut compressed_stream_length = 0usize;
+        let mut frame_count = 0usize;
 
         loop {
             // Read the type byte separately so a clean EOF can be distinguished
@@ -134,12 +218,53 @@ impl SnappyStream {
             // Extract 24-bit length (little-endian)
             let length = u32::from_le_bytes([length_bytes[0], length_bytes[1], length_bytes[2], 0]);
 
+            frame_count = frame_count
+                .checked_add(1)
+                .ok_or_else(|| Error::Snappy("Snappy frame count overflow".to_owned()))?;
+            if frame_count > limits.max_frames {
+                return Err(Error::Snappy(format!(
+                    "Snappy frame count exceeds the {} frame limit",
+                    limits.max_frames
+                )));
+            }
+
+            let compressed_length = usize::try_from(length)
+                .map_err(|_| Error::Snappy("Snappy frame length does not fit usize".to_owned()))?;
+            if compressed_length > limits.max_compressed_chunk {
+                return Err(Error::Snappy(format!(
+                    "Snappy compressed frame is {compressed_length} bytes, exceeding the {} byte limit",
+                    limits.max_compressed_chunk
+                )));
+            }
+            let frame_size = SNAPPY_FRAME_HEADER_SIZE
+                .checked_add(compressed_length)
+                .ok_or_else(|| {
+                    Error::Snappy("Snappy compressed frame length overflow".to_owned())
+                })?;
+            compressed_stream_length = compressed_stream_length
+                .checked_add(frame_size)
+                .ok_or_else(|| {
+                    Error::Snappy("Snappy compressed stream length overflow".to_owned())
+                })?;
+            if compressed_stream_length > limits.max_compressed_stream {
+                return Err(Error::Snappy(format!(
+                    "Snappy compressed stream exceeds the {} byte limit",
+                    limits.max_compressed_stream
+                )));
+            }
+
             if length == 0 {
                 continue;
             }
 
             // Read compressed chunk
-            let mut compressed = vec![0u8; length as usize];
+            let mut compressed = Vec::new();
+            compressed
+                .try_reserve_exact(compressed_length)
+                .map_err(|error| {
+                    Error::Snappy(format!("Unable to reserve compressed buffer: {error}"))
+                })?;
+            compressed.resize(compressed_length, 0);
             reader.read_exact(&mut compressed).map_err(Error::Io)?;
 
             let expected_length = decompress_len(&compressed)
@@ -235,7 +360,38 @@ mod tests {
     use super::*;
     use soapberry_zip::office::ArchiveReader;
     use std::fs::File;
-    use std::io::Cursor;
+    use std::io::{Cursor, Read};
+
+    struct HeaderOnlyReader {
+        header: [u8; SNAPPY_FRAME_HEADER_SIZE],
+        position: usize,
+        payload_reads: usize,
+    }
+
+    impl HeaderOnlyReader {
+        fn new(header: [u8; SNAPPY_FRAME_HEADER_SIZE]) -> Self {
+            Self {
+                header,
+                position: 0,
+                payload_reads: 0,
+            }
+        }
+    }
+
+    impl Read for HeaderOnlyReader {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            if self.position >= self.header.len() {
+                self.payload_reads += 1;
+                return Err(io::Error::other("payload was read"));
+            }
+
+            let available = self.header.len() - self.position;
+            let amount = available.min(buffer.len());
+            buffer[..amount].copy_from_slice(&self.header[self.position..self.position + amount]);
+            self.position += amount;
+            Ok(amount)
+        }
+    }
 
     #[test]
     fn test_empty_stream() {
@@ -293,6 +449,103 @@ mod tests {
         let limits = SnappyLimits::new(8, 16).unwrap();
         assert_eq!(limits.max_uncompressed_chunk(), 8);
         assert_eq!(limits.max_decompressed_stream(), 16);
+        assert_eq!(
+            limits.max_compressed_chunk(),
+            SnappyStream::MAX_COMPRESSED_CHUNK
+        );
+        assert_eq!(
+            limits.max_compressed_stream(),
+            SnappyStream::MAX_COMPRESSED_STREAM
+        );
+        assert_eq!(limits.max_frames(), SnappyStream::MAX_FRAMES);
+
+        assert!(limits.with_input_limits(0, 16, 1).is_err());
+        assert!(limits.with_input_limits(8, 0, 1).is_err());
+        assert!(limits.with_input_limits(8, 16, 0).is_err());
+        assert!(
+            limits
+                .with_input_limits(SnappyStream::MAX_COMPRESSED_CHUNK + 1, 1, 1)
+                .is_err()
+        );
+        assert!(
+            limits
+                .with_input_limits(1, SnappyStream::MAX_COMPRESSED_STREAM + 1, 1)
+                .is_err()
+        );
+        assert!(
+            limits
+                .with_input_limits(1, 5, SnappyStream::MAX_FRAMES + 1)
+                .is_err()
+        );
+        assert!(limits.with_input_limits(8, 11, 1).is_err());
+
+        let input_limits = limits.with_input_limits(8, 16, 3).unwrap();
+        assert_eq!(input_limits.max_compressed_chunk(), 8);
+        assert_eq!(input_limits.max_compressed_stream(), 16);
+        assert_eq!(input_limits.max_frames(), 3);
+    }
+
+    #[test]
+    fn compressed_frame_limit_is_checked_before_payload_read() {
+        let mut reader = HeaderOnlyReader::new([0, 4, 0, 0]);
+        let limits = SnappyLimits::default().with_input_limits(3, 16, 1).unwrap();
+        let error = SnappyStream::decompress_with_limits(&mut reader, limits).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("compressed frame is 4 bytes, exceeding the 3 byte limit")
+        );
+        assert_eq!(reader.payload_reads, 0);
+    }
+
+    #[test]
+    fn compressed_stream_limit_includes_the_next_frame_header() {
+        let first_frame = SnappyStream::compress(b"frame").unwrap();
+        let first_frame_length = usize::from(first_frame[1])
+            | (usize::from(first_frame[2]) << 8)
+            | (usize::from(first_frame[3]) << 16);
+        let first_frame_size = SNAPPY_FRAME_HEADER_SIZE + first_frame_length;
+        let limits = SnappyLimits::default()
+            .with_input_limits(first_frame_length, first_frame_size + 3, 2)
+            .unwrap();
+        let mut input = first_frame;
+        input.extend_from_slice(&[0, 0, 0, 0]);
+
+        let error =
+            SnappyStream::decompress_with_limits(&mut Cursor::new(input), limits).unwrap_err();
+        assert!(error.to_string().contains("compressed stream exceeds the"));
+    }
+
+    #[test]
+    fn frame_count_limit_rejects_empty_frame_floods() {
+        let limits = SnappyLimits::default().with_input_limits(1, 64, 2).unwrap();
+        let input = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+        let error =
+            SnappyStream::decompress_with_limits(&mut Cursor::new(input), limits).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("frame count exceeds the 2 frame limit")
+        );
+    }
+
+    #[test]
+    fn malformed_inputs_do_not_panic() {
+        for length in 0..256usize {
+            let mut input = Vec::with_capacity(length);
+            let mut state = length as u64 + 1;
+            for _ in 0..length {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                input.push((state >> 32) as u8);
+            }
+
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                SnappyStream::decompress(&mut Cursor::new(input))
+            }));
+            assert!(result.is_ok(), "decompression panicked for {length} bytes");
+        }
     }
 
     #[test]
