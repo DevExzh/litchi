@@ -20,7 +20,8 @@ use super::{
     MAX_ADJUST_HANDLES, MAX_CONNECTION_SITES, MAX_GEOMETRY_GUIDES, MAX_GEOMETRY_PATHS,
     MAX_PATH_COMMANDS, XlsxAdjustHandle, XlsxAdjustValue, XlsxConnectionSite, XlsxCustomGeometry,
     XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
-    XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxXyAdjustHandle,
+    XlsxPolarAdjustHandle, XlsxXyAdjustHandle, normalize_xsd_token,
+    validate_parsed_custom_geometry,
 };
 
 /// One element of the `a:custGeom` subtree, used as parser context so close
@@ -215,6 +216,7 @@ impl CustomGeometryBuilder {
         if !self.saw_path_list {
             return Err(invalid("custom geometry is missing its path list"));
         }
+        validate_parsed_custom_geometry(&self.geometry).map_err(invalid)?;
         Ok(self.geometry)
     }
 
@@ -238,6 +240,7 @@ impl CustomGeometryBuilder {
         decoder: Decoder,
     ) -> Result<()> {
         let name = unqualified_attribute_value(element, b"name", decoder)?
+            .map(|value| normalize_xsd_token(&value))
             .ok_or_else(|| invalid("geometry guide is missing its name"))?;
         let formula = unqualified_attribute_value(element, b"fmla", decoder)?
             .ok_or_else(|| invalid("geometry guide is missing its formula"))?
@@ -256,10 +259,10 @@ impl CustomGeometryBuilder {
 
     fn open_xy_handle(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         let handle = XlsxXyAdjustHandle {
-            horizontal_guide: unqualified_attribute_value(element, b"gdRefX", decoder)?,
+            horizontal_guide: token_attribute(element, b"gdRefX", decoder)?,
             minimum_x: optional_value(element, b"minX", decoder)?,
             maximum_x: optional_value(element, b"maxX", decoder)?,
-            vertical_guide: unqualified_attribute_value(element, b"gdRefY", decoder)?,
+            vertical_guide: token_attribute(element, b"gdRefY", decoder)?,
             minimum_y: optional_value(element, b"minY", decoder)?,
             maximum_y: optional_value(element, b"maxY", decoder)?,
             position: XlsxGeometryPoint::default(),
@@ -269,10 +272,10 @@ impl CustomGeometryBuilder {
 
     fn open_polar_handle(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         let handle = XlsxPolarAdjustHandle {
-            radius_guide: unqualified_attribute_value(element, b"gdRefR", decoder)?,
+            radius_guide: token_attribute(element, b"gdRefR", decoder)?,
             minimum_radius: optional_value(element, b"minR", decoder)?,
             maximum_radius: optional_value(element, b"maxR", decoder)?,
-            angle_guide: unqualified_attribute_value(element, b"gdRefAng", decoder)?,
+            angle_guide: token_attribute(element, b"gdRefAng", decoder)?,
             minimum_angle: optional_value(element, b"minAng", decoder)?,
             maximum_angle: optional_value(element, b"maxAng", decoder)?,
             position: XlsxGeometryPoint::default(),
@@ -363,13 +366,17 @@ impl CustomGeometryBuilder {
             height: optional_number(element, b"h", decoder, "geometry path height")?
                 .unwrap_or(defaults.height),
             fill_mode: unqualified_attribute_value(element, b"fill", decoder)?
-                .as_deref()
-                .and_then(XlsxPathFillMode::from_token)
+                .map(|value| value.parse())
+                .transpose()?
                 .unwrap_or(defaults.fill_mode),
             stroked: unqualified_attribute_value(element, b"stroke", decoder)?
-                .map_or(defaults.stroked, |value| is_on(&value)),
+                .map(|value| parse_bool(&value, "geometry path stroke"))
+                .transpose()?
+                .unwrap_or(defaults.stroked),
             extrusion_allowed: unqualified_attribute_value(element, b"extrusionOk", decoder)?
-                .map_or(defaults.extrusion_allowed, |value| is_on(&value)),
+                .map(|value| parse_bool(&value, "geometry path extrusionOk"))
+                .transpose()?
+                .unwrap_or(defaults.extrusion_allowed),
             commands: Vec::new(),
         };
         if self.pending_path.replace(path).is_some() {
@@ -505,6 +512,15 @@ fn optional_value(
         .transpose()
 }
 
+fn token_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<String>> {
+    Ok(unqualified_attribute_value(element, name, decoder)?
+        .map(|value| normalize_xsd_token(&value)))
+}
+
 fn optional_number(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -520,9 +536,12 @@ fn optional_number(
         .transpose()
 }
 
-/// OOXML boolean attribute values: `1`, `true`, and `on` are truthy.
-fn is_on(value: &str) -> bool {
-    matches!(value, "1" | "true" | "on")
+fn parse_bool(value: &str, field: &str) -> Result<bool> {
+    match value {
+        "1" | "true" => Ok(true),
+        "0" | "false" => Ok(false),
+        _ => Err(invalid(format!("invalid {field} boolean '{value}'"))),
+    }
 }
 
 fn invalid(message: impl Into<String>) -> OoxmlError {

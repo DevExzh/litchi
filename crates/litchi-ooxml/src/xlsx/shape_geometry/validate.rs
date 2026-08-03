@@ -12,59 +12,75 @@ use super::{
     XlsxGeometryPath, XlsxGeometryPoint, XlsxPathCommand,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Author,
+    Parsed,
+}
+
 /// Validate authored custom geometry.
 ///
 /// The schema requires the `a:pathLst` element but allows it to be empty;
 /// authored geometry additionally requires at least one path so the shape
 /// actually draws something.
 pub(crate) fn validate_custom_geometry(geometry: &XlsxCustomGeometry) -> Result<(), String> {
+    validate_geometry(geometry, Mode::Author)
+}
+
+/// Validate geometry loaded from a package without imposing the authoring-only
+/// requirement that a path list contain a visible path.
+pub(crate) fn validate_parsed_custom_geometry(geometry: &XlsxCustomGeometry) -> Result<(), String> {
+    validate_geometry(geometry, Mode::Parsed)
+}
+
+fn validate_geometry(geometry: &XlsxCustomGeometry, mode: Mode) -> Result<(), String> {
     if geometry.adjust_values.len() > MAX_GEOMETRY_GUIDES
         || geometry.guides.len() > MAX_GEOMETRY_GUIDES
     {
         return Err("custom geometry guide count limit exceeded".to_string());
     }
     for guide in geometry.adjust_values.iter().chain(&geometry.guides) {
-        validate_guide_name(&guide.name, "geometry guide name")?;
+        validate_guide_name(&guide.name, "geometry guide name", mode)?;
         for operand in guide.formula.operands() {
-            validate_coordinate_value(operand, "geometry formula operand")?;
+            validate_coordinate_value(operand, "geometry formula operand", mode)?;
         }
     }
     if geometry.adjust_handles.len() > MAX_ADJUST_HANDLES {
         return Err("custom geometry adjust handle count limit exceeded".to_string());
     }
     for handle in &geometry.adjust_handles {
-        validate_adjust_handle(handle)?;
+        validate_adjust_handle(handle, mode)?;
     }
     if geometry.connection_sites.len() > MAX_CONNECTION_SITES {
         return Err("custom geometry connection site count limit exceeded".to_string());
     }
     for site in &geometry.connection_sites {
-        validate_angle_value(&site.angle, "connection site angle")?;
-        validate_point(&site.position, "connection site position")?;
+        validate_angle_value(&site.angle, "connection site angle", mode)?;
+        validate_point(&site.position, "connection site position", mode)?;
     }
     if let Some(rectangle) = &geometry.text_rectangle {
-        validate_coordinate_value(&rectangle.left, "text rectangle left edge")?;
-        validate_coordinate_value(&rectangle.top, "text rectangle top edge")?;
-        validate_coordinate_value(&rectangle.right, "text rectangle right edge")?;
-        validate_coordinate_value(&rectangle.bottom, "text rectangle bottom edge")?;
+        validate_coordinate_value(&rectangle.left, "text rectangle left edge", mode)?;
+        validate_coordinate_value(&rectangle.top, "text rectangle top edge", mode)?;
+        validate_coordinate_value(&rectangle.right, "text rectangle right edge", mode)?;
+        validate_coordinate_value(&rectangle.bottom, "text rectangle bottom edge", mode)?;
     }
-    if geometry.paths.is_empty() {
+    if mode == Mode::Author && geometry.paths.is_empty() {
         return Err("custom geometry requires at least one path".to_string());
     }
     if geometry.paths.len() > MAX_GEOMETRY_PATHS {
         return Err("custom geometry path count limit exceeded".to_string());
     }
     for path in &geometry.paths {
-        validate_path(path)?;
+        validate_path(path, mode)?;
     }
     Ok(())
 }
 
-fn validate_adjust_handle(handle: &XlsxAdjustHandle) -> Result<(), String> {
+fn validate_adjust_handle(handle: &XlsxAdjustHandle, mode: Mode) -> Result<(), String> {
     match handle {
         XlsxAdjustHandle::Xy(handle) => {
-            validate_guide_reference(&handle.horizontal_guide, "XY handle horizontal guide")?;
-            validate_guide_reference(&handle.vertical_guide, "XY handle vertical guide")?;
+            validate_guide_reference(&handle.horizontal_guide, "XY handle horizontal guide", mode)?;
+            validate_guide_reference(&handle.vertical_guide, "XY handle vertical guide", mode)?;
             for (value, field) in [
                 (&handle.minimum_x, "XY handle minimum X"),
                 (&handle.maximum_x, "XY handle maximum X"),
@@ -72,20 +88,20 @@ fn validate_adjust_handle(handle: &XlsxAdjustHandle) -> Result<(), String> {
                 (&handle.maximum_y, "XY handle maximum Y"),
             ] {
                 if let Some(value) = value {
-                    validate_coordinate_value(value, field)?;
+                    validate_coordinate_value(value, field, mode)?;
                 }
             }
-            validate_point(&handle.position, "XY handle position")
+            validate_point(&handle.position, "XY handle position", mode)
         },
         XlsxAdjustHandle::Polar(handle) => {
-            validate_guide_reference(&handle.radius_guide, "polar handle radius guide")?;
-            validate_guide_reference(&handle.angle_guide, "polar handle angle guide")?;
+            validate_guide_reference(&handle.radius_guide, "polar handle radius guide", mode)?;
+            validate_guide_reference(&handle.angle_guide, "polar handle angle guide", mode)?;
             for (value, field) in [
                 (&handle.minimum_radius, "polar handle minimum radius"),
                 (&handle.maximum_radius, "polar handle maximum radius"),
             ] {
                 if let Some(value) = value {
-                    validate_coordinate_value(value, field)?;
+                    validate_coordinate_value(value, field, mode)?;
                 }
             }
             for (value, field) in [
@@ -93,15 +109,15 @@ fn validate_adjust_handle(handle: &XlsxAdjustHandle) -> Result<(), String> {
                 (&handle.maximum_angle, "polar handle maximum angle"),
             ] {
                 if let Some(value) = value {
-                    validate_angle_value(value, field)?;
+                    validate_angle_value(value, field, mode)?;
                 }
             }
-            validate_point(&handle.position, "polar handle position")
+            validate_point(&handle.position, "polar handle position", mode)
         },
     }
 }
 
-fn validate_path(path: &XlsxGeometryPath) -> Result<(), String> {
+fn validate_path(path: &XlsxGeometryPath, mode: Mode) -> Result<(), String> {
     if !(0..=MAX_POSITIVE_COORDINATE).contains(&path.width)
         || !(0..=MAX_POSITIVE_COORDINATE).contains(&path.height)
     {
@@ -111,15 +127,15 @@ fn validate_path(path: &XlsxGeometryPath) -> Result<(), String> {
         return Err("geometry path command count limit exceeded".to_string());
     }
     for command in &path.commands {
-        validate_command(command)?;
+        validate_command(command, mode)?;
     }
     Ok(())
 }
 
-fn validate_command(command: &XlsxPathCommand) -> Result<(), String> {
+fn validate_command(command: &XlsxPathCommand, mode: Mode) -> Result<(), String> {
     match command {
         XlsxPathCommand::MoveTo(point) | XlsxPathCommand::LineTo(point) => {
-            validate_point(point, "path command point")
+            validate_point(point, "path command point", mode)
         },
         XlsxPathCommand::ArcTo {
             width_radius,
@@ -127,77 +143,85 @@ fn validate_command(command: &XlsxPathCommand) -> Result<(), String> {
             start_angle,
             swing_angle,
         } => {
-            validate_coordinate_value(width_radius, "arc width radius")?;
-            validate_coordinate_value(height_radius, "arc height radius")?;
-            validate_angle_value(start_angle, "arc start angle")?;
-            validate_angle_value(swing_angle, "arc swing angle")
+            validate_coordinate_value(width_radius, "arc width radius", mode)?;
+            validate_coordinate_value(height_radius, "arc height radius", mode)?;
+            validate_angle_value(start_angle, "arc start angle", mode)?;
+            validate_angle_value(swing_angle, "arc swing angle", mode)
         },
         XlsxPathCommand::QuadraticBezierTo { control, end } => {
-            validate_point(control, "path command point")?;
-            validate_point(end, "path command point")
+            validate_point(control, "path command point", mode)?;
+            validate_point(end, "path command point", mode)
         },
         XlsxPathCommand::CubicBezierTo {
             control1,
             control2,
             end,
         } => {
-            validate_point(control1, "path command point")?;
-            validate_point(control2, "path command point")?;
-            validate_point(end, "path command point")
+            validate_point(control1, "path command point", mode)?;
+            validate_point(control2, "path command point", mode)?;
+            validate_point(end, "path command point", mode)
         },
         XlsxPathCommand::Close => Ok(()),
     }
 }
 
-fn validate_point(point: &XlsxGeometryPoint, field: &str) -> Result<(), String> {
-    validate_coordinate_value(&point.x, field)?;
-    validate_coordinate_value(&point.y, field)
+fn validate_point(point: &XlsxGeometryPoint, field: &str, mode: Mode) -> Result<(), String> {
+    validate_coordinate_value(&point.x, field, mode)?;
+    validate_coordinate_value(&point.y, field, mode)
 }
 
-fn validate_coordinate_value(value: &XlsxAdjustValue, field: &str) -> Result<(), String> {
+fn validate_coordinate_value(
+    value: &XlsxAdjustValue,
+    field: &str,
+    mode: Mode,
+) -> Result<(), String> {
     match value {
         XlsxAdjustValue::Value(value) if !(MIN_COORDINATE..=MAX_COORDINATE).contains(value) => {
             Err(format!("{field} is outside ST_Coordinate bounds"))
         },
         XlsxAdjustValue::Value(_) => Ok(()),
-        XlsxAdjustValue::Guide(name) => validate_guide_name(name, field),
+        XlsxAdjustValue::Guide(name) => validate_guide_name(name, field, mode),
     }
 }
 
-fn validate_angle_value(value: &XlsxAdjustValue, field: &str) -> Result<(), String> {
+fn validate_angle_value(value: &XlsxAdjustValue, field: &str, mode: Mode) -> Result<(), String> {
     match value {
         XlsxAdjustValue::Value(value) if !(MIN_ANGLE..=MAX_ANGLE).contains(value) => {
             Err(format!("{field} is outside ST_Angle bounds"))
         },
         XlsxAdjustValue::Value(_) => Ok(()),
-        XlsxAdjustValue::Guide(name) => validate_guide_name(name, field),
+        XlsxAdjustValue::Guide(name) => validate_guide_name(name, field, mode),
     }
 }
 
-fn validate_guide_reference(name: &Option<String>, field: &str) -> Result<(), String> {
+fn validate_guide_reference(name: &Option<String>, field: &str, mode: Mode) -> Result<(), String> {
     match name {
-        Some(name) => validate_guide_name(name, field),
+        Some(name) => validate_guide_name(name, field, mode),
         None => Ok(()),
     }
 }
 
-/// Validate an ST_GeomGuideName token for authoring.
+/// Validate an ST_GeomGuideName token.
 ///
-/// Names must be non-empty, bounded, XML-safe, free of whitespace (guide
-/// references embed in space-delimited formulas), and must not parse as a
-/// number (a numeric name would be re-read as a literal).
-fn validate_guide_name(name: &str, field: &str) -> Result<(), String> {
-    if name.is_empty() {
-        return Err(format!("{field} cannot be empty"));
+/// `ST_GeomGuideName` is an `xsd:token`, so internal spaces, empty strings, and
+/// numeric spellings remain schema-valid when parsing. Authoring rejects those
+/// forms because formulas are space-delimited and numeric references are
+/// indistinguishable from literals in the `ST_AdjCoordinate`/`ST_AdjAngle`
+/// unions.
+fn validate_guide_name(name: &str, field: &str, mode: Mode) -> Result<(), String> {
+    if mode == Mode::Author {
+        if name.is_empty() {
+            return Err(format!("{field} cannot be empty"));
+        }
+        if name.chars().any(char::is_whitespace) {
+            return Err(format!("{field} cannot contain whitespace"));
+        }
+        if name.parse::<i64>().is_ok() {
+            return Err(format!("{field} cannot be a number"));
+        }
     }
     if name.len() > MAX_GUIDE_NAME_BYTES {
         return Err(format!("{field} is too long"));
-    }
-    if name.chars().any(char::is_whitespace) {
-        return Err(format!("{field} cannot contain whitespace"));
-    }
-    if name.parse::<i64>().is_ok() {
-        return Err(format!("{field} cannot be a number"));
     }
     if name.chars().any(|character| {
         !matches!(

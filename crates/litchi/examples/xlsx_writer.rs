@@ -71,9 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             name: Some("Calibri".to_string()),
             size: Some(12.0),
             bold: true,
-            italic: false,
-            underline: false,
             color: None,
+            ..CellFont::default()
         }),
         fill: Some(CellFill {
             pattern_type: CellFillPatternType::Solid,
@@ -94,9 +93,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             name: Some("Calibri".to_string()),
             size: Some(11.0),
             bold: true,
-            italic: false,
-            underline: false,
             color: None,
+            ..CellFont::default()
         }),
         ..CellFormat::default()
     };
@@ -133,9 +131,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             name: Some("Arial".to_string()),
             size: Some(16.0),
             bold: true,
-            italic: false,
-            underline: false,
             color: Some("FF0000FF".to_string()), // Blue
+            ..CellFont::default()
         }),
         alignment: Some(Alignment::both(Horizontal::Center, Vertical::Center)),
         ..CellFormat::default()

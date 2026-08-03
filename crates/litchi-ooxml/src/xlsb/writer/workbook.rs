@@ -3541,8 +3541,8 @@ mod tests {
             XlsbDrawingAnchorKind, XlsbDrawingObject, XlsbWorksheetImage, XlsbWorksheetImageFormat,
         };
         use crate::xlsx::{
-            ChartAnchor, WorksheetChart, XlsxDrawingObject, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset,
-            XlsxShapeAnchor, XlsxShapePreset,
+            ChartAnchor, Preset, WorksheetChart, XlsxDrawingObject, XlsxEmu, XlsxEmuExtent,
+            XlsxEmuOffset, XlsxShapeAnchor,
         };
 
         const PNG_1X1: &[u8] = &[
@@ -3598,7 +3598,7 @@ mod tests {
                         height: XlsxEmu(500_000),
                     },
                 },
-                XlsxShapePreset::Rectangle,
+                Preset::Rect,
                 "Mixed drawing",
             )
             .unwrap();
@@ -3754,8 +3754,8 @@ mod tests {
             XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
         };
         use crate::xlsx::{
-            XlsxCellMarker, XlsxDrawingObject, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset,
-            XlsxGroupTransform, XlsxShapeAnchor, XlsxShapePreset,
+            Preset, TextSize, XlsxCellMarker, XlsxDrawingObject, XlsxEditAs, XlsxEmu,
+            XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor,
         };
 
         fn marker(column: u32, row: u32) -> XlsxCellMarker {
@@ -3777,15 +3777,11 @@ mod tests {
             to: marker(1, 1),
             edit_as: XlsxEditAs::TwoCell,
         };
-        let mut standalone = XlsxShapeSpec::text_box(
-            "Standalone",
-            two_cell,
-            XlsxShapePreset::RoundRectangle,
-            "A\nB",
-        );
+        let mut standalone =
+            XlsxShapeSpec::text_box("Standalone", two_cell, Preset::RoundRect, "A\nB");
         standalone.description = Some("Typed XLSB text box".to_string());
         standalone.paragraphs[0].runs[0].bold = Some(true);
-        standalone.paragraphs[0].runs[0].font_size_hundredths = Some(1_400);
+        standalone.paragraphs[0].runs[0].font_size = Some(TextSize::new(1_400).unwrap());
 
         let group_anchor = XlsxShapeAnchor::OneCell {
             from: marker(4, 1),
@@ -3795,12 +3791,8 @@ mod tests {
             },
         };
         let mut group = XlsxGroupSpec::new("Pair", group_anchor)
-            .with_child(
-                XlsxShapeSpec::shape("Left", child_anchor, XlsxShapePreset::Rectangle, "L").into(),
-            )
-            .with_child(
-                XlsxShapeSpec::shape("Right", child_anchor, XlsxShapePreset::Ellipse, "R").into(),
-            );
+            .with_child(XlsxShapeSpec::shape("Left", child_anchor, Preset::Rect, "L").into())
+            .with_child(XlsxShapeSpec::shape("Right", child_anchor, Preset::Ellipse, "R").into());
         group.transform = Some(XlsxGroupTransform {
             offset: Some(XlsxEmuOffset {
                 x: XlsxEmu(0),
@@ -3832,7 +3824,7 @@ mod tests {
                     height: XlsxEmu(1_000_000),
                 },
             },
-            XlsxShapePreset::StraightConnector1,
+            Preset::StraightConnector1,
             XlsxConnectionEndSpec {
                 shape_name: "Left".to_string(),
                 site: 1,
@@ -3908,7 +3900,9 @@ mod tests {
         use crate::xlsx::writer::{
             XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
         };
-        use crate::xlsx::{XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxShapeAnchor, XlsxShapePreset};
+        use crate::xlsx::{
+            Columns, Preset, TextSize, XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxShapeAnchor,
+        };
 
         fn anchor(from: (u32, u32), to: (u32, u32)) -> XlsxShapeAnchor {
             let marker = |(column, row)| XlsxCellMarker {
@@ -3924,40 +3918,23 @@ mod tests {
             }
         }
 
-        let valid = XlsxShapeSpec::shape(
-            "Target",
-            anchor((0, 0), (2, 2)),
-            XlsxShapePreset::Rectangle,
-            "target",
-        );
-        let invalid = XlsxShapeSpec::shape(
-            "Descending",
-            anchor((2, 2), (1, 1)),
-            XlsxShapePreset::Rectangle,
-            "",
-        );
+        let valid = XlsxShapeSpec::shape("Target", anchor((0, 0), (2, 2)), Preset::Rect, "target");
+        let invalid = XlsxShapeSpec::shape("Descending", anchor((2, 2), (1, 1)), Preset::Rect, "");
         let mut sheet = MutableXlsbWorksheet::new("Shapes");
         assert!(sheet.add_shape(invalid).is_err());
         assert!(sheet.shapes().is_empty());
         let mut invalid_xml = valid.clone();
         invalid_xml.name = "invalid\u{0}name".to_string();
         assert!(sheet.add_shape(invalid_xml).is_err());
-        let mut invalid_text_properties = valid.clone();
-        invalid_text_properties.paragraphs[0].runs[0].font_size_hundredths = Some(0);
-        invalid_text_properties.body_properties.column_count = 17;
-        assert!(sheet.add_shape(invalid_text_properties).is_err());
+        assert!(TextSize::new(0).is_err());
+        assert!(Columns::new(17).is_err());
         assert!(sheet.shapes().is_empty());
         sheet.add_shape(valid.clone()).unwrap();
         sheet
             .add_group(
                 XlsxGroupSpec::new("Group", anchor((3, 3), (6, 6))).with_child(
-                    XlsxShapeSpec::shape(
-                        "Nested",
-                        anchor((3, 3), (4, 4)),
-                        XlsxShapePreset::Ellipse,
-                        "",
-                    )
-                    .into(),
+                    XlsxShapeSpec::shape("Nested", anchor((3, 3), (4, 4)), Preset::Ellipse, "")
+                        .into(),
                 ),
             )
             .unwrap();
@@ -3965,7 +3942,7 @@ mod tests {
             .add_connection(XlsxConnectionShapeSpec::new(
                 "Dangling",
                 anchor((1, 1), (2, 2)),
-                XlsxShapePreset::StraightConnector1,
+                Preset::StraightConnector1,
                 XlsxConnectionEndSpec {
                     shape_name: "Missing".to_string(),
                     site: 0,

@@ -15,7 +15,7 @@
 //! The model is shared by the shape inventory reader
 //! ([`crate::xlsx::shapes`], which fills `XlsxShape::custom_geometry`) and
 //! the shape authoring pipeline ([`crate::xlsx::writer::shape`], through
-//! `XlsxShapeSpec::custom_geometry`), so authored geometry round-trips
+//! [`crate::xlsx::writer::Geometry::Custom`]), so authored geometry round-trips
 //! through the inventory with identical semantics. Everything here is inert:
 //! no rendering and no formula evaluation.
 
@@ -33,7 +33,7 @@ use std::str::FromStr;
 use crate::error::{OoxmlError, Result};
 
 pub use formula::XlsxGeometryFormula;
-pub(crate) use validate::validate_custom_geometry;
+pub(crate) use validate::{validate_custom_geometry, validate_parsed_custom_geometry};
 
 /// Smallest ST_Coordinate literal (ECMA-376 §20.1.10.16).
 pub(crate) const MIN_COORDINATE: i64 = -27_273_042_329_600;
@@ -76,7 +76,7 @@ pub enum XlsxAdjustValue {
 impl XlsxAdjustValue {
     /// A guide reference by name.
     pub fn guide(name: impl Into<String>) -> Self {
-        Self::Guide(name.into())
+        Self::Guide(normalize_xsd_token(&name.into()))
     }
 }
 
@@ -107,14 +107,14 @@ impl FromStr for XlsxAdjustValue {
     /// Numeric tokens become literals; any other non-empty token is kept as
     /// a guide reference, matching the ST_AdjCoordinate/ST_AdjAngle unions.
     fn from_str(text: &str) -> Result<Self> {
-        let token = text.trim();
+        let token = normalize_xsd_token(text);
         if token.is_empty() {
             return Err(invalid("custom geometry value is empty"));
         }
         if let Ok(value) = token.parse::<i64>() {
             return Ok(Self::Value(value));
         }
-        Ok(Self::Guide(token.to_string()))
+        Ok(Self::Guide(token))
     }
 }
 
@@ -154,10 +154,18 @@ impl XlsxGeometryGuide {
     /// A guide with the given name and formula.
     pub fn new(name: impl Into<String>, formula: XlsxGeometryFormula) -> Self {
         Self {
-            name: name.into(),
+            name: normalize_xsd_token(&name.into()),
             formula,
         }
     }
+}
+
+pub(crate) fn normalize_xsd_token(value: &str) -> String {
+    value
+        .split([' ', '\t', '\r', '\n'])
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// An XY adjust handle (`a:ahXY`, CT_XYAdjustHandle).
@@ -248,19 +256,6 @@ pub enum XlsxPathFillMode {
 }
 
 impl XlsxPathFillMode {
-    /// Parse an ST_PathFillMode token.
-    pub fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "none" => Some(Self::None),
-            "norm" => Some(Self::Normal),
-            "lighten" => Some(Self::Lighten),
-            "lightenLess" => Some(Self::LightenLess),
-            "darken" => Some(Self::Darken),
-            "darkenLess" => Some(Self::DarkenLess),
-            _ => None,
-        }
-    }
-
     /// The ST_PathFillMode token for this mode.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -271,6 +266,28 @@ impl XlsxPathFillMode {
             Self::Darken => "darken",
             Self::DarkenLess => "darkenLess",
         }
+    }
+}
+
+impl FromStr for XlsxPathFillMode {
+    type Err = OoxmlError;
+
+    fn from_str(token: &str) -> Result<Self> {
+        match token {
+            "none" => Ok(Self::None),
+            "norm" => Ok(Self::Normal),
+            "lighten" => Ok(Self::Lighten),
+            "lightenLess" => Ok(Self::LightenLess),
+            "darken" => Ok(Self::Darken),
+            "darkenLess" => Ok(Self::DarkenLess),
+            _ => Err(invalid(format!("invalid ST_PathFillMode token '{token}'"))),
+        }
+    }
+}
+
+impl fmt::Display for XlsxPathFillMode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 

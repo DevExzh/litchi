@@ -1,5 +1,9 @@
 //! Immutable WordprocessingML numbering definitions.
 
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
@@ -49,7 +53,7 @@ impl PictureBullet {
 #[derive(Debug, Clone)]
 pub struct AbstractNum {
     pub(crate) id: u32,
-    pub(crate) num_type: Option<String>,
+    pub(crate) num_type: Option<MultiLevelType>,
     pub(crate) num_style_link: Option<String>,
     pub(crate) style_link: Option<String>,
     pub(crate) levels: Vec<NumberingLevel>,
@@ -82,7 +86,72 @@ pub enum NumberingSuffix {
     Nothing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Structure of an abstract numbering definition (`ST_MultiLevelType`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum MultiLevelType {
+    Single,
+    Multi,
+    Hybrid,
+}
+
+impl MultiLevelType {
+    /// Return the exact WordprocessingML token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Single => "singleLevel",
+            Self::Multi => "multilevel",
+            Self::Hybrid => "hybridMultilevel",
+        }
+    }
+}
+
+/// Error returned for a token outside `ST_MultiLevelType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ParseMultiLevelTypeError;
+
+impl Display for ParseMultiLevelTypeError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("invalid WordprocessingML multi-level type")
+    }
+}
+
+impl Error for ParseMultiLevelTypeError {}
+
+impl FromStr for MultiLevelType {
+    type Err = ParseMultiLevelTypeError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "singleLevel" => Ok(Self::Single),
+            "multilevel" => Ok(Self::Multi),
+            "hybridMultilevel" => Ok(Self::Hybrid),
+            _ => Err(ParseMultiLevelTypeError),
+        }
+    }
+}
+
+impl Display for MultiLevelType {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Error returned for a token outside `ST_NumberFormat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ParseNumberFormatError;
+
+impl Display for ParseNumberFormatError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("invalid WordprocessingML number format")
+    }
+}
+
+impl Error for ParseNumberFormatError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum NumberFormat {
     Decimal,
     UpperRoman,
@@ -144,14 +213,16 @@ pub enum NumberFormat {
     ThaiLetters,
     ThaiNumbers,
     ThaiCounting,
+    BahtText,
+    DollarText,
     Custom,
-    /// A format token outside the standardized `ST_NumberFormat` value set.
-    Other(String),
 }
 
-impl NumberFormat {
-    pub(crate) fn parse(value: &str) -> Self {
-        match value {
+impl FromStr for NumberFormat {
+    type Err = ParseNumberFormatError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(match value {
             "decimal" => Self::Decimal,
             "upperRoman" => Self::UpperRoman,
             "lowerRoman" => Self::LowerRoman,
@@ -212,12 +283,18 @@ impl NumberFormat {
             "thaiLetters" => Self::ThaiLetters,
             "thaiNumbers" => Self::ThaiNumbers,
             "thaiCounting" => Self::ThaiCounting,
+            "bahtText" => Self::BahtText,
+            "dollarText" => Self::DollarText,
             "custom" => Self::Custom,
-            other => Self::Other(other.to_owned()),
-        }
+            _ => return Err(ParseNumberFormatError),
+        })
     }
+}
 
-    pub fn as_str(&self) -> &str {
+impl NumberFormat {
+    /// Return the exact WordprocessingML token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Decimal => "decimal",
             Self::UpperRoman => "upperRoman",
@@ -279,9 +356,16 @@ impl NumberFormat {
             Self::ThaiLetters => "thaiLetters",
             Self::ThaiNumbers => "thaiNumbers",
             Self::ThaiCounting => "thaiCounting",
+            Self::BahtText => "bahtText",
+            Self::DollarText => "dollarText",
             Self::Custom => "custom",
-            Self::Other(value) => value,
         }
+    }
+}
+
+impl Display for NumberFormat {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
@@ -763,7 +847,9 @@ fn apply_child(
             b"start" => value.value.start = required_i64(element, b"val", decoder, resolver)?,
             b"numFmt" => {
                 let raw = required_string(element, b"val", decoder, resolver)?;
-                value.value.format = NumberFormat::parse(&raw);
+                value.value.format = raw
+                    .parse()
+                    .map_err(|_| invalid(&format!("invalid numbering format '{raw}'")))?;
                 value.value.custom_format =
                     word_attribute_value(element, b"format", decoder, resolver)?;
             },
@@ -822,13 +908,13 @@ fn apply_child(
         match element.local_name().as_ref() {
             b"multiLevelType" => {
                 let raw = required_string(element, b"val", decoder, resolver)?;
-                if !matches!(
-                    raw.as_str(),
-                    "singleLevel" | "multilevel" | "hybridMultilevel"
-                ) {
-                    return Err(invalid(&format!("invalid multiLevelType '{raw}'")));
+                if value.value.num_type.is_some() {
+                    return Err(invalid("duplicate multiLevelType"));
                 }
-                set_once(&mut value.value.num_type, raw, "multiLevelType")?;
+                value.value.num_type = Some(
+                    raw.parse()
+                        .map_err(|_| invalid(&format!("invalid multiLevelType '{raw}'")))?,
+                );
             },
             b"numStyleLink" => {
                 let raw = required_string(element, b"val", decoder, resolver)?;
@@ -1097,8 +1183,8 @@ impl AbstractNum {
     pub fn id(&self) -> u32 {
         self.id
     }
-    pub fn num_type(&self) -> Option<&str> {
-        self.num_type.as_deref()
+    pub fn num_type(&self) -> Option<MultiLevelType> {
+        self.num_type
     }
     pub fn num_style_link(&self) -> Option<&str> {
         self.num_style_link.as_deref()
@@ -1148,6 +1234,10 @@ mod tests {
         assert_eq!(level.level_text.as_deref(), Some("%1."));
         assert_eq!(level.restart, LevelRestart::Never);
         assert!(level.legal);
+        assert_eq!(
+            value.abstract_nums()[0].num_type(),
+            Some(MultiLevelType::Multi)
+        );
         assert_eq!(value.nums()[0].overrides()[0].start_override, Some(5));
     }
 
@@ -1234,8 +1324,8 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_and_round_trips_every_standard_number_format() {
-        for raw in [
+    fn strict_and_transitional_number_format_domains_are_exhaustive() {
+        const TOKENS: [&str; 63] = [
             "decimal",
             "upperRoman",
             "lowerRoman",
@@ -1296,19 +1386,84 @@ mod tests {
             "thaiLetters",
             "thaiNumbers",
             "thaiCounting",
+            "bahtText",
+            "dollarText",
             "custom",
-        ] {
-            let parsed = NumberFormat::parse(raw);
-            assert!(
-                !matches!(parsed, NumberFormat::Other(_)),
-                "untyped standard token: {raw}"
-            );
+        ];
+        let mut values = std::collections::HashSet::new();
+        for raw in TOKENS {
+            let parsed = raw.parse::<NumberFormat>().unwrap();
+            assert!(values.insert(parsed), "duplicate enum mapping for {raw}");
             assert_eq!(parsed.as_str(), raw);
-        }
+            assert_eq!(parsed.to_string(), raw);
 
-        let extension = NumberFormat::parse("vendorNumbering");
-        assert_eq!(extension, NumberFormat::Other("vendorNumbering".to_owned()));
-        assert_eq!(extension.as_str(), "vendorNumbering");
+            for namespace in [
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "http://purl.oclc.org/ooxml/wordprocessingml/main",
+            ] {
+                let xml = format!(
+                    r#"<w:numbering xmlns:w="{namespace}"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="{raw}"/></w:lvl></w:abstractNum></w:numbering>"#
+                );
+                assert_eq!(
+                    parse(xml.as_bytes()).unwrap().abstract_nums()[0].levels()[0].format,
+                    parsed
+                );
+            }
+        }
+        assert_eq!(values.len(), 63);
+        assert_eq!(NumberFormat::Custom as u8, 62);
+        assert_eq!(std::mem::size_of::<NumberFormat>(), 1);
+        assert!("vendorNumbering".parse::<NumberFormat>().is_err());
+        assert!("Decimal".parse::<NumberFormat>().is_err());
+
+        for namespace in [
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        ] {
+            let xml = format!(
+                r#"<w:numbering xmlns:w="{namespace}"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="vendorNumbering"/></w:lvl></w:abstractNum></w:numbering>"#
+            );
+            assert!(parse(xml.as_bytes()).is_err());
+        }
+    }
+
+    #[test]
+    fn multi_level_type_is_a_closed_compact_domain() {
+        for (raw, expected) in [
+            ("singleLevel", MultiLevelType::Single),
+            ("multilevel", MultiLevelType::Multi),
+            ("hybridMultilevel", MultiLevelType::Hybrid),
+        ] {
+            assert_eq!(raw.parse(), Ok(expected));
+            assert_eq!(expected.as_str(), raw);
+            assert_eq!(expected.to_string(), raw);
+
+            for namespace in [
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "http://purl.oclc.org/ooxml/wordprocessingml/main",
+            ] {
+                let xml = format!(
+                    r#"<w:numbering xmlns:w="{namespace}"><w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="{raw}"/><w:lvl w:ilvl="0"/></w:abstractNum></w:numbering>"#
+                );
+                assert_eq!(
+                    parse(xml.as_bytes()).unwrap().abstract_nums()[0].num_type(),
+                    Some(expected)
+                );
+            }
+        }
+        assert!("multi".parse::<MultiLevelType>().is_err());
+        assert!("Multilevel".parse::<MultiLevelType>().is_err());
+        assert_eq!(std::mem::size_of::<MultiLevelType>(), 1);
+
+        for namespace in [
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        ] {
+            let xml = format!(
+                r#"<w:numbering xmlns:w="{namespace}"><w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="multi"/><w:lvl w:ilvl="0"/></w:abstractNum></w:numbering>"#
+            );
+            assert!(parse(xml.as_bytes()).is_err());
+        }
     }
 
     #[test]

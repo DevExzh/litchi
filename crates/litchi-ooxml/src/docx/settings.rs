@@ -6,7 +6,9 @@
 use crate::docx::mail_merge::{
     MailMergeSettings, parse_settings_mail_merge, validate_mail_merge_relationships,
 };
-use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
+use crate::docx::namespace::{
+    STRICT_WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace, word_attribute_value,
+};
 use crate::docx::numbering::NumberFormat;
 use crate::docx::variables::DocumentVariables;
 use crate::error::{OoxmlError, Result};
@@ -14,9 +16,12 @@ use litchi_opc::part::Part;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::ops::Range;
+use std::str::FromStr;
 
 const TRANSITIONAL_RELATIONSHIPS_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -146,19 +151,160 @@ pub const COMPATIBILITY_MODE_SETTING_NAME: &str = "compatibilityMode";
 /// `w:compatSetting` URI under which Word stores its compatibility settings.
 pub const COMPATIBILITY_SETTING_URI: &str = "http://schemas.microsoft.com/office/word";
 
+/// Error returned for a token outside the closed WordprocessingML
+/// compatibility-flag domain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ParseCompatFlagError;
+
+impl Display for ParseCompatFlagError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("invalid WordprocessingML compatibility flag")
+    }
+}
+
+impl Error for ParseCompatFlagError {}
+
+macro_rules! define_compat_flags {
+    ($($variant:ident => $token:literal),+ $(,)?) => {
+        /// A closed `CT_Compat` on/off flag from the Strict or Transitional
+        /// WordprocessingML schema.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[repr(u8)]
+        pub enum CompatFlag {
+            $(
+                #[doc = concat!("`", $token, "`.")]
+                $variant,
+            )+
+        }
+
+        impl CompatFlag {
+            /// Every compatibility flag accepted by either checked-in schema.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// Return the exact WordprocessingML element-local-name token.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $token,)+
+                }
+            }
+        }
+
+        impl FromStr for CompatFlag {
+            type Err = ParseCompatFlagError;
+
+            fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+                match value {
+                    $($token => Ok(Self::$variant),)+
+                    _ => Err(ParseCompatFlagError),
+                }
+            }
+        }
+
+        impl Display for CompatFlag {
+            fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+    };
+}
+
+define_compat_flags! {
+    UseSingleBorderForContiguousCells => "useSingleBorderforContiguousCells",
+    WpJustification => "wpJustification",
+    NoTabHangIndent => "noTabHangInd",
+    NoLeading => "noLeading",
+    SpaceForUnderline => "spaceForUL",
+    NoColumnBalance => "noColumnBalance",
+    BalanceSingleByteDoubleByteWidth => "balanceSingleByteDoubleByteWidth",
+    NoExtraLineSpacing => "noExtraLineSpacing",
+    DoNotLeaveBackslashAlone => "doNotLeaveBackslashAlone",
+    UnderlineTrailingSpace => "ulTrailSpace",
+    DoNotExpandShiftReturn => "doNotExpandShiftReturn",
+    SpacingInWholePoints => "spacingInWholePoints",
+    LineWrapLikeWord6 => "lineWrapLikeWord6",
+    PrintBodyTextBeforeHeader => "printBodyTextBeforeHeader",
+    PrintColorBlack => "printColBlack",
+    WpSpaceWidth => "wpSpaceWidth",
+    ShowBreaksInFrames => "showBreaksInFrames",
+    SubstituteFontBySize => "subFontBySize",
+    SuppressBottomSpacing => "suppressBottomSpacing",
+    SuppressTopSpacing => "suppressTopSpacing",
+    SuppressSpacingAtTopOfPage => "suppressSpacingAtTopOfPage",
+    SuppressTopSpacingWp => "suppressTopSpacingWP",
+    SuppressSpaceBeforeAfterPageBreak => "suppressSpBfAfterPgBrk",
+    SwapBordersFacingPages => "swapBordersFacingPages",
+    ConvertMailMergeEscapes => "convMailMergeEsc",
+    TruncateFontHeightsLikeWp6 => "truncateFontHeightsLikeWP6",
+    MwSmallCaps => "mwSmallCaps",
+    UsePrinterMetrics => "usePrinterMetrics",
+    DoNotSuppressParagraphBorders => "doNotSuppressParagraphBorders",
+    WrapTrailingSpaces => "wrapTrailSpaces",
+    FootnoteLayoutLikeWord8 => "footnoteLayoutLikeWW8",
+    ShapeLayoutLikeWord8 => "shapeLayoutLikeWW8",
+    AlignTablesRowByRow => "alignTablesRowByRow",
+    ForgetLastTabAlignment => "forgetLastTabAlignment",
+    AdjustLineHeightInTable => "adjustLineHeightInTable",
+    AutoSpaceLikeWord95 => "autoSpaceLikeWord95",
+    NoSpaceRaiseLower => "noSpaceRaiseLower",
+    DoNotUseHtmlParagraphAutoSpacing => "doNotUseHTMLParagraphAutoSpacing",
+    LayoutRawTableWidth => "layoutRawTableWidth",
+    LayoutTableRowsApart => "layoutTableRowsApart",
+    UseWord97LineBreakRules => "useWord97LineBreakRules",
+    DoNotBreakWrappedTables => "doNotBreakWrappedTables",
+    DoNotSnapToGridInCell => "doNotSnapToGridInCell",
+    SelectFieldWithFirstOrLastChar => "selectFldWithFirstOrLastChar",
+    ApplyBreakingRules => "applyBreakingRules",
+    DoNotWrapTextWithPunctuation => "doNotWrapTextWithPunct",
+    DoNotUseEastAsianBreakRules => "doNotUseEastAsianBreakRules",
+    UseWord2002TableStyleRules => "useWord2002TableStyleRules",
+    GrowAutoFit => "growAutofit",
+    UseFarEastLayout => "useFELayout",
+    UseNormalStyleForList => "useNormalStyleForList",
+    DoNotUseIndentAsNumberingTabStop => "doNotUseIndentAsNumberingTabStop",
+    UseAlternateKinsokuLineBreakRules => "useAltKinsokuLineBreakRules",
+    AllowSpaceOfSameStyleInTable => "allowSpaceOfSameStyleInTable",
+    DoNotSuppressIndentation => "doNotSuppressIndentation",
+    DoNotAutoFitConstrainedTables => "doNotAutofitConstrainedTables",
+    AutoFitToFirstFixedWidthCell => "autofitToFirstFixedWidthCell",
+    UnderlineTabInNumberedList => "underlineTabInNumList",
+    DisplayHangulFixedWidth => "displayHangulFixedWidth",
+    SplitPageBreakAndParagraphMark => "splitPgBreakAndParaMark",
+    DoNotVerticallyAlignCellWithSpacing => "doNotVertAlignCellWithSp",
+    DoNotBreakConstrainedForcedTable => "doNotBreakConstrainedForcedTable",
+    DoNotVerticallyAlignInTextBox => "doNotVertAlignInTxbx",
+    UseAnsiKerningPairs => "useAnsiKerningPairs",
+    CachedColumnBalance => "cachedColBalance",
+}
+
+impl CompatFlag {
+    const fn is_strict(self) -> bool {
+        matches!(
+            self,
+            Self::SpaceForUnderline
+                | Self::BalanceSingleByteDoubleByteWidth
+                | Self::DoNotLeaveBackslashAlone
+                | Self::UnderlineTrailingSpace
+                | Self::DoNotExpandShiftReturn
+                | Self::AdjustLineHeightInTable
+                | Self::ApplyBreakingRules
+        )
+    }
+}
+
 /// An on/off compatibility option flag from `w:compat` (for example
 /// `w:useFELayout`).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CompatibilityOption {
-    name: String,
+    flag: CompatFlag,
     enabled: bool,
 }
 
 impl CompatibilityOption {
-    /// Local element name of the option (for example `useFELayout`).
+    /// Return the schema-defined flag.
     #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn flag(&self) -> CompatFlag {
+        self.flag
     }
 
     /// Whether the option is enabled.
@@ -197,7 +343,8 @@ impl CompatibilitySetting {
 }
 
 /// Placement of footnote or endnote text (`ST_FtnPos`/`ST_EdnPos`).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum NotePosition {
     /// At the bottom of the page.
     PageBottom,
@@ -207,30 +354,54 @@ pub enum NotePosition {
     SectionEnd,
     /// At the end of the document.
     DocumentEnd,
-    /// A position token outside the standardized value set.
-    Other(String),
 }
 
 impl NotePosition {
-    fn from_xml(value: String) -> Self {
-        match value.as_str() {
-            "pageBottom" => Self::PageBottom,
-            "beneathText" => Self::BeneathText,
-            "sectEnd" => Self::SectionEnd,
-            "docEnd" => Self::DocumentEnd,
-            _ => Self::Other(value),
-        }
-    }
-
-    /// Get the XML value for this position.
-    pub fn as_str(&self) -> &str {
+    /// Return the exact WordprocessingML token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::PageBottom => "pageBottom",
             Self::BeneathText => "beneathText",
             Self::SectionEnd => "sectEnd",
             Self::DocumentEnd => "docEnd",
-            Self::Other(value) => value,
         }
+    }
+
+    const fn valid_for_endnote(self) -> bool {
+        matches!(self, Self::SectionEnd | Self::DocumentEnd)
+    }
+}
+
+/// Error returned for a token outside `ST_FtnPos`/`ST_EdnPos`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ParseNotePositionError;
+
+impl Display for ParseNotePositionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("invalid WordprocessingML note position")
+    }
+}
+
+impl Error for ParseNotePositionError {}
+
+impl FromStr for NotePosition {
+    type Err = ParseNotePositionError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "pageBottom" => Ok(Self::PageBottom),
+            "beneathText" => Ok(Self::BeneathText),
+            "sectEnd" => Ok(Self::SectionEnd),
+            "docEnd" => Ok(Self::DocumentEnd),
+            _ => Err(ParseNotePositionError),
+        }
+    }
+}
+
+impl Display for NotePosition {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
@@ -280,14 +451,14 @@ pub struct NoteNumberingProperties {
 impl NoteNumberingProperties {
     /// Return the note placement, when specified.
     #[inline]
-    pub fn position(&self) -> Option<&NotePosition> {
-        self.position.as_ref()
+    pub fn position(&self) -> Option<NotePosition> {
+        self.position
     }
 
     /// Return the numbering format, when specified (defaults to decimal).
     #[inline]
-    pub fn format(&self) -> Option<&NumberFormat> {
-        self.format.as_ref()
+    pub fn format(&self) -> Option<NumberFormat> {
+        self.format
     }
 
     /// Return the first note number, when specified.
@@ -969,6 +1140,7 @@ impl DocumentSettings {
         settings.mail_merge = parse_settings_mail_merge(xml_bytes)?;
         let mut depth = 0usize;
         let mut saw_root = false;
+        let mut strict_wordprocessingml = false;
         let mut seen = SeenSettings::default();
         let mut saw_compat = false;
         let mut pending_group: Option<PendingGroup> = None;
@@ -989,6 +1161,11 @@ impl DocumentSettings {
                     })?;
                     if depth == 1 {
                         validate_settings_root(&namespace, &element, saw_root)?;
+                        strict_wordprocessingml = matches!(
+                            namespace,
+                            ResolveResult::Bound(Namespace(uri))
+                                if uri == STRICT_WORDPROCESSINGML_NAMESPACE
+                        );
                         saw_root = true;
                     } else if saw_root && is_wordprocessing_namespace(&namespace) {
                         if depth == 2 {
@@ -1008,7 +1185,13 @@ impl DocumentSettings {
                         } else if depth == 3
                             && let Some(group) = pending_group.as_mut()
                         {
-                            parse_group_child(group, &element, decoder, &resolver)?;
+                            parse_group_child(
+                                group,
+                                strict_wordprocessingml,
+                                &element,
+                                decoder,
+                                &resolver,
+                            )?;
                         }
                     }
                 },
@@ -1018,6 +1201,11 @@ impl DocumentSettings {
                     })?;
                     if child_depth == 1 {
                         validate_settings_root(&namespace, &element, saw_root)?;
+                        strict_wordprocessingml = matches!(
+                            namespace,
+                            ResolveResult::Bound(Namespace(uri))
+                                if uri == STRICT_WORDPROCESSINGML_NAMESPACE
+                        );
                         saw_root = true;
                     } else if saw_root && is_wordprocessing_namespace(&namespace) {
                         if child_depth == 2 {
@@ -1037,7 +1225,13 @@ impl DocumentSettings {
                         } else if child_depth == 3
                             && let Some(group) = pending_group.as_mut()
                         {
-                            parse_group_child(group, &element, decoder, &resolver)?;
+                            parse_group_child(
+                                group,
+                                strict_wordprocessingml,
+                                &element,
+                                decoder,
+                                &resolver,
+                            )?;
                         }
                     }
                 },
@@ -1095,6 +1289,12 @@ enum PendingGroup {
     },
     FootnoteProperties(NoteNumberingProperties),
     EndnoteProperties(NoteNumberingProperties),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NoteKind {
+    Footnote,
+    Endnote,
 }
 
 fn begin_settings_group(
@@ -1167,6 +1367,7 @@ fn finish_settings_group(settings: &mut DocumentSettings, group: PendingGroup) -
 
 fn parse_group_child(
     group: &mut PendingGroup,
+    strict_wordprocessingml: bool,
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
@@ -1198,15 +1399,34 @@ fn parse_group_child(
                     )?,
                 });
             } else {
+                let local_name = element.local_name();
+                let raw = std::str::from_utf8(local_name.as_ref()).map_err(|_| {
+                    OoxmlError::InvalidFormat("compatibility flag name is not valid UTF-8".into())
+                })?;
+                let flag = raw.parse::<CompatFlag>().map_err(|_| {
+                    OoxmlError::InvalidFormat(format!("invalid compatibility flag '{raw}'"))
+                })?;
+                if strict_wordprocessingml && !flag.is_strict() {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "compatibility flag '{raw}' is not valid in Strict WordprocessingML"
+                    )));
+                }
+                if options.iter().any(|option| option.flag == flag) {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "duplicate compatibility flag '{raw}'"
+                    )));
+                }
                 options.push(CompatibilityOption {
-                    name: String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
+                    flag,
                     enabled: parse_on_off(element, decoder, resolver)?,
                 });
             }
         },
-        PendingGroup::FootnoteProperties(properties)
-        | PendingGroup::EndnoteProperties(properties) => {
-            parse_note_property_child(properties, element, decoder, resolver)?;
+        PendingGroup::FootnoteProperties(properties) => {
+            parse_note_property_child(properties, NoteKind::Footnote, element, decoder, resolver)?;
+        },
+        PendingGroup::EndnoteProperties(properties) => {
+            parse_note_property_child(properties, NoteKind::Endnote, element, decoder, resolver)?;
         },
     }
     Ok(())
@@ -1214,6 +1434,7 @@ fn parse_group_child(
 
 fn parse_note_property_child(
     properties: &mut NoteNumberingProperties,
+    kind: NoteKind,
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
@@ -1224,7 +1445,16 @@ fn parse_note_property_child(
                 return Err(OoxmlError::InvalidFormat("duplicate note position".into()));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note position")?;
-            properties.position = Some(NotePosition::from_xml(value));
+            let position = value.parse::<NotePosition>().map_err(|_| {
+                OoxmlError::InvalidFormat(format!("invalid note position '{value}'"))
+            })?;
+            if kind == NoteKind::Endnote && !position.valid_for_endnote() {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "position '{}' is not valid for an endnote",
+                    position.as_str()
+                )));
+            }
+            properties.position = Some(position);
         },
         b"numFmt" => {
             if properties.format.is_some() {
@@ -1233,7 +1463,9 @@ fn parse_note_property_child(
                 ));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numFmt")?;
-            properties.format = Some(NumberFormat::parse(&value));
+            properties.format = Some(value.parse().map_err(|_| {
+                OoxmlError::InvalidFormat(format!("invalid note numbering format '{value}'"))
+            })?);
         },
         b"numStart" => {
             if properties.start.is_some() {
@@ -2453,11 +2685,14 @@ mod tests {
         let settings = DocumentSettings::extract_from_xml(xml).unwrap();
         assert_eq!(settings.zoom_percent(), Some(100));
         assert_eq!(settings.compatibility_options().len(), 2);
-        assert_eq!(settings.compatibility_options()[0].name(), "useFELayout");
+        assert_eq!(
+            settings.compatibility_options()[0].flag(),
+            CompatFlag::UseFarEastLayout
+        );
         assert!(settings.compatibility_options()[0].is_enabled());
         assert_eq!(
-            settings.compatibility_options()[1].name(),
-            "doNotExpandShiftReturn"
+            settings.compatibility_options()[1].flag(),
+            CompatFlag::DoNotExpandShiftReturn
         );
         assert!(!settings.compatibility_options()[1].is_enabled());
         assert_eq!(settings.compatibility_settings().len(), 2);
@@ -2471,6 +2706,132 @@ mod tests {
                 .compatibility_setting("missing", COMPATIBILITY_SETTING_URI)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn strict_and_transitional_compatibility_flag_domains_are_exhaustive() {
+        const TRANSITIONAL_TOKENS: [&str; 65] = [
+            "useSingleBorderforContiguousCells",
+            "wpJustification",
+            "noTabHangInd",
+            "noLeading",
+            "spaceForUL",
+            "noColumnBalance",
+            "balanceSingleByteDoubleByteWidth",
+            "noExtraLineSpacing",
+            "doNotLeaveBackslashAlone",
+            "ulTrailSpace",
+            "doNotExpandShiftReturn",
+            "spacingInWholePoints",
+            "lineWrapLikeWord6",
+            "printBodyTextBeforeHeader",
+            "printColBlack",
+            "wpSpaceWidth",
+            "showBreaksInFrames",
+            "subFontBySize",
+            "suppressBottomSpacing",
+            "suppressTopSpacing",
+            "suppressSpacingAtTopOfPage",
+            "suppressTopSpacingWP",
+            "suppressSpBfAfterPgBrk",
+            "swapBordersFacingPages",
+            "convMailMergeEsc",
+            "truncateFontHeightsLikeWP6",
+            "mwSmallCaps",
+            "usePrinterMetrics",
+            "doNotSuppressParagraphBorders",
+            "wrapTrailSpaces",
+            "footnoteLayoutLikeWW8",
+            "shapeLayoutLikeWW8",
+            "alignTablesRowByRow",
+            "forgetLastTabAlignment",
+            "adjustLineHeightInTable",
+            "autoSpaceLikeWord95",
+            "noSpaceRaiseLower",
+            "doNotUseHTMLParagraphAutoSpacing",
+            "layoutRawTableWidth",
+            "layoutTableRowsApart",
+            "useWord97LineBreakRules",
+            "doNotBreakWrappedTables",
+            "doNotSnapToGridInCell",
+            "selectFldWithFirstOrLastChar",
+            "applyBreakingRules",
+            "doNotWrapTextWithPunct",
+            "doNotUseEastAsianBreakRules",
+            "useWord2002TableStyleRules",
+            "growAutofit",
+            "useFELayout",
+            "useNormalStyleForList",
+            "doNotUseIndentAsNumberingTabStop",
+            "useAltKinsokuLineBreakRules",
+            "allowSpaceOfSameStyleInTable",
+            "doNotSuppressIndentation",
+            "doNotAutofitConstrainedTables",
+            "autofitToFirstFixedWidthCell",
+            "underlineTabInNumList",
+            "displayHangulFixedWidth",
+            "splitPgBreakAndParaMark",
+            "doNotVertAlignCellWithSp",
+            "doNotBreakConstrainedForcedTable",
+            "doNotVertAlignInTxbx",
+            "useAnsiKerningPairs",
+            "cachedColBalance",
+        ];
+        const STRICT_TOKENS: [&str; 7] = [
+            "spaceForUL",
+            "balanceSingleByteDoubleByteWidth",
+            "doNotLeaveBackslashAlone",
+            "ulTrailSpace",
+            "doNotExpandShiftReturn",
+            "adjustLineHeightInTable",
+            "applyBreakingRules",
+        ];
+
+        assert_eq!(CompatFlag::ALL.len(), TRANSITIONAL_TOKENS.len());
+        let mut flags = std::collections::HashSet::new();
+        for (flag, raw) in CompatFlag::ALL.iter().copied().zip(TRANSITIONAL_TOKENS) {
+            assert!(flags.insert(flag), "duplicate compatibility flag {raw}");
+            assert_eq!(raw.parse(), Ok(flag));
+            assert_eq!(flag.as_str(), raw);
+            assert_eq!(flag.to_string(), raw);
+            assert_eq!(flag.is_strict(), STRICT_TOKENS.contains(&raw));
+
+            let transitional = format!(
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:{raw}/></w:compat></w:settings>"#
+            );
+            let parsed = DocumentSettings::extract_from_xml(transitional.as_bytes()).unwrap();
+            assert_eq!(parsed.compatibility_options()[0].flag(), flag);
+
+            let strict = format!(
+                r#"<w:settings xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:compat><w:{raw}/></w:compat></w:settings>"#
+            );
+            let parsed = DocumentSettings::extract_from_xml(strict.as_bytes());
+            if flag.is_strict() {
+                assert_eq!(parsed.unwrap().compatibility_options()[0].flag(), flag);
+            } else {
+                assert!(parsed.is_err(), "Strict accepted Transitional-only {raw}");
+            }
+        }
+        assert_eq!(flags.len(), 65);
+        assert_eq!(CompatFlag::CachedColumnBalance as u8, 64);
+        assert_eq!(std::mem::size_of::<CompatFlag>(), 1);
+        assert!("vendorCompat".parse::<CompatFlag>().is_err());
+        assert!("UseFELayout".parse::<CompatFlag>().is_err());
+
+        for namespace in [
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        ] {
+            let unknown = format!(
+                r#"<w:settings xmlns:w="{namespace}"><w:compat><w:vendorCompat/></w:compat></w:settings>"#
+            );
+            assert!(DocumentSettings::extract_from_xml(unknown.as_bytes()).is_err());
+
+            let duplicate = format!(
+                r#"<w:settings xmlns:w="{namespace}"><w:compat><w:spaceForUL/><w:spaceForUL/></w:compat></w:settings>"#
+            );
+            assert!(DocumentSettings::extract_from_xml(duplicate.as_bytes()).is_err());
+        }
     }
 
     #[test]
@@ -2504,31 +2865,84 @@ mod tests {
         let settings = DocumentSettings::extract_from_xml(xml).unwrap();
 
         let footnotes = settings.footnote_properties().unwrap();
-        assert_eq!(footnotes.position(), Some(&NotePosition::PageBottom));
-        assert_eq!(footnotes.format(), Some(&NumberFormat::LowerRoman));
+        assert_eq!(footnotes.position(), Some(NotePosition::PageBottom));
+        assert_eq!(footnotes.format(), Some(NumberFormat::LowerRoman));
         assert_eq!(footnotes.start(), Some(2));
         assert_eq!(footnotes.restart(), Some(NoteNumberingRestart::EachPage));
 
         let endnotes = settings.endnote_properties().unwrap();
-        assert_eq!(endnotes.position(), Some(&NotePosition::DocumentEnd));
-        assert_eq!(endnotes.format(), Some(&NumberFormat::UpperLetter));
+        assert_eq!(endnotes.position(), Some(NotePosition::DocumentEnd));
+        assert_eq!(endnotes.format(), Some(NumberFormat::UpperLetter));
         assert_eq!(endnotes.start(), None);
         assert_eq!(endnotes.restart(), None);
     }
 
     #[test]
-    fn note_property_enums_round_trip() {
+    fn strict_and_transitional_note_position_domains_are_closed() {
         for (raw, expected) in [
             ("pageBottom", NotePosition::PageBottom),
             ("beneathText", NotePosition::BeneathText),
             ("sectEnd", NotePosition::SectionEnd),
             ("docEnd", NotePosition::DocumentEnd),
         ] {
-            assert_eq!(NotePosition::from_xml(raw.to_owned()), expected);
+            assert_eq!(raw.parse(), Ok(expected));
             assert_eq!(expected.as_str(), raw);
+            assert_eq!(expected.to_string(), raw);
+
+            for namespace in [
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "http://purl.oclc.org/ooxml/wordprocessingml/main",
+            ] {
+                let xml = format!(
+                    r#"<w:settings xmlns:w="{namespace}"><w:footnotePr><w:pos w:val="{raw}"/></w:footnotePr></w:settings>"#
+                );
+                assert_eq!(
+                    DocumentSettings::extract_from_xml(xml.as_bytes())
+                        .unwrap()
+                        .footnote_properties()
+                        .unwrap()
+                        .position(),
+                    Some(expected)
+                );
+            }
         }
-        let extension = NotePosition::from_xml("vendorPosition".to_owned());
-        assert_eq!(extension.as_str(), "vendorPosition");
+        assert!("vendorPosition".parse::<NotePosition>().is_err());
+        assert!("PageBottom".parse::<NotePosition>().is_err());
+        assert_eq!(std::mem::size_of::<NotePosition>(), 1);
+
+        for (raw, expected) in [
+            ("sectEnd", NotePosition::SectionEnd),
+            ("docEnd", NotePosition::DocumentEnd),
+        ] {
+            for namespace in [
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "http://purl.oclc.org/ooxml/wordprocessingml/main",
+            ] {
+                let xml = format!(
+                    r#"<w:settings xmlns:w="{namespace}"><w:endnotePr><w:pos w:val="{raw}"/></w:endnotePr></w:settings>"#
+                );
+                assert_eq!(
+                    DocumentSettings::extract_from_xml(xml.as_bytes())
+                        .unwrap()
+                        .endnote_properties()
+                        .unwrap()
+                        .position(),
+                    Some(expected)
+                );
+            }
+        }
+
+        for raw in ["pageBottom", "beneathText"] {
+            for namespace in [
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "http://purl.oclc.org/ooxml/wordprocessingml/main",
+            ] {
+                let xml = format!(
+                    r#"<w:settings xmlns:w="{namespace}"><w:endnotePr><w:pos w:val="{raw}"/></w:endnotePr></w:settings>"#
+                );
+                assert!(DocumentSettings::extract_from_xml(xml.as_bytes()).is_err());
+            }
+        }
 
         for (raw, expected) in [
             ("continuous", NoteNumberingRestart::Continuous),
@@ -2551,6 +2965,15 @@ mod tests {
 
         let bad_restart = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numRestart w:val="sometimes"/></w:footnotePr></w:settings>"#;
         assert!(DocumentSettings::extract_from_xml(bad_restart).is_err());
+
+        let bad_position = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:pos w:val="vendorPosition"/></w:footnotePr></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(bad_position).is_err());
+
+        let footnote_only_position = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnotePr><w:pos w:val="pageBottom"/></w:endnotePr></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(footnote_only_position).is_err());
+
+        let bad_format = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numFmt w:val="vendorNumbering"/></w:footnotePr></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(bad_format).is_err());
 
         let duplicate_child = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numFmt w:val="decimal"/><w:numFmt w:val="bullet"/></w:footnotePr></w:settings>"#;
         assert!(DocumentSettings::extract_from_xml(duplicate_child).is_err());
@@ -2818,12 +3241,9 @@ mod tests {
             DocumentSettings::extract_from_xml(include_bytes!("resources/settings.xml")).unwrap();
         assert_eq!(settings.compatibility_mode(), Some(14));
         assert_eq!(settings.compatibility_settings().len(), 4);
-        assert!(
-            settings
-                .compatibility_options()
-                .iter()
-                .any(|option| option.name() == "useFELayout" && option.is_enabled())
-        );
+        assert!(settings.compatibility_options().iter().any(|option| {
+            option.flag() == CompatFlag::UseFarEastLayout && option.is_enabled()
+        }));
         let proofing = settings.proofing_state().unwrap();
         assert_eq!(proofing.spelling(), Some(ProofState::Clean));
         assert_eq!(proofing.grammar(), Some(ProofState::Clean));

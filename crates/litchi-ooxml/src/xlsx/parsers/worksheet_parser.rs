@@ -13,6 +13,7 @@ use quick_xml::reader::NsReader;
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::RichTextRun;
 use crate::xlsx::cell::Cell;
+use crate::xlsx::conditional_formatting::IconSet;
 use crate::xlsx::namespace::{
     SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
@@ -21,10 +22,7 @@ use crate::xlsx::sort::{SortBy, SortCondition, SortMethod, SortState};
 use crate::xlsx::views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
 };
-use crate::xlsx::worksheet::{
-    AutoFilter, ColumnInfo, ConditionalFormatRule, DataValidationRule, PageBreak, PageSetup,
-    RowInfo,
-};
+use crate::xlsx::worksheet::{AutoFilter, ColumnInfo, PageBreak, RowInfo};
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
 const MAX_EXCEL_COLUMN: u32 = 16_384;
@@ -40,9 +38,6 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) merged_regions: Vec<(u32, u32, u32, u32)>,
     pub(crate) columns: HashMap<u32, ColumnInfo>,
     pub(crate) hyperlinks: Vec<ParsedHyperlink>,
-    pub(crate) data_validations: Vec<DataValidationRule>,
-    pub(crate) conditional_formats: Vec<ConditionalFormatRule>,
-    pub(crate) page_setup: Option<PageSetup>,
     pub(crate) row_breaks: Vec<PageBreak>,
     pub(crate) col_breaks: Vec<PageBreak>,
     pub(crate) auto_filter: Option<AutoFilter>,
@@ -67,9 +62,6 @@ enum Context {
     SheetView,
     Columns,
     Hyperlinks,
-    DataValidations,
-    DataValidation,
-    ConditionalFormatting,
     RowBreaks,
     ColBreaks,
     AutoFilter,
@@ -94,8 +86,6 @@ enum TextTarget {
     Value,
     InlineSimple,
     InlineRun,
-    ValidationFormula1,
-    ValidationFormula2,
 }
 
 struct PendingRow {
@@ -130,12 +120,6 @@ struct PendingRun {
     saw_text: bool,
     saw_properties: bool,
     properties: u8,
-}
-
-struct PendingValidation {
-    value: DataValidationRule,
-    saw_formula1: bool,
-    saw_formula2: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -175,7 +159,6 @@ struct Parser {
     row: Option<PendingRow>,
     cell: Option<PendingCell>,
     run: Option<PendingRun>,
-    validation: Option<PendingValidation>,
     sort_state: Option<SortState>,
     previous_row: u32,
     rows: HashSet<u32>,
@@ -185,12 +168,7 @@ struct Parser {
     seen_sheet_views: bool,
     seen_columns: bool,
     seen_hyperlinks: bool,
-    seen_data_validations: bool,
-    expected_validation_count: Option<usize>,
-    conditional_range: Option<String>,
-    conditional_start_count: usize,
     breaks: Option<PendingBreaks>,
-    seen_page_setup: bool,
     seen_row_breaks: bool,
     seen_col_breaks: bool,
     seen_auto_filter: bool,
@@ -213,7 +191,6 @@ impl Parser {
             row: None,
             cell: None,
             run: None,
-            validation: None,
             sort_state: None,
             previous_row: 0,
             rows: HashSet::new(),
@@ -223,12 +200,7 @@ impl Parser {
             seen_sheet_views: false,
             seen_columns: false,
             seen_hyperlinks: false,
-            seen_data_validations: false,
-            expected_validation_count: None,
-            conditional_range: None,
-            conditional_start_count: 0,
             breaks: None,
-            seen_page_setup: false,
             seen_row_breaks: false,
             seen_col_breaks: false,
             seen_auto_filter: false,
@@ -434,48 +406,6 @@ impl Parser {
             return Ok(Context::Other);
         }
         if parent == Context::Worksheet
-            && is_spreadsheetml_name(namespace, element.name(), b"dataValidations")
-        {
-            self.start_data_validations(element, decoder)?;
-            return Ok(Context::DataValidations);
-        }
-        if parent == Context::DataValidations
-            && is_spreadsheetml_name(namespace, element.name(), b"dataValidation")
-        {
-            self.start_data_validation(element, decoder)?;
-            return Ok(Context::DataValidation);
-        }
-        if parent == Context::DataValidation
-            && is_spreadsheetml_name(namespace, element.name(), b"formula1")
-        {
-            self.start_validation_formula(1)?;
-            return Ok(Context::Text(TextTarget::ValidationFormula1));
-        }
-        if parent == Context::DataValidation
-            && is_spreadsheetml_name(namespace, element.name(), b"formula2")
-        {
-            self.start_validation_formula(2)?;
-            return Ok(Context::Text(TextTarget::ValidationFormula2));
-        }
-        if parent == Context::Worksheet
-            && is_spreadsheetml_name(namespace, element.name(), b"conditionalFormatting")
-        {
-            self.start_conditional_formatting(element, decoder)?;
-            return Ok(Context::ConditionalFormatting);
-        }
-        if parent == Context::ConditionalFormatting
-            && is_spreadsheetml_name(namespace, element.name(), b"cfRule")
-        {
-            self.conditional_rule(element, decoder)?;
-            return Ok(Context::Other);
-        }
-        if parent == Context::Worksheet
-            && is_spreadsheetml_name(namespace, element.name(), b"pageSetup")
-        {
-            self.page_setup(element, decoder)?;
-            return Ok(Context::Other);
-        }
-        if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"rowBreaks")
         {
             self.start_breaks(BreakKind::Row, element, decoder)?;
@@ -623,37 +553,6 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"hyperlink")
         {
             self.hyperlink(element, decoder, resolver)?;
-        } else if parent == Context::Worksheet
-            && is_spreadsheetml_name(namespace, element.name(), b"dataValidations")
-        {
-            self.start_data_validations(element, decoder)?;
-            self.finish_data_validations()?;
-        } else if parent == Context::DataValidations
-            && is_spreadsheetml_name(namespace, element.name(), b"dataValidation")
-        {
-            self.start_data_validation(element, decoder)?;
-            self.finish_data_validation()?;
-        } else if parent == Context::DataValidation
-            && is_spreadsheetml_name(namespace, element.name(), b"formula1")
-        {
-            self.start_validation_formula(1)?;
-        } else if parent == Context::DataValidation
-            && is_spreadsheetml_name(namespace, element.name(), b"formula2")
-        {
-            self.start_validation_formula(2)?;
-        } else if parent == Context::Worksheet
-            && is_spreadsheetml_name(namespace, element.name(), b"conditionalFormatting")
-        {
-            self.start_conditional_formatting(element, decoder)?;
-            self.finish_conditional_formatting()?;
-        } else if parent == Context::ConditionalFormatting
-            && is_spreadsheetml_name(namespace, element.name(), b"cfRule")
-        {
-            self.conditional_rule(element, decoder)?;
-        } else if parent == Context::Worksheet
-            && is_spreadsheetml_name(namespace, element.name(), b"pageSetup")
-        {
-            self.page_setup(element, decoder)?;
         } else if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"rowBreaks")
         {
@@ -874,309 +773,6 @@ impl Parser {
             location,
             display: unqualified_attribute_value(element, b"display", decoder)?,
             tooltip: unqualified_attribute_value(element, b"tooltip", decoder)?,
-        });
-        Ok(())
-    }
-
-    fn start_data_validations(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        if self.seen_data_validations {
-            return Err(invalid("duplicate worksheet dataValidations element"));
-        }
-        self.seen_data_validations = true;
-        self.expected_validation_count = optional_u32(
-            element,
-            b"count",
-            decoder,
-            "worksheet data-validation count",
-        )?
-        .map(|count| count as usize);
-        Ok(())
-    }
-
-    fn start_data_validation(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        if self.validation.is_some() {
-            return Err(invalid("nested worksheet data validation"));
-        }
-        let range = required_string(
-            element,
-            b"sqref",
-            decoder,
-            "worksheet data-validation sqref",
-        )?;
-        validate_sqref(&range, "worksheet data-validation sqref")?;
-        let validation_type = unqualified_attribute_value(element, b"type", decoder)?
-            .unwrap_or_else(|| "none".to_string());
-        if !matches!(
-            validation_type.as_str(),
-            "none" | "whole" | "decimal" | "list" | "date" | "time" | "textLength" | "custom"
-        ) {
-            return Err(invalid(format!(
-                "invalid worksheet data-validation type '{validation_type}'"
-            )));
-        }
-        let operator = unqualified_attribute_value(element, b"operator", decoder)?;
-        if let Some(operator) = operator.as_deref()
-            && !matches!(
-                operator,
-                "between"
-                    | "notBetween"
-                    | "equal"
-                    | "notEqual"
-                    | "lessThan"
-                    | "lessThanOrEqual"
-                    | "greaterThan"
-                    | "greaterThanOrEqual"
-            )
-        {
-            return Err(invalid(format!(
-                "invalid worksheet data-validation operator '{operator}'"
-            )));
-        }
-        let error_style = enum_attribute(
-            element,
-            b"errorStyle",
-            decoder,
-            "worksheet data-validation error style",
-            &["stop", "warning", "information"],
-        )?;
-        let ime_mode = enum_attribute(
-            element,
-            b"imeMode",
-            decoder,
-            "worksheet data-validation IME mode",
-            &[
-                "noControl",
-                "off",
-                "on",
-                "disabled",
-                "hiragana",
-                "fullKatakana",
-                "halfKatakana",
-                "fullAlpha",
-                "halfAlpha",
-                "fullHangul",
-                "halfHangul",
-            ],
-        )?;
-        self.validation = Some(PendingValidation {
-            value: DataValidationRule {
-                range,
-                validation_type,
-                operator,
-                formula: None,
-                formula2: None,
-                allow_blank: optional_bool(
-                    element,
-                    b"allowBlank",
-                    decoder,
-                    "worksheet data-validation allowBlank",
-                )?
-                .unwrap_or(false),
-                show_drop_down: optional_bool(
-                    element,
-                    b"showDropDown",
-                    decoder,
-                    "worksheet data-validation showDropDown",
-                )?
-                .unwrap_or(false),
-                show_input_message: optional_bool(
-                    element,
-                    b"showInputMessage",
-                    decoder,
-                    "worksheet data-validation showInputMessage",
-                )?
-                .unwrap_or(false),
-                show_error_message: optional_bool(
-                    element,
-                    b"showErrorMessage",
-                    decoder,
-                    "worksheet data-validation showErrorMessage",
-                )?
-                .unwrap_or(false),
-                error_style,
-                ime_mode,
-                error_title: unqualified_attribute_value(element, b"errorTitle", decoder)?,
-                error: unqualified_attribute_value(element, b"error", decoder)?,
-                prompt_title: unqualified_attribute_value(element, b"promptTitle", decoder)?,
-                prompt: unqualified_attribute_value(element, b"prompt", decoder)?,
-            },
-            saw_formula1: false,
-            saw_formula2: false,
-        });
-        Ok(())
-    }
-
-    fn start_validation_formula(&mut self, number: u8) -> Result<()> {
-        let validation = self
-            .validation
-            .as_mut()
-            .ok_or_else(|| invalid("formula outside a worksheet data validation"))?;
-        let seen = if number == 1 {
-            &mut validation.saw_formula1
-        } else {
-            &mut validation.saw_formula2
-        };
-        if *seen {
-            return Err(invalid(format!(
-                "duplicate worksheet data-validation formula{number}"
-            )));
-        }
-        *seen = true;
-        if number == 1 {
-            validation.value.formula = Some(String::new());
-        } else {
-            validation.value.formula2 = Some(String::new());
-        }
-        Ok(())
-    }
-
-    fn finish_data_validation(&mut self) -> Result<()> {
-        let validation = self
-            .validation
-            .take()
-            .ok_or_else(|| invalid("missing worksheet data validation"))?;
-        self.data.data_validations.push(validation.value);
-        Ok(())
-    }
-
-    fn finish_data_validations(&mut self) -> Result<()> {
-        if self.validation.is_some() {
-            return Err(invalid("unterminated worksheet data validation"));
-        }
-        if let Some(expected) = self.expected_validation_count
-            && expected != self.data.data_validations.len()
-        {
-            return Err(invalid(format!(
-                "worksheet dataValidations count is {expected}, but {} dataValidation elements were found",
-                self.data.data_validations.len()
-            )));
-        }
-        Ok(())
-    }
-
-    fn start_conditional_formatting(
-        &mut self,
-        element: &BytesStart<'_>,
-        decoder: Decoder,
-    ) -> Result<()> {
-        if self.conditional_range.is_some() {
-            return Err(invalid("nested worksheet conditionalFormatting element"));
-        }
-        let range = required_string(
-            element,
-            b"sqref",
-            decoder,
-            "worksheet conditional-formatting sqref",
-        )?;
-        validate_sqref(&range, "worksheet conditional-formatting sqref")?;
-        optional_bool(
-            element,
-            b"pivot",
-            decoder,
-            "worksheet conditional-formatting pivot",
-        )?;
-        self.conditional_start_count = self.data.conditional_formats.len();
-        self.conditional_range = Some(range);
-        Ok(())
-    }
-
-    fn conditional_rule(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let range = self
-            .conditional_range
-            .as_ref()
-            .ok_or_else(|| invalid("conditional-formatting rule outside its container"))?
-            .clone();
-        let rule_type = required_string(
-            element,
-            b"type",
-            decoder,
-            "worksheet conditional-formatting rule type",
-        )?;
-        if !matches!(
-            rule_type.as_str(),
-            "expression"
-                | "cellIs"
-                | "colorScale"
-                | "dataBar"
-                | "iconSet"
-                | "top10"
-                | "uniqueValues"
-                | "duplicateValues"
-                | "containsText"
-                | "notContainsText"
-                | "beginsWith"
-                | "endsWith"
-                | "containsBlanks"
-                | "notContainsBlanks"
-                | "containsErrors"
-                | "notContainsErrors"
-                | "timePeriod"
-                | "aboveAverage"
-        ) {
-            return Err(invalid(format!(
-                "invalid worksheet conditional-formatting rule type '{rule_type}'"
-            )));
-        }
-        let priority = required_u32(
-            element,
-            b"priority",
-            decoder,
-            "worksheet conditional-formatting rule priority",
-        )?;
-        self.data.conditional_formats.push(ConditionalFormatRule {
-            range,
-            rule_type,
-            priority,
-        });
-        Ok(())
-    }
-
-    fn finish_conditional_formatting(&mut self) -> Result<()> {
-        self.conditional_range
-            .take()
-            .ok_or_else(|| invalid("missing worksheet conditionalFormatting element"))?;
-        if self.data.conditional_formats.len() == self.conditional_start_count {
-            return Err(invalid(
-                "worksheet conditionalFormatting element has no rules",
-            ));
-        }
-        Ok(())
-    }
-
-    fn page_setup(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        if self.seen_page_setup {
-            return Err(invalid("duplicate worksheet pageSetup element"));
-        }
-        self.seen_page_setup = true;
-        let orientation = enum_attribute(
-            element,
-            b"orientation",
-            decoder,
-            "worksheet page orientation",
-            &["default", "portrait", "landscape"],
-        )?;
-        let scale = optional_u32(element, b"scale", decoder, "worksheet page scale")?;
-        if let Some(scale) = scale
-            && !(10..=400).contains(&scale)
-        {
-            return Err(invalid(format!("invalid worksheet page scale '{scale}'")));
-        }
-        self.data.page_setup = Some(PageSetup {
-            paper_size: optional_u32(element, b"paperSize", decoder, "worksheet paper size")?,
-            landscape: orientation.as_deref() == Some("landscape"),
-            scale,
-            fit_to_width: optional_u32(
-                element,
-                b"fitToWidth",
-                decoder,
-                "worksheet fit-to-page width",
-            )?,
-            fit_to_height: optional_u32(
-                element,
-                b"fitToHeight",
-                decoder,
-                "worksheet fit-to-page height",
-            )?,
         });
         Ok(())
     }
@@ -1535,8 +1131,9 @@ impl Parser {
         parse_range(&ref_range, "worksheet sort-state reference")?;
         let sort_method = unqualified_attribute_value(element, b"sortMethod", decoder)?
             .map(|value| {
-                SortMethod::parse(&value)
-                    .ok_or_else(|| invalid(format!("invalid worksheet sort method '{value}'")))
+                value
+                    .parse::<SortMethod>()
+                    .map_err(|error| invalid(error.to_string()))
             })
             .transpose()?;
         self.sort_state = Some(SortState {
@@ -1578,8 +1175,9 @@ impl Parser {
         parse_range(&ref_range, "worksheet sort-condition reference")?;
         let sort_by = unqualified_attribute_value(element, b"sortBy", decoder)?
             .map(|value| {
-                SortBy::parse(&value)
-                    .ok_or_else(|| invalid(format!("invalid worksheet sort criterion '{value}'")))
+                value
+                    .parse::<SortBy>()
+                    .map_err(|error| invalid(error.to_string()))
             })
             .transpose()?;
         let condition = SortCondition {
@@ -1598,7 +1196,13 @@ impl Parser {
                 decoder,
                 "worksheet sort-condition differential-format ID",
             )?,
-            icon_set: unqualified_attribute_value(element, b"iconSet", decoder)?,
+            icon_set: unqualified_attribute_value(element, b"iconSet", decoder)?
+                .map(|value| {
+                    value
+                        .parse::<IconSet>()
+                        .map_err(|error| invalid(error.to_string()))
+                })
+                .transpose()?,
             icon_id: optional_u32(
                 element,
                 b"iconId",
@@ -1606,6 +1210,9 @@ impl Parser {
                 "worksheet sort-condition icon ID",
             )?,
         };
+        condition
+            .validate()
+            .map_err(|error| invalid(error.to_string()))?;
         self.sort_state
             .as_mut()
             .ok_or_else(|| invalid("sort condition outside a worksheet sort state"))?
@@ -1879,10 +1486,7 @@ impl Parser {
                 }
                 run.saw_text = true;
             },
-            TextTarget::Formula
-            | TextTarget::Value
-            | TextTarget::ValidationFormula1
-            | TextTarget::ValidationFormula2 => {},
+            TextTarget::Formula | TextTarget::Value => {},
         }
         Ok(())
     }
@@ -1943,22 +1547,6 @@ impl Parser {
                 .ok_or_else(|| invalid("inline text outside a rich-text run"))?
                 .value
                 .text
-                .push_str(value),
-            TextTarget::ValidationFormula1 => self
-                .validation
-                .as_mut()
-                .ok_or_else(|| invalid("formula1 outside a worksheet data validation"))?
-                .value
-                .formula
-                .get_or_insert_with(String::new)
-                .push_str(value),
-            TextTarget::ValidationFormula2 => self
-                .validation
-                .as_mut()
-                .ok_or_else(|| invalid("formula2 outside a worksheet data validation"))?
-                .value
-                .formula2
-                .get_or_insert_with(String::new)
                 .push_str(value),
         }
         Ok(())
@@ -2032,9 +1620,6 @@ impl Parser {
             Context::Row => self.finish_row(),
             Context::MergeCells => self.finish_merge_cells(),
             Context::TableParts => self.finish_table_parts(),
-            Context::DataValidation => self.finish_data_validation(),
-            Context::DataValidations => self.finish_data_validations(),
-            Context::ConditionalFormatting => self.finish_conditional_formatting(),
             Context::RowBreaks | Context::ColBreaks => self.finish_breaks(),
             Context::SortState => self.finish_sort_state(),
             _ => Ok(()),
@@ -2676,62 +2261,8 @@ mod tests {
             Some("'Other Sheet'!A1")
         );
     }
-
     #[test]
-    fn parses_validation_and_conditional_format_rules() {
-        let xml = format!(
-            r#"<x:worksheet xmlns:x="{STRICT_S}" xmlns:f="urn:foreign">
-                <f:dataValidations><x:dataValidation sqref="XFD1048576"/></f:dataValidations>
-                <x:dataValidations count="2">
-                    <x:dataValidation sqref="A1:B2 D4" type="whole" operator="between"
-                            allowBlank="true" showDropDown="1" showInputMessage="1"
-                            showErrorMessage="true" errorStyle="warning" imeMode="hiragana"
-                            errorTitle="Bad &amp; value" error="Try again"
-                            promptTitle="Enter" prompt="A number">
-                        <x:formula1>1 &lt; A1<![CDATA[ & B1]]></x:formula1>
-                        <x:formula2>10</x:formula2>
-                    </x:dataValidation>
-                    <x:dataValidation sqref="E5"><x:formula1/></x:dataValidation>
-                </x:dataValidations>
-                <f:conditionalFormatting sqref="XFD1048576"><x:cfRule type="top10" priority="99"/></f:conditionalFormatting>
-                <x:conditionalFormatting sqref="A1:A10 C1:C10" pivot="false">
-                    <x:cfRule type="cellIs" priority="2"><x:formula>A1&gt;0</x:formula></x:cfRule>
-                </x:conditionalFormatting>
-                <x:conditionalFormatting sqref="D1:D10">
-                    <x:cfRule type="colorScale" priority="1"/>
-                </x:conditionalFormatting>
-            </x:worksheet>"#
-        );
-        let data = parse_worksheet_data(&xml).unwrap();
-
-        assert_eq!(data.data_validations.len(), 2);
-        let validation = &data.data_validations[0];
-        assert_eq!(validation.range, "A1:B2 D4");
-        assert_eq!(validation.validation_type, "whole");
-        assert_eq!(validation.operator.as_deref(), Some("between"));
-        assert_eq!(validation.formula.as_deref(), Some("1 < A1 & B1"));
-        assert_eq!(validation.formula2.as_deref(), Some("10"));
-        assert!(validation.allow_blank);
-        assert!(validation.show_drop_down);
-        assert!(validation.show_input_message);
-        assert!(validation.show_error_message);
-        assert_eq!(validation.error_style.as_deref(), Some("warning"));
-        assert_eq!(validation.ime_mode.as_deref(), Some("hiragana"));
-        assert_eq!(validation.error_title.as_deref(), Some("Bad & value"));
-        assert_eq!(data.data_validations[1].validation_type, "none");
-        assert_eq!(data.data_validations[1].formula.as_deref(), Some(""));
-
-        assert_eq!(data.conditional_formats.len(), 2);
-        assert_eq!(data.conditional_formats[0].range, "A1:A10 C1:C10");
-        assert_eq!(data.conditional_formats[0].rule_type, "cellIs");
-        assert_eq!(data.conditional_formats[0].priority, 2);
-        assert_eq!(data.conditional_formats[1].range, "D1:D10");
-        assert_eq!(data.conditional_formats[1].rule_type, "colorScale");
-        assert_eq!(data.conditional_formats[1].priority, 1);
-    }
-
-    #[test]
-    fn parses_page_setup_and_page_breaks() {
+    fn skips_canonical_page_setup_and_parses_page_breaks() {
         let xml = format!(
             r#"<x:worksheet xmlns:x="{STRICT_S}" xmlns:f="urn:foreign">
                 <f:pageSetup paperSize="1" orientation="portrait"/>
@@ -2749,12 +2280,6 @@ mod tests {
         );
         let data = parse_worksheet_data(&xml).unwrap();
 
-        let setup = data.page_setup.unwrap();
-        assert_eq!(setup.paper_size, Some(9));
-        assert!(setup.landscape);
-        assert_eq!(setup.scale, Some(125));
-        assert_eq!(setup.fit_to_width, Some(2));
-        assert_eq!(setup.fit_to_height, Some(3));
         assert_eq!(data.row_breaks.len(), 2);
         assert!(data.row_breaks[0].manual);
         assert!(data.row_breaks[0].pivot);
@@ -2798,7 +2323,7 @@ mod tests {
         assert_eq!(state.conditions[0].custom_list.as_deref(), Some("High,Low"));
         assert_eq!(state.conditions[0].dxf_id, Some(4));
         assert_eq!(state.conditions[1].sort_by, Some(SortBy::Icon));
-        assert_eq!(state.conditions[1].icon_set.as_deref(), Some("3Arrows"));
+        assert_eq!(state.conditions[1].icon_set, Some(IconSet::ThreeArrows));
         assert_eq!(state.conditions[1].icon_id, Some(2));
 
         let data = parse_worksheet_data(&wrap("<autoFilter/>")).unwrap();
@@ -2945,41 +2470,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_validation_and_conditional_format_rules() {
+    fn rejects_invalid_page_breaks() {
         let invalid_documents = [
-            "<dataValidations count=\"2\"><dataValidation sqref=\"A1\"/></dataValidations>",
-            "<dataValidations><dataValidation sqref=\"A1\" type=\"integer\"/></dataValidations>",
-            "<dataValidations><dataValidation sqref=\"A1\" operator=\"near\"/></dataValidations>",
-            "<dataValidations><dataValidation sqref=\"A1\" errorStyle=\"fatal\"/></dataValidations>",
-            "<dataValidations><dataValidation sqref=\"A1\" imeMode=\"automatic\"/></dataValidations>",
-            "<dataValidations><dataValidation sqref=\"A1\" allowBlank=\"TRUE\"/></dataValidations>",
-            "<dataValidations><dataValidation sqref=\"A0\"/></dataValidations>",
-            "<dataValidations><dataValidation sqref=\"A1\"><formula1/><formula1/></dataValidation></dataValidations>",
-            "<dataValidations/><dataValidations/>",
-            "<conditionalFormatting><cfRule type=\"top10\" priority=\"1\"/></conditionalFormatting>",
-            "<conditionalFormatting sqref=\"A1\"><cfRule priority=\"1\"/></conditionalFormatting>",
-            "<conditionalFormatting sqref=\"A1\"><cfRule type=\"mystery\" priority=\"1\"/></conditionalFormatting>",
-            "<conditionalFormatting sqref=\"A1\"><cfRule type=\"top10\"/></conditionalFormatting>",
-            "<conditionalFormatting sqref=\"A1\" pivot=\"yes\"/>",
-            "<conditionalFormatting sqref=\"A1\"/>",
-        ];
-
-        for fragment in invalid_documents {
-            let xml = wrap(fragment);
-            assert!(
-                parse_worksheet_data(&xml).is_err(),
-                "accepted invalid worksheet fragment: {fragment}"
-            );
-        }
-    }
-
-    #[test]
-    fn rejects_invalid_page_setup_and_page_breaks() {
-        let invalid_documents = [
-            "<pageSetup scale=\"9\"/>",
-            "<pageSetup scale=\"401\"/>",
-            "<pageSetup orientation=\"sideways\"/>",
-            "<pageSetup/><pageSetup/>",
             "<rowBreaks count=\"2\"><brk id=\"1\"/></rowBreaks>",
             "<rowBreaks manualBreakCount=\"1\"><brk id=\"1\"/></rowBreaks>",
             "<rowBreaks><brk id=\"1048577\"/></rowBreaks>",

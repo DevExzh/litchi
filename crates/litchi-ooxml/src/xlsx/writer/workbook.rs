@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;
 
-use super::sheet::{MutableWorksheet, NamedRange};
+use super::sheet::{MutableWorksheet, NamedRange, Visibility};
 use super::strings::MutableSharedStrings;
 use super::styles::StylesBuilder;
 use crate::xlsx::ProtectionPasswordVerifier;
@@ -963,15 +963,34 @@ impl MutableWorkbookData {
 
         xml.push_str("<sheets>");
         for (name, sheet_id, rel_id) in sheet_entries {
+            let visibility = self
+                .worksheets
+                .iter()
+                .find(|worksheet| worksheet.sheet_id() == *sheet_id)
+                .map(MutableWorksheet::visibility)
+                .unwrap_or_default();
+
             // Sheet elements are always self-closing (tab colors are in worksheet XML, not here)
-            write!(
-                xml,
-                r#"<sheet name="{}" sheetId="{}" r:id="{}"/>"#,
-                escape_xml(name),
-                sheet_id,
-                rel_id
-            )
-            .map_err(|e| format!("XML write error: {}", e))?;
+            if visibility == Visibility::Visible {
+                write!(
+                    xml,
+                    r#"<sheet name="{}" sheetId="{}" r:id="{}"/>"#,
+                    escape_xml(name),
+                    sheet_id,
+                    rel_id
+                )
+                .map_err(|e| format!("XML write error: {}", e))?;
+            } else {
+                write!(
+                    xml,
+                    r#"<sheet name="{}" sheetId="{}" state="{}" r:id="{}"/>"#,
+                    escape_xml(name),
+                    sheet_id,
+                    visibility.as_str(),
+                    rel_id
+                )
+                .map_err(|e| format!("XML write error: {}", e))?;
+            }
         }
         xml.push_str("</sheets>");
 
@@ -1122,7 +1141,11 @@ impl MutableWorkbookData {
     }
 
     /// Set sheet visibility state.
-    pub fn set_sheet_visibility(&mut self, index: usize, visibility: &str) -> SheetResult<()> {
+    pub fn set_sheet_visibility(
+        &mut self,
+        index: usize,
+        visibility: Visibility,
+    ) -> SheetResult<()> {
         if let Some(ws) = self.worksheets.get_mut(index) {
             ws.set_visibility(visibility);
             self.modified = true;
@@ -1133,7 +1156,7 @@ impl MutableWorkbookData {
     }
 
     /// Get sheet visibility state.
-    pub fn get_sheet_visibility(&self, index: usize) -> Option<&str> {
+    pub fn get_sheet_visibility(&self, index: usize) -> Option<Visibility> {
         self.worksheets.get(index).map(|ws| ws.visibility())
     }
 
@@ -1970,6 +1993,30 @@ mod tests {
 
         wb.unhide_sheet(0).unwrap();
         assert!(!wb.worksheets[0].is_hidden());
+    }
+
+    #[test]
+    fn typed_visibility_is_persisted_in_workbook_xml() {
+        let mut wb = MutableWorkbookData::new();
+        assert_eq!(wb.get_sheet_visibility(0), Some(Visibility::Visible));
+
+        wb.set_sheet_visibility(0, Visibility::VeryHidden).unwrap();
+        assert_eq!(wb.get_sheet_visibility(0), Some(Visibility::VeryHidden));
+        assert_eq!(wb.is_sheet_hidden(0), Some(true));
+
+        let xml = wb
+            .generate_workbook_xml_with_external_rels(&["rId1".to_string()], &[], &[])
+            .unwrap();
+        assert!(
+            xml.contains(r#"<sheet name="Sheet1" sheetId="1" state="veryHidden" r:id="rId1"/>"#)
+        );
+
+        wb.set_sheet_visibility(0, Visibility::Visible).unwrap();
+        let xml = wb
+            .generate_workbook_xml_with_external_rels(&["rId1".to_string()], &[], &[])
+            .unwrap();
+        assert!(xml.contains(r#"<sheet name="Sheet1" sheetId="1" r:id="rId1"/>"#));
+        assert!(!xml.contains(" state="));
     }
 
     #[test]

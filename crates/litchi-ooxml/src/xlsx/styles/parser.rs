@@ -10,7 +10,9 @@ use quick_xml::reader::NsReader;
 
 use super::alignment::{Horizontal, Indent, Reading, Rotation, Vertical};
 use super::border::{Color, Dir, Line, Rgb, Side, Tint};
-use super::{Alignment, Border, CellStyle, Fill, Font, NumberFormat, Styles};
+use super::{
+    Alignment, Border, CellStyle, Fill, Font, NumberFormat, Scheme, Script, Styles, Underline,
+};
 use crate::error::{OoxmlError, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
@@ -263,13 +265,11 @@ fn parse_font(reader: &mut XmlReader<'_>) -> Result<Font> {
                 mark_property(&mut seen, 32, "underline property")?;
                 let value =
                     optional_string(&element, b"val", decoder)?.unwrap_or_else(|| "single".into());
-                if !matches!(
-                    value.as_str(),
-                    "single" | "double" | "singleAccounting" | "doubleAccounting" | "none"
-                ) {
-                    return Err(invalid(format!("invalid underline style '{value}'")));
-                }
-                font.underline = (value != "none").then_some(value);
+                font.underline = Some(
+                    value
+                        .parse::<Underline>()
+                        .map_err(|error| invalid(error.to_string()))?,
+                );
             },
             Event::Start(element) | Event::Empty(element)
                 if is_spreadsheetml_name(namespace, element.name(), b"color") =>
@@ -290,14 +290,26 @@ fn parse_font(reader: &mut XmlReader<'_>) -> Result<Font> {
                 font.family = Some(required_u32(&element, b"val", decoder, "font family")?);
             },
             Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"vertAlign") =>
+            {
+                mark_property(&mut seen, 1024, "font script property")?;
+                let value = required_string(&element, b"val", decoder, "font script")?;
+                font.script = Some(
+                    value
+                        .parse::<Script>()
+                        .map_err(|error| invalid(error.to_string()))?,
+                );
+            },
+            Event::Start(element) | Event::Empty(element)
                 if is_spreadsheetml_name(namespace, element.name(), b"scheme") =>
             {
                 mark_property(&mut seen, 512, "font scheme")?;
                 let value = required_string(&element, b"val", decoder, "font scheme")?;
-                if !matches!(value.as_str(), "major" | "minor" | "none") {
-                    return Err(invalid(format!("invalid font scheme '{value}'")));
-                }
-                font.scheme = Some(value);
+                font.scheme = Some(
+                    value
+                        .parse::<Scheme>()
+                        .map_err(|error| invalid(error.to_string()))?,
+                );
             },
             Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"font") => {
                 return Ok(font);
@@ -1171,7 +1183,8 @@ mod tests {
                 <s:numFmts count="1"><s:numFmt numFmtId="164" formatCode="0.00&amp; units"/></s:numFmts>
                 <s:fonts count="1"><s:font><s:name val="A &amp; B"/><s:sz val="11.5"/>
                     <s:b val="0"/><s:i/><s:u val="double"/><s:color rgb="FF112233"/>
-                    <s:charset val="1"/><s:family val="2"/><s:scheme val="minor"/></s:font></s:fonts>
+                    <s:charset val="1"/><s:family val="2"/><s:vertAlign val="superscript"/>
+                    <s:scheme val="minor"/></s:font></s:fonts>
                 <s:fills count="2"><s:fill><s:patternFill patternType="solid"><s:fgColor theme="2"/>
                     <s:bgColor indexed="64"/></s:patternFill></s:fill>
                     <s:fill><s:gradientFill type="linear"><s:stop position="0"><s:color rgb="FF000000"/></s:stop>
@@ -1195,7 +1208,9 @@ mod tests {
         assert_eq!(styles.fonts[0].name.as_deref(), Some("A & B"));
         assert!(!styles.fonts[0].bold);
         assert!(styles.fonts[0].italic);
-        assert_eq!(styles.fonts[0].underline.as_deref(), Some("double"));
+        assert_eq!(styles.fonts[0].underline, Some(Underline::Double));
+        assert_eq!(styles.fonts[0].scheme, Some(Scheme::Minor));
+        assert_eq!(styles.fonts[0].script, Some(Script::Superscript));
         assert_eq!(styles.fills.len(), 2);
         match &styles.fills[1] {
             Fill::Gradient {
@@ -1305,6 +1320,15 @@ mod tests {
                 r#"<styleSheet xmlns="{S}"><fonts><font><b val="maybe"/></font></fonts></styleSheet>"#
             ),
             &format!(
+                r#"<styleSheet xmlns="{S}"><fonts><font><u val="Single"/></font></fonts></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><fonts><font><scheme val="body"/></font></fonts></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><fonts><font><vertAlign val="raised"/></font></fonts></styleSheet>"#
+            ),
+            &format!(
                 r#"<styleSheet xmlns="{S}"><fills><fill><gradientFill><stop position="2"><color rgb="FF000000"/></stop></gradientFill></fill></fills></styleSheet>"#
             ),
             &format!(
@@ -1360,5 +1384,18 @@ mod tests {
                 "accepted invalid styles XML: {xml}"
             );
         }
+    }
+
+    #[test]
+    fn preserves_explicit_none_and_baseline_font_tokens() {
+        let xml = format!(
+            r#"<styleSheet xmlns="{S}"><fonts count="1"><font><u val="none"/><vertAlign val="baseline"/><scheme val="none"/></font></fonts></styleSheet>"#
+        );
+        let styles = parse_styles(&xml).unwrap();
+        let font = &styles.fonts[0];
+        assert_eq!(font.underline, Some(Underline::None));
+        assert_eq!(font.script, Some(Script::Baseline));
+        assert_eq!(font.scheme, Some(Scheme::None));
+        assert!(!font.has_formatting());
     }
 }

@@ -71,14 +71,14 @@ pub use crate::xlsb::external_link::{
 };
 pub use crate::xlsb::pivot_view::XlsbPivotTableViewPart;
 pub use crate::xlsx::writer::{
-    XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
+    Geometry, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
     XlsxShapeSpec,
 };
 pub use crate::xlsx::{
-    ChartAnchor, WorksheetChart, XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset,
-    XlsxGroupTransform, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeParagraph,
-    XlsxShapePreset, XlsxShapeRun, XlsxTextAutofit, XlsxTextDirection, XlsxTextInsets,
-    XlsxTextVerticalAnchor, XlsxTextWrap,
+    ChartAnchor, Columns, Coordinate32, Preset, TextSize, WorksheetChart, XlsxCellMarker,
+    XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor,
+    XlsxShapeBodyProperties, XlsxShapeParagraph, XlsxShapeRun, XlsxTextAutofit, XlsxTextDirection,
+    XlsxTextInsets, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap,
 };
 pub use chartsheet::MutableXlsbChartSheet;
 pub use shared_strings::MutableSharedStringsWriter;

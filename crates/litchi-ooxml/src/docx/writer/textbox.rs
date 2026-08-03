@@ -9,18 +9,20 @@
 //! WordArt authoring (text warps and run-level text fill/outline/effect
 //! styling) is deliberately not supported; those remain read-only metadata.
 
-use crate::docx::drawing::ShapeType;
 use crate::docx::textbox::{
-    TextBoxAutofit, TextBoxBodyProperties, TextBoxParagraph, TextBoxRun, TextDirection,
+    Columns, TextBoxAutofit, TextBoxBodyProperties, TextBoxParagraph, TextBoxRun, TextDirection,
     TextVerticalAnchor, TextWrap,
 };
 use crate::error::{OoxmlError, Result};
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_core::xml::escape_xml;
+use litchi_drawingml::geom::Preset;
 use std::fmt::Write as FmtWrite;
 
 /// Maximum paragraphs in an authored text-box story.
 pub(crate) const MAX_PARAGRAPHS: usize = 1024;
+/// Maximum runs in an authored text-box story.
+pub(crate) const MAX_RUNS: usize = 65_536;
 /// Maximum aggregate story text bytes in an authored text box.
 pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 
@@ -37,9 +39,9 @@ pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 ///
 /// let mut package = Package::new()?;
 /// let mut text_box = MutableTextBox::new("Greeting", 1828800, 914400)?;
-/// text_box.add_run("Hello ").bold = Some(true);
-/// text_box.add_run("world");
-/// text_box.body_properties_mut().autofit = TextBoxAutofit::ShapeAutofit;
+/// text_box.add_run("Hello ")?.bold = Some(true);
+/// text_box.add_run("world")?;
+/// text_box.body_properties_mut().autofit = TextBoxAutofit::Shape;
 /// package.document_mut()?.add_text_box(text_box);
 /// package.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -51,7 +53,7 @@ pub struct MutableTextBox {
     /// Shape name written to `wp:docPr@name`.
     pub(crate) name: String,
     /// Preset geometry of the shape.
-    pub(crate) shape_type: ShapeType,
+    pub(crate) preset: Preset,
     /// Shape width in EMUs (English Metric Units, 1 inch = 914400 EMUs).
     pub(crate) width_emu: i64,
     /// Shape height in EMUs.
@@ -60,6 +62,10 @@ pub struct MutableTextBox {
     pub(crate) body: TextBoxBodyProperties,
     /// The text-box story as paragraphs with runs.
     pub(crate) paragraphs: Vec<TextBoxParagraph>,
+    /// Cached aggregate run count for atomic mutation-time limit checks.
+    run_count: usize,
+    /// Cached aggregate text bytes for atomic mutation-time limit checks.
+    text_bytes: usize,
 }
 
 impl MutableTextBox {
@@ -70,14 +76,18 @@ impl MutableTextBox {
     /// * `name` - Shape name (written to `wp:docPr@name`)
     /// * `width_emu` - Width in EMUs (must be positive)
     /// * `height_emu` - Height in EMUs (must be positive)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either extent is not positive.
     pub fn new(name: impl Into<String>, width_emu: i64, height_emu: i64) -> Result<Self> {
-        Self::with_shape(name, ShapeType::Rectangle, width_emu, height_emu)
+        Self::with_shape(name, Preset::Rect, width_emu, height_emu)
     }
 
     /// Create a text box with a preset shape geometry, name, and EMU extents.
     pub fn with_shape(
         name: impl Into<String>,
-        shape_type: ShapeType,
+        preset: Preset,
         width_emu: i64,
         height_emu: i64,
     ) -> Result<Self> {
@@ -92,11 +102,13 @@ impl MutableTextBox {
             // distinct IDs with `set_id`.
             id: 1,
             name: name.into(),
-            shape_type,
+            preset,
             width_emu,
             height_emu,
             body: TextBoxBodyProperties::default(),
             paragraphs: Vec::new(),
+            run_count: 0,
+            text_bytes: 0,
         })
     }
 
@@ -118,8 +130,8 @@ impl MutableTextBox {
     }
 
     /// Get the preset shape geometry.
-    pub fn shape_type(&self) -> &ShapeType {
-        &self.shape_type
+    pub fn preset(&self) -> Preset {
+        self.preset
     }
 
     /// Get the text-body properties.
@@ -134,10 +146,19 @@ impl MutableTextBox {
     }
 
     /// Append a paragraph of plain text to the story.
-    pub fn add_paragraph_with_text(&mut self, text: &str) -> &mut Self {
-        self.paragraphs.push(TextBoxParagraph::default());
-        self.add_run(text);
-        self
+    ///
+    /// # Errors
+    ///
+    /// Returns an error without changing the story when the bounded paragraph,
+    /// run, or aggregate text limit would be exceeded.
+    pub fn add_paragraph_with_text(&mut self, text: &str) -> Result<&mut Self> {
+        let (run_count, text_bytes) = self.checked_append(text.len(), true)?;
+        self.paragraphs.push(TextBoxParagraph {
+            runs: vec![plain_run(text)],
+        });
+        self.run_count = run_count;
+        self.text_bytes = text_bytes;
+        Ok(self)
     }
 
     /// Append a run with the given text to the current story paragraph,
@@ -145,21 +166,59 @@ impl MutableTextBox {
     ///
     /// Returns the new run so basic formatting can be toggled through its
     /// public fields (`bold`, `italic`, `underline`).
-    pub fn add_run(&mut self, text: &str) -> &mut TextBoxRun {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error without changing the story when the bounded paragraph,
+    /// run, or aggregate text limit would be exceeded.
+    pub fn add_run(&mut self, text: &str) -> Result<&mut TextBoxRun> {
+        let adds_paragraph = self.paragraphs.is_empty();
+        let (run_count, text_bytes) = self.checked_append(text.len(), adds_paragraph)?;
         if self.paragraphs.is_empty() {
             self.paragraphs.push(TextBoxParagraph::default());
         }
-        let paragraph = self.paragraphs.last_mut().expect("paragraph checked above");
-        paragraph.runs.push(TextBoxRun {
-            text: text.to_string(),
-            ..TextBoxRun::default()
-        });
-        paragraph.runs.last_mut().expect("run pushed above")
+        let paragraph = self.paragraphs.last_mut().ok_or_else(|| {
+            OoxmlError::InvalidFormat("text box has no current paragraph".to_string())
+        })?;
+        paragraph.runs.push(plain_run(text));
+        let run = paragraph.runs.last_mut().ok_or_else(|| {
+            OoxmlError::InvalidFormat("text box failed to append a run".to_string())
+        })?;
+        self.run_count = run_count;
+        self.text_bytes = text_bytes;
+        Ok(run)
     }
 
     /// Get the story paragraphs.
     pub fn paragraphs(&self) -> &[TextBoxParagraph] {
         &self.paragraphs
+    }
+
+    /// Check an append against the bounded story limits without changing state.
+    fn checked_append(&self, text_bytes: usize, adds_paragraph: bool) -> Result<(usize, usize)> {
+        let paragraph_count = self
+            .paragraphs
+            .len()
+            .checked_add(usize::from(adds_paragraph))
+            .ok_or_else(|| story_limit("paragraph"))?;
+        if paragraph_count > MAX_PARAGRAPHS {
+            return Err(story_limit("paragraph"));
+        }
+        let run_count = self
+            .run_count
+            .checked_add(1)
+            .ok_or_else(|| story_limit("run"))?;
+        if run_count > MAX_RUNS {
+            return Err(story_limit("run"));
+        }
+        let text_bytes = self
+            .text_bytes
+            .checked_add(text_bytes)
+            .ok_or_else(|| story_limit("text"))?;
+        if text_bytes > MAX_TEXT_BYTES {
+            return Err(story_limit("text"));
+        }
+        Ok((run_count, text_bytes))
     }
 
     /// Convert extents from inches to EMUs.
@@ -183,7 +242,7 @@ impl MutableTextBox {
             name,
             self.width_emu,
             self.height_emu,
-            escape_xml(self.shape_type.to_preset()),
+            escape_xml(self.preset.token()),
         )
         .map_err(|error| OoxmlError::Xml(error.to_string()))?;
 
@@ -197,6 +256,17 @@ impl MutableTextBox {
     }
 }
 
+fn plain_run(text: &str) -> TextBoxRun {
+    TextBoxRun {
+        text: text.to_string(),
+        ..TextBoxRun::default()
+    }
+}
+
+fn story_limit(kind: &str) -> OoxmlError {
+    OoxmlError::InvalidFormat(format!("text box story {kind} limit exceeded"))
+}
+
 /// Serialize story paragraphs (`w:p` with runs and basic run properties),
 /// validating the bounded story limits. Shared by the DrawingML text-box and
 /// VML shape writers.
@@ -206,15 +276,21 @@ pub(crate) fn write_story_xml(xml: &mut String, paragraphs: &[TextBoxParagraph])
             "text box paragraph limit exceeded".to_string(),
         ));
     }
-    let text_bytes: usize = paragraphs
+    let (run_count, text_bytes) = paragraphs
         .iter()
         .flat_map(|paragraph| paragraph.runs.iter())
-        .map(|run| run.text.len())
-        .sum();
+        .try_fold((0usize, 0usize), |(runs, bytes), run| {
+            let runs = runs.checked_add(1).ok_or_else(|| story_limit("run"))?;
+            let bytes = bytes
+                .checked_add(run.text.len())
+                .ok_or_else(|| story_limit("text"))?;
+            Ok::<_, OoxmlError>((runs, bytes))
+        })?;
+    if run_count > MAX_RUNS {
+        return Err(story_limit("run"));
+    }
     if text_bytes > MAX_TEXT_BYTES {
-        return Err(OoxmlError::InvalidFormat(
-            "text box story text limit exceeded".to_string(),
-        ));
+        return Err(story_limit("text"));
     }
     for paragraph in paragraphs {
         xml.push_str("<w:p>");
@@ -255,11 +331,8 @@ fn write_run_properties(xml: &mut String, run: &TextBoxRun) -> Result<()> {
         });
     }
     if let Some(underline) = run.underline {
-        xml.push_str(if underline {
-            r#"<w:u w:val="single"/>"#
-        } else {
-            r#"<w:u w:val="none"/>"#
-        });
+        write!(xml, r#"<w:u w:val="{}"/>"#, underline.wml())
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     xml.push_str("</w:rPr>");
     Ok(())
@@ -270,25 +343,25 @@ fn write_body_properties(xml: &mut String, body: &TextBoxBodyProperties) -> Resu
     write!(
         xml,
         r#"<wps:bodyPr lIns="{}" tIns="{}" rIns="{}" bIns="{}""#,
-        body.insets.left_emu, body.insets.top_emu, body.insets.right_emu, body.insets.bottom_emu,
+        body.insets.left, body.insets.top, body.insets.right, body.insets.bottom,
     )
     .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     if body.vertical_anchor != TextVerticalAnchor::Top {
-        write!(xml, r#" anchor="{}""#, body.vertical_anchor.as_token())
+        write!(xml, r#" anchor="{}""#, body.vertical_anchor.token())
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     if body.anchor_center {
         xml.push_str(r#" anchorCtr="1""#);
     }
     if body.direction != TextDirection::Horizontal {
-        write!(xml, r#" vert="{}""#, body.direction.as_token())
+        write!(xml, r#" vert="{}""#, body.direction.token())
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     if body.wrap != TextWrap::Square {
-        write!(xml, r#" wrap="{}""#, body.wrap.as_token())
+        write!(xml, r#" wrap="{}""#, body.wrap.token())
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
-    if body.column_count > 1 {
+    if body.column_count != Columns::ONE {
         write!(xml, r#" numCol="{}""#, body.column_count)
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
@@ -296,9 +369,9 @@ fn write_body_properties(xml: &mut String, body: &TextBoxBodyProperties) -> Resu
         xml.push_str(r#" spcFirstLastPara="1""#);
     }
     let autofit = match body.autofit {
-        TextBoxAutofit::NoAutofit => "<a:noAutofit/>",
-        TextBoxAutofit::ShapeAutofit => "<a:spAutoFit/>",
-        TextBoxAutofit::NormalAutofit => "<a:normAutofit/>",
+        TextBoxAutofit::None => "<a:noAutofit/>",
+        TextBoxAutofit::Shape => "<a:spAutoFit/>",
+        TextBoxAutofit::Normal => "<a:normAutofit/>",
     };
     write!(xml, ">{autofit}</wps:bodyPr>").map_err(|error| OoxmlError::Xml(error.to_string()))?;
     Ok(())
@@ -307,7 +380,7 @@ fn write_body_properties(xml: &mut String, body: &TextBoxBodyProperties) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::docx::textbox::{TextBoxAnchor, load_text_boxes};
+    use crate::docx::textbox::{Coordinate32, TextBoxAnchor, TextUnderline, load_text_boxes};
 
     fn authored_xml(text_box: &MutableTextBox) -> String {
         let mut xml = String::new();
@@ -325,15 +398,15 @@ mod tests {
     fn serializes_inline_text_box_with_body_properties() {
         let mut text_box = MutableTextBox::new("My Box", 1828800, 914400).unwrap();
         text_box.set_id(42);
-        text_box.add_run("rich text");
+        text_box.add_run("rich text").unwrap();
         {
             let body = text_box.body_properties_mut();
-            body.insets.left_emu = 182880;
+            body.insets.left = Coordinate32::from(182880);
             body.vertical_anchor = TextVerticalAnchor::Center;
             body.direction = TextDirection::Vertical270;
             body.wrap = TextWrap::None;
-            body.autofit = TextBoxAutofit::ShapeAutofit;
-            body.column_count = 2;
+            body.autofit = TextBoxAutofit::Shape;
+            body.column_count = Columns::new(2).unwrap();
             body.space_first_last_paragraph = true;
         }
         let document_xml = authored_xml(&text_box);
@@ -349,34 +422,34 @@ mod tests {
         assert_eq!(parsed.id, Some(42));
         assert_eq!(parsed.name.as_deref(), Some("My Box"));
         assert_eq!(parsed.anchor, TextBoxAnchor::Inline);
-        assert_eq!(parsed.shape_type, Some(ShapeType::Rectangle));
+        assert_eq!(parsed.preset, Some(Preset::Rect));
         assert_eq!(parsed.text(), "rich text");
-        assert_eq!(parsed.body, *text_box.body_properties());
+        assert_eq!(&parsed.body, text_box.body_properties());
     }
 
     #[test]
     fn serializes_preset_shape_and_formatted_runs() {
         let mut text_box =
-            MutableTextBox::with_shape("Round", ShapeType::RoundRectangle, 914400, 457200).unwrap();
-        text_box.add_run("bold").bold = Some(true);
-        text_box.add_run("italic-off").italic = Some(false);
-        text_box.add_run("under").underline = Some(true);
-        text_box.add_paragraph_with_text("second");
+            MutableTextBox::with_shape("Round", Preset::RoundRect, 914400, 457200).unwrap();
+        text_box.add_run("bold").unwrap().bold = Some(true);
+        text_box.add_run("italic-off").unwrap().italic = Some(false);
+        text_box.add_run("under").unwrap().underline = Some(TextUnderline::WavyDouble);
+        text_box.add_paragraph_with_text("second").unwrap();
 
         let document_xml = authored_xml(&text_box);
         assert!(document_xml.contains(r#"<a:prstGeom prst="roundRect">"#));
         assert!(document_xml.contains("<w:b/>"));
         assert!(document_xml.contains(r#"<w:i w:val="0"/>"#));
-        assert!(document_xml.contains(r#"<w:u w:val="single"/>"#));
+        assert!(document_xml.contains(r#"<w:u w:val="wavyDouble"/>"#));
 
         let inventory = load_text_boxes(document_xml.as_bytes()).unwrap();
         let parsed = &inventory[0];
-        assert_eq!(parsed.shape_type, Some(ShapeType::RoundRectangle));
+        assert_eq!(parsed.preset, Some(Preset::RoundRect));
         assert_eq!(parsed.text(), "bolditalic-offunder\nsecond");
         let runs = &parsed.paragraphs[0].runs;
         assert_eq!(runs[0].bold, Some(true));
         assert_eq!(runs[1].italic, Some(false));
-        assert_eq!(runs[2].underline, Some(true));
+        assert_eq!(runs[2].underline, Some(TextUnderline::WavyDouble));
     }
 
     #[test]
@@ -399,7 +472,7 @@ mod tests {
     #[test]
     fn escapes_markup_in_text_and_name() {
         let mut text_box = MutableTextBox::new("A & <B>", 914400, 914400).unwrap();
-        text_box.add_run("x < y & \"z\"");
+        text_box.add_run("x < y & \"z\"").unwrap();
         let document_xml = authored_xml(&text_box);
         assert!(document_xml.contains("name=\"A &amp; &lt;B&gt;\""));
         let inventory = load_text_boxes(document_xml.as_bytes()).unwrap();
@@ -419,17 +492,19 @@ mod tests {
             document.add_paragraph_with_text("before the box");
             let mut text_box = MutableTextBox::new("Round Trip Box", 1828800, 914400).unwrap();
             text_box.set_id(11);
-            text_box.add_run("Hello ").bold = Some(true);
-            text_box.add_run("world").italic = Some(true);
-            text_box.add_paragraph_with_text("second paragraph");
+            text_box.add_run("Hello ").unwrap().bold = Some(true);
+            text_box.add_run("world").unwrap().italic = Some(true);
+            text_box
+                .add_paragraph_with_text("second paragraph")
+                .unwrap();
             {
                 let body = text_box.body_properties_mut();
-                body.insets.left_emu = 182880;
-                body.insets.right_emu = 182880;
+                body.insets.left = Coordinate32::from(182880);
+                body.insets.right = Coordinate32::from(182880);
                 body.vertical_anchor = TextVerticalAnchor::Center;
-                body.autofit = TextBoxAutofit::ShapeAutofit;
+                body.autofit = TextBoxAutofit::Shape;
             }
-            let expected_body = *text_box.body_properties();
+            let expected_body = text_box.body_properties().clone();
             document.add_text_box(text_box);
             document.add_paragraph_with_text("after the box");
 
@@ -448,7 +523,7 @@ mod tests {
             assert_eq!(parsed.id, Some(11));
             assert_eq!(parsed.name.as_deref(), Some("Round Trip Box"));
             assert_eq!(parsed.anchor, TextBoxAnchor::Inline);
-            assert_eq!(parsed.shape_type, Some(ShapeType::Rectangle));
+            assert_eq!(parsed.preset, Some(Preset::Rect));
             assert_eq!(parsed.text(), "Hello world\nsecond paragraph");
             assert_eq!(parsed.body, expected_body);
             assert!(!parsed.is_word_art());
@@ -472,7 +547,7 @@ mod tests {
             let document = package.document_mut().unwrap();
             let mut first = MutableTextBox::new("First Box", 914400, 457200).unwrap();
             first.set_id(21);
-            first.add_run("first story");
+            first.add_run("first story").unwrap();
             document.add_text_box(first);
 
             document
@@ -481,11 +556,10 @@ mod tests {
                 .unwrap();
 
             let mut second =
-                MutableTextBox::with_shape("Second Box", ShapeType::Ellipse, 457200, 457200)
-                    .unwrap();
+                MutableTextBox::with_shape("Second Box", Preset::Ellipse, 457200, 457200).unwrap();
             second.set_id(22);
             second.body_properties_mut().wrap = TextWrap::None;
-            second.add_paragraph_with_text("second story");
+            second.add_paragraph_with_text("second story").unwrap();
             document.add_text_box(second);
 
             package.save(file.path()).unwrap();
@@ -506,7 +580,7 @@ mod tests {
                 .find(|text_box| text_box.name.as_deref() == Some("Second Box"))
                 .expect("second text box survives the round trip");
             assert_eq!(second.id, Some(22));
-            assert_eq!(second.shape_type, Some(ShapeType::Ellipse));
+            assert_eq!(second.preset, Some(Preset::Ellipse));
             assert_eq!(second.body.wrap, TextWrap::None);
             assert_eq!(second.text(), "second story");
 
@@ -527,5 +601,33 @@ mod tests {
                 .sum::<usize>();
             assert_eq!(picture_count, 1);
         }
+    }
+
+    #[test]
+    fn append_limits_leave_the_story_unchanged() {
+        let mut text_box = MutableTextBox::new("Bounded", 914400, 914400).unwrap();
+        let too_much_text = "x".repeat(MAX_TEXT_BYTES + 1);
+
+        assert!(text_box.add_run(&too_much_text).is_err());
+        assert!(text_box.paragraphs().is_empty());
+        assert_eq!(text_box.run_count, 0);
+        assert_eq!(text_box.text_bytes, 0);
+
+        text_box.run_count = MAX_RUNS;
+        assert!(text_box.add_run("run over limit").is_err());
+        assert!(text_box.paragraphs().is_empty());
+        assert_eq!(text_box.run_count, MAX_RUNS);
+        assert_eq!(text_box.text_bytes, 0);
+
+        text_box.run_count = 0;
+        text_box.paragraphs = vec![TextBoxParagraph::default(); MAX_PARAGRAPHS];
+        assert!(
+            text_box
+                .add_paragraph_with_text("paragraph over limit")
+                .is_err()
+        );
+        assert_eq!(text_box.paragraphs().len(), MAX_PARAGRAPHS);
+        assert_eq!(text_box.run_count, 0);
+        assert_eq!(text_box.text_bytes, 0);
     }
 }

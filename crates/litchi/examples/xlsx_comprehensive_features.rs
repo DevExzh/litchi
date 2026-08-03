@@ -8,11 +8,13 @@ use litchi::ooxml::Props;
 use litchi::ooxml::xlsx::{
     Border, CellFill, CellFillPatternType, CellFont, CellFormat, ConditionalFormatType,
     HeaderFooter, Workbook,
+    page_setup::{Orientation, Paper, Scale, Setup},
     styles::{
         Alignment,
         alignment::{Horizontal, Vertical},
         border::{Color, Line, Side},
     },
+    writer::Operator,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -56,9 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 name: Some("Arial".to_string()),
                 size: Some(12.0),
                 bold: true,
-                italic: false,
-                underline: false,
                 color: Some("FFFFFF".to_string()),
+                ..CellFont::default()
             }),
             fill: Some(CellFill {
                 pattern_type: CellFillPatternType::Solid,
@@ -141,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         ws.add_conditional_formatting(
             "A2:A11",
             ConditionalFormatType::CellIs {
-                operator: "greaterThan".to_string(),
+                operator: Operator::GreaterThan,
                 formula: "50".to_string(),
             },
             1,
@@ -241,7 +242,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         ws.set_cell_value(2, 1, "Check Print Preview to see headers/footers");
 
         // Configure page setup
-        ws.set_page_setup_with_options("landscape", 9, Some(100), None, None)?;
+        ws.set_page(Setup {
+            orientation: Some(Orientation::Landscape),
+            paper: Some(Paper::A4),
+            scale: Some(Scale::new(100)?),
+            ..Setup::default()
+        });
 
         // Set headers and footers
         let hf = HeaderFooter {

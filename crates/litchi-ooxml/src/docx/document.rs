@@ -2573,9 +2573,7 @@ impl<'a> Document<'a> {
     ///     if let Some(tag) = control.tag() {
     ///         println!("  Tag: {}", tag);
     ///     }
-    ///     if let Some(control_type) = control.control_type() {
-    ///         println!("  Type: {}", control_type);
-    ///     }
+    ///     println!("  Type: {}", control.kind());
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```

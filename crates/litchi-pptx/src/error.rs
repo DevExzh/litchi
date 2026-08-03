@@ -23,7 +23,7 @@ pub enum Error {
     #[error("invalid PresentationML: {0}")]
     Invalid(String),
 
-    /// A bounded decoder resource was exhausted.
+    /// A bounded codec resource was exhausted.
     #[error("PresentationML {resource} exceeds the limit of {limit}")]
     Limit {
         /// Resource that exceeded its configured limit.

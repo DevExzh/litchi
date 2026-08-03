@@ -9,6 +9,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::str::FromStr;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -70,16 +72,85 @@ impl OleObjectConformance {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// How an OLE object is represented when rendered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OleObjectAspect {
+    /// Render the embedded object's content (`DVASPECT_CONTENT`).
     Content,
+    /// Render the embedded object's icon (`DVASPECT_ICON`).
     Icon,
+}
+
+impl OleObjectAspect {
+    /// Return the exact SpreadsheetML token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Content => "DVASPECT_CONTENT",
+            Self::Icon => "DVASPECT_ICON",
+        }
+    }
+}
+
+impl FromStr for OleObjectAspect {
+    type Err = OoxmlError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
+            "DVASPECT_CONTENT" => Ok(Self::Content),
+            "DVASPECT_ICON" => Ok(Self::Icon),
+            _ => Err(invalid(format!("invalid OLE data/view aspect '{value}'"))),
+        }
+    }
+}
+
+impl TryFrom<&str> for OleObjectAspect {
+    type Error = OoxmlError;
+
+    fn try_from(value: &str) -> Result<Self> {
+        value.parse()
+    }
+}
+
+impl fmt::Display for OleObjectAspect {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OleObjectUpdate {
     Always,
     OnCall,
+}
+
+impl OleObjectUpdate {
+    /// Return the exact SpreadsheetML token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Always => "OLEUPDATE_ALWAYS",
+            Self::OnCall => "OLEUPDATE_ONCALL",
+        }
+    }
+}
+
+impl FromStr for OleObjectUpdate {
+    type Err = OoxmlError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
+            "OLEUPDATE_ALWAYS" => Ok(Self::Always),
+            "OLEUPDATE_ONCALL" => Ok(Self::OnCall),
+            _ => Err(invalid(format!("invalid OLE update mode '{value}'"))),
+        }
+    }
+}
+
+impl fmt::Display for OleObjectUpdate {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -207,11 +278,11 @@ fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<Worksh
     }
     let program_id = optional(node, "", "progId").map(str::to_owned);
     let data_or_view_aspect = optional(node, "", "dvAspect")
-        .map(parse_aspect)
+        .map(OleObjectAspect::try_from)
         .transpose()?;
     let link = optional(node, "", "link").map(str::to_owned);
     let update = optional(node, "", "oleUpdate")
-        .map(parse_update)
+        .map(str::parse)
         .transpose()?;
     let auto_load = optional(node, "", "autoLoad")
         .map(|value| parse_bool(value, "autoLoad"))
@@ -366,27 +437,13 @@ pub fn write_worksheet_ole_objects(
             attr(&mut output, "progId", value);
         }
         if let Some(value) = object.data_or_view_aspect {
-            attr(
-                &mut output,
-                "dvAspect",
-                match value {
-                    OleObjectAspect::Content => "DVASPECT_CONTENT",
-                    OleObjectAspect::Icon => "DVASPECT_ICON",
-                },
-            );
+            attr(&mut output, "dvAspect", value.as_str());
         }
         if let Some(value) = &object.link {
             attr(&mut output, "link", value);
         }
         if let Some(value) = object.update {
-            attr(
-                &mut output,
-                "oleUpdate",
-                match value {
-                    OleObjectUpdate::Always => "OLEUPDATE_ALWAYS",
-                    OleObjectUpdate::OnCall => "OLEUPDATE_ONCALL",
-                },
-            );
+            attr(&mut output, "oleUpdate", value.as_str());
         }
         if let Some(value) = object.auto_load {
             bool_attr(&mut output, "autoLoad", value);
@@ -1184,20 +1241,6 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
         "1" | "true" => Ok(true),
         "0" | "false" => Ok(false),
         _ => Err(invalid(format!("invalid boolean '{value}' for {name}"))),
-    }
-}
-fn parse_aspect(value: &str) -> Result<OleObjectAspect> {
-    match value {
-        "DVASPECT_CONTENT" => Ok(OleObjectAspect::Content),
-        "DVASPECT_ICON" => Ok(OleObjectAspect::Icon),
-        _ => Err(invalid(format!("invalid OLE data/view aspect '{value}'"))),
-    }
-}
-fn parse_update(value: &str) -> Result<OleObjectUpdate> {
-    match value {
-        "OLEUPDATE_ALWAYS" => Ok(OleObjectUpdate::Always),
-        "OLEUPDATE_ONCALL" => Ok(OleObjectUpdate::OnCall),
-        _ => Err(invalid(format!("invalid OLE update mode '{value}'"))),
     }
 }
 fn validate_id(value: &str) -> Result<()> {

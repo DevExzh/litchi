@@ -1,8 +1,10 @@
 use crate::xlsx::cell::Cell;
+use crate::xlsx::conditional_formatting::{IconSet, Operator};
 use crate::xlsx::data_validation::{
     DataValidationCollection, DataValidationConformance, validate_data_validation_collections,
     write_data_validation_core, write_data_validation_extensions,
 };
+use crate::xlsx::page_setup::{Fit, Setup};
 use crate::xlsx::sheet_protection::{
     ProtectionPasswordVerifier, WorksheetProtection, WorksheetProtectionConformance,
     WorksheetProtectionMetadata, write_worksheet_protection_core,
@@ -10,6 +12,7 @@ use crate::xlsx::sheet_protection::{
 };
 use crate::xlsx::sort::{SortCondition, SortState};
 use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
+use crate::xlsx::styles::Rgb;
 use crate::xlsx::table::Table;
 use crate::xlsx::views::{SheetPane, SheetSelection, SheetView};
 use crate::xlsx::writer::shape::{
@@ -22,7 +25,8 @@ use litchi_drawingml::blip::write_embed_id;
 use litchi_drawingml::ext::write_creation_id;
 use litchi_drawingml::fill::write_stretch_rect;
 use std::collections::HashMap;
-use std::fmt::Write as FmtWrite;
+use std::fmt::{self, Write as FmtWrite};
+use std::str::FromStr;
 
 // Import shared formatting types
 pub use super::super::format::{
@@ -152,21 +156,6 @@ impl DefinedNameBuiltIn {
     }
 }
 
-/// Page setup configuration.
-#[derive(Debug, Clone)]
-pub struct PageSetup {
-    /// Orientation: "portrait" or "landscape"
-    pub orientation: String,
-    /// Paper size (e.g., 1 = Letter, 9 = A4)
-    pub paper_size: u32,
-    /// Scale percentage (10-400)
-    pub scale: Option<u32>,
-    /// Fit to page width
-    pub fit_to_width: Option<u32>,
-    /// Fit to page height
-    pub fit_to_height: Option<u32>,
-}
-
 /// Optional authoring state for `sheetPr/pageSetUpPr`.
 ///
 /// `None` preserves attribute absence. This is distinct from an explicitly
@@ -294,6 +283,68 @@ pub struct RichTextRun {
     pub color: Option<String>,
 }
 
+/// An unknown token in a closed SpreadsheetML writer domain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseTokenError(&'static str);
+
+impl fmt::Display for ParseTokenError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "invalid SpreadsheetML {} token", self.0)
+    }
+}
+
+impl std::error::Error for ParseTokenError {}
+
+/// Worksheet tab visibility (`ST_SheetState`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Visibility {
+    /// The sheet is visible.
+    #[default]
+    Visible,
+    /// The sheet is hidden but can be unhidden through Excel's UI.
+    Hidden,
+    /// The sheet is hidden and can only be unhidden programmatically.
+    VeryHidden,
+}
+
+impl Visibility {
+    /// Return the exact SpreadsheetML token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Visible => "visible",
+            Self::Hidden => "hidden",
+            Self::VeryHidden => "veryHidden",
+        }
+    }
+
+    /// Whether the sheet is hidden in either mode.
+    #[must_use]
+    pub const fn is_hidden(self) -> bool {
+        !matches!(self, Self::Visible)
+    }
+}
+
+impl FromStr for Visibility {
+    type Err = ParseTokenError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "visible" => Ok(Self::Visible),
+            "hidden" => Ok(Self::Hidden),
+            "veryHidden" => Ok(Self::VeryHidden),
+            _ => Err(ParseTokenError("sheet visibility")),
+        }
+    }
+}
+
+impl fmt::Display for Visibility {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 /// Conditional formatting rule.
 #[derive(Debug, Clone)]
 pub struct ConditionalFormat {
@@ -312,31 +363,31 @@ pub struct ConditionalFormat {
 pub enum ConditionalFormatType {
     /// Cell value comparison (e.g., greater than, less than)
     CellIs {
-        /// Operator (e.g., "greaterThan", "lessThan", "equal")
-        operator: String,
+        /// Comparison operator.
+        operator: Operator,
         /// Formula to compare against
         formula: String,
     },
     /// Color scale (2 or 3 color gradient)
     ColorScale {
-        /// Minimum color (RGB hex)
-        min_color: String,
-        /// Maximum color (RGB hex)
-        max_color: String,
-        /// Optional mid color (RGB hex)
-        mid_color: Option<String>,
+        /// Minimum color.
+        min_color: Rgb,
+        /// Maximum color.
+        max_color: Rgb,
+        /// Optional middle color.
+        mid_color: Option<Rgb>,
     },
     /// Data bar
     DataBar {
-        /// Color (RGB hex)
-        color: String,
+        /// Bar color.
+        color: Rgb,
         /// Show value alongside bar
         show_value: bool,
     },
     /// Icon set
     IconSet {
-        /// Icon set name (e.g., "3Arrows", "3TrafficLights")
-        icon_set: String,
+        /// Core icon set.
+        icon_set: IconSet,
         /// Show values
         show_value: bool,
     },
@@ -378,16 +429,14 @@ pub struct MutableWorksheet {
     hidden_rows: std::collections::HashSet<u32>,
     /// Freeze panes configuration
     freeze_panes: Option<FreezePanes>,
-    /// Whether the worksheet is hidden
-    hidden: bool,
-    /// Visibility state: "visible", "hidden", or "veryHidden"
-    visibility: String,
+    /// Worksheet tab visibility.
+    visibility: Visibility,
     /// Whether this worksheet is active
     is_active: bool,
-    /// Tab color (RGB hex, e.g., "FF0000" for red)
-    tab_color: Option<String>,
+    /// Worksheet tab color.
+    tab_color: Option<Rgb>,
     /// Page setup configuration
-    page_setup: Option<PageSetup>,
+    page_setup: Option<Setup>,
     /// Optional flags serialized as `sheetPr/pageSetUpPr`.
     page_setup_properties: Option<PageSetupProperties>,
     /// Print area
@@ -489,8 +538,7 @@ impl MutableWorksheet {
             row_heights: HashMap::new(),
             hidden_rows: std::collections::HashSet::new(),
             freeze_panes: None,
-            hidden: false,
-            visibility: "visible".to_string(),
+            visibility: Visibility::Visible,
             is_active: false,
             tab_color: None,
             page_setup: None,
@@ -1024,33 +1072,28 @@ impl MutableWorksheet {
 
     /// Set whether the worksheet is hidden.
     pub fn set_hidden(&mut self, hidden: bool) {
-        self.hidden = hidden;
         self.visibility = if hidden {
-            "hidden".to_string()
+            Visibility::Hidden
         } else {
-            "visible".to_string()
+            Visibility::Visible
         };
         self.modified = true;
     }
 
     /// Check if the worksheet is hidden.
     pub fn is_hidden(&self) -> bool {
-        self.hidden
+        self.visibility.is_hidden()
     }
 
     /// Set worksheet visibility state.
-    ///
-    /// # Arguments
-    /// * `visibility` - Visibility state: "visible", "hidden", or "veryHidden"
-    pub fn set_visibility(&mut self, visibility: &str) {
-        self.visibility = visibility.to_string();
-        self.hidden = visibility != "visible";
+    pub fn set_visibility(&mut self, visibility: Visibility) {
+        self.visibility = visibility;
         self.modified = true;
     }
 
     /// Get worksheet visibility state.
-    pub fn visibility(&self) -> &str {
-        &self.visibility
+    pub const fn visibility(&self) -> Visibility {
+        self.visibility
     }
 
     /// Set whether this worksheet is the active sheet.
@@ -1066,10 +1109,8 @@ impl MutableWorksheet {
 
     /// Set the tab color for the worksheet.
     ///
-    /// # Arguments
-    /// * `color` - RGB hex color (e.g., "FF0000" for red)
-    pub fn set_tab_color(&mut self, color: &str) {
-        self.tab_color = Some(color.to_string());
+    pub fn set_tab_color(&mut self, color: Rgb) {
+        self.tab_color = Some(color);
         self.modified = true;
     }
 
@@ -1080,8 +1121,8 @@ impl MutableWorksheet {
     }
 
     /// Get the tab color for the worksheet.
-    pub fn tab_color(&self) -> Option<&str> {
-        self.tab_color.as_deref()
+    pub const fn tab_color(&self) -> Option<Rgb> {
+        self.tab_color
     }
 
     // ===== Hyperlinks =====
@@ -1574,7 +1615,7 @@ impl MutableWorksheet {
         &mut self,
         name: &str,
         anchor: crate::xlsx::XlsxShapeAnchor,
-        preset: crate::xlsx::XlsxShapePreset,
+        preset: crate::xlsx::Preset,
         text: &str,
     ) -> SheetResult<()> {
         self.add_shape(XlsxShapeSpec::text_box(name, anchor, preset, text))
@@ -1663,7 +1704,7 @@ impl MutableWorksheet {
         Ok(self.connections.remove(index))
     }
 
-    /// Generate drawing XML for images and charts.
+    /// Generate drawing XML for images, charts, and shapes.
     ///
     /// This generates the xl/drawings/drawing{N}.xml file content.
     pub fn generate_drawing_xml(&self) -> SheetResult<Option<String>> {
@@ -1798,7 +1839,10 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ooxml::xlsx::{Workbook, writer::ConditionalFormatType};
+    /// use litchi_ooxml::xlsx::{
+    ///     Rgb, Workbook,
+    ///     writer::{ConditionalFormatType, Operator},
+    /// };
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1807,7 +1851,7 @@ impl MutableWorksheet {
     /// ws.add_conditional_formatting(
     ///     "A1:A10",
     ///     ConditionalFormatType::CellIs {
-    ///         operator: "greaterThan".to_string(),
+    ///         operator: Operator::GreaterThan,
     ///         formula: "100".to_string(),
     ///     },
     ///     1,
@@ -1818,8 +1862,8 @@ impl MutableWorksheet {
     /// ws.add_conditional_formatting(
     ///     "B1:B10",
     ///     ConditionalFormatType::ColorScale {
-    ///         min_color: "FF0000".to_string(),
-    ///         max_color: "00FF00".to_string(),
+    ///         min_color: Rgb::new(0xFF, 0, 0),
+    ///         max_color: Rgb::new(0, 0xFF, 0),
     ///         mid_color: None,
     ///     },
     ///     2,
@@ -1922,98 +1966,63 @@ impl MutableWorksheet {
         self.page_setup_properties.as_ref()
     }
 
-    /// Configure page setup for printing.
+    /// Replace the worksheet's checked page-setup state.
     ///
-    /// # Arguments
-    /// * `orientation` - "portrait" or "landscape"
-    /// * `paper_size` - Paper size code (1 = Letter, 9 = A4, etc.)
+    /// This preserves the independently authored `pageSetUpPr` flags. Use
+    /// [`Self::set_fit`] when both fit dimensions and fit mode should change.
     ///
     /// # Examples
     ///
     /// ```rust,no_run
+    /// use litchi_ooxml::xlsx::page_setup::{Orientation, Paper, Setup};
     /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
-    /// let mut ws = wb.worksheet_mut(0)?;
-    /// ws.set_page_setup("landscape", 9); // A4 landscape
+    /// let ws = wb.worksheet_mut(0)?;
+    /// ws.set_page(Setup {
+    ///     orientation: Some(Orientation::Landscape),
+    ///     paper: Some(Paper::A4),
+    ///     ..Setup::default()
+    /// });
     /// wb.save("output.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn set_page_setup(&mut self, orientation: &str, paper_size: u32) {
-        self.page_setup = Some(PageSetup {
-            orientation: orientation.to_string(),
-            paper_size,
-            scale: None,
-            fit_to_width: None,
-            fit_to_height: None,
-        });
-        self.modified = true;
-    }
-
-    /// Set page setup with scaling options.
-    ///
-    /// # Arguments
-    /// * `orientation` - "portrait" or "landscape"
-    /// * `paper_size` - Paper size code
-    /// * `scale` - Scale percentage (10-400), or None
-    /// * `fit_to_width` - Fit to N pages wide, or None
-    /// * `fit_to_height` - Fit to N pages tall, or None
-    pub fn set_page_setup_with_options(
-        &mut self,
-        orientation: &str,
-        paper_size: u32,
-        scale: Option<u32>,
-        fit_to_width: Option<u32>,
-        fit_to_height: Option<u32>,
-    ) -> SheetResult<()> {
-        if !matches!(orientation, "portrait" | "landscape") {
-            return Err(format!(
-                "page orientation must be 'portrait' or 'landscape', got '{orientation}'"
-            )
-            .into());
-        }
-        if let Some(scale) = scale
-            && !(10..=400).contains(&scale)
-        {
-            return Err(format!("page scale must be between 10 and 400, got {scale}").into());
-        }
-        const MAX_EXCEL_FIT_PAGES: u32 = 32_767;
-        for (name, value) in [
-            ("fit-to-width", fit_to_width),
-            ("fit-to-height", fit_to_height),
-        ] {
-            if let Some(value) = value
-                && value > MAX_EXCEL_FIT_PAGES
-            {
-                return Err(format!(
-                    "{name} must be between 0 and {MAX_EXCEL_FIT_PAGES}, got {value}"
-                )
-                .into());
-            }
-        }
-
-        let setup = PageSetup {
-            orientation: orientation.to_string(),
-            paper_size,
-            scale,
-            fit_to_width,
-            fit_to_height,
-        };
-        let activates_fit_to_page = fit_to_width.is_some() || fit_to_height.is_some();
-
+    pub fn set_page(&mut self, setup: Setup) -> &mut Self {
         self.page_setup = Some(setup);
-        if activates_fit_to_page {
-            self.page_setup_properties
-                .get_or_insert_with(PageSetupProperties::default)
-                .fit_to_page = Some(true);
-        }
         self.modified = true;
-        Ok(())
+        self
     }
 
-    /// Get the page setup configuration.
-    pub fn get_page_setup(&self) -> Option<&PageSetup> {
+    /// Set both fit dimensions and explicitly enable fit-to-page mode.
+    ///
+    /// Unlike [`Self::set_page`], this semantic operation intentionally updates
+    /// both `pageSetup` and `sheetPr/pageSetUpPr` as one atomic authoring action.
+    pub fn set_fit(&mut self, width: Fit, height: Fit) -> &mut Self {
+        let setup = self.page_setup.get_or_insert_with(Setup::default);
+        setup.fit_to_width = Some(width);
+        setup.fit_to_height = Some(height);
+        self.page_setup_properties
+            .get_or_insert_with(PageSetupProperties::default)
+            .fit_to_page = Some(true);
+        self.modified = true;
+        self
+    }
+
+    /// Borrow the authored page setup.
+    pub fn page(&self) -> Option<&Setup> {
         self.page_setup.as_ref()
+    }
+
+    /// Remove and return the authored page setup.
+    ///
+    /// This removes only the `pageSetup` record. Independently authored
+    /// `pageSetUpPr` flags, including fit-to-page mode, remain unchanged.
+    pub fn remove_page(&mut self) -> Option<Setup> {
+        let removed = self.page_setup.take();
+        if removed.is_some() {
+            self.modified = true;
+        }
+        removed
     }
 
     /// Set the print area for the worksheet.
@@ -2845,14 +2854,10 @@ impl MutableWorksheet {
             self.write_page_breaks(&mut xml)?;
         }
 
-        // Write drawing reference for charts and images
-        if !self.charts.is_empty() || !self.images.is_empty() {
-            write!(
-                xml,
-                r#"<drawing r:id="{}"/>"#,
-                relationships.drawing.unwrap_or("rId1")
-            )
-            .map_err(|e| format!("XML write error: {}", e))?;
+        // Write the worksheet drawing reference when the package assigned one.
+        if let Some(drawing_rel_id) = relationships.drawing {
+            write!(xml, r#"<drawing r:id="{}"/>"#, drawing_rel_id)
+                .map_err(|e| format!("XML write error: {}", e))?;
         }
 
         // Write legacyDrawing reference for comments (VML)
@@ -3540,7 +3545,7 @@ impl MutableWorksheet {
                     xml,
                     r#"<cfRule type="cellIs" priority="{}" operator="{}">"#,
                     format.priority,
-                    escape_xml(operator)
+                    operator.as_str()
                 )
                 .map_err(|e| format!("XML write error: {}", e))?;
 
@@ -3573,13 +3578,13 @@ impl MutableWorksheet {
                 xml.push_str(r#"<cfvo type="max"/>"#);
 
                 // Then all color elements
-                write!(xml, r#"<color rgb="{}"/>"#, escape_xml(min_color))
+                write!(xml, r#"<color rgb="{min_color}"/>"#)
                     .map_err(|e| format!("XML write error: {}", e))?;
                 if let Some(mid) = mid_color {
-                    write!(xml, r#"<color rgb="{}"/>"#, escape_xml(mid))
+                    write!(xml, r#"<color rgb="{mid}"/>"#)
                         .map_err(|e| format!("XML write error: {}", e))?;
                 }
-                write!(xml, r#"<color rgb="{}"/>"#, escape_xml(max_color))
+                write!(xml, r#"<color rgb="{max_color}"/>"#)
                     .map_err(|e| format!("XML write error: {}", e))?;
 
                 xml.push_str("</colorScale>");
@@ -3601,7 +3606,7 @@ impl MutableWorksheet {
 
                 xml.push_str(r#"<cfvo type="min"/>"#);
                 xml.push_str(r#"<cfvo type="max"/>"#);
-                write!(xml, r#"<color rgb="{}"/>"#, escape_xml(color))
+                write!(xml, r#"<color rgb="{color}"/>"#)
                     .map_err(|e| format!("XML write error: {}", e))?;
 
                 xml.push_str("</dataBar>");
@@ -3621,14 +3626,17 @@ impl MutableWorksheet {
                 write!(
                     xml,
                     r#"<iconSet iconSet="{}" showValue="{}">"#,
-                    escape_xml(icon_set),
+                    icon_set.as_str(),
                     if *show_value { "1" } else { "0" }
                 )
                 .map_err(|e| format!("XML write error: {}", e))?;
 
-                xml.push_str(r#"<cfvo type="percent" val="0"/>"#);
-                xml.push_str(r#"<cfvo type="percent" val="33"/>"#);
-                xml.push_str(r#"<cfvo type="percent" val="67"/>"#);
+                let count = icon_set.len();
+                for index in 0..count {
+                    let percent = u16::from(index) * 100 / u16::from(count);
+                    write!(xml, r#"<cfvo type="percent" val="{percent}"/>"#)
+                        .map_err(|error| format!("XML write error: {error}"))?;
+                }
 
                 xml.push_str("</iconSet>");
                 xml.push_str("</cfRule>");
@@ -3665,31 +3673,80 @@ impl MutableWorksheet {
         if let Some(ref setup) = self.page_setup {
             xml.push_str("<pageSetup");
 
-            // Paper size
-            write!(xml, r#" paperSize="{}""#, setup.paper_size)
-                .map_err(|e| format!("XML write error: {}", e))?;
-
-            // Orientation
-            if setup.orientation == "landscape" {
-                xml.push_str(r#" orientation="landscape""#);
+            if let Some(paper) = setup.paper {
+                write!(xml, r#" paperSize="{}""#, paper.get())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(width) = setup.paper_width.as_ref() {
+                write!(xml, r#" paperWidth="{width}""#)
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(height) = setup.paper_height.as_ref() {
+                write!(xml, r#" paperHeight="{height}""#)
+                    .map_err(|error| format!("XML write error: {error}"))?;
             }
 
-            // Scale
             if let Some(scale) = setup.scale {
-                write!(xml, r#" scale="{}""#, scale)
-                    .map_err(|e| format!("XML write error: {}", e))?;
+                write!(xml, r#" scale="{}""#, scale.get())
+                    .map_err(|error| format!("XML write error: {error}"))?;
             }
-
-            // Fit to page
+            if let Some(first_page) = setup.first_page {
+                write!(xml, r#" firstPageNumber="{}""#, first_page.wire())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
             if let Some(width) = setup.fit_to_width {
-                write!(xml, r#" fitToWidth="{}""#, width)
-                    .map_err(|e| format!("XML write error: {}", e))?;
+                write!(xml, r#" fitToWidth="{}""#, width.get())
+                    .map_err(|error| format!("XML write error: {error}"))?;
             }
             if let Some(height) = setup.fit_to_height {
-                write!(xml, r#" fitToHeight="{}""#, height)
-                    .map_err(|e| format!("XML write error: {}", e))?;
+                write!(xml, r#" fitToHeight="{}""#, height.get())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(order) = setup.order {
+                write!(xml, r#" pageOrder="{}""#, order.as_str())
+                    .map_err(|error| format!("XML write error: {error}"))?;
             }
 
+            if let Some(orientation) = setup.orientation {
+                write!(xml, r#" orientation="{}""#, orientation.as_str())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(value) = setup.use_printer_defaults {
+                write!(xml, r#" usePrinterDefaults="{}""#, u8::from(value))
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(value) = setup.black_and_white {
+                write!(xml, r#" blackAndWhite="{}""#, u8::from(value))
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(value) = setup.draft {
+                write!(xml, r#" draft="{}""#, u8::from(value))
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(comments) = setup.comments {
+                write!(xml, r#" cellComments="{}""#, comments.as_str())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(value) = setup.use_first_page {
+                write!(xml, r#" useFirstPageNumber="{}""#, u8::from(value))
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(errors) = setup.errors {
+                write!(xml, r#" errors="{}""#, errors.as_str())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(dpi) = setup.horizontal_dpi {
+                write!(xml, r#" horizontalDpi="{}""#, dpi.get())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(dpi) = setup.vertical_dpi {
+                write!(xml, r#" verticalDpi="{}""#, dpi.get())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
+            if let Some(copies) = setup.copies {
+                write!(xml, r#" copies="{}""#, copies.get())
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            }
             xml.push_str("/>");
         }
 
@@ -3796,6 +3853,7 @@ impl MutableWorksheet {
     }
 
     fn write_sort_condition(&self, xml: &mut String, condition: &SortCondition) -> SheetResult<()> {
+        condition.validate()?;
         write!(
             xml,
             r#"<sortCondition ref="{}""#,
@@ -3818,8 +3876,8 @@ impl MutableWorksheet {
         if let Some(dxf_id) = condition.dxf_id {
             write!(xml, r#" dxfId="{}""#, dxf_id).map_err(|e| format!("XML write error: {}", e))?;
         }
-        if let Some(ref icon_set) = condition.icon_set {
-            write!(xml, r#" iconSet="{}""#, escape_xml(icon_set))
+        if let Some(icon_set) = condition.icon_set {
+            write!(xml, r#" iconSet="{}""#, icon_set.as_str())
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
         if let Some(icon_id) = condition.icon_id {
@@ -4039,6 +4097,10 @@ impl MutableWorksheet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xlsx::page_setup::{
+        Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, Measure, Order, Orientation, Paper,
+        Scale, Unit,
+    };
 
     #[test]
     fn test_create_worksheet() {
@@ -4046,6 +4108,137 @@ mod tests {
         assert_eq!(ws.name(), "Sheet1");
         assert_eq!(ws.sheet_id(), 1);
         assert_eq!(ws.cell_count(), 0);
+    }
+
+    #[test]
+    fn closed_writer_domains_are_exhaustive_compact_and_strict() {
+        let visibility = [
+            (Visibility::Visible, "visible"),
+            (Visibility::Hidden, "hidden"),
+            (Visibility::VeryHidden, "veryHidden"),
+        ];
+        let operators = [
+            (Operator::LessThan, "lessThan"),
+            (Operator::LessThanOrEqual, "lessThanOrEqual"),
+            (Operator::Equal, "equal"),
+            (Operator::NotEqual, "notEqual"),
+            (Operator::GreaterThanOrEqual, "greaterThanOrEqual"),
+            (Operator::GreaterThan, "greaterThan"),
+            (Operator::Between, "between"),
+            (Operator::NotBetween, "notBetween"),
+            (Operator::ContainsText, "containsText"),
+            (Operator::NotContains, "notContains"),
+            (Operator::BeginsWith, "beginsWith"),
+            (Operator::EndsWith, "endsWith"),
+        ];
+        let icon_sets = [
+            (IconSet::ThreeArrows, "3Arrows", 3),
+            (IconSet::ThreeArrowsGray, "3ArrowsGray", 3),
+            (IconSet::ThreeFlags, "3Flags", 3),
+            (IconSet::ThreeTrafficLights1, "3TrafficLights1", 3),
+            (IconSet::ThreeTrafficLights2, "3TrafficLights2", 3),
+            (IconSet::ThreeSigns, "3Signs", 3),
+            (IconSet::ThreeSymbols, "3Symbols", 3),
+            (IconSet::ThreeSymbols2, "3Symbols2", 3),
+            (IconSet::FourArrows, "4Arrows", 4),
+            (IconSet::FourArrowsGray, "4ArrowsGray", 4),
+            (IconSet::FourRedToBlack, "4RedToBlack", 4),
+            (IconSet::FourRating, "4Rating", 4),
+            (IconSet::FourTrafficLights, "4TrafficLights", 4),
+            (IconSet::FiveArrows, "5Arrows", 5),
+            (IconSet::FiveArrowsGray, "5ArrowsGray", 5),
+            (IconSet::FiveRating, "5Rating", 5),
+            (IconSet::FiveQuarters, "5Quarters", 5),
+        ];
+
+        for (value, token) in visibility {
+            assert_eq!(value.as_str(), token);
+            assert_eq!(value.to_string(), token);
+            assert_eq!(token.parse::<Visibility>(), Ok(value));
+        }
+        for (value, token) in operators {
+            assert_eq!(value.as_str(), token);
+            assert_eq!(value.to_string(), token);
+            assert_eq!(token.parse::<Operator>(), Ok(value));
+        }
+        for (value, token, count) in icon_sets {
+            assert_eq!(value.as_str(), token);
+            assert_eq!(value.to_string(), token);
+            assert_eq!(value.len(), count);
+            assert!(!value.is_empty());
+            assert_eq!(token.parse::<IconSet>(), Ok(value));
+        }
+
+        assert!("Visible".parse::<Visibility>().is_err());
+        assert!("greater_than".parse::<Operator>().is_err());
+        assert!("6Arrows".parse::<IconSet>().is_err());
+        assert_eq!(std::mem::size_of::<Visibility>(), 1);
+        assert_eq!(std::mem::size_of::<Operator>(), 1);
+        assert_eq!(std::mem::size_of::<IconSet>(), 1);
+    }
+
+    #[test]
+    fn visibility_and_conditional_formats_use_typed_tokens() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        assert_eq!(ws.visibility(), Visibility::Visible);
+        assert!(!ws.is_hidden());
+
+        ws.set_visibility(Visibility::VeryHidden);
+        assert_eq!(ws.visibility(), Visibility::VeryHidden);
+        assert!(ws.is_hidden());
+        ws.set_hidden(false);
+        assert_eq!(ws.visibility(), Visibility::Visible);
+
+        ws.add_conditional_formatting(
+            "A1:A10",
+            ConditionalFormatType::CellIs {
+                operator: Operator::GreaterThan,
+                formula: "50".to_string(),
+            },
+            1,
+            None,
+        );
+        ws.add_conditional_formatting(
+            "B1:B10",
+            ConditionalFormatType::IconSet {
+                icon_set: IconSet::FiveRating,
+                show_value: false,
+            },
+            2,
+            None,
+        );
+        ws.add_conditional_formatting(
+            "C1:C10",
+            ConditionalFormatType::ColorScale {
+                min_color: Rgb::new(0xFF, 0, 0),
+                mid_color: Some(Rgb::argb(0x80, 0xFF, 0xFF, 0)),
+                max_color: Rgb::new(0, 0xFF, 0),
+            },
+            3,
+            None,
+        );
+        ws.add_conditional_formatting(
+            "D1:D10",
+            ConditionalFormatType::DataBar {
+                color: Rgb::new(0, 0, 0xFF),
+                show_value: true,
+            },
+            4,
+            None,
+        );
+
+        let xml = ws
+            .to_xml(&mut MutableSharedStrings::new(), &HashMap::new())
+            .unwrap();
+        assert!(xml.contains(r#"type="cellIs" priority="1" operator="greaterThan""#));
+        assert!(xml.contains(r#"<formula>50</formula>"#));
+        assert!(xml.contains(r#"<iconSet iconSet="5Rating" showValue="0">"#));
+        assert_eq!(xml.matches(r#"<cfvo type="percent" val="#).count(), 5);
+        assert!(xml.contains(r#"<cfvo type="percent" val="80"/>"#));
+        assert!(xml.contains(r#"<color rgb="FFFF0000"/>"#));
+        assert!(xml.contains(r#"<color rgb="80FFFF00"/>"#));
+        assert!(xml.contains(r#"<color rgb="FF00FF00"/>"#));
+        assert!(xml.contains(r#"<color rgb="FF0000FF"/>"#));
     }
 
     #[test]
@@ -4383,10 +4576,14 @@ mod tests {
     #[test]
     fn fit_to_page_serializes_in_sheet_properties_order_and_round_trips() {
         let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
-        ws.set_tab_color("FF336699");
+        ws.set_tab_color(Rgb::new(0x33, 0x66, 0x99));
         ws.set_automatic_page_breaks(true);
-        ws.set_page_setup_with_options("landscape", 9, None, Some(1), Some(0))
-            .unwrap();
+        ws.set_page(Setup {
+            orientation: Some(Orientation::Landscape),
+            paper: Some(Paper::A4),
+            ..Setup::default()
+        });
+        ws.set_fit(Fit::ONE, Fit::NONE);
 
         let mut shared_strings = MutableSharedStrings::new();
         let xml = ws.to_xml(&mut shared_strings, &HashMap::new()).unwrap();
@@ -4394,7 +4591,7 @@ mod tests {
             r#"<sheetPr><tabColor rgb="FF336699"/><pageSetUpPr autoPageBreaks="1" fitToPage="1"/></sheetPr>"#
         ));
         assert!(xml.contains(
-            r#"<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>"#
+            r#"<pageSetup paperSize="9" fitToWidth="1" fitToHeight="0" orientation="landscape"/>"#
         ));
 
         let properties = crate::xlsx::parse_worksheet_sheet_properties(xml.as_bytes())
@@ -4406,6 +4603,46 @@ mod tests {
         assert_eq!(
             properties.tab_color().unwrap().argb(),
             Some([255, 51, 102, 153])
+        );
+    }
+
+    #[test]
+    fn every_typed_page_attribute_serializes_and_parses_losslessly() {
+        let setup = Setup {
+            paper: Some(Paper::new(u32::MAX).unwrap()),
+            paper_width: Some(Measure::new("00.50", Unit::Centimeter).unwrap()),
+            paper_height: Some(Measure::new("0", Unit::Millimeter).unwrap()),
+            scale: Some(Scale::AUTO),
+            first_page: Some(FirstPage::new(-32_767).unwrap()),
+            fit_to_width: Some(Fit::NONE),
+            fit_to_height: Some(Fit::new(Fit::MAX).unwrap()),
+            order: Some(Order::OverThenDown),
+            orientation: Some(Orientation::Default),
+            use_printer_defaults: Some(false),
+            black_and_white: Some(true),
+            draft: Some(false),
+            comments: Some(Comments::AsDisplayed),
+            use_first_page: Some(true),
+            errors: Some(ErrorMode::Dash),
+            horizontal_dpi: Some(Dpi::new(1).unwrap()),
+            vertical_dpi: Some(Dpi::new(u32::MAX).unwrap()),
+            copies: Some(Copies::new(Copies::MAX).unwrap()),
+        };
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_page(setup.clone());
+
+        let xml = ws
+            .to_xml(&mut MutableSharedStrings::new(), &HashMap::new())
+            .unwrap();
+        assert!(xml.contains(r#"paperSize="4294967295""#));
+        assert!(xml.contains(r#"paperWidth="00.50cm""#));
+        assert!(xml.contains(r#"firstPageNumber="4294934529""#));
+        assert!(!xml.contains("r:id="));
+        assert_eq!(
+            crate::xlsx::page_setup::parse_worksheet_page_setup(xml.as_bytes())
+                .unwrap()
+                .unwrap(),
+            setup
         );
     }
 
@@ -4435,22 +4672,105 @@ mod tests {
     }
 
     #[test]
-    fn clearing_fit_mode_preserves_dimensions_and_invalid_update_is_atomic() {
+    fn replacing_page_setup_preserves_independent_fit_intent_and_other_properties() {
         let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
-        ws.set_page_setup_with_options("portrait", 9, None, Some(1), Some(2))
+        ws.set_automatic_page_breaks(false);
+        ws.set_fit_to_page(false);
+        ws.set_page(Setup {
+            paper: Some(Paper::A4),
+            fit_to_width: Some(Fit::ONE),
+            ..Setup::default()
+        });
+        assert_eq!(ws.fit_to_page(), Some(false));
+
+        ws.set_page(Setup {
+            paper: Some(Paper::A4),
+            scale: Some(Scale::DEFAULT),
+            ..Setup::default()
+        });
+        assert_eq!(ws.fit_to_page(), Some(false));
+        assert_eq!(ws.automatic_page_breaks(), Some(false));
+
+        let xml = ws
+            .to_xml(&mut MutableSharedStrings::new(), &HashMap::new())
             .unwrap();
+        assert!(xml.contains(r#"<pageSetUpPr autoPageBreaks="0" fitToPage="0"/>"#));
+        assert!(xml.contains(r#"<pageSetup paperSize="9" scale="100"/>"#));
+    }
+
+    #[test]
+    fn clearing_fit_mode_preserves_typed_dimensions() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_page(Setup {
+            orientation: Some(Orientation::Portrait),
+            paper: Some(Paper::A4),
+            ..Setup::default()
+        });
+        ws.set_fit(Fit::ONE, Fit::new(2).unwrap());
         ws.clear_fit_to_page();
         assert_eq!(ws.fit_to_page(), None);
-        assert_eq!(ws.get_page_setup().unwrap().fit_to_width, Some(1));
-        assert_eq!(ws.get_page_setup().unwrap().fit_to_height, Some(2));
+        assert_eq!(ws.page().unwrap().fit_to_width, Some(Fit::ONE));
+        assert_eq!(ws.page().unwrap().fit_to_height, Some(Fit::new(2).unwrap()));
+    }
 
-        assert!(
-            ws.set_page_setup_with_options("portrait", 9, None, Some(32_768), Some(1))
-                .is_err()
-        );
-        assert_eq!(ws.get_page_setup().unwrap().fit_to_width, Some(1));
-        assert_eq!(ws.get_page_setup().unwrap().fit_to_height, Some(2));
-        assert_eq!(ws.fit_to_page(), None);
+    #[test]
+    fn page_orientation_preserves_absence_and_every_explicit_token() {
+        let cases = [
+            (None, None),
+            (Some(Orientation::Default), Some("default")),
+            (Some(Orientation::Portrait), Some("portrait")),
+            (Some(Orientation::Landscape), Some("landscape")),
+        ];
+
+        for (orientation, token) in cases {
+            let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+            ws.set_page(Setup {
+                orientation,
+                paper: Some(Paper::A4),
+                ..Setup::default()
+            });
+            let xml = ws
+                .to_xml(&mut MutableSharedStrings::new(), &HashMap::new())
+                .unwrap();
+
+            match token {
+                Some(token) => assert!(xml.contains(&format!(r#" orientation="{token}""#))),
+                None => assert!(!xml.contains(" orientation=")),
+            }
+        }
+    }
+
+    #[test]
+    fn remove_page_is_move_first_and_no_op_aware() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        assert_eq!(ws.remove_page(), None);
+        assert!(!ws.is_modified());
+
+        let setup = Setup {
+            orientation: Some(Orientation::Landscape),
+            paper: Some(Paper::A4),
+            fit_to_width: Some(Fit::ONE),
+            ..Setup::default()
+        };
+        ws.set_page(setup.clone());
+        ws.set_fit_to_page(true);
+        assert_eq!(ws.fit_to_page(), Some(true));
+        ws.modified = false;
+
+        assert_eq!(ws.remove_page(), Some(setup));
+        assert!(ws.page().is_none());
+        assert!(ws.is_modified());
+        assert_eq!(ws.fit_to_page(), Some(true));
+
+        let xml = ws
+            .to_xml(&mut MutableSharedStrings::new(), &HashMap::new())
+            .unwrap();
+        assert!(!xml.contains("<pageSetup "));
+        assert!(xml.contains(r#"<pageSetUpPr fitToPage="1"/>"#));
+
+        ws.modified = false;
+        assert_eq!(ws.remove_page(), None);
+        assert!(!ws.is_modified());
     }
 
     #[test]

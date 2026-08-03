@@ -16,6 +16,9 @@
 //! inert: unknown elements are skipped, OLE payloads and external targets are
 //! never followed, and all inputs are bounded by named limits.
 
+use std::fmt;
+use std::str::FromStr;
+
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -24,12 +27,19 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::relationship_attribute_value;
+use crate::xlsx::ole_objects::OleObjectAspect;
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::shape_geometry::XlsxCustomGeometry;
 use crate::xlsx::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
 use crate::xlsx::worksheet::WorksheetInfo;
+use litchi_drawingml::geom::Preset;
+use litchi_drawingml::text::parse_bool;
+pub use litchi_drawingml::text::{
+    Anchor as XlsxTextVerticalAnchor, Autofit as XlsxTextAutofit, Columns, Coordinate32,
+    Direction as XlsxTextDirection, TextSize, Underline as XlsxTextUnderline, Wrap as XlsxTextWrap,
+};
 use litchi_ooxml_common::xml::{
-    decode_xml_reference, is_drawingml_name, unqualified_attribute_value,
+    decode_xml_reference, is_drawingml_name, unqualified_attribute_value, xsd_token_atom,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, Part};
@@ -40,9 +50,9 @@ const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
 
 /// ECMA-376 default left/right text inset (0.1 inch) when `lIns`/`rIns` are absent.
-const DEFAULT_HORIZONTAL_INSET_EMU: i64 = 91440;
+const DEFAULT_HORIZONTAL_INSET_EMU: i32 = 91440;
 /// ECMA-376 default top/bottom text inset (0.05 inch) when `tIns`/`bIns` are absent.
-const DEFAULT_VERTICAL_INSET_EMU: i64 = 45720;
+const DEFAULT_VERTICAL_INSET_EMU: i32 = 45720;
 
 const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_WORKBOOK_BYTES: usize = 32 * 1024 * 1024;
@@ -83,13 +93,44 @@ pub enum XlsxEditAs {
 }
 
 impl XlsxEditAs {
-    /// Parse the `editAs` token; unknown tokens degrade to the default.
-    fn from_token(token: &str) -> Self {
-        match token {
-            "oneCell" => Self::OneCell,
-            "absolute" => Self::Absolute,
-            _ => Self::TwoCell,
+    /// Return the exact SpreadsheetDrawingML token.
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::TwoCell => "twoCell",
+            Self::OneCell => "oneCell",
+            Self::Absolute => "absolute",
         }
+    }
+}
+
+/// An invalid `xdr:twoCellAnchor@editAs` token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsxEditAsError;
+
+impl fmt::Display for XlsxEditAsError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("invalid SpreadsheetDrawingML editAs token")
+    }
+}
+
+impl std::error::Error for XlsxEditAsError {}
+
+impl FromStr for XlsxEditAs {
+    type Err = XlsxEditAsError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "twoCell" => Ok(Self::TwoCell),
+            "oneCell" => Ok(Self::OneCell),
+            "absolute" => Ok(Self::Absolute),
+            _ => Err(XlsxEditAsError),
+        }
+    }
+}
+
+impl fmt::Display for XlsxEditAs {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.token())
     }
 }
 
@@ -152,597 +193,82 @@ pub enum XlsxShapeAnchor {
     },
 }
 
-/// Preset geometry of a shape (`a:prstGeom@prst`, ST_ShapeType).
-///
-/// Common presets have typed variants; any other preset token — including
-/// future or vendor extensions — is retained inertly as [`XlsxShapePreset::Other`].
+/// Mutually exclusive DrawingML geometry of a worksheet shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsxShapePreset {
-    /// `rect`.
-    Rectangle,
-    /// `roundRect`.
-    RoundRectangle,
-    /// `round1Rect`.
-    RoundSingleCornerRectangle,
-    /// `round2SameRect`.
-    RoundSameSideCornerRectangle,
-    /// `round2DiagRect`.
-    RoundDiagonalCornerRectangle,
-    /// `snip1Rect`.
-    SnipSingleCornerRectangle,
-    /// `snip2SameRect`.
-    SnipSameSideCornerRectangle,
-    /// `snip2DiagRect`.
-    SnipDiagonalCornerRectangle,
-    /// `snipRoundRect`.
-    SnipRoundRectangle,
-    /// `ellipse`.
-    Ellipse,
-    /// `triangle`.
-    Triangle,
-    /// `rtTriangle`.
-    RightTriangle,
-    /// `diamond`.
-    Diamond,
-    /// `parallelogram`.
-    Parallelogram,
-    /// `trapezoid`.
-    Trapezoid,
-    /// `nonIsoscelesTrapezoid`.
-    NonIsoscelesTrapezoid,
-    /// `pentagon`.
-    Pentagon,
-    /// `hexagon`.
-    Hexagon,
-    /// `heptagon`.
-    Heptagon,
-    /// `octagon`.
-    Octagon,
-    /// `decagon`.
-    Decagon,
-    /// `dodecagon`.
-    Dodecagon,
-    /// `star4`.
-    Star4,
-    /// `star5`.
-    Star5,
-    /// `star6`.
-    Star6,
-    /// `star8`.
-    Star8,
-    /// `star10`.
-    Star10,
-    /// `star12`.
-    Star12,
-    /// `star16`.
-    Star16,
-    /// `star24`.
-    Star24,
-    /// `star32`.
-    Star32,
-    /// `rightArrow`.
-    RightArrow,
-    /// `leftArrow`.
-    LeftArrow,
-    /// `upArrow`.
-    UpArrow,
-    /// `downArrow`.
-    DownArrow,
-    /// `leftRightArrow`.
-    LeftRightArrow,
-    /// `upDownArrow`.
-    UpDownArrow,
-    /// `quadArrow`.
-    QuadArrow,
-    /// `leftRightUpArrow`.
-    LeftRightUpArrow,
-    /// `bentArrow`.
-    BentArrow,
-    /// `bentUpArrow`.
-    BentUpArrow,
-    /// `uturnArrow`.
-    UTurnArrow,
-    /// `circularArrow`.
-    CircularArrow,
-    /// `leftCircularArrow`.
-    LeftCircularArrow,
-    /// `notchedRightArrow`.
-    NotchedRightArrow,
-    /// `stripedRightArrow`.
-    StripedRightArrow,
-    /// `homePlate`.
-    HomePlate,
-    /// `chevron`.
-    Chevron,
-    /// `pieWedge`.
-    PieWedge,
-    /// `line`.
-    Line,
-    /// `lineInv`.
-    LineInverse,
-    /// `straightConnector1`.
-    StraightConnector1,
-    /// `bentConnector2`.
-    BentConnector2,
-    /// `bentConnector3`.
-    BentConnector3,
-    /// `bentConnector4`.
-    BentConnector4,
-    /// `bentConnector5`.
-    BentConnector5,
-    /// `curvedConnector2`.
-    CurvedConnector2,
-    /// `curvedConnector3`.
-    CurvedConnector3,
-    /// `curvedConnector4`.
-    CurvedConnector4,
-    /// `curvedConnector5`.
-    CurvedConnector5,
-    /// `callout1`.
-    Callout1,
-    /// `callout2`.
-    Callout2,
-    /// `callout3`.
-    Callout3,
-    /// `accentCallout1`.
-    AccentCallout1,
-    /// `accentCallout2`.
-    AccentCallout2,
-    /// `accentCallout3`.
-    AccentCallout3,
-    /// `borderCallout1`.
-    BorderCallout1,
-    /// `borderCallout2`.
-    BorderCallout2,
-    /// `borderCallout3`.
-    BorderCallout3,
-    /// `wedgeRectCallout`.
-    WedgeRectangleCallout,
-    /// `wedgeRoundRectCallout`.
-    WedgeRoundRectangleCallout,
-    /// `wedgeEllipseCallout`.
-    WedgeEllipseCallout,
-    /// `cloudCallout`.
-    CloudCallout,
-    /// `cloud`.
-    Cloud,
-    /// `textBox`.
-    TextBox,
-    /// `plaque`.
-    Plaque,
-    /// `can`.
-    Can,
-    /// `cube`.
-    Cube,
-    /// `bevel`.
-    Bevel,
-    /// `donut`.
-    Donut,
-    /// `noSmoking`.
-    NoSmoking,
-    /// `blockArc`.
-    BlockArc,
-    /// `arc`.
-    Arc,
-    /// `heart`.
-    Heart,
-    /// `lightningBolt`.
-    LightningBolt,
-    /// `sun`.
-    Sun,
-    /// `moon`.
-    Moon,
-    /// `smileyFace`.
-    SmileyFace,
-    /// `foldedCorner`.
-    FoldedCorner,
-    /// `cross`.
-    Cross,
-    /// `plus`.
-    Plus,
-    /// `pie`.
-    Pie,
-    /// `chord`.
-    Chord,
-    /// `teardrop`.
-    Teardrop,
-    /// `frame`.
-    Frame,
-    /// `halfFrame`.
-    HalfFrame,
-    /// `corner`.
-    Corner,
-    /// `diagStripe`.
-    DiagonalStripe,
-    /// `bracketPair`.
-    BracketPair,
-    /// `bracePair`.
-    BracePair,
-    /// `leftBracket`.
-    LeftBracket,
-    /// `rightBracket`.
-    RightBracket,
-    /// `leftBrace`.
-    LeftBrace,
-    /// `rightBrace`.
-    RightBrace,
-    /// `mathPlus`.
-    MathPlus,
-    /// `mathMinus`.
-    MathMinus,
-    /// `mathMultiply`.
-    MathMultiply,
-    /// `mathDivide`.
-    MathDivide,
-    /// `mathEqual`.
-    MathEqual,
-    /// `mathNotEqual`.
-    MathNotEqual,
-    /// Any other ST_ShapeType token, retained verbatim.
-    Other(String),
+pub enum Geometry {
+    /// A schema-defined preset (`a:prstGeom`).
+    Preset(Preset),
+    /// A custom geometry (`a:custGeom`).
+    Custom(Box<XlsxCustomGeometry>),
 }
 
-impl XlsxShapePreset {
-    /// Parse a preset from its ST_ShapeType token; unknown tokens are kept inertly.
-    pub fn from_token(token: &str) -> Self {
-        match token {
-            "rect" => Self::Rectangle,
-            "roundRect" => Self::RoundRectangle,
-            "round1Rect" => Self::RoundSingleCornerRectangle,
-            "round2SameRect" => Self::RoundSameSideCornerRectangle,
-            "round2DiagRect" => Self::RoundDiagonalCornerRectangle,
-            "snip1Rect" => Self::SnipSingleCornerRectangle,
-            "snip2SameRect" => Self::SnipSameSideCornerRectangle,
-            "snip2DiagRect" => Self::SnipDiagonalCornerRectangle,
-            "snipRoundRect" => Self::SnipRoundRectangle,
-            "ellipse" => Self::Ellipse,
-            "triangle" => Self::Triangle,
-            "rtTriangle" => Self::RightTriangle,
-            "diamond" => Self::Diamond,
-            "parallelogram" => Self::Parallelogram,
-            "trapezoid" => Self::Trapezoid,
-            "nonIsoscelesTrapezoid" => Self::NonIsoscelesTrapezoid,
-            "pentagon" => Self::Pentagon,
-            "hexagon" => Self::Hexagon,
-            "heptagon" => Self::Heptagon,
-            "octagon" => Self::Octagon,
-            "decagon" => Self::Decagon,
-            "dodecagon" => Self::Dodecagon,
-            "star4" => Self::Star4,
-            "star5" => Self::Star5,
-            "star6" => Self::Star6,
-            "star8" => Self::Star8,
-            "star10" => Self::Star10,
-            "star12" => Self::Star12,
-            "star16" => Self::Star16,
-            "star24" => Self::Star24,
-            "star32" => Self::Star32,
-            "rightArrow" => Self::RightArrow,
-            "leftArrow" => Self::LeftArrow,
-            "upArrow" => Self::UpArrow,
-            "downArrow" => Self::DownArrow,
-            "leftRightArrow" => Self::LeftRightArrow,
-            "upDownArrow" => Self::UpDownArrow,
-            "quadArrow" => Self::QuadArrow,
-            "leftRightUpArrow" => Self::LeftRightUpArrow,
-            "bentArrow" => Self::BentArrow,
-            "bentUpArrow" => Self::BentUpArrow,
-            "uturnArrow" => Self::UTurnArrow,
-            "circularArrow" => Self::CircularArrow,
-            "leftCircularArrow" => Self::LeftCircularArrow,
-            "notchedRightArrow" => Self::NotchedRightArrow,
-            "stripedRightArrow" => Self::StripedRightArrow,
-            "homePlate" => Self::HomePlate,
-            "chevron" => Self::Chevron,
-            "pieWedge" => Self::PieWedge,
-            "line" => Self::Line,
-            "lineInv" => Self::LineInverse,
-            "straightConnector1" => Self::StraightConnector1,
-            "bentConnector2" => Self::BentConnector2,
-            "bentConnector3" => Self::BentConnector3,
-            "bentConnector4" => Self::BentConnector4,
-            "bentConnector5" => Self::BentConnector5,
-            "curvedConnector2" => Self::CurvedConnector2,
-            "curvedConnector3" => Self::CurvedConnector3,
-            "curvedConnector4" => Self::CurvedConnector4,
-            "curvedConnector5" => Self::CurvedConnector5,
-            "callout1" => Self::Callout1,
-            "callout2" => Self::Callout2,
-            "callout3" => Self::Callout3,
-            "accentCallout1" => Self::AccentCallout1,
-            "accentCallout2" => Self::AccentCallout2,
-            "accentCallout3" => Self::AccentCallout3,
-            "borderCallout1" => Self::BorderCallout1,
-            "borderCallout2" => Self::BorderCallout2,
-            "borderCallout3" => Self::BorderCallout3,
-            "wedgeRectCallout" => Self::WedgeRectangleCallout,
-            "wedgeRoundRectCallout" => Self::WedgeRoundRectangleCallout,
-            "wedgeEllipseCallout" => Self::WedgeEllipseCallout,
-            "cloudCallout" => Self::CloudCallout,
-            "cloud" => Self::Cloud,
-            "textBox" => Self::TextBox,
-            "plaque" => Self::Plaque,
-            "can" => Self::Can,
-            "cube" => Self::Cube,
-            "bevel" => Self::Bevel,
-            "donut" => Self::Donut,
-            "noSmoking" => Self::NoSmoking,
-            "blockArc" => Self::BlockArc,
-            "arc" => Self::Arc,
-            "heart" => Self::Heart,
-            "lightningBolt" => Self::LightningBolt,
-            "sun" => Self::Sun,
-            "moon" => Self::Moon,
-            "smileyFace" => Self::SmileyFace,
-            "foldedCorner" => Self::FoldedCorner,
-            "cross" => Self::Cross,
-            "plus" => Self::Plus,
-            "pie" => Self::Pie,
-            "chord" => Self::Chord,
-            "teardrop" => Self::Teardrop,
-            "frame" => Self::Frame,
-            "halfFrame" => Self::HalfFrame,
-            "corner" => Self::Corner,
-            "diagStripe" => Self::DiagonalStripe,
-            "bracketPair" => Self::BracketPair,
-            "bracePair" => Self::BracePair,
-            "leftBracket" => Self::LeftBracket,
-            "rightBracket" => Self::RightBracket,
-            "leftBrace" => Self::LeftBrace,
-            "rightBrace" => Self::RightBrace,
-            "mathPlus" => Self::MathPlus,
-            "mathMinus" => Self::MathMinus,
-            "mathMultiply" => Self::MathMultiply,
-            "mathDivide" => Self::MathDivide,
-            "mathEqual" => Self::MathEqual,
-            "mathNotEqual" => Self::MathNotEqual,
-            other => Self::Other(other.to_string()),
-        }
-    }
-
-    /// The ST_ShapeType token for this preset.
-    pub fn as_str(&self) -> &str {
+impl Geometry {
+    /// Return the preset when this is a preset geometry.
+    pub const fn preset(&self) -> Option<Preset> {
         match self {
-            Self::Rectangle => "rect",
-            Self::RoundRectangle => "roundRect",
-            Self::RoundSingleCornerRectangle => "round1Rect",
-            Self::RoundSameSideCornerRectangle => "round2SameRect",
-            Self::RoundDiagonalCornerRectangle => "round2DiagRect",
-            Self::SnipSingleCornerRectangle => "snip1Rect",
-            Self::SnipSameSideCornerRectangle => "snip2SameRect",
-            Self::SnipDiagonalCornerRectangle => "snip2DiagRect",
-            Self::SnipRoundRectangle => "snipRoundRect",
-            Self::Ellipse => "ellipse",
-            Self::Triangle => "triangle",
-            Self::RightTriangle => "rtTriangle",
-            Self::Diamond => "diamond",
-            Self::Parallelogram => "parallelogram",
-            Self::Trapezoid => "trapezoid",
-            Self::NonIsoscelesTrapezoid => "nonIsoscelesTrapezoid",
-            Self::Pentagon => "pentagon",
-            Self::Hexagon => "hexagon",
-            Self::Heptagon => "heptagon",
-            Self::Octagon => "octagon",
-            Self::Decagon => "decagon",
-            Self::Dodecagon => "dodecagon",
-            Self::Star4 => "star4",
-            Self::Star5 => "star5",
-            Self::Star6 => "star6",
-            Self::Star8 => "star8",
-            Self::Star10 => "star10",
-            Self::Star12 => "star12",
-            Self::Star16 => "star16",
-            Self::Star24 => "star24",
-            Self::Star32 => "star32",
-            Self::RightArrow => "rightArrow",
-            Self::LeftArrow => "leftArrow",
-            Self::UpArrow => "upArrow",
-            Self::DownArrow => "downArrow",
-            Self::LeftRightArrow => "leftRightArrow",
-            Self::UpDownArrow => "upDownArrow",
-            Self::QuadArrow => "quadArrow",
-            Self::LeftRightUpArrow => "leftRightUpArrow",
-            Self::BentArrow => "bentArrow",
-            Self::BentUpArrow => "bentUpArrow",
-            Self::UTurnArrow => "uturnArrow",
-            Self::CircularArrow => "circularArrow",
-            Self::LeftCircularArrow => "leftCircularArrow",
-            Self::NotchedRightArrow => "notchedRightArrow",
-            Self::StripedRightArrow => "stripedRightArrow",
-            Self::HomePlate => "homePlate",
-            Self::Chevron => "chevron",
-            Self::PieWedge => "pieWedge",
-            Self::Line => "line",
-            Self::LineInverse => "lineInv",
-            Self::StraightConnector1 => "straightConnector1",
-            Self::BentConnector2 => "bentConnector2",
-            Self::BentConnector3 => "bentConnector3",
-            Self::BentConnector4 => "bentConnector4",
-            Self::BentConnector5 => "bentConnector5",
-            Self::CurvedConnector2 => "curvedConnector2",
-            Self::CurvedConnector3 => "curvedConnector3",
-            Self::CurvedConnector4 => "curvedConnector4",
-            Self::CurvedConnector5 => "curvedConnector5",
-            Self::Callout1 => "callout1",
-            Self::Callout2 => "callout2",
-            Self::Callout3 => "callout3",
-            Self::AccentCallout1 => "accentCallout1",
-            Self::AccentCallout2 => "accentCallout2",
-            Self::AccentCallout3 => "accentCallout3",
-            Self::BorderCallout1 => "borderCallout1",
-            Self::BorderCallout2 => "borderCallout2",
-            Self::BorderCallout3 => "borderCallout3",
-            Self::WedgeRectangleCallout => "wedgeRectCallout",
-            Self::WedgeRoundRectangleCallout => "wedgeRoundRectCallout",
-            Self::WedgeEllipseCallout => "wedgeEllipseCallout",
-            Self::CloudCallout => "cloudCallout",
-            Self::Cloud => "cloud",
-            Self::TextBox => "textBox",
-            Self::Plaque => "plaque",
-            Self::Can => "can",
-            Self::Cube => "cube",
-            Self::Bevel => "bevel",
-            Self::Donut => "donut",
-            Self::NoSmoking => "noSmoking",
-            Self::BlockArc => "blockArc",
-            Self::Arc => "arc",
-            Self::Heart => "heart",
-            Self::LightningBolt => "lightningBolt",
-            Self::Sun => "sun",
-            Self::Moon => "moon",
-            Self::SmileyFace => "smileyFace",
-            Self::FoldedCorner => "foldedCorner",
-            Self::Cross => "cross",
-            Self::Plus => "plus",
-            Self::Pie => "pie",
-            Self::Chord => "chord",
-            Self::Teardrop => "teardrop",
-            Self::Frame => "frame",
-            Self::HalfFrame => "halfFrame",
-            Self::Corner => "corner",
-            Self::DiagonalStripe => "diagStripe",
-            Self::BracketPair => "bracketPair",
-            Self::BracePair => "bracePair",
-            Self::LeftBracket => "leftBracket",
-            Self::RightBracket => "rightBracket",
-            Self::LeftBrace => "leftBrace",
-            Self::RightBrace => "rightBrace",
-            Self::MathPlus => "mathPlus",
-            Self::MathMinus => "mathMinus",
-            Self::MathMultiply => "mathMultiply",
-            Self::MathDivide => "mathDivide",
-            Self::MathEqual => "mathEqual",
-            Self::MathNotEqual => "mathNotEqual",
-            Self::Other(token) => token,
+            Self::Preset(preset) => Some(*preset),
+            Self::Custom(_) => None,
+        }
+    }
+
+    /// Borrow the custom geometry when this is custom.
+    pub fn custom(&self) -> Option<&XlsxCustomGeometry> {
+        match self {
+            Self::Preset(_) => None,
+            Self::Custom(geometry) => Some(geometry.as_ref()),
+        }
+    }
+
+    /// Move out the custom geometry when this is custom.
+    pub fn into_custom(self) -> Option<XlsxCustomGeometry> {
+        match self {
+            Self::Preset(_) => None,
+            Self::Custom(geometry) => Some(*geometry),
         }
     }
 }
 
-/// Vertical anchoring of text within the shape (`a:bodyPr@anchor`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum XlsxTextVerticalAnchor {
-    /// Text starts at the top inset (`t`, the ECMA-376 default).
-    #[default]
-    Top,
-    /// Text is vertically centered (`ctr`).
-    Center,
-    /// Text ends at the bottom inset (`b`).
-    Bottom,
-    /// Lines are spread to fill the shape (`just`).
-    Justified,
-    /// Words are spread to fill the shape (`dist`).
-    Distributed,
-}
-
-impl XlsxTextVerticalAnchor {
-    fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "t" => Some(Self::Top),
-            "ctr" => Some(Self::Center),
-            "b" => Some(Self::Bottom),
-            "just" => Some(Self::Justified),
-            "dist" => Some(Self::Distributed),
-            _ => None,
-        }
+impl From<Preset> for Geometry {
+    fn from(preset: Preset) -> Self {
+        Self::Preset(preset)
     }
 }
 
-/// Direction of text within the shape (`a:bodyPr@vert`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum XlsxTextDirection {
-    /// Horizontal text (`horz`, the ECMA-376 default).
-    #[default]
-    Horizontal,
-    /// Vertical text, each line rotated 90 degrees (`vert`).
-    Vertical,
-    /// Vertical text, each line rotated 270 degrees (`vert270`).
-    Vertical270,
-    /// WordArt vertical text, letters stacked upright (`wordArtVert`).
-    WordArtVertical,
-    /// East Asian vertical text (`eaVert`).
-    EastAsianVertical,
-    /// Mongolian vertical text (`mongolianVert`).
-    MongolianVertical,
-    /// Right-to-left WordArt vertical text (`wordArtVertRtl`).
-    WordArtVerticalRtl,
-}
-
-impl XlsxTextDirection {
-    fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "horz" => Some(Self::Horizontal),
-            "vert" => Some(Self::Vertical),
-            "vert270" => Some(Self::Vertical270),
-            "wordArtVert" => Some(Self::WordArtVertical),
-            "eaVert" => Some(Self::EastAsianVertical),
-            "mongolianVert" => Some(Self::MongolianVertical),
-            "wordArtVertRtl" => Some(Self::WordArtVerticalRtl),
-            _ => None,
-        }
+impl From<XlsxCustomGeometry> for Geometry {
+    fn from(geometry: XlsxCustomGeometry) -> Self {
+        Self::Custom(Box::new(geometry))
     }
-}
-
-/// Whether text wraps inside the shape extents (`a:bodyPr@wrap`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum XlsxTextWrap {
-    /// Text wraps within the bounding rectangle (`square`, the ECMA-376 default).
-    #[default]
-    Square,
-    /// Text does not wrap; the shape extents are ignored (`none`).
-    None,
-}
-
-impl XlsxTextWrap {
-    fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "square" => Some(Self::Square),
-            "none" => Some(Self::None),
-            _ => None,
-        }
-    }
-}
-
-/// Autofit behavior of the text body (`a:bodyPr` child element).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum XlsxTextAutofit {
-    /// `a:noAutofit` — text is not resized and does not resize the shape (default).
-    #[default]
-    NoAutofit,
-    /// `a:spAutoFit` — the shape grows or shrinks to fit the text.
-    ShapeAutofit,
-    /// `a:normAutofit` — the text is scaled to fit the shape.
-    NormalAutofit,
 }
 
 /// Text insets of the shape body (`a:bodyPr` `lIns`/`tIns`/`rIns`/`bIns`).
 ///
 /// Missing attributes fall back to the ECMA-376 defaults (0.1 inch horizontal,
 /// 0.05 inch vertical).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XlsxTextInsets {
     /// Left inset.
-    pub left: XlsxEmu,
+    pub left: Coordinate32,
     /// Top inset.
-    pub top: XlsxEmu,
+    pub top: Coordinate32,
     /// Right inset.
-    pub right: XlsxEmu,
+    pub right: Coordinate32,
     /// Bottom inset.
-    pub bottom: XlsxEmu,
+    pub bottom: Coordinate32,
 }
 
 impl Default for XlsxTextInsets {
     fn default() -> Self {
         Self {
-            left: XlsxEmu(DEFAULT_HORIZONTAL_INSET_EMU),
-            top: XlsxEmu(DEFAULT_VERTICAL_INSET_EMU),
-            right: XlsxEmu(DEFAULT_HORIZONTAL_INSET_EMU),
-            bottom: XlsxEmu(DEFAULT_VERTICAL_INSET_EMU),
+            left: Coordinate32::from(DEFAULT_HORIZONTAL_INSET_EMU),
+            top: Coordinate32::from(DEFAULT_VERTICAL_INSET_EMU),
+            right: Coordinate32::from(DEFAULT_HORIZONTAL_INSET_EMU),
+            bottom: Coordinate32::from(DEFAULT_VERTICAL_INSET_EMU),
         }
     }
 }
 
 /// Text-body properties of a shape (`a:bodyPr`), with ECMA-376 defaults applied.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XlsxShapeBodyProperties {
     /// Text insets.
     pub insets: XlsxTextInsets,
@@ -757,7 +283,7 @@ pub struct XlsxShapeBodyProperties {
     /// Autofit behavior.
     pub autofit: XlsxTextAutofit,
     /// Number of text columns (`numCol`; 1 when absent).
-    pub column_count: u32,
+    pub column_count: Columns,
     /// Whether paragraph spacing is ignored in the first and last paragraphs
     /// (`spcFirstLastPara`).
     pub space_first_last_paragraph: bool,
@@ -773,7 +299,7 @@ impl Default for XlsxShapeBodyProperties {
             wrap: XlsxTextWrap::default(),
             autofit: XlsxTextAutofit::default(),
             // ECMA-376 defaults `numCol` to a single column.
-            column_count: 1,
+            column_count: Columns::ONE,
             space_first_last_paragraph: false,
         }
     }
@@ -788,10 +314,10 @@ pub struct XlsxShapeRun {
     pub bold: Option<bool>,
     /// Explicit italic toggle (`a:rPr@i`), when declared.
     pub italic: Option<bool>,
-    /// Explicit underline toggle (`a:rPr@u` present and not `none`), when declared.
-    pub underline: Option<bool>,
+    /// Exact underline style (`a:rPr@u`), when declared.
+    pub underline: Option<XlsxTextUnderline>,
     /// Font size in hundredths of a point (`a:rPr@sz`), when declared.
-    pub font_size_hundredths: Option<u32>,
+    pub font_size: Option<TextSize>,
 }
 
 /// A paragraph inside a shape text body (`a:p`).
@@ -850,12 +376,22 @@ pub struct XlsxShape {
     pub non_visual: XlsxShapeNonVisual,
     /// Whether the shape is a text box (`xdr:cNvSpPr@txBox`).
     pub is_text_box: bool,
-    /// Preset geometry (`a:prstGeom@prst`), when declared.
-    pub preset: Option<XlsxShapePreset>,
-    /// Custom geometry (`a:custGeom`), when declared.
-    pub custom_geometry: Option<XlsxCustomGeometry>,
+    /// Mutually exclusive preset or custom geometry, when declared.
+    pub geometry: Option<Geometry>,
     /// Rich-text story (`xdr:txBody`), when present.
     pub text_body: Option<XlsxShapeTextBody>,
+}
+
+impl XlsxShape {
+    /// Return the declared preset geometry, if any.
+    pub fn preset(&self) -> Option<Preset> {
+        self.geometry.as_ref().and_then(Geometry::preset)
+    }
+
+    /// Borrow the declared custom geometry, if any.
+    pub fn custom_geometry(&self) -> Option<&XlsxCustomGeometry> {
+        self.geometry.as_ref().and_then(Geometry::custom)
+    }
 }
 
 /// One end of a connection shape (`a:stCxn`/`a:endCxn`).
@@ -872,14 +408,26 @@ pub struct XlsxShapeConnectionEnd {
 pub struct XlsxConnectionShape {
     /// Non-visual identity and flags.
     pub non_visual: XlsxShapeNonVisual,
-    /// Preset geometry (`a:prstGeom@prst`), when declared.
-    pub preset: Option<XlsxShapePreset>,
+    /// Mutually exclusive preset or custom geometry, when declared.
+    pub geometry: Option<Geometry>,
     /// Start connection, when declared.
     pub start: Option<XlsxShapeConnectionEnd>,
     /// End connection, when declared.
     pub end: Option<XlsxShapeConnectionEnd>,
     /// Rich-text story (`xdr:txBody`), when present.
     pub text_body: Option<XlsxShapeTextBody>,
+}
+
+impl XlsxConnectionShape {
+    /// Return the declared preset geometry, if any.
+    pub fn preset(&self) -> Option<Preset> {
+        self.geometry.as_ref().and_then(Geometry::preset)
+    }
+
+    /// Borrow the declared custom geometry, if any.
+    pub fn custom_geometry(&self) -> Option<&XlsxCustomGeometry> {
+        self.geometry.as_ref().and_then(Geometry::custom)
+    }
 }
 
 /// Group coordinate transform (`xdr:grpSpPr/a:xfrm`).
@@ -919,8 +467,8 @@ pub struct XlsxDrawingOleObject {
     pub program_id: Option<String>,
     /// Shape ID linked to the worksheet OLE object record (`@shapeId`).
     pub shape_id: Option<u32>,
-    /// Data-or-view aspect token (`@dvAspect`), retained inertly.
-    pub data_or_view_aspect: Option<String>,
+    /// Typed data-or-view aspect (`@dvAspect`).
+    pub data_or_view_aspect: Option<OleObjectAspect>,
     /// Whether the object loads automatically (`@autoLoad`), when declared.
     pub auto_load: Option<bool>,
     /// Relationship ID of the embedded object (`r:id`), when declared.
@@ -1123,8 +671,7 @@ struct ObjectBuilder {
     kind: BuilderKind,
     non_visual: XlsxShapeNonVisual,
     is_text_box: bool,
-    preset: Option<XlsxShapePreset>,
-    custom_geometry: Option<XlsxCustomGeometry>,
+    geometry: Option<Geometry>,
     geometry_builder: Option<CustomGeometryBuilder>,
     start: Option<XlsxShapeConnectionEnd>,
     end: Option<XlsxShapeConnectionEnd>,
@@ -1141,8 +688,7 @@ impl ObjectBuilder {
             kind,
             non_visual: XlsxShapeNonVisual::default(),
             is_text_box: false,
-            preset: None,
-            custom_geometry: None,
+            geometry: None,
             geometry_builder: None,
             start: None,
             end: None,
@@ -1167,14 +713,13 @@ impl ObjectBuilder {
             BuilderKind::Shape => Some(XlsxDrawingObject::Shape(XlsxShape {
                 non_visual: self.non_visual,
                 is_text_box: self.is_text_box,
-                preset: self.preset,
-                custom_geometry: self.custom_geometry,
+                geometry: self.geometry,
                 text_body,
             })),
             BuilderKind::Connection => {
                 Some(XlsxDrawingObject::ConnectionShape(XlsxConnectionShape {
                     non_visual: self.non_visual,
-                    preset: self.preset,
+                    geometry: self.geometry,
                     start: self.start,
                     end: self.end,
                     text_body,
@@ -1395,8 +940,11 @@ impl Parser {
                 b"twoCellAnchor" => {
                     self.open_anchor(AnchorKind::TwoCell)?;
                     let edit_as = unqualified_attribute_value(element, b"editAs", decoder)?;
-                    self.anchor_mut()?.edit_as =
-                        edit_as.map_or(XlsxEditAs::TwoCell, |v| XlsxEditAs::from_token(&v));
+                    self.anchor_mut()?.edit_as = edit_as
+                        .as_deref()
+                        .map_or(Ok(XlsxEditAs::TwoCell), |value| {
+                            parse_value(value, "drawing editAs")
+                        })?;
                     return Ok(Context::Anchor);
                 },
                 b"oneCellAnchor" => {
@@ -1543,7 +1091,10 @@ impl Parser {
                             element,
                             b"dvAspect",
                             decoder,
-                        )?,
+                        )?
+                        .as_deref()
+                        .map(OleObjectAspect::try_from)
+                        .transpose()?,
                         auto_load: bool_attribute(element, b"autoLoad", decoder)?,
                         relationship_id: relationship_attribute_value(
                             element, b"id", decoder, resolver,
@@ -1561,11 +1112,30 @@ impl Parser {
             let builder_kind = self.builders.last().map(|b| b.kind);
             match local {
                 b"prstGeom" => {
-                    if let Some(preset) = unqualified_attribute_value(element, b"prst", decoder)? {
-                        self.builder_mut()?.preset = Some(XlsxShapePreset::from_token(&preset));
+                    let preset = unqualified_attribute_value(element, b"prst", decoder)?
+                        .ok_or_else(|| invalid("DrawingML prstGeom is missing required prst"))?;
+                    let token = xsd_token_atom(&preset).ok_or_else(|| {
+                        invalid(format!("invalid DrawingML shape preset '{preset}'"))
+                    })?;
+                    let parsed = token.parse().map_err(|error| {
+                        invalid(format!(
+                            "invalid DrawingML shape preset '{preset}': {error}"
+                        ))
+                    })?;
+                    let builder = self.builder_mut()?;
+                    if builder.geometry.is_some() || builder.geometry_builder.is_some() {
+                        return Err(invalid(
+                            "drawing shape contains competing or duplicate geometries",
+                        ));
                     }
+                    builder.geometry = Some(Geometry::Preset(parsed));
                 },
-                b"custGeom" if builder_kind == Some(BuilderKind::Shape) => {
+                b"custGeom"
+                    if matches!(
+                        builder_kind,
+                        Some(BuilderKind::Shape | BuilderKind::Connection)
+                    ) =>
+                {
                     return self.open_custom_geometry();
                 },
                 b"spLocks" | b"cxnSpLocks" | b"grpSpLocks"
@@ -1598,15 +1168,13 @@ impl Parser {
                     return Ok(Context::BodyProperties);
                 },
                 b"noAutofit" if parent == Context::BodyProperties => {
-                    self.builder_mut()?.text_body.properties.autofit = XlsxTextAutofit::NoAutofit;
+                    self.builder_mut()?.text_body.properties.autofit = XlsxTextAutofit::None;
                 },
                 b"spAutoFit" if parent == Context::BodyProperties => {
-                    self.builder_mut()?.text_body.properties.autofit =
-                        XlsxTextAutofit::ShapeAutofit;
+                    self.builder_mut()?.text_body.properties.autofit = XlsxTextAutofit::Shape;
                 },
                 b"normAutofit" if parent == Context::BodyProperties => {
-                    self.builder_mut()?.text_body.properties.autofit =
-                        XlsxTextAutofit::NormalAutofit;
+                    self.builder_mut()?.text_body.properties.autofit = XlsxTextAutofit::Normal;
                 },
                 b"p" if parent == Context::TextBody => {
                     let builder = self.builder_mut()?;
@@ -1650,9 +1218,9 @@ impl Parser {
     /// Open the `a:custGeom` element of the current shape.
     fn open_custom_geometry(&mut self) -> Result<Context> {
         let builder = self.builder_mut()?;
-        if builder.custom_geometry.is_some() || builder.geometry_builder.is_some() {
+        if builder.geometry.is_some() || builder.geometry_builder.is_some() {
             return Err(invalid(
-                "drawing shape contains duplicate custom geometries",
+                "drawing shape contains competing or duplicate geometries",
             ));
         }
         builder.geometry_builder = Some(CustomGeometryBuilder::new());
@@ -1684,7 +1252,7 @@ impl Parser {
         let builder = self.builder_mut()?;
         if element == GeometryElement::CustomGeometry {
             if let Some(geometry) = builder.geometry_builder.take() {
-                builder.custom_geometry = Some(geometry.finish()?);
+                builder.geometry = Some(geometry.finish()?.into());
             }
             return Ok(());
         }
@@ -1734,51 +1302,35 @@ impl Parser {
 
     fn parse_body_properties(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         let body = &mut self.builder_mut()?.text_body.properties;
-        if let Some(value) = unqualified_attribute_value(element, b"lIns", decoder)?
-            && let Ok(inset) = value.parse()
-        {
-            body.insets.left = XlsxEmu(inset);
+        if let Some(value) = unqualified_attribute_value(element, b"lIns", decoder)? {
+            body.insets.left = parse_value(&value, "left text inset")?;
         }
-        if let Some(value) = unqualified_attribute_value(element, b"tIns", decoder)?
-            && let Ok(inset) = value.parse()
-        {
-            body.insets.top = XlsxEmu(inset);
+        if let Some(value) = unqualified_attribute_value(element, b"tIns", decoder)? {
+            body.insets.top = parse_value(&value, "top text inset")?;
         }
-        if let Some(value) = unqualified_attribute_value(element, b"rIns", decoder)?
-            && let Ok(inset) = value.parse()
-        {
-            body.insets.right = XlsxEmu(inset);
+        if let Some(value) = unqualified_attribute_value(element, b"rIns", decoder)? {
+            body.insets.right = parse_value(&value, "right text inset")?;
         }
-        if let Some(value) = unqualified_attribute_value(element, b"bIns", decoder)?
-            && let Ok(inset) = value.parse()
-        {
-            body.insets.bottom = XlsxEmu(inset);
+        if let Some(value) = unqualified_attribute_value(element, b"bIns", decoder)? {
+            body.insets.bottom = parse_value(&value, "bottom text inset")?;
         }
-        if let Some(value) = unqualified_attribute_value(element, b"anchor", decoder)?
-            && let Some(anchor) = XlsxTextVerticalAnchor::from_token(&value)
-        {
-            body.vertical_anchor = anchor;
+        if let Some(value) = unqualified_attribute_value(element, b"anchor", decoder)? {
+            body.vertical_anchor = parse_value(&value, "text anchor")?;
         }
         if let Some(value) = unqualified_attribute_value(element, b"anchorCtr", decoder)? {
-            body.anchor_center = is_on(&value);
+            body.anchor_center = parse_dml_bool(&value, "anchorCtr")?;
         }
-        if let Some(value) = unqualified_attribute_value(element, b"vert", decoder)?
-            && let Some(direction) = XlsxTextDirection::from_token(&value)
-        {
-            body.direction = direction;
+        if let Some(value) = unqualified_attribute_value(element, b"vert", decoder)? {
+            body.direction = parse_value(&value, "text direction")?;
         }
-        if let Some(value) = unqualified_attribute_value(element, b"wrap", decoder)?
-            && let Some(wrap) = XlsxTextWrap::from_token(&value)
-        {
-            body.wrap = wrap;
+        if let Some(value) = unqualified_attribute_value(element, b"wrap", decoder)? {
+            body.wrap = parse_value(&value, "text wrap")?;
         }
-        if let Some(value) = unqualified_attribute_value(element, b"numCol", decoder)?
-            && let Ok(count) = value.parse()
-        {
-            body.column_count = count;
+        if let Some(value) = unqualified_attribute_value(element, b"numCol", decoder)? {
+            body.column_count = parse_value(&value, "text column count")?;
         }
         if let Some(value) = unqualified_attribute_value(element, b"spcFirstLastPara", decoder)? {
-            body.space_first_last_paragraph = is_on(&value);
+            body.space_first_last_paragraph = parse_dml_bool(&value, "spcFirstLastPara")?;
         }
         Ok(())
     }
@@ -1789,16 +1341,18 @@ impl Parser {
             return Ok(());
         };
         if let Some(value) = unqualified_attribute_value(element, b"b", decoder)? {
-            run.bold = Some(is_on(&value));
+            run.bold = Some(parse_dml_bool(&value, "run bold")?);
         }
         if let Some(value) = unqualified_attribute_value(element, b"i", decoder)? {
-            run.italic = Some(is_on(&value));
+            run.italic = Some(parse_dml_bool(&value, "run italic")?);
         }
         if let Some(value) = unqualified_attribute_value(element, b"u", decoder)? {
-            run.underline = Some(value != "none");
+            run.underline = Some(XlsxTextUnderline::from_dml(&value).map_err(|error| {
+                invalid(format!("invalid DrawingML underline '{value}': {error}"))
+            })?);
         }
         if let Some(value) = unqualified_attribute_value(element, b"sz", decoder)? {
-            run.font_size_hundredths = value.parse().ok();
+            run.font_size = Some(parse_value(&value, "text size")?);
         }
         Ok(())
     }
@@ -2047,9 +1601,12 @@ fn is_xdr_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]
     name.local_name().as_ref() == local_name && is_xdr(namespace)
 }
 
-/// OOXML boolean attribute values: `1`, `true`, and `on` are truthy.
-fn is_on(value: &str) -> bool {
-    matches!(value, "1" | "true" | "on")
+fn parse_dml_bool(value: &str, attribute: &str) -> Result<bool> {
+    parse_bool(value).map_err(|error| {
+        invalid(format!(
+            "invalid DrawingML {attribute} boolean '{value}': {error}"
+        ))
+    })
 }
 
 fn emu_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<i64> {
@@ -2078,20 +1635,21 @@ fn required_u32_attribute(
 }
 
 fn bool_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<bool>> {
-    Ok(unqualified_attribute_value(element, name, decoder)?.map(|value| is_on(&value)))
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| parse_dml_bool(&value, &String::from_utf8_lossy(name)))
+        .transpose()
 }
 
 fn any_truthy_attribute(element: &BytesStart<'_>, decoder: Decoder) -> Result<bool> {
+    let mut any = false;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-        if is_on(&value) {
-            return Ok(true);
-        }
+        any |= parse_dml_bool(&value, "lock")?;
     }
-    Ok(false)
+    Ok(any)
 }
 
 fn set_once<T>(target: &mut Option<T>, value: T, description: &str) -> Result<()> {
@@ -2202,30 +1760,43 @@ mod tests {
         assert!(shape.non_visual.hidden);
         assert!(shape.non_visual.locked);
         assert!(shape.is_text_box);
-        assert_eq!(shape.preset, Some(XlsxShapePreset::RoundRectangle));
+        assert_eq!(shape.preset(), Some(Preset::RoundRect));
         let body = shape.text_body.as_ref().unwrap();
         let properties = &body.body_properties;
-        assert_eq!(properties.insets.left, XlsxEmu(182880));
-        assert_eq!(properties.insets.bottom, XlsxEmu(91440));
+        assert_eq!(properties.insets.left.as_emu(), Some(182880));
+        assert_eq!(properties.insets.bottom.as_emu(), Some(91440));
         assert_eq!(properties.vertical_anchor, XlsxTextVerticalAnchor::Center);
         assert!(properties.anchor_center);
         assert_eq!(properties.direction, XlsxTextDirection::Vertical270);
         assert_eq!(properties.wrap, XlsxTextWrap::None);
-        assert_eq!(properties.autofit, XlsxTextAutofit::ShapeAutofit);
-        assert_eq!(properties.column_count, 2);
+        assert_eq!(properties.autofit, XlsxTextAutofit::Shape);
+        assert_eq!(properties.column_count.get(), 2);
         assert!(properties.space_first_last_paragraph);
         assert_eq!(body.paragraphs.len(), 2);
         let bold = &body.paragraphs[0].runs[0];
         assert_eq!(bold.text, "Bold");
         assert_eq!(bold.bold, Some(true));
         assert_eq!(bold.italic, Some(true));
-        assert_eq!(bold.underline, Some(true));
-        assert_eq!(bold.font_size_hundredths, Some(1200));
+        assert_eq!(bold.underline, Some(XlsxTextUnderline::Single));
+        assert_eq!(bold.font_size.map(TextSize::get), Some(1200));
         assert_eq!(body.paragraphs[0].runs[1].text, " plain");
         assert_eq!(body.paragraphs[0].runs[1].bold, None);
         // The break contributes a newline run.
         assert_eq!(body.paragraphs[0].runs[2].text, "\n");
         assert_eq!(body.text(), "Bold plain\n\nSecond");
+    }
+
+    #[test]
+    fn preset_attributes_apply_xml_schema_token_whitespace() {
+        let shape =
+            text_box_shape().replace("prst=\"roundRect\"", "prst=\" &#x9;roundRect&#xA;&#xD; \"");
+        let objects = parse_drawing_shapes(&drawing(&two_cell_anchor(&shape)))
+            .unwrap()
+            .unwrap();
+        let XlsxDrawingObject::Shape(shape) = &objects[0].object else {
+            panic!("expected a shape");
+        };
+        assert_eq!(shape.preset(), Some(Preset::RoundRect));
     }
 
     #[test]
@@ -2256,7 +1827,7 @@ mod tests {
         };
         assert_eq!(connection.non_visual.id, Some(9));
         assert!(!connection.non_visual.locked);
-        assert_eq!(connection.preset, Some(XlsxShapePreset::BentConnector3));
+        assert_eq!(connection.preset(), Some(Preset::BentConnector3));
         assert_eq!(
             connection.start,
             Some(XlsxShapeConnectionEnd {
@@ -2275,37 +1846,95 @@ mod tests {
     }
 
     #[test]
-    fn parses_absolute_anchor_and_unknown_preset() {
+    fn connection_custom_geometry_is_typed_and_exclusive() {
+        let object = "<xdr:cxnSp><xdr:nvCxnSpPr><xdr:cNvPr id=\"9\" name=\"Custom\"/>\
+            <xdr:cNvCxnSpPr/></xdr:nvCxnSpPr><xdr:spPr>\
+            <a:custGeom><a:pathLst/></a:custGeom></xdr:spPr></xdr:cxnSp>";
+        let anchor = format!(
+            "<xdr:oneCellAnchor><xdr:from>{}</xdr:from>\
+             <xdr:ext cx=\"914400\" cy=\"457200\"/>{object}<xdr:clientData/></xdr:oneCellAnchor>",
+            marker(0, 0, 0, 0)
+        );
+        let objects = parse_drawing_shapes(&drawing(&anchor)).unwrap().unwrap();
+        let XlsxDrawingObject::ConnectionShape(connection) = &objects[0].object else {
+            panic!("expected a connection shape");
+        };
+        assert_eq!(connection.preset(), None);
+        assert!(connection.custom_geometry().is_some());
+    }
+
+    #[test]
+    fn rejects_unknown_preset() {
         let object = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"3\" name=\"Odd\"/><xdr:cNvSpPr/>\
             </xdr:nvSpPr><xdr:spPr><a:prstGeom prst=\"vendorWeird\"/></xdr:spPr></xdr:sp>";
         let anchor = format!(
             "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
              <xdr:ext cx=\"789\" cy=\"101\"/>{object}<xdr:clientData/></xdr:absoluteAnchor>"
         );
-        let objects = parse_drawing_shapes(&drawing(&anchor)).unwrap().unwrap();
-        assert_eq!(
-            objects[0].anchor,
-            XlsxShapeAnchor::Absolute {
-                position: XlsxEmuOffset {
-                    x: XlsxEmu(123),
-                    y: XlsxEmu(456),
-                },
-                extent: XlsxEmuExtent {
-                    width: XlsxEmu(789),
-                    height: XlsxEmu(101),
-                },
-            }
+        let error = parse_drawing_shapes(&drawing(&anchor)).unwrap_err();
+        assert!(error.to_string().contains("vendorWeird"));
+    }
+
+    #[test]
+    fn rejects_missing_presets_and_invalid_text_domains() {
+        let missing = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"3\" name=\"Odd\"/><xdr:cNvSpPr/>\
+            </xdr:nvSpPr><xdr:spPr><a:prstGeom/></xdr:spPr></xdr:sp>";
+        let anchor = format!(
+            "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
+             <xdr:ext cx=\"789\" cy=\"101\"/>{missing}<xdr:clientData/></xdr:absoluteAnchor>"
         );
-        let XlsxDrawingObject::Shape(shape) = &objects[0].object else {
-            panic!("expected a shape");
-        };
-        assert_eq!(
-            shape.preset,
-            Some(XlsxShapePreset::Other("vendorWeird".to_string()))
+        let error = parse_drawing_shapes(&drawing(&anchor)).unwrap_err();
+        assert!(error.to_string().contains("missing required prst"));
+
+        assert!(parse_drawing_shapes(&drawing("<xdr:twoCellAnchor editAs=\"vendor\"/>")).is_err());
+
+        for attribute in [
+            "anchor=\"middle\"",
+            "vert=\"diagonal\"",
+            "wrap=\"tight\"",
+            "anchorCtr=\"on\"",
+            "numCol=\"17\"",
+            "lIns=\"2147483648\"",
+        ] {
+            let object = format!(
+                "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"3\" name=\"Text\"/><xdr:cNvSpPr/>\
+                 </xdr:nvSpPr><xdr:txBody><a:bodyPr {attribute}/><a:p/></xdr:txBody></xdr:sp>"
+            );
+            assert!(
+                parse_drawing_shapes(&drawing(&two_cell_anchor(&object))).is_err(),
+                "accepted {attribute}"
+            );
+        }
+
+        for run_properties in ["u=\"vendor\"", "sz=\"99\"", "b=\"on\""] {
+            let object = format!(
+                "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"3\" name=\"Text\"/><xdr:cNvSpPr/>\
+                 </xdr:nvSpPr><xdr:txBody><a:bodyPr/><a:p><a:r><a:rPr {run_properties}/>\
+                 <a:t>x</a:t></a:r></a:p></xdr:txBody></xdr:sp>"
+            );
+            assert!(
+                parse_drawing_shapes(&drawing(&two_cell_anchor(&object))).is_err(),
+                "accepted {run_properties}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_competing_shape_geometries() {
+        let object = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"3\" name=\"Both\"/><xdr:cNvSpPr/>\
+            </xdr:nvSpPr><xdr:spPr><a:prstGeom prst=\"rect\"/>\
+            <a:custGeom><a:pathLst/></a:custGeom></xdr:spPr></xdr:sp>";
+        let anchor = format!(
+            "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
+             <xdr:ext cx=\"789\" cy=\"101\"/>{object}<xdr:clientData/></xdr:absoluteAnchor>"
         );
-        assert_eq!(shape.preset.as_ref().unwrap().as_str(), "vendorWeird");
-        assert!(!shape.is_text_box);
-        assert!(shape.text_body.is_none());
+        let error = parse_drawing_shapes(&drawing(&anchor)).unwrap_err();
+        assert!(error.to_string().contains("competing"));
+    }
+
+    #[test]
+    fn geometry_keeps_the_custom_payload_off_the_hot_path() {
+        assert!(std::mem::size_of::<Geometry>() <= 2 * std::mem::size_of::<usize>());
     }
 
     #[test]
@@ -2339,7 +1968,7 @@ mod tests {
         let XlsxDrawingObject::Shape(inner) = &group.children[0] else {
             panic!("expected an inner shape");
         };
-        assert_eq!(inner.preset, Some(XlsxShapePreset::Ellipse));
+        assert_eq!(inner.preset(), Some(Preset::Ellipse));
         let XlsxDrawingObject::Group(nested) = &group.children[1] else {
             panic!("expected a nested group");
         };
@@ -2377,13 +2006,23 @@ mod tests {
         assert_eq!(ole_object.non_visual.name.as_deref(), Some("Object"));
         assert_eq!(ole_object.program_id.as_deref(), Some("Excel.Sheet.12"));
         assert_eq!(ole_object.shape_id, Some(1027));
-        assert_eq!(
-            ole_object.data_or_view_aspect.as_deref(),
-            Some("DVASPECT_ICON")
-        );
+        assert_eq!(ole_object.data_or_view_aspect, Some(OleObjectAspect::Icon));
         assert_eq!(ole_object.auto_load, Some(true));
         assert_eq!(ole_object.relationship_id.as_deref(), Some("rId7"));
         assert_eq!(ole_object.link_relationship_id.as_deref(), Some("rId6"));
+    }
+
+    #[test]
+    fn rejects_unknown_ole_object_aspect() {
+        let ole = "<xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id=\"52\" name=\"Object\"/>\
+            </xdr:nvGraphicFramePr><a:graphic><a:graphicData>\
+            <xdr:oleObject shapeId=\"1027\" dvAspect=\"DVASPECT_THUMBNAIL\" \
+            r:id=\"rId7\"/></a:graphicData></a:graphic></xdr:graphicFrame>";
+        let xml = drawing(&two_cell_anchor(ole));
+
+        let error = parse_drawing_shapes(&xml).unwrap_err();
+
+        assert!(error.to_string().contains("DVASPECT_THUMBNAIL"));
     }
 
     #[test]
@@ -2409,15 +2048,15 @@ mod tests {
             panic!("expected a shape");
         };
         assert!(shape.is_text_box);
-        assert_eq!(shape.preset, Some(XlsxShapePreset::Rectangle));
+        assert_eq!(shape.preset(), Some(Preset::Rect));
         assert_eq!(shape.text_body.as_ref().unwrap().text(), "S");
         // ECMA-376 default body properties apply when a:bodyPr is empty.
         let properties = &shape.text_body.as_ref().unwrap().body_properties;
         assert_eq!(
-            properties.insets.left,
-            XlsxEmu(DEFAULT_HORIZONTAL_INSET_EMU)
+            properties.insets.left.as_emu(),
+            Some(DEFAULT_HORIZONTAL_INSET_EMU)
         );
-        assert_eq!(properties.column_count, 1);
+        assert_eq!(properties.column_count, Columns::ONE);
     }
 
     #[test]
@@ -2584,13 +2223,13 @@ mod tests {
         assert!(text_box.is_text_box);
         assert!(text_box.non_visual.locked);
         assert!(!text_box.non_visual.hidden);
-        assert_eq!(text_box.preset, Some(XlsxShapePreset::Rectangle));
+        assert_eq!(text_box.preset(), Some(Preset::Rect));
         let body = text_box.text_body.as_ref().unwrap();
-        assert_eq!(body.body_properties.insets.left, XlsxEmu(27432));
+        assert_eq!(body.body_properties.insets.left.as_emu(), Some(27432));
         assert_eq!(body.text(), "State-Owned Enterprise");
         let run = &body.paragraphs[0].runs[0];
         assert_eq!(run.bold, Some(false));
-        assert_eq!(run.font_size_hundredths, Some(900));
+        assert_eq!(run.font_size.map(TextSize::get), Some(900));
         // All four fixture text boxes anchor with two-cell anchors.
         assert!(
             all.iter()

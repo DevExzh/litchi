@@ -7,7 +7,7 @@
 //! coordinate transform, and [`XlsxConnectionShapeSpec`] authors `xdr:cxnSp`
 //! connectors whose `a:stCxn`/`a:endCxn` sites reference other shapes by
 //! name. All three deliberately reuse the typed read model from
-//! [`crate::xlsx::shapes`] (`XlsxShapePreset`, `XlsxShapeAnchor`,
+//! [`crate::xlsx::shapes`] (`XlsxShapeAnchor`,
 //! `XlsxShapeBodyProperties`, `XlsxGroupTransform`, paragraphs and runs) so
 //! anything authored here round-trips through the shape inventory with
 //! identical semantics.
@@ -23,13 +23,14 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use litchi_core::xml::escape::escape_xml;
+use litchi_drawingml::geom::Preset;
 
 use crate::xlsx::shape_geometry::write::write_custom_geometry;
 use crate::xlsx::shape_geometry::{XlsxCustomGeometry, validate_custom_geometry};
 use crate::xlsx::shapes::{
-    XlsxCellMarker, XlsxEditAs, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor,
-    XlsxShapeBodyProperties, XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun, XlsxTextAutofit,
-    XlsxTextDirection, XlsxTextVerticalAnchor, XlsxTextWrap,
+    Columns, Geometry, XlsxCellMarker, XlsxEditAs, XlsxEmuExtent, XlsxEmuOffset,
+    XlsxGroupTransform, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeParagraph, XlsxShapeRun,
+    XlsxTextAutofit, XlsxTextDirection, XlsxTextVerticalAnchor, XlsxTextWrap,
 };
 
 /// Maximum number of authored top-level drawing objects per worksheet.
@@ -48,11 +49,6 @@ const MAX_RUNS_PER_PARAGRAPH: usize = 4096;
 const MAX_GROUP_CHILDREN: usize = 1024;
 /// Maximum group nesting depth, mirroring the reader's limit.
 const MAX_GROUP_DEPTH: usize = 32;
-/// DrawingML text bodies allow at most 16 columns.
-const MAX_TEXT_COLUMNS: u32 = 16;
-/// ST_TextFontSize bounds, in hundredths of a point.
-const MIN_FONT_SIZE_HUNDREDTHS: u32 = 100;
-const MAX_FONT_SIZE_HUNDREDTHS: u32 = 400_000;
 
 /// One authored DrawingML text-box shape for a worksheet drawing part.
 ///
@@ -71,12 +67,8 @@ pub struct XlsxShapeSpec {
     pub is_text_box: bool,
     /// How the shape is anchored on the worksheet grid.
     pub anchor: XlsxShapeAnchor,
-    /// Preset geometry (`a:prstGeom@prst`), used when no custom geometry is
-    /// set.
-    pub preset: XlsxShapePreset,
-    /// Custom geometry (`a:custGeom`), written instead of the preset when
-    /// set.
-    pub custom_geometry: Option<XlsxCustomGeometry>,
+    /// The shape's mutually exclusive preset or custom geometry.
+    pub geometry: Geometry,
     /// Text-body properties (`a:bodyPr`).
     pub body_properties: XlsxShapeBodyProperties,
     /// The text story as paragraphs with runs.
@@ -91,7 +83,7 @@ impl XlsxShapeSpec {
     pub fn text_box(
         name: impl Into<String>,
         anchor: XlsxShapeAnchor,
-        preset: XlsxShapePreset,
+        preset: Preset,
         text: &str,
     ) -> Self {
         Self {
@@ -104,7 +96,16 @@ impl XlsxShapeSpec {
     pub fn shape(
         name: impl Into<String>,
         anchor: XlsxShapeAnchor,
-        preset: XlsxShapePreset,
+        preset: Preset,
+        text: &str,
+    ) -> Self {
+        Self::with_geometry(name, anchor, Geometry::Preset(preset), text)
+    }
+
+    fn with_geometry(
+        name: impl Into<String>,
+        anchor: XlsxShapeAnchor,
+        geometry: Geometry,
         text: &str,
     ) -> Self {
         let paragraphs = text
@@ -122,8 +123,7 @@ impl XlsxShapeSpec {
             hidden: false,
             is_text_box: false,
             anchor,
-            preset,
-            custom_geometry: None,
+            geometry,
             body_properties: XlsxShapeBodyProperties::default(),
             paragraphs,
         }
@@ -133,18 +133,13 @@ impl XlsxShapeSpec {
     /// of a preset.
     ///
     /// `text` is split into paragraphs on `\n` as in [`XlsxShapeSpec::shape`].
-    /// The `preset` field keeps its default and is not serialized while the
-    /// custom geometry is set.
     pub fn custom(
         name: impl Into<String>,
         anchor: XlsxShapeAnchor,
         geometry: XlsxCustomGeometry,
         text: &str,
     ) -> Self {
-        Self {
-            custom_geometry: Some(geometry),
-            ..Self::shape(name, anchor, XlsxShapePreset::Rectangle, text)
-        }
+        Self::with_geometry(name, anchor, geometry.into(), text)
     }
 
     /// Validate the spec against worksheet bounds and the module limits.
@@ -161,11 +156,6 @@ impl XlsxShapeSpec {
             }
             for run in &paragraph.runs {
                 validate_xml_text(&run.text, "shape run text")?;
-                if run.font_size_hundredths.is_some_and(|size| {
-                    !(MIN_FONT_SIZE_HUNDREDTHS..=MAX_FONT_SIZE_HUNDREDTHS).contains(&size)
-                }) {
-                    return Err("shape run font size is outside DrawingML bounds".to_string());
-                }
                 text_bytes = text_bytes
                     .checked_add(run.text.len())
                     .ok_or_else(|| "shape text byte count overflow".to_string())?;
@@ -174,11 +164,7 @@ impl XlsxShapeSpec {
         if text_bytes > MAX_SHAPE_TEXT_BYTES {
             return Err("shape text bytes limit exceeded".to_string());
         }
-        if !(1..=MAX_TEXT_COLUMNS).contains(&self.body_properties.column_count) {
-            return Err("shape text column count is outside DrawingML bounds".to_string());
-        }
-        validate_preset(&self.preset)?;
-        if let Some(geometry) = &self.custom_geometry {
+        if let Geometry::Custom(geometry) = &self.geometry {
             validate_custom_geometry(geometry)?;
         }
         validate_anchor(&self.anchor)
@@ -209,9 +195,9 @@ pub struct XlsxConnectionShapeSpec {
     pub hidden: bool,
     /// How the connector is anchored on the worksheet grid.
     pub anchor: XlsxShapeAnchor,
-    /// Connector geometry, for example [`XlsxShapePreset::StraightConnector1`],
-    /// [`XlsxShapePreset::BentConnector2`], or [`XlsxShapePreset::CurvedConnector3`].
-    pub preset: XlsxShapePreset,
+    /// Connector geometry, for example [`Preset::StraightConnector1`],
+    /// [`Preset::BentConnector2`], or [`Preset::CurvedConnector3`].
+    pub geometry: Geometry,
     /// Start connection site.
     pub start: XlsxConnectionEndSpec,
     /// End connection site.
@@ -223,7 +209,7 @@ impl XlsxConnectionShapeSpec {
     pub fn new(
         name: impl Into<String>,
         anchor: XlsxShapeAnchor,
-        preset: XlsxShapePreset,
+        geometry: impl Into<Geometry>,
         start: XlsxConnectionEndSpec,
         end: XlsxConnectionEndSpec,
     ) -> Self {
@@ -232,7 +218,7 @@ impl XlsxConnectionShapeSpec {
             description: None,
             hidden: false,
             anchor,
-            preset,
+            geometry: geometry.into(),
             start,
             end,
         }
@@ -255,7 +241,9 @@ impl XlsxConnectionShapeSpec {
         {
             return Err("connection shape reference is too long".to_string());
         }
-        validate_preset(&self.preset)?;
+        if let Geometry::Custom(geometry) = &self.geometry {
+            validate_custom_geometry(geometry)?;
+        }
         validate_anchor(&self.anchor)
     }
 }
@@ -361,14 +349,6 @@ fn validate_identity(name: &str, description: &Option<String>) -> Result<(), Str
         validate_xml_text(description, "shape description")?;
     }
     Ok(())
-}
-
-fn validate_preset(preset: &XlsxShapePreset) -> Result<(), String> {
-    let token = preset.as_str();
-    if token.is_empty() || token.len() > MAX_SHAPE_NAME_BYTES {
-        return Err("shape preset token is empty or too long".to_string());
-    }
-    validate_xml_text(token, "shape preset token")
 }
 
 fn validate_xml_text(value: &str, field: &str) -> Result<(), String> {
@@ -700,11 +680,16 @@ impl ShapeEmitter {
         );
         xml.push_str("</xdr:nvCxnSpPr><xdr:spPr>");
         xml.push_str(r#"<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>"#);
-        let _ = write!(
-            xml,
-            r#"<a:prstGeom prst="{}"><a:avLst/></a:prstGeom>"#,
-            escape_xml(connection.preset.as_str())
-        );
+        match &connection.geometry {
+            Geometry::Preset(preset) => {
+                let _ = write!(
+                    xml,
+                    r#"<a:prstGeom prst="{}"><a:avLst/></a:prstGeom>"#,
+                    escape_xml(preset.token())
+                );
+            },
+            Geometry::Custom(geometry) => write_custom_geometry(xml, geometry),
+        }
         xml.push_str("</xdr:spPr></xdr:cxnSp>");
         Ok(())
     }
@@ -826,13 +811,13 @@ fn write_shape_xml(xml: &mut String, spec: &XlsxShapeSpec, id: u32) {
     }
     xml.push_str("</xdr:nvSpPr><xdr:spPr>");
     xml.push_str(r#"<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>"#);
-    match &spec.custom_geometry {
-        Some(geometry) => write_custom_geometry(xml, geometry),
-        None => {
+    match &spec.geometry {
+        Geometry::Custom(geometry) => write_custom_geometry(xml, geometry),
+        Geometry::Preset(preset) => {
             let _ = write!(
                 xml,
                 r#"<a:prstGeom prst="{}"><a:avLst/></a:prstGeom>"#,
-                escape_xml(spec.preset.as_str())
+                escape_xml(preset.token())
             );
         },
     }
@@ -857,49 +842,34 @@ fn write_body_properties(xml: &mut String, body: &XlsxShapeBodyProperties) {
     let _ = write!(
         xml,
         r#" lIns="{}" tIns="{}" rIns="{}" bIns="{}""#,
-        body.insets.left.emu(),
-        body.insets.top.emu(),
-        body.insets.right.emu(),
-        body.insets.bottom.emu()
+        body.insets.left, body.insets.top, body.insets.right, body.insets.bottom
     );
-    if body.vertical_anchor != XlsxTextVerticalAnchor::Top {
-        let token = match body.vertical_anchor {
-            XlsxTextVerticalAnchor::Top => unreachable!(),
-            XlsxTextVerticalAnchor::Center => "ctr",
-            XlsxTextVerticalAnchor::Bottom => "b",
-            XlsxTextVerticalAnchor::Justified => "just",
-            XlsxTextVerticalAnchor::Distributed => "dist",
-        };
+    let anchor =
+        (body.vertical_anchor != XlsxTextVerticalAnchor::Top).then(|| body.vertical_anchor.token());
+    if let Some(token) = anchor {
         let _ = write!(xml, r#" anchor="{token}""#);
     }
     if body.anchor_center {
         xml.push_str(r#" anchorCtr="1""#);
     }
-    if body.direction != XlsxTextDirection::Horizontal {
-        let token = match body.direction {
-            XlsxTextDirection::Horizontal => unreachable!(),
-            XlsxTextDirection::Vertical => "vert",
-            XlsxTextDirection::Vertical270 => "vert270",
-            XlsxTextDirection::WordArtVertical => "wordArtVert",
-            XlsxTextDirection::EastAsianVertical => "eaVert",
-            XlsxTextDirection::MongolianVertical => "mongolianVert",
-            XlsxTextDirection::WordArtVerticalRtl => "wordArtVertRtl",
-        };
+    let direction =
+        (body.direction != XlsxTextDirection::Horizontal).then(|| body.direction.token());
+    if let Some(token) = direction {
         let _ = write!(xml, r#" vert="{token}""#);
     }
     if body.wrap == XlsxTextWrap::None {
         xml.push_str(r#" wrap="none""#);
     }
-    if body.column_count != 1 {
+    if body.column_count != Columns::ONE {
         let _ = write!(xml, r#" numCol="{}""#, body.column_count);
     }
     if body.space_first_last_paragraph {
         xml.push_str(r#" spcFirstLastPara="1""#);
     }
     match body.autofit {
-        XlsxTextAutofit::NoAutofit => xml.push_str("><a:noAutofit/></a:bodyPr>"),
-        XlsxTextAutofit::ShapeAutofit => xml.push_str("><a:spAutoFit/></a:bodyPr>"),
-        XlsxTextAutofit::NormalAutofit => xml.push_str("><a:normAutofit/></a:bodyPr>"),
+        XlsxTextAutofit::None => xml.push_str("><a:noAutofit/></a:bodyPr>"),
+        XlsxTextAutofit::Shape => xml.push_str("><a:spAutoFit/></a:bodyPr>"),
+        XlsxTextAutofit::Normal => xml.push_str("><a:normAutofit/></a:bodyPr>"),
     }
 }
 
@@ -907,13 +877,13 @@ fn write_run_properties(xml: &mut String, run: &XlsxShapeRun) {
     if run.bold.is_none()
         && run.italic.is_none()
         && run.underline.is_none()
-        && run.font_size_hundredths.is_none()
+        && run.font_size.is_none()
     {
         xml.push_str("<a:rPr/>");
         return;
     }
     xml.push_str("<a:rPr");
-    if let Some(size) = run.font_size_hundredths {
+    if let Some(size) = run.font_size {
         let _ = write!(xml, r#" sz="{size}""#);
     }
     if let Some(bold) = run.bold {
@@ -923,11 +893,7 @@ fn write_run_properties(xml: &mut String, run: &XlsxShapeRun) {
         xml.push_str(if italic { r#" i="1""# } else { r#" i="0""# });
     }
     if let Some(underline) = run.underline {
-        xml.push_str(if underline {
-            r#" u="sng""#
-        } else {
-            r#" u="none""#
-        });
+        let _ = write!(xml, r#" u="{}""#, underline.dml());
     }
     xml.push_str("/>");
 }
@@ -936,10 +902,11 @@ fn write_run_properties(xml: &mut String, run: &XlsxShapeRun) {
 mod tests {
     use super::*;
     use crate::xlsx::shapes::{
-        XlsxCellMarker, XlsxDrawingObject, XlsxEmu, XlsxShapeRun, XlsxTextInsets,
-        parse_drawing_shapes,
+        Coordinate32, TextSize, XlsxCellMarker, XlsxDrawingObject, XlsxEmu, XlsxShapeRun,
+        XlsxTextInsets, XlsxTextUnderline, parse_drawing_shapes,
     };
     use crate::xlsx::writer::sheet::MutableWorksheet;
+    use litchi_drawingml::coord::Unit;
 
     fn marker(column: u32, row: u32) -> XlsxCellMarker {
         XlsxCellMarker {
@@ -973,27 +940,22 @@ mod tests {
 
     #[test]
     fn two_cell_text_box_round_trips_through_reader() {
-        let mut spec = XlsxShapeSpec::text_box(
-            "Box 1",
-            two_cell(),
-            XlsxShapePreset::RoundRectangle,
-            "Hello",
-        );
+        let mut spec = XlsxShapeSpec::text_box("Box 1", two_cell(), Preset::RoundRect, "Hello");
         spec.description = Some("alt <text>".to_string());
         spec.hidden = true;
         spec.body_properties = XlsxShapeBodyProperties {
             insets: XlsxTextInsets {
-                left: XlsxEmu(182880),
-                top: XlsxEmu(91440),
-                right: XlsxEmu(182880),
-                bottom: XlsxEmu(91440),
+                left: Coordinate32::measure("0.2", Unit::Inch).unwrap(),
+                top: Coordinate32::from(91440),
+                right: Coordinate32::from(182880),
+                bottom: Coordinate32::from(91440),
             },
             vertical_anchor: XlsxTextVerticalAnchor::Center,
             anchor_center: true,
             direction: XlsxTextDirection::Vertical270,
             wrap: XlsxTextWrap::None,
-            autofit: XlsxTextAutofit::ShapeAutofit,
-            column_count: 2,
+            autofit: XlsxTextAutofit::Shape,
+            column_count: Columns::new(2).unwrap(),
             space_first_last_paragraph: true,
         };
         spec.paragraphs = vec![
@@ -1003,8 +965,8 @@ mod tests {
                         text: "Bold &".to_string(),
                         bold: Some(true),
                         italic: Some(false),
-                        underline: Some(true),
-                        font_size_hundredths: Some(1200),
+                        underline: Some(XlsxTextUnderline::DotDashHeavy),
+                        font_size: Some(TextSize::new(1200).unwrap()),
                     },
                     XlsxShapeRun {
                         text: " plain".to_string(),
@@ -1035,7 +997,7 @@ mod tests {
         assert!(shape.non_visual.hidden);
         assert!(!shape.non_visual.locked);
         assert!(shape.is_text_box);
-        assert_eq!(shape.preset, Some(XlsxShapePreset::RoundRectangle));
+        assert_eq!(shape.preset(), Some(Preset::RoundRect));
         let body = shape.text_body.as_ref().unwrap();
         assert_eq!(body.body_properties, spec.body_properties);
         assert_eq!(body.paragraphs, spec.paragraphs);
@@ -1062,8 +1024,7 @@ mod tests {
             },
         };
         for anchor in [one_cell, absolute] {
-            let spec =
-                XlsxShapeSpec::shape("S", anchor, XlsxShapePreset::Other("custGeom".into()), "");
+            let spec = XlsxShapeSpec::shape("S", anchor, Preset::Arc, "");
             let mut xml = String::new();
             ShapeEmitter::new(1)
                 .write_anchored_shape(&mut xml, &spec)
@@ -1074,16 +1035,13 @@ mod tests {
                 panic!("expected a shape");
             };
             assert!(!shape.is_text_box);
-            assert_eq!(
-                shape.preset,
-                Some(XlsxShapePreset::Other("custGeom".to_string()))
-            );
+            assert_eq!(shape.preset(), Some(Preset::Arc));
         }
     }
 
     #[test]
     fn default_body_properties_round_trip() {
-        let spec = XlsxShapeSpec::text_box("Defaults", two_cell(), XlsxShapePreset::Rectangle, "x");
+        let spec = XlsxShapeSpec::text_box("Defaults", two_cell(), Preset::Rect, "x");
         let mut xml = String::new();
         ShapeEmitter::new(2)
             .write_anchored_shape(&mut xml, &spec)
@@ -1100,7 +1058,7 @@ mod tests {
             to: marker(1, 1),
             edit_as: XlsxEditAs::TwoCell,
         };
-        let spec = XlsxShapeSpec::text_box("E", default_edit, XlsxShapePreset::Rectangle, "x");
+        let spec = XlsxShapeSpec::text_box("E", default_edit, Preset::Rect, "x");
         let mut xml = String::new();
         ShapeEmitter::new(3)
             .write_anchored_shape(&mut xml, &spec)
@@ -1111,7 +1069,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_invalid_specs() {
-        let mut spec = XlsxShapeSpec::text_box("", two_cell(), XlsxShapePreset::Rectangle, "x");
+        let mut spec = XlsxShapeSpec::text_box("", two_cell(), Preset::Rect, "x");
         assert!(spec.validate(0).is_err());
         spec.name = "ok".to_string();
         spec.anchor = XlsxShapeAnchor::TwoCell {
@@ -1134,12 +1092,12 @@ mod tests {
     #[test]
     fn worksheet_api_adds_removes_and_serializes_shapes() {
         let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
-        ws.add_text_box("First", two_cell(), XlsxShapePreset::Rectangle, "hello")
+        ws.add_text_box("First", two_cell(), Preset::Rect, "hello")
             .unwrap();
         ws.add_shape(XlsxShapeSpec::text_box(
             "Second",
             two_cell(),
-            XlsxShapePreset::Ellipse,
+            Preset::Ellipse,
             "world",
         ))
         .unwrap();
@@ -1166,7 +1124,7 @@ mod tests {
         let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
         ws.add_image(vec![1, 2, 3], "png", 1, 1, 2, 2, Some("Logo"))
             .unwrap();
-        ws.add_text_box("Note", two_cell(), XlsxShapePreset::Rectangle, "note text")
+        ws.add_text_box("Note", two_cell(), Preset::Rect, "note text")
             .unwrap();
         let xml = ws.generate_drawing_xml().unwrap().unwrap();
         // The image keeps rId1; the shape follows with the next object ID.
@@ -1204,7 +1162,7 @@ mod tests {
                     },
                     edit_as: XlsxEditAs::TwoCell,
                 },
-                XlsxShapePreset::RoundRectangle,
+                Preset::RoundRect,
                 "line one\nline two",
             )
             .unwrap();
@@ -1222,14 +1180,14 @@ mod tests {
                         height: XlsxEmu(914_400),
                     },
                 },
-                XlsxShapePreset::Ellipse,
+                Preset::Ellipse,
                 "fancy",
             );
             fancy.body_properties.vertical_anchor = XlsxTextVerticalAnchor::Bottom;
-            fancy.body_properties.autofit = XlsxTextAutofit::NormalAutofit;
+            fancy.body_properties.autofit = XlsxTextAutofit::Normal;
             fancy.body_properties.wrap = XlsxTextWrap::None;
             fancy.paragraphs[0].runs[0].bold = Some(true);
-            fancy.paragraphs[0].runs[0].font_size_hundredths = Some(1400);
+            fancy.paragraphs[0].runs[0].font_size = Some(TextSize::new(1400).unwrap());
             ws.add_shape(fancy).unwrap();
             let _ = ws;
             workbook.save(&path).unwrap();
@@ -1244,7 +1202,7 @@ mod tests {
         };
         assert_eq!(greeting.non_visual.name.as_deref(), Some("Greeting"));
         assert!(greeting.is_text_box);
-        assert_eq!(greeting.preset, Some(XlsxShapePreset::RoundRectangle));
+        assert_eq!(greeting.preset(), Some(Preset::RoundRect));
         assert_eq!(
             greeting.text_body.as_ref().unwrap().text(),
             "line one\nline two"
@@ -1267,10 +1225,13 @@ mod tests {
             body.body_properties.vertical_anchor,
             XlsxTextVerticalAnchor::Bottom
         );
-        assert_eq!(body.body_properties.autofit, XlsxTextAutofit::NormalAutofit);
+        assert_eq!(body.body_properties.autofit, XlsxTextAutofit::Normal);
         assert_eq!(body.body_properties.wrap, XlsxTextWrap::None);
         assert_eq!(body.paragraphs[0].runs[0].bold, Some(true));
-        assert_eq!(body.paragraphs[0].runs[0].font_size_hundredths, Some(1400));
+        assert_eq!(
+            body.paragraphs[0].runs[0].font_size.map(TextSize::get),
+            Some(1400)
+        );
 
         // The saved package stays valid for the crate's own readers, and the
         // image pipeline still sees its picture.
@@ -1291,6 +1252,7 @@ mod tests {
 #[cfg(test)]
 mod group_connection_tests {
     use super::*;
+    use crate::xlsx::shape_geometry::XlsxGeometryPath;
     use crate::xlsx::shapes::{XlsxCellMarker, XlsxDrawingObject, XlsxEmu, parse_drawing_shapes};
     use crate::xlsx::writer::sheet::MutableWorksheet;
 
@@ -1361,32 +1323,16 @@ mod group_connection_tests {
     #[test]
     fn group_with_nested_children_round_trips() {
         let nested = XlsxGroupSpec::new("Inner", anchor((0, 0), (1, 1))).with_child(
-            XlsxShapeSpec::text_box(
-                "Deep",
-                anchor((0, 0), (1, 1)),
-                XlsxShapePreset::Ellipse,
-                "deep",
-            )
-            .into(),
+            XlsxShapeSpec::text_box("Deep", anchor((0, 0), (1, 1)), Preset::Ellipse, "deep").into(),
         );
         let mut group = XlsxGroupSpec::new("Outer", anchor((1, 1), (8, 12)))
             .with_child(
-                XlsxShapeSpec::text_box(
-                    "First",
-                    anchor((2, 2), (4, 4)),
-                    XlsxShapePreset::Rectangle,
-                    "one",
-                )
-                .into(),
+                XlsxShapeSpec::text_box("First", anchor((2, 2), (4, 4)), Preset::Rect, "one")
+                    .into(),
             )
             .with_child(
-                XlsxShapeSpec::text_box(
-                    "Second",
-                    anchor((5, 5), (7, 7)),
-                    XlsxShapePreset::RoundRectangle,
-                    "two",
-                )
-                .into(),
+                XlsxShapeSpec::text_box("Second", anchor((5, 5), (7, 7)), Preset::RoundRect, "two")
+                    .into(),
             )
             .with_child(nested.into());
         group.transform = Some(transform());
@@ -1428,18 +1374,14 @@ mod group_connection_tests {
 
     #[test]
     fn connector_resolves_named_shapes() {
-        let start_shape = XlsxShapeSpec::text_box(
-            "Start",
-            anchor((0, 0), (2, 2)),
-            XlsxShapePreset::Rectangle,
-            "a",
-        );
+        let start_shape =
+            XlsxShapeSpec::text_box("Start", anchor((0, 0), (2, 2)), Preset::Rect, "a");
         let end_shape =
-            XlsxShapeSpec::text_box("End", anchor((4, 4), (6, 6)), XlsxShapePreset::Ellipse, "b");
+            XlsxShapeSpec::text_box("End", anchor((4, 4), (6, 6)), Preset::Ellipse, "b");
         let connector = XlsxConnectionShapeSpec::new(
             "Link",
             anchor((2, 2), (4, 4)),
-            XlsxShapePreset::BentConnector3,
+            Preset::BentConnector3,
             XlsxConnectionEndSpec {
                 shape_name: "Start".to_string(),
                 site: 3,
@@ -1472,7 +1414,7 @@ mod group_connection_tests {
             panic!("expected a connection shape");
         };
         assert_eq!(link.non_visual.id, Some(7));
-        assert_eq!(link.preset, Some(XlsxShapePreset::BentConnector3));
+        assert_eq!(link.preset(), Some(Preset::BentConnector3));
         assert_eq!(
             link.start,
             Some(crate::xlsx::shapes::XlsxShapeConnectionEnd {
@@ -1492,11 +1434,47 @@ mod group_connection_tests {
     }
 
     #[test]
+    fn custom_connector_geometry_round_trips_without_a_preset_state() {
+        let start = XlsxShapeSpec::shape("Start", anchor((0, 0), (1, 1)), Preset::Rect, "");
+        let end = XlsxShapeSpec::shape("End", anchor((3, 3), (4, 4)), Preset::Rect, "");
+        let geometry = XlsxCustomGeometry::new().with_path(XlsxGeometryPath::new(10, 10));
+        let connector = XlsxConnectionShapeSpec::new(
+            "Custom Link",
+            anchor((1, 1), (3, 3)),
+            geometry,
+            XlsxConnectionEndSpec {
+                shape_name: "Start".to_string(),
+                site: 0,
+            },
+            XlsxConnectionEndSpec {
+                shape_name: "End".to_string(),
+                site: 0,
+            },
+        );
+
+        let mut xml = String::new();
+        let mut emitter = ShapeEmitter::new(1);
+        emitter.write_anchored_shape(&mut xml, &start).unwrap();
+        emitter.write_anchored_shape(&mut xml, &end).unwrap();
+        emitter
+            .write_anchored_connection(&mut xml, &connector)
+            .unwrap();
+        assert!(xml.contains("<a:custGeom>"));
+
+        let objects = parse_drawing_shapes(&drawing_wrap(&xml)).unwrap().unwrap();
+        let XlsxDrawingObject::ConnectionShape(connection) = &objects[2].object else {
+            panic!("expected a connection shape");
+        };
+        assert_eq!(connection.preset(), None);
+        assert!(connection.custom_geometry().is_some());
+    }
+
+    #[test]
     fn preallocated_graph_resolves_forward_group_child_references() {
         let connection = XlsxConnectionShapeSpec::new(
             "Forward",
             anchor((0, 0), (1, 1)),
-            XlsxShapePreset::StraightConnector1,
+            Preset::StraightConnector1,
             XlsxConnectionEndSpec {
                 shape_name: "Later".to_string(),
                 site: 0,
@@ -1509,17 +1487,10 @@ mod group_connection_tests {
         let group = XlsxGroupSpec::new("Group", anchor((0, 0), (4, 4)))
             .with_child(connection.into())
             .with_child(
-                XlsxShapeSpec::shape(
-                    "Later",
-                    anchor((1, 1), (2, 2)),
-                    XlsxShapePreset::Rectangle,
-                    "",
-                )
-                .into(),
+                XlsxShapeSpec::shape("Later", anchor((1, 1), (2, 2)), Preset::Rect, "").into(),
             )
             .with_child(
-                XlsxShapeSpec::shape("Last", anchor((2, 2), (3, 3)), XlsxShapePreset::Ellipse, "")
-                    .into(),
+                XlsxShapeSpec::shape("Last", anchor((2, 2), (3, 3)), Preset::Ellipse, "").into(),
             );
         let mut emitter = ShapeEmitter::for_objects(1, &[], std::slice::from_ref(&group), &[])
             .expect("shape graph should preallocate");
@@ -1539,24 +1510,14 @@ mod group_connection_tests {
     #[test]
     fn connector_to_group_child_resolves() {
         let group = XlsxGroupSpec::new("Box", anchor((0, 0), (3, 3))).with_child(
-            XlsxShapeSpec::text_box(
-                "Child",
-                anchor((0, 0), (1, 1)),
-                XlsxShapePreset::Rectangle,
-                "c",
-            )
-            .into(),
+            XlsxShapeSpec::text_box("Child", anchor((0, 0), (1, 1)), Preset::Rect, "c").into(),
         );
-        let target = XlsxShapeSpec::text_box(
-            "Target",
-            anchor((5, 5), (7, 7)),
-            XlsxShapePreset::Ellipse,
-            "t",
-        );
+        let target =
+            XlsxShapeSpec::text_box("Target", anchor((5, 5), (7, 7)), Preset::Ellipse, "t");
         let connector = XlsxConnectionShapeSpec::new(
             "L",
             anchor((3, 3), (5, 5)),
-            XlsxShapePreset::StraightConnector1,
+            Preset::StraightConnector1,
             XlsxConnectionEndSpec {
                 shape_name: "Child".to_string(),
                 site: 0,
@@ -1587,7 +1548,7 @@ mod group_connection_tests {
         let dangling = XlsxConnectionShapeSpec::new(
             "Bad",
             anchor((0, 0), (1, 1)),
-            XlsxShapePreset::StraightConnector1,
+            Preset::StraightConnector1,
             XlsxConnectionEndSpec {
                 shape_name: "Ghost".to_string(),
                 site: 0,
@@ -1605,12 +1566,7 @@ mod group_connection_tests {
         );
 
         // Duplicate shape names are ambiguous and rejected.
-        let shape = XlsxShapeSpec::text_box(
-            "Dup",
-            anchor((0, 0), (1, 1)),
-            XlsxShapePreset::Rectangle,
-            "",
-        );
+        let shape = XlsxShapeSpec::text_box("Dup", anchor((0, 0), (1, 1)), Preset::Rect, "");
         let mut xml = String::new();
         let mut emitter = ShapeEmitter::new(1);
         emitter.write_anchored_shape(&mut xml, &shape).unwrap();
@@ -1620,24 +1576,16 @@ mod group_connection_tests {
     #[test]
     fn worksheet_api_manages_groups_and_connections() {
         let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
-        ws.add_text_box("A", anchor((0, 0), (2, 2)), XlsxShapePreset::Rectangle, "a")
+        ws.add_text_box("A", anchor((0, 0), (2, 2)), Preset::Rect, "a")
             .unwrap();
-        ws.add_group(
-            XlsxGroupSpec::new("G", anchor((3, 3), (6, 6))).with_child(
-                XlsxShapeSpec::text_box(
-                    "GA",
-                    anchor((3, 3), (4, 4)),
-                    XlsxShapePreset::Ellipse,
-                    "g",
-                )
-                .into(),
-            ),
-        )
+        ws.add_group(XlsxGroupSpec::new("G", anchor((3, 3), (6, 6))).with_child(
+            XlsxShapeSpec::text_box("GA", anchor((3, 3), (4, 4)), Preset::Ellipse, "g").into(),
+        ))
         .unwrap();
         ws.add_connection(XlsxConnectionShapeSpec::new(
             "C",
             anchor((2, 2), (3, 3)),
-            XlsxShapePreset::CurvedConnector3,
+            Preset::CurvedConnector3,
             XlsxConnectionEndSpec {
                 shape_name: "A".to_string(),
                 site: 1,
@@ -1670,7 +1618,7 @@ mod group_connection_tests {
         ws.add_connection(XlsxConnectionShapeSpec::new(
             "Dangling",
             anchor((0, 0), (1, 1)),
-            XlsxShapePreset::StraightConnector1,
+            Preset::StraightConnector1,
             XlsxConnectionEndSpec {
                 shape_name: "Nope".to_string(),
                 site: 0,
@@ -1696,38 +1644,23 @@ mod group_connection_tests {
             let ws = workbook.worksheet_mut(0).unwrap();
             sheet_name = ws.name().to_string();
             ws.add_image(vec![7, 7], "png", 1, 1, 2, 2, None).unwrap();
-            ws.add_text_box(
-                "Solo",
-                anchor((0, 0), (2, 2)),
-                XlsxShapePreset::Rectangle,
-                "solo",
-            )
-            .unwrap();
+            ws.add_text_box("Solo", anchor((0, 0), (2, 2)), Preset::Rect, "solo")
+                .unwrap();
             let mut group = XlsxGroupSpec::new("Pair", anchor((3, 3), (9, 9)))
                 .with_child(
-                    XlsxShapeSpec::text_box(
-                        "Left",
-                        anchor((3, 3), (5, 5)),
-                        XlsxShapePreset::Rectangle,
-                        "L",
-                    )
-                    .into(),
+                    XlsxShapeSpec::text_box("Left", anchor((3, 3), (5, 5)), Preset::Rect, "L")
+                        .into(),
                 )
                 .with_child(
-                    XlsxShapeSpec::text_box(
-                        "Right",
-                        anchor((6, 6), (8, 8)),
-                        XlsxShapePreset::Ellipse,
-                        "R",
-                    )
-                    .into(),
+                    XlsxShapeSpec::text_box("Right", anchor((6, 6), (8, 8)), Preset::Ellipse, "R")
+                        .into(),
                 );
             group.transform = Some(transform());
             ws.add_group(group).unwrap();
             ws.add_connection(XlsxConnectionShapeSpec::new(
                 "Bridge",
                 anchor((5, 5), (6, 6)),
-                XlsxShapePreset::StraightConnector1,
+                Preset::StraightConnector1,
                 XlsxConnectionEndSpec {
                     shape_name: "Left".to_string(),
                     site: 4,
@@ -1770,7 +1703,7 @@ mod group_connection_tests {
         let XlsxDrawingObject::ConnectionShape(bridge) = &inventory.objects[2].object else {
             panic!("expected a connection shape");
         };
-        assert_eq!(bridge.preset, Some(XlsxShapePreset::StraightConnector1));
+        assert_eq!(bridge.preset(), Some(Preset::StraightConnector1));
         assert_eq!(bridge.start.unwrap().shape_id, left.non_visual.id.unwrap());
         assert_eq!(bridge.start.unwrap().site, 4);
         assert_eq!(bridge.end.unwrap().shape_id, right.non_visual.id.unwrap());

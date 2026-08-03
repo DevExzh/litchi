@@ -11,6 +11,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use crate::xlsx::cell::Cell;
+use crate::xlsx::conditional_formatting::IconSet;
 use crate::xlsx::namespace::is_spreadsheetml_name;
 use crate::xlsx::sort::{SortBy, SortCondition, SortMethod, SortState};
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
@@ -704,9 +705,7 @@ fn parse_sort_state(element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<S
     let range = required_string(element, b"ref", decoder, "table sortState reference")?;
     validate_table_range(&range, "table sortState reference")?;
     let sort_method = unqualified_attribute_value(element, b"sortMethod", decoder)?
-        .map(|value| {
-            SortMethod::parse(&value).ok_or_else(|| format!("invalid table sort method '{value}'"))
-        })
+        .map(|value| value.parse::<SortMethod>())
         .transpose()?;
     Ok(SortState {
         ref_range: range,
@@ -731,11 +730,9 @@ fn parse_sort_condition(element: &BytesStart<'_>, decoder: Decoder) -> SheetResu
     let range = required_string(element, b"ref", decoder, "table sort condition reference")?;
     validate_table_range(&range, "table sort condition reference")?;
     let sort_by = unqualified_attribute_value(element, b"sortBy", decoder)?
-        .map(|value| {
-            SortBy::parse(&value).ok_or_else(|| format!("invalid table sort criterion '{value}'"))
-        })
+        .map(|value| value.parse::<SortBy>())
         .transpose()?;
-    Ok(SortCondition {
+    let condition = SortCondition {
         ref_range: range,
         descending: optional_bool(
             element,
@@ -746,9 +743,13 @@ fn parse_sort_condition(element: &BytesStart<'_>, decoder: Decoder) -> SheetResu
         sort_by,
         custom_list: unqualified_attribute_value(element, b"customList", decoder)?,
         dxf_id: optional_u32(element, b"dxfId", decoder, "table sort condition dxfId")?,
-        icon_set: unqualified_attribute_value(element, b"iconSet", decoder)?,
+        icon_set: unqualified_attribute_value(element, b"iconSet", decoder)?
+            .map(|value| value.parse::<IconSet>())
+            .transpose()?,
         icon_id: optional_u32(element, b"iconId", decoder, "table sort condition iconId")?,
-    })
+    };
+    condition.validate()?;
+    Ok(condition)
 }
 
 fn required_string(

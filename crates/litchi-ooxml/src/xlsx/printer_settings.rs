@@ -1,12 +1,11 @@
 //! SpreadsheetML worksheet Printer Settings references and inert DEVMODE parts.
 
 use crate::error::{OoxmlError, Result};
-use crate::xlsx::page_setup::parse_complete_worksheet_page_setup;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use crate::xlsx::page_setup::parse_worksheet_page_setup_relationship_id;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -76,17 +75,12 @@ pub fn parse_worksheet_printer_settings_reference(
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("worksheet XML bytes"));
     }
-    validate_mce(xml)?;
-    let setup = parse_complete_worksheet_page_setup(xml)?;
-    let Some(id) = setup
-        .as_ref()
-        .and_then(|value| value.printer_settings_relationship_id())
-    else {
+    let Some(id) = parse_worksheet_page_setup_relationship_id(xml)? else {
         return Ok(None);
     };
-    validate_id(id)?;
+    validate_id(id.as_str())?;
     Ok(Some(WorksheetPrinterSettingsReference {
-        relationship_id: id.to_owned(),
+        relationship_id: id.into_string(),
     }))
 }
 
@@ -271,7 +265,7 @@ fn add_reference_to_worksheet(
         let start = usize::try_from(reader.buffer_position())
             .map_err(|_| invalid("worksheet XML offset overflow"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let resolver = reader.resolver().clone();
+        let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         let end = usize::try_from(reader.buffer_position())
             .map_err(|_| invalid("worksheet XML offset overflow"))?;
@@ -286,7 +280,8 @@ fn add_reference_to_worksheet(
                     }
                     root = true;
                 } else if depth == 1 && core && element.local_name().as_ref() == b"pageSetup" {
-                    if page_setup.replace((end - 1, false)).is_some() {
+                    let prefix = relationship_attribute_prefix(resolver, conformance.rel())?;
+                    if page_setup.replace((end - 1, false, prefix)).is_some() {
                         return Err(invalid("worksheet has multiple direct pageSetup elements"));
                     }
                 } else if depth == 1 && core && later.contains(&element.local_name().as_ref()) {
@@ -302,7 +297,8 @@ fn add_reference_to_worksheet(
             Event::Empty(element) => {
                 let core = exact(&namespace, conformance.sml());
                 if depth == 1 && core && element.local_name().as_ref() == b"pageSetup" {
-                    if page_setup.replace((end - 2, true)).is_some() {
+                    let prefix = relationship_attribute_prefix(resolver, conformance.rel())?;
+                    if page_setup.replace((end - 2, true, prefix)).is_some() {
                         return Err(invalid("worksheet has multiple direct pageSetup elements"));
                     }
                 } else if depth == 1 && core && later.contains(&element.local_name().as_ref()) {
@@ -329,13 +325,27 @@ fn add_reference_to_worksheet(
         return Err(invalid("invalid worksheet XML"));
     }
     let mut addition = Vec::new();
-    if let Some((position, empty)) = page_setup {
-        addition.extend_from_slice(b" xmlns:r=\"");
-        escape(&mut addition, conformance.rel());
-        addition.extend_from_slice(b"\" r:id=\"");
+    if let Some((position, empty, (prefix, declare))) = page_setup {
+        if declare {
+            addition.extend_from_slice(b" xmlns:");
+            addition.extend_from_slice(&prefix);
+            addition.extend_from_slice(b"=\"");
+            escape(&mut addition, conformance.rel());
+            addition.push(b'\"');
+        }
+        addition.push(b' ');
+        addition.extend_from_slice(&prefix);
+        addition.extend_from_slice(b":id=\"");
         escape(&mut addition, &reference.relationship_id);
         addition.push(b'\"');
-        let mut output = Vec::with_capacity(xml.len() + addition.len());
+        let length = xml
+            .len()
+            .checked_add(addition.len())
+            .ok_or_else(|| limit("updated worksheet XML bytes"))?;
+        if length > MAX_XML_BYTES {
+            return Err(limit("updated worksheet XML bytes"));
+        }
+        let mut output = Vec::with_capacity(length);
         output.extend_from_slice(&xml[..position]);
         output.extend_from_slice(&addition);
         output.extend_from_slice(&xml[position..]);
@@ -360,17 +370,38 @@ fn add_reference_to_worksheet(
     Ok(output)
 }
 
-fn validate_mce(xml: &[u8]) -> Result<()> {
-    let limits = MceLimits {
-        max_input_bytes: MAX_XML_BYTES,
-        max_output_bytes: MAX_XML_BYTES,
-        max_depth: MAX_DEPTH,
-        max_namespace_bindings: 4096,
-        max_directive_tokens: 4096,
-        max_choices_per_alternate: 1024,
-    };
-    process_markup_compatibility(xml, &MceCapabilities::default(), &limits)?;
-    Ok(())
+/// Select an in-scope relationship prefix, or a deterministic fresh prefix.
+///
+/// Reusing a binding avoids duplicate `xmlns:r` attributes when the existing
+/// `pageSetup` already declares the relationship namespace. If `r` is bound to
+/// another namespace, a fresh `rN` prefix preserves that declaration.
+fn relationship_attribute_prefix(
+    resolver: &NamespaceResolver,
+    relationship_namespace: &str,
+) -> Result<(Vec<u8>, bool)> {
+    let active_bindings = resolver.bindings().count();
+    for index in 0..=active_bindings {
+        let prefix = if index == 0 {
+            b"r".to_vec()
+        } else {
+            format!("r{index}").into_bytes()
+        };
+        let mut qualified_name = Vec::with_capacity(prefix.len() + b":id".len());
+        qualified_name.extend_from_slice(&prefix);
+        qualified_name.extend_from_slice(b":id");
+        match resolver.resolve_attribute(QName(&qualified_name)).0 {
+            ResolveResult::Bound(Namespace(namespace))
+                if namespace == relationship_namespace.as_bytes() =>
+            {
+                return Ok((prefix, false));
+            },
+            ResolveResult::Unknown(_) | ResolveResult::Unbound => {
+                return Ok((prefix, true));
+            },
+            ResolveResult::Bound(_) => {},
+        }
+    }
+    Err(limit("namespace prefixes"))
 }
 
 fn worksheet_conformance(xml: &[u8]) -> Result<PrinterSettingsConformance> {
@@ -436,11 +467,13 @@ pub(crate) fn validate_printer_settings_uri(uri: &PackURI) -> Result<()> {
     Ok(())
 }
 fn validate_id(id: &str) -> Result<()> {
-    if id.is_empty() || id.len() > MAX_RELATIONSHIP_ID_BYTES {
+    if id.len() > MAX_RELATIONSHIP_ID_BYTES {
         return Err(invalid("invalid Printer Settings relationship ID length"));
     }
     let mut bytes = id.bytes();
-    let first = bytes.next().unwrap();
+    let Some(first) = bytes.next() else {
+        return Err(invalid("invalid Printer Settings relationship ID length"));
+    };
     if !(first.is_ascii_alphabetic() || first == b'_')
         || !bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
     {
@@ -607,6 +640,51 @@ mod tests {
         .unwrap();
         let xml = std::str::from_utf8(package.get_part(&uri).unwrap().blob()).unwrap();
         assert!(xml.find("pageSetup").unwrap() < xml.find("headerFooter").unwrap());
+    }
+
+    #[test]
+    fn package_writer_reuses_or_avoids_existing_relationship_prefixes() {
+        let existing = format!(r#"<x:pageSetup xmlns:r="{REL}" orientation="portrait"/>"#);
+        let (mut existing_package, uri) =
+            package(PrinterSettingsConformance::Transitional, &existing);
+        store_worksheet_printer_settings(
+            &mut existing_package,
+            &uri,
+            &value(),
+            PrinterSettingsConformance::Transitional,
+        )
+        .unwrap();
+        let xml = std::str::from_utf8(existing_package.get_part(&uri).unwrap().blob()).unwrap();
+        assert_eq!(xml.matches(&format!(r#"xmlns:r="{REL}""#)).count(), 1);
+        assert!(xml.contains(r#" r:id="rIdPrinter""#));
+        assert_eq!(
+            parse_worksheet_printer_settings_reference(xml.as_bytes())
+                .unwrap()
+                .unwrap()
+                .relationship_id,
+            "rIdPrinter"
+        );
+
+        let conflicting =
+            r#"<x:pageSetup xmlns:r="urn:vendor" orientation="portrait"> </x:pageSetup>"#;
+        let (mut package, uri) = package(PrinterSettingsConformance::Transitional, conflicting);
+        store_worksheet_printer_settings(
+            &mut package,
+            &uri,
+            &value(),
+            PrinterSettingsConformance::Transitional,
+        )
+        .unwrap();
+        let xml = std::str::from_utf8(package.get_part(&uri).unwrap().blob()).unwrap();
+        assert!(xml.contains(r#"xmlns:r="urn:vendor""#));
+        assert!(xml.contains(&format!(r#"xmlns:r1="{REL}" r1:id="rIdPrinter""#)));
+        assert_eq!(
+            parse_worksheet_printer_settings_reference(xml.as_bytes())
+                .unwrap()
+                .unwrap()
+                .relationship_id,
+            "rIdPrinter"
+        );
     }
 
     #[test]

@@ -112,6 +112,20 @@ pub fn unqualified_attribute_value(
     Ok(value)
 }
 
+/// Borrow one whitespace-collapsed XML Schema `token` atom.
+///
+/// XML Schema collapse recognizes only space, tab, carriage return, and line
+/// feed. Returning a borrowed atom lets fixed-token parsers accept surrounding
+/// schema whitespace without allocating; a value that collapses to zero or
+/// multiple atoms returns `None`.
+pub fn xsd_token_atom(value: &str) -> Option<&str> {
+    let mut atoms = value
+        .split([' ', '\t', '\n', '\r'])
+        .filter(|atom| !atom.is_empty());
+    let atom = atoms.next()?;
+    atoms.next().is_none().then_some(atom)
+}
+
 /// Return whether `value` is an XML 1.0 Fifth Edition NCName.
 ///
 /// Relationship IDs and namespace prefixes use this Unicode-aware grammar;
@@ -325,6 +339,15 @@ mod tests {
         assert!(!is_ncname("1relationship"));
         assert!(!is_ncname("r:id"));
         assert!(!is_ncname("relationship id"));
+    }
+
+    #[test]
+    fn xsd_token_atom_collapses_only_schema_whitespace_without_allocating() {
+        assert_eq!(xsd_token_atom(" \t\r\nrect "), Some("rect"));
+        assert_eq!(xsd_token_atom("rect"), Some("rect"));
+        assert_eq!(xsd_token_atom("re ct"), None);
+        assert_eq!(xsd_token_atom(" \t\r\n "), None);
+        assert_eq!(xsd_token_atom("\u{000b}rect"), Some("\u{000b}rect"));
     }
 
     #[test]

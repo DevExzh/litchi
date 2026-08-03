@@ -1253,7 +1253,7 @@ impl MutableXlsbWorksheet {
         &mut self,
         name: impl Into<String>,
         anchor: crate::xlsx::XlsxShapeAnchor,
-        preset: crate::xlsx::XlsxShapePreset,
+        preset: crate::xlsx::Preset,
         text: &str,
     ) -> XlsbResult<()> {
         self.add_shape(crate::xlsx::writer::XlsxShapeSpec::text_box(

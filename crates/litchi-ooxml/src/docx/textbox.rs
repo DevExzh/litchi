@@ -17,12 +17,17 @@
 //! Everything is treated as inert metadata: linked OLE objects, scripts, and
 //! style bodies are never interpreted or followed.
 
-use crate::docx::drawing::ShapeType;
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
+use litchi_drawingml::geom::{Preset, TextPreset};
+pub use litchi_drawingml::text::{
+    Anchor as TextVerticalAnchor, Autofit as TextBoxAutofit, Columns, Coordinate32,
+    Direction as TextDirection, Underline as TextUnderline, Wrap as TextWrap,
+};
+use litchi_drawingml::text::{parse_bool, parse_on_off};
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_ooxml_common::xml::{
-    decode_xml_reference, is_drawingml_name, unqualified_attribute_value,
+    decode_xml_reference, is_drawingml_name, unqualified_attribute_value, xsd_token_atom,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -37,9 +42,9 @@ const VML_NAMESPACE: &[u8] = b"urn:schemas-microsoft-com:vml";
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 
 /// ECMA-376 default left/right text inset (0.1 inch) when `lIns`/`rIns` are absent.
-const DEFAULT_HORIZONTAL_INSET_EMU: i64 = 91440;
+const DEFAULT_HORIZONTAL_INSET_EMU: i32 = 91440;
 /// ECMA-376 default top/bottom text inset (0.05 inch) when `tIns`/`bIns` are absent.
-const DEFAULT_VERTICAL_INSET_EMU: i64 = 45720;
+const DEFAULT_VERTICAL_INSET_EMU: i32 = 45720;
 
 const MAX_DOCUMENT_XML: usize = 32 * 1024 * 1024;
 const MAX_TEXT_BOXES: usize = 256;
@@ -60,312 +65,35 @@ pub enum TextBoxAnchor {
     Vml,
 }
 
-/// Vertical anchoring of text within the shape (`wps:bodyPr@anchor`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[repr(u8)]
-pub enum TextVerticalAnchor {
-    /// Text starts at the top inset (`t`, the ECMA-376 default).
-    #[default]
-    Top,
-    /// Text is vertically centered (`ctr`).
-    Center,
-    /// Text ends at the bottom inset (`b`).
-    Bottom,
-    /// Lines are spread to fill the shape (`just`).
-    Justified,
-    /// Words are spread to fill the shape (`dist`).
-    Distributed,
-}
-
-impl TextVerticalAnchor {
-    fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "t" => Some(Self::Top),
-            "ctr" => Some(Self::Center),
-            "b" => Some(Self::Bottom),
-            "just" => Some(Self::Justified),
-            "dist" => Some(Self::Distributed),
-            _ => None,
-        }
-    }
-
-    /// The vertical-anchor token for this anchor.
-    pub fn as_token(self) -> &'static str {
-        match self {
-            Self::Top => "t",
-            Self::Center => "ctr",
-            Self::Bottom => "b",
-            Self::Justified => "just",
-            Self::Distributed => "dist",
-        }
-    }
-}
-
-/// Direction of text within the shape (`wps:bodyPr@vert`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[repr(u8)]
-pub enum TextDirection {
-    /// Horizontal text (`horz`, the ECMA-376 default).
-    #[default]
-    Horizontal,
-    /// Vertical text, each line rotated 90 degrees (`vert`).
-    Vertical,
-    /// Vertical text, each line rotated 270 degrees (`vert270`).
-    Vertical270,
-    /// WordArt vertical text, letters stacked upright (`wordArtVert`).
-    WordArtVertical,
-    /// East Asian vertical text (`eaVert`).
-    EastAsianVertical,
-    /// Mongolian vertical text (`mongolianVert`).
-    MongolianVertical,
-    /// Right-to-left WordArt vertical text (`wordArtVertRtl`).
-    WordArtVerticalRtl,
-}
-
-impl TextDirection {
-    fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "horz" => Some(Self::Horizontal),
-            "vert" => Some(Self::Vertical),
-            "vert270" => Some(Self::Vertical270),
-            "wordArtVert" => Some(Self::WordArtVertical),
-            "eaVert" => Some(Self::EastAsianVertical),
-            "mongolianVert" => Some(Self::MongolianVertical),
-            "wordArtVertRtl" => Some(Self::WordArtVerticalRtl),
-            _ => None,
-        }
-    }
-
-    /// The ST_TextDirection token for this direction.
-    pub fn as_token(self) -> &'static str {
-        match self {
-            Self::Horizontal => "horz",
-            Self::Vertical => "vert",
-            Self::Vertical270 => "vert270",
-            Self::WordArtVertical => "wordArtVert",
-            Self::EastAsianVertical => "eaVert",
-            Self::MongolianVertical => "mongolianVert",
-            Self::WordArtVerticalRtl => "wordArtVertRtl",
-        }
-    }
-}
-
-/// Whether text wraps inside the shape extents (`wps:bodyPr@wrap`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[repr(u8)]
-pub enum TextWrap {
-    /// Text wraps within the bounding rectangle (`square`, the ECMA-376 default).
-    #[default]
-    Square,
-    /// Text does not wrap; the shape extents are ignored (`none`).
-    None,
-}
-
-impl TextWrap {
-    fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "square" => Some(Self::Square),
-            "none" => Some(Self::None),
-            _ => None,
-        }
-    }
-
-    /// The wrap token for this mode.
-    pub fn as_token(self) -> &'static str {
-        match self {
-            Self::Square => "square",
-            Self::None => "none",
-        }
-    }
-}
-
-/// Autofit behavior of the text body (`wps:bodyPr` child element).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[repr(u8)]
-pub enum TextBoxAutofit {
-    /// `a:noAutofit` — text is not resized and does not resize the shape (default).
-    #[default]
-    NoAutofit,
-    /// `a:spAutoFit` — the shape grows or shrinks to fit the text.
-    ShapeAutofit,
-    /// `a:normAutofit` — the text is scaled to fit the shape.
-    NormalAutofit,
-}
-
-/// Standard DrawingML text warp presets (`a:prstTxWarp@prst`, ST_TextShapeType).
-///
-/// The `NoShape` preset (`textNoShape`) disables warping and is the value Word
-/// writes on ordinary text boxes; any other preset marks WordArt.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[repr(u8)]
-pub enum TextWarpPreset {
-    /// `textNoShape` — no warp (ordinary text box).
-    #[default]
-    NoShape,
-    /// `textPlain`.
-    Plain,
-    /// `textStop`.
-    Stop,
-    /// `textTriangle`.
-    Triangle,
-    /// `textTriangleInverted`.
-    TriangleInverted,
-    /// `textChevron`.
-    Chevron,
-    /// `textChevronInverted`.
-    ChevronInverted,
-    /// `textRingInside`.
-    RingInside,
-    /// `textRingOutside`.
-    RingOutside,
-    /// `textArchUp`.
-    ArchUp,
-    /// `textArchDown`.
-    ArchDown,
-    /// `textCircle`.
-    Circle,
-    /// `textButtonUp`.
-    ButtonUp,
-    /// `textButtonDown`.
-    ButtonDown,
-    /// `textArchUpPour`.
-    ArchUpPour,
-    /// `textArchDownPour`.
-    ArchDownPour,
-    /// `textCirclePour`.
-    CirclePour,
-    /// `textButtonPour`.
-    ButtonPour,
-    /// `textCurveUp`.
-    CurveUp,
-    /// `textCurveDown`.
-    CurveDown,
-    /// `textCanUp`.
-    CanUp,
-    /// `textCanDown`.
-    CanDown,
-    /// `textWave1`.
-    Wave1,
-    /// `textWave2`.
-    Wave2,
-    /// `textDoubleWave1`.
-    DoubleWave1,
-    /// `textWave4`.
-    Wave4,
-    /// `textInflate`.
-    Inflate,
-    /// `textDeflate`.
-    Deflate,
-    /// `textInflateBottom`.
-    InflateBottom,
-    /// `textDeflateBottom`.
-    DeflateBottom,
-    /// `textInflateTop`.
-    InflateTop,
-    /// `textDeflateTop`.
-    DeflateTop,
-    /// `textDeflateInflate`.
-    DeflateInflate,
-    /// `textDeflateInflateDeflate`.
-    DeflateInflateDeflate,
-    /// `textFadeRight`.
-    FadeRight,
-    /// `textFadeLeft`.
-    FadeLeft,
-    /// `textFadeUp`.
-    FadeUp,
-    /// `textFadeDown`.
-    FadeDown,
-    /// `textSlantUp`.
-    SlantUp,
-    /// `textSlantDown`.
-    SlantDown,
-    /// `textCascadeUp`.
-    CascadeUp,
-    /// `textCascadeDown`.
-    CascadeDown,
-}
-
-impl TextWarpPreset {
-    /// Parse a preset from its ST_TextShapeType token.
-    pub fn from_token(token: &str) -> Option<Self> {
-        match token {
-            "textNoShape" => Some(Self::NoShape),
-            "textPlain" => Some(Self::Plain),
-            "textStop" => Some(Self::Stop),
-            "textTriangle" => Some(Self::Triangle),
-            "textTriangleInverted" => Some(Self::TriangleInverted),
-            "textChevron" => Some(Self::Chevron),
-            "textChevronInverted" => Some(Self::ChevronInverted),
-            "textRingInside" => Some(Self::RingInside),
-            "textRingOutside" => Some(Self::RingOutside),
-            "textArchUp" => Some(Self::ArchUp),
-            "textArchDown" => Some(Self::ArchDown),
-            "textCircle" => Some(Self::Circle),
-            "textButtonUp" => Some(Self::ButtonUp),
-            "textButtonDown" => Some(Self::ButtonDown),
-            "textArchUpPour" => Some(Self::ArchUpPour),
-            "textArchDownPour" => Some(Self::ArchDownPour),
-            "textCirclePour" => Some(Self::CirclePour),
-            "textButtonPour" => Some(Self::ButtonPour),
-            "textCurveUp" => Some(Self::CurveUp),
-            "textCurveDown" => Some(Self::CurveDown),
-            "textCanUp" => Some(Self::CanUp),
-            "textCanDown" => Some(Self::CanDown),
-            "textWave1" => Some(Self::Wave1),
-            "textWave2" => Some(Self::Wave2),
-            "textDoubleWave1" => Some(Self::DoubleWave1),
-            "textWave4" => Some(Self::Wave4),
-            "textInflate" => Some(Self::Inflate),
-            "textDeflate" => Some(Self::Deflate),
-            "textInflateBottom" => Some(Self::InflateBottom),
-            "textDeflateBottom" => Some(Self::DeflateBottom),
-            "textInflateTop" => Some(Self::InflateTop),
-            "textDeflateTop" => Some(Self::DeflateTop),
-            "textDeflateInflate" => Some(Self::DeflateInflate),
-            "textDeflateInflateDeflate" => Some(Self::DeflateInflateDeflate),
-            "textFadeRight" => Some(Self::FadeRight),
-            "textFadeLeft" => Some(Self::FadeLeft),
-            "textFadeUp" => Some(Self::FadeUp),
-            "textFadeDown" => Some(Self::FadeDown),
-            "textSlantUp" => Some(Self::SlantUp),
-            "textSlantDown" => Some(Self::SlantDown),
-            "textCascadeUp" => Some(Self::CascadeUp),
-            "textCascadeDown" => Some(Self::CascadeDown),
-            _ => None,
-        }
-    }
-}
-
-/// Text insets of the shape body (`wps:bodyPr` `lIns`/`tIns`/`rIns`/`bIns`), in EMUs.
+/// Text insets of the shape body (`wps:bodyPr` `lIns`/`tIns`/`rIns`/`bIns`).
 ///
 /// Missing attributes fall back to the ECMA-376 defaults (0.1 inch horizontal,
 /// 0.05 inch vertical).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextBoxInsets {
-    /// Left inset in EMUs.
-    pub left_emu: i64,
-    /// Top inset in EMUs.
-    pub top_emu: i64,
-    /// Right inset in EMUs.
-    pub right_emu: i64,
-    /// Bottom inset in EMUs.
-    pub bottom_emu: i64,
+    /// Left inset.
+    pub left: Coordinate32,
+    /// Top inset.
+    pub top: Coordinate32,
+    /// Right inset.
+    pub right: Coordinate32,
+    /// Bottom inset.
+    pub bottom: Coordinate32,
 }
 
 impl Default for TextBoxInsets {
     fn default() -> Self {
         Self {
-            left_emu: DEFAULT_HORIZONTAL_INSET_EMU,
-            top_emu: DEFAULT_VERTICAL_INSET_EMU,
-            right_emu: DEFAULT_HORIZONTAL_INSET_EMU,
-            bottom_emu: DEFAULT_VERTICAL_INSET_EMU,
+            left: Coordinate32::from(DEFAULT_HORIZONTAL_INSET_EMU),
+            top: Coordinate32::from(DEFAULT_VERTICAL_INSET_EMU),
+            right: Coordinate32::from(DEFAULT_HORIZONTAL_INSET_EMU),
+            bottom: Coordinate32::from(DEFAULT_VERTICAL_INSET_EMU),
         }
     }
 }
 
 /// Text-body properties of a shape (`wps:bodyPr`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextBoxBodyProperties {
     /// Text insets.
     pub insets: TextBoxInsets,
@@ -380,7 +108,7 @@ pub struct TextBoxBodyProperties {
     /// Autofit behavior.
     pub autofit: TextBoxAutofit,
     /// Number of text columns (`numCol`; 1 when absent).
-    pub column_count: u32,
+    pub column_count: Columns,
     /// Whether paragraph spacing is ignored in the first and last paragraphs
     /// (`spcFirstLastPara`).
     pub space_first_last_paragraph: bool,
@@ -396,7 +124,7 @@ impl Default for TextBoxBodyProperties {
             wrap: TextWrap::default(),
             autofit: TextBoxAutofit::default(),
             // ECMA-376 defaults `numCol` to a single column.
-            column_count: 1,
+            column_count: Columns::ONE,
             space_first_last_paragraph: false,
         }
     }
@@ -409,7 +137,7 @@ impl Default for TextBoxBodyProperties {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct WordArt {
     /// The text warp preset (`a:prstTxWarp`), when declared.
-    pub warp: Option<TextWarpPreset>,
+    pub warp: Option<TextPreset>,
     /// At least one run carries Word 2010 text fill styling (`w14:textFill`).
     pub has_text_fill: bool,
     /// At least one run carries Word 2010 text outline styling (`w14:textOutline`).
@@ -427,8 +155,8 @@ pub struct TextBoxRun {
     pub bold: Option<bool>,
     /// Explicit italic toggle, when declared.
     pub italic: Option<bool>,
-    /// Explicit underline toggle, when declared (`w:u` present and not `none`).
-    pub underline: Option<bool>,
+    /// Exact underline style, when declared.
+    pub underline: Option<TextUnderline>,
 }
 
 /// A paragraph inside a text-box story.
@@ -455,7 +183,7 @@ pub struct DocxTextBox {
     /// How the shape is anchored in the document flow.
     pub anchor: TextBoxAnchor,
     /// Preset geometry of the shape, when declared.
-    pub shape_type: Option<ShapeType>,
+    pub preset: Option<Preset>,
     /// Text-body properties (ECMA-376 defaults when `wps:bodyPr` is absent,
     /// which is always the case for the VML fallback representation).
     pub body: TextBoxBodyProperties,
@@ -487,11 +215,11 @@ struct ShapeBuilder {
     anchor: TextBoxAnchor,
     id: Option<u32>,
     name: Option<String>,
-    shape_type: Option<ShapeType>,
+    preset: Option<Preset>,
     body: TextBoxBodyProperties,
     saw_body_pr: bool,
     saw_content: bool,
-    warp: Option<TextWarpPreset>,
+    warp: Option<TextPreset>,
     from_word_art: bool,
     legacy_word_art: bool,
     text_fill: bool,
@@ -524,9 +252,7 @@ impl ShapeBuilder {
         if !self.saw_content && !self.saw_body_pr && !self.legacy_word_art {
             return None;
         }
-        let warped = self
-            .warp
-            .is_some_and(|warp| warp != TextWarpPreset::NoShape);
+        let warped = self.warp.is_some_and(|warp| warp != TextPreset::NoShape);
         let styled = self.text_fill || self.text_outline || self.text_effects;
         let word_art = if warped || self.from_word_art || self.legacy_word_art || styled {
             Some(WordArt {
@@ -542,7 +268,7 @@ impl ShapeBuilder {
             id: self.id,
             name: self.name,
             anchor: self.anchor,
-            shape_type: self.shape_type,
+            preset: self.preset,
             body: self.body,
             word_art,
             paragraphs: self.paragraphs,
@@ -771,8 +497,16 @@ fn handle_element(
                     && builder.in_run_properties
                     && let Some(run) = builder.run.as_mut()
                 {
-                    let value = word_attribute_value(element, b"val", decoder, resolver)?
-                        .is_none_or(|value| is_on(&value));
+                    let value = word_attribute_value(element, b"val", decoder, resolver)?.map_or(
+                        Ok(true),
+                        |value| {
+                            parse_on_off(&value).map_err(|error| {
+                                invalid(format!(
+                                    "invalid WordprocessingML on/off value '{value}': {error}"
+                                ))
+                            })
+                        },
+                    )?;
                     if local == b"b" {
                         run.bold = Some(value);
                     } else {
@@ -785,8 +519,15 @@ fn handle_element(
                     && builder.in_run_properties
                     && let Some(run) = builder.run.as_mut()
                 {
-                    let value = word_attribute_value(element, b"val", decoder, resolver)?;
-                    run.underline = Some(value.as_deref() != Some("none"));
+                    let underline = word_attribute_value(element, b"val", decoder, resolver)?
+                        .map_or(Ok(TextUnderline::Single), |value| {
+                            TextUnderline::from_wml(&value).map_err(|error| {
+                                invalid(format!(
+                                    "invalid WordprocessingML underline '{value}': {error}"
+                                ))
+                            })
+                        })?;
+                    run.underline = Some(underline);
                 }
             },
             _ => {},
@@ -824,16 +565,29 @@ fn handle_element(
         if let Some(builder) = stack.last_mut() {
             match local {
                 b"prstGeom" => {
-                    if let Some(preset) = attribute(element, b"prst", decoder)? {
-                        builder.shape_type = Some(ShapeType::from_preset(&preset));
-                    }
+                    let preset = attribute(element, b"prst", decoder)?
+                        .ok_or_else(|| invalid("DrawingML prstGeom is missing required prst"))?;
+                    let token = xsd_token_atom(&preset).ok_or_else(|| {
+                        invalid(format!("invalid DrawingML shape preset '{preset}'"))
+                    })?;
+                    builder.preset = Some(token.parse().map_err(|error| {
+                        invalid(format!(
+                            "invalid DrawingML shape preset '{preset}': {error}"
+                        ))
+                    })?);
                 },
-                b"noAutofit" => builder.body.autofit = TextBoxAutofit::NoAutofit,
-                b"spAutoFit" => builder.body.autofit = TextBoxAutofit::ShapeAutofit,
-                b"normAutofit" => builder.body.autofit = TextBoxAutofit::NormalAutofit,
+                b"noAutofit" => builder.body.autofit = TextBoxAutofit::None,
+                b"spAutoFit" => builder.body.autofit = TextBoxAutofit::Shape,
+                b"normAutofit" => builder.body.autofit = TextBoxAutofit::Normal,
                 b"prstTxWarp" => {
-                    builder.warp = attribute(element, b"prst", decoder)?
-                        .and_then(|preset| TextWarpPreset::from_token(&preset));
+                    let preset = attribute(element, b"prst", decoder)?
+                        .ok_or_else(|| invalid("DrawingML prstTxWarp is missing required prst"))?;
+                    let token = xsd_token_atom(&preset).ok_or_else(|| {
+                        invalid(format!("invalid DrawingML text preset '{preset}'"))
+                    })?;
+                    builder.warp = Some(token.parse().map_err(|error| {
+                        invalid(format!("invalid DrawingML text preset '{preset}': {error}"))
+                    })?);
                 },
                 _ => {},
             }
@@ -842,7 +596,7 @@ fn handle_element(
         if let Some(builder) = stack.last_mut() {
             match local {
                 b"textpath" => {
-                    if attribute(element, b"on", decoder)?.is_some_and(|v| is_on(&v)) {
+                    if attribute(element, b"on", decoder)?.is_some_and(|v| is_vml_on(&v)) {
                         builder.legacy_word_art = true;
                     }
                 },
@@ -881,61 +635,63 @@ fn parse_body_pr(
 ) -> Result<()> {
     builder.saw_body_pr = true;
     let body = &mut builder.body;
-    if let Some(value) = attribute(element, b"lIns", decoder)?
-        && let Ok(inset) = value.parse()
-    {
-        body.insets.left_emu = inset;
+    if let Some(value) = attribute(element, b"lIns", decoder)? {
+        body.insets.left = parse_text_value(&value, "left text inset")?;
     }
-    if let Some(value) = attribute(element, b"tIns", decoder)?
-        && let Ok(inset) = value.parse()
-    {
-        body.insets.top_emu = inset;
+    if let Some(value) = attribute(element, b"tIns", decoder)? {
+        body.insets.top = parse_text_value(&value, "top text inset")?;
     }
-    if let Some(value) = attribute(element, b"rIns", decoder)?
-        && let Ok(inset) = value.parse()
-    {
-        body.insets.right_emu = inset;
+    if let Some(value) = attribute(element, b"rIns", decoder)? {
+        body.insets.right = parse_text_value(&value, "right text inset")?;
     }
-    if let Some(value) = attribute(element, b"bIns", decoder)?
-        && let Ok(inset) = value.parse()
-    {
-        body.insets.bottom_emu = inset;
+    if let Some(value) = attribute(element, b"bIns", decoder)? {
+        body.insets.bottom = parse_text_value(&value, "bottom text inset")?;
     }
-    if let Some(value) = attribute(element, b"anchor", decoder)?
-        && let Some(anchor) = TextVerticalAnchor::from_token(&value)
-    {
-        body.vertical_anchor = anchor;
+    if let Some(value) = attribute(element, b"anchor", decoder)? {
+        body.vertical_anchor = parse_text_value(&value, "text anchor")?;
     }
     if let Some(value) = attribute(element, b"anchorCtr", decoder)? {
-        body.anchor_center = is_on(&value);
+        body.anchor_center = parse_dml_bool(&value, "anchorCtr")?;
     }
-    if let Some(value) = attribute(element, b"vert", decoder)?
-        && let Some(direction) = TextDirection::from_token(&value)
-    {
-        body.direction = direction;
+    if let Some(value) = attribute(element, b"vert", decoder)? {
+        body.direction = parse_text_value(&value, "text direction")?;
     }
-    if let Some(value) = attribute(element, b"wrap", decoder)?
-        && let Some(wrap) = TextWrap::from_token(&value)
-    {
-        body.wrap = wrap;
+    if let Some(value) = attribute(element, b"wrap", decoder)? {
+        body.wrap = parse_text_value(&value, "text wrap")?;
     }
-    if let Some(value) = attribute(element, b"numCol", decoder)?
-        && let Ok(count) = value.parse()
-    {
-        body.column_count = count;
+    if let Some(value) = attribute(element, b"numCol", decoder)? {
+        body.column_count = parse_text_value(&value, "text column count")?;
     }
     if let Some(value) = attribute(element, b"spcFirstLastPara", decoder)? {
-        body.space_first_last_paragraph = is_on(&value);
+        body.space_first_last_paragraph = parse_dml_bool(&value, "spcFirstLastPara")?;
     }
     if let Some(value) = attribute(element, b"fromWordArt", decoder)? {
-        builder.from_word_art = is_on(&value);
+        builder.from_word_art = parse_dml_bool(&value, "fromWordArt")?;
     }
     Ok(())
 }
 
-/// OOXML boolean attribute values: `1`, `true`, and `on` are truthy.
-fn is_on(value: &str) -> bool {
+/// Legacy VML truth spelling used only by the inert fallback detector.
+fn is_vml_on(value: &str) -> bool {
     matches!(value, "1" | "true" | "on")
+}
+
+fn parse_dml_bool(value: &str, attribute: &str) -> Result<bool> {
+    parse_bool(value).map_err(|error| {
+        invalid(format!(
+            "invalid DrawingML {attribute} boolean '{value}': {error}"
+        ))
+    })
+}
+
+fn parse_text_value<T>(value: &str, domain: &str) -> Result<T>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    value
+        .parse()
+        .map_err(|error| invalid(format!("invalid DrawingML {domain} '{value}': {error}")))
 }
 
 fn is_namespace(namespace: &ResolveResult<'_>, uri: &[u8]) -> bool {
@@ -1015,25 +771,25 @@ mod tests {
         assert_eq!(text_box.id, Some(7));
         assert_eq!(text_box.name.as_deref(), Some("Box 7"));
         assert_eq!(text_box.anchor, TextBoxAnchor::Floating);
-        assert_eq!(text_box.shape_type, Some(ShapeType::Rectangle));
+        assert_eq!(text_box.preset, Some(Preset::Rect));
         assert!(!text_box.is_word_art());
         assert_eq!(text_box.text(), "Hello");
         let body = &text_box.body;
         assert_eq!(
             body.insets,
             TextBoxInsets {
-                left_emu: 182880,
-                top_emu: 91440,
-                right_emu: 182880,
-                bottom_emu: 91440,
+                left: Coordinate32::from(182880),
+                top: Coordinate32::from(91440),
+                right: Coordinate32::from(182880),
+                bottom: Coordinate32::from(91440),
             }
         );
         assert_eq!(body.vertical_anchor, TextVerticalAnchor::Center);
         assert!(body.anchor_center);
         assert_eq!(body.direction, TextDirection::Vertical270);
         assert_eq!(body.wrap, TextWrap::None);
-        assert_eq!(body.autofit, TextBoxAutofit::ShapeAutofit);
-        assert_eq!(body.column_count, 2);
+        assert_eq!(body.autofit, TextBoxAutofit::Shape);
+        assert_eq!(body.column_count.get(), 2);
         assert!(body.space_first_last_paragraph);
     }
 
@@ -1060,12 +816,18 @@ mod tests {
         let runs = &text_box.paragraphs[1].runs;
         assert_eq!(runs[0].bold, Some(true));
         assert_eq!(runs[1].italic, Some(false));
-        assert_eq!(runs[1].underline, Some(true));
-        assert_eq!(text_box.body.autofit, TextBoxAutofit::NoAutofit);
+        assert_eq!(runs[1].underline, Some(TextUnderline::Single));
+        assert_eq!(text_box.body.autofit, TextBoxAutofit::None);
         // Undeclared body properties fall back to the ECMA-376 defaults.
-        assert_eq!(text_box.body.column_count, 1);
-        assert_eq!(text_box.body.insets.left_emu, DEFAULT_HORIZONTAL_INSET_EMU);
-        assert_eq!(text_box.body.insets.top_emu, DEFAULT_VERTICAL_INSET_EMU);
+        assert_eq!(text_box.body.column_count, Columns::ONE);
+        assert_eq!(
+            text_box.body.insets.left.as_emu(),
+            Some(DEFAULT_HORIZONTAL_INSET_EMU)
+        );
+        assert_eq!(
+            text_box.body.insets.top.as_emu(),
+            Some(DEFAULT_VERTICAL_INSET_EMU)
+        );
     }
 
     #[test]
@@ -1086,11 +848,31 @@ mod tests {
         let text_box = &text_boxes[0];
         assert!(text_box.is_word_art());
         let word_art = text_box.word_art.unwrap();
-        assert_eq!(word_art.warp, Some(TextWarpPreset::ArchUp));
+        assert_eq!(word_art.warp, Some(TextPreset::ArchUp));
         assert!(word_art.has_text_fill);
         assert!(!word_art.has_text_outline);
         assert!(!word_art.has_text_effects);
         assert_eq!(text_box.text(), "Warped");
+    }
+
+    #[test]
+    fn preset_attributes_apply_xml_schema_token_whitespace() {
+        let body = "<w:p><w:r><w:drawing><wp:inline><wps:wsp>\
+             <wps:spPr><a:prstGeom prst=\" &#x9;rect&#xA;&#xD; \"/></wps:spPr>\
+             <wps:bodyPr fromWordArt=\"1\">\
+             <a:prstTxWarp prst=\"&#xD; textArchUp &#x9;\"/>\
+             </wps:bodyPr></wps:wsp></wp:inline></w:drawing></w:r></w:p>";
+        let xml = document(false, body);
+        let text_boxes = load_text_boxes(xml.as_bytes()).unwrap();
+        assert_eq!(text_boxes.len(), 1);
+        assert_eq!(text_boxes[0].preset, Some(Preset::Rect));
+        assert_eq!(
+            text_boxes[0]
+                .word_art
+                .as_ref()
+                .and_then(|word_art| word_art.warp),
+            Some(TextPreset::ArchUp)
+        );
     }
 
     #[test]
@@ -1104,6 +886,59 @@ mod tests {
         let text_boxes = load_text_boxes(xml.as_bytes()).unwrap();
         assert_eq!(text_boxes.len(), 1);
         assert!(!text_boxes[0].is_word_art());
+    }
+
+    #[test]
+    fn rejects_tokens_outside_closed_geometry_domains() {
+        let shape = "<w:p><w:r><w:drawing><wp:inline><wps:wsp><wps:spPr>\
+             <a:prstGeom prst=\"customShape\"/>\
+             </wps:spPr></wps:wsp></wp:inline></w:drawing></w:r></w:p>";
+        let error = load_text_boxes(document(false, shape).as_bytes()).unwrap_err();
+        assert!(error.to_string().contains("customShape"));
+
+        let warp = "<w:p><w:r><w:drawing><wp:inline><wps:wsp><wps:bodyPr>\
+             <a:prstTxWarp prst=\"textButtonUp\"/>\
+             </wps:bodyPr></wps:wsp></wp:inline></w:drawing></w:r></w:p>";
+        let error = load_text_boxes(document(false, warp).as_bytes()).unwrap_err();
+        assert!(error.to_string().contains("textButtonUp"));
+
+        let missing_shape = "<w:p><w:r><w:drawing><wp:inline><wps:wsp><wps:spPr>\
+             <a:prstGeom/>\
+             </wps:spPr></wps:wsp></wp:inline></w:drawing></w:r></w:p>";
+        let error = load_text_boxes(document(false, missing_shape).as_bytes()).unwrap_err();
+        assert!(error.to_string().contains("missing required prst"));
+
+        let missing_warp = "<w:p><w:r><w:drawing><wp:inline><wps:wsp><wps:bodyPr>\
+             <a:prstTxWarp/>\
+             </wps:bodyPr></wps:wsp></wp:inline></w:drawing></w:r></w:p>";
+        let error = load_text_boxes(document(false, missing_warp).as_bytes()).unwrap_err();
+        assert!(error.to_string().contains("missing required prst"));
+    }
+
+    #[test]
+    fn rejects_invalid_body_and_run_domains() {
+        for attribute in [
+            "anchor=\"middle\"",
+            "vert=\"diagonal\"",
+            "wrap=\"tight\"",
+            "anchorCtr=\"on\"",
+            "numCol=\"17\"",
+            "lIns=\"2147483648\"",
+        ] {
+            let shape = format!(
+                "<w:p><w:r><w:drawing><wp:inline><wps:wsp><wps:bodyPr {attribute}/></wps:wsp>\
+                 </wp:inline></w:drawing></w:r></w:p>"
+            );
+            assert!(
+                load_text_boxes(document(false, &shape).as_bytes()).is_err(),
+                "accepted {attribute}"
+            );
+        }
+
+        let run = "<w:p><w:r><w:drawing><wp:inline><wps:wsp><wps:txbx><w:txbxContent>\
+             <w:p><w:r><w:rPr><w:u w:val=\"vendor\"/></w:rPr><w:t>x</w:t></w:r></w:p>\
+             </w:txbxContent></wps:txbx></wps:wsp></wp:inline></w:drawing></w:r></w:p>";
+        assert!(load_text_boxes(document(false, run).as_bytes()).is_err());
     }
 
     #[test]
@@ -1150,7 +985,7 @@ mod tests {
         let text_box = &text_boxes[0];
         assert_eq!(text_box.id, Some(7));
         assert_eq!(text_box.anchor, TextBoxAnchor::Floating);
-        assert_eq!(text_box.body.autofit, TextBoxAutofit::ShapeAutofit);
+        assert_eq!(text_box.body.autofit, TextBoxAutofit::Shape);
         assert_eq!(text_box.text(), "Hello");
     }
 

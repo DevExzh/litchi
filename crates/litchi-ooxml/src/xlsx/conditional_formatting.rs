@@ -1,6 +1,7 @@
 //! Immutable SpreadsheetML conditional-formatting and differential-style models.
 
 use crate::error::{OoxmlError, Result};
+use crate::xlsx::styles::Rgb;
 use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -9,6 +10,8 @@ use quick_xml::reader::NsReader;
 use quick_xml::{Writer, XmlVersion};
 use smallvec::SmallVec;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::str::FromStr;
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -18,7 +21,8 @@ const MAX_FORMULA_BYTES: usize = 1024 * 1024;
 const MAX_FRAGMENT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_RULES: usize = 1_000_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum ConditionalFormattingSource {
     Core,
     Office2010,
@@ -33,95 +37,300 @@ impl CellRangeRef {
     }
 }
 
+/// Error returned when a closed conditional-formatting token is invalid.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConditionalRuleType {
-    Expression,
-    CellIs,
-    ColorScale,
-    DataBar,
-    IconSet,
-    Top10,
-    UniqueValues,
-    DuplicateValues,
-    ContainsText,
-    NotContainsText,
-    BeginsWith,
-    EndsWith,
-    ContainsBlanks,
-    NotContainsBlanks,
-    ContainsErrors,
-    NotContainsErrors,
-    TimePeriod,
-    AboveAverage,
-    Other(String),
+pub struct TokenError {
+    domain: &'static str,
+    token: Box<str>,
 }
 
-impl ConditionalRuleType {
-    fn parse(value: &str) -> Self {
-        match value {
-            "expression" => Self::Expression,
-            "cellIs" => Self::CellIs,
-            "colorScale" => Self::ColorScale,
-            "dataBar" => Self::DataBar,
-            "iconSet" => Self::IconSet,
-            "top10" => Self::Top10,
-            "uniqueValues" => Self::UniqueValues,
-            "duplicateValues" => Self::DuplicateValues,
-            "containsText" => Self::ContainsText,
-            "notContainsText" => Self::NotContainsText,
-            "beginsWith" => Self::BeginsWith,
-            "endsWith" => Self::EndsWith,
-            "containsBlanks" => Self::ContainsBlanks,
-            "notContainsBlanks" => Self::NotContainsBlanks,
-            "containsErrors" => Self::ContainsErrors,
-            "notContainsErrors" => Self::NotContainsErrors,
-            "timePeriod" => Self::TimePeriod,
-            "aboveAverage" => Self::AboveAverage,
-            value => Self::Other(value.to_owned()),
+impl TokenError {
+    pub(crate) fn new(domain: &'static str, token: &str) -> Self {
+        Self {
+            domain,
+            token: token.into(),
         }
+    }
+
+    #[must_use]
+    pub const fn domain(&self) -> &'static str {
+        self.domain
+    }
+
+    #[must_use]
+    pub fn token(&self) -> &str {
+        &self.token
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConditionalFormatOperator {
-    Between,
-    NotBetween,
-    Equal,
-    NotEqual,
-    LessThan,
-    LessThanOrEqual,
-    GreaterThan,
-    GreaterThanOrEqual,
-    ContainsText,
-    NotContains,
-    BeginsWith,
-    EndsWith,
-    Other(String),
+impl fmt::Display for TokenError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "invalid SpreadsheetML {} token '{}'",
+            self.domain, self.token
+        )
+    }
 }
 
-impl ConditionalFormatOperator {
-    fn parse(value: &str) -> Self {
-        match value {
-            "between" => Self::Between,
-            "notBetween" => Self::NotBetween,
-            "equal" => Self::Equal,
-            "notEqual" => Self::NotEqual,
-            "lessThan" => Self::LessThan,
-            "lessThanOrEqual" => Self::LessThanOrEqual,
-            "greaterThan" => Self::GreaterThan,
-            "greaterThanOrEqual" => Self::GreaterThanOrEqual,
-            "containsText" => Self::ContainsText,
-            "notContains" => Self::NotContains,
-            "beginsWith" => Self::BeginsWith,
-            "endsWith" => Self::EndsWith,
-            value => Self::Other(value.to_owned()),
+impl std::error::Error for TokenError {}
+
+macro_rules! token_enum {
+    ($(#[$meta:meta])* pub enum $name:ident, $domain:literal { $($variant:ident => $token:literal),+ $(,)? }) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[repr(u8)]
+        pub enum $name { $($variant),+ }
+
+        impl $name {
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self { $(Self::$variant => $token),+ }
+            }
         }
+
+        impl FromStr for $name {
+            type Err = TokenError;
+
+            fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+                match value {
+                    $($token => Ok(Self::$variant),)+
+                    _ => Err(TokenError::new($domain, value)),
+                }
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+    };
+}
+
+token_enum! {
+    /// Conditional-formatting rule kind (`ST_CfType`).
+    pub enum Kind, "conditional-formatting rule kind" {
+        Expression => "expression",
+        CellIs => "cellIs",
+        ColorScale => "colorScale",
+        DataBar => "dataBar",
+        IconSet => "iconSet",
+        Top10 => "top10",
+        UniqueValues => "uniqueValues",
+        DuplicateValues => "duplicateValues",
+        ContainsText => "containsText",
+        NotContainsText => "notContainsText",
+        BeginsWith => "beginsWith",
+        EndsWith => "endsWith",
+        ContainsBlanks => "containsBlanks",
+        NotContainsBlanks => "notContainsBlanks",
+        ContainsErrors => "containsErrors",
+        NotContainsErrors => "notContainsErrors",
+        TimePeriod => "timePeriod",
+        AboveAverage => "aboveAverage",
+    }
+}
+
+token_enum! {
+    /// Cell comparison operator (`ST_ConditionalFormattingOperator`).
+    pub enum Operator, "conditional-formatting operator" {
+        LessThan => "lessThan",
+        LessThanOrEqual => "lessThanOrEqual",
+        Equal => "equal",
+        NotEqual => "notEqual",
+        GreaterThanOrEqual => "greaterThanOrEqual",
+        GreaterThan => "greaterThan",
+        Between => "between",
+        NotBetween => "notBetween",
+        ContainsText => "containsText",
+        NotContains => "notContains",
+        BeginsWith => "beginsWith",
+        EndsWith => "endsWith",
+    }
+}
+
+token_enum! {
+    /// Conditional-formatting value-object kind (core and x14 `ST_CfvoType`).
+    pub enum ValueKind, "conditional-formatting value kind" {
+        Number => "num",
+        Percent => "percent",
+        Max => "max",
+        Min => "min",
+        Formula => "formula",
+        Percentile => "percentile",
+        AutoMin => "autoMin",
+        AutoMax => "autoMax",
+    }
+}
+
+impl ValueKind {
+    #[must_use]
+    pub const fn is_core(self) -> bool {
+        !matches!(self, Self::AutoMin | Self::AutoMax)
+    }
+}
+
+token_enum! {
+    /// Relative date period (`ST_TimePeriod`).
+    pub enum Period, "conditional-formatting time period" {
+        Today => "today",
+        Yesterday => "yesterday",
+        Tomorrow => "tomorrow",
+        Last7Days => "last7Days",
+        ThisMonth => "thisMonth",
+        LastMonth => "lastMonth",
+        NextMonth => "nextMonth",
+        ThisWeek => "thisWeek",
+        LastWeek => "lastWeek",
+        NextWeek => "nextWeek",
+    }
+}
+
+token_enum! {
+    /// Office 2010 data-bar direction (`x14:ST_DataBarDirection`).
+    pub enum Direction, "data-bar direction" {
+        Context => "context",
+        LeftToRight => "leftToRight",
+        RightToLeft => "rightToLeft",
+    }
+}
+
+token_enum! {
+    /// Office 2010 data-bar axis position (`x14:ST_DataBarAxisPosition`).
+    pub enum Axis, "data-bar axis position" {
+        Automatic => "automatic",
+        Middle => "middle",
+        None => "none",
+    }
+}
+
+token_enum! {
+    /// Conditional-formatting color element role.
+    pub enum ColorRole, "conditional-formatting color role" {
+        Color => "color",
+        Fill => "fillColor",
+        Border => "borderColor",
+        NegativeFill => "negativeFillColor",
+        NegativeBorder => "negativeBorderColor",
+        Axis => "axisColor",
+    }
+}
+
+token_enum! {
+    /// Core SpreadsheetML icon set (`ST_IconSetType`).
+    pub enum IconSet, "core icon set" {
+        ThreeArrows => "3Arrows",
+        ThreeArrowsGray => "3ArrowsGray",
+        ThreeFlags => "3Flags",
+        ThreeTrafficLights1 => "3TrafficLights1",
+        ThreeTrafficLights2 => "3TrafficLights2",
+        ThreeSigns => "3Signs",
+        ThreeSymbols => "3Symbols",
+        ThreeSymbols2 => "3Symbols2",
+        FourArrows => "4Arrows",
+        FourArrowsGray => "4ArrowsGray",
+        FourRedToBlack => "4RedToBlack",
+        FourRating => "4Rating",
+        FourTrafficLights => "4TrafficLights",
+        FiveArrows => "5Arrows",
+        FiveArrowsGray => "5ArrowsGray",
+        FiveRating => "5Rating",
+        FiveQuarters => "5Quarters",
+    }
+}
+
+impl IconSet {
+    #[must_use]
+    pub const fn len(self) -> u8 {
+        match self {
+            Self::ThreeArrows
+            | Self::ThreeArrowsGray
+            | Self::ThreeFlags
+            | Self::ThreeTrafficLights1
+            | Self::ThreeTrafficLights2
+            | Self::ThreeSigns
+            | Self::ThreeSymbols
+            | Self::ThreeSymbols2 => 3,
+            Self::FourArrows
+            | Self::FourArrowsGray
+            | Self::FourRedToBlack
+            | Self::FourRating
+            | Self::FourTrafficLights => 4,
+            Self::FiveArrows | Self::FiveArrowsGray | Self::FiveRating | Self::FiveQuarters => 5,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        false
+    }
+}
+
+token_enum! {
+    /// Office 2010 icon set (`x14:ST_IconSetType`).
+    pub enum IconSet14, "Office 2010 icon set" {
+        ThreeArrows => "3Arrows",
+        ThreeArrowsGray => "3ArrowsGray",
+        ThreeFlags => "3Flags",
+        ThreeTrafficLights1 => "3TrafficLights1",
+        ThreeTrafficLights2 => "3TrafficLights2",
+        ThreeSigns => "3Signs",
+        ThreeSymbols => "3Symbols",
+        ThreeSymbols2 => "3Symbols2",
+        FourArrows => "4Arrows",
+        FourArrowsGray => "4ArrowsGray",
+        FourRedToBlack => "4RedToBlack",
+        FourRating => "4Rating",
+        FourTrafficLights => "4TrafficLights",
+        FiveArrows => "5Arrows",
+        FiveArrowsGray => "5ArrowsGray",
+        FiveRating => "5Rating",
+        FiveQuarters => "5Quarters",
+        ThreeStars => "3Stars",
+        ThreeTriangles => "3Triangles",
+        FiveBoxes => "5Boxes",
+        NoIcons => "NoIcons",
+    }
+}
+
+impl IconSet14 {
+    #[must_use]
+    pub const fn len(self) -> Option<u8> {
+        match self {
+            Self::ThreeArrows
+            | Self::ThreeArrowsGray
+            | Self::ThreeFlags
+            | Self::ThreeTrafficLights1
+            | Self::ThreeTrafficLights2
+            | Self::ThreeSigns
+            | Self::ThreeSymbols
+            | Self::ThreeSymbols2
+            | Self::ThreeStars
+            | Self::ThreeTriangles => Some(3),
+            Self::FourArrows
+            | Self::FourArrowsGray
+            | Self::FourRedToBlack
+            | Self::FourRating
+            | Self::FourTrafficLights => Some(4),
+            Self::FiveArrows
+            | Self::FiveArrowsGray
+            | Self::FiveRating
+            | Self::FiveQuarters
+            | Self::FiveBoxes => Some(5),
+            Self::NoIcons => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        matches!(self, Self::NoIcons)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpreadsheetColor {
-    pub rgb: Option<String>,
+    pub rgb: Option<Rgb>,
     pub indexed: Option<u32>,
     pub theme: Option<u32>,
     pub tint: Option<f64>,
@@ -129,37 +338,8 @@ pub struct SpreadsheetColor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConditionalFormatValueType {
-    Min,
-    Max,
-    Number,
-    Percent,
-    Percentile,
-    Formula,
-    AutoMin,
-    AutoMax,
-    Other(String),
-}
-
-impl ConditionalFormatValueType {
-    fn parse(value: &str) -> Self {
-        match value {
-            "min" => Self::Min,
-            "max" => Self::Max,
-            "num" => Self::Number,
-            "percent" => Self::Percent,
-            "percentile" => Self::Percentile,
-            "formula" => Self::Formula,
-            "autoMin" => Self::AutoMin,
-            "autoMax" => Self::AutoMax,
-            value => Self::Other(value.to_owned()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConditionalFormatValue {
-    pub kind: ConditionalFormatValueType,
+    pub kind: ValueKind,
     pub value: Option<String>,
     pub formula: Option<String>,
     pub greater_than_or_equal: bool,
@@ -173,7 +353,7 @@ pub struct ColorScale {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedColor {
-    pub role: String,
+    pub role: ColorRole,
     pub color: SpreadsheetColor,
 }
 
@@ -186,13 +366,14 @@ pub struct DataBar {
     pub show_value: bool,
     pub border: bool,
     pub gradient: bool,
-    pub direction: String,
-    pub axis_position: String,
+    pub direction: Direction,
+    pub axis_position: Axis,
 }
 
+/// Typed icon-set payload whose vocabulary is carried by `S`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IconSet {
-    pub name: String,
+pub struct Icons<S> {
+    pub set: S,
     pub thresholds: Vec<ConditionalFormatValue>,
     pub show_value: bool,
     pub percent: bool,
@@ -203,12 +384,8 @@ pub struct IconSet {
 pub enum ConditionalFormatPayload {
     ColorScale(ColorScale),
     DataBar(DataBar),
-    IconSet(IconSet),
-    UnsupportedExtension {
-        namespace: String,
-        local_name: String,
-        raw_xml: Box<[u8]>,
-    },
+    IconSet(Icons<IconSet>),
+    IconSet14(Icons<IconSet14>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -263,7 +440,7 @@ pub enum ExtensionAssociation {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConditionalFormattingRule {
     pub source: ConditionalFormattingSource,
-    pub rule_type: Option<ConditionalRuleType>,
+    pub rule_type: Option<Kind>,
     pub priority: Option<i32>,
     pub differential_format: Option<DifferentialFormatRef>,
     pub formulas: SmallVec<[String; 3]>,
@@ -272,9 +449,9 @@ pub struct ConditionalFormattingRule {
     pub equal_average: bool,
     pub percent: bool,
     pub bottom: bool,
-    pub operator: Option<ConditionalFormatOperator>,
+    pub operator: Option<Operator>,
     pub text: Option<String>,
-    pub time_period: Option<String>,
+    pub time_period: Option<Period>,
     pub rank: Option<u32>,
     pub standard_deviations: Option<i32>,
     pub payload: Option<ConditionalFormatPayload>,
@@ -349,7 +526,9 @@ pub(crate) fn parse_differential_formats(xml: &[u8]) -> Result<Vec<DifferentialF
                 _ => {},
             }
             if *capture_depth == 0 {
-                let (_, _, writer) = capture.take().expect("capture checked");
+                let (_, _, writer) = capture
+                    .take()
+                    .ok_or_else(|| invalid("missing differential-format capture state"))?;
                 let raw = writer.into_inner();
                 if raw.len() > MAX_FRAGMENT_BYTES {
                     return Err(invalid("differential format is too large"));
@@ -421,7 +600,9 @@ fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>> {
                 _ => {},
             }
             if *depth == 0 {
-                let (_, source, prefix, writer) = capture.take().expect("capture checked");
+                let (_, source, prefix, writer) = capture
+                    .take()
+                    .ok_or_else(|| invalid("missing conditional-formatting capture state"))?;
                 values.push(Captured {
                     source,
                     prefix,
@@ -528,7 +709,11 @@ fn parse_container(fragment: &Captured) -> Result<ConditionalFormatting> {
                 if *capture_depth == 2 && ((spreadsheet(&namespace) && element.local_name().as_ref() == b"formula")
                     || (exact(&namespace, XM) && element.local_name().as_ref() == b"f")))
             {
-                formulas.push(captured_formula.take().expect("formula capture started"));
+                formulas.push(
+                    captured_formula
+                        .take()
+                        .ok_or_else(|| invalid("formula end without matching start"))?,
+                );
                 if formulas.len() > 3 {
                     return Err(invalid("cfRule has more than three formulas"));
                 }
@@ -540,7 +725,9 @@ fn parse_container(fragment: &Captured) -> Result<ConditionalFormatting> {
                 _ => {},
             }
             if *capture_depth == 0 {
-                let (_, formulas, writer) = capture.take().expect("capture checked");
+                let (_, formulas, writer) = capture
+                    .take()
+                    .ok_or_else(|| invalid("missing cfRule capture state"))?;
                 let mut rule = parse_rule(&writer.into_inner(), fragment.source)?;
                 rule.formulas = formulas.into_iter().collect();
                 validate_rule_shape(&rule)?;
@@ -610,7 +797,9 @@ fn parse_container(fragment: &Captured) -> Result<ConditionalFormatting> {
                     && exact(&namespace, XM)
                     && element.local_name().as_ref() == b"sqref"
                 {
-                    let (_, raw) = sqref_text.take().expect("sqref checked");
+                    let (_, raw) = sqref_text
+                        .take()
+                        .ok_or_else(|| invalid("sqref end without matching start"))?;
                     ranges = parse_sqref(&raw)?;
                 }
                 depth = depth
@@ -678,7 +867,7 @@ fn parse_rule(
     };
     let mut depth = 0usize;
     let mut text_target: Option<(usize, TextTarget, String)> = None;
-    let mut payload = PayloadBuilder::default();
+    let mut payload = PayloadBuilder::new(source);
     loop {
         let decoder = reader.decoder();
         let event_start = reader.buffer_position() as usize;
@@ -699,7 +888,12 @@ fn parse_rule(
                 } else if (spreadsheet(&namespace) && name.as_ref() == b"formula")
                     || (exact(&namespace, XM) && name.as_ref() == b"f")
                 {
-                    text_target = Some((depth, TextTarget::Formula, String::new()));
+                    let target = if exact(&namespace, XM) && payload.active.is_some() {
+                        TextTarget::CfvoFormula
+                    } else {
+                        TextTarget::Formula
+                    };
+                    text_target = Some((depth, target, String::new()));
                 } else if exact(&namespace, X14) && name.as_ref() == b"id" {
                     text_target = Some((depth, TextTarget::ExtensionId, String::new()));
                 } else if (spreadsheet(&namespace) || exact(&namespace, X14))
@@ -718,9 +912,6 @@ fn parse_rule(
                     && name.as_ref() == b"cfvo"
                 {
                     payload.cfvo(&element, decoder)?;
-                    if exact(&namespace, X14) {
-                        text_target = Some((depth, TextTarget::CfvoFormula, String::new()));
-                    }
                 } else if (spreadsheet(&namespace) || exact(&namespace, X14))
                     && is_color_element(name.as_ref())
                 {
@@ -763,7 +954,9 @@ fn parse_rule(
                     .as_ref()
                     .is_some_and(|(target, _, _)| *target == depth)
                 {
-                    let (_, target, value) = text_target.take().expect("target checked");
+                    let (_, target, value) = text_target
+                        .take()
+                        .ok_or_else(|| invalid("text end without matching start"))?;
                     match target {
                         TextTarget::Formula => {
                             if rule.formulas.len() == 3 {
@@ -804,16 +997,6 @@ fn parse_rule(
         rule.differential_format = Some(DifferentialFormatRef::StylesIndex(index));
     }
     rule.payload = payload.finish()?;
-    if rule.payload.is_none()
-        && source == ConditionalFormattingSource::Office2010
-        && let Some(ConditionalRuleType::Other(local_name)) = &rule.rule_type
-    {
-        rule.payload = Some(ConditionalFormatPayload::UnsupportedExtension {
-            namespace: String::from_utf8_lossy(X14).into_owned(),
-            local_name: local_name.clone(),
-            raw_xml: raw.to_vec().into_boxed_slice(),
-        });
-    }
     validate_rule_shape(&rule)?;
     Ok(rule)
 }
@@ -823,8 +1006,13 @@ fn parse_rule_attributes(
     decoder: Decoder,
     rule: &mut ConditionalFormattingRule,
 ) -> Result<()> {
-    rule.rule_type =
-        optional_attr(element, b"type", decoder)?.map(|value| ConditionalRuleType::parse(&value));
+    rule.rule_type = optional_attr(element, b"type", decoder)?
+        .map(|value| {
+            value
+                .parse::<Kind>()
+                .map_err(|error| invalid(error.to_string()))
+        })
+        .transpose()?;
     rule.priority = optional_attr(element, b"priority", decoder)?
         .map(|value| {
             value
@@ -841,9 +1029,20 @@ fn parse_rule_attributes(
     rule.percent = optional_bool(element, b"percent", decoder)?.unwrap_or(false);
     rule.bottom = optional_bool(element, b"bottom", decoder)?.unwrap_or(false);
     rule.operator = optional_attr(element, b"operator", decoder)?
-        .map(|value| ConditionalFormatOperator::parse(&value));
+        .map(|value| {
+            value
+                .parse::<Operator>()
+                .map_err(|error| invalid(error.to_string()))
+        })
+        .transpose()?;
     rule.text = optional_attr(element, b"text", decoder)?;
-    rule.time_period = optional_attr(element, b"timePeriod", decoder)?;
+    rule.time_period = optional_attr(element, b"timePeriod", decoder)?
+        .map(|value| {
+            value
+                .parse::<Period>()
+                .map_err(|error| invalid(error.to_string()))
+        })
+        .transpose()?;
     rule.rank = optional_u32(element, b"rank", decoder)?;
     rule.standard_deviations = optional_attr(element, b"stdDev", decoder)?
         .map(|value| {
@@ -869,17 +1068,34 @@ enum PayloadKind {
     IconSet,
 }
 
-#[derive(Default)]
 struct PayloadBuilder {
+    source: ConditionalFormattingSource,
     active: Option<PayloadKind>,
     seen: Option<PayloadKind>,
     thresholds: Vec<ConditionalFormatValue>,
     colors: Vec<NamedColor>,
-    data_attrs: Option<(u32, u32, bool, bool, bool, String, String)>,
-    icon_attrs: Option<(String, bool, bool, bool)>,
+    data_attrs: Option<(u32, u32, bool, bool, bool, Direction, Axis)>,
+    icon_attrs: Option<IconAttrs>,
+}
+
+enum IconAttrs {
+    Core(IconSet, bool, bool, bool),
+    Office2010(IconSet14, bool, bool, bool),
 }
 
 impl PayloadBuilder {
+    fn new(source: ConditionalFormattingSource) -> Self {
+        Self {
+            source,
+            active: None,
+            seen: None,
+            thresholds: Vec::new(),
+            colors: Vec::new(),
+            data_attrs: None,
+            icon_attrs: None,
+        }
+    }
+
     fn begin(
         &mut self,
         kind: PayloadKind,
@@ -897,24 +1113,53 @@ impl PayloadBuilder {
             if min > max || max > 100 {
                 return Err(invalid("invalid data-bar length bounds"));
             }
+            let border = optional_bool(element, b"border", decoder)?;
+            let gradient = optional_bool(element, b"gradient", decoder)?;
+            let direction = optional_attr(element, b"direction", decoder)?;
+            let axis = optional_attr(element, b"axisPosition", decoder)?;
+            if self.source == ConditionalFormattingSource::Core
+                && (border.is_some() || gradient.is_some() || direction.is_some() || axis.is_some())
+            {
+                return Err(invalid("core dataBar contains Office 2010-only attributes"));
+            }
             self.data_attrs = Some((
                 min,
                 max,
                 optional_bool(element, b"showValue", decoder)?.unwrap_or(true),
-                optional_bool(element, b"border", decoder)?.unwrap_or(false),
-                optional_bool(element, b"gradient", decoder)?.unwrap_or(true),
-                optional_attr(element, b"direction", decoder)?.unwrap_or_else(|| "context".into()),
-                optional_attr(element, b"axisPosition", decoder)?
-                    .unwrap_or_else(|| "automatic".into()),
+                border.unwrap_or(false),
+                gradient.unwrap_or(true),
+                direction
+                    .as_deref()
+                    .unwrap_or("context")
+                    .parse::<Direction>()
+                    .map_err(|error| invalid(error.to_string()))?,
+                axis.as_deref()
+                    .unwrap_or("automatic")
+                    .parse::<Axis>()
+                    .map_err(|error| invalid(error.to_string()))?,
             ));
         } else if kind == PayloadKind::IconSet {
-            self.icon_attrs = Some((
-                optional_attr(element, b"iconSet", decoder)?
-                    .unwrap_or_else(|| "3TrafficLights1".into()),
-                optional_bool(element, b"showValue", decoder)?.unwrap_or(true),
-                optional_bool(element, b"percent", decoder)?.unwrap_or(true),
-                optional_bool(element, b"reverse", decoder)?.unwrap_or(false),
-            ));
+            let raw = optional_attr(element, b"iconSet", decoder)?
+                .unwrap_or_else(|| "3TrafficLights1".into());
+            let show = optional_bool(element, b"showValue", decoder)?.unwrap_or(true);
+            let percent = optional_bool(element, b"percent", decoder)?.unwrap_or(true);
+            let reverse = optional_bool(element, b"reverse", decoder)?.unwrap_or(false);
+            self.icon_attrs = Some(match self.source {
+                ConditionalFormattingSource::Core => IconAttrs::Core(
+                    raw.parse::<IconSet>()
+                        .map_err(|error| invalid(error.to_string()))?,
+                    show,
+                    percent,
+                    reverse,
+                ),
+                ConditionalFormattingSource::Office2010 => IconAttrs::Office2010(
+                    raw.parse::<IconSet14>()
+                        .map_err(|error| invalid(error.to_string()))?,
+                    show,
+                    percent,
+                    reverse,
+                ),
+            });
         }
         Ok(())
     }
@@ -929,8 +1174,16 @@ impl PayloadBuilder {
             return Err(invalid("cfvo outside visual payload"));
         }
         let raw = required_attr(element, b"type", decoder)?;
+        let kind = raw
+            .parse::<ValueKind>()
+            .map_err(|error| invalid(error.to_string()))?;
+        if self.source == ConditionalFormattingSource::Core && !kind.is_core() {
+            return Err(invalid(format!(
+                "core conditional formatting does not support CFVO kind '{raw}'"
+            )));
+        }
         self.thresholds.push(ConditionalFormatValue {
-            kind: ConditionalFormatValueType::parse(&raw),
+            kind,
             value: optional_attr(element, b"val", decoder)?,
             formula: None,
             greater_than_or_equal: optional_bool(element, b"gte", decoder)?.unwrap_or(true),
@@ -949,10 +1202,26 @@ impl PayloadBuilder {
         if self.active.is_none() {
             return Err(invalid("color outside visual payload"));
         }
+        let role = std::str::from_utf8(role)
+            .map_err(xml_error)?
+            .parse::<ColorRole>()
+            .map_err(|error| invalid(error.to_string()))?;
+        if self.source == ConditionalFormattingSource::Core && role != ColorRole::Color {
+            return Err(invalid(format!(
+                "core conditional formatting does not support '{}' colors",
+                role.as_str()
+            )));
+        }
         self.colors.push(NamedColor {
-            role: String::from_utf8_lossy(role).into_owned(),
+            role,
             color: SpreadsheetColor {
-                rgb: optional_attr(element, b"rgb", decoder)?,
+                rgb: optional_attr(element, b"rgb", decoder)?
+                    .map(|value| {
+                        value
+                            .parse::<Rgb>()
+                            .map_err(|error| invalid(error.to_string()))
+                    })
+                    .transpose()?,
                 indexed: optional_u32(element, b"indexed", decoder)?,
                 theme: optional_u32(element, b"theme", decoder)?,
                 tint: optional_attr(element, b"tint", decoder)?
@@ -984,8 +1253,9 @@ impl PayloadBuilder {
                 if self.thresholds.len() != 2 {
                     return Err(invalid("data bar must contain exactly two thresholds"));
                 }
-                let (min, max, show, border, gradient, direction, axis) =
-                    self.data_attrs.expect("data attrs");
+                let (min, max, show, border, gradient, direction, axis) = self
+                    .data_attrs
+                    .ok_or_else(|| invalid("data-bar payload has no attributes"))?;
                 Some(ConditionalFormatPayload::DataBar(DataBar {
                     thresholds: self.thresholds,
                     colors: self.colors,
@@ -998,27 +1268,42 @@ impl PayloadBuilder {
                     axis_position: axis,
                 }))
             },
-            Some(PayloadKind::IconSet) => {
-                let (name, show, percent, reverse) = self.icon_attrs.expect("icon attrs");
-                let expected = name
-                    .as_bytes()
-                    .first()
-                    .and_then(|b| (*b as char).to_digit(10))
-                    .map(|v| v as usize);
-                if self.thresholds.len() < 3
-                    || expected.is_some_and(|value| value != self.thresholds.len())
-                {
-                    return Err(invalid(
-                        "icon-set threshold count does not match its icon cardinality",
-                    ));
-                }
-                Some(ConditionalFormatPayload::IconSet(IconSet {
-                    name,
-                    thresholds: self.thresholds,
-                    show_value: show,
-                    percent,
-                    reverse,
-                }))
+            Some(PayloadKind::IconSet) => match self
+                .icon_attrs
+                .ok_or_else(|| invalid("icon-set payload has no attributes"))?
+            {
+                IconAttrs::Core(set, show, percent, reverse) => {
+                    if usize::from(set.len()) != self.thresholds.len() {
+                        return Err(invalid(
+                            "icon-set threshold count does not match its icon cardinality",
+                        ));
+                    }
+                    Some(ConditionalFormatPayload::IconSet(Icons {
+                        set,
+                        thresholds: self.thresholds,
+                        show_value: show,
+                        percent,
+                        reverse,
+                    }))
+                },
+                IconAttrs::Office2010(set, show, percent, reverse) => {
+                    if !(3..=5).contains(&self.thresholds.len())
+                        || set
+                            .len()
+                            .is_some_and(|value| usize::from(value) != self.thresholds.len())
+                    {
+                        return Err(invalid(
+                            "Office 2010 icon-set threshold count does not match its icon cardinality",
+                        ));
+                    }
+                    Some(ConditionalFormatPayload::IconSet14(Icons {
+                        set,
+                        thresholds: self.thresholds,
+                        show_value: show,
+                        percent,
+                        reverse,
+                    }))
+                },
             },
         })
     }
@@ -1026,31 +1311,33 @@ impl PayloadBuilder {
 
 fn validate_rule_shape(rule: &ConditionalFormattingRule) -> Result<()> {
     match (&rule.rule_type, &rule.payload) {
-        (Some(ConditionalRuleType::ColorScale), Some(ConditionalFormatPayload::ColorScale(_)))
-        | (Some(ConditionalRuleType::DataBar), Some(ConditionalFormatPayload::DataBar(_)))
-        | (Some(ConditionalRuleType::IconSet), Some(ConditionalFormatPayload::IconSet(_))) => {},
-        (
-            Some(
-                ConditionalRuleType::ColorScale
-                | ConditionalRuleType::DataBar
-                | ConditionalRuleType::IconSet,
-            ),
-            _,
-        ) => {
+        (Some(Kind::ColorScale), Some(ConditionalFormatPayload::ColorScale(_)))
+        | (Some(Kind::DataBar), Some(ConditionalFormatPayload::DataBar(_)))
+        | (
+            Some(Kind::IconSet),
+            Some(ConditionalFormatPayload::IconSet(_) | ConditionalFormatPayload::IconSet14(_)),
+        ) => {},
+        (Some(Kind::ColorScale | Kind::DataBar | Kind::IconSet), _) => {
             return Err(invalid(
                 "visual cfRule type is missing its matching payload",
             ));
         },
-        (
-            Some(ConditionalRuleType::Other(_)),
-            Some(ConditionalFormatPayload::UnsupportedExtension { .. }),
-        ) => {},
         (_, Some(_)) => return Err(invalid("non-visual cfRule contains a visual payload")),
         _ => {},
     }
+    if matches!(rule.payload, Some(ConditionalFormatPayload::IconSet14(_)))
+        && rule.source != ConditionalFormattingSource::Office2010
+    {
+        return Err(invalid("Office 2010 icon set used in a core rule"));
+    }
+    if matches!(rule.payload, Some(ConditionalFormatPayload::IconSet(_)))
+        && rule.source != ConditionalFormattingSource::Core
+    {
+        return Err(invalid("core icon set used in an Office 2010 rule"));
+    }
     if matches!(
         rule.operator,
-        Some(ConditionalFormatOperator::Between | ConditionalFormatOperator::NotBetween)
+        Some(Operator::Between | Operator::NotBetween)
     ) && rule.formulas.len() != 2
     {
         return Err(invalid("between cfRule requires two formulas"));
@@ -1188,7 +1475,9 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
                 _ => {},
             }
             if *depth == 0 {
-                let (_, prefix, writer) = cap.take().unwrap();
+                let (_, prefix, writer) = cap
+                    .take()
+                    .ok_or_else(|| invalid("missing XML fragment capture state"))?;
                 out.push(Captured {
                     source: ConditionalFormattingSource::Core,
                     prefix,
@@ -1276,7 +1565,9 @@ fn parse_sqref(raw: &str) -> Result<Vec<CellRangeRef>> {
     raw.split_whitespace()
         .map(|area| {
             let mut parts = area.split(':');
-            let a = parts.next().unwrap();
+            let a = parts
+                .next()
+                .ok_or_else(|| invalid("conditional-formatting range has no first cell"))?;
             let b = parts.next();
             if parts.next().is_some() || !valid_cell(a) || b.is_some_and(|v| !valid_cell(v)) {
                 return Err(invalid(format!(
@@ -1487,9 +1778,58 @@ mod tests {
         let values = parse_conditional_formattings(encoded, 0).unwrap();
         assert_eq!(values[0].rules[0].formulas.as_slice(), ["$B$3>5"]);
         let extension=br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:conditionalFormattings><x14:conditionalFormatting><x14:cfRule type="futureThing"><x14:futurePayload/></x14:cfRule><xm:sqref>A1</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></worksheet>"#;
-        let values = parse_conditional_formattings(extension, 0).unwrap();
-        assert!(matches!(values[0].rules[0].payload,
-            Some(ConditionalFormatPayload::UnsupportedExtension { ref local_name, .. }) if local_name == "futureThing"));
+        assert!(parse_conditional_formattings(extension, 0).is_err());
+    }
+
+    #[test]
+    fn fixed_domains_are_compact_exact_and_strict() {
+        assert_eq!(std::mem::size_of::<Kind>(), 1);
+        assert_eq!(std::mem::size_of::<Operator>(), 1);
+        assert_eq!(std::mem::size_of::<ValueKind>(), 1);
+        assert_eq!(std::mem::size_of::<Period>(), 1);
+        assert_eq!(std::mem::size_of::<Direction>(), 1);
+        assert_eq!(std::mem::size_of::<Axis>(), 1);
+        assert_eq!(std::mem::size_of::<ColorRole>(), 1);
+        assert_eq!(std::mem::size_of::<IconSet>(), 1);
+        assert_eq!(std::mem::size_of::<IconSet14>(), 1);
+
+        assert_eq!("cellIs".parse::<Kind>(), Ok(Kind::CellIs));
+        assert_eq!("between".parse::<Operator>(), Ok(Operator::Between));
+        assert_eq!("last7Days".parse::<Period>(), Ok(Period::Last7Days));
+        assert_eq!(
+            "rightToLeft".parse::<Direction>(),
+            Ok(Direction::RightToLeft)
+        );
+        assert_eq!("middle".parse::<Axis>(), Ok(Axis::Middle));
+        assert_eq!(
+            "negativeFillColor".parse::<ColorRole>(),
+            Ok(ColorRole::NegativeFill)
+        );
+        assert_eq!("5Rating".parse::<IconSet>(), Ok(IconSet::FiveRating));
+        assert_eq!("3Stars".parse::<IconSet14>(), Ok(IconSet14::ThreeStars));
+        assert!("futureThing".parse::<Kind>().is_err());
+        assert!("3Stars".parse::<IconSet>().is_err());
+        assert!("FF00Aa10".parse::<Rgb>().is_ok());
+        assert!("00AA10".parse::<Rgb>().is_err());
+    }
+
+    #[test]
+    fn office_2010_icon_sets_are_distinct_from_core_sets() {
+        let x14 = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:conditionalFormattings><x14:conditionalFormatting><x14:cfRule type="iconSet"><x14:iconSet iconSet="3Stars"><x14:cfvo type="autoMin"><xm:f>0</xm:f></x14:cfvo><x14:cfvo type="percent"><xm:f>33</xm:f></x14:cfvo><x14:cfvo type="autoMax"><xm:f>67</xm:f></x14:cfvo></x14:iconSet></x14:cfRule><xm:sqref>A1:A3</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></worksheet>"#;
+        let values = parse_conditional_formattings(x14, 0).unwrap();
+        let Some(ConditionalFormatPayload::IconSet14(icons)) = &values[0].rules[0].payload else {
+            panic!("expected a typed Office 2010 icon set")
+        };
+        assert_eq!(icons.set, IconSet14::ThreeStars);
+        assert_eq!(icons.thresholds.len(), 3);
+        assert_eq!(icons.thresholds[0].kind, ValueKind::AutoMin);
+        assert_eq!(icons.thresholds[0].formula.as_deref(), Some("0"));
+
+        let core = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1"><iconSet iconSet="3Stars"><cfvo type="min"/><cfvo type="percent" val="33"/><cfvo type="max"/></iconSet></cfRule></conditionalFormatting></worksheet>"#;
+        assert!(parse_conditional_formattings(core, 0).is_err());
+
+        let core_auto = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1"><iconSet iconSet="3Arrows"><cfvo type="autoMin"/><cfvo type="percent" val="33"/><cfvo type="max"/></iconSet></cfRule></conditionalFormatting></worksheet>"#;
+        assert!(parse_conditional_formattings(core_auto, 0).is_err());
     }
 
     #[test]
@@ -1545,6 +1885,7 @@ mod tests {
                         ConditionalFormatPayload::ColorScale(_)
                             | ConditionalFormatPayload::DataBar(_)
                             | ConditionalFormatPayload::IconSet(_)
+                            | ConditionalFormatPayload::IconSet14(_)
                     )
                 ))
         );

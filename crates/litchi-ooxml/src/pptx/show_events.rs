@@ -10,6 +10,7 @@ use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
+use litchi_pptx::time::{Offset, ParseError as TimeParseError};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
@@ -25,11 +26,12 @@ const MAX_TOTAL_SLIDE_XML_BYTES: usize = 256 * 1024 * 1024;
 const MAX_SHOW_EVENTS: usize = 65_536;
 const MAX_XML_NODES: usize = 250_000;
 const MAX_XML_DEPTH: usize = 128;
-const MAX_TIME_OFFSET_BYTES: usize = 64;
 
 /// A trigger type recorded by a PowerPoint slide show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PptxSlideShowTrigger {
+    /// Office extension accepted by PowerPoint 2007 through 2007 SP2; see
+    /// `[MS-OE376]` section 2.1.1237.
     None,
     OnBegin,
     OnEnd,
@@ -42,18 +44,20 @@ pub enum PptxSlideShowTrigger {
     OnNext,
     OnPrevious,
     OnStopAudio,
-    OnMediaBookmark,
 }
 
 /// The recorded action represented by a PowerPoint slide-show event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PptxSlideShowEventKind {
     Trigger(PptxSlideShowTrigger),
     Play,
     Stop,
     Pause,
     Resume,
-    Seek,
+    /// Seek the targeted media object to an exact stream offset.
+    Seek {
+        at: Offset,
+    },
     /// A reserved unknown event record for future PowerPoint extensions.
     Null,
 }
@@ -64,9 +68,8 @@ pub struct PptxSlideShowEvent {
     slide_index: usize,
     event_index: usize,
     kind: PptxSlideShowEventKind,
-    time: String,
+    time: Offset,
     object_id: u32,
-    seek_time: Option<String>,
 }
 
 impl PptxSlideShowEvent {
@@ -84,13 +87,13 @@ impl PptxSlideShowEvent {
 
     /// Return the recorded event kind.
     #[inline]
-    pub fn kind(&self) -> PptxSlideShowEventKind {
-        self.kind
+    pub fn kind(&self) -> &PptxSlideShowEventKind {
+        &self.kind
     }
 
-    /// Return the stored universal time offset in the slide timeline.
+    /// Return the exact normalized time offset in the slide timeline.
     #[inline]
-    pub fn time(&self) -> &str {
+    pub fn time(&self) -> &Offset {
         &self.time
     }
 
@@ -100,10 +103,13 @@ impl PptxSlideShowEvent {
         self.object_id
     }
 
-    /// Return the stored media-stream offset for a seek event.
+    /// Return the exact normalized media-stream offset for a seek event.
     #[inline]
-    pub fn seek_time(&self) -> Option<&str> {
-        self.seek_time.as_deref()
+    pub fn seek_time(&self) -> Option<&Offset> {
+        match &self.kind {
+            PptxSlideShowEventKind::Seek { at } => Some(at),
+            _ => None,
+        }
     }
 }
 
@@ -457,26 +463,21 @@ fn parse_show_event(
     element: &BytesStart<'_>,
     decoder: Decoder,
 ) -> Result<PptxSlideShowEvent> {
-    let time = required_attribute(element, b"time", decoder)?;
-    validate_time_offset(&time)?;
+    let time = parse_time_offset(required_attribute(element, b"time", decoder)?)?;
     let object_id = parse_object_id(required_attribute(element, b"objId", decoder)?)?;
-    let (kind, seek_time) = match element.local_name().as_ref() {
-        b"triggerEvt" => (
-            PptxSlideShowEventKind::Trigger(parse_trigger(required_attribute(
-                element, b"type", decoder,
-            )?)?),
-            None,
-        ),
-        b"playEvt" => (PptxSlideShowEventKind::Play, None),
-        b"stopEvt" => (PptxSlideShowEventKind::Stop, None),
-        b"pauseEvt" => (PptxSlideShowEventKind::Pause, None),
-        b"resumeEvt" => (PptxSlideShowEventKind::Resume, None),
+    let kind = match element.local_name().as_ref() {
+        b"triggerEvt" => PptxSlideShowEventKind::Trigger(parse_trigger(required_attribute(
+            element, b"type", decoder,
+        )?)?),
+        b"playEvt" => PptxSlideShowEventKind::Play,
+        b"stopEvt" => PptxSlideShowEventKind::Stop,
+        b"pauseEvt" => PptxSlideShowEventKind::Pause,
+        b"resumeEvt" => PptxSlideShowEventKind::Resume,
         b"seekEvt" => {
-            let seek_time = required_attribute(element, b"seek", decoder)?;
-            validate_time_offset(&seek_time)?;
-            (PptxSlideShowEventKind::Seek, Some(seek_time))
+            let at = parse_time_offset(required_attribute(element, b"seek", decoder)?)?;
+            PptxSlideShowEventKind::Seek { at }
         },
-        b"nullEvt" => (PptxSlideShowEventKind::Null, None),
+        b"nullEvt" => PptxSlideShowEventKind::Null,
         _ => return Err(invalid("unsupported slide-show event element")),
     };
     Ok(PptxSlideShowEvent {
@@ -485,7 +486,6 @@ fn parse_show_event(
         kind,
         time,
         object_id,
-        seek_time,
     })
 }
 
@@ -520,36 +520,20 @@ fn parse_trigger(value: String) -> Result<PptxSlideShowTrigger> {
         "onNext" => Ok(PptxSlideShowTrigger::OnNext),
         "onPrev" => Ok(PptxSlideShowTrigger::OnPrevious),
         "onStopAudio" => Ok(PptxSlideShowTrigger::OnStopAudio),
-        "onMediaBookmark" => Ok(PptxSlideShowTrigger::OnMediaBookmark),
         _ => Err(invalid(format!(
             "unsupported slide-show trigger type '{value}'"
         ))),
     }
 }
 
-fn validate_time_offset(value: &str) -> Result<()> {
-    if value.len() > MAX_TIME_OFFSET_BYTES {
-        return Err(limit("slide-show event time offset bytes"));
-    }
-    let split = value
-        .find(|character: char| !character.is_ascii_digit() && character != '.')
-        .unwrap_or(value.len());
-    let (number, unit) = value.split_at(split);
-    let mut pieces = number.split('.');
-    let whole = pieces.next().unwrap_or_default();
-    let fraction = pieces.next();
-    if whole.is_empty()
-        || !whole.bytes().all(|byte| byte.is_ascii_digit())
-        || fraction
-            .is_some_and(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
-        || pieces.next().is_some()
-        || !matches!(unit, "" | "h" | "min" | "s" | "ms" | "µs" | "ns")
-    {
-        return Err(invalid(format!(
-            "invalid slide-show event universal time offset '{value}'"
-        )));
-    }
-    Ok(())
+fn parse_time_offset(value: String) -> Result<Offset> {
+    Offset::try_from(value).map_err(time_error)
+}
+
+fn time_error(error: TimeParseError) -> OoxmlError {
+    invalid(format!(
+        "invalid slide-show event universal time offset: {error}"
+    ))
 }
 
 fn increment_nodes(nodes: &mut usize) -> Result<()> {
@@ -574,50 +558,74 @@ fn limit(what: &str) -> OoxmlError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PptxSlideShowEventDraft {
     kind: PptxSlideShowEventKind,
-    time: String,
+    time: Offset,
     object_id: u32,
-    seek_time: Option<String>,
 }
 
 impl PptxSlideShowEventDraft {
-    /// Create a non-seek event (trigger, play, stop, pause, resume, or null).
-    ///
-    /// `time` is validated against the universal-time-offset grammar but is
-    /// never interpreted. Seek events require [`Self::seek`] instead.
-    pub fn new(kind: PptxSlideShowEventKind, time: &str, object_id: u32) -> Result<Self> {
-        if matches!(kind, PptxSlideShowEventKind::Seek) {
-            return Err(invalid(
-                "seek slide-show events require a media-stream offset",
-            ));
-        }
-        validate_time_offset(time)?;
-        Ok(Self {
+    /// Create an event from its complete, typed action state.
+    #[must_use]
+    pub fn new(kind: PptxSlideShowEventKind, time: Offset, object_id: u32) -> Self {
+        Self {
             kind,
-            time: time.to_string(),
+            time,
             object_id,
-            seek_time: None,
-        })
+        }
+    }
+
+    /// Create a trigger event.
+    #[must_use]
+    pub fn trigger(trigger: PptxSlideShowTrigger, time: Offset, object_id: u32) -> Self {
+        Self::new(PptxSlideShowEventKind::Trigger(trigger), time, object_id)
+    }
+
+    /// Create a play event.
+    #[must_use]
+    pub fn play(time: Offset, object_id: u32) -> Self {
+        Self::new(PptxSlideShowEventKind::Play, time, object_id)
+    }
+
+    /// Create a stop event.
+    #[must_use]
+    pub fn stop(time: Offset, object_id: u32) -> Self {
+        Self::new(PptxSlideShowEventKind::Stop, time, object_id)
+    }
+
+    /// Create a pause event.
+    #[must_use]
+    pub fn pause(time: Offset, object_id: u32) -> Self {
+        Self::new(PptxSlideShowEventKind::Pause, time, object_id)
+    }
+
+    /// Create a resume event.
+    #[must_use]
+    pub fn resume(time: Offset, object_id: u32) -> Self {
+        Self::new(PptxSlideShowEventKind::Resume, time, object_id)
     }
 
     /// Create a seek event with a media-stream offset.
-    pub fn seek(time: &str, object_id: u32, seek_time: &str) -> Result<Self> {
-        validate_time_offset(time)?;
-        validate_time_offset(seek_time)?;
-        Ok(Self {
-            kind: PptxSlideShowEventKind::Seek,
-            time: time.to_string(),
+    #[must_use]
+    pub fn seek(time: Offset, object_id: u32, seek_time: Offset) -> Self {
+        Self::new(
+            PptxSlideShowEventKind::Seek { at: seek_time },
+            time,
             object_id,
-            seek_time: Some(seek_time.to_string()),
-        })
+        )
+    }
+
+    /// Create a reserved null event.
+    #[must_use]
+    pub fn null(time: Offset, object_id: u32) -> Self {
+        Self::new(PptxSlideShowEventKind::Null, time, object_id)
     }
 
     /// Return the recorded event kind.
-    pub fn kind(&self) -> PptxSlideShowEventKind {
-        self.kind
+    pub fn kind(&self) -> &PptxSlideShowEventKind {
+        &self.kind
     }
 
-    /// Return the stored universal time offset.
-    pub fn time(&self) -> &str {
+    /// Return the exact normalized universal time offset.
+    pub fn time(&self) -> &Offset {
         &self.time
     }
 
@@ -626,19 +634,22 @@ impl PptxSlideShowEventDraft {
         self.object_id
     }
 
-    /// Return the stored media-stream offset for a seek event.
-    pub fn seek_time(&self) -> Option<&str> {
-        self.seek_time.as_deref()
+    /// Return the exact normalized media-stream offset for a seek event.
+    pub fn seek_time(&self) -> Option<&Offset> {
+        match &self.kind {
+            PptxSlideShowEventKind::Seek { at } => Some(at),
+            _ => None,
+        }
     }
 
     fn element_name(&self) -> &'static str {
-        match self.kind {
+        match &self.kind {
             PptxSlideShowEventKind::Trigger(_) => "triggerEvt",
             PptxSlideShowEventKind::Play => "playEvt",
             PptxSlideShowEventKind::Stop => "stopEvt",
             PptxSlideShowEventKind::Pause => "pauseEvt",
             PptxSlideShowEventKind::Resume => "resumeEvt",
-            PptxSlideShowEventKind::Seek => "seekEvt",
+            PptxSlideShowEventKind::Seek { .. } => "seekEvt",
             PptxSlideShowEventKind::Null => "nullEvt",
         }
     }
@@ -658,14 +669,13 @@ fn trigger_token(trigger: PptxSlideShowTrigger) -> &'static str {
         PptxSlideShowTrigger::OnNext => "onNext",
         PptxSlideShowTrigger::OnPrevious => "onPrev",
         PptxSlideShowTrigger::OnStopAudio => "onStopAudio",
-        PptxSlideShowTrigger::OnMediaBookmark => "onMediaBookmark",
     }
 }
 
 /// Store slide-show event records onto a slide as a PowerPoint 2010
 /// `p14:showEvtLst` extension.
 ///
-/// The events are validated and serialized verbatim in caller order; the
+/// The typed events are serialized canonically in caller order; the
 /// slide gains the `p:ext` extension block (patched into an existing
 /// extension list, expanding an empty one, or creating one) while
 /// preserving its namespace dialect. Slides that already carry a show-event
@@ -707,19 +717,19 @@ pub fn store_slide_show_events(
     for event in events {
         fragment.push_str("<p14:");
         fragment.push_str(event.element_name());
-        if let PptxSlideShowEventKind::Trigger(trigger) = event.kind {
+        if let PptxSlideShowEventKind::Trigger(trigger) = &event.kind {
             fragment.push_str(" type=\"");
-            fragment.push_str(trigger_token(trigger));
+            fragment.push_str(trigger_token(*trigger));
             fragment.push('"');
         }
         fragment.push_str(" time=\"");
-        fragment.push_str(&event.time);
+        fragment.push_str(event.time.as_str());
         fragment.push_str("\" objId=\"");
         fragment.push_str(&event.object_id.to_string());
         fragment.push('"');
-        if let Some(seek_time) = &event.seek_time {
+        if let PptxSlideShowEventKind::Seek { at: seek_time } = &event.kind {
             fragment.push_str(" seek=\"");
-            fragment.push_str(seek_time);
+            fragment.push_str(seek_time.as_str());
             fragment.push('"');
         }
         fragment.push_str("/>");
@@ -760,14 +770,21 @@ mod tests {
         assert_eq!(events[0].event_index(), 0);
         assert_eq!(
             events[0].kind(),
-            PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
+            &PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
         );
-        assert_eq!(events[0].time(), "1.5s");
+        assert_eq!(events[0].time(), &Offset::parse("1.5s").unwrap());
         assert_eq!(events[0].object_id(), 6);
         assert_eq!(events[0].seek_time(), None);
-        assert_eq!(events[1].kind(), PptxSlideShowEventKind::Seek);
-        assert_eq!(events[1].seek_time(), Some("10.379s"));
-        assert_eq!(events[2].kind(), PptxSlideShowEventKind::Null);
+        assert!(matches!(
+            events[1].kind(),
+            PptxSlideShowEventKind::Seek { at }
+                if at == &Offset::parse("10.379s").unwrap()
+        ));
+        assert_eq!(
+            events[1].seek_time(),
+            Some(&Offset::parse("10.379s").unwrap())
+        );
+        assert_eq!(events[2].kind(), &PptxSlideShowEventKind::Null);
     }
 
     #[test]
@@ -778,6 +795,26 @@ mod tests {
 
         assert!(
             scan_slide_show_events(0, xml.as_bytes(), &mut ShowEventLoadLimits::default()).is_err()
+        );
+    }
+
+    #[test]
+    fn retains_office_none_trigger_and_rejects_non_domain_bookmark_trigger() {
+        let accepted = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:p14="{P14_NAMESPACE}"><p:extLst><p:ext uri="{SHOW_EVENT_EXTENSION_URI}"><p14:showEvtLst><p14:triggerEvt type="none" time="0" objId="1"/></p14:showEvtLst></p:ext></p:extLst></p:sld>"#
+        );
+        let events =
+            scan_slide_show_events(0, accepted.as_bytes(), &mut ShowEventLoadLimits::default())
+                .unwrap();
+        assert_eq!(
+            events[0].kind(),
+            &PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::None)
+        );
+
+        let rejected = accepted.replace("type=\"none\"", "type=\"onMediaBookmark\"");
+        assert!(
+            scan_slide_show_events(0, rejected.as_bytes(), &mut ShowEventLoadLimits::default(),)
+                .is_err()
         );
     }
 
@@ -797,15 +834,14 @@ mod tests {
 
     fn sample_events() -> Vec<PptxSlideShowEventDraft> {
         vec![
-            PptxSlideShowEventDraft::new(
-                PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick),
-                "1.5s",
+            PptxSlideShowEventDraft::trigger(
+                PptxSlideShowTrigger::OnClick,
+                Offset::parse("1.5s").unwrap(),
                 6,
-            )
-            .unwrap(),
-            PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Play, "2s", 4).unwrap(),
-            PptxSlideShowEventDraft::seek("2500ms", 4, "10.379s").unwrap(),
-            PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Null, "3", 5).unwrap(),
+            ),
+            PptxSlideShowEventDraft::play(Offset::secs(2), 4),
+            PptxSlideShowEventDraft::seek(Offset::ms(2500), 4, Offset::parse("10.379s").unwrap()),
+            PptxSlideShowEventDraft::null(Offset::ms(3), 5),
         ]
     }
 
@@ -821,14 +857,21 @@ mod tests {
         assert_eq!(discovered.len(), events.len());
         assert_eq!(
             discovered[0].kind(),
-            PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
+            &PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
         );
-        assert_eq!(discovered[0].time(), "1.5s");
+        assert_eq!(discovered[0].time(), &Offset::ms(1500));
         assert_eq!(discovered[0].object_id(), 6);
-        assert_eq!(discovered[1].kind(), PptxSlideShowEventKind::Play);
-        assert_eq!(discovered[2].kind(), PptxSlideShowEventKind::Seek);
-        assert_eq!(discovered[2].seek_time(), Some("10.379s"));
-        assert_eq!(discovered[3].kind(), PptxSlideShowEventKind::Null);
+        assert_eq!(discovered[1].kind(), &PptxSlideShowEventKind::Play);
+        assert!(matches!(
+            discovered[2].kind(),
+            PptxSlideShowEventKind::Seek { at }
+                if at == &Offset::parse("10.379s").unwrap()
+        ));
+        assert_eq!(
+            discovered[2].seek_time(),
+            Some(&Offset::parse("10.379s").unwrap())
+        );
+        assert_eq!(discovered[3].kind(), &PptxSlideShowEventKind::Null);
 
         // A second storage on the same slide is rejected (no replacement).
         assert!(store_slide_show_events(&mut package, &slide_name, &events).is_err());
@@ -857,10 +900,19 @@ mod tests {
         let (mut package, slide_name) = slide_package("");
         // No events.
         assert!(store_slide_show_events(&mut package, &slide_name, &[]).is_err());
-        // Seek without offset, non-seek with bad time.
-        assert!(PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Seek, "1s", 1).is_err());
-        assert!(PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Play, "1..2s", 1).is_err());
-        assert!(PptxSlideShowEventDraft::seek("1s", 1, "bad!!").is_err());
+        // Seek owns its offset in the action variant; non-seek actions cannot
+        // carry one in memory or emit one during serialization.
+        let seek = PptxSlideShowEventDraft::seek(Offset::secs(1), 1, Offset::ms(250));
+        assert!(matches!(
+            seek.kind(),
+            PptxSlideShowEventKind::Seek { at } if at == &Offset::ms(250)
+        ));
+        assert_eq!(
+            PptxSlideShowEventDraft::play(Offset::secs(1), 1).seek_time(),
+            None
+        );
+        assert!(Offset::parse("1..2s").is_err());
+        assert!(Offset::parse("bad!!").is_err());
         // Non-slide part.
         let wrong = litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap();
         package.add_part(Box::new(litchi_opc::BlobPart::new(

@@ -93,9 +93,9 @@ fn path_fill_mode_tokens_round_trip() {
         XlsxPathFillMode::Darken,
         XlsxPathFillMode::DarkenLess,
     ] {
-        assert_eq!(XlsxPathFillMode::from_token(mode.as_str()), Some(mode));
+        assert_eq!(mode.as_str().parse::<XlsxPathFillMode>().unwrap(), mode);
     }
-    assert_eq!(XlsxPathFillMode::from_token("sparkly"), None);
+    assert!("sparkly".parse::<XlsxPathFillMode>().is_err());
 }
 
 #[test]
@@ -160,6 +160,20 @@ fn validation_rejects_invalid_guide_names() {
         assert!(
             validate_custom_geometry(&geometry).is_err(),
             "guide name '{name}' should be rejected"
+        );
+    }
+}
+
+#[test]
+fn parsed_validation_preserves_schema_valid_open_guide_names() {
+    for name in ["", "has space", "123", "-45"] {
+        let geometry = XlsxCustomGeometry::new().with_adjust_value(XlsxGeometryGuide::new(
+            name,
+            XlsxGeometryFormula::literal(1),
+        ));
+        assert!(
+            validate_parsed_custom_geometry(&geometry).is_ok(),
+            "schema-valid parsed guide name '{name}' should be preserved"
         );
     }
 }

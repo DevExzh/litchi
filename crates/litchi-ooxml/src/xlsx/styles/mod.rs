@@ -35,15 +35,15 @@ pub mod alignment;
 pub mod border;
 mod cell_style;
 mod fill;
-mod font;
+pub mod font;
 mod number_format;
 mod parser;
 
 pub use alignment::Alignment;
-pub use border::Border;
+pub use border::{Border, ParseRgbError, Rgb};
 pub use cell_style::CellStyle;
 pub use fill::Fill;
-pub use font::Font;
+pub use font::{Font, ParseError as FontParseError, Scheme, Script, Underline};
 pub use number_format::NumberFormat;
 
 use std::collections::HashMap;

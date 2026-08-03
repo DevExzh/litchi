@@ -141,6 +141,7 @@ pub use hyperlinks::Hyperlink;
 pub use ink::{
     INK_CONTENT_TYPE, PptxInkAnnotation, StoredInkAnnotation, store_slide_ink_annotation,
 };
+pub use litchi_drawingml::coord;
 pub use modern_comment_authors::{
     add_modern_comment_author, find_modern_comment_author, remove_modern_comment_author,
     reorder_modern_comment_authors, replace_modern_comment_author, update_modern_comment_author,
@@ -158,6 +159,7 @@ pub use laser::{
 pub use litchi_opc::FontEmbedding;
 pub use litchi_pptx::font;
 pub use litchi_pptx::tag;
+pub use litchi_pptx::time;
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
     PlaceholderSpec, SlideLayoutKind, add_slide_layout, add_slide_master, remove_slide_layout,
@@ -165,9 +167,9 @@ pub use master_layout::{
 };
 pub use media::{Media, MediaFormat, MediaType};
 pub use media_parts::{
-    MediaBookmark, MediaFade, MediaResource, MediaTrim, OfficeMediaExtension,
-    SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture, SlideMediaPoster,
-    SlideMediaTransform, load_slide_media, parse_slide_media, store_slide_media,
+    MediaBookmark, MediaData, MediaExtensionList, MediaFade, MediaResource, MediaTrim,
+    OfficeMediaExtension, SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
+    SlideMediaPoster, SlideMediaTransform, load_slide_media, parse_slide_media, store_slide_media,
     write_slide_media_pictures,
 };
 pub use ole::{PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind};

@@ -30,7 +30,7 @@ fn slide_loads_inert_audio_resources() {
         "/ppt/media/media1.mp3"
     );
     assert_eq!(
-        media.pictures[0].resource.as_ref().unwrap().data,
+        media.pictures[0].resource.as_ref().unwrap().data.as_slice(),
         b"opaque audio payload"
     );
 }

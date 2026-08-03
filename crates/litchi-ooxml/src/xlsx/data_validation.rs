@@ -465,37 +465,6 @@ impl ParsedDataValidation {
     pub fn uid(&self) -> Option<&str> {
         self.uid.as_deref()
     }
-
-    pub(crate) fn to_legacy(&self) -> crate::xlsx::worksheet::DataValidationRule {
-        let formula = match &self.formula1 {
-            Some(ValidationListSource::Formula(value)) => Some(value.0.clone()),
-            Some(ValidationListSource::QuotedList(value)) => Some(value.clone()),
-            None => None,
-        };
-        crate::xlsx::worksheet::DataValidationRule {
-            range: self
-                .sqref
-                .ranges
-                .iter()
-                .map(|v| v.as_str())
-                .collect::<Vec<_>>()
-                .join(" "),
-            validation_type: self.validation_type.as_str().to_owned(),
-            operator: Some(self.operator.as_str().to_owned()),
-            formula,
-            formula2: self.formula2.as_ref().map(|v| v.0.clone()),
-            allow_blank: self.allow_blank,
-            show_drop_down: self.show_drop_down,
-            show_input_message: self.show_input_message,
-            show_error_message: self.show_error_message,
-            error_style: Some(self.error_style.as_str().to_owned()),
-            ime_mode: Some(self.ime_mode.as_str().to_owned()),
-            error_title: self.error_title.clone(),
-            error: self.error.clone(),
-            prompt_title: self.prompt_title.clone(),
-            prompt: self.prompt.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

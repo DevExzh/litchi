@@ -4,12 +4,13 @@
 
 use litchi_ooxml::xlsx::writer::XlsxShapeSpec;
 use litchi_ooxml::xlsx::{
-    Workbook, XlsxAdjustHandle, XlsxAdjustValue, XlsxCellMarker, XlsxConnectionSite,
+    Geometry, Workbook, XlsxAdjustHandle, XlsxAdjustValue, XlsxCellMarker, XlsxConnectionSite,
     XlsxCustomGeometry, XlsxDrawingObject, XlsxEditAs, XlsxEmu, XlsxGeometryFormula,
     XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
     XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxShapeAnchor, XlsxXyAdjustHandle,
     parse_drawing_shapes,
 };
+use litchi_opc::{OpcPackage, PackURI, constants::relationship_type as rt};
 
 const XDR_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
 const A_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -165,8 +166,11 @@ fn parses_custom_geometry_from_drawing_xml() {
          </a:custGeom>",
     );
     let shape = parse_single_shape(&xml);
-    assert_eq!(shape.preset, None);
-    let geometry = shape.custom_geometry.expect("custom geometry parsed");
+    assert_eq!(shape.preset(), None);
+    let geometry = shape
+        .geometry
+        .and_then(Geometry::into_custom)
+        .expect("custom geometry parsed");
 
     assert_eq!(
         geometry.adjust_values,
@@ -259,12 +263,40 @@ fn parses_path_attribute_defaults() {
         "<a:custGeom><a:pathLst><a:path>\
          <a:moveTo><a:pt x=\"0\" y=\"0\"/></a:moveTo></a:path></a:pathLst></a:custGeom>",
     );
-    let geometry = parse_single_shape(&xml).custom_geometry.unwrap();
+    let geometry = parse_single_shape(&xml)
+        .geometry
+        .and_then(Geometry::into_custom)
+        .unwrap();
     let path = &geometry.paths[0];
     assert_eq!((path.width, path.height), (0, 0));
     assert_eq!(path.fill_mode, XlsxPathFillMode::Normal);
     assert!(path.stroked);
     assert!(path.extrusion_allowed);
+}
+
+#[test]
+fn schema_valid_geometry_guide_tokens_are_canonicalized_without_rejection() {
+    let xml = anchored_shape(
+        "<a:custGeom><a:avLst>\
+         <a:gd name=\"  my&#x9; guide  \" fmla=\"val 1\"/>\
+         <a:gd name=\"123\" fmla=\"val 2\"/>\
+         <a:gd name=\"\" fmla=\"val 3\"/>\
+         </a:avLst><a:ahLst>\
+         <a:ahXY gdRefX=\" my&#xA; guide \" ><a:pos x=\"0\" y=\"0\"/></a:ahXY>\
+         </a:ahLst><a:pathLst/></a:custGeom>",
+    );
+    let geometry = parse_single_shape(&xml)
+        .geometry
+        .and_then(Geometry::into_custom)
+        .unwrap();
+
+    assert_eq!(geometry.adjust_values[0].name, "my guide");
+    assert_eq!(geometry.adjust_values[1].name, "123");
+    assert_eq!(geometry.adjust_values[2].name, "");
+    let XlsxAdjustHandle::Xy(handle) = &geometry.adjust_handles[0] else {
+        panic!("expected XY handle");
+    };
+    assert_eq!(handle.horizontal_guide.as_deref(), Some("my guide"));
 }
 
 #[test]
@@ -282,8 +314,8 @@ fn authored_geometry_round_trips_through_the_parser() {
 
     let shape = parse_single_shape(&xml);
     assert_eq!(shape.non_visual.name.as_deref(), Some("Wave"));
-    assert_eq!(shape.preset, None);
-    assert_eq!(shape.custom_geometry, Some(geometry));
+    assert_eq!(shape.preset(), None);
+    assert_eq!(shape.geometry, Some(geometry.into()));
     assert_eq!(shape.text_body.unwrap().text(), "wave text");
 }
 
@@ -298,7 +330,10 @@ fn reparsed_geometry_serializes_identically() {
     let first = worksheet.generate_drawing_xml().unwrap().unwrap();
 
     // parse -> author again -> serialize must reproduce the same markup.
-    let reparsed = parse_single_shape(&first).custom_geometry.unwrap();
+    let reparsed = parse_single_shape(&first)
+        .geometry
+        .and_then(Geometry::into_custom)
+        .unwrap();
     let mut workbook = Workbook::create().unwrap();
     let worksheet = workbook.worksheet_mut(0).unwrap();
     worksheet
@@ -329,6 +364,26 @@ fn authors_workbook_with_custom_geometry_shape() {
         workbook.save(&path).unwrap();
     }
 
+    let package = OpcPackage::open(&path).unwrap();
+    let worksheet_part = package
+        .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+        .unwrap();
+    let drawing_relationship = worksheet_part
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::DRAWING)
+        .unwrap();
+    let worksheet_xml = std::str::from_utf8(worksheet_part.blob()).unwrap();
+    assert!(worksheet_xml.contains(&format!(
+        r#"<drawing r:id="{}"/>"#,
+        drawing_relationship.r_id()
+    )));
+    assert!(
+        package
+            .get_part(&drawing_relationship.target_partname().unwrap())
+            .is_ok()
+    );
+
     let workbook = Workbook::open(&path).unwrap();
     let inventory = workbook.shapes_on_sheet(&sheet_name).unwrap();
     assert_eq!(inventory.objects.len(), 1);
@@ -336,8 +391,8 @@ fn authors_workbook_with_custom_geometry_shape() {
         panic!("expected a shape");
     };
     assert_eq!(shape.non_visual.name.as_deref(), Some("Wave"));
-    assert_eq!(shape.preset, None);
-    assert_eq!(shape.custom_geometry.as_ref(), Some(&geometry));
+    assert_eq!(shape.preset(), None);
+    assert_eq!(shape.custom_geometry(), Some(&geometry));
     assert_eq!(shape.text_body.as_ref().unwrap().text(), "hello");
 }
 
@@ -349,7 +404,7 @@ fn preset_shapes_still_author_preset_geometry() {
         .add_shape(XlsxShapeSpec::shape(
             "Plain",
             two_cell(),
-            litchi_ooxml::xlsx::XlsxShapePreset::Ellipse,
+            litchi_ooxml::xlsx::Preset::Ellipse,
             "",
         ))
         .unwrap();
@@ -359,7 +414,7 @@ fn preset_shapes_still_author_preset_geometry() {
 }
 
 #[test]
-fn validation_rejects_invalid_authored_geometry() {
+fn validation_rejects_invalid_or_ambiguous_authored_geometry() {
     let mut workbook = Workbook::create().unwrap();
     let worksheet = workbook.worksheet_mut(0).unwrap();
 
@@ -377,7 +432,7 @@ fn validation_rejects_invalid_authored_geometry() {
             XlsxGeometryPath::new(0, 0)
                 .with_command(XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(0, 0))),
         );
-    let spec = XlsxShapeSpec::custom("Bad", two_cell(), numeric_guide, "");
+    let spec = XlsxShapeSpec::custom("Numeric guide", two_cell(), numeric_guide, "");
     assert!(worksheet.add_shape(spec).is_err());
 
     let mut negative_path = full_geometry();
@@ -421,13 +476,32 @@ fn parsing_rejects_structurally_invalid_geometry() {
          <a:pathLst><a:path/></a:pathLst></a:custGeom>",
     );
     assert!(parse_drawing_shapes(&missing_position).is_err());
+
+    for attributes in [
+        "fill=\"sparkly\"",
+        "stroke=\"on\"",
+        "extrusionOk=\"sometimes\"",
+        "w=\"-1\"",
+        "h=\"27273042316901\"",
+    ] {
+        let malformed_domain = anchored_shape(&format!(
+            "<a:custGeom><a:pathLst><a:path {attributes}/></a:pathLst></a:custGeom>"
+        ));
+        assert!(
+            parse_drawing_shapes(&malformed_domain).is_err(),
+            "accepted fixed-domain attributes {attributes}"
+        );
+    }
 }
 
 #[test]
 fn empty_path_list_parses_but_cannot_be_authored() {
     // CT_Path2DList allows zero paths; parsing keeps the empty geometry.
     let xml = anchored_shape("<a:custGeom><a:pathLst/></a:custGeom>");
-    let geometry = parse_single_shape(&xml).custom_geometry.unwrap();
+    let geometry = parse_single_shape(&xml)
+        .geometry
+        .and_then(Geometry::into_custom)
+        .unwrap();
     assert!(geometry.paths.is_empty());
 
     // Re-authoring it is rejected: authored geometry must draw something.

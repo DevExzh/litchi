@@ -35,7 +35,7 @@ use super::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_erro
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::outline_properties::WorksheetOutlineProperties;
 use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
-use super::page_setup::{WorksheetPageSetup, parse_complete_worksheet_page_setup};
+use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
 use super::phonetic_properties::{
     WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
@@ -177,67 +177,6 @@ pub struct Comment {
     pub shape_id: Option<u32>,
 }
 
-/// Data validation rule information (parsed from worksheet XML)
-#[derive(Debug, Clone)]
-pub struct DataValidationRule {
-    /// Range (e.g., "A1:B10")
-    pub range: String,
-    /// Validation type (e.g., "list", "whole", "decimal")
-    pub validation_type: String,
-    /// Comparison operator, when applicable.
-    pub operator: Option<String>,
-    /// First validation formula.
-    pub formula: Option<String>,
-    /// Second validation formula, when applicable.
-    pub formula2: Option<String>,
-    /// Whether blank cells are allowed.
-    pub allow_blank: bool,
-    /// Whether the in-cell dropdown arrow is hidden.
-    pub show_drop_down: bool,
-    /// Whether the input message is shown.
-    pub show_input_message: bool,
-    /// Whether the error message is shown.
-    pub show_error_message: bool,
-    /// Error alert style.
-    pub error_style: Option<String>,
-    /// IME mode.
-    pub ime_mode: Option<String>,
-    /// Error alert title.
-    pub error_title: Option<String>,
-    /// Error alert text.
-    pub error: Option<String>,
-    /// Input prompt title.
-    pub prompt_title: Option<String>,
-    /// Input prompt text.
-    pub prompt: Option<String>,
-}
-
-/// Conditional formatting rule
-#[derive(Debug, Clone)]
-pub struct ConditionalFormatRule {
-    /// Range (e.g., "A1:B10")
-    pub range: String,
-    /// Rule type (e.g., "cellIs", "colorScale")
-    pub rule_type: String,
-    /// Priority
-    pub priority: u32,
-}
-
-/// Page setup information
-#[derive(Debug, Clone, Default)]
-pub struct PageSetup {
-    /// Paper size (e.g., 9 for A4)
-    pub paper_size: Option<u32>,
-    /// Orientation (true = landscape, false = portrait)
-    pub landscape: bool,
-    /// Scale percentage
-    pub scale: Option<u32>,
-    /// Fit to page width
-    pub fit_to_width: Option<u32>,
-    /// Fit to page height
-    pub fit_to_height: Option<u32>,
-}
-
 /// Auto-filter information
 #[derive(Debug, Clone)]
 pub struct AutoFilter {
@@ -269,15 +208,9 @@ pub struct Worksheet<'a> {
     columns: HashMap<u32, ColumnInfo>,
     /// Row information by row number
     rows: HashMap<u32, RowInfo>,
-    /// Data validations
-    data_validations: Vec<DataValidationRule>,
     data_validation_collections: Vec<ParsedDataValidationCollection>,
-    /// Conditional formatting rules
-    conditional_formats: Vec<ConditionalFormatRule>,
     /// Complete conditional-formatting containers and rules.
     conditional_formattings: Vec<ParsedConditionalFormatting>,
-    /// Page setup
-    page_setup: PageSetup,
     /// Auto-filter
     auto_filter: Option<AutoFilter>,
     auto_filter_definition: Option<AutoFilterDefinition>,
@@ -295,8 +228,8 @@ pub struct Worksheet<'a> {
     page_margins: Option<WorksheetPageMargins>,
     /// Static worksheet print options.
     print_options: Option<WorksheetPrintOptions>,
-    /// Complete static worksheet page setup.
-    complete_page_setup: Option<WorksheetPageSetup>,
+    /// Typed static worksheet page setup.
+    page_setup: Option<Setup>,
     /// Effective static worksheet row/column defaults and outline metadata.
     sheet_format_properties: Option<WorksheetSheetFormatProperties>,
     /// User-reviewed worksheet error-checking exceptions.
@@ -342,11 +275,8 @@ impl<'a> Worksheet<'a> {
             comments: HashMap::new(),
             columns: HashMap::new(),
             rows: HashMap::new(),
-            data_validations: Vec::new(),
             data_validation_collections: Vec::new(),
-            conditional_formats: Vec::new(),
             conditional_formattings: Vec::new(),
-            page_setup: PageSetup::default(),
             auto_filter: None,
             auto_filter_definition: None,
             sheet_views: Vec::new(),
@@ -356,7 +286,7 @@ impl<'a> Worksheet<'a> {
             header_footer: None,
             page_margins: None,
             print_options: None,
-            complete_page_setup: None,
+            page_setup: None,
             sheet_format_properties: None,
             ignored_errors: None,
             cell_watches: None,
@@ -488,7 +418,7 @@ impl<'a> Worksheet<'a> {
         let header_footer = parse_worksheet_header_footer(sheet_data.as_bytes())?;
         let page_margins = parse_worksheet_page_margins(sheet_data.as_bytes())?;
         let print_options = parse_worksheet_print_options(sheet_data.as_bytes())?;
-        let complete_page_setup = parse_complete_worksheet_page_setup(sheet_data.as_bytes())?;
+        let page_setup = parse_worksheet_page_setup(sheet_data.as_bytes())?;
         let sheet_format_properties =
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
@@ -509,24 +439,8 @@ impl<'a> Worksheet<'a> {
         self.rich_text_cells = parsed.rich_text_cells;
         self.merged_regions = parsed.merged_regions;
         self.columns = parsed.columns;
-        self.data_validations = parsed.data_validations;
-        self.data_validations.extend(
-            data_validation_collections
-                .iter()
-                .filter(|collection| {
-                    collection.source() == super::data_validation::DataValidationSource::Office2010
-                })
-                .flat_map(|collection| {
-                    collection
-                        .validations()
-                        .iter()
-                        .map(ParsedDataValidation::to_legacy)
-                }),
-        );
         self.data_validation_collections = data_validation_collections;
-        self.conditional_formats = parsed.conditional_formats;
         self.conditional_formattings = conditional_formattings;
-        self.page_setup = parsed.page_setup.unwrap_or_default();
         self.row_breaks = parsed.row_breaks;
         self.col_breaks = parsed.col_breaks;
         self.auto_filter = parsed.auto_filter;
@@ -537,7 +451,7 @@ impl<'a> Worksheet<'a> {
         self.header_footer = header_footer;
         self.page_margins = page_margins;
         self.print_options = print_options;
-        self.complete_page_setup = complete_page_setup;
+        self.page_setup = page_setup;
         self.sheet_format_properties = sheet_format_properties;
         self.ignored_errors = ignored_errors;
         self.cell_watches = cell_watches;
@@ -1779,8 +1693,10 @@ impl<'a> Worksheet<'a> {
                 size: f.size,
                 bold: f.bold,
                 italic: f.italic,
-                underline: f.underline.is_some(),
+                underline: f.underline,
                 color: f.color.clone(),
+                scheme: f.scheme,
+                script: f.script,
             });
 
         let fill = style
@@ -2055,11 +1971,11 @@ impl<'a> Worksheet<'a> {
         self.rows.get(&row)
     }
 
-    // ===== Complete Page Setup =====
+    // ===== Page Setup =====
 
-    /// Complete immutable worksheet page setup, when explicitly present.
-    pub fn complete_page_setup(&self) -> Option<&WorksheetPageSetup> {
-        self.complete_page_setup.as_ref()
+    /// Borrow the typed worksheet page setup, when explicitly present.
+    pub fn page(&self) -> Option<&Setup> {
+        self.page_setup.as_ref()
     }
 
     // ===== Sheet Format Properties =====
@@ -2159,59 +2075,22 @@ impl<'a> Worksheet<'a> {
 
     // ===== Data Validation =====
 
-    /// Get all data validations in the worksheet.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use litchi_ooxml::xlsx::Workbook;
-    /// use litchi_core::sheet::WorkbookTrait;
-    ///
-    /// let wb = Workbook::open("workbook.xlsx")?;
-    /// let ws = wb.worksheet_by_index(0)?;
-    ///
-    /// for validation in ws.get_data_validations() {
-    ///     println!("Validation on range: {}", validation.range);
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    pub fn get_data_validations(&self) -> &[DataValidationRule] {
-        &self.data_validations
-    }
-
     /// Complete core and Office 2010 data-validation collections in document order.
     pub fn data_validation_collections(&self) -> &[ParsedDataValidationCollection] {
         &self.data_validation_collections
     }
 
-    /// Complete core and Office 2010 validation rules in document order.
-    pub fn parsed_data_validations(&self) -> impl Iterator<Item = &ParsedDataValidation> {
+    /// Core and Office 2010 validation rules in document order.
+    ///
+    /// Fixed properties such as validation kind, operator, error style, and IME
+    /// mode are exposed as enums; no raw schema tokens escape this API.
+    pub fn data_validations(&self) -> impl Iterator<Item = &ParsedDataValidation> {
         self.data_validation_collections
             .iter()
             .flat_map(|collection| collection.validations())
     }
 
     // ===== Conditional Formatting =====
-
-    /// Get all conditional formatting rules in the worksheet.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use litchi_ooxml::xlsx::Workbook;
-    /// use litchi_core::sheet::WorkbookTrait;
-    ///
-    /// let wb = Workbook::open("workbook.xlsx")?;
-    /// let ws = wb.worksheet_by_index(0)?;
-    ///
-    /// for rule in ws.get_conditional_formatting() {
-    ///     println!("Conditional format on range: {}", rule.range);
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    pub fn get_conditional_formatting(&self) -> &[ConditionalFormatRule] {
-        &self.conditional_formats
-    }
 
     /// Complete conditional-formatting containers in worksheet document order.
     pub fn conditional_formattings(&self) -> &[ParsedConditionalFormatting] {
@@ -2245,29 +2124,6 @@ impl<'a> Worksheet<'a> {
             Some(DifferentialFormatRef::Inline(format)) => Some(format),
             None => None,
         }
-    }
-
-    // ===== Page Setup =====
-
-    /// Get the page setup information.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use litchi_ooxml::xlsx::Workbook;
-    /// use litchi_core::sheet::WorkbookTrait;
-    ///
-    /// let wb = Workbook::open("workbook.xlsx")?;
-    /// let ws = wb.worksheet_by_index(0)?;
-    ///
-    /// let page_setup = ws.get_page_setup();
-    /// if page_setup.landscape {
-    ///     println!("Page is in landscape orientation");
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    pub fn get_page_setup(&self) -> &PageSetup {
-        &self.page_setup
     }
 
     // ===== Auto-Filter =====
@@ -2400,9 +2256,9 @@ impl<'a> Worksheet<'a> {
     // ✅ Column operations: get_column_width(), is_column_hidden(), get_column_info()
     // ✅ Row operations: is_row_hidden(), get_row_height(), get_row_info()
     // ✅ Auto-filter: get_auto_filter()
-    // ✅ Data validation: get_data_validations()
-    // ✅ Conditional formatting: get_conditional_formatting()
-    // ✅ Page setup: get_page_setup()
+    // ✅ Data validation: data_validations()
+    // ✅ Conditional formatting: conditional_formattings()
+    // ✅ Typed page setup: page()
     // ✅ Array formulas: get_array_formulas() (read), set_array_formula() (write)
     // ✅ Rich text cells: get_rich_text_cell() (read), set_rich_text_cell() (write)
     // ✅ Cell set operations: set_hyperlink(), remove_hyperlink(),

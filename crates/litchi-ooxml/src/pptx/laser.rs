@@ -6,14 +6,17 @@
 
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
+use litchi_drawingml::coord::{Coordinate, ParseError as CoordinateParseError};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
+use litchi_pptx::time::{Offset, ParseError as TimeParseError};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::fmt::Write as _;
 
 /// The PowerPoint extension URI that contains persisted laser-pointer traces.
 pub const LASER_TRACE_EXTENSION_URI: &str = "{3A86A75C-4F4B-4683-9AE1-C65F6400EC91}";
@@ -26,36 +29,37 @@ const MAX_LASER_TRACES: usize = 4_096;
 const MAX_LASER_POINTS: usize = 65_536;
 const MAX_XML_NODES: usize = 250_000;
 const MAX_XML_DEPTH: usize = 128;
-const MAX_TIME_OFFSET_BYTES: usize = 64;
 
 /// A persisted laser-pointer point from a PowerPoint slide show.
 ///
-/// The timestamp is kept in its stored universal-time-offset lexical form.
-/// Coordinates are DrawingML EMUs relative to the slide's top-left corner.
+/// The represented duration is exact; its source spelling is canonicalized to
+/// a normalized typed offset.
+/// Coordinates are exact `a:ST_Coordinate` values relative to the slide's
+/// top-left corner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PptxLaserTracePoint {
-    time: String,
-    x: i64,
-    y: i64,
+    time: Offset,
+    x: Coordinate,
+    y: Coordinate,
 }
 
 impl PptxLaserTracePoint {
-    /// Return the stored universal time offset relative to the slide timeline.
+    /// Return the exact normalized time offset relative to the slide timeline.
     #[inline]
-    pub fn time(&self) -> &str {
+    pub fn time(&self) -> &Offset {
         &self.time
     }
 
-    /// Return the horizontal position in DrawingML EMUs.
+    /// Return the checked horizontal DrawingML coordinate.
     #[inline]
-    pub fn x(&self) -> i64 {
-        self.x
+    pub fn x(&self) -> &Coordinate {
+        &self.x
     }
 
-    /// Return the vertical position in DrawingML EMUs.
+    /// Return the checked vertical DrawingML coordinate.
     #[inline]
-    pub fn y(&self) -> i64 {
-        self.y
+    pub fn y(&self) -> &Coordinate {
+        &self.y
     }
 }
 
@@ -470,8 +474,7 @@ fn is_p14_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]
 }
 
 fn parse_trace_point(element: &BytesStart<'_>, decoder: Decoder) -> Result<PptxLaserTracePoint> {
-    let time = required_attribute(element, b"t", decoder)?;
-    validate_time_offset(&time)?;
+    let time = parse_time_offset(required_attribute(element, b"t", decoder)?)?;
     let x = parse_coordinate(required_attribute(element, b"x", decoder)?, "x")?;
     let y = parse_coordinate(required_attribute(element, b"y", decoder)?, "y")?;
     Ok(PptxLaserTracePoint { time, x, y })
@@ -488,35 +491,24 @@ fn required_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -
         })
 }
 
-fn parse_coordinate(value: String, name: &str) -> Result<i64> {
-    value
-        .parse()
-        .map_err(|_| invalid(format!("invalid laser trace point {name} coordinate")))
+fn parse_coordinate(value: String, name: &str) -> Result<Coordinate> {
+    Coordinate::try_from(value).map_err(|error| coordinate_error(error, name))
 }
 
-fn validate_time_offset(value: &str) -> Result<()> {
-    if value.len() > MAX_TIME_OFFSET_BYTES {
-        return Err(limit("laser trace point time offset bytes"));
-    }
-    let split = value
-        .find(|character: char| !character.is_ascii_digit() && character != '.')
-        .unwrap_or(value.len());
-    let (number, unit) = value.split_at(split);
-    let mut pieces = number.split('.');
-    let whole = pieces.next().unwrap_or_default();
-    let fraction = pieces.next();
-    if whole.is_empty()
-        || !whole.bytes().all(|byte| byte.is_ascii_digit())
-        || fraction
-            .is_some_and(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
-        || pieces.next().is_some()
-        || !matches!(unit, "" | "h" | "min" | "s" | "ms" | "µs" | "ns")
-    {
-        return Err(invalid(format!(
-            "invalid laser trace point universal time offset '{value}'"
-        )));
-    }
-    Ok(())
+fn coordinate_error(error: CoordinateParseError, name: &str) -> OoxmlError {
+    invalid(format!(
+        "invalid laser trace point {name} DrawingML coordinate: {error}"
+    ))
+}
+
+fn parse_time_offset(value: String) -> Result<Offset> {
+    Offset::try_from(value).map_err(time_error)
+}
+
+fn time_error(error: TimeParseError) -> OoxmlError {
+    invalid(format!(
+        "invalid laser trace point universal time offset: {error}"
+    ))
 }
 
 fn increment_nodes(nodes: &mut usize) -> Result<()> {
@@ -538,35 +530,16 @@ fn limit(what: &str) -> OoxmlError {
 }
 
 impl PptxLaserTracePoint {
-    /// Create a trace point from a stored time offset and EMU coordinates.
-    ///
-    /// `time` is the universal-time-offset lexical form used by producers;
-    /// it is validated for shape (non-empty, bounded, no markup characters)
-    /// but never interpreted.
-    pub fn new(time: &str, x: i64, y: i64) -> Result<Self> {
-        if time.is_empty() || time.len() > MAX_TIME_OFFSET_BYTES {
-            return Err(invalid("laser trace point has an invalid time offset"));
-        }
-        if time
-            .chars()
-            .any(|character| matches!(character, '<' | '>' | '&' | '"' | '\''))
-        {
-            return Err(invalid(
-                "laser trace point time offset contains markup characters",
-            ));
-        }
-        Ok(Self {
-            time: time.to_string(),
-            x,
-            y,
-        })
+    /// Create a trace point from exact, checked time and coordinate values.
+    pub fn new(time: Offset, x: Coordinate, y: Coordinate) -> Self {
+        Self { time, x, y }
     }
 }
 
 /// Store one laser-pointer trace onto a slide as a PowerPoint 2010
 /// `p14:laserTraceLst` extension.
 ///
-/// The points are validated and serialized verbatim into a new
+/// The points are typed and serialized canonically into a new
 /// `p14:tracePtLst`; the slide gains the `p:ext` extension block (creating
 /// `p:extLst` when absent) while preserving its namespace dialect. Slides
 /// that already carry a laser extension are rejected — replacement is not
@@ -605,11 +578,13 @@ pub fn store_slide_laser_trace(
     fragment.push_str("\"><p14:laserTraceLst><p14:tracePtLst>");
     for point in points {
         fragment.push_str("<p14:tracePt t=\"");
-        fragment.push_str(&point.time);
+        fragment.push_str(point.time.as_str());
         fragment.push_str("\" x=\"");
-        fragment.push_str(&point.x.to_string());
+        write!(fragment, "{}", point.x)
+            .map_err(|_| invalid("failed to serialize laser trace x coordinate"))?;
         fragment.push_str("\" y=\"");
-        fragment.push_str(&point.y.to_string());
+        write!(fragment, "{}", point.y)
+            .map_err(|_| invalid("failed to serialize laser trace y coordinate"))?;
         fragment.push_str("\"/>");
     }
     fragment.push_str("</p14:tracePtLst></p14:laserTraceLst></p:ext>");
@@ -636,7 +611,7 @@ mod tests {
     #[test]
     fn scans_laser_traces_through_markup_compatibility() {
         let xml = format!(
-            r#"<p:sld xmlns:p="{PML}" xmlns:mc="{MCE}" xmlns:p14="{P14_NAMESPACE}" mc:Ignorable="p14"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="1.5s" x="-2" y="3"/><p14:tracePt t="2000ms" x="0" y="0"/></p14:tracePtLst><p14:tracePtLst/></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
+            r#"<p:sld xmlns:p="{PML}" xmlns:mc="{MCE}" xmlns:p14="{P14_NAMESPACE}" mc:Ignorable="p14"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="1.5s" x="-2" y="3"/><p14:tracePt t="2000ms" x="1.5cm" y="-2pt"/></p14:tracePtLst><p14:tracePtLst/></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
         );
         let traces =
             scan_slide_laser_traces(4, xml.as_bytes(), &mut LaserLoadLimits::default()).unwrap();
@@ -645,9 +620,10 @@ mod tests {
         assert_eq!(traces[0].slide_index(), 4);
         assert_eq!(traces[0].trace_index(), 0);
         assert_eq!(traces[0].point_count(), 2);
-        assert_eq!(traces[0].points()[0].time(), "1.5s");
-        assert_eq!(traces[0].points()[0].x(), -2);
-        assert_eq!(traces[0].points()[1].y(), 0);
+        assert_eq!(traces[0].points()[0].time(), &Offset::ms(1500));
+        assert_eq!(traces[0].points()[0].x().as_emu(), Some(-2));
+        assert_eq!(traces[0].points()[1].x().to_string(), "1.5cm");
+        assert_eq!(traces[0].points()[1].y().to_string(), "-2pt");
         assert_eq!(traces[1].trace_index(), 1);
         assert!(traces[1].points().is_empty());
     }
@@ -661,6 +637,17 @@ mod tests {
         assert!(
             scan_slide_laser_traces(0, xml.as_bytes(), &mut LaserLoadLimits::default()).is_err()
         );
+
+        for coordinate in ["27273042316901", "1e2mm", "+1mm", "1px"] {
+            let xml = format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:p14="{P14_NAMESPACE}"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="0" x="{coordinate}" y="0"/></p14:tracePtLst></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
+            );
+            assert!(
+                scan_slide_laser_traces(0, xml.as_bytes(), &mut LaserLoadLimits::default())
+                    .is_err(),
+                "accepted {coordinate:?}"
+            );
+        }
     }
 
     fn slide_package(tail: &str) -> (litchi_opc::OpcPackage, litchi_opc::PackURI) {
@@ -679,8 +666,16 @@ mod tests {
 
     fn sample_points() -> Vec<PptxLaserTracePoint> {
         vec![
-            PptxLaserTracePoint::new("0", 914_400, 457_200).unwrap(),
-            PptxLaserTracePoint::new("2500ms", -12, 34).unwrap(),
+            PptxLaserTracePoint::new(
+                Offset::ZERO,
+                Coordinate::emu(914_400).unwrap(),
+                Coordinate::emu(457_200).unwrap(),
+            ),
+            PptxLaserTracePoint::new(
+                Offset::ms(2500),
+                Coordinate::parse("1.25cm").unwrap(),
+                Coordinate::from(34),
+            ),
         ]
     }
 
@@ -752,9 +747,9 @@ mod tests {
         let (mut package, slide_name) = slide_package("");
         // No points.
         assert!(store_slide_laser_trace(&mut package, &slide_name, &[]).is_err());
-        // Bad time offsets.
-        assert!(PptxLaserTracePoint::new("", 0, 0).is_err());
-        assert!(PptxLaserTracePoint::new("a<b", 0, 0).is_err());
+        // Bad time offsets cannot enter the typed point constructor.
+        assert!(Offset::parse("").is_err());
+        assert!(Offset::parse("a<b").is_err());
         // Non-slide part.
         let wrong = litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap();
         package.add_part(Box::new(litchi_opc::BlobPart::new(

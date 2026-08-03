@@ -1499,7 +1499,11 @@ fn parse_sort_state(e: &BytesStart<'_>, d: Decoder) -> Result<SortBuilder> {
     let reference = FilterRange(required_attr(e, b"ref", d)?);
     parse_range(reference.as_str())?;
     let method = optional_attr(e, b"sortMethod", d)?
-        .map(|v| SortMethod::parse(&v).ok_or_else(|| invalid(format!("invalid sortMethod '{v}'"))))
+        .map(|value| {
+            value
+                .parse::<SortMethod>()
+                .map_err(|error| invalid(error.to_string()))
+        })
         .transpose()?;
     Ok(SortBuilder {
         reference,
@@ -1516,7 +1520,11 @@ fn push_sort(s: &mut (usize, SortBuilder), e: &BytesStart<'_>, d: Decoder) -> Re
     let reference = FilterRange(required_attr(e, b"ref", d)?);
     parse_range(reference.as_str())?;
     let sort_by = optional_attr(e, b"sortBy", d)?
-        .map(|v| SortBy::parse(&v).ok_or_else(|| invalid(format!("invalid sortBy '{v}'"))))
+        .map(|value| {
+            value
+                .parse::<SortBy>()
+                .map_err(|error| invalid(error.to_string()))
+        })
         .transpose()?
         .unwrap_or(SortBy::Value);
     let dxf = optional_u32(e, b"dxfId", d)?;

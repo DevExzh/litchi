@@ -357,8 +357,17 @@ impl StylesBuilder {
         if font.italic {
             xml.push_str("<i/>");
         }
-        if font.underline {
-            xml.push_str("<u/>");
+        if let Some(underline) = font.underline {
+            write!(xml, r#"<u val="{}"/>"#, underline.as_str())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        if let Some(script) = font.script {
+            write!(xml, r#"<vertAlign val="{}"/>"#, script.as_str())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        if let Some(scheme) = font.scheme {
+            write!(xml, r#"<scheme val="{}"/>"#, scheme.as_str())
+                .map_err(|error| format!("XML write error: {error}"))?;
         }
 
         if let Some(ref size) = font.size {
@@ -584,6 +593,8 @@ impl StylesBuilder {
         font.bold.hash(&mut hasher);
         font.italic.hash(&mut hasher);
         font.underline.hash(&mut hasher);
+        font.scheme.hash(&mut hasher);
+        font.script.hash(&mut hasher);
         if let Some(ref name) = font.name {
             name.hash(&mut hasher);
         }
@@ -623,9 +634,9 @@ impl Default for StylesBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsx::styles::Styles;
     use crate::xlsx::styles::alignment::{Horizontal, Indent, Reading, Rotation, Vertical};
     use crate::xlsx::styles::border::{Diagonal, Dir, Line, Tint};
+    use crate::xlsx::styles::{Scheme, Script, Styles, Underline};
 
     #[test]
     fn test_create_default_styles() {
@@ -684,6 +695,33 @@ mod tests {
         assert!(xml.contains("<fills"));
         assert!(xml.contains("<borders"));
         assert!(xml.contains("<cellXfs"));
+    }
+
+    #[test]
+    fn typed_font_tokens_write_and_parse_losslessly() {
+        let mut builder = StylesBuilder::new();
+        let format = CellFormat {
+            font: Some(CellFont {
+                name: Some("Aptos".to_string()),
+                underline: Some(Underline::DoubleAccounting),
+                scheme: Some(Scheme::Major),
+                script: Some(Script::Subscript),
+                ..CellFont::default()
+            }),
+            ..CellFormat::default()
+        };
+        assert_eq!(builder.add_cell_format(&format), 1);
+
+        let xml = builder.to_xml().unwrap();
+        assert!(xml.contains(r#"<u val="doubleAccounting"/>"#));
+        assert!(xml.contains(r#"<vertAlign val="subscript"/>"#));
+        assert!(xml.contains(r#"<scheme val="major"/>"#));
+
+        let styles = Styles::parse(&xml).unwrap();
+        let font = &styles.fonts[1];
+        assert_eq!(font.underline, Some(Underline::DoubleAccounting));
+        assert_eq!(font.scheme, Some(Scheme::Major));
+        assert_eq!(font.script, Some(Script::Subscript));
     }
 
     #[test]

@@ -871,7 +871,7 @@ impl Paragraph {
     ///     for drawing in para.drawing_objects()? {
     ///         println!("Shape: {} (type: {:?})",
     ///             drawing.name(),
-    ///             drawing.shape_type()
+    ///             drawing.preset()
     ///         );
     ///         if !drawing.text().is_empty() {
     ///             println!("  Text: {}", drawing.text());

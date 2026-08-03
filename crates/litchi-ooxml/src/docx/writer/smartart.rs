@@ -415,7 +415,7 @@ mod tests {
             let document = package.document_mut().unwrap();
 
             let mut text_box = MutableTextBox::new("Companion Box", 914400, 457200).unwrap();
-            text_box.add_run("box story");
+            text_box.add_run("box story").unwrap();
             document.add_text_box(text_box);
 
             document

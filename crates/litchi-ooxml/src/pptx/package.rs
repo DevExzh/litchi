@@ -689,7 +689,7 @@ impl Package {
     /// Store one laser-pointer trace onto a slide as a PowerPoint 2010
     /// `p14:laserTraceLst` extension.
     ///
-    /// Points are validated and serialized verbatim; the slide gains the
+    /// Typed points are serialized canonically; the slide gains the
     /// `p:ext` extension block (creating `p:extLst` when absent) while
     /// preserving its namespace dialect. Slides that already carry a laser
     /// extension are rejected. Traces are never replayed, rendered,
@@ -716,7 +716,7 @@ impl Package {
     /// Store slide-show event records onto a slide as a PowerPoint 2010
     /// `p14:showEvtLst` extension.
     ///
-    /// Events are validated and serialized verbatim in caller order; the
+    /// Typed events are serialized canonically in caller order; the
     /// slide gains the `p:ext` extension block while preserving its
     /// namespace dialect. Slides that already carry a show-event extension
     /// are rejected. Events are never replayed, rendered, or executed.

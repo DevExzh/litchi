@@ -381,12 +381,7 @@ mod tests {
 
     #[test]
     fn returns_typed_markers_for_unsupported_and_picture_formats() {
-        let value = numbering(vec![level(
-            0,
-            2,
-            NumberFormat::Other("circleNum".to_owned()),
-            "%1",
-        )]);
+        let value = numbering(vec![level(0, 2, NumberFormat::NumberInDash, "%1")]);
         let mut state = ListCounterState::new();
         assert_eq!(
             state
@@ -400,7 +395,7 @@ mod tests {
                 .unwrap()
                 .0,
             ListMarker::UnsupportedFormat {
-                format: "circleNum".to_owned(),
+                format: "numberInDash".to_owned(),
                 value: 2
             }
         );

@@ -204,6 +204,7 @@ fn serialize_sort_state(
     } else {
         xml.push('>');
         for condition in &sort_state.conditions {
+            condition.validate()?;
             write!(
                 xml,
                 r#"<sortCondition ref="{}""#,
@@ -227,8 +228,8 @@ fn serialize_sort_state(
                 write!(xml, r#" dxfId="{}""#, dxf_id)
                     .map_err(|e| format!("XML write error: {}", e))?;
             }
-            if let Some(icon_set) = &condition.icon_set {
-                write!(xml, r#" iconSet="{}""#, escape_xml(icon_set))
+            if let Some(icon_set) = condition.icon_set {
+                write!(xml, r#" iconSet="{}""#, icon_set.as_str())
                     .map_err(|e| format!("XML write error: {}", e))?;
             }
             if let Some(icon_id) = condition.icon_id {
@@ -480,6 +481,7 @@ mod tests {
 
     #[test]
     fn serialized_table_round_trips_through_parser() {
+        use crate::xlsx::conditional_formatting::IconSet;
         use crate::xlsx::sort::SortBy;
         use crate::xlsx::table::parse_table_xml;
 
@@ -496,8 +498,8 @@ mod tests {
                 descending: Some(true),
                 sort_by: Some(SortBy::Icon),
                 custom_list: Some("High,Low".to_string()),
-                dxf_id: Some(3),
-                icon_set: Some("3Arrows".to_string()),
+                dxf_id: None,
+                icon_set: Some(IconSet::ThreeArrows),
                 icon_id: Some(2),
             }],
         });
@@ -525,8 +527,8 @@ mod tests {
         let condition = &parsed.sort_state.unwrap().conditions[0];
         assert_eq!(condition.sort_by, Some(SortBy::Icon));
         assert_eq!(condition.custom_list.as_deref(), Some("High,Low"));
-        assert_eq!(condition.dxf_id, Some(3));
-        assert_eq!(condition.icon_set.as_deref(), Some("3Arrows"));
+        assert_eq!(condition.dxf_id, None);
+        assert_eq!(condition.icon_set, Some(IconSet::ThreeArrows));
         assert_eq!(condition.icon_id, Some(2));
     }
 

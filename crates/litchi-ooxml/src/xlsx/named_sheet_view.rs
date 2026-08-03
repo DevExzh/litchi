@@ -1863,8 +1863,11 @@ impl Parser {
             return Err(invalid("duplicate or misplaced sortRules"));
         }
         filter.phase = 1;
-        let method = SortMethod::parse(attr(e, b"sortMethod", d)?.as_deref().unwrap_or("none"))
-            .ok_or_else(|| invalid("invalid named-sheet-view sortMethod"))?;
+        let method = attr(e, b"sortMethod", d)?
+            .as_deref()
+            .unwrap_or("none")
+            .parse::<SortMethod>()
+            .map_err(|error| invalid(error.to_string()))?;
         self.sort_rules = Some(SortRulesBuilder {
             value: NamedSheetViewSortRules {
                 sort_method: method,
@@ -2211,8 +2214,11 @@ fn parse_condition(
     kind: NamedSheetViewSortConditionKind,
 ) -> Result<NamedSheetViewSortCondition> {
     let reference = parse_range(&required_attr(e, b"ref", d)?)?;
-    let sort_by = SortBy::parse(attr(e, b"sortBy", d)?.as_deref().unwrap_or("value"))
-        .ok_or_else(|| invalid("invalid named-sheet-view sortBy"))?;
+    let sort_by = attr(e, b"sortBy", d)?
+        .as_deref()
+        .unwrap_or("value")
+        .parse::<SortBy>()
+        .map_err(|error| invalid(error.to_string()))?;
     let dxf = optional_u32(e, b"dxfId", d)?;
     let icon_set = attr(e, b"iconSet", d)?
         .map(|v| NamedSheetViewIconSet::parse(&v))

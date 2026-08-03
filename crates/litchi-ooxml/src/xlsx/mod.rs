@@ -126,11 +126,11 @@ pub use chart::{
     ChartUserShapesRelationshipTarget, WorksheetChart,
 };
 pub use conditional_formatting::{
-    CellRangeRef, ColorScale, ConditionalFormatOperator, ConditionalFormatPayload,
-    ConditionalFormatValue, ConditionalFormatValueType, ConditionalFormatting,
-    ConditionalFormattingRule, ConditionalFormattingSource, ConditionalRuleType, DataBar,
+    Axis, CellRangeRef, ColorRole, ColorScale, ConditionalFormatPayload, ConditionalFormatValue,
+    ConditionalFormatting, ConditionalFormattingRule, ConditionalFormattingSource, DataBar,
     DifferentialFormat, DifferentialFormatComponent, DifferentialFormatRef,
-    DifferentialNumberFormat, ExtensionAssociation, IconSet, NamedColor, SpreadsheetColor,
+    DifferentialNumberFormat, Direction, ExtensionAssociation, IconSet, IconSet14, Icons, Kind,
+    NamedColor, Operator, Period, SpreadsheetColor, TokenError, ValueKind,
 };
 pub use data_consolidation::{
     WorksheetDataConsolidation, WorksheetDataConsolidationConformance,
@@ -186,6 +186,7 @@ pub use ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
+pub use litchi_drawingml::geom::Preset;
 pub use litchi_xlsx::web;
 pub use named_sheet_view::{
     NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewDifferentialFormat,
@@ -203,11 +204,7 @@ pub use ole_objects::{
 };
 pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
-pub use page_setup::{
-    PageSetupCellComments, PageSetupOrder, PageSetupOrientation, PageSetupPrintErrors,
-    PositiveUniversalMeasure, UniversalMeasureUnit, WorksheetPageSetup,
-    parse_complete_worksheet_page_setup,
-};
+pub use page_setup::parse_worksheet_page_setup;
 pub use phonetic_properties::{
     WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
     parse_worksheet_phonetic_properties,
@@ -225,12 +222,13 @@ pub use shape_geometry::{
     XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxXyAdjustHandle,
 };
 pub use shapes::{
-    XlsxAnchoredObject, XlsxCellMarker, XlsxClientData, XlsxConnectionShape, XlsxDrawingObject,
-    XlsxDrawingOleObject, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform,
-    XlsxShape, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeConnectionEnd, XlsxShapeGroup,
-    XlsxShapeNonVisual, XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun, XlsxShapeTextBody,
-    XlsxTextAutofit, XlsxTextDirection, XlsxTextInsets, XlsxTextVerticalAnchor, XlsxTextWrap,
-    XlsxWorksheetShapes, load_shapes, load_worksheet_shapes, parse_drawing_shapes,
+    Columns, Coordinate32, Geometry, TextSize, XlsxAnchoredObject, XlsxCellMarker, XlsxClientData,
+    XlsxConnectionShape, XlsxDrawingObject, XlsxDrawingOleObject, XlsxEditAs, XlsxEditAsError,
+    XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShape, XlsxShapeAnchor,
+    XlsxShapeBodyProperties, XlsxShapeConnectionEnd, XlsxShapeGroup, XlsxShapeNonVisual,
+    XlsxShapeParagraph, XlsxShapeRun, XlsxShapeTextBody, XlsxTextAutofit, XlsxTextDirection,
+    XlsxTextInsets, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap, XlsxWorksheetShapes,
+    load_shapes, load_worksheet_shapes, parse_drawing_shapes,
 };
 pub use shared_strings::SharedStrings;
 pub use sheet_calculation_properties::{
@@ -280,7 +278,10 @@ pub use sparkline::{
     Sparkline, SparklineAxisMinMax, SparklineColor, SparklineDisplayEmptyCellsAs, SparklineGroup,
     SparklineGroupColors, SparklineGroupOptions, SparklineType,
 };
-pub use styles::{Alignment, Border, CellStyle, Fill, Font, NumberFormat, Styles};
+pub use styles::{
+    Alignment, Border, CellStyle, Fill, Font, FontParseError, NumberFormat, ParseRgbError, Rgb,
+    Scheme, Script, Styles, Underline,
+};
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction, parse_table_xml,
 };
@@ -301,8 +302,8 @@ pub use workbook_protection::{
     WorkbookProtectionMetadata, parse_workbook_protection, write_workbook_protection,
 };
 pub use worksheet::{
-    ArrayFormula, AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule,
-    Hyperlink, PageBreak, PageSetup, RowInfo, Worksheet, WorksheetInfo,
+    ArrayFormula, AutoFilter, ColumnInfo, Comment, Hyperlink, PageBreak, RowInfo, Worksheet,
+    WorksheetInfo,
 };
 pub use xml_maps::{
     XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema,
@@ -331,7 +332,7 @@ pub use writer::{
     AutoFilter as WriterAutoFilter, CellComment as WriterCellComment, ConditionalFormat,
     ConditionalFormatType, DefinedNameBuiltIn, FreezePanes, HeaderFooter,
     Hyperlink as WriterHyperlink, Image, MutableSharedStrings, MutableWorkbookData,
-    MutableWorksheet, NamedRange, PageBreak as WriterPageBreak, PageSetup as WriterPageSetup,
+    MutableWorksheet, NamedRange, PageBreak as WriterPageBreak,
     PageSetupProperties as WriterPageSetupProperties, RichTextRun, SheetProtection, StylesBuilder,
     WorkbookProtection, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec,
     XlsxGroupSpec, XlsxShapeSpec,

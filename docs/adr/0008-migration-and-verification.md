@@ -3445,6 +3445,140 @@ Mode**, so this is deliberately not recorded as a no-compatibility-mode gate.
 Neither native probe includes an Office edit/resave, reverse-read of an Office
 copy, other domain variants or Office builds, or performance evidence.
 
+## Geometry, page setup, and presentation-time fixed domains
+
+The next fixed-domain slice centralizes DrawingML preset geometry in
+`litchi-drawingml::geom::{Preset, TextPreset}`. The 187 shape tokens and 41
+text-warp tokens were compared against `dml-main.xsd` in both checked-in schema
+sources: the nested `OfficeOpenXML-XMLSchema-Strict.zip` inside
+`ECMA-376-1_5th_edition_december_2016.zip`, and the nested
+`OfficeOpenXML-XMLSchema-Transitional.zip` inside
+`ECMA-376-4_5th_edition_december_2016.zip`. The ordered sets are identical
+between those dialects. The old DOCX and XLSX partial enums, invalid text-warp
+spellings, and open-ended preset strings are removed. XLSB authoring reuses the
+same XLSX/DrawingML vocabulary during the migration instead of maintaining a
+fourth token table.
+
+XLSX parsing and authoring now use one
+`Geometry::{Preset, Custom(Box<XlsxCustomGeometry>)}` state for ordinary and
+connection shapes. Competing or duplicate geometry elements fail parsing;
+preset/custom conflicts cannot be constructed in the semantic model; and
+custom geometry can be borrowed or moved out without cloning its vectors. The
+box is a deliberate cold-payload indirection that keeps `Geometry` within two
+machine words rather than making every preset shape as large as the custom
+model. Parsing preserves every bounded XML-safe `ST_GeomGuideName` token that
+the schema admits, while authoring rejects empty, whitespace-bearing, and
+numeric guide names because formula tokenization or the adjustable-value union
+would make those references ambiguous. Focused tests cover all preset token
+round trips, rejection of former non-schema tokens, preset/custom exclusivity,
+custom-geometry parse/write round trips, DOCX text-box geometry and text-warp
+parsing, and XLSB shape authoring.
+
+PresentationML's ten modeled `ST_UniversalTimeOffset` fields now use
+`litchi-pptx::time::Offset`. Parsing follows `[MS-PPTX]` section 2.3.4.6,
+normalizes exact values to decimal milliseconds, and bounds both producer
+spellings and canonical output. Semantic equality, hashing, and ordering make
+equivalent unit spellings identical, including bookmark-uniqueness checks.
+Laser traces, slide-show events, media trim/fade, and media bookmarks serialize
+canonical values. Malformed values fail before entering a draft; exact
+`Duration` conversion fails when precision or range would be lost. This is a
+typed representation and correctness result, not a claim that arbitrary-
+precision decimal arithmetic is allocation-free.
+
+SpreadsheetML page authoring now uses
+`page_setup::{Orientation, Paper, Scale, Fit, FirstPage, Copies, Dpi, Measure,
+Order, Comments, ErrorMode, Setup}`. The numeric wrappers encode the Office
+ranges in `[MS-OI29500]` section 2.1.638: reserved paper codes fail, scale
+admits only automatic zero or 10 through 400, fit counts stop at 32,767,
+copies are 1 through 32,767, DPI is positive, and the first-page domain is the
+disjoint `-32,767..=-1 | 1..=32,767` range using SpreadsheetML's unsigned wire
+encoding for negative values. The writer preserves absence versus explicit
+defaults, and `remove_page` returns the owned setup while leaving independently
+authored `pageSetUpPr` flags intact. `set_fit` updates both fit dimensions and
+enables the independent policy as one semantic operation. The duplicate raw
+`u32`/`bool` worksheet read model and its second parser are deleted; immutable
+`Worksheet::page` is backed by the one complete typed parser.
+
+Public `Setup` no longer carries a printer relationship ID. Relationship
+projection and mutation live in `xlsx::printer_settings`, validate NCNames and
+dialect-matched relationship namespaces, reuse an in-scope prefix or allocate
+a non-conflicting one, and reject duplicate or dangling states. Page setup is
+anchored to the worksheet-root dialect, so a Strict child under a Transitional
+worksheet (or the inverse) is not accepted by selecting a dialect from the
+child. The relationship-only projection intentionally tolerates unrelated
+producer page-setting quirks needed to load real printer blobs, while the
+public semantic setup parser remains strict. Focused parser, writer, package
+round-trip, strict-Clippy, example, and formatting gates cover this slice.
+These functional gates do not establish printer-specific output, pagination,
+allocation, latency, or throughput.
+
+The same migration closes additional token domains instead of adding
+compatibility shims:
+
+- SpreadsheetML font underline, scheme, and vertical script are compact exact
+  enums. Explicit `none` and `baseline` survive read/write round trips.
+- Conditional-format rule kind, operator, value kind, time period, data-bar
+  direction/axis, color role, core icon set, Office 2010 icon set, sheet
+  visibility, and sort icon set are typed. Core and x14 icon sets cannot be
+  mixed accidentally. Conditional-format and tab colors reuse the checked
+  four-byte `styles::Rgb` value.
+- The legacy worksheet validation/conditional-format structs and the second
+  streaming parse/copy path are removed. Dedicated strict parsers populate the
+  typed models before any worksheet state is assigned, so a failure cannot
+  partially mutate the worksheet.
+- Word numbering format/multilevel type, note position, and all 65
+  Transitional compatibility flags are fixed enums. Strict documents admit
+  only the schema's seven-flag subset; unknown names fail.
+- Shared DrawingML body/run properties use typed anchor, direction, wrap,
+  autofit, underline, coordinate, column-count, and text-size domains across
+  DOCX and XLSX. Content controls expose `content_control::Kind` rather than a
+  tag-name string.
+
+Focused exhaustive token tests compare these domains with the checked-in
+Strict/Transitional schemas where both dialects apply. Unknown-token,
+cross-dialect, explicit-default, and read/write tests are correctness evidence;
+they are not performance measurements.
+
+Presentation media now preserves absent trim/fade values separately from
+explicit zero, makes seek time part of the `Seek { at }` event variant, and
+uses checked shared DrawingML coordinates. The XSD audit is significant:
+`ST_PositiveCoordinate` is integer-only and permits zero, so `Extent` is a
+transparent checked `0..=27,273,042,316,900` value and rejects unit-bearing
+spellings. Bounded inert media extension lists round-trip canonically; p14
+relationship attributes use the required Transitional relationship namespace
+even in a Strict package. Shared `MediaData` clones retain one immutable byte
+allocation and expose a move-first `try_into_vec` path. Focused tests cover
+media, slide-show events, coordinates, namespace behavior, extension bounds,
+sharing, and integration round trips. These are functional/storage-invariant
+tests, not throughput or resident-memory benchmarks.
+
+The native Excel probe deliberately used a shape-only worksheet, rather than
+one whose chart or image happened to force drawing attachment. The first probe
+opened without a repair prompt but displayed no drawing objects. Package
+inspection traced that result to a worksheet drawing relationship and part
+without the required worksheet `<drawing>` reference: worksheet serialization
+had incorrectly gated the element on chart/image collections and guessed
+`rId1`. The writer now emits the element only from its assigned drawing
+relationship ID, and the package regression resolves that exact ID to the
+drawing part before reopening the workbook through the public API.
+
+After that correction, Microsoft Excel for Mac opened
+`target/office-verification/typed-page-shapes/xlsx_typed_page_and_shapes.xlsx`
+without repair, recovery, or compatibility UI. Excel's accessibility model
+reported 16 populated cells and two objects on sheet `Typed API`, exposed A1
+as bold and single-underlined, identified the rose-to-green color scale on
+A2:A6, identified red/yellow/green traffic-light icons on B2:B6, and reported
+conditional formatting on C2:C6. It also reported the selected tab as blue.
+Page Layout reported A4 selected, Landscape selected, width `1 page`, and
+height `Automatic`, matching the typed `Setup`. The exact probed artifact
+SHA-256 is
+`16002ab60cbf775d244d03fb41b2e0f61e4319435f083aa278eea6265c6ac11c`;
+ZIP integrity and package inspection also confirmed the named `Summary` and
+`Status` objects, `roundRect`, `ellipse`, and `<drawing r:id="rId1"/>`. This is
+evidence for opening and application interpretation in the installed Excel
+build, not for edit/resave fidelity, other Office versions, printer drivers,
+every fixed token, or performance.
+
 ## Failure-atomic PPTX publication and owned font buffers
 
 PPTX save preparation now treats legacy-writer materialization, optional font

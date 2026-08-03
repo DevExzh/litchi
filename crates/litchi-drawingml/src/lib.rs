@@ -8,9 +8,12 @@
 
 pub mod blip;
 pub mod chart;
+pub mod coord;
 pub mod diagram;
 pub mod ext;
 pub mod fill;
+pub mod geom;
+pub mod text;
 pub mod xfrm;
 
 use thiserror::Error;

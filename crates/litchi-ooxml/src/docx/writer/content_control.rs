@@ -419,7 +419,7 @@ mod tests {
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].id(), 5);
         assert_eq!(parsed[0].tag(), Some("Check & Verify"));
-        assert_eq!(parsed[0].control_type(), Some("checkbox"));
+        assert_eq!(parsed[0].kind(), crate::docx::ContentControlKind::Checkbox);
         assert_eq!(parsed[0].checked(), Some(true));
     }
 }

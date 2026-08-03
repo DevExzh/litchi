@@ -9,12 +9,12 @@
 /// - `DrawingObject`: Base type for all drawing objects
 /// - `Shape`: A shape with geometry, fill, and text
 /// - `TextBox`: A text box containing formatted text
-/// - `ShapeType`: Enumeration of standard shape types
+/// - [`litchi_drawingml::geom::Preset`]: standard preset shape geometry
 ///
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi_ooxml::docx::{Package, drawing::ShapeType};
+/// use litchi_ooxml::docx::{Package, Preset};
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;
@@ -22,11 +22,11 @@
 /// // Extract all drawing objects from the document
 /// for para in doc.paragraphs()? {
 ///     for drawing in para.drawing_objects()? {
-///         match drawing.shape_type() {
-///             ShapeType::TextBox => {
-///                 println!("Text box: {}", drawing.text());
-///             }
-///             ShapeType::Rectangle => {
+///         if drawing.is_text_box() {
+///             println!("Text box: {}", drawing.text());
+///         }
+///         match drawing.preset() {
+///             Some(Preset::Rect) => {
 ///                 println!("Rectangle: {}x{} EMUs",
 ///                     drawing.width_emu(),
 ///                     drawing.height_emu()
@@ -40,117 +40,10 @@
 /// ```
 use crate::error::{OoxmlError, Result};
 use litchi_core::unit::{EMUS_PER_INCH, emu_to_pt_f64, emu_to_px_96};
+use litchi_drawingml::geom::Preset;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
-
-/// Type of shape.
-///
-/// DrawingML supports numerous predefined shape types. This enum covers
-/// the most commonly used shapes in Word documents.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ShapeType {
-    /// Rectangle shape
-    Rectangle,
-    /// Rounded rectangle
-    RoundRectangle,
-    /// Ellipse/circle shape
-    Ellipse,
-    /// Triangle shape
-    Triangle,
-    /// Right triangle
-    RightTriangle,
-    /// Parallelogram
-    Parallelogram,
-    /// Trapezoid
-    Trapezoid,
-    /// Diamond shape
-    Diamond,
-    /// Pentagon
-    Pentagon,
-    /// Hexagon
-    Hexagon,
-    /// Octagon
-    Octagon,
-    /// Star (5-pointed)
-    Star5,
-    /// Star (6-pointed)
-    Star6,
-    /// Arrow (right)
-    ArrowRight,
-    /// Arrow (left)
-    ArrowLeft,
-    /// Arrow (up)
-    ArrowUp,
-    /// Arrow (down)
-    ArrowDown,
-    /// Text box (rectangular with text)
-    TextBox,
-    /// Line
-    Line,
-    /// Custom or unknown shape type
-    Custom(String),
-}
-
-impl ShapeType {
-    /// Parse shape type from preset geometry string.
-    ///
-    /// # Arguments
-    ///
-    /// * `prst` - The preset geometry value (e.g., "rect", "ellipse")
-    #[inline]
-    pub fn from_preset(prst: &str) -> Self {
-        match prst {
-            "rect" => Self::Rectangle,
-            "roundRect" => Self::RoundRectangle,
-            "ellipse" => Self::Ellipse,
-            "triangle" => Self::Triangle,
-            "rtTriangle" => Self::RightTriangle,
-            "parallelogram" => Self::Parallelogram,
-            "trapezoid" => Self::Trapezoid,
-            "diamond" => Self::Diamond,
-            "pentagon" => Self::Pentagon,
-            "hexagon" => Self::Hexagon,
-            "octagon" => Self::Octagon,
-            "star5" => Self::Star5,
-            "star6" => Self::Star6,
-            "rightArrow" => Self::ArrowRight,
-            "leftArrow" => Self::ArrowLeft,
-            "upArrow" => Self::ArrowUp,
-            "downArrow" => Self::ArrowDown,
-            "textBox" => Self::TextBox,
-            "line" => Self::Line,
-            _ => Self::Custom(prst.to_string()),
-        }
-    }
-
-    /// Get the preset string for this shape type.
-    #[inline]
-    pub fn to_preset(&self) -> &str {
-        match self {
-            Self::Rectangle => "rect",
-            Self::RoundRectangle => "roundRect",
-            Self::Ellipse => "ellipse",
-            Self::Triangle => "triangle",
-            Self::RightTriangle => "rtTriangle",
-            Self::Parallelogram => "parallelogram",
-            Self::Trapezoid => "trapezoid",
-            Self::Diamond => "diamond",
-            Self::Pentagon => "pentagon",
-            Self::Hexagon => "hexagon",
-            Self::Octagon => "octagon",
-            Self::Star5 => "star5",
-            Self::Star6 => "star6",
-            Self::ArrowRight => "rightArrow",
-            Self::ArrowLeft => "leftArrow",
-            Self::ArrowUp => "upArrow",
-            Self::ArrowDown => "downArrow",
-            Self::TextBox => "textBox",
-            Self::Line => "line",
-            Self::Custom(s) => s,
-        }
-    }
-}
 
 /// A drawing object (shape, text box, or diagram) in a Word document.
 ///
@@ -191,8 +84,11 @@ pub struct DrawingObject {
     /// Y position in EMUs (distance from anchor)
     y_emu: i64,
 
-    /// Shape type
-    shape_type: ShapeType,
+    /// Preset shape geometry.
+    preset: Option<Preset>,
+
+    /// Whether the shape contains a text-box story.
+    is_text_box: bool,
 
     /// Whether this is an inline shape (vs. anchored/floating)
     is_inline: bool,
@@ -207,14 +103,24 @@ impl DrawingObject {
     /// * `description` - Shape description/alt text
     /// * `width_emu` - Width in EMUs
     /// * `height_emu` - Height in EMUs
-    /// * `shape_type` - Type of shape
+    /// * `preset` - Preset shape geometry
     #[inline]
     pub fn new(
         name: String,
         description: String,
         width_emu: i64,
         height_emu: i64,
-        shape_type: ShapeType,
+        preset: Preset,
+    ) -> Self {
+        Self::with_preset(name, description, width_emu, height_emu, Some(preset))
+    }
+
+    fn with_preset(
+        name: String,
+        description: String,
+        width_emu: i64,
+        height_emu: i64,
+        preset: Option<Preset>,
     ) -> Self {
         Self {
             name,
@@ -224,7 +130,8 @@ impl DrawingObject {
             height_emu,
             x_emu: 0,
             y_emu: 0,
-            shape_type,
+            preset,
+            is_text_box: false,
             is_inline: true,
         }
     }
@@ -308,10 +215,22 @@ impl DrawingObject {
         emu_to_pt_f64(self.height_emu)
     }
 
-    /// Get the shape type.
+    /// Get the preset shape geometry.
     #[inline]
-    pub fn shape_type(&self) -> &ShapeType {
-        &self.shape_type
+    pub fn preset(&self) -> Option<Preset> {
+        self.preset
+    }
+
+    /// Check whether this shape contains a text-box story.
+    #[inline]
+    pub fn is_text_box(&self) -> bool {
+        self.is_text_box
+    }
+
+    /// Set whether this shape contains a text-box story.
+    #[inline]
+    pub fn set_text_box(&mut self, is_text_box: bool) {
+        self.is_text_box = is_text_box;
     }
 
     /// Check if this is an inline shape (vs. anchored/floating).
@@ -390,7 +309,8 @@ pub(crate) fn parse_drawing_objects(xml_bytes: &[u8]) -> Result<SmallVec<[Drawin
     let mut y_emu: i64 = 0;
     let mut description = String::new();
     let mut name = String::new();
-    let mut shape_type = ShapeType::Rectangle;
+    let mut preset = None;
+    let mut has_text_box = false;
     let mut is_inline = true;
     let mut text_content = String::new();
 
@@ -410,7 +330,8 @@ pub(crate) fn parse_drawing_objects(xml_bytes: &[u8]) -> Result<SmallVec<[Drawin
                         y_emu = 0;
                         description.clear();
                         name.clear();
-                        shape_type = ShapeType::Rectangle;
+                        preset = None;
+                        has_text_box = false;
                         is_inline = true;
                         text_content.clear();
                     },
@@ -502,17 +423,32 @@ pub(crate) fn parse_drawing_objects(xml_bytes: &[u8]) -> Result<SmallVec<[Drawin
                     b"prstGeom" if in_shape => {
                         // Parse preset geometry (shape type)
                         // <a:prstGeom prst="rect"/>
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"prst"
-                                && let Ok(s) = std::str::from_utf8(&attr.value)
-                            {
-                                shape_type = ShapeType::from_preset(s);
+                        let mut found = None;
+                        for attr in e.attributes() {
+                            let attr = attr.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                            if attr.key.as_ref() == b"prst" {
+                                let value = std::str::from_utf8(&attr.value).map_err(|error| {
+                                    OoxmlError::InvalidFormat(format!(
+                                        "DrawingML prstGeom@prst is not UTF-8: {error}"
+                                    ))
+                                })?;
+                                found = Some(value.parse().map_err(|error| {
+                                    OoxmlError::InvalidFormat(format!(
+                                        "invalid DrawingML shape preset '{value}': {error}"
+                                    ))
+                                })?);
                             }
                         }
+                        preset = Some(found.ok_or_else(|| {
+                            OoxmlError::InvalidFormat(
+                                "DrawingML prstGeom is missing required prst".to_string(),
+                            )
+                        })?);
                     },
                     b"txbx" if in_shape => {
                         // Text box element
                         in_text_box = true;
+                        has_text_box = true;
                     },
                     b"txbxContent" if in_text_box => {
                         // Text box content
@@ -540,15 +476,16 @@ pub(crate) fn parse_drawing_objects(xml_bytes: &[u8]) -> Result<SmallVec<[Drawin
                         in_drawing = false;
 
                         // Create and add the drawing object
-                        let mut drawing = DrawingObject::new(
+                        let mut drawing = DrawingObject::with_preset(
                             name.clone(),
                             description.clone(),
                             width_emu,
                             height_emu,
-                            shape_type.clone(),
+                            preset,
                         );
                         drawing.set_position(x_emu, y_emu);
                         drawing.set_inline(is_inline);
+                        drawing.set_text_box(has_text_box);
                         drawing.set_text(text_content.clone());
 
                         drawings.push(drawing);
@@ -579,17 +516,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_shape_type_parsing() {
-        assert_eq!(ShapeType::from_preset("rect"), ShapeType::Rectangle);
-        assert_eq!(ShapeType::from_preset("ellipse"), ShapeType::Ellipse);
-        assert_eq!(ShapeType::from_preset("rightArrow"), ShapeType::ArrowRight);
-        assert_eq!(ShapeType::from_preset("textBox"), ShapeType::TextBox);
+    fn rejects_unknown_or_non_schema_shape_presets() {
+        assert!("customShape".parse::<Preset>().is_err());
+        assert!("textBox".parse::<Preset>().is_err());
 
-        if let ShapeType::Custom(s) = ShapeType::from_preset("customShape") {
-            assert_eq!(s, "customShape");
-        } else {
-            panic!("Expected Custom shape type");
-        }
+        let xml = br#"<w:drawing><wp:inline><wps:wsp><wps:spPr>
+            <a:prstGeom prst="customShape"/>
+            </wps:spPr></wps:wsp></wp:inline></w:drawing>"#;
+        let error = parse_drawing_objects(xml).unwrap_err();
+        assert!(error.to_string().contains("customShape"));
     }
 
     #[test]
@@ -599,7 +534,7 @@ mod tests {
             "Test shape".to_string(),
             914400,  // 1 inch
             1828800, // 2 inches
-            ShapeType::Rectangle,
+            Preset::Rect,
         );
 
         assert_eq!(drawing.width_emu(), 914400);
@@ -615,6 +550,15 @@ mod tests {
         let xml = b"<w:p><w:r><w:t>Text only</w:t></w:r></w:p>";
         let drawings = parse_drawing_objects(xml).unwrap();
         assert_eq!(drawings.len(), 0);
+    }
+
+    #[test]
+    fn missing_geometry_is_not_reported_as_a_rectangle() {
+        let xml =
+            br#"<w:drawing><wp:inline><wps:wsp><wps:spPr/></wps:wsp></wp:inline></w:drawing>"#;
+        let drawings = parse_drawing_objects(xml).unwrap();
+        assert_eq!(drawings.len(), 1);
+        assert_eq!(drawings[0].preset(), None);
     }
 
     #[test]
@@ -647,7 +591,8 @@ mod tests {
         assert_eq!(drawing.description(), "Test shape");
         assert_eq!(drawing.width_emu(), 1000000);
         assert_eq!(drawing.height_emu(), 2000000);
-        assert_eq!(drawing.shape_type(), &ShapeType::Rectangle);
+        assert_eq!(drawing.preset(), Some(Preset::Rect));
+        assert!(!drawing.is_text_box());
         assert!(drawing.is_inline());
     }
 
@@ -661,7 +606,7 @@ mod tests {
                         <wp:docPr name="TextBox1"/>
                         <wps:wsp>
                             <wps:spPr>
-                                <a:prstGeom prst="textBox"/>
+                                <a:prstGeom prst="rect"/>
                             </wps:spPr>
                             <wps:txbx>
                                 <w:txbxContent>
@@ -679,7 +624,8 @@ mod tests {
 
         let drawing = &drawings[0];
         assert_eq!(drawing.name(), "TextBox1");
-        assert_eq!(drawing.shape_type(), &ShapeType::TextBox);
+        assert_eq!(drawing.preset(), Some(Preset::Rect));
+        assert!(drawing.is_text_box());
         assert_eq!(drawing.text(), "Hello World");
         assert!(!drawing.is_inline()); // anchor = not inline
     }

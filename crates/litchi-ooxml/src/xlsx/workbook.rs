@@ -32,6 +32,7 @@ use crate::xlsx::sheet_protection::{
     parse_worksheet_protection, replace_worksheet_protection,
     validate_worksheet_protection_metadata,
 };
+use crate::xlsx::styles::Rgb;
 use crate::xlsx::vba_project::{
     VbaProject, discover_vba_project, remove_vba_project as clear_workbook_vba,
     store_vba_project as store_workbook_vba_project,
@@ -47,7 +48,7 @@ use crate::xlsx::writer::workbook::{
     generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
     generate_pivot_table_definition_xml, render_pivot_table_sheet_cells,
 };
-use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet, NamedRange};
+use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet, NamedRange, Visibility};
 use crate::xlsx::xml_maps::{
     XmlMapConformance, XmlMapInfo, load_from_package_with_conformance as load_xml_maps,
     remove_from_package as remove_xml_maps, store_in_package as store_xml_maps,
@@ -4041,27 +4042,25 @@ impl Workbook {
     ///
     /// # Arguments
     /// * `index` - Worksheet index (0-based)
-    /// * `visibility` - Visibility state: "visible", "hidden", or "veryHidden"
+    /// * `visibility` - Checked worksheet visibility state
     ///
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::{Workbook, writer::Visibility};
     ///
     /// let mut wb = Workbook::create()?;
-    /// wb.set_sheet_visibility(0, "hidden")?;
+    /// wb.set_sheet_visibility(0, Visibility::Hidden)?;
     /// wb.save("output.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn set_sheet_visibility(&mut self, index: usize, visibility: &str) -> SheetResult<()> {
+    pub fn set_sheet_visibility(
+        &mut self,
+        index: usize,
+        visibility: Visibility,
+    ) -> SheetResult<()> {
         if index >= self.worksheets.len() {
             return Err("Worksheet index out of bounds".into());
-        }
-
-        if !matches!(visibility, "visible" | "hidden" | "veryHidden") {
-            return Err(
-                "Invalid visibility state. Must be 'visible', 'hidden', or 'veryHidden'".into(),
-            );
         }
 
         if self.mutable_data.is_none() {
@@ -4077,11 +4076,11 @@ impl Workbook {
 
     /// Get sheet visibility state.
     ///
-    /// Returns "visible", "hidden", or "veryHidden".
+    /// Returns the checked visibility state.
     ///
     /// # Arguments
     /// * `index` - Worksheet index (0-based)
-    pub fn get_sheet_visibility(&self, index: usize) -> Option<&str> {
+    pub fn get_sheet_visibility(&self, index: usize) -> Option<Visibility> {
         self.mutable_data
             .as_ref()
             .and_then(|d| d.get_sheet_visibility(index))
@@ -4191,26 +4190,21 @@ impl Workbook {
     ///
     /// # Arguments
     /// * `index` - Worksheet index (0-based)
-    /// * `color` - RGB hex color (e.g., "FF0000" for red)
+    /// * `color` - Checked four-byte (eight-hex-digit) ARGB color
     ///
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::{Rgb, Workbook};
     ///
     /// let mut wb = Workbook::create()?;
-    /// wb.set_tab_color(0, "FF0000")?; // Set red tab color
+    /// wb.set_tab_color(0, Rgb::new(0xFF, 0, 0))?;
     /// wb.save("output.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn set_tab_color(&mut self, index: usize, color: &str) -> SheetResult<()> {
-        if self.mutable_data.is_none() {
-            self.mutable_data = Some(MutableWorkbookData::new());
-        }
-
+    pub fn set_tab_color(&mut self, index: usize, color: Rgb) -> SheetResult<()> {
         self.mutable_data
-            .as_mut()
-            .unwrap()
+            .get_or_insert_with(MutableWorkbookData::new)
             .worksheet_mut(index)?
             .set_tab_color(color);
         Ok(())
@@ -4220,7 +4214,7 @@ impl Workbook {
     ///
     /// # Arguments
     /// * `index` - Worksheet index (0-based)
-    pub fn get_tab_color(&self, index: usize) -> Option<&str> {
+    pub fn get_tab_color(&self, index: usize) -> Option<Rgb> {
         self.mutable_data
             .as_ref()
             .and_then(|d| d.worksheets.get(index))
@@ -4372,9 +4366,9 @@ impl Workbook {
     // - Column width/Row height (reading): get_column_width(), get_row_height()
     // - Hyperlinks (reading): get_hyperlink(), get_hyperlinks()
     // - Comments (reading): get_cell_comment(), get_comments()
-    // - Data validation (reading): get_data_validations()
-    // - Conditional formatting (reading): get_conditional_formatting()
-    // - Page setup (reading): get_page_setup()
+    // - Data validation (reading): data_validations()
+    // - Conditional formatting (reading): conditional_formattings()
+    // - Page setup (reading): page()
     //
     // ✅ FULLY IMPLEMENTED (Worksheet writing - via MutableWorksheet):
     // - Cell values & formulas: set_cell_value(), set_cell_formula(), set_cell_formula_with_cache()
@@ -4385,7 +4379,7 @@ impl Workbook {
     // - Data validation: add_data_validation()
     // - Charts: add_chart() (basic support)
     // - Freeze panes: freeze_panes(), unfreeze_panes()
-    // - Page setup: set_page_setup(), set_page_setup_with_options(), set_print_area(), clear_print_area()
+    // - Page setup: set_page(), set_print_area(), clear_print_area()
     // - Auto-filter: set_auto_filter(), remove_auto_filter()
     // - Sheet protection: protect_sheet(), protect_sheet_with_options(), unprotect_sheet()
     // - Hyperlinks: set_hyperlink(), remove_hyperlink(), hyperlinks()
@@ -5807,22 +5801,38 @@ mod tests {
             worksheet.get_hyperlink(4, 4).unwrap().target,
             "'Other Sheet'!A1"
         );
-        let validation = &worksheet.get_data_validations()[0];
-        assert_eq!(validation.range, "E1:E2");
-        assert_eq!(validation.operator.as_deref(), Some("between"));
-        assert_eq!(validation.formula.as_deref(), Some("1"));
-        assert_eq!(validation.formula2.as_deref(), Some("10"));
-        assert!(validation.allow_blank);
-        assert!(validation.show_error_message);
-        assert_eq!(validation.error_title.as_deref(), Some("Out of range"));
-        assert_eq!(worksheet.get_conditional_formatting().len(), 1);
+        let validation = worksheet.data_validations().next().unwrap();
+        assert_eq!(validation.sqref().ranges()[0].as_str(), "E1:E2");
         assert_eq!(
-            worksheet.get_conditional_formatting()[0].rule_type,
-            "expression"
+            validation.operator(),
+            crate::xlsx::ParsedDataValidationOperator::Between
         );
-        assert_eq!(worksheet.get_page_setup().paper_size, Some(9));
-        assert!(worksheet.get_page_setup().landscape);
-        assert_eq!(worksheet.get_page_setup().scale, Some(110));
+        assert!(matches!(
+            validation.formula1(),
+            Some(crate::xlsx::ValidationListSource::Formula(value)) if value.as_str() == "1"
+        ));
+        assert_eq!(
+            validation.formula2().map(|value| value.as_str()),
+            Some("10")
+        );
+        assert!(validation.allow_blank());
+        assert!(validation.show_error_message());
+        assert_eq!(validation.error_title(), Some("Out of range"));
+        assert_eq!(worksheet.conditional_formattings().len(), 1);
+        assert_eq!(
+            worksheet.conditional_formattings()[0].rules[0].rule_type,
+            Some(crate::xlsx::Kind::Expression)
+        );
+        let page = worksheet.page().unwrap();
+        assert_eq!(page.paper, Some(crate::xlsx::page_setup::Paper::A4));
+        assert_eq!(
+            page.orientation,
+            Some(crate::xlsx::page_setup::Orientation::Landscape)
+        );
+        assert_eq!(
+            page.scale.map(crate::xlsx::page_setup::Scale::get),
+            Some(110)
+        );
         assert_eq!(worksheet.row_breaks().len(), 1);
         assert!(worksheet.row_breaks()[0].manual);
         assert!(worksheet.row_breaks()[0].pivot);

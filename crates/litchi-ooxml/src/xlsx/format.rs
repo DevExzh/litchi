@@ -1,6 +1,6 @@
 //! Shared formatting types for XLSX (used in both reading and writing).
 
-use super::styles::{Alignment, border::Border};
+use super::styles::{Alignment, Scheme, Script, Underline, border::Border};
 
 /// Cell format information.
 #[derive(Debug, Clone, Default)]
@@ -14,28 +14,16 @@ pub struct CellFormat {
 }
 
 /// Font properties for a cell.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CellFont {
     pub name: Option<String>,
     pub size: Option<f64>,
     pub bold: bool,
     pub italic: bool,
-    pub underline: bool,
+    pub underline: Option<Underline>,
     pub color: Option<String>,
-}
-
-#[allow(clippy::derivable_impls)]
-impl Default for CellFont {
-    fn default() -> Self {
-        Self {
-            name: None,
-            size: None,
-            bold: false,
-            italic: false,
-            underline: false,
-            color: None,
-        }
-    }
+    pub scheme: Option<Scheme>,
+    pub script: Option<Script>,
 }
 
 /// Fill properties for a cell.
@@ -200,8 +188,10 @@ mod tests {
         assert!(font.size.is_none());
         assert!(!font.bold);
         assert!(!font.italic);
-        assert!(!font.underline);
+        assert!(font.underline.is_none());
         assert!(font.color.is_none());
+        assert!(font.scheme.is_none());
+        assert!(font.script.is_none());
     }
 
     #[test]
@@ -211,8 +201,10 @@ mod tests {
             size: Some(12.0),
             bold: true,
             italic: false,
-            underline: true,
+            underline: Some(Underline::Single),
             color: Some("FF0000".to_string()),
+            scheme: Some(Scheme::Major),
+            script: Some(Script::Superscript),
         };
         let font2 = font.clone();
         assert_eq!(font.name, font2.name);

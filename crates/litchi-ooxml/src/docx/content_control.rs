@@ -10,9 +10,122 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::fmt;
+use std::str::FromStr;
 
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2012/wordml";
+
+/// Semantic kind of a Word content control.
+///
+/// The enum covers the complete set of core, Word 2010, and Word 2012 kind
+/// markers recognized by this reader. A control with no marker is rich text.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Kind {
+    /// Unrestricted rich text (`w:richText`), also the schema default.
+    #[default]
+    RichText,
+    /// Plain text (`w:text`).
+    Text,
+    /// Picture (`w:picture`).
+    Picture,
+    /// Date (`w:date`).
+    Date,
+    /// Editable combo box (`w:comboBox`).
+    ComboBox,
+    /// Drop-down list (`w:dropDownList`).
+    Dropdown,
+    /// Citation (`w:citation`).
+    Citation,
+    /// Equation (`w:equation`).
+    Equation,
+    /// Group (`w:group`).
+    Group,
+    /// Document-part list (`w:docPartList`).
+    DocPartList,
+    /// Document-part object (`w:docPartObj`).
+    DocPart,
+    /// Bibliography (`w:bibliography`).
+    Bibliography,
+    /// Word 2010 checkbox (`w14:checkbox`).
+    Checkbox,
+    /// Word 2010 entity picker (`w14:entityPicker`).
+    EntityPicker,
+    /// Word 2012 repeating section (`w15:repeatingSection`).
+    RepeatingSection,
+    /// Word 2012 repeating-section item (`w15:repeatingSectionItem`).
+    RepeatingItem,
+}
+
+impl Kind {
+    /// Return the exact OOXML marker name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::RichText => "richText",
+            Self::Text => "text",
+            Self::Picture => "picture",
+            Self::Date => "date",
+            Self::ComboBox => "comboBox",
+            Self::Dropdown => "dropDownList",
+            Self::Citation => "citation",
+            Self::Equation => "equation",
+            Self::Group => "group",
+            Self::DocPartList => "docPartList",
+            Self::DocPart => "docPartObj",
+            Self::Bibliography => "bibliography",
+            Self::Checkbox => "checkbox",
+            Self::EntityPicker => "entityPicker",
+            Self::RepeatingSection => "repeatingSection",
+            Self::RepeatingItem => "repeatingSectionItem",
+        }
+    }
+}
+
+impl fmt::Display for Kind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Kind {
+    type Err = ParseKindError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "richText" => Ok(Self::RichText),
+            "text" => Ok(Self::Text),
+            "picture" => Ok(Self::Picture),
+            "date" => Ok(Self::Date),
+            "comboBox" => Ok(Self::ComboBox),
+            "dropDownList" => Ok(Self::Dropdown),
+            "citation" => Ok(Self::Citation),
+            "equation" => Ok(Self::Equation),
+            "group" => Ok(Self::Group),
+            "docPartList" => Ok(Self::DocPartList),
+            "docPartObj" => Ok(Self::DocPart),
+            "bibliography" => Ok(Self::Bibliography),
+            "checkbox" => Ok(Self::Checkbox),
+            "entityPicker" => Ok(Self::EntityPicker),
+            "repeatingSection" => Ok(Self::RepeatingSection),
+            "repeatingSectionItem" => Ok(Self::RepeatingItem),
+            _ => Err(ParseKindError),
+        }
+    }
+}
+
+/// An unknown content-control kind token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseKindError;
+
+impl fmt::Display for ParseKindError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("invalid content-control kind")
+    }
+}
+
+impl std::error::Error for ParseKindError {}
 
 /// A content control in a Word document.
 ///
@@ -42,8 +155,8 @@ pub struct ContentControl {
     tag: Option<String>,
     /// Control title
     title: Option<String>,
-    /// Control type (text, date, comboBox, etc.)
-    control_type: Option<String>,
+    /// Semantic control kind.
+    kind: Kind,
     /// Whether the control can be deleted
     lock_delete: bool,
     /// Whether the content can be edited
@@ -80,7 +193,7 @@ impl ContentControl {
         id: u32,
         tag: Option<String>,
         title: Option<String>,
-        control_type: Option<String>,
+        kind: Option<Kind>,
         lock_delete: bool,
         lock_content: bool,
     ) -> Self {
@@ -88,7 +201,7 @@ impl ContentControl {
             id,
             tag,
             title,
-            control_type,
+            kind: kind.unwrap_or_default(),
             lock_delete,
             lock_content,
             temporary: false,
@@ -124,10 +237,10 @@ impl ContentControl {
         self.title.as_deref()
     }
 
-    /// Get the control type.
+    /// Get the semantic control kind.
     #[inline]
-    pub fn control_type(&self) -> Option<&str> {
-        self.control_type.as_deref()
+    pub fn kind(&self) -> Kind {
+        self.kind
     }
 
     /// Check if the control is locked for deletion.
@@ -456,7 +569,7 @@ struct PendingContentControl {
     id: Option<u32>,
     tag: Option<String>,
     title: Option<String>,
-    control_type: Option<String>,
+    kind: Option<Kind>,
     lock: Option<(bool, bool)>,
     temporary: Option<bool>,
     showing_placeholder: Option<bool>,
@@ -481,7 +594,7 @@ impl PendingContentControl {
             id: None,
             tag: None,
             title: None,
-            control_type: None,
+            kind: None,
             lock: None,
             temporary: None,
             showing_placeholder: None,
@@ -509,7 +622,7 @@ impl PendingContentControl {
             id,
             tag: self.tag,
             title: self.title,
-            control_type: Some(self.control_type.unwrap_or_else(|| "richText".to_string())),
+            kind: self.kind.unwrap_or_default(),
             lock_delete,
             lock_content,
             temporary: self.temporary.unwrap_or(false),
@@ -605,45 +718,45 @@ fn parse_direct_property(
                 set_context(control, PropertyContext::Placeholder, depth, empty);
             },
             b"date" => {
-                set_control_type(control, "date")?;
+                set_kind(control, Kind::Date)?;
                 control.date_value = word_attribute_value(element, b"fullDate", decoder, resolver)?;
                 set_context(control, PropertyContext::Date, depth, empty);
             },
             b"comboBox" => {
-                set_control_type(control, "comboBox")?;
+                set_kind(control, Kind::ComboBox)?;
                 set_context(control, PropertyContext::List, depth, empty);
             },
             b"dropDownList" => {
-                set_control_type(control, "dropDownList")?;
+                set_kind(control, Kind::Dropdown)?;
                 set_context(control, PropertyContext::List, depth, empty);
             },
-            b"text" | b"picture" | b"citation" | b"equation" | b"group" | b"docPartList"
-            | b"docPartObj" | b"bibliography" | b"richText" => {
-                set_control_type(
-                    control,
-                    std::str::from_utf8(name.as_ref()).map_err(|error| {
-                        OoxmlError::InvalidFormat(format!("invalid content-control type: {error}"))
-                    })?,
-                )?;
-            },
+            b"text" => set_kind(control, Kind::Text)?,
+            b"picture" => set_kind(control, Kind::Picture)?,
+            b"citation" => set_kind(control, Kind::Citation)?,
+            b"equation" => set_kind(control, Kind::Equation)?,
+            b"group" => set_kind(control, Kind::Group)?,
+            b"docPartList" => set_kind(control, Kind::DocPartList)?,
+            b"docPartObj" => set_kind(control, Kind::DocPart)?,
+            b"bibliography" => set_kind(control, Kind::Bibliography)?,
+            b"richText" => set_kind(control, Kind::RichText)?,
             _ => {},
         }
     } else if is_extension_namespace(namespace, WORD_2010_NAMESPACE) {
         match name.as_ref() {
             b"checkbox" => {
-                set_control_type(control, "checkbox")?;
+                set_kind(control, Kind::Checkbox)?;
                 set_context(control, PropertyContext::Checkbox, depth, empty);
             },
-            b"entityPicker" => set_control_type(control, "entityPicker")?,
+            b"entityPicker" => set_kind(control, Kind::EntityPicker)?,
             _ => {},
         }
     } else if is_extension_namespace(namespace, WORD_2012_NAMESPACE) {
         match name.as_ref() {
             b"repeatingSection" => {
-                set_control_type(control, "repeatingSection")?;
+                set_kind(control, Kind::RepeatingSection)?;
                 set_context(control, PropertyContext::RepeatingSection, depth, empty);
             },
-            b"repeatingSectionItem" => set_control_type(control, "repeatingSectionItem")?,
+            b"repeatingSectionItem" => set_kind(control, Kind::RepeatingItem)?,
             _ => {},
         }
     }
@@ -786,13 +899,13 @@ fn set_context(
     }
 }
 
-fn set_control_type(control: &mut PendingContentControl, value: &str) -> Result<()> {
-    if let Some(existing) = &control.control_type {
+fn set_kind(control: &mut PendingContentControl, value: Kind) -> Result<()> {
+    if let Some(existing) = control.kind {
         return Err(OoxmlError::InvalidFormat(format!(
             "multiple content-control types '{existing}' and '{value}'"
         )));
     }
-    control.control_type = Some(value.to_string());
+    control.kind = Some(value);
     Ok(())
 }
 
@@ -898,6 +1011,7 @@ fn is_extension_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
@@ -907,7 +1021,7 @@ mod tests {
             1,
             Some("field1".to_string()),
             Some("My Field".to_string()),
-            Some("text".to_string()),
+            Some(Kind::Text),
             false,
             false,
         );
@@ -915,9 +1029,41 @@ mod tests {
         assert_eq!(control.id(), 1);
         assert_eq!(control.tag(), Some("field1"));
         assert_eq!(control.title(), Some("My Field"));
-        assert_eq!(control.control_type(), Some("text"));
+        assert_eq!(control.kind(), Kind::Text);
         assert!(!control.is_lock_delete());
         assert!(!control.is_lock_content());
+
+        let defaulted = ContentControl::new(2, None, None, None, false, false);
+        assert_eq!(defaulted.kind(), Kind::RichText);
+    }
+
+    #[test]
+    fn kind_tokens_are_complete_compact_and_round_trip() {
+        let kinds = [
+            Kind::RichText,
+            Kind::Text,
+            Kind::Picture,
+            Kind::Date,
+            Kind::ComboBox,
+            Kind::Dropdown,
+            Kind::Citation,
+            Kind::Equation,
+            Kind::Group,
+            Kind::DocPartList,
+            Kind::DocPart,
+            Kind::Bibliography,
+            Kind::Checkbox,
+            Kind::EntityPicker,
+            Kind::RepeatingSection,
+            Kind::RepeatingItem,
+        ];
+        for kind in kinds {
+            assert_eq!(kind.as_str().parse::<Kind>().unwrap(), kind);
+            assert_eq!(kind.to_string(), kind.as_str());
+        }
+        assert_eq!(size_of::<Kind>(), 1);
+        assert_eq!(Kind::default(), Kind::RichText);
+        assert!("vendorControl".parse::<Kind>().is_err());
     }
 
     #[test]
@@ -940,7 +1086,7 @@ mod tests {
         assert_eq!(control.id(), 42);
         assert_eq!(control.tag(), Some("customer&id"));
         assert_eq!(control.title(), Some("Customer & address"));
-        assert_eq!(control.control_type(), Some("dropDownList"));
+        assert_eq!(control.kind(), Kind::Dropdown);
         assert_eq!(control.tab_index(), Some(7));
         assert!(control.is_temporary());
         assert!(control.is_showing_placeholder());
@@ -969,8 +1115,8 @@ mod tests {
             <x:sdtPr><x:id x:val="2"/></x:sdtPr></x:document>"#;
         let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
         assert_eq!(controls.len(), 2);
-        assert_eq!(controls[0].control_type(), Some("text"));
-        assert_eq!(controls[1].control_type(), Some("richText"));
+        assert_eq!(controls[0].kind(), Kind::Text);
+        assert_eq!(controls[1].kind(), Kind::RichText);
     }
 
     #[test]
@@ -984,16 +1130,20 @@ mod tests {
                     <w:dateFormat w:val="yyyy-MM-dd"/></w:date></w:sdtPr>
                 <w:sdtPr><w:id w:val="3"/><r:repeatingSection>
                     <r:sectionTitle w:val="People"/></r:repeatingSection></w:sdtPr>
+                <w:sdtPr><w:id w:val="4"/><c:entityPicker/></w:sdtPr>
+                <w:sdtPr><w:id w:val="5"/><r:repeatingSectionItem/></w:sdtPr>
             </w:document>"#
         );
         let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
-        assert_eq!(controls[0].control_type(), Some("checkbox"));
+        assert_eq!(controls[0].kind(), Kind::Checkbox);
         assert_eq!(controls[0].checked(), Some(true));
-        assert_eq!(controls[1].control_type(), Some("date"));
+        assert_eq!(controls[1].kind(), Kind::Date);
         assert_eq!(controls[1].date_value(), Some("2026-07-14T00:00:00Z"));
         assert_eq!(controls[1].date_format(), Some("yyyy-MM-dd"));
-        assert_eq!(controls[2].control_type(), Some("repeatingSection"));
+        assert_eq!(controls[2].kind(), Kind::RepeatingSection);
         assert_eq!(controls[2].repeating_section_title(), Some("People"));
+        assert_eq!(controls[3].kind(), Kind::EntityPicker);
+        assert_eq!(controls[4].kind(), Kind::RepeatingItem);
     }
 
     #[test]
@@ -1002,13 +1152,13 @@ mod tests {
             r#"<w:document xmlns:w="{W}" xmlns:f="urn:foreign">
                 <f:sdtPr><f:id f:val="8"/><f:text/></f:sdtPr>
                 <w:sdtPr><f:id f:val="9"/><f:tag f:val="spoof"/></w:sdtPr>
-                <w:sdtPr/><w:sdtPr><w:id w:val="10"/><f:text/></w:sdtPr>
+                <w:sdtPr/><w:sdtPr><w:id w:val="10"/><f:text/><w:vendorKind/></w:sdtPr>
             </w:document>"#
         );
         let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
         assert_eq!(controls.len(), 1);
         assert_eq!(controls[0].id(), 10);
-        assert_eq!(controls[0].control_type(), Some("richText"));
+        assert_eq!(controls[0].kind(), Kind::RichText);
     }
 
     #[test]
@@ -1025,13 +1175,13 @@ mod tests {
             "richText",
             "comboBox",
         ];
-        for (index, control_type) in types.iter().enumerate() {
+        for (index, kind) in types.iter().enumerate() {
             let xml = format!(
-                r#"<w:sdtPr xmlns:w="{W}"><w:id w:val="{}"/><w:{control_type}/></w:sdtPr>"#,
+                r#"<w:sdtPr xmlns:w="{W}"><w:id w:val="{}"/><w:{kind}/></w:sdtPr>"#,
                 index + 1
             );
             let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
-            assert_eq!(controls[0].control_type(), Some(*control_type));
+            assert_eq!(controls[0].kind().as_str(), *kind);
         }
     }
 
@@ -1043,6 +1193,7 @@ mod tests {
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:id w:val="2"/></w:sdtPr>"#,
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:lock w:val="invalid"/></w:sdtPr>"#,
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:text/><w:picture/></w:sdtPr>"#,
+            r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:text/><w:text/></w:sdtPr>"#,
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:temporary w:val="maybe"/></w:sdtPr>"#,
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:temporary/><w:temporary w:val="0"/></w:sdtPr>"#,
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:lock w:val="unlocked"/><w:lock w:val="unlocked"/></w:sdtPr>"#,

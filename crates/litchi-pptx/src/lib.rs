@@ -15,6 +15,7 @@ pub mod notes;
 pub mod shape;
 pub mod table;
 pub mod tag;
+pub mod time;
 pub mod transition;
 
 pub use error::{Error, Result};

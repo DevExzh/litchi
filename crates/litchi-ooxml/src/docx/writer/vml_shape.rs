@@ -491,7 +491,7 @@ mod tests {
             let document = package.document_mut().unwrap();
 
             let mut text_box = MutableTextBox::new("DrawingML Box", 914400, 457200).unwrap();
-            text_box.add_run("drawingml story");
+            text_box.add_run("drawingml story").unwrap();
             document.add_text_box(text_box);
 
             document

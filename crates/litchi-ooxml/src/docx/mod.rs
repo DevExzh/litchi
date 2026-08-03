@@ -104,10 +104,10 @@ pub use chart::{
     store_chart_graph,
 };
 pub use comment::Comment;
-pub use content_control::ContentControl;
+pub use content_control::{ContentControl, Kind as ContentControlKind};
 pub use custom_xml::{Binding, NewStore, Part};
 pub use document::{Document, ImageWatermarkPart};
-pub use drawing::{DrawingObject, ShapeType};
+pub use drawing::DrawingObject;
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::CompareField;
 pub use field::{
@@ -150,7 +150,10 @@ pub use modern_comments::{
     store_modern_comment_metadata, write_comments_extended, write_comments_extensible,
     write_comments_ids, write_people,
 };
-pub use numbering::{AbstractNum, Num, Numbering, PictureBullet};
+pub use numbering::{
+    AbstractNum, MultiLevelType, Num, NumberFormat, Numbering, ParseMultiLevelTypeError,
+    ParseNumberFormatError, PictureBullet,
+};
 pub use package::Package;
 pub use paragraph::{
     Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
@@ -159,23 +162,25 @@ pub use paragraph::{
 pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use settings::{
-    AttachedTemplate, ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatibilityOption,
-    CompatibilitySetting, DocumentSettings, DocumentView, MAX_LANGUAGE_TAG_LENGTH,
-    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ProofState, ProofingState,
-    ProtectionType, SmartTagType, ThemeFontLanguages,
+    AttachedTemplate, ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatFlag,
+    CompatibilityOption, CompatibilitySetting, DocumentSettings, DocumentView,
+    MAX_LANGUAGE_TAG_LENGTH, NoteNumberingProperties, NoteNumberingRestart, NotePosition,
+    ParseCompatFlagError, ParseNotePositionError, ProofState, ProofingState, ProtectionType,
+    SmartTagType, ThemeFontLanguages,
 };
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
 // Re-export the shared semantic SmartArt model for authoring.
 use litchi_docx::alt::Chunk;
 pub use litchi_drawingml::diagram::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
+pub use litchi_drawingml::geom::{Preset, TextPreset};
 pub use statistics::DocumentStatistics;
 pub use styles::{Outline, Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use textbox::{
-    DocxTextBox, TextBoxAnchor, TextBoxAutofit, TextBoxBodyProperties, TextBoxInsets,
-    TextBoxParagraph, TextBoxRun, TextDirection, TextVerticalAnchor, TextWarpPreset, TextWrap,
-    WordArt, load_text_boxes,
+    Columns, Coordinate32, DocxTextBox, TextBoxAnchor, TextBoxAutofit, TextBoxBodyProperties,
+    TextBoxInsets, TextBoxParagraph, TextBoxRun, TextDirection, TextUnderline, TextVerticalAnchor,
+    TextWrap, WordArt, load_text_boxes,
 };
 pub use theme::Theme;
 pub use variables::DocumentVariables;

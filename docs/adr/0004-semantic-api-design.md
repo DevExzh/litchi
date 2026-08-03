@@ -167,6 +167,87 @@ by `PageBorderStyle::Art`, not an arbitrary token. Copyable option structs use
 public fields and `Default` only where struct-update syntax cannot create an
 invalid domain value.
 
+DrawingML preset geometry is one shared closed vocabulary in
+`litchi-drawingml::geom`. `Preset` contains all 187 `ST_ShapeType` values and
+`TextPreset` contains all 41 `ST_TextShapeType` values from the checked-in
+ECMA-376 Strict and Transitional schema archives. Both are one-byte enums,
+convert exact tokens to borrowed static strings, and return a compact typed
+error for an unknown token. DOCX, XLSX, and XLSB consume these same types;
+there is no format-local partial enum, `Custom(String)` escape hatch, or
+allocation in preset-to-wire conversion. Whether an object owns a text-box
+story is separate from its preset geometry because `textBox` is not an
+`ST_ShapeType` value.
+
+Worksheet shapes use `xlsx::Geometry::{Preset, Custom}` from both parser and
+writer. This makes competing `a:prstGeom` and `a:custGeom` states
+unrepresentable after parsing, while the parser rejects duplicate or competing
+elements. The large, comparatively cold custom-geometry payload is boxed so
+every ordinary preset shape does not carry its size; `From` conversions and
+the semantic shape constructors hide that storage choice. Borrowing and
+move-out accessors avoid copying the custom payload.
+
+PresentationML universal time offsets use
+`litchi-pptx::time::{Offset, Unit}` rather than lexical strings. `Offset`
+implements the complete `[MS-PPTX]` decimal grammar with bounded input,
+retains values exactly as canonical decimal milliseconds, and defines
+equality, hashing, and ordering by represented duration. Consequently `1s`
+and `1000ms` are one semantic bookmark time rather than two distinct strings.
+Short integral constructors and checked decimal parsing cover ordinary
+authoring; exact conversion to `std::time::Duration` is available only when
+the value has nanosecond precision and fits that type.
+
+SpreadsheetML page setup lives in the focused `xlsx::page_setup` module.
+`Orientation`, `Order`, `Comments`, `ErrorMode`, and `Unit` close the token
+domains; `Paper`, `Scale`, `Fit`, `FirstPage`, `Copies`, and `Dpi` are compact
+checked numbers with Office-specific reserved ranges; `Measure` retains exact
+positive-universal-measure decimals; and `Setup` has public typed fields for
+concise struct-update authoring. Options keep absent attributes distinct from
+explicit defaults. The mutable facade uses `set_page`, `page`, and
+move-returning `remove_page`; `set_fit` atomically sets both dimensions and the
+independent fit-to-page policy. The immutable worksheet also exposes one
+`page` view backed by the complete typed parser. Printer-settings relationship
+IDs are deliberately absent from public `Setup`: the dedicated
+`xlsx::printer_settings` graph API owns and validates them, so ordinary page
+authoring cannot create a dangling package relationship. The earlier raw
+numeric/boolean read model and string setter are deleted rather than retained
+as compatibility paths.
+
+SpreadsheetML text and conditional formatting do not expose schema tokens as
+strings. Cell fonts use `styles::{Underline, Scheme, Script}`; worksheet state
+uses `writer::Visibility`; and `conditional_formatting` owns the compact
+`Kind`, `Operator`, `ValueKind`, `Period`, `Direction`, `Axis`, `ColorRole`,
+`IconSet`, and `IconSet14` vocabularies. Core and Office 2010 icon-set types are
+separate, preventing an extension-only icon set from entering a core writer.
+The reader, conditional-format writer, sort model, and workbook facade share
+those types. Spreadsheet colors reuse the checked four-byte `styles::Rgb`
+value, including tab colors, instead of accepting arbitrary hex strings.
+Unknown values in closed domains fail parsing. The old worksheet validation
+and conditional-formatting facade that cloned typed values back into strings
+is removed; `Worksheet::data_validations` and
+`Worksheet::conditional_formattings` expose the complete typed models
+directly.
+
+WordprocessingML follows the same rule. `numbering::NumberFormat` contains the
+complete fixed number-format vocabulary, `MultiLevelType` models numbering
+structure, `settings::NotePosition` models footnote/endnote placement, and
+`settings::CompatFlag` models the complete Transitional compatibility-flag
+set while identifying the Strict subset. These enums are compact, copyable,
+and have exact codecs; invalid fixed tokens are errors. Free-form numbering
+text, style identifiers, compatibility-setting extension triples, and custom
+number-format strings remain strings because their value spaces are not
+closed.
+
+Presentation media separates presence, time, geometry, and payload ownership.
+Trim/fade values remain optional typed `time::Offset`s so absence is not
+collapsed into zero, and a slide-show seek event is `Seek { at: Offset }`,
+making the required time part of the variant. Media offsets use checked
+`drawingml::coord::Coordinate`; extents use the integer-only inclusive
+`coord::Extent` domain from `ST_PositiveCoordinate` (whose lower bound is
+zero). `MediaData` hides shared immutable storage behind slice access and a
+move-first recovery path, so cloning a resource does not copy its bytes.
+Bounded canonical `p:extLst` content is retained as inert XML rather than
+discarded or interpreted as executable markup.
+
 The DrawingML diagram data model uses `Id::{Number(i32), Guid([u8; 16])}` for
 the complete `ST_ModelId` union and the concise `Point`, `PointType`,
 `Connection`, and `ConnectionType` names inside `diagram::data`. Transition and
