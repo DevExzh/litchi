@@ -15,6 +15,7 @@ use crate::xlsx::active_x::{
 use crate::xlsx::calculation_properties::{
     WorkbookCalculationProperties, parse_workbook_calculation_properties,
 };
+use crate::xlsx::chart::chart_external_data_content_type;
 use crate::xlsx::data_validation::{
     DataValidationCollection, parse_data_validation_collections,
     replace_data_validation_collections, validate_data_validation_collections,
@@ -3538,10 +3539,14 @@ impl Workbook {
                                 extension,
                             } => {
                                 let expected_content_type =
-                                    crate::xlsx::chart::chart_external_data_content_type(
-                                        &external_data.relationship_type,
-                                    )
-                                    .expect("relationship type was validated above");
+                                    chart_external_data_content_type(&external_data.relationship_type)
+                                    .ok_or_else(|| {
+                                        format!(
+                                            "Worksheet chart {} has unsupported external-data relationship type '{}'",
+                                            idx + 1,
+                                            external_data.relationship_type
+                                        )
+                                    })?;
                                 if content_type.is_empty()
                                     || content_type != expected_content_type
                                     || extension.is_empty()

@@ -617,9 +617,15 @@ impl<'a> Worksheet<'a> {
                 } else {
                     let external_uri = relationship.target_partname()?;
                     let external_part = self.workbook.package().get_part(&external_uri)?;
-                    let expected_content_type =
-                        chart_external_data_content_type(relationship.reltype())
-                            .expect("relationship type was validated above");
+                    let expected_content_type = chart_external_data_content_type(
+                        relationship.reltype(),
+                    )
+                    .ok_or_else(|| {
+                        format!(
+                            "Chart external-data relationship '{relationship_id}' has unsupported type '{}'",
+                            relationship.reltype()
+                        )
+                    })?;
                     if external_part.content_type() != expected_content_type {
                         return Err(format!(
                             "Chart external-data part '{external_uri}' has content type '{}', expected '{expected_content_type}'",

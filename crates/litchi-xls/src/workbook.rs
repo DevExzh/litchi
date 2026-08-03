@@ -1081,9 +1081,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         if next.header.record_type
                             == crate::custom_view::USER_S_VIEW_END_RECORD_TYPE
                         {
-                            break crate::custom_view::XlsSheetCustomViewEnd::parse(
+                            let end = crate::custom_view::XlsSheetCustomViewEnd::parse(
                                 &next.data,
                             )?;
+                            // The closing record is consumed by this loop rather than the
+                            // normal collector feed path. Close the stateful page-setup
+                            // collector explicitly so primary records after the custom-view
+                            // bracket are not mistaken for custom-view content.
+                            page_setup_collector.feed_record(next.header.record_type, &next.data)?;
+                            break end;
                         }
                     };
                     worksheet
@@ -2090,6 +2096,43 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn custom_view_closing_record_restores_primary_page_setup_collection() {
+        let mut custom_view_begin = vec![0; 64];
+        custom_view_begin[20..24].copy_from_slice(&100u32.to_le_bytes());
+
+        let mut stream = Vec::new();
+        push_record(
+            &mut stream,
+            crate::custom_view::USER_S_VIEW_BEGIN_RECORD_TYPE,
+            &custom_view_begin,
+        );
+        // Custom-view content is consumed inertly by the worksheet parser.
+        push_record(&mut stream, 0x0014, &[]);
+        push_record(
+            &mut stream,
+            crate::custom_view::USER_S_VIEW_END_RECORD_TYPE,
+            &1u16.to_le_bytes(),
+        );
+        // This record belongs to the worksheet's primary page-setup block.
+        push_record(&mut stream, 0x0014, &[]);
+        push_record(&mut stream, 0x000A, &[]);
+
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
+            None,
+            Arc::new(XlsFormatting::default()),
+        )
+        .unwrap();
+
+        assert!(worksheet.page_setup().is_some());
     }
 
     #[test]

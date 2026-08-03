@@ -21,6 +21,7 @@ pub mod sheet_calculation_properties;
 pub mod style;
 pub mod web;
 mod workbook;
+pub mod xml_maps;
 
 pub use calculation_properties::{
     WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
