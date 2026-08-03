@@ -248,9 +248,59 @@ pub struct MediaManager {
 #[derive(Debug)]
 struct MediaManagerState {
     source: MediaSource,
-    assets: HashMap<String, MediaAsset>,
+    assets: MediaCatalog,
     limits: MediaLimits,
     package_limits: PackageLimits,
+}
+
+/// Immutable media catalog with deterministic traversal and checked basename
+/// lookup.
+///
+/// The sorted slice is the public read path; the private map is only an index
+/// for the basename selector. Keeping the two responsibilities separate avoids
+/// exposing hash-map storage and means repeated ordered traversals do not sort
+/// or allocate.
+#[derive(Debug, Clone)]
+struct MediaCatalog {
+    ordered: Box<[MediaAsset]>,
+    by_filename: HashMap<String, usize>,
+}
+
+impl MediaCatalog {
+    fn from_assets(assets: HashMap<String, MediaAsset>) -> Self {
+        let mut ordered: Vec<_> = assets.into_values().collect();
+        ordered.sort_unstable_by(|left, right| {
+            left.path
+                .as_os_str()
+                .cmp(right.path.as_os_str())
+                .then_with(|| left.filename.cmp(&right.filename))
+        });
+
+        let by_filename = ordered
+            .iter()
+            .enumerate()
+            .map(|(index, asset)| (asset.filename.clone(), index))
+            .collect();
+
+        Self {
+            ordered: ordered.into_boxed_slice(),
+            by_filename,
+        }
+    }
+
+    fn as_slice(&self) -> &[MediaAsset] {
+        &self.ordered
+    }
+
+    fn len(&self) -> usize {
+        self.ordered.len()
+    }
+
+    fn get(&self, filename: &str) -> Option<&MediaAsset> {
+        self.by_filename
+            .get(filename)
+            .and_then(|&index| self.ordered.get(index))
+    }
 }
 
 impl MediaManager {
@@ -263,7 +313,7 @@ impl MediaManager {
         Self {
             state: Arc::new(MediaManagerState {
                 source,
-                assets,
+                assets: MediaCatalog::from_assets(assets),
                 limits,
                 package_limits,
             }),
@@ -465,23 +515,25 @@ impl MediaManager {
         Ok(assets)
     }
 
-    /// Get the compatibility lookup map keyed by basename.
+    /// Borrow all materialized assets in deterministic relative-path order.
     ///
-    /// Callers that need reproducible traversal should use
-    /// [`Self::assets_in_order`] instead of depending on `HashMap` iteration
-    /// order.
-    pub fn assets(&self) -> &HashMap<String, MediaAsset> {
-        &self.state.assets
+    /// The returned slice is backed by the immutable media snapshot and does
+    /// not expose the private basename lookup index.
+    pub fn assets(&self) -> &[MediaAsset] {
+        self.state.assets.as_slice()
+    }
+
+    /// Iterate over all materialized assets without allocating.
+    pub fn iter_assets(&self) -> impl Iterator<Item = &MediaAsset> + '_ {
+        self.state.assets.as_slice().iter()
     }
 
     /// Return all materialized assets in deterministic relative-path order.
     ///
-    /// The vector owns only the ordering allocation; each asset remains
-    /// borrowed from this immutable manager snapshot.
-    pub fn assets_in_order(&self) -> Vec<&MediaAsset> {
-        let mut assets: Vec<_> = self.state.assets.values().collect();
-        assets.sort_unstable_by_key(|asset| asset.path.as_os_str());
-        assets
+    /// This is a borrowed view; use [`Self::assets`] when slice access is more
+    /// convenient.
+    pub fn assets_in_order(&self) -> &[MediaAsset] {
+        self.state.assets.as_slice()
     }
 
     /// Return the checked resource profile used by this manager.
@@ -500,14 +552,9 @@ impl MediaManager {
 
     /// Return matching assets in deterministic relative-path order.
     pub fn assets_by_type(&self, media_type: MediaType) -> Vec<&MediaAsset> {
-        let mut assets: Vec<_> = self
-            .state
-            .assets
-            .values()
+        self.iter_assets()
             .filter(|asset| asset.media_type == media_type)
-            .collect();
-        assets.sort_unstable_by_key(|asset| asset.path.as_os_str());
-        assets
+            .collect()
     }
 
     pub fn images(&self) -> Vec<&MediaAsset> {
@@ -659,7 +706,7 @@ impl MediaManager {
             total_count: self.state.assets.len(),
             ..MediaStats::default()
         };
-        for asset in self.state.assets.values() {
+        for asset in self.iter_assets() {
             stats.total_size = stats.total_size.saturating_add(asset.size);
             match asset.media_type {
                 MediaType::Image => stats.image_count += 1,
@@ -2006,7 +2053,7 @@ mod tests {
         let manager = MediaManager::from_package(package).unwrap();
         let all_paths: Vec<_> = manager
             .assets_in_order()
-            .into_iter()
+            .iter()
             .map(|asset| asset.path.to_string_lossy().into_owned())
             .collect();
         assert_eq!(
