@@ -18,6 +18,17 @@ pub(crate) mod worksheet;
 
 pub use catalog::{parse_catalog, parse_sheet};
 
+/// Parse only the direct worksheet-grid defaults from one WorksheetPart.
+///
+/// This focused read path shares the canonical [`crate::layout::Defaults`]
+/// model and validation with the full worksheet parser without materializing
+/// cells, rows, columns, or merges. Markup compatibility and the supported
+/// `x14ac:dyDescent` extension are processed using the same bounded rules as
+/// the full parser.
+pub fn parse_worksheet_defaults(content: &[u8]) -> crate::Result<Option<crate::layout::Defaults>> {
+    worksheet::parse_defaults(content)
+}
+
 /// Physical visibility value retained from `sheet/@state`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]

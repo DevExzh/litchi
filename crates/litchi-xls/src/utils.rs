@@ -247,10 +247,12 @@ pub fn column_name_to_index(name: &str) -> Option<u32> {
         if !ch.is_ascii_uppercase() {
             return None;
         }
-        result = result * 26 + (ch as u32 - 'A' as u32) + 1;
+        result = result
+            .checked_mul(26)?
+            .checked_add(ch as u32 - 'A' as u32 + 1)?;
     }
 
-    Some(result - 1) // Make 0-based
+    result.checked_sub(1) // Make 0-based
 }
 
 /// Convert row and column to Excel cell reference (e.g., "A1", "B2")
@@ -286,6 +288,9 @@ pub fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
 
     let col = column_name_to_index(&col_str)?;
     let row: u32 = row_str.parse().ok()?;
+    if row == 0 {
+        return None;
+    }
 
     Some((row - 1, col)) // Make 0-based
 }
@@ -390,6 +395,8 @@ mod tests {
         assert_eq!(column_name_to_index("AAA"), Some(702));
         assert_eq!(column_name_to_index("a"), Some(0)); // case insensitive
         assert_eq!(column_name_to_index("1A"), None); // invalid
+        assert_eq!(column_name_to_index(""), None); // empty
+        assert_eq!(column_name_to_index("ZZZZZZZ"), None); // u32 overflow
     }
 
     #[test]
@@ -408,6 +415,8 @@ mod tests {
         assert!(parse_cell_reference("1A").is_none()); // invalid - digits before letters
         assert!(parse_cell_reference("A").is_none()); // no row
         assert!(parse_cell_reference("1").is_none()); // no column
+        assert!(parse_cell_reference("A0").is_none()); // rows are 1-based
+        assert!(parse_cell_reference("ZZZZZZZ1").is_none()); // column overflow
     }
 
     #[test]

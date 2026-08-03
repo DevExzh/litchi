@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_sheet::ROWS;
+use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -15,11 +16,13 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::{super::namespace::is_spreadsheetml_name, parse_one_based_row};
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 use crate::layout::Descent;
 
 pub(crate) const NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
 const MAX_XML_DEPTH: usize = 256;
+const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+const MARKER: &[u8] = b"litchi_x14ac_dyDescent";
 
 #[derive(Debug, Default)]
 pub(crate) struct Values {
@@ -36,7 +39,34 @@ enum Context {
 }
 
 pub(crate) fn capture(content: &[u8]) -> Result<Values> {
+    if has_markup_compatibility(content)
+        && has_descent_attribute(content)
+        && has_alternate_content(content)
+    {
+        return capture_active(content, true);
+    }
+    capture_inner(content, true, false)
+}
+
+pub(crate) fn capture_defaults(content: &[u8]) -> Result<Option<Descent>> {
+    if has_markup_compatibility(content)
+        && has_descent_attribute(content)
+        && has_alternate_content(content)
+    {
+        return Ok(capture_active(content, false)?.defaults);
+    }
+    Ok(capture_inner(content, false, false)?.defaults)
+}
+
+fn capture_active(content: &[u8], capture_rows: bool) -> Result<Values> {
+    let rewritten = rewrite_descent_attributes(content)?;
+    let processed = litchi_ooxml_common::mce::process_ooxml(&rewritten)?;
+    capture_inner(processed.as_ref(), capture_rows, true)
+}
+
+fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Result<Values> {
     let mut reader = NsReader::from_reader(content);
+    reader.config_mut().check_end_names = true;
     let mut stack = Vec::<Context>::new();
     let mut values = Values::default();
     let mut previous_row = 0u32;
@@ -64,6 +94,8 @@ pub(crate) fn capture(content: &[u8]) -> Result<Values> {
                     &resolver,
                     &mut previous_row,
                     &mut values,
+                    capture_rows,
+                    marker_only,
                 )?;
                 stack.push(context);
             },
@@ -76,10 +108,19 @@ pub(crate) fn capture(content: &[u8]) -> Result<Values> {
                     &resolver,
                     &mut previous_row,
                     &mut values,
+                    capture_rows,
+                    marker_only,
                 )?;
             },
             Event::End(_) => {
-                stack.pop();
+                stack
+                    .pop()
+                    .ok_or_else(|| invalid("worksheet extension XML has an unexpected end"))?;
+            },
+            Event::Eof if !stack.is_empty() => {
+                return Err(invalid(
+                    "worksheet extension XML has an unterminated element",
+                ));
             },
             Event::Eof => break,
             _ => {},
@@ -97,6 +138,8 @@ fn start(
     resolver: &NamespaceResolver,
     previous_row: &mut u32,
     values: &mut Values,
+    capture_rows: bool,
+    marker_only: bool,
 ) -> Result<Context> {
     if parent.is_none() && is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
         return Ok(Context::Worksheet);
@@ -104,7 +147,7 @@ fn start(
     if parent == Some(Context::Worksheet)
         && is_spreadsheetml_name(namespace, element.name(), b"sheetFormatPr")
     {
-        if let Some(value) = descent(element, decoder, resolver)?
+        if let Some(value) = descent(element, decoder, resolver, marker_only)?
             && values.defaults.replace(value).is_some()
         {
             return Err(invalid("duplicate worksheet default dyDescent"));
@@ -119,6 +162,9 @@ fn start(
     if parent == Some(Context::SheetData)
         && is_spreadsheetml_name(namespace, element.name(), b"row")
     {
+        if !capture_rows {
+            return Ok(Context::Row);
+        }
         let number = match unqualified_attribute_value(element, b"r", decoder)? {
             Some(value) => parse_one_based_row(&value)?,
             None => previous_row
@@ -127,7 +173,7 @@ fn start(
                 .ok_or_else(|| invalid("inferred extension row exceeds the spreadsheet grid"))?,
         };
         *previous_row = number;
-        if let Some(value) = descent(element, decoder, resolver)?
+        if let Some(value) = descent(element, decoder, resolver, marker_only)?
             && values.rows.insert(number, value).is_some()
         {
             return Err(invalid(format!(
@@ -139,18 +185,103 @@ fn start(
     Ok(Context::Other)
 }
 
+fn has_markup_compatibility(content: &[u8]) -> bool {
+    content
+        .windows(MCE_NAMESPACE.len())
+        .any(|window| window == MCE_NAMESPACE)
+}
+
+fn has_descent_attribute(content: &[u8]) -> bool {
+    content
+        .windows(b"dyDescent".len())
+        .any(|window| window == b"dyDescent")
+}
+
+fn has_alternate_content(content: &[u8]) -> bool {
+    content
+        .windows(b"AlternateContent".len())
+        .any(|window| window == b"AlternateContent")
+}
+
+fn rewrite_descent_attributes(content: &[u8]) -> Result<Vec<u8>> {
+    let mut reader = NsReader::from_reader(content);
+    reader.config_mut().check_end_names = true;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(content.len())
+        .map_err(|source| allocation("worksheet extension rewrite", source))?;
+    let mut writer = Writer::new(output);
+
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid worksheet extension XML: {error}")))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (_, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => writer
+                .write_event(Event::Start(rewrite_element(&element, &resolver)?))
+                .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
+            Event::Empty(element) => writer
+                .write_event(Event::Empty(rewrite_element(&element, &resolver)?))
+                .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
+            Event::Eof => break,
+            other => writer
+                .write_event(other)
+                .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
+        }
+    }
+    Ok(writer.into_inner())
+}
+
+fn rewrite_element(
+    element: &BytesStart<'_>,
+    resolver: &NamespaceResolver,
+) -> Result<BytesStart<'static>> {
+    let element_name = element.name();
+    let name = std::str::from_utf8(element_name.as_ref())
+        .map_err(|error| invalid(format!("worksheet element name is not UTF-8: {error}")))?;
+    let mut rewritten = BytesStart::new(name.to_owned());
+    let mut replaced = false;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        if attribute.key.as_ref() == MARKER {
+            return Err(invalid("worksheet XML uses a reserved internal marker"));
+        }
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        if local.as_ref() == b"dyDescent"
+            && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == NAMESPACE)
+        {
+            if replaced {
+                return Err(invalid("duplicate x14ac:dyDescent attribute"));
+            }
+            rewritten.push_attribute((MARKER, attribute.value.as_ref()));
+            replaced = true;
+        } else {
+            rewritten.push_attribute((attribute.key.as_ref(), attribute.value.as_ref()));
+        }
+    }
+    Ok(rewritten)
+}
+
 pub(crate) fn descent(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
+    marker_only: bool,
 ) -> Result<Option<Descent>> {
     let mut result = None;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
-        if local.as_ref() != b"dyDescent"
-            || !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == NAMESPACE)
-        {
+        let is_target = if marker_only {
+            local.as_ref() == MARKER && matches!(namespace, ResolveResult::Unbound)
+        } else {
+            local.as_ref() == b"dyDescent"
+                && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == NAMESPACE)
+        };
+        if !is_target {
             continue;
         }
         let lexical = attribute
