@@ -4,6 +4,7 @@ use super::*;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
+const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArchive> {
     let archive = package.archive("Index/Document.iwa")?;
     let object = archive
@@ -2329,12 +2330,7 @@ pub(super) fn attached_table_descriptor(
     let model_object = model_archive.object(table_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
     })?;
-    let models = model_object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == 6000 || message.type_ == 6001)
-        .filter_map(|message| TableModelArchive::decode(message.data.as_slice()).ok())
-        .collect::<Vec<_>>();
+    let models = decode_attached_table_models(model_object.messages.iter(), table_id)?;
     let [model] = models.as_slice() else {
         return Err(Error::InvalidFormat(format!(
             "iWork table model {table_id} must contain exactly one table-model payload"
@@ -2398,14 +2394,7 @@ pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<T
                 let Some(model_object) = model_archive.object(model_id) else {
                     continue;
                 };
-                let models = model_object
-                    .messages
-                    .iter()
-                    .filter(|candidate| candidate.type_ == 6000 || candidate.type_ == 6001)
-                    .filter_map(|candidate| {
-                        TableModelArchive::decode(candidate.data.as_slice()).ok()
-                    })
-                    .collect::<Vec<_>>();
+                let models = decode_attached_table_models(model_object.messages.iter(), model_id)?;
                 let [model] = models.as_slice() else {
                     continue;
                 };
@@ -2427,6 +2416,22 @@ pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<T
     }
 
     Ok(descriptors.into_values().collect())
+}
+
+fn decode_attached_table_models<'a>(
+    messages: impl Iterator<Item = &'a RawMessage>,
+    table_id: u64,
+) -> Result<Vec<TableModelArchive>> {
+    messages
+        .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
+        .map(|message| {
+            TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "iWork table model {table_id} contains malformed table-model payload: {error}"
+                ))
+            })
+        })
+        .collect()
 }
 
 pub(super) fn rename_attached_table_in_package(
@@ -4324,4 +4329,40 @@ pub(super) fn cleanup_removed_cell_comment_graph(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_attached_table_model_payload_is_reported() {
+        let messages = [RawMessage {
+            type_: TABLE_MODEL_MESSAGE_TYPES[0],
+            data: vec![0x80],
+        }];
+
+        let error = decode_attached_table_models(messages.iter(), 41)
+            .expect_err("malformed table model payload");
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message)
+                if message.contains("iWork table model 41")
+                    && message.contains("malformed table-model payload")
+        ));
+    }
+
+    #[test]
+    fn unrelated_messages_do_not_masquerade_as_table_models() {
+        let messages = [RawMessage {
+            type_: 9_999,
+            data: vec![0x80],
+        }];
+
+        assert!(
+            decode_attached_table_models(messages.iter(), 41)
+                .expect("unrelated messages are ignored")
+                .is_empty()
+        );
+    }
 }
