@@ -998,8 +998,33 @@ impl ObjectIndex {
         bundle: &Bundle,
         object_ids: &[ObjectId],
     ) -> Result<Vec<ResolvedObject>> {
+        let mut requested = HashSet::with_capacity(object_ids.len());
+        for object_id in object_ids {
+            if !requested.insert(object_id.get()) {
+                return Err(Error::Archive(format!(
+                    "object {object_id:?} occurs more than once in a batch"
+                )));
+            }
+            if !self.contains(*object_id) {
+                return Err(Error::Archive(format!(
+                    "object {} is not present in the object index",
+                    object_id.get()
+                )));
+            }
+        }
+
         let raw_ids: Vec<_> = object_ids.iter().map(|object_id| object_id.get()).collect();
         let mut resolved = self.resolve_objects(bundle, &raw_ids)?;
+        let resolved_ids: HashSet<_> = resolved.iter().map(|object| object.id).collect();
+        if let Some(missing) = object_ids
+            .iter()
+            .find(|object_id| !resolved_ids.contains(&object_id.get()))
+        {
+            return Err(Error::Bundle(format!(
+                "object {} could not be resolved from the bundle",
+                missing.get()
+            )));
+        }
         let order: HashMap<_, _> = object_ids
             .iter()
             .enumerate()
@@ -1306,6 +1331,42 @@ mod tests {
         );
         assert!(!index.has_cycle_from(source));
         assert!(index.contains(source));
+    }
+
+    #[test]
+    fn typed_batch_resolution_rejects_unindexed_and_missing_objects() {
+        let empty_package = crate::IWorkPackage::new().to_bytes().unwrap();
+        let empty_bundle = Bundle::from_bytes(&empty_package).unwrap();
+        let object_id = ObjectId::try_from(10).unwrap();
+
+        let empty_index = ObjectIndex::new();
+        let error = empty_index
+            .resolve_many(&empty_bundle, &[object_id])
+            .unwrap_err();
+        assert!(matches!(error, Error::Archive(message) if message.contains("not present")));
+
+        let object = ArchiveObject::new(
+            object_id.get(),
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let mut index = ObjectIndex::new();
+        index
+            .parse_archive(
+                "Index/Missing.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        let error = index.resolve_many(&empty_bundle, &[object_id]).unwrap_err();
+        assert!(
+            matches!(error, Error::Bundle(message) if message.contains("could not be resolved"))
+        );
     }
 
     #[test]
