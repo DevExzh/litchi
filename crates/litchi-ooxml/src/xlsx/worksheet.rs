@@ -29,7 +29,7 @@ use super::data_validation::{
     parse_data_validation_collections,
 };
 use super::drawing::parse_drawing_xml;
-use super::format::{CellBorder, CellFill, CellFont, CellFormat};
+use super::format::{CellFill, CellFont, CellFormat};
 use super::header_footer::{WorksheetHeaderFooter, parse_worksheet_header_footer};
 use super::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
@@ -1817,41 +1817,10 @@ impl<'a> Worksheet<'a> {
                 _ => None,
             });
 
-        // Helper function to map border style string to enum
-        let map_border_style = |s: &super::styles::BorderStyle| {
-            let style = match s.style.as_str() {
-                "thin" => super::format::CellBorderLineStyle::Thin,
-                "medium" => super::format::CellBorderLineStyle::Medium,
-                "dashed" => super::format::CellBorderLineStyle::Dashed,
-                "dotted" => super::format::CellBorderLineStyle::Dotted,
-                "thick" => super::format::CellBorderLineStyle::Thick,
-                "double" => super::format::CellBorderLineStyle::Double,
-                "hair" => super::format::CellBorderLineStyle::Hair,
-                "mediumDashed" => super::format::CellBorderLineStyle::MediumDashed,
-                "dashDot" => super::format::CellBorderLineStyle::DashDot,
-                "mediumDashDot" => super::format::CellBorderLineStyle::MediumDashDot,
-                "dashDotDot" => super::format::CellBorderLineStyle::DashDotDot,
-                "mediumDashDotDot" => super::format::CellBorderLineStyle::MediumDashDotDot,
-                "slantDashDot" => super::format::CellBorderLineStyle::SlantDashDot,
-                "none" => super::format::CellBorderLineStyle::None,
-                _ => super::format::CellBorderLineStyle::Thin, // Default fallback
-            };
-            super::format::CellBorderSide {
-                style,
-                color: s.color.clone(),
-            }
-        };
-
         let border = style
             .border_id
             .and_then(|id| styles.get_border(id as usize))
-            .map(|b| CellBorder {
-                left: b.left.as_ref().map(map_border_style),
-                right: b.right.as_ref().map(map_border_style),
-                top: b.top.as_ref().map(map_border_style),
-                bottom: b.bottom.as_ref().map(map_border_style),
-                diagonal: b.diagonal.as_ref().map(map_border_style),
-            });
+            .cloned();
 
         let number_format = style
             .num_fmt_id

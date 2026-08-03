@@ -521,7 +521,7 @@ mod tests {
     const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
     fn roundtrip(package: &Package) -> Package {
-        let bytes = PackageWriter::to_bytes(package.opc_package()).unwrap();
+        let bytes = PackageWriter::to_bytes(package.opc().unwrap()).unwrap();
         Package::from_reader(Cursor::new(bytes)).unwrap()
     }
 
@@ -535,40 +535,42 @@ mod tests {
     fn package_with_slides(count: u32, extra_shapes: &str) -> (Package, Vec<String>) {
         let mut package = Package::new().unwrap();
         let mut names = Vec::new();
-        {
-            let opc = package.opc_package_mut();
-            let presentation_name = opc.main_document_part().unwrap().partname().clone();
-            let mut entries = String::new();
-            for index in 1..=count {
-                let part_name = format!("/ppt/slides/slide{index}.xml");
-                let mut slide = BlobPart::new(
-                    PackURI::new(&part_name).unwrap(),
-                    ct::PML_SLIDE.to_string(),
-                    slide_xml(extra_shapes).into_bytes(),
-                );
-                slide.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
-                opc.add_part(Box::new(slide));
-                let relationship_id = opc
-                    .get_part_mut(&presentation_name)
-                    .unwrap()
-                    .relate_to(&format!("slides/slide{index}.xml"), rt::SLIDE);
-                let _ = write!(
-                    entries,
-                    "<p:sldId id=\"{}\" r:id=\"{relationship_id}\"/>",
-                    255 + index
-                );
-                names.push(part_name);
-            }
-            let presentation = opc.get_part_mut(&presentation_name).unwrap();
-            let xml = String::from_utf8(presentation.blob().to_vec()).unwrap();
-            let entry = format!("<p:sldIdLst>{entries}</p:sldIdLst>");
-            let position = xml
-                .find("<p:sldSz")
-                .expect("default presentation has a slide size");
-            let mut patched = xml;
-            patched.insert_str(position, &entry);
-            presentation.set_blob(patched.into_bytes());
-        }
+        package
+            .edit_opc(|opc| {
+                let presentation_name = opc.main_document_part().unwrap().partname().clone();
+                let mut entries = String::new();
+                for index in 1..=count {
+                    let part_name = format!("/ppt/slides/slide{index}.xml");
+                    let mut slide = BlobPart::new(
+                        PackURI::new(&part_name).unwrap(),
+                        ct::PML_SLIDE.to_string(),
+                        slide_xml(extra_shapes).into_bytes(),
+                    );
+                    slide.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
+                    opc.add_part(Box::new(slide));
+                    let relationship_id = opc
+                        .get_part_mut(&presentation_name)
+                        .unwrap()
+                        .relate_to(&format!("slides/slide{index}.xml"), rt::SLIDE);
+                    let _ = write!(
+                        entries,
+                        "<p:sldId id=\"{}\" r:id=\"{relationship_id}\"/>",
+                        255 + index
+                    );
+                    names.push(part_name);
+                }
+                let presentation = opc.get_part_mut(&presentation_name).unwrap();
+                let xml = String::from_utf8(presentation.blob().to_vec()).unwrap();
+                let entry = format!("<p:sldIdLst>{entries}</p:sldIdLst>");
+                let position = xml
+                    .find("<p:sldSz")
+                    .expect("default presentation has a slide size");
+                let mut patched = xml;
+                patched.insert_str(position, &entry);
+                presentation.set_blob(patched.into_bytes());
+                Ok(())
+            })
+            .unwrap();
         (package, names)
     }
 
@@ -622,7 +624,8 @@ mod tests {
 
         // The payload round-trips byte-identically.
         let part = reopened
-            .opc_package()
+            .opc()
+            .unwrap()
             .get_part(&PackURI::new(&authored.part_name).unwrap())
             .unwrap();
         assert_eq!(part.blob(), payload.as_slice());
@@ -722,7 +725,8 @@ mod tests {
         assert_eq!(objects[0].shape_id(), Some(3));
         // The pre-existing picture survives the patch untouched.
         let slide = reopened
-            .opc_package()
+            .opc()
+            .unwrap()
             .get_part(&PackURI::new(&slides[0]).unwrap())
             .unwrap();
         let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
@@ -890,8 +894,8 @@ mod tests {
         ] {
             let uri = PackURI::new(part_name).unwrap();
             assert_eq!(
-                first.opc_package().get_part(&uri).unwrap().blob(),
-                second.opc_package().get_part(&uri).unwrap().blob(),
+                first.opc().unwrap().get_part(&uri).unwrap().blob(),
+                second.opc().unwrap().get_part(&uri).unwrap().blob(),
                 "part {part_name} must serialize deterministically"
             );
         }

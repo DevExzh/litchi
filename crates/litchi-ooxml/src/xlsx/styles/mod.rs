@@ -32,7 +32,7 @@
 //! ```
 
 mod alignment;
-mod border;
+pub mod border;
 mod cell_style;
 mod fill;
 mod font;
@@ -40,7 +40,7 @@ mod number_format;
 mod parser;
 
 pub use alignment::Alignment;
-pub use border::{Border, BorderStyle};
+pub use border::Border;
 pub use cell_style::CellStyle;
 pub use fill::Fill;
 pub use font::Font;

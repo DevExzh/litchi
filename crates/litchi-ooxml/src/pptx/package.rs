@@ -24,6 +24,9 @@ use std::io::{Read, Seek};
 use std::path::Path;
 
 pub(crate) const STALE_NOTES_REASON: &str = "the legacy writer has unflushed changes that could replace slide and notes relationships; save and reopen before reading or editing notes";
+const STALE_SLIDE_GRAPH_REASON: &str = "the legacy writer has unflushed changes that could replace slide parts or relationships; save and reopen before editing the canonical slide graph";
+const STALE_TAG_GRAPH_REASON: &str = "the legacy writer has unflushed changes that could replace slide relationships; save and reopen before editing tags";
+const STALE_PRESENTATION_GRAPH_REASON: &str = "the legacy writer has unflushed changes that could replace presentation parts or relationships; publish before switching to canonical graph editing";
 
 /// Default media poster image - a simple 1x1 gray PNG.
 /// This is used as a placeholder for media shapes that don't have a custom poster frame.
@@ -94,6 +97,9 @@ pub struct Package {
     mutable_pres: Option<MutablePresentation>,
     /// Authoritative, mutation-tracked core properties.
     properties: Slot,
+    /// Whether managed publication must synchronize embedded-font state.
+    #[cfg(feature = "fonts")]
+    font_sync_pending: bool,
     /// Encryption profile of the opened outer package.
     #[cfg(feature = "encryption")]
     source_encryption: Option<Mode>,
@@ -438,6 +444,8 @@ impl Package {
             opc,
             mutable_pres,
             properties,
+            #[cfg(feature = "fonts")]
+            font_sync_pending: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -472,6 +480,8 @@ impl Package {
             opc,
             mutable_pres: None,
             properties,
+            #[cfg(feature = "fonts")]
+            font_sync_pending: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -528,6 +538,8 @@ impl Package {
             opc,
             mutable_pres: None,
             properties,
+            #[cfg(feature = "fonts")]
+            font_sync_pending: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -565,6 +577,8 @@ impl Package {
             opc,
             mutable_pres: None,
             properties,
+            #[cfg(feature = "fonts")]
+            font_sync_pending: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -653,12 +667,15 @@ impl Package {
     /// `p:contentPart` reference at the end of its shape tree, preserving
     /// the slide's namespace dialect. The ink is never rendered, recognized,
     /// or executed.
+    /// A successful edit disables subsequent legacy-writer access on this value.
     pub fn add_ink_annotation(
         &mut self,
         slide_name: &PackURI,
         inkml: &[u8],
     ) -> Result<crate::pptx::StoredInkAnnotation> {
-        crate::pptx::store_slide_ink_annotation(&mut self.opc, slide_name, inkml)
+        self.edit_canonical("add_ink_annotation", STALE_SLIDE_GRAPH_REASON, |package| {
+            crate::pptx::store_slide_ink_annotation(package, slide_name, inkml)
+        })
     }
 
     /// Discover persisted laser-pointer traces from presentation slides.
@@ -677,12 +694,15 @@ impl Package {
     /// preserving its namespace dialect. Slides that already carry a laser
     /// extension are rejected. Traces are never replayed, rendered,
     /// interpolated, or executed.
+    /// A successful edit disables subsequent legacy-writer access on this value.
     pub fn add_laser_trace(
         &mut self,
         slide_name: &PackURI,
         points: &[crate::pptx::PptxLaserTracePoint],
     ) -> Result<()> {
-        crate::pptx::store_slide_laser_trace(&mut self.opc, slide_name, points)
+        self.edit_canonical("add_laser_trace", STALE_SLIDE_GRAPH_REASON, |package| {
+            crate::pptx::store_slide_laser_trace(package, slide_name, points)
+        })
     }
 
     /// Discover persisted slide-show event records from presentation slides.
@@ -700,12 +720,17 @@ impl Package {
     /// slide gains the `p:ext` extension block while preserving its
     /// namespace dialect. Slides that already carry a show-event extension
     /// are rejected. Events are never replayed, rendered, or executed.
+    /// A successful edit disables subsequent legacy-writer access on this value.
     pub fn add_slide_show_events(
         &mut self,
         slide_name: &PackURI,
         events: &[crate::pptx::PptxSlideShowEventDraft],
     ) -> Result<()> {
-        crate::pptx::store_slide_show_events(&mut self.opc, slide_name, events)
+        self.edit_canonical(
+            "add_slide_show_events",
+            STALE_SLIDE_GRAPH_REASON,
+            |package| crate::pptx::store_slide_show_events(package, slide_name, events),
+        )
     }
 
     /// Discover bounded, inert click and hover action settings on slides.
@@ -763,7 +788,9 @@ impl Package {
     ) -> Result<Option<tag::List>> {
         self.ensure_tag_graph_current("put_tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
-        tag::put(&mut self.opc, &slide_name, list).map_err(Into::into)
+        self.edit_canonical("put_tags", STALE_TAG_GRAPH_REASON, move |package| {
+            tag::put(package, &slide_name, list).map_err(Into::into)
+        })
     }
 
     /// Remove the direct tag list from one selected slide.
@@ -776,7 +803,9 @@ impl Package {
     pub fn remove_tags<'a>(&mut self, slide: impl Into<SlideKey<'a>>) -> Result<Option<tag::List>> {
         self.ensure_tag_graph_current("remove_tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
-        tag::remove(&mut self.opc, &slide_name).map_err(Into::into)
+        self.edit_canonical("remove_tags", STALE_TAG_GRAPH_REASON, move |package| {
+            tag::remove(package, &slide_name).map_err(Into::into)
+        })
     }
 
     /// Read the programmable-tag list attached to one semantic slide shape.
@@ -806,7 +835,9 @@ impl Package {
     ) -> Result<Option<tag::List>> {
         self.ensure_tag_graph_current("put_shape_tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
-        tag::shape::put(&mut self.opc, &slide_name, shape, list).map_err(Into::into)
+        self.edit_canonical("put_shape_tags", STALE_TAG_GRAPH_REASON, move |package| {
+            tag::shape::put(package, &slide_name, shape, list).map_err(Into::into)
+        })
     }
 
     /// Remove one semantic slide shape's programmable-tag list.
@@ -820,25 +851,26 @@ impl Package {
     ) -> Result<Option<tag::List>> {
         self.ensure_tag_graph_current("remove_shape_tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
-        tag::shape::remove(&mut self.opc, &slide_name, shape).map_err(Into::into)
+        self.edit_canonical(
+            "remove_shape_tags",
+            STALE_TAG_GRAPH_REASON,
+            move |package| tag::shape::remove(package, &slide_name, shape).map_err(Into::into),
+        )
     }
 
     fn ensure_tag_graph_current(&self, operation: &'static str) -> Result<()> {
-        if self
-            .mutable_pres
-            .as_ref()
-            .is_some_and(MutablePresentation::is_modified)
-        {
-            return Err(OoxmlError::UnsafeEdit {
-                format: "PPTX",
-                operation,
-                reason: "the legacy writer has unflushed changes that could replace slide relationships; save and reopen before editing tags",
-            });
-        }
-        Ok(())
+        self.ensure_canonical_edit_ready(operation, STALE_TAG_GRAPH_REASON)
     }
 
     fn ensure_notes_graph_current(&self, operation: &'static str) -> Result<()> {
+        self.ensure_canonical_edit_ready(operation, STALE_NOTES_REASON)
+    }
+
+    fn ensure_canonical_edit_ready(
+        &self,
+        operation: &'static str,
+        stale_reason: &'static str,
+    ) -> Result<()> {
         if self
             .mutable_pres
             .as_ref()
@@ -847,10 +879,65 @@ impl Package {
             return Err(OoxmlError::UnsafeEdit {
                 format: "PPTX",
                 operation,
-                reason: STALE_NOTES_REASON,
+                reason: stale_reason,
             });
         }
+
+        if self.opc.save_options().fonts != litchi_opc::FontEmbedding::None {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "automatic font embedding requires the legacy presentation model; disable the font policy before switching to canonical graph editing",
+            });
+        }
+
+        #[cfg(feature = "fonts")]
+        if self.font_sync_pending {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "font embedding is pending; publish through save or to_bytes before switching to canonical graph editing",
+            });
+        }
+
         Ok(())
+    }
+
+    fn edit_canonical<T>(
+        &mut self,
+        operation: &'static str,
+        stale_reason: &'static str,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        self.ensure_canonical_edit_ready(operation, stale_reason)?;
+
+        // Built-in part payloads are Arc-backed. Custom `Part` implementations
+        // retain their declared clone and interior-mutability policy.
+        let mut candidate = self.opc.clone();
+        let value = edit(&mut candidate)?;
+        self.opc = candidate;
+        self.mutable_pres = None;
+        Ok(value)
+    }
+
+    fn edit_signature<T>(
+        &mut self,
+        operation: &'static str,
+        edit: impl FnOnce(&mut OpcPackage) -> litchi_opc::sign::Result<T>,
+    ) -> litchi_opc::sign::Result<T> {
+        self.ensure_canonical_edit_ready(operation, STALE_PRESENTATION_GRAPH_REASON)
+            .map_err(|error| litchi_opc::sign::Error::Graph(error.to_string()))?;
+        if self.properties.is_dirty() {
+            return Err(litchi_opc::sign::Error::Graph(format!(
+                "PPTX {operation} requires current core properties; publish through save or to_bytes before signing"
+            )));
+        }
+
+        let mut candidate = self.opc.clone();
+        let value = edit(&mut candidate)?;
+        self.opc = candidate;
+        self.mutable_pres = None;
+        Ok(value)
     }
 
     fn resolve_slide(&self, key: SlideKey<'_>) -> Result<PackURI> {
@@ -918,6 +1005,34 @@ impl Package {
         Ok(litchi_pptx::font::load(&self.opc)?)
     }
 
+    /// Select the font publication policy used by managed save operations.
+    #[cfg(feature = "fonts")]
+    pub fn set_font_embedding(
+        &mut self,
+        embedding: litchi_opc::FontEmbedding,
+    ) -> Result<&mut Self> {
+        if embedding != litchi_opc::FontEmbedding::None && self.mutable_pres.is_none() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: "set_font_embedding",
+                reason: "font discovery requires a complete mutable presentation model",
+            });
+        }
+
+        if self.opc.save_options().fonts != embedding {
+            self.opc.with_fonts(embedding);
+            self.font_sync_pending = embedding != litchi_opc::FontEmbedding::None;
+        }
+        Ok(self)
+    }
+
+    /// Select the font publication policy and return this package by value.
+    #[cfg(feature = "fonts")]
+    pub fn with_font_embedding(mut self, embedding: litchi_opc::FontEmbedding) -> Result<Self> {
+        self.set_font_embedding(embedding)?;
+        Ok(self)
+    }
+
     /// Atomically publish a complete embedded-font collection by value.
     ///
     /// Returns `false` for an exact no-op, preserving valid signatures.
@@ -967,9 +1082,15 @@ impl Package {
         &mut self,
         value: &crate::pptx::revision_information::RevisionInformationPart,
     ) -> Result<()> {
-        crate::pptx::revision_information::store_revision_information(&mut self.opc, value)?;
-        self.opc.unsign();
-        Ok(())
+        self.edit_canonical(
+            "store_revision_information",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| {
+                crate::pptx::revision_information::store_revision_information(package, value)?;
+                package.unsign();
+                Ok(())
+            },
+        )
     }
 
     /// Load the PowerPoint Changes Information part, if present.
@@ -989,9 +1110,15 @@ impl Package {
         &mut self,
         value: &crate::pptx::changes_information::ChangesInformationPart,
     ) -> Result<()> {
-        crate::pptx::changes_information::store_changes_information(&mut self.opc, value)?;
-        self.opc.unsign();
-        Ok(())
+        self.edit_canonical(
+            "store_changes_information",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| {
+                crate::pptx::changes_information::store_changes_information(package, value)?;
+                package.unsign();
+                Ok(())
+            },
+        )
     }
 
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
@@ -1069,12 +1196,15 @@ impl Package {
         Ok(ribbon::remove(&mut self.opc, family)?)
     }
 
-    /// Get the underlying OPC package.
+    /// Borrow the current plaintext OPC graph for focused low-level inspection.
     ///
-    /// This provides access to lower-level package operations.
+    /// This rejects access while facade-owned changes still need managed
+    /// materialization, or when exposing the graph would disclose an encrypted
+    /// source as plaintext. Use [`Self::to_bytes`] for managed serialization.
     #[inline]
-    pub fn opc_package(&self) -> &OpcPackage {
-        &self.opc
+    pub fn opc(&self) -> Result<&OpcPackage> {
+        self.ensure_opc_current("opc")?;
+        Ok(&self.opc)
     }
 
     /// Return whether this presentation contains package signatures.
@@ -1099,7 +1229,7 @@ impl Package {
 
     /// Add a signature while preserving every existing valid signature.
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.sign(signer)
+        self.edit_signature("sign", |package| package.sign(signer))
     }
 
     /// Add a signature with explicit authoring resource bounds.
@@ -1108,12 +1238,12 @@ impl Package {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.sign_with(signer, limits)
+        self.edit_signature("sign_with", |package| package.sign_with(signer, limits))
     }
 
     /// Atomically replace all signatures with one signature.
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.resign(signer)
+        self.edit_signature("resign", |package| package.resign(signer))
     }
 
     /// Atomically replace signatures with explicit authoring resource bounds.
@@ -1122,7 +1252,7 @@ impl Package {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.resign_with(signer, limits)
+        self.edit_signature("resign_with", |package| package.resign_with(signer, limits))
     }
 
     /// Remove all package signatures.
@@ -1134,8 +1264,8 @@ impl Package {
     /// Discover inert embedded-object and embedded-package relationships
     /// using the shared safe default resource limits.
     ///
-    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
-    /// layer needs explicitly tuned limits.
+    /// Use [`embedded::scan_with`] with [`Self::opc`] when a lower layer needs
+    /// explicitly tuned limits and the raw graph is current.
     pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
         Ok(embedded::scan(&self.opc)?)
     }
@@ -1151,11 +1281,9 @@ impl Package {
     pub fn put_notes(&mut self, graph: litchi_pptx::notes::Graph) -> Result<()> {
         self.ensure_notes_graph_current("put_notes")?;
         let presentation = self.opc.main_document_part()?.partname().clone();
-        Ok(litchi_pptx::notes::put(
-            &mut self.opc,
-            &presentation,
-            graph,
-        )?)
+        self.edit_canonical("put_notes", STALE_NOTES_REASON, move |package| {
+            Ok(litchi_pptx::notes::put(package, &presentation, graph)?)
+        })
     }
 
     /// Remove the speaker notes owned by one selected slide.
@@ -1168,11 +1296,13 @@ impl Package {
         self.ensure_notes_graph_current("remove_notes")?;
         let slide_name = self.resolve_slide(slide.into())?;
         let presentation = self.opc.main_document_part()?.partname().clone();
-        Ok(litchi_pptx::notes::remove(
-            &mut self.opc,
-            &presentation,
-            &slide_name,
-        )?)
+        self.edit_canonical("remove_notes", STALE_NOTES_REASON, move |package| {
+            Ok(litchi_pptx::notes::remove(
+                package,
+                &presentation,
+                &slide_name,
+            )?)
+        })
     }
 
     /// Remove speaker notes from every slide, returning the number removed.
@@ -1183,7 +1313,9 @@ impl Package {
     pub fn clear_notes(&mut self) -> Result<usize> {
         self.ensure_notes_graph_current("clear_notes")?;
         let presentation = self.opc.main_document_part()?.partname().clone();
-        Ok(litchi_pptx::notes::clear(&mut self.opc, &presentation)?)
+        self.edit_canonical("clear_notes", STALE_NOTES_REASON, move |package| {
+            Ok(litchi_pptx::notes::clear(package, &presentation)?)
+        })
     }
 
     /// Create a new slide master with default text styles and reference it
@@ -1192,7 +1324,11 @@ impl Package {
     /// The master is assigned a spec-compliant unique ID (≥ 2^31) and is
     /// related to an existing theme part when one is available.
     pub fn add_slide_master(&mut self) -> Result<crate::pptx::master_layout::AuthoredSlideMaster> {
-        crate::pptx::master_layout::add_slide_master(&mut self.opc)
+        self.edit_canonical(
+            "add_slide_master",
+            STALE_PRESENTATION_GRAPH_REASON,
+            crate::pptx::master_layout::add_slide_master,
+        )
     }
 
     /// Create a new slide layout of the given kind, attached to an existing
@@ -1210,12 +1346,18 @@ impl Package {
         name: &str,
         placeholders: &[crate::pptx::master_layout::PlaceholderSpec],
     ) -> Result<crate::pptx::master_layout::AuthoredSlideLayout> {
-        crate::pptx::master_layout::add_slide_layout(
-            &mut self.opc,
-            master_part_name,
-            kind,
-            name,
-            placeholders,
+        self.edit_canonical(
+            "add_slide_layout",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| {
+                crate::pptx::master_layout::add_slide_layout(
+                    package,
+                    master_part_name,
+                    kind,
+                    name,
+                    placeholders,
+                )
+            },
         )
     }
 
@@ -1229,7 +1371,11 @@ impl Package {
         part_name: &str,
         spec: &crate::pptx::master_layout::PlaceholderSpec,
     ) -> Result<()> {
-        crate::pptx::master_layout::store_placeholder_shape(&mut self.opc, part_name, spec)
+        self.edit_canonical(
+            "store_placeholder_shape",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| crate::pptx::master_layout::store_placeholder_shape(package, part_name, spec),
+        )
     }
 
     /// Delete a slide layout that is not referenced by any slide.
@@ -1237,7 +1383,11 @@ impl Package {
     /// The owning master's `sldLayoutIdLst` entry and relationship are
     /// removed together with the layout part.
     pub fn remove_slide_layout(&mut self, layout_part_name: &str) -> Result<()> {
-        crate::pptx::master_layout::remove_slide_layout(&mut self.opc, layout_part_name)
+        self.edit_canonical(
+            "remove_slide_layout",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| crate::pptx::master_layout::remove_slide_layout(package, layout_part_name),
+        )
     }
 
     /// Validate the slide master and slide layout relationship graph with the
@@ -1258,7 +1408,9 @@ impl Package {
         color_scheme: &crate::pptx::theme::ThemeColorScheme,
         font_scheme: &crate::pptx::theme::ThemeFontScheme,
     ) -> Result<crate::pptx::theme::AuthoredTheme> {
-        crate::pptx::theme::add_theme(&mut self.opc, name, color_scheme, font_scheme)
+        self.edit_canonical("add_theme", STALE_PRESENTATION_GRAPH_REASON, |package| {
+            crate::pptx::theme::add_theme(package, name, color_scheme, font_scheme)
+        })
     }
 
     /// Attach a theme part to a slide master through a theme relationship.
@@ -1272,7 +1424,17 @@ impl Package {
         master_part_name: &str,
         theme_part_name: &str,
     ) -> Result<String> {
-        crate::pptx::theme::attach_theme_to_master(&mut self.opc, master_part_name, theme_part_name)
+        self.edit_canonical(
+            "attach_theme_to_master",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| {
+                crate::pptx::theme::attach_theme_to_master(
+                    package,
+                    master_part_name,
+                    theme_part_name,
+                )
+            },
+        )
     }
 
     /// Store a theme override on a slide layout or slide part.
@@ -1286,7 +1448,11 @@ impl Package {
         parent_part_name: &str,
         value: &crate::pptx::ThemeOverride,
     ) -> Result<String> {
-        crate::pptx::store_theme_override(&mut self.opc, parent_part_name, value)
+        self.edit_canonical(
+            "store_theme_override",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| crate::pptx::store_theme_override(package, parent_part_name, value),
+        )
     }
 
     /// Read the theme override attached to a slide layout or slide part.
@@ -1300,7 +1466,11 @@ impl Package {
     /// Remove the theme override from a slide layout or slide part,
     /// deleting the override part when it becomes orphaned.
     pub fn remove_theme_override(&mut self, parent_part_name: &str) -> Result<bool> {
-        crate::pptx::remove_theme_override(&mut self.opc, parent_part_name)
+        self.edit_canonical(
+            "remove_theme_override",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| crate::pptx::remove_theme_override(package, parent_part_name),
+        )
     }
 
     /// Replace the color scheme (`a:clrScheme`) of an existing theme part,
@@ -1310,7 +1480,13 @@ impl Package {
         theme_part_name: &str,
         color_scheme: &crate::pptx::theme::ThemeColorScheme,
     ) -> Result<()> {
-        crate::pptx::theme::store_theme_color_scheme(&mut self.opc, theme_part_name, color_scheme)
+        self.edit_canonical(
+            "store_theme_color_scheme",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| {
+                crate::pptx::theme::store_theme_color_scheme(package, theme_part_name, color_scheme)
+            },
+        )
     }
 
     /// Replace the font scheme (`a:fontScheme`) of an existing theme part,
@@ -1320,7 +1496,13 @@ impl Package {
         theme_part_name: &str,
         font_scheme: &crate::pptx::theme::ThemeFontScheme,
     ) -> Result<()> {
-        crate::pptx::theme::store_theme_font_scheme(&mut self.opc, theme_part_name, font_scheme)
+        self.edit_canonical(
+            "store_theme_font_scheme",
+            STALE_PRESENTATION_GRAPH_REASON,
+            |package| {
+                crate::pptx::theme::store_theme_font_scheme(package, theme_part_name, font_scheme)
+            },
+        )
     }
 
     /// Validate the master/layout/theme relationship graph with the same
@@ -1337,6 +1519,7 @@ impl Package {
     /// is appended to the slide's shape tree. The patched slide is verified
     /// through the read-side OLE inventory before the operation returns.
     /// Payloads are never parsed, activated, rendered, or executed.
+    /// A successful edit disables subsequent legacy-writer access on this value.
     pub fn add_ole_object(
         &mut self,
         slide_part_name: &str,
@@ -1346,24 +1529,64 @@ impl Package {
         frame: crate::pptx::ole_object::OleObjectFrame,
         payload: &[u8],
     ) -> Result<crate::pptx::ole_object::AuthoredOleObject> {
-        crate::pptx::ole_object::add_ole_object(
-            &mut self.opc,
-            slide_part_name,
-            kind,
-            prog_id,
-            name,
-            frame,
-            payload,
-        )
+        self.edit_canonical("add_ole_object", STALE_SLIDE_GRAPH_REASON, |package| {
+            crate::pptx::ole_object::add_ole_object(
+                package,
+                slide_part_name,
+                kind,
+                prog_id,
+                name,
+                frame,
+                payload,
+            )
+        })
     }
 
-    /// Get mutable access to the underlying OPC package.
+    /// Transactionally edit the current plaintext OPC graph.
     ///
-    /// This provides access to lower-level package operations for modification.
-    #[inline]
-    pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
-        self.opc.unsign();
-        &mut self.opc
+    /// The closure receives a structural candidate whose built-in part payloads
+    /// share immutable `Arc` storage. Returning an error or unwinding leaves
+    /// this package's graph unpublished; custom `Part` implementations retain
+    /// their own clone and interior-mutability policy. Before a successful
+    /// commit, the candidate's PowerPoint main relationship, content type, and
+    /// core properties are validated and facade-owned state is reloaded.
+    /// Committing a raw edit disables the legacy writer so it cannot later
+    /// erase the edit.
+    pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+        self.ensure_opc_current("edit_opc")?;
+        if self.opc.save_options().fonts != litchi_opc::FontEmbedding::None {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: "edit_opc",
+                reason: "raw OPC editing cannot honor an automatic font policy; disable font embedding before entering the transaction",
+            });
+        }
+
+        let mut candidate = self.opc.clone();
+        candidate.unsign();
+        let value = edit(&mut candidate)?;
+
+        if candidate.save_options().fonts != litchi_opc::FontEmbedding::None {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: "edit_opc",
+                reason: "raw OPC transactions cannot configure automatic font embedding; use the typed package facade",
+            });
+        }
+        let main_part = candidate.main_document_part().map_err(|error| {
+            OoxmlError::PartNotFound(format!("main presentation part: {error}"))
+        })?;
+        validate_presentation_main_content_type(main_part.content_type())?;
+        let properties = Slot::load(&candidate)?;
+
+        self.opc = candidate;
+        self.properties = properties;
+        self.mutable_pres = None;
+        #[cfg(feature = "fonts")]
+        {
+            self.font_sync_pending = false;
+        }
+        Ok(value)
     }
 
     /// Get a mutable presentation for writing and modification.
@@ -1388,11 +1611,27 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn presentation_mut(&mut self) -> Result<&mut MutablePresentation> {
-        self.mutable_pres.as_mut().ok_or(OoxmlError::UnsafeEdit {
-            format: "PPTX",
-            operation: "presentation_mut",
-            reason: "the legacy writer cannot hydrate an existing presentation losslessly",
-        })
+        if self.mutable_pres.is_none() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: "presentation_mut",
+                reason: "the legacy writer cannot hydrate an existing presentation losslessly",
+            });
+        }
+
+        #[cfg(feature = "fonts")]
+        if self.opc.save_options().fonts != litchi_opc::FontEmbedding::None {
+            self.font_sync_pending = true;
+        }
+
+        match self.mutable_pres.as_mut() {
+            Some(presentation) => Ok(presentation),
+            None => Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: "presentation_mut",
+                reason: "the legacy writer cannot hydrate an existing presentation losslessly",
+            }),
+        }
     }
 
     /// Borrows the presentation core properties, retaining package absence.
@@ -1467,8 +1706,22 @@ impl Package {
     }
 
     fn save_plain_impl<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        self.prepare_for_save()?;
-        self.opc.save(path).map_err(Into::into)
+        self.write_with(|package| package.save(path).map_err(Into::into))
+    }
+
+    /// Serialize the complete plaintext package through the managed staged
+    /// publication path.
+    pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
+        self.ensure_plain_output("to_bytes")?;
+        self.to_plain_bytes()
+    }
+
+    /// Explicitly serialize a plaintext package, even when the source was
+    /// encrypted.
+    pub fn to_plain_bytes(&mut self) -> Result<Vec<u8>> {
+        use litchi_opc::pkgwriter::PackageWriter;
+
+        self.write_with(|package| PackageWriter::to_bytes(package).map_err(Into::into))
     }
 
     /// Serialize and encrypt this package entirely in memory.
@@ -1476,9 +1729,10 @@ impl Package {
     pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
         use litchi_opc::pkgwriter::PackageWriter;
 
-        self.prepare_for_save()?;
-        let package = PackageWriter::to_bytes(&self.opc)?;
-        crate::encryption::encrypt(package, password, mode).map_err(Into::into)
+        self.write_with(|package| {
+            let package = PackageWriter::to_bytes(package)?;
+            crate::encryption::encrypt(package, password, mode).map_err(Into::into)
+        })
     }
 
     /// Serialize and encrypt using the source package's retained profile.
@@ -1496,12 +1750,16 @@ impl Package {
         password: &str,
         mode: Mode,
     ) -> Result<()> {
+        use litchi_opc::pkgwriter::PackageWriter;
         use std::io::Write;
 
-        let output = self.to_encrypted(password, mode)?;
-        litchi_opc::atomic::replace(path.as_ref(), |temporary| {
-            temporary.write_all(&output)?;
-            Ok(())
+        self.write_with(|package| {
+            litchi_opc::atomic::replace_with::<OoxmlError>(path.as_ref(), |temporary| {
+                let plain = PackageWriter::to_bytes(package)?;
+                let encrypted = crate::encryption::encrypt(plain, password, mode)?;
+                temporary.write_all(&encrypted)?;
+                Ok(())
+            })
         })?;
         self.source_encryption = Some(mode);
         Ok(())
@@ -1532,6 +1790,47 @@ impl Package {
         Ok(())
     }
 
+    fn ensure_opc_current(&self, operation: &'static str) -> Result<()> {
+        #[cfg(feature = "encryption")]
+        if self.source_encryption.is_some() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
+            });
+        }
+
+        if self
+            .mutable_pres
+            .as_ref()
+            .is_some_and(MutablePresentation::is_modified)
+        {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "the legacy writer has unmaterialized presentation changes; use a managed save or to_bytes first",
+            });
+        }
+        if self.properties.is_dirty() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "core properties have unmaterialized changes; use a managed save or to_bytes first",
+            });
+        }
+
+        #[cfg(feature = "fonts")]
+        if self.font_sync_pending {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "font embedding is pending; use a managed save or to_bytes first",
+            });
+        }
+
+        Ok(())
+    }
+
     #[cfg(feature = "encryption")]
     fn preserved_mode(&self, operation: &'static str) -> Result<Mode> {
         self.source_encryption.ok_or(OoxmlError::UnsafeEdit {
@@ -1541,18 +1840,56 @@ impl Package {
         })
     }
 
-    fn prepare_for_save(&mut self) -> Result<()> {
-        self.flush_presentation()?;
-
-        // Flush only an explicitly edited core-properties slot.
-        self.properties.flush(&mut self.opc)?;
-
-        // Embed fonts if feature enabled and requested in options
+    fn write_with<T>(&mut self, write: impl FnOnce(&OpcPackage) -> Result<T>) -> Result<T> {
+        let presentation_dirty = self
+            .mutable_pres
+            .as_ref()
+            .is_some_and(MutablePresentation::is_modified);
+        let properties_dirty = self.properties.is_dirty();
         #[cfg(feature = "fonts")]
-        {
-            self.embed_fonts()?;
+        let fonts_requested = self.font_sync_pending;
+        #[cfg(not(feature = "fonts"))]
+        let fonts_requested = false;
+
+        // An unchanged package needs no rollback graph. This is the common
+        // opened-document save path and retains shared payload identity.
+        if !presentation_dirty && !properties_dirty && !fonts_requested {
+            return write(&self.opc);
         }
-        Ok(())
+
+        // Built-in OPC parts retain immutable payloads behind `Arc`, so this
+        // transaction copies bounded graph metadata rather than package bytes.
+        let package_before = self.opc.clone();
+        let result = (|| {
+            let presentation_staged = self.materialize_presentation()?;
+
+            // Font publication may inspect the complete writer model and is
+            // therefore staged after presentation materialization.
+            #[cfg(feature = "fonts")]
+            self.embed_fonts()?;
+
+            // This guard keeps core-property intent dirty until the output
+            // sink has accepted the complete staged package.
+            let staged_properties = self.properties.stage(&mut self.opc)?;
+            let value = write(&self.opc)?;
+            staged_properties.commit();
+            if presentation_staged && let Some(presentation) = self.mutable_pres.as_mut() {
+                presentation.mark_clean();
+            }
+            #[cfg(feature = "fonts")]
+            {
+                self.font_sync_pending = false;
+            }
+            Ok(value)
+        })();
+
+        match result {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                self.opc = package_before;
+                Err(error)
+            },
+        }
     }
 
     /// Materialize pending legacy-writer state without allowing it to erase
@@ -1569,10 +1906,38 @@ impl Package {
             return Ok(());
         }
 
-        let Some(mut presentation) = self.mutable_pres.take() else {
-            return Ok(());
+        let package_before = self.opc.clone();
+        match self.materialize_presentation() {
+            Ok(true) => {
+                if let Some(presentation) = self.mutable_pres.as_mut() {
+                    presentation.mark_clean();
+                }
+                Ok(())
+            },
+            Ok(false) => Ok(()),
+            Err(error) => {
+                self.opc = package_before;
+                Err(error)
+            },
+        }
+    }
+
+    /// Stage pending legacy-writer state into the current OPC graph.
+    ///
+    /// The caller owns rollback and decides when successful publication may
+    /// mark the writer model clean.
+    fn materialize_presentation(&mut self) -> Result<bool> {
+        let should_update = self
+            .mutable_pres
+            .as_ref()
+            .is_some_and(MutablePresentation::is_modified);
+        if !should_update {
+            return Ok(false);
+        }
+
+        let Some(presentation) = self.mutable_pres.take() else {
+            return Ok(false);
         };
-        let original = self.opc.clone();
         let result = (|| {
             // The legacy writer replaces presentation.xml and its
             // relationships. Detach the typed graph first, then republish it
@@ -1586,13 +1951,8 @@ impl Package {
             Ok(())
         })();
 
-        if result.is_ok() {
-            presentation.mark_clean();
-        } else {
-            self.opc = original;
-        }
         self.mutable_pres = Some(presentation);
-        result
+        result.map(|()| true)
     }
 
     /// Update presentation parts with modified data.
@@ -2285,25 +2645,478 @@ mod tests {
         );
     }
 
+    #[test]
+    fn handout_theme_allocation_does_not_overwrite_an_existing_theme() {
+        let output = NamedTempFile::with_suffix(".pptx").unwrap();
+        let mut package = Package::new().unwrap();
+        let default_theme_uri = PackURI::new("/ppt/theme/theme1.xml").unwrap();
+        let occupied_theme_uri = PackURI::new("/ppt/theme/theme3.xml").unwrap();
+        let default_theme = package
+            .opc
+            .get_part(&default_theme_uri)
+            .unwrap()
+            .blob()
+            .to_vec();
+        package
+            .opc
+            .add_part(Box::new(litchi_opc::part::BlobPart::new(
+                occupied_theme_uri,
+                ct::OFC_THEME.to_owned(),
+                default_theme,
+            )));
+        package
+            .presentation_mut()
+            .unwrap()
+            .set_handout_master(crate::pptx::HandoutMaster::new());
+        package.save(output.path()).unwrap();
+
+        let reopened = Package::open(output.path()).unwrap();
+        let handout_uri = PackURI::new("/ppt/handoutMasters/handoutMaster1.xml").unwrap();
+        let handout = reopened.opc().unwrap().get_part(&handout_uri).unwrap();
+        let theme = handout
+            .rels()
+            .iter()
+            .find(|relationship| {
+                relationship.reltype() == litchi_opc::constants::relationship_type::THEME
+            })
+            .expect("handout theme relationship");
+        assert_eq!(theme.target_ref(), "../theme/theme4.xml");
+        assert!(
+            reopened
+                .opc()
+                .unwrap()
+                .contains_part(&PackURI::new("/ppt/theme/theme4.xml").unwrap())
+        );
+    }
+
+    #[test]
+    fn failed_publication_restores_package_and_retains_dirty_intent() {
+        let presentation_uri = PackURI::new("/ppt/presentation.xml").unwrap();
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        package.put_props(Props::new().title("Retry title"));
+        let original = package.opc.get_part(&presentation_uri).unwrap().blob_arc();
+
+        let error = package
+            .write_with::<()>(|staged| {
+                let presentation = staged.get_part(&presentation_uri)?.blob();
+                assert!(memchr::memmem::find(presentation, b"<p:sldId ").is_some());
+                assert_eq!(
+                    litchi_ooxml_common::properties::read(staged)?.and_then(|props| props.title),
+                    Some("Retry title".to_owned())
+                );
+                Err(OoxmlError::Io(std::io::Error::other(
+                    "injected sink failure",
+                )))
+            })
+            .unwrap_err();
+        assert!(matches!(error, OoxmlError::Io(_)));
+
+        let restored = package.opc.get_part(&presentation_uri).unwrap().blob_arc();
+        assert!(std::sync::Arc::ptr_eq(&original, &restored));
+        assert!(
+            package
+                .mutable_pres
+                .as_ref()
+                .is_some_and(MutablePresentation::is_modified)
+        );
+        assert!(package.properties.is_dirty());
+
+        let file = NamedTempFile::with_suffix(".pptx").unwrap();
+        package.save(file.path()).unwrap();
+        assert!(
+            !package
+                .mutable_pres
+                .as_ref()
+                .is_some_and(MutablePresentation::is_modified)
+        );
+        assert!(!package.properties.is_dirty());
+        let reopened = Package::open(file.path()).unwrap();
+        assert_eq!(
+            reopened.props().and_then(|props| props.title.as_deref()),
+            Some("Retry title")
+        );
+    }
+
+    #[test]
+    fn raw_opc_access_rejects_pending_facade_state() {
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+
+        assert!(matches!(
+            package.opc(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "opc",
+                ..
+            })
+        ));
+        assert!(matches!(
+            package.edit_opc(|_| Ok(())),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "edit_opc",
+                ..
+            })
+        ));
+
+        let bytes = package.to_bytes().unwrap();
+        assert!(!bytes.is_empty());
+        assert!(package.opc().is_ok());
+
+        package.put_props(Props::new().title("pending"));
+        assert!(matches!(
+            package.opc(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "opc",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn raw_transaction_disables_the_legacy_writer_after_commit() {
+        let mut package = Package::new().unwrap();
+        package.edit_opc(|_| Ok(())).unwrap();
+        assert!(matches!(
+            package.presentation_mut(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "presentation_mut",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn failed_raw_transaction_rolls_back_and_keeps_the_writer_available() {
+        let presentation_uri = PackURI::new("/ppt/presentation.xml").unwrap();
+        let mut package = Package::new().unwrap();
+        let original = package.opc.get_part(&presentation_uri).unwrap().blob_arc();
+
+        let error = package
+            .edit_opc(|candidate| {
+                candidate
+                    .get_part_mut(&presentation_uri)?
+                    .set_blob(b"not a presentation".to_vec());
+                Err::<(), _>(OoxmlError::InvalidFormat("injected raw failure".to_owned()))
+            })
+            .unwrap_err();
+        assert!(matches!(error, OoxmlError::InvalidFormat(_)));
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            &package.opc.get_part(&presentation_uri).unwrap().blob_arc()
+        ));
+        assert!(package.presentation_mut().is_ok());
+    }
+
+    #[test]
+    fn raw_transaction_reloads_core_properties_before_commit() {
+        let mut package = Package::new().unwrap();
+        package
+            .edit_opc(|candidate| {
+                litchi_ooxml_common::properties::write(
+                    candidate,
+                    Props::new().title("Raw transaction title"),
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        assert_eq!(
+            package.props().and_then(|props| props.title.as_deref()),
+            Some("Raw transaction title")
+        );
+        assert!(matches!(
+            package.presentation_mut(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "presentation_mut",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn raw_transaction_rejects_invalid_main_graph_without_committing() {
+        let presentation_uri = PackURI::new("/ppt/presentation.xml").unwrap();
+        let mut package = Package::new().unwrap();
+        let error = package
+            .edit_opc(|candidate| {
+                assert!(candidate.remove_part(&presentation_uri));
+                Ok(())
+            })
+            .unwrap_err();
+
+        assert!(matches!(error, OoxmlError::PartNotFound(_)));
+        assert!(package.opc.get_part(&presentation_uri).is_ok());
+        assert!(package.presentation_mut().is_ok());
+    }
+
+    #[test]
+    fn canonical_tag_and_master_edits_disable_the_legacy_writer() {
+        let mut tags = Package::new().unwrap();
+        tags.presentation_mut().unwrap().add_slide().unwrap();
+        tags.to_bytes().unwrap();
+        tags.put_tags(0, tag::List::new()).unwrap();
+        assert!(matches!(
+            tags.presentation_mut(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "presentation_mut",
+                ..
+            })
+        ));
+
+        let mut masters = Package::new().unwrap();
+        masters.add_slide_master().unwrap();
+        assert!(matches!(
+            masters.presentation_mut(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "presentation_mut",
+                ..
+            })
+        ));
+    }
+
     #[cfg(feature = "fonts")]
     #[test]
-    fn opened_presentation_font_embedding_fails_without_a_complete_model() {
+    fn canonical_edit_rejects_even_a_synchronized_automatic_font_policy() {
+        let mut package = Package::new().unwrap();
+        package
+            .set_font_embedding(litchi_opc::FontEmbedding::Subset)
+            .unwrap();
+        package.to_bytes().unwrap();
+        assert!(!package.font_sync_pending);
+
+        assert!(matches!(
+            package.add_slide_master(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "add_slide_master",
+                ..
+            })
+        ));
+        package
+            .set_font_embedding(litchi_opc::FontEmbedding::None)
+            .unwrap();
+        package.add_slide_master().unwrap();
+    }
+
+    #[test]
+    fn canonical_slide_mutators_reject_a_dirty_legacy_writer() {
+        let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+
+        assert!(matches!(
+            package.add_ink_annotation(&slide, b""),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "add_ink_annotation",
+                ..
+            })
+        ));
+        assert!(matches!(
+            package.add_laser_trace(&slide, &[]),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "add_laser_trace",
+                ..
+            })
+        ));
+        assert!(matches!(
+            package.add_slide_show_events(&slide, &[]),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "add_slide_show_events",
+                ..
+            })
+        ));
+        assert!(matches!(
+            package.add_ole_object(
+                slide.as_str(),
+                crate::pptx::ole::PptxOlePayloadKind::OleObject,
+                None,
+                None,
+                crate::pptx::ole_object::OleObjectFrame::new(0, 0, 1, 1),
+                b"",
+            ),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "add_ole_object",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn successful_canonical_slide_edit_disables_the_legacy_writer() {
+        let file = NamedTempFile::with_suffix(".pptx").unwrap();
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        package.save(file.path()).unwrap();
+
+        package
+            .add_ole_object(
+                "/ppt/slides/slide1.xml",
+                crate::pptx::ole::PptxOlePayloadKind::Package,
+                None,
+                None,
+                crate::pptx::ole_object::OleObjectFrame::new(0, 0, 1, 1),
+                b"opaque",
+            )
+            .unwrap();
+        assert!(matches!(
+            package.presentation_mut(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "presentation_mut",
+                ..
+            })
+        ));
+    }
+
+    #[cfg(feature = "encryption")]
+    #[test]
+    fn failed_encrypted_file_sink_keeps_edits_retryable() {
+        const PASSWORD: &str = "transaction retry password";
+
+        let directory = tempfile::tempdir().unwrap();
+        let missing_parent = directory.path().join("missing").join("failed.pptx");
+        let output = directory.path().join("retry.pptx");
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        package.put_props(Props::new().title("Encrypted retry"));
+
+        assert!(
+            package
+                .save_encrypted(&missing_parent, PASSWORD, Mode::Agile)
+                .is_err()
+        );
+        assert!(!missing_parent.exists());
+        assert_eq!(package.encryption(), None);
+        assert!(
+            package
+                .mutable_pres
+                .as_ref()
+                .is_some_and(MutablePresentation::is_modified)
+        );
+        assert!(package.properties.is_dirty());
+
+        package
+            .save_encrypted(&output, PASSWORD, Mode::Agile)
+            .unwrap();
+        assert_eq!(package.encryption(), Some(Mode::Agile));
+        assert!(
+            !package
+                .mutable_pres
+                .as_ref()
+                .is_some_and(MutablePresentation::is_modified)
+        );
+        assert!(!package.properties.is_dirty());
+
+        let reopened = Package::open_with_password(&output, PASSWORD).unwrap();
+        assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 1);
+        assert_eq!(
+            reopened.props().and_then(|props| props.title.as_deref()),
+            Some("Encrypted retry")
+        );
+    }
+
+    #[cfg(feature = "encryption")]
+    #[test]
+    fn encrypted_source_rejects_raw_plaintext_access() {
+        const PASSWORD: &str = "raw access guard password";
+
+        let mut source = Package::new().unwrap();
+        let encrypted = source.to_encrypted(PASSWORD, Mode::Agile).unwrap();
+        let mut package =
+            Package::from_reader_with_password(std::io::Cursor::new(encrypted), PASSWORD).unwrap();
+
+        assert!(matches!(
+            package.opc(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "opc",
+                ..
+            })
+        ));
+        assert!(matches!(
+            package.edit_opc(|_| Ok(())),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "edit_opc",
+                ..
+            })
+        ));
+        assert!(matches!(
+            package.to_bytes(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "to_bytes",
+                ..
+            })
+        ));
+        assert!(!package.to_plain_bytes().unwrap().is_empty());
+    }
+
+    #[cfg(feature = "fonts")]
+    #[test]
+    fn opened_presentation_rejects_font_embedding_policy_immediately() {
         let file = NamedTempFile::with_suffix(".pptx").unwrap();
         let mut source = Package::new().unwrap();
         source.presentation_mut().unwrap().add_slide().unwrap();
         source.save(file.path()).unwrap();
 
         let mut opened = Package::open(file.path()).unwrap();
-        opened
-            .opc_package_mut()
-            .with_fonts(litchi_opc::FontEmbedding::Subset);
         assert!(matches!(
-            opened.embed_fonts(),
+            opened.set_font_embedding(litchi_opc::FontEmbedding::Subset),
             Err(OoxmlError::UnsafeEdit {
-                operation: "embed_fonts",
+                operation: "set_font_embedding",
                 ..
             })
         ));
+        assert_eq!(
+            opened.opc.save_options().fonts,
+            litchi_opc::FontEmbedding::None
+        );
+        assert!(!opened.font_sync_pending);
+    }
+
+    #[cfg(feature = "fonts")]
+    #[test]
+    fn font_policy_syncs_once_and_rearms_only_when_needed() {
+        let mut package = Package::new().unwrap();
+        package
+            .set_font_embedding(litchi_opc::FontEmbedding::Subset)
+            .unwrap();
+        assert!(package.font_sync_pending);
+        assert!(matches!(
+            package.opc(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "opc",
+                ..
+            })
+        ));
+
+        package.to_bytes().unwrap();
+        assert!(!package.font_sync_pending);
+        assert!(package.opc().is_ok());
+
+        package
+            .set_font_embedding(litchi_opc::FontEmbedding::Subset)
+            .unwrap();
+        assert!(!package.font_sync_pending);
+        package.to_bytes().unwrap();
+        assert!(!package.font_sync_pending);
+
+        let _ = package.presentation_mut().unwrap();
+        assert!(package.font_sync_pending);
+        package.to_bytes().unwrap();
+        assert!(!package.font_sync_pending);
+
+        package
+            .set_font_embedding(litchi_opc::FontEmbedding::Full)
+            .unwrap();
+        assert!(package.font_sync_pending);
+        let error = package
+            .write_with::<()>(|_| {
+                Err(OoxmlError::Io(std::io::Error::other(
+                    "injected font publication failure",
+                )))
+            })
+            .unwrap_err();
+        assert!(matches!(error, OoxmlError::Io(_)));
+        assert!(package.font_sync_pending);
+        package.to_bytes().unwrap();
+        assert!(!package.font_sync_pending);
     }
 
     #[test]

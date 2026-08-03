@@ -26,7 +26,7 @@ fn package_inventory_accepts_strict_chart_relationships() {
     let mut package = generated_package();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let (relationship_id, target) = {
-        let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
+        let slide = package.opc().unwrap().get_part(&slide_name).unwrap();
         let relationship = slide
             .rels()
             .iter()
@@ -38,11 +38,19 @@ fn package_inventory_accepts_strict_chart_relationships() {
         )
     };
 
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    assert!(slide.rels_mut().remove(&relationship_id).is_some());
-    slide
-        .rels_mut()
-        .add_relationship(STRICT_CHART.to_string(), target, relationship_id, false);
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name).unwrap();
+            assert!(slide.rels_mut().remove(&relationship_id).is_some());
+            slide.rels_mut().add_relationship(
+                STRICT_CHART.to_string(),
+                target,
+                relationship_id,
+                false,
+            );
+            Ok(())
+        })
+        .unwrap();
 
     let charts = package.charts().unwrap();
     assert_eq!(charts.len(), 1);
@@ -53,7 +61,11 @@ fn package_inventory_accepts_strict_chart_relationships() {
 fn package_inventory_rejects_missing_chart_targets() {
     let mut package = generated_package();
     let chart_name = PackURI::new("/ppt/charts/chart1.xml").unwrap();
-    assert!(package.opc_package_mut().remove_part(&chart_name));
+    assert!(
+        package
+            .edit_opc(|opc| Ok(opc.remove_part(&chart_name)))
+            .unwrap()
+    );
 
     let error = package.charts().unwrap_err();
     assert!(matches!(

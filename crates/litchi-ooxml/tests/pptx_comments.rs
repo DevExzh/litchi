@@ -47,14 +47,19 @@ fn presentation_comments_are_typed_and_legacy_adapters_preserve_data() {
 fn legacy_comment_adapter_rejects_external_comment_relationships() {
     let mut package = package_with_comments();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    slide.rels_mut().remove("rIdComments");
-    slide.rels_mut().add_relationship(
-        rt::COMMENTS.to_string(),
-        "https://example.invalid/comments.xml".to_string(),
-        "rIdComments".to_string(),
-        true,
-    );
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name).unwrap();
+            slide.rels_mut().remove("rIdComments");
+            slide.rels_mut().add_relationship(
+                rt::COMMENTS.to_string(),
+                "https://example.invalid/comments.xml".to_string(),
+                "rIdComments".to_string(),
+                true,
+            );
+            Ok(())
+        })
+        .unwrap();
 
     assert!(matches!(
         package.presentation().unwrap().get_comments(),
@@ -70,50 +75,48 @@ fn package_with_comments() -> Package {
     let authors_name = PackURI::new("/ppt/commentAuthors.xml").unwrap();
     let comments_name = PackURI::new("/ppt/comments/comment1.xml").unwrap();
 
-    {
-        let presentation = package
-            .opc_package_mut()
-            .get_part_mut(&presentation_name)
-            .unwrap();
-        presentation.set_blob(PRESENTATION_XML.to_vec());
-        presentation.rels_mut().add_relationship(
-            rt::SLIDE.to_string(),
-            "slides/slide1.xml".to_string(),
-            "rIdSlideOne".to_string(),
-            false,
-        );
-        presentation.rels_mut().add_relationship(
-            rt::COMMENT_AUTHORS.to_string(),
-            "commentAuthors.xml".to_string(),
-            "rIdCommentAuthors".to_string(),
-            false,
-        );
-    }
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        slide_name.clone(),
-        ct::PML_SLIDE.to_string(),
-        SLIDE_XML.to_vec(),
-    )));
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        authors_name,
-        ct::PML_COMMENT_AUTHORS.to_string(),
-        AUTHORS_XML.to_vec(),
-    )));
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        comments_name,
-        ct::PML_COMMENTS.to_string(),
-        COMMENTS_XML.to_vec(),
-    )));
     package
-        .opc_package_mut()
-        .get_part_mut(&slide_name)
-        .unwrap()
-        .rels_mut()
-        .add_relationship(
-            rt::COMMENTS.to_string(),
-            "../comments/comment1.xml".to_string(),
-            "rIdComments".to_string(),
-            false,
-        );
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.set_blob(PRESENTATION_XML.to_vec());
+            presentation.rels_mut().add_relationship(
+                rt::SLIDE.to_string(),
+                "slides/slide1.xml".to_string(),
+                "rIdSlideOne".to_string(),
+                false,
+            );
+            presentation.rels_mut().add_relationship(
+                rt::COMMENT_AUTHORS.to_string(),
+                "commentAuthors.xml".to_string(),
+                "rIdCommentAuthors".to_string(),
+                false,
+            );
+            opc.add_part(Box::new(BlobPart::new(
+                slide_name.clone(),
+                ct::PML_SLIDE.to_string(),
+                SLIDE_XML.to_vec(),
+            )));
+            opc.add_part(Box::new(BlobPart::new(
+                authors_name,
+                ct::PML_COMMENT_AUTHORS.to_string(),
+                AUTHORS_XML.to_vec(),
+            )));
+            opc.add_part(Box::new(BlobPart::new(
+                comments_name,
+                ct::PML_COMMENTS.to_string(),
+                COMMENTS_XML.to_vec(),
+            )));
+            opc.get_part_mut(&slide_name)
+                .unwrap()
+                .rels_mut()
+                .add_relationship(
+                    rt::COMMENTS.to_string(),
+                    "../comments/comment1.xml".to_string(),
+                    "rIdComments".to_string(),
+                    false,
+                );
+            Ok(())
+        })
+        .unwrap();
     package
 }

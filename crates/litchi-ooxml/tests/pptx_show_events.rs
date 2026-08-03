@@ -76,10 +76,15 @@ fn package_with_show_event_extension(extension: &str) -> Package {
 
     let mut package = Package::open(output.path()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    let xml = std::str::from_utf8(slide.blob()).unwrap();
-    let updated = xml.replacen("</p:sld>", &format!("{extension}</p:sld>"), 1);
-    assert_ne!(updated, xml);
-    slide.set_blob(updated.into_bytes());
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            let xml = std::str::from_utf8(slide.blob()).unwrap();
+            let updated = xml.replacen("</p:sld>", &format!("{extension}</p:sld>"), 1);
+            assert_ne!(updated, xml);
+            slide.set_blob(updated.into_bytes());
+            Ok(())
+        })
+        .unwrap();
     package
 }

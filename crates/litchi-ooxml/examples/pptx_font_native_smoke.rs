@@ -134,7 +134,7 @@ fn verify(path: &Path, expected_text: &[u8], payload: Payload) -> Result<()> {
         Payload::Exact => {},
     }
 
-    let opc = package.opc_package();
+    let opc = package.opc()?;
     let mut font_parts = opc
         .iter_parts()
         .filter(|part| part.content_type() == FONT_DATA);

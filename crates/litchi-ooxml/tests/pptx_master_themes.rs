@@ -33,7 +33,8 @@ fn master_theme_accessor_rejects_external_theme_relationships() {
     let mut package = package_with_slide();
     let master_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
     let relationship_id = package
-        .opc_package()
+        .opc()
+        .unwrap()
         .get_part(&master_name)
         .unwrap()
         .rels()
@@ -42,17 +43,19 @@ fn master_theme_accessor_rejects_external_theme_relationships() {
         .unwrap()
         .r_id()
         .to_string();
-    let master = package
-        .opc_package_mut()
-        .get_part_mut(&master_name)
+    package
+        .edit_opc(|opc| {
+            let master = opc.get_part_mut(&master_name)?;
+            master.rels_mut().remove(&relationship_id);
+            master.rels_mut().add_relationship(
+                rt::THEME.to_string(),
+                "https://example.invalid/theme.xml".to_string(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
         .unwrap();
-    master.rels_mut().remove(&relationship_id);
-    master.rels_mut().add_relationship(
-        rt::THEME.to_string(),
-        "https://example.invalid/theme.xml".to_string(),
-        relationship_id,
-        true,
-    );
 
     let presentation = package.presentation().unwrap();
     let masters = presentation.slide_masters().unwrap();

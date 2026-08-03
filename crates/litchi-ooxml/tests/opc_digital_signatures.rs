@@ -47,7 +47,7 @@ fn digital_signature_mutable_opc_access_drops_stale_signatures() {
     assert!(xlsx.signatures_with(&policy).unwrap().is_empty());
 
     let mut pptx = litchi_ooxml::pptx::Package::from_reader(Cursor::new(PPTX)).unwrap();
-    let _ = pptx.opc_package_mut();
+    pptx.edit_opc(|_| Ok(())).unwrap();
     assert!(!pptx.is_signed());
     assert!(pptx.signatures_with(&policy).unwrap().is_empty());
 }

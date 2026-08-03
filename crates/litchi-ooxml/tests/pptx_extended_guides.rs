@@ -37,9 +37,12 @@ fn package_with_presentation_xml(xml: &[u8]) -> Package {
     let mut package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
-        .unwrap()
-        .set_blob(xml.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&presentation_name)
+                .unwrap()
+                .set_blob(xml.to_vec());
+            Ok(())
+        })
+        .unwrap();
     package
 }

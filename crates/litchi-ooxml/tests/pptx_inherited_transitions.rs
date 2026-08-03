@@ -38,7 +38,8 @@ fn master_layout_inventory_rejects_external_layout_relationships() {
     let mut package = Package::new().unwrap();
     let master_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
     let relationship_id = package
-        .opc_package()
+        .opc()
+        .unwrap()
         .get_part(&master_name)
         .unwrap()
         .rels()
@@ -47,17 +48,19 @@ fn master_layout_inventory_rejects_external_layout_relationships() {
         .unwrap()
         .r_id()
         .to_string();
-    let master = package
-        .opc_package_mut()
-        .get_part_mut(&master_name)
+    package
+        .edit_opc(|opc| {
+            let master = opc.get_part_mut(&master_name).unwrap();
+            master.rels_mut().remove(&relationship_id);
+            master.rels_mut().add_relationship(
+                rt::SLIDE_LAYOUT.to_string(),
+                "https://example.invalid/slide-layout.xml".to_string(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
         .unwrap();
-    master.rels_mut().remove(&relationship_id);
-    master.rels_mut().add_relationship(
-        rt::SLIDE_LAYOUT.to_string(),
-        "https://example.invalid/slide-layout.xml".to_string(),
-        relationship_id,
-        true,
-    );
 
     let presentation = package.presentation().unwrap();
     let masters = presentation.slide_masters().unwrap();
@@ -76,7 +79,8 @@ fn slide_layout_accessor_rejects_external_layout_relationships() {
     let mut package = Package::open(output.path()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let relationship_id = package
-        .opc_package()
+        .opc()
+        .unwrap()
         .get_part(&slide_name)
         .unwrap()
         .rels()
@@ -85,14 +89,19 @@ fn slide_layout_accessor_rejects_external_layout_relationships() {
         .unwrap()
         .r_id()
         .to_string();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    slide.rels_mut().remove(&relationship_id);
-    slide.rels_mut().add_relationship(
-        rt::SLIDE_LAYOUT.to_string(),
-        "https://example.invalid/slide-layout.xml".to_string(),
-        relationship_id,
-        true,
-    );
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name).unwrap();
+            slide.rels_mut().remove(&relationship_id);
+            slide.rels_mut().add_relationship(
+                rt::SLIDE_LAYOUT.to_string(),
+                "https://example.invalid/slide-layout.xml".to_string(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
+        .unwrap();
 
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
@@ -111,7 +120,8 @@ fn layout_master_accessor_rejects_external_master_relationships() {
     let mut package = Package::open(output.path()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let layout_name = package
-        .opc_package()
+        .opc()
+        .unwrap()
         .get_part(&slide_name)
         .unwrap()
         .rels()
@@ -121,7 +131,8 @@ fn layout_master_accessor_rejects_external_master_relationships() {
         .target_partname()
         .unwrap();
     let relationship_id = package
-        .opc_package()
+        .opc()
+        .unwrap()
         .get_part(&layout_name)
         .unwrap()
         .rels()
@@ -130,17 +141,19 @@ fn layout_master_accessor_rejects_external_master_relationships() {
         .unwrap()
         .r_id()
         .to_string();
-    let layout = package
-        .opc_package_mut()
-        .get_part_mut(&layout_name)
+    package
+        .edit_opc(|opc| {
+            let layout = opc.get_part_mut(&layout_name).unwrap();
+            layout.rels_mut().remove(&relationship_id);
+            layout.rels_mut().add_relationship(
+                rt::SLIDE_MASTER.to_string(),
+                "https://example.invalid/slide-master.xml".to_string(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
         .unwrap();
-    layout.rels_mut().remove(&relationship_id);
-    layout.rels_mut().add_relationship(
-        rt::SLIDE_MASTER.to_string(),
-        "https://example.invalid/slide-master.xml".to_string(),
-        relationship_id,
-        true,
-    );
 
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
@@ -162,16 +175,21 @@ fn package_with_inherited_transition_fragment(fragment: &str) -> Package {
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
-    for (part_name, end_tag) in [
-        ("/ppt/slideLayouts/slideLayout1.xml", "</p:sldLayout>"),
-        ("/ppt/slideMasters/slideMaster1.xml", "</p:sldMaster>"),
-    ] {
-        let part_name = PackURI::new(part_name).unwrap();
-        let part = package.opc_package_mut().get_part_mut(&part_name).unwrap();
-        let xml = std::str::from_utf8(part.blob()).unwrap();
-        let updated = xml.replacen(end_tag, &format!("{fragment}{end_tag}"), 1);
-        assert_ne!(updated, xml);
-        part.set_blob(updated.into_bytes());
-    }
+    package
+        .edit_opc(|opc| {
+            for (part_name, end_tag) in [
+                ("/ppt/slideLayouts/slideLayout1.xml", "</p:sldLayout>"),
+                ("/ppt/slideMasters/slideMaster1.xml", "</p:sldMaster>"),
+            ] {
+                let part_name = PackURI::new(part_name).unwrap();
+                let part = opc.get_part_mut(&part_name).unwrap();
+                let xml = std::str::from_utf8(part.blob()).unwrap();
+                let updated = xml.replacen(end_tag, &format!("{fragment}{end_tag}"), 1);
+                assert_ne!(updated, xml);
+                part.set_blob(updated.into_bytes());
+            }
+            Ok(())
+        })
+        .unwrap();
     package
 }

@@ -987,65 +987,76 @@ mod tests {
 
     fn package_with_slides() -> crate::pptx::Package {
         let mut package = crate::pptx::Package::new().unwrap();
-        let opc = package.opc_package_mut();
-        let presentation_name = opc.main_document_part().unwrap().partname().clone();
-        let mut xml = std::str::from_utf8(opc.get_part(&presentation_name).unwrap().blob())
-            .unwrap()
-            .to_owned();
-        let marker = "<p:sldSz";
-        let offset = xml.find(marker).unwrap();
-        xml.insert_str(
-            offset,
-            "<!--preserve--><p:sldIdLst><p:sldId id=\"256\" r:id=\"rIdSlideA\"/><p:sldId id=\"300\" r:id=\"slide-beta\"/></p:sldIdLst>",
-        );
-        opc.get_part_mut(&presentation_name)
-            .unwrap()
-            .set_blob(xml.into_bytes());
-        opc.get_part_mut(&presentation_name)
-            .unwrap()
-            .rels_mut()
-            .add_relationship(
-                relationship_type::SLIDE.into(),
-                "slides/slide1.xml".into(),
-                "rIdSlideA".into(),
-                false,
-            );
-        opc.get_part_mut(&presentation_name)
-            .unwrap()
-            .rels_mut()
-            .add_relationship(
-                relationship_type::SLIDE.into(),
-                "slides/slide2.xml".into(),
-                "slide-beta".into(),
-                false,
-            );
-        for index in 1..=2 {
-            let uri = PackURI::new(format!("/ppt/slides/slide{index}.xml")).unwrap();
-            opc.add_part(Box::new(BlobPart::new(
-                uri,
-                "application/vnd.openxmlformats-officedocument.presentationml.slide+xml".into(),
-                b"<p:sld xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"><p:cSld/><p:clrMapOvr><a:masterClrMapping xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"/></p:clrMapOvr></p:sld>".to_vec(),
-            )));
-        }
+        package
+            .edit_opc(|opc| {
+                let presentation_name = opc.main_document_part().unwrap().partname().clone();
+                let mut xml = std::str::from_utf8(opc.get_part(&presentation_name).unwrap().blob())
+                    .unwrap()
+                    .to_owned();
+                let marker = "<p:sldSz";
+                let offset = xml.find(marker).unwrap();
+                xml.insert_str(
+                    offset,
+                    "<!--preserve--><p:sldIdLst><p:sldId id=\"256\" r:id=\"rIdSlideA\"/><p:sldId id=\"300\" r:id=\"slide-beta\"/></p:sldIdLst>",
+                );
+                opc.get_part_mut(&presentation_name)
+                    .unwrap()
+                    .set_blob(xml.into_bytes());
+                opc.get_part_mut(&presentation_name)
+                    .unwrap()
+                    .rels_mut()
+                    .add_relationship(
+                        relationship_type::SLIDE.into(),
+                        "slides/slide1.xml".into(),
+                        "rIdSlideA".into(),
+                        false,
+                    );
+                opc.get_part_mut(&presentation_name)
+                    .unwrap()
+                    .rels_mut()
+                    .add_relationship(
+                        relationship_type::SLIDE.into(),
+                        "slides/slide2.xml".into(),
+                        "slide-beta".into(),
+                        false,
+                    );
+                for index in 1..=2 {
+                    let uri = PackURI::new(format!("/ppt/slides/slide{index}.xml")).unwrap();
+                    opc.add_part(Box::new(BlobPart::new(
+                        uri,
+                        "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"
+                            .into(),
+                        b"<p:sld xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"><p:cSld/><p:clrMapOvr><a:masterClrMapping xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"/></p:clrMapOvr></p:sld>".to_vec(),
+                    )));
+                }
+                Ok(())
+            })
+            .unwrap();
         package
     }
 
     #[test]
     fn generated_package_crud_preserves_relationship_ids_and_unknown_xml() {
         let mut package = package_with_slides();
-        add_custom_show(
-            package.opc_package_mut(),
-            CustomShow::new(7, "Roadshow").with_slides(vec![300, 256]),
-        )
-        .unwrap();
-        let section_id = add_section(
-            package.opc_package_mut(),
-            Section::new("Opening", "{11111111-1111-1111-1111-111111111111}")
-                .with_slides([256, 300]),
-        )
-        .unwrap();
+        package
+            .edit_opc(|opc| {
+                add_custom_show(
+                    opc,
+                    CustomShow::new(7, "Roadshow").with_slides(vec![300, 256]),
+                )
+            })
+            .unwrap();
+        let section_id = package
+            .edit_opc(|opc| {
+                add_section(
+                    opc,
+                    Section::new("Opening", "{11111111-1111-1111-1111-111111111111}")
+                        .with_slides([256, 300]),
+                )
+            })
+            .unwrap();
         assert_eq!(section_id, "{11111111-1111-1111-1111-111111111111}");
-        let graph = load_presentation_structure(package.opc_package()).unwrap();
+        let graph = load_presentation_structure(package.opc().unwrap()).unwrap();
         assert_eq!(
             graph.custom_shows.get_by_id(7).unwrap().slide_ids,
             vec![300, 256]
@@ -1054,60 +1065,75 @@ mod tests {
             graph.sections.get_by_id(&section_id).unwrap().slide_ids,
             vec![256, 300]
         );
-        let xml = std::str::from_utf8(package.opc_package().main_document_part().unwrap().blob())
+        let xml = std::str::from_utf8(package.opc().unwrap().main_document_part().unwrap().blob())
             .unwrap();
         assert!(xml.contains("r:id=\"slide-beta\""));
         assert!(xml.contains("<!--preserve-->"));
 
-        reorder_custom_show_slides(package.opc_package_mut(), 7, &[256, 300]).unwrap();
-        remove_custom_show_slide(package.opc_package_mut(), 7, 300).unwrap();
-        remove_section_slide(package.opc_package_mut(), &section_id, 300).unwrap();
+        package
+            .edit_opc(|opc| reorder_custom_show_slides(opc, 7, &[256, 300]))
+            .unwrap();
+        package
+            .edit_opc(|opc| remove_custom_show_slide(opc, 7, 300))
+            .unwrap();
+        package
+            .edit_opc(|opc| remove_section_slide(opc, &section_id, 300))
+            .unwrap();
         assert_eq!(
-            find_custom_show(package.opc_package(), 7)
+            find_custom_show(package.opc().unwrap(), 7)
                 .unwrap()
                 .unwrap()
                 .slide_ids,
             vec![256]
         );
         assert_eq!(
-            find_section(package.opc_package(), &section_id)
+            find_section(package.opc().unwrap(), &section_id)
                 .unwrap()
                 .unwrap()
                 .slide_ids,
             vec![256]
         );
-        assert!(remove_custom_show(package.opc_package_mut(), 7).unwrap());
-        assert!(remove_section(package.opc_package_mut(), &section_id).unwrap());
+        assert!(package.edit_opc(|opc| remove_custom_show(opc, 7)).unwrap());
+        assert!(
+            package
+                .edit_opc(|opc| remove_section(opc, &section_id))
+                .unwrap()
+        );
     }
 
     #[test]
     fn orphan_and_non_permutation_mutations_are_atomic() {
         let mut package = package_with_slides();
-        add_custom_show(
-            package.opc_package_mut(),
-            CustomShow::new(9, "Demo").with_slides(vec![256, 300]),
-        )
-        .unwrap();
+        package
+            .edit_opc(|opc| {
+                add_custom_show(opc, CustomShow::new(9, "Demo").with_slides(vec![256, 300]))
+            })
+            .unwrap();
         let before = package
-            .opc_package()
+            .opc()
+            .unwrap()
             .main_document_part()
             .unwrap()
             .blob()
             .to_vec();
-        assert!(reorder_custom_show_slides(package.opc_package_mut(), 9, &[256, 256]).is_err());
+        assert!(
+            package
+                .edit_opc(|opc| reorder_custom_show_slides(opc, 9, &[256, 256]))
+                .is_err()
+        );
         assert_eq!(
-            package.opc_package().main_document_part().unwrap().blob(),
+            package.opc().unwrap().main_document_part().unwrap().blob(),
             before
         );
         assert!(
-            add_custom_show(
-                package.opc_package_mut(),
-                CustomShow::new(10, "Broken").with_slides(vec![999]),
-            )
-            .is_err()
+            package
+                .edit_opc(|opc| {
+                    add_custom_show(opc, CustomShow::new(10, "Broken").with_slides(vec![999]))
+                })
+                .is_err()
         );
         assert_eq!(
-            package.opc_package().main_document_part().unwrap().blob(),
+            package.opc().unwrap().main_document_part().unwrap().blob(),
             before
         );
     }

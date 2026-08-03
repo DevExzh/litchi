@@ -7,6 +7,7 @@
 
 use litchi::drawing::chart::Chart;
 use litchi::drawing::chart::axis::{Axis, CategoryAxis, ValueAxis};
+use litchi::drawing::chart::bubble::{Scale as BubbleScale, Size as BubbleSize};
 use litchi::drawing::chart::data::{DataSourceRef, NumericData, RichText, StringData, TitleText};
 use litchi::drawing::chart::legend::Legend;
 use litchi::drawing::chart::plot_area::{
@@ -178,9 +179,9 @@ fn create_scatter_bubble_sheet(
     // Scatter chart
     let scatter_chart = WorksheetChart::scatter_chart_with_cache(
         "Price vs Sales",
-        "Scatter & Bubble!$A$2:$A$7",
+        "'Scatter & Bubble'!$A$2:$A$7",
         &prices,
-        "Scatter & Bubble!$B$2:$B$7",
+        "'Scatter & Bubble'!$B$2:$B$7",
         &sales,
         ChartAnchor::new(0, 5, 10, 17),
     )?;
@@ -189,9 +190,9 @@ fn create_scatter_bubble_sheet(
     // Bubble chart
     let bubble_chart = create_bubble_chart(
         "Price vs Sales (Bubble Size = Market)",
-        "Scatter & Bubble!$A$2:$A$7",
-        "Scatter & Bubble!$B$2:$B$7",
-        "Scatter & Bubble!$C$2:$C$7",
+        "'Scatter & Bubble'!$A$2:$A$7",
+        "'Scatter & Bubble'!$B$2:$B$7",
+        "'Scatter & Bubble'!$C$2:$C$7",
         ChartAnchor::new(12, 5, 22, 17),
     )?;
     sheet.add_chart(bubble_chart);
@@ -310,7 +311,9 @@ fn create_bubble_chart(
         format_code: None,
     });
 
-    let mut bubble_group = BubbleTypeGroup::new();
+    let mut bubble_group = BubbleTypeGroup::new()
+        .with_scale(BubbleScale::new(125)?)
+        .with_size(BubbleSize::Width);
     bubble_group.common.series.push(series);
 
     let x_axis = ValueAxis::new(1, AxisPosition::Bottom, 2);

@@ -166,23 +166,28 @@ fn style_removal_composes_with_a_new_deck_slide_edit() {
 }
 
 #[test]
-fn noncanonical_style_target_survives_the_legacy_writer() {
+fn noncanonical_style_target_survives_transactional_raw_save() {
     let mut package = Package::new().unwrap();
     let styles = package.remove_styles().unwrap().unwrap();
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        PackURI::new("/ppt/tableStyles.xml").unwrap(),
-        "application/xml".into(),
-        b"<occupied/>".to_vec(),
-    )));
+    package
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                PackURI::new("/ppt/tableStyles.xml").unwrap(),
+                "application/xml".into(),
+                b"<occupied/>".to_vec(),
+            )));
+            Ok(())
+        })
+        .unwrap();
     assert!(package.put_styles(styles).unwrap());
 
-    // Exercise a producer-selected style reference that occupies the writer's
-    // historical rId1 slide-master slot. The writer must retain this ID and
-    // make presentation XML point at the slide master's newly allocated ID.
+    // Exercise a producer-selected style reference that occupies the
+    // historical rId1 slide-master slot.
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let (master_id, master_target, style_id, style_target) = {
         let relationships = package
-            .opc_package()
+            .opc()
+            .unwrap()
             .get_part(&presentation_name)
             .unwrap()
             .rels();
@@ -201,27 +206,30 @@ fn noncanonical_style_target_survives_the_legacy_writer() {
             style.target_ref().to_owned(),
         )
     };
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name)?;
+            assert!(presentation.rels_mut().remove(&master_id).is_some());
+            assert!(presentation.rels_mut().remove(&style_id).is_some());
+            presentation.rels_mut().add_relationship(
+                rt::SLIDE_MASTER.into(),
+                master_target,
+                style_id,
+                false,
+            );
+            presentation.rels_mut().add_relationship(
+                rt::TABLE_STYLES.into(),
+                style_target,
+                master_id,
+                false,
+            );
+            Ok(())
+        })
         .unwrap();
-    assert!(presentation.rels_mut().remove(&master_id).is_some());
-    assert!(presentation.rels_mut().remove(&style_id).is_some());
-    presentation.rels_mut().add_relationship(
-        rt::SLIDE_MASTER.into(),
-        master_target,
-        style_id,
-        false,
-    );
-    presentation.rels_mut().add_relationship(
-        rt::TABLE_STYLES.into(),
-        style_target,
-        master_id,
-        false,
-    );
 
     let before = package
-        .opc_package()
+        .opc()
+        .unwrap()
         .main_document_part()
         .unwrap()
         .rels()
@@ -232,12 +240,19 @@ fn noncanonical_style_target_survives_the_legacy_writer() {
     let before_id = before.r_id().to_owned();
     assert_eq!(before_id, "rId1");
 
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    assert!(matches!(
+        package.presentation_mut(),
+        Err(OoxmlError::UnsafeEdit {
+            operation: "presentation_mut",
+            ..
+        })
+    ));
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     package.save(output.path()).unwrap();
     let reopened = Package::open(output.path()).unwrap();
     let after = reopened
-        .opc_package()
+        .opc()
+        .unwrap()
         .main_document_part()
         .unwrap()
         .rels()
@@ -247,40 +262,32 @@ fn noncanonical_style_target_survives_the_legacy_writer() {
     assert_eq!(after.r_id(), before_id);
     assert_eq!(after.target_ref(), "tableStyles2.xml");
     assert!(reopened.styles().unwrap().is_some());
-    assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 1);
+    assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 0);
 }
 
 #[test]
-fn strict_legacy_materialization_is_rejected_without_package_mutation() {
+fn strict_raw_edit_disables_the_transitional_legacy_writer() {
     let mut package = Package::new().unwrap();
     make_strict(&mut package);
     assert_eq!(
         package.styles().unwrap().unwrap().conformance(),
         Conformance::Strict
     );
-    package.presentation_mut().unwrap().add_slide().unwrap();
-    let before = PackageWriter::to_bytes(package.opc_package()).unwrap();
+    assert!(matches!(
+        package.presentation_mut(),
+        Err(OoxmlError::UnsafeEdit {
+            operation: "presentation_mut",
+            ..
+        })
+    ));
+    let before = PackageWriter::to_bytes(package.opc().unwrap()).unwrap();
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
 
-    assert!(matches!(
-        package.save(output.path()),
-        Err(OoxmlError::UnsafeEdit {
-            format: "PPTX",
-            operation: "materialize_presentation",
-            ..
-        })
-    ));
+    package.save(output.path()).unwrap();
     assert_eq!(
-        PackageWriter::to_bytes(package.opc_package()).unwrap(),
+        PackageWriter::to_bytes(package.opc().unwrap()).unwrap(),
         before
     );
-    assert!(matches!(
-        package.save(output.path()),
-        Err(OoxmlError::UnsafeEdit {
-            operation: "materialize_presentation",
-            ..
-        })
-    ));
 }
 
 fn make_strict(package: &mut Package) {
@@ -292,57 +299,61 @@ fn make_strict(package: &mut Package) {
     const STRICT_TABLE_STYLES: &str =
         "http://purl.oclc.org/ooxml/officeDocument/relationships/tableStyles";
 
-    let opc = package.opc_package_mut();
-    let (root_id, root_target) = opc
-        .rels()
-        .iter()
-        .find(|relationship| relationship.reltype() == rt::OFFICE_DOCUMENT)
-        .map(|relationship| {
-            (
-                relationship.r_id().to_owned(),
-                relationship.target_ref().to_owned(),
-            )
+    package
+        .edit_opc(|opc| {
+            let (root_id, root_target) = opc
+                .rels()
+                .iter()
+                .find(|relationship| relationship.reltype() == rt::OFFICE_DOCUMENT)
+                .map(|relationship| {
+                    (
+                        relationship.r_id().to_owned(),
+                        relationship.target_ref().to_owned(),
+                    )
+                })
+                .unwrap();
+            assert!(opc.rels_mut().remove(&root_id).is_some());
+            opc.rels_mut().add_relationship(
+                rt::STRICT_OFFICE_DOCUMENT.into(),
+                root_target,
+                root_id,
+                false,
+            );
+
+            let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
+            let (style_id, style_target) = opc
+                .get_part(&presentation_name)
+                .unwrap()
+                .rels()
+                .iter()
+                .find(|relationship| relationship.reltype() == rt::TABLE_STYLES)
+                .map(|relationship| {
+                    (
+                        relationship.r_id().to_owned(),
+                        relationship.target_ref().to_owned(),
+                    )
+                })
+                .unwrap();
+            let presentation = opc.get_part_mut(&presentation_name)?;
+            let presentation_xml = String::from_utf8(presentation.blob().to_vec())
+                .unwrap()
+                .replace(TRANSITIONAL_PRESENTATION, STRICT_PRESENTATION);
+            presentation.set_blob(presentation_xml.into_bytes());
+            assert!(presentation.rels_mut().remove(&style_id).is_some());
+            presentation.rels_mut().add_relationship(
+                STRICT_TABLE_STYLES.into(),
+                style_target,
+                style_id,
+                false,
+            );
+
+            let style_name = PackURI::new("/ppt/tableStyles.xml").unwrap();
+            let style = opc.get_part_mut(&style_name)?;
+            let style_xml = String::from_utf8(style.blob().to_vec())
+                .unwrap()
+                .replace(TRANSITIONAL_DRAWING, STRICT_DRAWING);
+            style.set_blob(style_xml.into_bytes());
+            Ok(())
         })
         .unwrap();
-    assert!(opc.rels_mut().remove(&root_id).is_some());
-    opc.rels_mut().add_relationship(
-        rt::STRICT_OFFICE_DOCUMENT.into(),
-        root_target,
-        root_id,
-        false,
-    );
-
-    let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let (style_id, style_target) = opc
-        .get_part(&presentation_name)
-        .unwrap()
-        .rels()
-        .iter()
-        .find(|relationship| relationship.reltype() == rt::TABLE_STYLES)
-        .map(|relationship| {
-            (
-                relationship.r_id().to_owned(),
-                relationship.target_ref().to_owned(),
-            )
-        })
-        .unwrap();
-    let presentation = opc.get_part_mut(&presentation_name).unwrap();
-    let presentation_xml = String::from_utf8(presentation.blob().to_vec())
-        .unwrap()
-        .replace(TRANSITIONAL_PRESENTATION, STRICT_PRESENTATION);
-    presentation.set_blob(presentation_xml.into_bytes());
-    assert!(presentation.rels_mut().remove(&style_id).is_some());
-    presentation.rels_mut().add_relationship(
-        STRICT_TABLE_STYLES.into(),
-        style_target,
-        style_id,
-        false,
-    );
-
-    let style_name = PackURI::new("/ppt/tableStyles.xml").unwrap();
-    let style = opc.get_part_mut(&style_name).unwrap();
-    let style_xml = String::from_utf8(style.blob().to_vec())
-        .unwrap()
-        .replace(TRANSITIONAL_DRAWING, STRICT_DRAWING);
-    style.set_blob(style_xml.into_bytes());
 }

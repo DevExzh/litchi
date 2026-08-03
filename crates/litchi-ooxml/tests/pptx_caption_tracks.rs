@@ -36,16 +36,19 @@ fn presentation_caption_tracks_reject_invalid_sources() {
     let mut package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
-        .unwrap()
-        .rels_mut()
-        .add_relationship(
-            TRACK_RELATIONSHIP_TYPE.to_string(),
-            "https://example.invalid/captions.vtt".to_string(),
-            "rIdCaptions".to_string(),
-            true,
-        );
+        .edit_opc(|opc| {
+            opc.get_part_mut(&presentation_name)
+                .unwrap()
+                .rels_mut()
+                .add_relationship(
+                    TRACK_RELATIONSHIP_TYPE.to_string(),
+                    "https://example.invalid/captions.vtt".to_string(),
+                    "rIdCaptions".to_string(),
+                    true,
+                );
+            Ok(())
+        })
+        .unwrap();
 
     assert!(matches!(
         package.presentation().unwrap().caption_tracks(),
@@ -58,26 +61,29 @@ fn package_with_internal_track() -> Package {
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let track_name = PackURI::new("/ppt/media/captions.vtt").unwrap();
 
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        slide_name.clone(),
-        ct::PML_SLIDE.to_string(),
-        SLIDE_XML.to_vec(),
-    )));
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        track_name,
-        TRACK_CONTENT_TYPE.to_string(),
-        TRACK_DATA.to_vec(),
-    )));
     package
-        .opc_package_mut()
-        .get_part_mut(&slide_name)
-        .unwrap()
-        .rels_mut()
-        .add_relationship(
-            TRACK_RELATIONSHIP_TYPE.to_string(),
-            "../media/captions.vtt".to_string(),
-            "rIdCaptions".to_string(),
-            false,
-        );
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                slide_name.clone(),
+                ct::PML_SLIDE.to_string(),
+                SLIDE_XML.to_vec(),
+            )));
+            opc.add_part(Box::new(BlobPart::new(
+                track_name,
+                TRACK_CONTENT_TYPE.to_string(),
+                TRACK_DATA.to_vec(),
+            )));
+            opc.get_part_mut(&slide_name)
+                .unwrap()
+                .rels_mut()
+                .add_relationship(
+                    TRACK_RELATIONSHIP_TYPE.to_string(),
+                    "../media/captions.vtt".to_string(),
+                    "rIdCaptions".to_string(),
+                    false,
+                );
+            Ok(())
+        })
+        .unwrap();
     package
 }

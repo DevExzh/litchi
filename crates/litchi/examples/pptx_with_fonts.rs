@@ -4,7 +4,7 @@
 //! font embedding and subsetting. Open the generated file in Microsoft PowerPoint
 //! to verify that fonts are properly embedded.
 
-use litchi::ooxml::pptx::Package;
+use litchi::ooxml::pptx::{FontEmbedding, Package};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -14,8 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut pkg = Package::new()?;
 
     // Enable font embedding with subsetting
-    pkg.opc_package_mut()
-        .with_fonts(litchi_opc::FontEmbedding::Subset);
+    pkg.set_font_embedding(FontEmbedding::Subset)?;
 
     // Get mutable presentation
     let pres = pkg.presentation_mut()?;

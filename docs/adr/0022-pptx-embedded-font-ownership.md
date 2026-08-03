@@ -111,7 +111,10 @@ only be populated from Rust `char`, so surrogates and values above `U+10FFFF`
 cannot enter through the public collector. Bold, italic, and bold-italic runs
 select their corresponding system face and publish the corresponding DOCX or
 PPTX face instead of being mislabeled Regular. Cmap failures propagate; request
-and result allocations are fallible and bounded at the adapter seam.
+and result allocations are fallible and bounded at the adapter seam. A
+font-kit memory handle transfers its original `Vec` allocation when its `Arc`
+is unique and clones only when another owner remains; path-backed handles keep
+their direct owned file read.
 
 OPC save configuration uses `FontEmbedding::{None, Full, Subset}` rather than
 two booleans, making `embed = false, subset = true` unrepresentable. Automatic
@@ -147,6 +150,9 @@ allocation.
 - Shared program bytes remain one allocation across faces, package snapshots,
   and publication. This is a structural memory property, not a throughput or
   cache-performance claim; ADR 0005 still requires measurements.
+- A uniquely owned in-memory system-font handle crosses the loader boundary by
+  move. Shared handles retain copy-on-ownership-conflict semantics rather than
+  invalidating another owner.
 - A valid face-less producer entry and repeated-rId graph remain representable.
   New authoring can choose the concise face-bearing constructor.
 - `x-font-ttf` is supported for standards preservation, but native PowerPoint

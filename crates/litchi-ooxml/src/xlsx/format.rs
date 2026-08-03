@@ -1,11 +1,13 @@
 //! Shared formatting types for XLSX (used in both reading and writing).
 
+use super::styles::border::Border;
+
 /// Cell format information.
 #[derive(Debug, Clone, Default)]
 pub struct CellFormat {
     pub font: Option<CellFont>,
     pub fill: Option<CellFill>,
-    pub border: Option<CellBorder>,
+    pub border: Option<Border>,
     pub number_format: Option<String>,
 }
 
@@ -77,64 +79,6 @@ impl CellFillPatternType {
             Self::DarkUp => "darkUp",
             Self::DarkGrid => "darkGrid",
             Self::DarkTrellis => "darkTrellis",
-        }
-    }
-}
-
-/// Border properties for a cell.
-#[derive(Debug, Clone, Default)]
-pub struct CellBorder {
-    pub left: Option<CellBorderSide>,
-    pub right: Option<CellBorderSide>,
-    pub top: Option<CellBorderSide>,
-    pub bottom: Option<CellBorderSide>,
-    pub diagonal: Option<CellBorderSide>,
-}
-
-/// Border side properties.
-#[derive(Debug, Clone)]
-pub struct CellBorderSide {
-    pub style: CellBorderLineStyle,
-    pub color: Option<String>,
-}
-
-/// Border line styles.
-#[derive(Debug, Clone, Copy)]
-pub enum CellBorderLineStyle {
-    None,
-    Thin,
-    Medium,
-    Dashed,
-    Dotted,
-    Thick,
-    Double,
-    Hair,
-    MediumDashed,
-    DashDot,
-    MediumDashDot,
-    DashDotDot,
-    MediumDashDotDot,
-    SlantDashDot,
-}
-
-impl CellBorderLineStyle {
-    #[allow(dead_code)]
-    pub(crate) fn as_str(&self) -> &'static str {
-        match self {
-            Self::None => "none",
-            Self::Thin => "thin",
-            Self::Medium => "medium",
-            Self::Dashed => "dashed",
-            Self::Dotted => "dotted",
-            Self::Thick => "thick",
-            Self::Double => "double",
-            Self::Hair => "hair",
-            Self::MediumDashed => "mediumDashed",
-            Self::DashDot => "dashDot",
-            Self::MediumDashDot => "mediumDashDot",
-            Self::DashDotDot => "dashDotDot",
-            Self::MediumDashDotDot => "mediumDashDotDot",
-            Self::SlantDashDot => "slantDashDot",
         }
     }
 }
@@ -300,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_cell_border_default() {
-        let border = CellBorder::default();
+        let border = Border::default();
         assert!(border.left.is_none());
         assert!(border.right.is_none());
         assert!(border.top.is_none());
@@ -310,33 +254,30 @@ mod tests {
 
     #[test]
     fn test_cell_border_side() {
-        let side = CellBorderSide {
-            style: CellBorderLineStyle::Thin,
-            color: Some("000000".to_string()),
-        };
-        assert_eq!(side.style.as_str(), "thin");
-        assert_eq!(side.color, Some("000000".to_string()));
+        use super::super::styles::border::{Color, Line, Side};
+
+        let side = Side::new(Line::Thin).with_color(Color::rgb(0, 0, 0));
+        assert_eq!(side.line.as_str(), "thin");
+        assert_eq!(side.color, Some(Color::rgb(0, 0, 0)));
     }
 
     #[test]
     fn test_cell_border_line_style_as_str() {
-        assert_eq!(CellBorderLineStyle::None.as_str(), "none");
-        assert_eq!(CellBorderLineStyle::Thin.as_str(), "thin");
-        assert_eq!(CellBorderLineStyle::Medium.as_str(), "medium");
-        assert_eq!(CellBorderLineStyle::Dashed.as_str(), "dashed");
-        assert_eq!(CellBorderLineStyle::Dotted.as_str(), "dotted");
-        assert_eq!(CellBorderLineStyle::Thick.as_str(), "thick");
-        assert_eq!(CellBorderLineStyle::Double.as_str(), "double");
-        assert_eq!(CellBorderLineStyle::Hair.as_str(), "hair");
-        assert_eq!(CellBorderLineStyle::MediumDashed.as_str(), "mediumDashed");
-        assert_eq!(CellBorderLineStyle::DashDot.as_str(), "dashDot");
-        assert_eq!(CellBorderLineStyle::MediumDashDot.as_str(), "mediumDashDot");
-        assert_eq!(CellBorderLineStyle::DashDotDot.as_str(), "dashDotDot");
-        assert_eq!(
-            CellBorderLineStyle::MediumDashDotDot.as_str(),
-            "mediumDashDotDot"
-        );
-        assert_eq!(CellBorderLineStyle::SlantDashDot.as_str(), "slantDashDot");
+        use super::super::styles::border::Line;
+
+        assert_eq!(Line::Thin.as_str(), "thin");
+        assert_eq!(Line::Medium.as_str(), "medium");
+        assert_eq!(Line::Dashed.as_str(), "dashed");
+        assert_eq!(Line::Dotted.as_str(), "dotted");
+        assert_eq!(Line::Thick.as_str(), "thick");
+        assert_eq!(Line::Double.as_str(), "double");
+        assert_eq!(Line::Hair.as_str(), "hair");
+        assert_eq!(Line::MediumDashed.as_str(), "mediumDashed");
+        assert_eq!(Line::DashDot.as_str(), "dashDot");
+        assert_eq!(Line::MediumDashDot.as_str(), "mediumDashDot");
+        assert_eq!(Line::DashDotDot.as_str(), "dashDotDot");
+        assert_eq!(Line::MediumDashDotDot.as_str(), "mediumDashDotDot");
+        assert_eq!(Line::SlantDashDot.as_str(), "slantDashDot");
     }
 
     #[test]

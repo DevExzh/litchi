@@ -81,20 +81,24 @@ fn package_with_task_panes(external_extension: bool) -> Package {
         external_extension,
     );
 
-    let opc = package.opc_package_mut();
-    opc.relationships_mut().add_relationship(
-        TASK_PANES_RELATIONSHIP.to_owned(),
-        "ppt/webextensions/taskpanes.xml".to_owned(),
-        "rIdTaskPanes".to_owned(),
-        false,
-    );
-    opc.add_part(Box::new(task_panes));
-    if !external_extension {
-        opc.add_part(Box::new(XmlPart::new(
-            extension_name,
-            ADD_IN_CONTENT_TYPE.to_owned(),
-            WEB_EXTENSION_XML.to_vec(),
-        )));
-    }
+    package
+        .edit_opc(|opc| {
+            opc.relationships_mut().add_relationship(
+                TASK_PANES_RELATIONSHIP.to_owned(),
+                "ppt/webextensions/taskpanes.xml".to_owned(),
+                "rIdTaskPanes".to_owned(),
+                false,
+            );
+            opc.add_part(Box::new(task_panes));
+            if !external_extension {
+                opc.add_part(Box::new(XmlPart::new(
+                    extension_name,
+                    ADD_IN_CONTENT_TYPE.to_owned(),
+                    WEB_EXTENSION_XML.to_vec(),
+                )));
+            }
+            Ok(())
+        })
+        .unwrap();
     package
 }

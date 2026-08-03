@@ -85,16 +85,19 @@ fn package_readers_reject_external_settings_relationships() {
     let mut package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     remove_presentation_relationships(&mut package, VIEW_PROPERTIES_RELATIONSHIP_TYPE);
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&presentation_name)?
+                .rels_mut()
+                .add_relationship(
+                    VIEW_PROPERTIES_RELATIONSHIP_TYPE.to_string(),
+                    "https://example.invalid/view-properties.xml".to_string(),
+                    "rIdExternalViewProperties".to_string(),
+                    true,
+                );
+            Ok(())
+        })
         .unwrap();
-    presentation.rels_mut().add_relationship(
-        VIEW_PROPERTIES_RELATIONSHIP_TYPE.to_string(),
-        "https://example.invalid/view-properties.xml".to_string(),
-        "rIdExternalViewProperties".to_string(),
-        true,
-    );
 
     assert!(matches!(
         package.view_properties(),
@@ -102,16 +105,19 @@ fn package_readers_reject_external_settings_relationships() {
     ));
 
     remove_presentation_relationships(&mut package, PRESENTATION_PROPERTIES_RELATIONSHIP_TYPE);
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&presentation_name)?
+                .rels_mut()
+                .add_relationship(
+                    PRESENTATION_PROPERTIES_RELATIONSHIP_TYPE.to_string(),
+                    "https://example.invalid/presentation-properties.xml".to_string(),
+                    "rIdExternalPresentationProperties".to_string(),
+                    true,
+                );
+            Ok(())
+        })
         .unwrap();
-    presentation.rels_mut().add_relationship(
-        PRESENTATION_PROPERTIES_RELATIONSHIP_TYPE.to_string(),
-        "https://example.invalid/presentation-properties.xml".to_string(),
-        "rIdExternalPresentationProperties".to_string(),
-        true,
-    );
 
     assert!(matches!(
         package.presentation_properties(),
@@ -124,32 +130,34 @@ fn package_with_local_settings() -> Package {
     let view_properties_name = PackURI::new("/ppt/viewProps.xml").unwrap();
     let presentation_properties_name = PackURI::new("/ppt/presProps.xml").unwrap();
 
-    {
-        let opc = package.opc_package_mut();
-        opc.get_part_mut(&view_properties_name)
-            .unwrap()
-            .set_blob(LOCAL_VIEW_PROPERTIES.to_vec());
-        opc.get_part_mut(&presentation_properties_name)
-            .unwrap()
-            .set_blob(LOCAL_PRESENTATION_PROPERTIES.to_vec());
-    }
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&view_properties_name)?
+                .set_blob(LOCAL_VIEW_PROPERTIES.to_vec());
+            opc.get_part_mut(&presentation_properties_name)?
+                .set_blob(LOCAL_PRESENTATION_PROPERTIES.to_vec());
+            Ok(())
+        })
+        .unwrap();
 
     package
 }
 
 fn remove_presentation_relationships(package: &mut Package, relationship_type: &str) {
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name)?;
+            let relationship_ids = presentation
+                .rels()
+                .iter()
+                .filter(|relationship| relationship.reltype() == relationship_type)
+                .map(|relationship| relationship.r_id().to_string())
+                .collect::<Vec<_>>();
+            for relationship_id in relationship_ids {
+                presentation.rels_mut().remove(&relationship_id);
+            }
+            Ok(())
+        })
         .unwrap();
-    let relationship_ids = presentation
-        .rels()
-        .iter()
-        .filter(|relationship| relationship.reltype() == relationship_type)
-        .map(|relationship| relationship.r_id().to_string())
-        .collect::<Vec<_>>();
-    for relationship_id in relationship_ids {
-        presentation.rels_mut().remove(&relationship_id);
-    }
 }

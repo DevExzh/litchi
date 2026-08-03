@@ -70,6 +70,7 @@
 //! ```
 
 pub mod axis;
+pub mod bubble;
 pub mod data;
 pub mod legend;
 pub mod model;

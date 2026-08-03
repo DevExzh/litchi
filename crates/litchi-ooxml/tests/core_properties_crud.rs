@@ -109,7 +109,7 @@ fn docx_host_preserves_updates_and_clears_core_properties() {
 #[test]
 fn pptx_host_preserves_updates_and_clears_core_properties() {
     let fresh = pptx::Package::new().expect("fresh PPTX");
-    let (source, exact) = strict_source(fresh.opc_package().clone());
+    let (source, exact) = strict_source(fresh.opc().unwrap().clone());
     let mut package = pptx::Package::from_opc_package(source).expect("open PPTX");
     assert_eq!(
         package.props().and_then(|props| props.title.as_deref()),

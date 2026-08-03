@@ -112,24 +112,26 @@ fn strict_root_slide_and_master_relationships_are_supported() {
     let (master_relationship_id, master_target) =
         presentation_relationship(&package, rt::SLIDE_MASTER);
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name)?;
+            presentation.rels_mut().remove(&slide_relationship_id);
+            presentation.rels_mut().add_relationship(
+                STRICT_SLIDE_RELATIONSHIP_TYPE.to_string(),
+                slide_target,
+                slide_relationship_id,
+                false,
+            );
+            presentation.rels_mut().remove(&master_relationship_id);
+            presentation.rels_mut().add_relationship(
+                STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE.to_string(),
+                master_target,
+                master_relationship_id,
+                false,
+            );
+            Ok(())
+        })
         .unwrap();
-    presentation.rels_mut().remove(&slide_relationship_id);
-    presentation.rels_mut().add_relationship(
-        STRICT_SLIDE_RELATIONSHIP_TYPE.to_string(),
-        slide_target,
-        slide_relationship_id,
-        false,
-    );
-    presentation.rels_mut().remove(&master_relationship_id);
-    presentation.rels_mut().add_relationship(
-        STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE.to_string(),
-        master_target,
-        master_relationship_id,
-        false,
-    );
 
     let presentation = package.presentation().unwrap();
     assert_eq!(presentation.slides().unwrap().len(), 1);
@@ -153,23 +155,26 @@ fn replace_presentation_relationship(
 ) {
     let (relationship_id, _) = presentation_relationship(package, old_type);
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name)?;
+            presentation.rels_mut().remove(&relationship_id);
+            presentation.rels_mut().add_relationship(
+                new_type.to_string(),
+                target.to_string(),
+                relationship_id,
+                external,
+            );
+            Ok(())
+        })
         .unwrap();
-    presentation.rels_mut().remove(&relationship_id);
-    presentation.rels_mut().add_relationship(
-        new_type.to_string(),
-        target.to_string(),
-        relationship_id,
-        external,
-    );
 }
 
 fn presentation_relationship(package: &Package, relationship_type: &str) -> (String, String) {
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .opc_package()
+        .opc()
+        .unwrap()
         .get_part(&presentation_name)
         .unwrap()
         .rels()

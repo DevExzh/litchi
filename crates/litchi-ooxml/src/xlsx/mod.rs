@@ -176,8 +176,8 @@ pub use scenarios::{
 };
 // Re-export shared formatting types
 pub use format::{
-    CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
-    CellFormat, DataValidation, DataValidationOperator, DataValidationType,
+    CellFill, CellFillPatternType, CellFont, CellFormat, DataValidation, DataValidationOperator,
+    DataValidationType,
 };
 pub use header_footer::{
     HeaderFooterSectionKind, HeaderFooterText, WorksheetHeaderFooter, parse_worksheet_header_footer,
@@ -280,7 +280,7 @@ pub use sparkline::{
     Sparkline, SparklineAxisMinMax, SparklineColor, SparklineDisplayEmptyCellsAs, SparklineGroup,
     SparklineGroupColors, SparklineGroupOptions, SparklineType,
 };
-pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
+pub use styles::{Alignment, Border, CellStyle, Fill, Font, NumberFormat, Styles};
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction, parse_table_xml,
 };

@@ -57,7 +57,7 @@ fn writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
     assert!(first_transition(&package).same_semantics(&expected));
 
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let slide = package.opc_package().get_part(&slide_name).unwrap();
+    let slide = package.opc().unwrap().get_part(&slide_name).unwrap();
     let xml = std::str::from_utf8(slide.blob()).unwrap();
     assert!(xml.contains("<mc:AlternateContent"));
     assert!(xml.contains(r#"<p14:ripple dir="ld"/>"#));
@@ -85,7 +85,7 @@ fn writer_round_trips_custom_duration_through_compatibility_markup() {
     assert!(first_transition(&package).same_semantics(&expected));
 
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let slide = package.opc_package().get_part(&slide_name).unwrap();
+    let slide = package.opc().unwrap().get_part(&slide_name).unwrap();
     let xml = std::str::from_utf8(slide.blob()).unwrap();
     assert!(xml.contains(r#"p14:dur="750""#));
     assert!(xml.contains("<mc:Fallback>"));
@@ -105,10 +105,15 @@ fn package_with_transition_fragment(fragment: &str) -> Package {
 
     let mut package = Package::open(output.path()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    let xml = std::str::from_utf8(slide.blob()).unwrap();
-    let updated = xml.replacen("</p:sld>", &format!("{fragment}</p:sld>"), 1);
-    assert_ne!(updated, xml);
-    slide.set_blob(updated.into_bytes());
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            let xml = std::str::from_utf8(slide.blob()).unwrap();
+            let updated = xml.replacen("</p:sld>", &format!("{fragment}</p:sld>"), 1);
+            assert_ne!(updated, xml);
+            slide.set_blob(updated.into_bytes());
+            Ok(())
+        })
+        .unwrap();
     package
 }

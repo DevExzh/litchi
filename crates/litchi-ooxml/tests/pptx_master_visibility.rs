@@ -62,8 +62,9 @@ fn package_with_visibility(slide_xml: &[u8], layout_xml: &[u8]) -> Package {
 fn replace_part(package: &mut Package, part_name: &str, xml: &[u8]) {
     let part_name = PackURI::new(part_name).unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&part_name)
-        .unwrap()
-        .set_blob(xml.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&part_name)?.set_blob(xml.to_vec());
+            Ok(())
+        })
+        .unwrap();
 }

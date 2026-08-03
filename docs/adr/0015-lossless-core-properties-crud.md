@@ -94,13 +94,25 @@ not for a metadata-only or worksheet-overlay save.
   representative measurement.
 - Reduced-precision W3CDTF values remain exact in `Props` but cannot always be
   projected into the chrono-based fields of the generic `Metadata` facade.
-- The hosts still expose mutable raw OPC access. A caller that changes the core
-  graph through that escape hatch can make the cached slot stale. XLSX now
-  restores its in-memory package and retains dirty intent for failures in the
-  late publication phase, but mutations performed by its earlier writer-model
-  materialization are not yet one transaction. DOCX and PPTX still flush their
-  slots directly before later save work. Closing those seams remains follow-up
-  work and is not hidden by the concise facade.
+- PPTX no longer exposes an unconditional mutable raw-OPC reference. Its
+  fallible `opc` boundary rejects pending presentation, core-property, or font
+  state and rejects implicit plaintext exposure for an encrypted source.
+  `edit_opc` mutates a structural candidate through a non-escaping closure;
+  built-in payloads retain immutable `Arc` sharing, while custom `Part`
+  implementations retain their own clone and interior-mutability policy.
+  Error or unwind leaves the candidate unpublished. Successful commit requires
+  one internal main-document relationship with an allowed PPTX content type,
+  reloads the validated property slot, rejects raw automatic-font-policy
+  changes, and disables the legacy writer. This boundary does not parse the
+  complete PresentationML graph. PPTX stages writer-model materialization,
+  optional font publication, and the property slot in one rollback package,
+  committing the slot and clean writer state only after the sink succeeds.
+  XLSX still exposes mutable raw OPC and restores its in-memory package and
+  dirty intent only for failures in the late publication phase; mutations
+  performed by its earlier writer-model materialization are not yet one
+  transaction. DOCX still flushes its slot directly before later save work.
+  Closing those remaining seams is follow-up work and is not hidden by the
+  concise facade.
 - The XLSX dirty path structurally clones package metadata and shares built-in
   immutable payloads. Custom `Part` implementations retain their own clone
   policy. This is a correctness boundary, not evidence of lower allocation or

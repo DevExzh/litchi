@@ -4,6 +4,7 @@
 //! and chart type groups.
 
 use crate::chart::axis::Axis;
+use crate::chart::bubble::{Scale as BubbleScale, Size as BubbleSize};
 use crate::chart::data::Layout;
 use crate::chart::model::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
 use crate::chart::series::{DataLabels, Series};
@@ -386,14 +387,12 @@ impl Bar3DTypeGroup {
 pub struct BubbleTypeGroup {
     /// Common properties
     pub common: TypeGroupCommon,
-    /// Show bubbles in 3D
-    pub bubble_3d: bool,
-    /// Bubble scale (0-300%)
-    pub bubble_scale: Option<u32>,
+    /// Bubble scale percentage.
+    scale: BubbleScale,
     /// Show negative bubbles
     pub show_negative_bubbles: bool,
-    /// Size represents area or width ("area" or "w", default "area")
-    pub size_represents: String,
+    /// How each bubble's numeric size is interpreted.
+    size: BubbleSize,
 }
 
 impl BubbleTypeGroup {
@@ -402,11 +401,50 @@ impl BubbleTypeGroup {
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
-            bubble_3d: false,
-            bubble_scale: None,
+            scale: BubbleScale::default(),
             show_negative_bubbles: true,
-            size_represents: "area".to_string(),
+            size: BubbleSize::default(),
         }
+    }
+
+    /// Returns the bubble scale percentage.
+    #[inline]
+    pub const fn scale(&self) -> BubbleScale {
+        self.scale
+    }
+
+    /// Sets the bubble scale percentage.
+    #[inline]
+    pub fn set_scale(&mut self, scale: BubbleScale) -> &mut Self {
+        self.scale = scale;
+        self
+    }
+
+    /// Sets the bubble scale percentage and returns this group.
+    #[inline]
+    pub fn with_scale(mut self, scale: BubbleScale) -> Self {
+        self.set_scale(scale);
+        self
+    }
+
+    /// Returns how each bubble's numeric size is interpreted.
+    #[inline]
+    pub const fn size(&self) -> BubbleSize {
+        self.size
+    }
+
+    /// Sets how each bubble's numeric size is interpreted.
+    #[inline]
+    pub fn set_size(&mut self, size: BubbleSize) -> &mut Self {
+        self.size = size;
+        self
+    }
+
+    /// Sets how each bubble's numeric size is interpreted and returns this group.
+    #[inline]
+    pub fn with_size(mut self, size: BubbleSize) -> Self {
+        self.set_size(size);
+        self
     }
 }
 

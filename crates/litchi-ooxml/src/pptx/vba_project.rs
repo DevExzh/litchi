@@ -229,11 +229,12 @@ mod tests {
 
         let mut reopened = Package::open(file.path()).unwrap();
         let metadata = reopened.vba().unwrap().unwrap();
-        let parsed = metadata.project(reopened.opc_package()).unwrap();
+        let parsed = metadata.project(reopened.opc().unwrap()).unwrap();
         assert_eq!(parsed.name(), "PowerPointProject");
         assert_eq!(
             reopened
-                .opc_package()
+                .opc()
+                .unwrap()
                 .main_document_part()
                 .unwrap()
                 .content_type(),
@@ -244,7 +245,8 @@ mod tests {
         assert!(reopened.vba().unwrap().is_none());
         assert_eq!(
             reopened
-                .opc_package()
+                .opc()
+                .unwrap()
                 .main_document_part()
                 .unwrap()
                 .content_type(),
@@ -273,22 +275,26 @@ mod tests {
         ] {
             let mut package = Package::new().unwrap();
             let source = package
-                .opc_package()
+                .opc()
+                .unwrap()
                 .main_document_part()
                 .unwrap()
                 .partname()
                 .clone();
             package
-                .opc_package_mut()
-                .get_part_mut(&source)
-                .unwrap()
-                .set_content_type(plain.to_string())
+                .edit_opc(|candidate| {
+                    candidate
+                        .get_part_mut(&source)?
+                        .set_content_type(plain.to_string())?;
+                    Ok(())
+                })
                 .unwrap();
 
             package.set_vba(authored_project()).unwrap();
             assert_eq!(
                 package
-                    .opc_package()
+                    .opc()
+                    .unwrap()
                     .get_part(&source)
                     .unwrap()
                     .content_type(),
@@ -297,7 +303,8 @@ mod tests {
             package.clear_vba().unwrap();
             assert_eq!(
                 package
-                    .opc_package()
+                    .opc()
+                    .unwrap()
                     .get_part(&source)
                     .unwrap()
                     .content_type(),

@@ -58,14 +58,19 @@ fn presentation_rejects_external_ribbon_relationships() {
         .unwrap();
     let relationship_id = package.ribbon().unwrap().modern().unwrap().id().to_owned();
 
-    let relationships = package.opc_package_mut().relationships_mut();
-    relationships.remove(&relationship_id);
-    relationships.add_relationship(
-        Version::V2010.relationship().to_owned(),
-        "https://example.invalid/customUI.xml".to_owned(),
-        relationship_id,
-        true,
-    );
+    package
+        .edit_opc(|opc| {
+            let relationships = opc.relationships_mut();
+            relationships.remove(&relationship_id);
+            relationships.add_relationship(
+                Version::V2010.relationship().to_owned(),
+                "https://example.invalid/customUI.xml".to_owned(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
+        .unwrap();
 
     assert!(matches!(
         package.presentation().unwrap().ribbon(),

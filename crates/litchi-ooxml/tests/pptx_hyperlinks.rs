@@ -36,10 +36,13 @@ fn presentation_hyperlinks_reject_malformed_inline_xml() {
     let mut package = package_with_hyperlinks();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&slide_name)
-        .unwrap()
-        .set_blob(MALFORMED_SLIDE_XML.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&slide_name)
+                .unwrap()
+                .set_blob(MALFORMED_SLIDE_XML.to_vec());
+            Ok(())
+        })
+        .unwrap();
 
     assert!(matches!(
         package.presentation().unwrap().get_hyperlinks(),
@@ -52,34 +55,32 @@ fn package_with_hyperlinks() -> Package {
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
 
-    {
-        let presentation = package
-            .opc_package_mut()
-            .get_part_mut(&presentation_name)
-            .unwrap();
-        presentation.set_blob(PRESENTATION_XML.to_vec());
-        presentation.rels_mut().add_relationship(
-            rt::SLIDE.to_string(),
-            "slides/slide1.xml".to_string(),
-            "rIdSlideOne".to_string(),
-            false,
-        );
-    }
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        slide_name.clone(),
-        ct::PML_SLIDE.to_string(),
-        SLIDE_XML.to_vec(),
-    )));
     package
-        .opc_package_mut()
-        .get_part_mut(&slide_name)
-        .unwrap()
-        .rels_mut()
-        .add_relationship(
-            rt::STRICT_HYPERLINK.to_string(),
-            "https://example.invalid/".to_string(),
-            "rIdExternal".to_string(),
-            true,
-        );
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.set_blob(PRESENTATION_XML.to_vec());
+            presentation.rels_mut().add_relationship(
+                rt::SLIDE.to_string(),
+                "slides/slide1.xml".to_string(),
+                "rIdSlideOne".to_string(),
+                false,
+            );
+            opc.add_part(Box::new(BlobPart::new(
+                slide_name.clone(),
+                ct::PML_SLIDE.to_string(),
+                SLIDE_XML.to_vec(),
+            )));
+            opc.get_part_mut(&slide_name)
+                .unwrap()
+                .rels_mut()
+                .add_relationship(
+                    rt::STRICT_HYPERLINK.to_string(),
+                    "https://example.invalid/".to_string(),
+                    "rIdExternal".to_string(),
+                    true,
+                );
+            Ok(())
+        })
+        .unwrap();
     package
 }

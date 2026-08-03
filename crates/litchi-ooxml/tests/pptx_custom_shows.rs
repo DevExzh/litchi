@@ -25,17 +25,19 @@ fn presentation_custom_shows_resolve_slide_membership() {
 fn presentation_custom_shows_validate_slide_relationships() {
     let mut package = package_with_custom_shows();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.rels_mut().remove("rIdSlideOne");
+            presentation.rels_mut().add_relationship(
+                rt::THEME.to_string(),
+                "slides/slide1.xml".to_string(),
+                "rIdSlideOne".to_string(),
+                false,
+            );
+            Ok(())
+        })
         .unwrap();
-    presentation.rels_mut().remove("rIdSlideOne");
-    presentation.rels_mut().add_relationship(
-        rt::THEME.to_string(),
-        "slides/slide1.xml".to_string(),
-        "rIdSlideOne".to_string(),
-        false,
-    );
 
     assert!(matches!(
         package.presentation().unwrap().custom_shows(),
@@ -48,36 +50,36 @@ fn package_with_custom_shows() -> Package {
     let mut package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
 
-    {
-        let presentation = package
-            .opc_package_mut()
-            .get_part_mut(&presentation_name)
-            .unwrap();
-        presentation.set_blob(PRESENTATION_XML.to_vec());
-        for (relationship_id, target) in [
-            ("rIdSlideOne", "slides/slide1.xml"),
-            ("rIdSlideTwo", "slides/slide2.xml"),
-            ("rIdSlideThree", "slides/slide3.xml"),
-        ] {
-            presentation.rels_mut().add_relationship(
-                rt::SLIDE.to_string(),
-                target.to_string(),
-                relationship_id.to_string(),
-                false,
-            );
-        }
-    }
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.set_blob(PRESENTATION_XML.to_vec());
+            for (relationship_id, target) in [
+                ("rIdSlideOne", "slides/slide1.xml"),
+                ("rIdSlideTwo", "slides/slide2.xml"),
+                ("rIdSlideThree", "slides/slide3.xml"),
+            ] {
+                presentation.rels_mut().add_relationship(
+                    rt::SLIDE.to_string(),
+                    target.to_string(),
+                    relationship_id.to_string(),
+                    false,
+                );
+            }
 
-    for name in [
-        "/ppt/slides/slide1.xml",
-        "/ppt/slides/slide2.xml",
-        "/ppt/slides/slide3.xml",
-    ] {
-        package.opc_package_mut().add_part(Box::new(BlobPart::new(
-            PackURI::new(name).unwrap(),
-            ct::PML_SLIDE.to_string(),
-            SLIDE_XML.to_vec(),
-        )));
-    }
+            for name in [
+                "/ppt/slides/slide1.xml",
+                "/ppt/slides/slide2.xml",
+                "/ppt/slides/slide3.xml",
+            ] {
+                opc.add_part(Box::new(BlobPart::new(
+                    PackURI::new(name).unwrap(),
+                    ct::PML_SLIDE.to_string(),
+                    SLIDE_XML.to_vec(),
+                )));
+            }
+            Ok(())
+        })
+        .unwrap();
     package
 }

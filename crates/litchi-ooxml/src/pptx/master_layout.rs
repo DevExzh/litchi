@@ -1577,7 +1577,7 @@ mod tests {
     use std::io::Cursor;
 
     fn roundtrip(package: &Package) -> Package {
-        let bytes = PackageWriter::to_bytes(package.opc_package()).unwrap();
+        let bytes = PackageWriter::to_bytes(package.opc().unwrap()).unwrap();
         Package::from_reader(Cursor::new(bytes)).unwrap()
     }
 
@@ -1851,8 +1851,8 @@ mod tests {
             .unwrap();
 
         // Attach a slide part that references the layout.
-        {
-            let opc = package.opc_package_mut();
+        package
+            .edit_opc(|opc| {
             let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
             let mut slide = BlobPart::new(
                 slide_uri,
@@ -1864,7 +1864,9 @@ mod tests {
                 rt::SLIDE_LAYOUT,
             );
             opc.add_part(Box::new(slide));
-        }
+                Ok(())
+            })
+            .unwrap();
 
         assert!(package.remove_slide_layout(&layout.part_name).is_err());
         package.validate_master_layout_graph().unwrap();
@@ -1885,7 +1887,8 @@ mod tests {
         package.validate_master_layout_graph().unwrap();
         assert!(
             package
-                .opc_package()
+                .opc()
+                .unwrap()
                 .get_part(&PackURI::new(&layout.part_name).unwrap())
                 .is_err(),
             "layout part must be gone"
@@ -1930,8 +1933,8 @@ mod tests {
         ] {
             let uri = PackURI::new(part_name).unwrap();
             assert_eq!(
-                first.opc_package().get_part(&uri).unwrap().blob(),
-                second.opc_package().get_part(&uri).unwrap().blob(),
+                first.opc().unwrap().get_part(&uri).unwrap().blob(),
+                second.opc().unwrap().get_part(&uri).unwrap().blob(),
                 "part {part_name} must serialize deterministically"
             );
         }

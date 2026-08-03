@@ -96,10 +96,13 @@ fn handout_master_root_is_validated() {
     let mut package = package_with_handout_master();
     let handout_name = PackURI::new("/ppt/handoutMasters/handoutMaster1.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&handout_name)
-        .unwrap()
-        .set_blob(WRONG_ROOT_XML.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&handout_name)
+                .unwrap()
+                .set_blob(WRONG_ROOT_XML.to_vec());
+            Ok(())
+        })
+        .unwrap();
 
     assert!(matches!(
         package.presentation().unwrap().handout_master(),
@@ -112,24 +115,24 @@ fn package_with_handout_master() -> Package {
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let handout_name = PackURI::new("/ppt/handoutMasters/handoutMaster1.xml").unwrap();
 
-    {
-        let presentation = package
-            .opc_package_mut()
-            .get_part_mut(&presentation_name)
-            .unwrap();
-        presentation.set_blob(PRESENTATION_XML.to_vec());
-        presentation.rels_mut().add_relationship(
-            rt::HANDOUT_MASTER.to_string(),
-            "handoutMasters/handoutMaster1.xml".to_string(),
-            "rIdHandout".to_string(),
-            false,
-        );
-    }
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        handout_name,
-        ct::PML_HANDOUT_MASTER.to_string(),
-        HANDOUT_MASTER_XML.to_vec(),
-    )));
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.set_blob(PRESENTATION_XML.to_vec());
+            presentation.rels_mut().add_relationship(
+                rt::HANDOUT_MASTER.to_string(),
+                "handoutMasters/handoutMaster1.xml".to_string(),
+                "rIdHandout".to_string(),
+                false,
+            );
+            opc.add_part(Box::new(BlobPart::new(
+                handout_name,
+                ct::PML_HANDOUT_MASTER.to_string(),
+                HANDOUT_MASTER_XML.to_vec(),
+            )));
+            Ok(())
+        })
+        .unwrap();
     package
 }
 
@@ -140,15 +143,17 @@ fn replace_handout_relationship(
     is_external: bool,
 ) {
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.rels_mut().remove("rIdHandout");
+            presentation.rels_mut().add_relationship(
+                relationship_type.to_string(),
+                target.to_string(),
+                "rIdHandout".to_string(),
+                is_external,
+            );
+            Ok(())
+        })
         .unwrap();
-    presentation.rels_mut().remove("rIdHandout");
-    presentation.rels_mut().add_relationship(
-        relationship_type.to_string(),
-        target.to_string(),
-        "rIdHandout".to_string(),
-        is_external,
-    );
 }

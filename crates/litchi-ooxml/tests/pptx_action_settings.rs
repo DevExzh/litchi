@@ -97,24 +97,29 @@ fn package_with_actions(fragment: &str, add_relationships: bool) -> Package {
 
 fn install_actions(package: &mut Package, fragment: &str, add_relationships: bool) {
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    let xml = std::str::from_utf8(slide.blob()).unwrap();
-    let updated = xml.replacen("</p:spTree>", &format!("{fragment}</p:spTree>"), 1);
-    assert_ne!(updated, xml);
-    slide.set_blob(updated.into_bytes());
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name).unwrap();
+            let xml = std::str::from_utf8(slide.blob()).unwrap();
+            let updated = xml.replacen("</p:spTree>", &format!("{fragment}</p:spTree>"), 1);
+            assert_ne!(updated, xml);
+            slide.set_blob(updated.into_bytes());
 
-    if add_relationships {
-        slide.rels_mut().add_relationship(
-            HYPERLINK.to_string(),
-            "https://example.invalid/other.pptx".to_string(),
-            "rIdExternal".to_string(),
-            true,
-        );
-        slide.rels_mut().add_relationship(
-            SLIDE.to_string(),
-            "slide2.xml".to_string(),
-            "rIdSlide".to_string(),
-            false,
-        );
-    }
+            if add_relationships {
+                slide.rels_mut().add_relationship(
+                    HYPERLINK.to_string(),
+                    "https://example.invalid/other.pptx".to_string(),
+                    "rIdExternal".to_string(),
+                    true,
+                );
+                slide.rels_mut().add_relationship(
+                    SLIDE.to_string(),
+                    "slide2.xml".to_string(),
+                    "rIdSlide".to_string(),
+                    false,
+                );
+            }
+            Ok(())
+        })
+        .unwrap();
 }

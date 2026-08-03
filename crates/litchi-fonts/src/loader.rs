@@ -2,6 +2,7 @@ use font_kit::family_name::FamilyName;
 use font_kit::handle::Handle;
 use font_kit::properties::{Properties, Style as FontStyle, Weight};
 use font_kit::source::SystemSource;
+use std::sync::Arc;
 
 use crate::{
     Charset, Family, FontData, FontError, FontProperties, License, Panose, Pitch, Request,
@@ -59,7 +60,7 @@ impl FontLoader {
                 let properties = Self::extract_font_properties(&bytes, font_index)?;
                 Ok(FontData {
                     name: request.family().to_owned(),
-                    data: bytes.to_vec(),
+                    data: into_owned_bytes(bytes),
                     index: font_index,
                     properties,
                 })
@@ -102,6 +103,12 @@ impl FontLoader {
         let os2_table: &[u8] = os2_table.as_ref();
         parse_os2_properties(os2_table).map(Some)
     }
+}
+
+/// Adopt a uniquely owned font-kit allocation, copying only when it is shared.
+#[inline]
+fn into_owned_bytes(bytes: Arc<Vec<u8>>) -> Vec<u8> {
+    Arc::unwrap_or_clone(bytes)
 }
 
 fn parse_os2_properties(os2_table: &[u8]) -> Result<FontProperties, FontError> {
@@ -256,6 +263,30 @@ impl Default for FontLoader {
 mod tests {
     use super::*;
     use crate::Permission;
+
+    #[test]
+    fn uniquely_owned_memory_bytes_keep_their_allocation() {
+        let bytes = Arc::new(vec![1, 2, 3, 4]);
+        let allocation = bytes.as_slice().as_ptr();
+
+        let owned = into_owned_bytes(bytes);
+
+        assert_eq!(owned.as_ptr(), allocation);
+        assert_eq!(owned, [1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn shared_memory_bytes_leave_the_other_owner_intact() {
+        let bytes = Arc::new(vec![1, 2, 3, 4]);
+        let retained = Arc::clone(&bytes);
+        let shared_allocation = retained.as_slice().as_ptr();
+
+        let owned = into_owned_bytes(bytes);
+
+        assert_eq!(owned, retained.as_slice());
+        assert_ne!(owned.as_ptr(), shared_allocation);
+        assert_eq!(retained.as_slice().as_ptr(), shared_allocation);
+    }
 
     #[test]
     fn parses_versioned_os2_lengths_and_ignores_undefined_fields() {

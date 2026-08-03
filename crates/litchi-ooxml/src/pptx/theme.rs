@@ -1433,7 +1433,7 @@ mod tests {
     use std::io::Cursor;
 
     fn roundtrip(package: &Package) -> Package {
-        let bytes = PackageWriter::to_bytes(package.opc_package()).unwrap();
+        let bytes = PackageWriter::to_bytes(package.opc().unwrap()).unwrap();
         Package::from_reader(Cursor::new(bytes)).unwrap()
     }
 
@@ -1758,15 +1758,16 @@ mod tests {
         ] {
             let uri = PackURI::new(part_name).unwrap();
             assert_eq!(
-                first.opc_package().get_part(&uri).unwrap().blob(),
-                second.opc_package().get_part(&uri).unwrap().blob(),
+                first.opc().unwrap().get_part(&uri).unwrap().blob(),
+                second.opc().unwrap().get_part(&uri).unwrap().blob(),
                 "part {part_name} must serialize deterministically"
             );
         }
         // Relationship targets are deterministic as well.
         let master_uri = PackURI::new("/ppt/slideMasters/slideMaster2.xml").unwrap();
         let first_rels: Vec<String> = first
-            .opc_package()
+            .opc()
+            .unwrap()
             .get_part(&master_uri)
             .unwrap()
             .rels()
@@ -1774,7 +1775,8 @@ mod tests {
             .map(|relationship| relationship.r_id().to_string())
             .collect();
         let second_rels: Vec<String> = second
-            .opc_package()
+            .opc()
+            .unwrap()
             .get_part(&master_uri)
             .unwrap()
             .rels()
@@ -1826,7 +1828,8 @@ mod tests {
         let uri = PackURI::new(&part_name).unwrap();
         assert_eq!(
             reopened
-                .opc_package()
+                .opc()
+                .unwrap()
                 .get_part(&uri)
                 .unwrap()
                 .content_type(),
@@ -1857,7 +1860,7 @@ mod tests {
         assert!(package.remove_theme_override(&layout).unwrap());
         assert_eq!(package.theme_override(&layout).unwrap(), None);
         let uri = PackURI::new(&part_name).unwrap();
-        assert!(package.opc_package().get_part(&uri).is_err());
+        assert!(package.opc().unwrap().get_part(&uri).is_err());
         // Second removal is a no-op.
         assert!(!package.remove_theme_override(&layout).unwrap());
     }

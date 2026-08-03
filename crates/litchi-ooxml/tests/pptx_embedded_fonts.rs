@@ -27,17 +27,19 @@ fn presentation_embedded_fonts_resolve_inert_resources() {
 fn presentation_embedded_fonts_validate_font_relationships() {
     let mut package = package_with_embedded_font();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let presentation = package
-        .opc_package_mut()
-        .get_part_mut(&presentation_name)
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.rels_mut().remove("rIdFontRegular");
+            presentation.rels_mut().add_relationship(
+                rt::THEME.to_string(),
+                "fonts/example.odttf".to_string(),
+                "rIdFontRegular".to_string(),
+                false,
+            );
+            Ok(())
+        })
         .unwrap();
-    presentation.rels_mut().remove("rIdFontRegular");
-    presentation.rels_mut().add_relationship(
-        rt::THEME.to_string(),
-        "fonts/example.odttf".to_string(),
-        "rIdFontRegular".to_string(),
-        false,
-    );
 
     assert!(matches!(
         package.presentation().unwrap().fonts(),
@@ -51,23 +53,23 @@ fn package_with_embedded_font() -> Package {
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let font_name = PackURI::new("/ppt/fonts/example.odttf").unwrap();
 
-    {
-        let presentation = package
-            .opc_package_mut()
-            .get_part_mut(&presentation_name)
-            .unwrap();
-        presentation.set_blob(PRESENTATION_XML.to_vec());
-        presentation.rels_mut().add_relationship(
-            rt::FONT.to_string(),
-            "fonts/example.odttf".to_string(),
-            "rIdFontRegular".to_string(),
-            false,
-        );
-    }
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        font_name,
-        FONT_CONTENT_TYPE.to_string(),
-        FONT_DATA.to_vec(),
-    )));
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&presentation_name).unwrap();
+            presentation.set_blob(PRESENTATION_XML.to_vec());
+            presentation.rels_mut().add_relationship(
+                rt::FONT.to_string(),
+                "fonts/example.odttf".to_string(),
+                "rIdFontRegular".to_string(),
+                false,
+            );
+            opc.add_part(Box::new(BlobPart::new(
+                font_name,
+                FONT_CONTENT_TYPE.to_string(),
+                FONT_DATA.to_vec(),
+            )));
+            Ok(())
+        })
+        .unwrap();
     package
 }

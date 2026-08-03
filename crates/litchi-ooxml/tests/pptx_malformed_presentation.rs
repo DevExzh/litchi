@@ -16,10 +16,11 @@ fn with_presentation_blob(blob: &[u8]) -> Package {
     let mut package = Package::open(output.path()).unwrap();
     let part_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&part_name)
-        .unwrap()
-        .set_blob(blob.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&part_name)?.set_blob(blob.to_vec());
+            Ok(())
+        })
+        .unwrap();
     package
 }
 
@@ -156,10 +157,11 @@ fn slide_part_parsers_reject_malformed_xml_without_panics() {
         let mut package = Package::open(output.path()).unwrap();
         let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         package
-            .opc_package_mut()
-            .get_part_mut(&slide_uri)
-            .unwrap()
-            .set_blob(blob.clone());
+            .edit_opc(|opc| {
+                opc.get_part_mut(&slide_uri)?.set_blob(blob.clone());
+                Ok(())
+            })
+            .unwrap();
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();
         let slide = &slides[0];
@@ -193,10 +195,11 @@ fn exercise_slide(
     let mut package = Package::open(output.path()).unwrap();
     let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&slide_uri)
-        .unwrap()
-        .set_blob(blob.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&slide_uri)?.set_blob(blob.to_vec());
+            Ok(())
+        })
+        .unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let slide = &slides[0];

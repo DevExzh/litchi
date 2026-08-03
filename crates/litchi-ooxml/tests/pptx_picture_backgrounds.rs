@@ -22,7 +22,8 @@ fn picture_background_rejects_external_image_relationships() {
     let mut package = package_with_picture_background();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let relationship_id = package
-        .opc_package()
+        .opc()
+        .unwrap()
         .get_part(&slide_name)
         .unwrap()
         .rels()
@@ -31,14 +32,19 @@ fn picture_background_rejects_external_image_relationships() {
         .unwrap()
         .r_id()
         .to_string();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    slide.rels_mut().remove(&relationship_id);
-    slide.rels_mut().add_relationship(
-        rt::IMAGE.to_string(),
-        "https://example.invalid/background.png".to_string(),
-        relationship_id,
-        true,
-    );
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            slide.rels_mut().remove(&relationship_id);
+            slide.rels_mut().add_relationship(
+                rt::IMAGE.to_string(),
+                "https://example.invalid/background.png".to_string(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
+        .unwrap();
 
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();

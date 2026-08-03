@@ -6,8 +6,9 @@
 
 use litchi::ooxml::Props;
 use litchi::ooxml::xlsx::{
-    CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
-    CellFormat, ConditionalFormatType, HeaderFooter, Workbook,
+    Border, CellFill, CellFillPatternType, CellFont, CellFormat, ConditionalFormatType,
+    HeaderFooter, Workbook,
+    styles::border::{Color, Line, Side},
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -60,15 +61,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 fg_color: Some("4472C4".to_string()),
                 bg_color: None,
             }),
-            border: Some(CellBorder {
-                left: None,
-                right: None,
-                top: None,
-                bottom: Some(CellBorderSide {
-                    style: CellBorderLineStyle::Thick,
-                    color: Some("000000".to_string()),
-                }),
-                diagonal: None,
+            border: Some(Border {
+                bottom: Some(Side::new(Line::Thick).with_color(Color::rgb(0, 0, 0))),
+                ..Border::default()
             }),
             number_format: None,
         };

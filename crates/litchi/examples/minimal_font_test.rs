@@ -1,4 +1,4 @@
-use litchi::ooxml::docx::Package;
+use litchi::ooxml::docx::{FontEmbedding, Package};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating minimal DOCX with single embedded font...");
@@ -7,8 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pkg = Package::new()?;
 
     // Enable font embedding
-    pkg.opc_package_mut()
-        .with_fonts(litchi_opc::FontEmbedding::Subset);
+    pkg.opc_package_mut().with_fonts(FontEmbedding::Subset);
 
     // Add simple paragraph with Liberation Sans
     {

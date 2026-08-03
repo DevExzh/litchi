@@ -26,8 +26,8 @@ use std::fmt::Write as FmtWrite;
 
 // Import shared formatting types
 pub use super::super::format::{
-    CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
-    CellFormat, DataValidation, DataValidationOperator, DataValidationType,
+    CellFill, CellFillPatternType, CellFont, CellFormat, DataValidation, DataValidationOperator,
+    DataValidationType,
 };
 
 // Import chart types

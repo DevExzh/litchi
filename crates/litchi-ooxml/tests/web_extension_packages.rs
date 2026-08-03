@@ -26,7 +26,11 @@ fn package_wrappers_discover_local_task_panes_without_activation() {
     assert_task_pane(xlsx.task_panes().unwrap().unwrap());
 
     let mut pptx = litchi_ooxml::pptx::Package::new().unwrap();
-    install_task_panes(pptx.opc_package_mut());
+    pptx.edit_opc(|opc| {
+        install_task_panes(opc);
+        Ok(())
+    })
+    .unwrap();
     assert_task_pane(pptx.task_panes().unwrap().unwrap());
 }
 

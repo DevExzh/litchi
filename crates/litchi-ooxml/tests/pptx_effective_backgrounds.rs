@@ -72,14 +72,19 @@ fn package_with_backgrounds(backgrounds: &[(&str, &str)]) -> Package {
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
-    for (part_name, color) in backgrounds {
-        let part_name = PackURI::new(*part_name).unwrap();
-        let part = package.opc_package_mut().get_part_mut(&part_name).unwrap();
-        let xml = std::str::from_utf8(part.blob()).unwrap();
-        let background = SOLID_BACKGROUND.replacen("112233", color, 1);
-        let updated = xml.replacen("<p:spTree>", &format!("{background}<p:spTree>"), 1);
-        assert_ne!(updated, xml);
-        part.set_blob(updated.into_bytes());
-    }
+    package
+        .edit_opc(|opc| {
+            for (part_name, color) in backgrounds {
+                let part_name = PackURI::new(*part_name).unwrap();
+                let part = opc.get_part_mut(&part_name).unwrap();
+                let xml = std::str::from_utf8(part.blob()).unwrap();
+                let background = SOLID_BACKGROUND.replacen("112233", color, 1);
+                let updated = xml.replacen("<p:spTree>", &format!("{background}<p:spTree>"), 1);
+                assert_ne!(updated, xml);
+                part.set_blob(updated.into_bytes());
+            }
+            Ok(())
+        })
+        .unwrap();
     package
 }

@@ -73,10 +73,12 @@ fn numeric_slide_lookup_does_not_process_unrelated_slides() {
     let mut package = package_with_direct_tag_lists();
     let unrelated = PackURI::new("/ppt/slides/slide2.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&unrelated)
-        .unwrap()
-        .set_blob(b"<not-valid-xml".to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&unrelated)?
+                .set_blob(b"<not-valid-xml".to_vec());
+            Ok(())
+        })
+        .unwrap();
 
     let selected = package.tags(0).unwrap().unwrap();
     assert_eq!(selected.get("owner").unwrap().value(), "Alice");
@@ -86,18 +88,23 @@ fn numeric_slide_lookup_does_not_process_unrelated_slides() {
 fn direct_anchor_rejects_an_external_tag_relationship() {
     let mut package = package_with_direct_tag_lists();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let source = tag::load(package.opc_package(), &slide_name)
+    let source = tag::load(package.opc().unwrap(), &slide_name)
         .unwrap()
         .unwrap();
     let relationship_id = source.rel().to_owned();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    let relationship = slide.rels_mut().remove(&relationship_id).unwrap();
-    slide.rels_mut().add_relationship(
-        relationship.reltype().to_owned(),
-        "https://example.invalid/tags.xml".to_owned(),
-        relationship_id,
-        true,
-    );
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            let relationship = slide.rels_mut().remove(&relationship_id).unwrap();
+            slide.rels_mut().add_relationship(
+                relationship.reltype().to_owned(),
+                "https://example.invalid/tags.xml".to_owned(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
+        .unwrap();
 
     assert!(matches!(
         package.tags(0),
@@ -110,17 +117,22 @@ fn direct_anchor_rejects_an_external_tag_relationship() {
 fn direct_anchor_rejects_the_wrong_tag_content_type() {
     let mut package = package_with_direct_tag_lists();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let part_name = tag::load(package.opc_package(), &slide_name)
+    let part_name = tag::load(package.opc().unwrap(), &slide_name)
         .unwrap()
         .unwrap()
         .part()
         .clone();
-    assert!(package.opc_package_mut().remove_part(&part_name));
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        part_name,
-        "application/xml".to_owned(),
-        LOCAL_PRIMARY_TAGS.to_vec(),
-    )));
+    package
+        .edit_opc(|opc| {
+            assert!(opc.remove_part(&part_name));
+            opc.add_part(Box::new(BlobPart::new(
+                part_name,
+                "application/xml".to_owned(),
+                LOCAL_PRIMARY_TAGS.to_vec(),
+            )));
+            Ok(())
+        })
+        .unwrap();
 
     assert!(matches!(
         package.tags(0),
@@ -186,32 +198,35 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
     let mut package = package_with_named_slides();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let inactive_part = PackURI::new("/ppt/tags/tag900.xml").unwrap();
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        inactive_part.clone(),
-        TAG_CONTENT_TYPE.to_owned(),
-        LOCAL_SECONDARY_TAGS.to_vec(),
-    )));
     package
-        .opc_package_mut()
-        .get_part_mut(&slide_name)
-        .unwrap()
-        .rels_mut()
-        .add_relationship(
-            TAG_RELATIONSHIP_TYPE.to_owned(),
-            "../tags/tag900.xml".to_owned(),
-            "rIdInactiveTags".to_owned(),
-            false,
-        );
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                inactive_part.clone(),
+                TAG_CONTENT_TYPE.to_owned(),
+                LOCAL_SECONDARY_TAGS.to_vec(),
+            )));
+            opc.get_part_mut(&slide_name)?.rels_mut().add_relationship(
+                TAG_RELATIONSHIP_TYPE.to_owned(),
+                "../tags/tag900.xml".to_owned(),
+                "rIdInactiveTags".to_owned(),
+                false,
+            );
+            Ok(())
+        })
+        .unwrap();
     let alternate = format!(
         r#"<mc:AlternateContent xmlns:mc="{MC}"><mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/></p:custDataLst></mc:Choice><mc:Fallback><p:custDataLst><!--active-branch--></p:custDataLst></mc:Fallback></mc:AlternateContent>"#
     );
-    {
-        let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-        let xml = std::str::from_utf8(slide.blob()).unwrap();
-        let updated = xml.replacen("</p:spTree>", &format!("</p:spTree>{alternate}"), 1);
-        assert_ne!(updated, xml, "generated slide must contain p:spTree");
-        slide.set_blob(updated.into_bytes());
-    }
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            let xml = std::str::from_utf8(slide.blob()).unwrap();
+            let updated = xml.replacen("</p:spTree>", &format!("</p:spTree>{alternate}"), 1);
+            assert_ne!(updated, xml, "generated slide must contain p:spTree");
+            slide.set_blob(updated.into_bytes());
+            Ok(())
+        })
+        .unwrap();
 
     assert_eq!(package.tags("Overview").unwrap(), None);
     let created = tag_list("Owner", "Alice");
@@ -225,7 +240,7 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
     );
     assert_eq!(package.tags("Overview").unwrap(), Some(replacement.clone()));
     let after_put =
-        std::str::from_utf8(package.opc_package().get_part(&slide_name).unwrap().blob()).unwrap();
+        std::str::from_utf8(package.opc().unwrap().get_part(&slide_name).unwrap().blob()).unwrap();
     assert!(after_put.contains(
         r#"<mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/>"#
     ));
@@ -241,17 +256,25 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
     );
     assert_eq!(reopened.remove_tags("Overview").unwrap(), Some(replacement));
     assert_eq!(reopened.remove_tags("Overview").unwrap(), None);
-    let after_remove =
-        std::str::from_utf8(reopened.opc_package().get_part(&slide_name).unwrap().blob()).unwrap();
+    let after_remove = std::str::from_utf8(
+        reopened
+            .opc()
+            .unwrap()
+            .get_part(&slide_name)
+            .unwrap()
+            .blob(),
+    )
+    .unwrap();
     assert!(after_remove.contains(
         r#"<mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/>"#
     ));
     assert!(after_remove.contains(r#"<p:custDataLst><!--active-branch--></p:custDataLst>"#));
     assert_eq!(after_remove.matches("<p:tags ").count(), 1);
-    assert!(reopened.opc_package().get_part(&inactive_part).is_ok());
+    assert!(reopened.opc().unwrap().get_part(&inactive_part).is_ok());
     assert!(
         reopened
-            .opc_package()
+            .opc()
+            .unwrap()
             .get_part(&slide_name)
             .unwrap()
             .rels()
@@ -307,53 +330,58 @@ fn package_with_named_slides() -> Package {
 
 fn name_slide(package: &mut Package, slide_name: &str, name: &str) {
     let slide_name = PackURI::new(slide_name).unwrap();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    let xml = std::str::from_utf8(slide.blob()).unwrap();
-    let named = if xml.contains("<p:cSld>") {
-        xml.replacen("<p:cSld>", &format!(r#"<p:cSld name="{name}">"#), 1)
-    } else {
-        let marker = " name=\"";
-        let root = xml.find("<p:cSld ").expect("generated slide has p:cSld");
-        let end = root
-            + xml[root..]
-                .find('>')
-                .expect("generated p:cSld has a closing delimiter");
-        let value_start = root
-            + xml[root..end]
-                .find(marker)
-                .expect("named slide has a name attribute")
-            + marker.len();
-        let value_end = value_start
-            + xml[value_start..end]
-                .find('"')
-                .expect("slide name attribute is quoted");
-        let mut named = xml.to_owned();
-        named.replace_range(value_start..value_end, name);
-        named
-    };
-    assert_ne!(named, xml, "generated slide must contain p:cSld");
-    slide.set_blob(named.into_bytes());
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            let xml = std::str::from_utf8(slide.blob()).unwrap();
+            let named = if xml.contains("<p:cSld>") {
+                xml.replacen("<p:cSld>", &format!(r#"<p:cSld name="{name}">"#), 1)
+            } else {
+                let marker = " name=\"";
+                let root = xml.find("<p:cSld ").expect("generated slide has p:cSld");
+                let end = root
+                    + xml[root..]
+                        .find('>')
+                        .expect("generated p:cSld has a closing delimiter");
+                let value_start = root
+                    + xml[root..end]
+                        .find(marker)
+                        .expect("named slide has a name attribute")
+                    + marker.len();
+                let value_end = value_start
+                    + xml[value_start..end]
+                        .find('"')
+                        .expect("slide name attribute is quoted");
+                let mut named = xml.to_owned();
+                named.replace_range(value_start..value_end, name);
+                named
+            };
+            assert_ne!(named, xml, "generated slide must contain p:cSld");
+            slide.set_blob(named.into_bytes());
+            Ok(())
+        })
+        .unwrap();
 }
 
 fn install_unanchored_tag_relationship(package: &mut Package) {
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let part_name = PackURI::new("/ppt/tags/tag99.xml").unwrap();
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        part_name,
-        TAG_CONTENT_TYPE.to_owned(),
-        LOCAL_PRIMARY_TAGS.to_vec(),
-    )));
     package
-        .opc_package_mut()
-        .get_part_mut(&slide_name)
-        .unwrap()
-        .rels_mut()
-        .add_relationship(
-            TAG_RELATIONSHIP_TYPE.to_owned(),
-            "../tags/tag99.xml".to_owned(),
-            "rIdDanglingTags".to_owned(),
-            false,
-        );
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                part_name,
+                TAG_CONTENT_TYPE.to_owned(),
+                LOCAL_PRIMARY_TAGS.to_vec(),
+            )));
+            opc.get_part_mut(&slide_name)?.rels_mut().add_relationship(
+                TAG_RELATIONSHIP_TYPE.to_owned(),
+                "../tags/tag99.xml".to_owned(),
+                "rIdDanglingTags".to_owned(),
+                false,
+            );
+            Ok(())
+        })
+        .unwrap();
 }
 
 fn tag_list(name: &str, value: &str) -> List {

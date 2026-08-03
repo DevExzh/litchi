@@ -144,6 +144,18 @@ tokio = { workspace = true }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [[example]]
+name = "docx_with_fonts"
+required-features = ["ooxml", "fonts"]
+
+[[example]]
+name = "minimal_font_test"
+required-features = ["ooxml", "fonts"]
+
+[[example]]
+name = "pptx_with_fonts"
+required-features = ["ooxml", "fonts"]
+
+[[example]]
 name = "pptx_open_password_encryption"
 required-features = ["ooxml_encryption"]
 

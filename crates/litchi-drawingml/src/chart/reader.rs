@@ -7,6 +7,7 @@ use crate::chart::axis::{
     Axis, AxisCommon, AxisCrossBetween, AxisCrossMode, AxisLabelAlign, BuiltInUnit, CategoryAxis,
     DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
 };
+use crate::chart::bubble::{Scale as BubbleScale, Size as BubbleSize};
 use crate::chart::data::{
     DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
@@ -2445,33 +2446,26 @@ fn parse_area_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Are
 }
 
 fn parse_bubble_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<BubbleTypeGroup> {
-    let mut bubble_3d = false;
-    let mut bubble_scale = None;
+    let mut group_bubble_3d = false;
+    let mut scale = BubbleScale::default();
     let mut show_negative_bubbles = true;
-    let mut size_represents = "area".to_string();
+    let mut size = BubbleSize::default();
     let common = parse_common_type_group(reader, b"bubbleChart", true, true, None, |element| {
         match element.local_name().as_ref() {
-            b"bubble3D" => bubble_3d = parse_bool_attr(element)?,
+            b"bubble3D" => group_bubble_3d = parse_bool_attr(element)?,
             b"bubbleScale" => {
-                bubble_scale = Some(match get_attr(element, b"val") {
+                let value = match get_attr(element, b"val") {
                     Some(_) => bounded_percentage_u32_attr(element, "bubble scale", 0, 300)?,
-                    None => 100,
-                });
+                    None => u32::from(BubbleScale::DEFAULT),
+                };
+                scale = BubbleScale::try_from(value)
+                    .map_err(|error| Error::Invalid(error.to_string()))?;
             },
             b"showNegBubbles" => show_negative_bubbles = parse_bool_attr(element)?,
             b"sizeRepresents" => {
                 let value = get_attr(element, b"val").unwrap_or_else(|| b"area".to_vec());
-                match value.as_slice() {
-                    b"area" | b"w" => {
-                        size_represents = String::from_utf8_lossy(&value).into_owned();
-                    },
-                    _ => {
-                        return Err(invalid_attribute(
-                            "chart bubble size representation",
-                            &value,
-                        ));
-                    },
-                }
+                size = BubbleSize::from_xml(&value)
+                    .map_err(|_| invalid_attribute("chart bubble size representation", &value))?;
             },
             _ => {},
         }
@@ -2479,10 +2473,17 @@ fn parse_bubble_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Bubb
     })?;
     let mut group = BubbleTypeGroup::new();
     group.common = common;
-    group.bubble_3d = bubble_3d;
-    group.bubble_scale = bubble_scale;
+    // ECMA-376 permits bubble3D at group level, but Microsoft Office rejects
+    // that placement. Canonicalize its semantic effect onto each series,
+    // which is the Office-compatible representation.
+    if group_bubble_3d {
+        for series in &mut group.common.series {
+            series.bubble_3d = true;
+        }
+    }
+    group.set_scale(scale);
     group.show_negative_bubbles = show_negative_bubbles;
-    group.size_represents = size_represents;
+    group.set_size(size);
     Ok(group)
 }
 
@@ -7940,8 +7941,8 @@ mod tests {
         let TypeGroup::Bubble(bubble) = &chart.plot_area.type_groups[2] else {
             panic!("expected bubble chart");
         };
-        assert_eq!(bubble.bubble_scale, Some(125));
-        assert_eq!(bubble.size_represents, "area");
+        assert_eq!(bubble.scale().get(), 125);
+        assert_eq!(bubble.size(), BubbleSize::Area);
         let TypeGroup::Doughnut(doughnut) = &chart.plot_area.type_groups[3] else {
             panic!("expected doughnut chart");
         };
@@ -7967,8 +7968,6 @@ mod tests {
         bar.gap_width = Some(501);
         let mut bar_3d = Bar3DTypeGroup::new(BarDirection::Column, BarGrouping::Clustered);
         bar_3d.gap_depth = Some(501);
-        let mut bubble = BubbleTypeGroup::new();
-        bubble.size_represents = "diameter".to_string();
         let mut doughnut = DoughnutTypeGroup::new();
         doughnut.hole_size = 0;
         let mut line_3d = Line3DTypeGroup::new(BarGrouping::Standard);
@@ -7979,7 +7978,6 @@ mod tests {
         for group in [
             TypeGroup::Bar(bar),
             TypeGroup::Bar3D(bar_3d),
-            TypeGroup::Bubble(bubble),
             TypeGroup::Doughnut(doughnut),
             TypeGroup::Line3D(line_3d),
             TypeGroup::Pie(pie),
@@ -8285,11 +8283,10 @@ mod tests {
         surface.wireframe = true;
         let mut surface_3d = Surface3DTypeGroup::new();
         surface_3d.wireframe = true;
-        let mut bubble = BubbleTypeGroup::new();
-        bubble.bubble_scale = Some(125);
+        let mut bubble = BubbleTypeGroup::new()
+            .with_scale(BubbleScale::new(125).unwrap())
+            .with_size(BubbleSize::Width);
         bubble.show_negative_bubbles = false;
-        bubble.bubble_3d = true;
-        bubble.size_represents = "w".to_string();
         let mut bubble_series = Series::new(0);
         bubble_series.x_values = Some(NumericData::from_values(vec![1.0]));
         bubble_series.y_values = Some(NumericData::from_values(vec![2.0]));
@@ -8616,10 +8613,9 @@ mod tests {
         let TypeGroup::Bubble(group) = &parsed.plot_area.type_groups[4] else {
             unreachable!();
         };
-        assert_eq!(group.bubble_scale, Some(125));
+        assert_eq!(group.scale().get(), 125);
         assert!(!group.show_negative_bubbles);
-        assert!(group.bubble_3d);
-        assert_eq!(group.size_represents, "w");
+        assert_eq!(group.size(), BubbleSize::Width);
         assert_eq!(
             group.common.series[0].x_values.as_ref().unwrap().values,
             [1.0]

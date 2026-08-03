@@ -2965,11 +2965,12 @@ six opened without repair prompts, displayed the expected metadata before
 clear and blank values afterward, and rendered the document, slide, and
 worksheet content. This supports open-and-inspect compatibility for those
 artifacts and tested desktop applications only; Office-side edit/resave and
-reverse-read were not performed for this slice. Raw mutable OPC access can
-still make the host slot stale, and a later host-save failure can leave the
-in-memory package changed after a successful slot flush; those transaction
-seams remain explicit follow-up work. Per user direction, the previously green
-full-workspace suite is not repeated.
+reverse-read were not performed for this slice. At this historical slice, raw
+mutable OPC access could still make the host slot stale, and a later host-save
+failure could leave the in-memory package changed after a successful slot
+flush. The later failure-atomic PPTX publication section supersedes this state
+for PPTX; DOCX and the separately described XLSX seams remain open. Per user
+direction, the previously green full-workspace suite is not repeated.
 
 ## Checked BIFF8 writer locations beyond ordinary cells
 
@@ -3194,9 +3195,11 @@ properties bytes instead of regenerating them.
 Three focused host regressions prove the unchanged fast path, injected sink-
 failure restoration with a successful retry, and invalid-property rejection
 before the sink. The common guard regression proves drop-retains/commit-clears
-semantics. The earlier writer-model materialization phase, custom `Part` clone
-policies, and DOCX/PPTX save transactions remain explicit follow-up work. This
-is correctness evidence, not an allocation or latency result.
+semantics. At this slice, the earlier writer-model materialization phase,
+custom `Part` clone policies, and DOCX/PPTX save transactions remained explicit
+follow-up work. The later PPTX publication section closes its staged save
+transaction; DOCX and XLSX's earlier materialization seam remain open. This is
+correctness evidence, not an allocation or latency result.
 
 Per explicit direction, no redundant manual full-workspace gate was scheduled.
 The repository's mandatory pre-commit hook nevertheless ran
@@ -3350,6 +3353,97 @@ structurally valid Office normalization rather than requiring byte identity.
 This is evidence for that producer EOT artifact and desktop build only; it is
 not a native gate for the automatic uncompressed-EOT wrapper, Strict,
 `x-font-ttf`, other Office versions, or measured performance.
+
+## Typed chart domains and native Excel compatibility
+
+The DrawingML bubble-chart facade now uses the closed `bubble::Size` enum and
+the checked `bubble::Scale` scalar instead of an open string and an unbounded
+integer. SpreadsheetML borders likewise use the focused
+`xlsx::styles::border::{Line, Rgb, Tint, Color, Side, Dir, Diagonal, Border}`
+model throughout the parser, worksheet facade, cell format, and writer.
+Unknown line-style and malformed ARGB tokens fail parsing, tint is bounded,
+absence is represented by `Option<Side>`, and authored diagonals require both
+a side and direction. On visible sides, theme, indexed, RGB, automatic, and
+tint-only color states survive read/write; style-less or `none` sides
+canonicalize to absence. Inside-edge, outline, and Strict logical-edge states
+also survive read/write. Border resources compare complete values, and cell
+formats key their resolved resource identities rather than trusting a hash
+alone.
+
+Computer Use first opened
+`target/office-verification/typed-chart-domains.xlsx` in desktop Microsoft
+Excel for macOS and observed a repair report that removed
+`xl/drawings/drawing3.xml`. Quoting the worksheet name in the chart formulas
+was necessary but did not remove the repair. Inspection of the checked-in
+`[MS-OE376]` conformance notes identified section 2.1.1458(b): ISO/IEC 29500
+permits `bubble3D` directly under `bubbleChart`, but Microsoft Office does not.
+The reader now accepts that standards form and projects its value onto each
+typed series; the writer emits only the Office-compatible series-level form.
+
+After regeneration, the same artifact opened with no repair, recovery, or
+compatibility warning. Excel's accessibility tree exposed both the scatter
+chart and the bubble chart on the `Scatter & Bubble` sheet, and visual
+inspection confirmed both rendered. This is native-open evidence for that
+generated workbook and the tested desktop Excel build only.
+
+A separate `xlsx_comprehensive_features.xlsx` artifact exercises the typed
+border facade by authoring a black `Line::Thick` bottom `Side` on each header
+cell. The same desktop Excel session opened it without a repair, recovery, or
+compatibility warning. With `A1` selected, Excel's native **Format Cells >
+Border** inspector reported `Thick` as the selected line style and rendered a
+black bottom edge with the other edges absent. This verifies native
+interpretation of that one RGB bottom-side combination. Neither artifact is an
+Office-resave fidelity test, a version matrix, coverage of the remaining line,
+color, logical-edge, diagonal, or chart variants, or measured performance.
+
+## Failure-atomic PPTX publication and owned font buffers
+
+PPTX save preparation now treats legacy-writer materialization, optional font
+publication, core-property staging, and the final sink as one publication
+transaction. An unchanged presentation with no property edit or requested font
+work writes the original OPC graph directly. A dirty path snapshots bounded
+package metadata while built-in part payloads retain their shared `Arc`
+allocations, materializes the presentation, applies optional font work, and
+stages core properties without clearing their edit intent. Only a successful
+sink marks the presentation clean and commits the exact property guard. Any
+error restores the prior package graph and leaves both edits retryable.
+
+Encrypted file save includes serialization, encryption, and atomic destination
+replacement inside that same transaction. Producing an encrypted byte vector
+is itself a successful publication boundary, but a pre-publication filesystem
+failure no longer inherits an earlier in-memory commit. The atomic layer does
+not yet distinguish a directory-sync failure after rename. In that case the
+new destination may already be visible while `write_with` restores dirty
+in-memory state and encrypted-save profile state; this committed-but-not-known-
+durable divergence remains follow-up work. A focused injected-sink regression
+observes the fully staged slide and property in the candidate, then proves
+pointer-identical presentation-payload restoration, retained dirty intent, a
+successful retry, and semantic reopen.
+
+PPTX raw OPC access is now a fallible, explicitly low-level boundary. `opc`
+rejects a graph whose presentation writer, core-property slot, or font policy
+still has managed state pending; encrypted sources also reject raw plaintext
+exposure. Mutable access no longer returns an escaping `&mut OpcPackage`.
+`edit_opc` applies a closure to a structural candidate whose built-in payloads
+share immutable `Arc` storage. Error or unwind leaves that candidate
+unpublished, but custom `Part` implementations retain their own clone and
+interior-mutability policy. The boundary rejects automatic font-policy
+changes, validates that the PowerPoint main relationship is singular and
+internal with an allowed PPTX content type, validates the core-property graph,
+reloads the property slot, and only then commits while disabling the legacy
+writer. It does not parse the complete PresentationML graph. Covered notes,
+tag, slide, master, layout, and theme graph mutators use the same
+candidate-and-mode-transition rule, so a later writer materialization cannot
+erase their successful edits. Managed `to_bytes` preserves the encrypted-
+source policy, while `to_plain_bytes` makes plaintext extraction explicit.
+DOCX, XLSX, and the binary-format hosts still require equivalent boundary work.
+
+The system-font loader also consumes a uniquely owned font-kit memory `Arc` via
+`Arc::unwrap_or_clone`: the unique case keeps the original `Vec`
+allocation, while a genuinely shared handle copies and leaves its other owner
+intact. Pointer-identity tests cover both ownership branches. These are
+structural copy and transaction guarantees, not measured latency, allocation,
+or throughput claims; ADR 0005 performance evidence remains outstanding.
 
 ## Evidence levels
 

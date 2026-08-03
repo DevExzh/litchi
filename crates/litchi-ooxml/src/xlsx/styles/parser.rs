@@ -7,7 +7,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
+use super::border::{Color, Dir, Line, Rgb, Side, Tint};
+use super::{Alignment, Border, CellStyle, Fill, Font, NumberFormat, Styles};
 use crate::error::{OoxmlError, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
@@ -554,7 +555,7 @@ fn parse_borders(
 
 fn parse_empty_border(element: &BytesStart<'_>, decoder: Decoder) -> Result<Border> {
     let mut border = Border::new();
-    set_diagonal_direction(&mut border, element, decoder)?;
+    set_border_attributes(&mut border, element, decoder)?;
     Ok(border)
 }
 
@@ -564,8 +565,8 @@ fn parse_border(
     decoder: Decoder,
 ) -> Result<Border> {
     let mut border = Border::new();
-    set_diagonal_direction(&mut border, element, decoder)?;
-    let mut seen = 0u8;
+    set_border_attributes(&mut border, element, decoder)?;
+    let mut seen = 0u16;
     loop {
         let decoder = reader.decoder();
         let (namespace, event) = resolved_event(reader, "border")?;
@@ -590,29 +591,46 @@ fn parse_border_child(
     element: &BytesStart<'_>,
     decoder: Decoder,
     empty: bool,
-    seen: &mut u8,
+    seen: &mut u16,
     border: &mut Border,
 ) -> Result<()> {
     match element.local_name().as_ref() {
+        b"start" => {
+            mark_property(seen, 1, "start border")?;
+            border.start = parse_border_side_event(reader, element, decoder, empty)?;
+        },
+        b"end" => {
+            mark_property(seen, 2, "end border")?;
+            border.end = parse_border_side_event(reader, element, decoder, empty)?;
+        },
         b"left" => {
-            mark_property(seen, 1, "left border")?;
+            mark_property(seen, 4, "left border")?;
             border.left = parse_border_side_event(reader, element, decoder, empty)?;
         },
         b"right" => {
-            mark_property(seen, 2, "right border")?;
+            mark_property(seen, 8, "right border")?;
             border.right = parse_border_side_event(reader, element, decoder, empty)?;
         },
         b"top" => {
-            mark_property(seen, 4, "top border")?;
+            mark_property(seen, 16, "top border")?;
             border.top = parse_border_side_event(reader, element, decoder, empty)?;
         },
         b"bottom" => {
-            mark_property(seen, 8, "bottom border")?;
+            mark_property(seen, 32, "bottom border")?;
             border.bottom = parse_border_side_event(reader, element, decoder, empty)?;
         },
         b"diagonal" => {
-            mark_property(seen, 16, "diagonal border")?;
-            border.diagonal = parse_border_side_event(reader, element, decoder, empty)?;
+            mark_property(seen, 64, "diagonal border")?;
+            let side = parse_border_side_event(reader, element, decoder, empty)?;
+            border.set_diagonal_side(side);
+        },
+        b"vertical" => {
+            mark_property(seen, 128, "vertical border")?;
+            border.vertical = parse_border_side_event(reader, element, decoder, empty)?;
+        },
+        b"horizontal" => {
+            mark_property(seen, 256, "horizontal border")?;
+            border.horizontal = parse_border_side_event(reader, element, decoder, empty)?;
         },
         _ => {},
     }
@@ -624,11 +642,12 @@ fn parse_border_side_event(
     element: &BytesStart<'_>,
     decoder: Decoder,
     empty: bool,
-) -> Result<Option<BorderStyle>> {
+) -> Result<Option<Side>> {
     let style = optional_string(element, b"style", decoder)?.unwrap_or_else(|| "none".into());
-    validate_border_style(&style)?;
+    let line =
+        Line::from_xml(&style).map_err(|_| invalid(format!("invalid border style '{style}'")))?;
     if empty {
-        return Ok((style != "none").then(|| BorderStyle::new(style, None)));
+        return Ok(line.map(Side::new));
     }
     let side = element.local_name().as_ref().to_vec();
     let mut color = None;
@@ -639,11 +658,17 @@ fn parse_border_side_event(
             Event::Start(element) | Event::Empty(element)
                 if is_spreadsheetml_name(namespace, element.name(), b"color") =>
             {
-                let parsed = parse_color(&element, decoder)?;
+                let parsed = parse_border_color(&element, decoder)?;
                 set_once(&mut color, parsed, "border color")?;
             },
             Event::End(element) if is_spreadsheetml_name(namespace, element.name(), &side) => {
-                return Ok((style != "none").then(|| BorderStyle::new(style, color.flatten())));
+                return Ok(line.map(|line| {
+                    let side = Side::new(line);
+                    match color.flatten() {
+                        Some(color) => side.with_color(color),
+                        None => side,
+                    }
+                }));
             },
             Event::Eof => return Err(unterminated("border side")),
             _ => {},
@@ -651,15 +676,15 @@ fn parse_border_side_event(
     }
 }
 
-fn set_diagonal_direction(
+fn set_border_attributes(
     border: &mut Border,
     element: &BytesStart<'_>,
     decoder: Decoder,
 ) -> Result<()> {
     let up = optional_bool(element, b"diagonalUp", decoder, "diagonalUp")?.unwrap_or(false);
     let down = optional_bool(element, b"diagonalDown", decoder, "diagonalDown")?.unwrap_or(false);
-    let direction = u32::from(up) | (u32::from(down) << 1);
-    border.diagonal_direction = (direction != 0).then_some(direction);
+    border.set_diagonal_dir(Dir::from_flags(up, down));
+    border.outline = optional_bool(element, b"outline", decoder, "border outline")?;
     Ok(())
 }
 
@@ -821,6 +846,45 @@ fn parse_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<Stri
     }
 }
 
+fn parse_border_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<Color>> {
+    let rgb = optional_string(element, b"rgb", decoder)?;
+    let theme = optional_u32(element, b"theme", decoder, "theme color")?;
+    let indexed = optional_u32(element, b"indexed", decoder, "indexed color")?;
+    let automatic = optional_bool(element, b"auto", decoder, "automatic color")?;
+    let specified = usize::from(rgb.is_some())
+        + usize::from(theme.is_some())
+        + usize::from(indexed.is_some())
+        + usize::from(automatic.is_some());
+    if specified > 1 {
+        return Err(invalid("border color has multiple base values"));
+    }
+    let tint = optional_f64(element, b"tint", decoder, "border color tint")?
+        .map(Tint::new)
+        .transpose()
+        .map_err(|_| invalid("border color tint must be finite and between -1 and 1"))?;
+
+    let color = if let Some(value) = rgb {
+        Color::from_rgb(
+            value
+                .parse::<Rgb>()
+                .map_err(|_| invalid(format!("invalid RGB color '{value}'")))?,
+        )
+    } else if let Some(index) = theme {
+        Color::theme(index)
+    } else if let Some(index) = indexed {
+        Color::indexed(index)
+    } else if let Some(enabled) = automatic {
+        Color::auto_value(enabled)
+    } else {
+        Color::default_base()
+    };
+
+    Ok(Some(match tint {
+        Some(tint) => color.with_tint(tint),
+        None => color,
+    }))
+}
+
 fn validate_pattern(value: &str) -> Result<()> {
     if matches!(
         value,
@@ -847,30 +911,6 @@ fn validate_pattern(value: &str) -> Result<()> {
         Ok(())
     } else {
         Err(invalid(format!("invalid fill pattern '{value}'")))
-    }
-}
-
-fn validate_border_style(value: &str) -> Result<()> {
-    if matches!(
-        value,
-        "none"
-            | "thin"
-            | "medium"
-            | "dashed"
-            | "dotted"
-            | "thick"
-            | "double"
-            | "hair"
-            | "mediumDashed"
-            | "dashDot"
-            | "mediumDashDot"
-            | "dashDotDot"
-            | "mediumDashDotDot"
-            | "slantDashDot"
-    ) {
-        Ok(())
-    } else {
-        Err(invalid(format!("invalid border style '{value}'")))
     }
 }
 
@@ -1086,11 +1126,17 @@ mod tests {
             },
             _ => panic!("expected gradient fill"),
         }
-        assert_eq!(styles.borders[0].diagonal_direction, Some(1));
-        assert_eq!(styles.borders[0].left.as_ref().unwrap().style, "thin");
         assert_eq!(
-            styles.borders[0].left.as_ref().unwrap().color.as_deref(),
-            Some("auto")
+            styles.borders[0]
+                .diagonal
+                .as_ref()
+                .and_then(super::super::border::Diagonal::dir),
+            Some(Dir::Up)
+        );
+        assert_eq!(styles.borders[0].left.as_ref().unwrap().line, Line::Thin);
+        assert_eq!(
+            styles.borders[0].left.as_ref().unwrap().color,
+            Some(Color::auto())
         );
         assert_eq!(styles.cell_styles.len(), 1);
         assert_eq!(styles.cell_xfs.len(), 2);
@@ -1106,11 +1152,53 @@ mod tests {
     fn supports_strict_aliases_and_empty_sections() {
         let xml = r#"<x:styleSheet xmlns:x="http://purl.oclc.org/ooxml/spreadsheetml/main">
             <x:numFmts count="0"/><x:fonts count="1"><x:font/></x:fonts><x:fills count="0"/>
-            <x:borders count="1"><x:border/></x:borders><x:cellStyleXfs count="0"/>
+            <x:borders count="1"><x:border outline="0" diagonalDown="1">
+                <x:start style="thin"><x:color theme="2" tint="-0.25"/></x:start>
+                <x:end style="dotted"/><x:bottom style="medium"><x:color tint="0.5"/></x:bottom>
+                <x:diagonal style="dashed"/><x:vertical style="hair"/><x:horizontal style="double"/>
+                </x:border></x:borders><x:cellStyleXfs count="0"/>
             <x:cellXfs count="1"><x:xf quotePrefix="1"/></x:cellXfs></x:styleSheet>"#;
         let styles = parse_styles(xml).unwrap();
         assert_eq!(styles.fonts.len(), 1);
         assert_eq!(styles.borders.len(), 1);
+        let border = &styles.borders[0];
+        assert_eq!(border.outline, Some(false));
+        assert_eq!(
+            border.start.as_ref().map(|side| side.line),
+            Some(Line::Thin)
+        );
+        assert_eq!(
+            border.end.as_ref().map(|side| side.line),
+            Some(Line::Dotted)
+        );
+        assert_eq!(
+            border.vertical.as_ref().map(|side| side.line),
+            Some(Line::Hair)
+        );
+        assert_eq!(
+            border.horizontal.as_ref().map(|side| side.line),
+            Some(Line::Double)
+        );
+        assert_eq!(
+            border
+                .diagonal
+                .as_ref()
+                .and_then(super::super::border::Diagonal::dir),
+            Some(Dir::Down)
+        );
+        assert!(matches!(
+            border.start.as_ref().and_then(|side| side.color),
+            Some(Color::Theme {
+                index: 2,
+                tint: Some(value),
+            }) if value.get() == -0.25
+        ));
+        assert!(matches!(
+            border.bottom.as_ref().and_then(|side| side.color),
+            Some(Color::Default {
+                tint: Some(value),
+            }) if value.get() == 0.5
+        ));
         assert!(styles.cell_xfs[0].quote_prefix);
     }
 
@@ -1130,6 +1218,15 @@ mod tests {
             ),
             &format!(
                 r#"<styleSheet xmlns="{S}"><borders><border><left style="invalid"/></border></borders></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><borders><border><left style="thin"><color rgb="112233"/></left></border></borders></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><borders><border><left style="thin"><color theme="1" indexed="2"/></left></border></borders></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><borders><border><left style="thin"><color rgb="FF112233" tint="2"/></left></border></borders></styleSheet>"#
             ),
             &format!(
                 r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment textRotation="200"/></xf></cellXfs></styleSheet>"#

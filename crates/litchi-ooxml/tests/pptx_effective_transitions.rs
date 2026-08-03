@@ -98,14 +98,19 @@ fn package_with_transition_fragments(fragments: &[(&str, &str, &str)]) -> Packag
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
-    for (part_name, end_tag, fragment) in fragments {
-        let part_name = PackURI::new(*part_name).unwrap();
-        let part = package.opc_package_mut().get_part_mut(&part_name).unwrap();
-        let xml = std::str::from_utf8(part.blob()).unwrap();
-        let updated = xml.replacen(end_tag, &format!("{fragment}{end_tag}"), 1);
-        assert_ne!(updated, xml);
-        part.set_blob(updated.into_bytes());
-    }
+    package
+        .edit_opc(|opc| {
+            for (part_name, end_tag, fragment) in fragments {
+                let part_name = PackURI::new(*part_name).unwrap();
+                let part = opc.get_part_mut(&part_name).unwrap();
+                let xml = std::str::from_utf8(part.blob()).unwrap();
+                let updated = xml.replacen(end_tag, &format!("{fragment}{end_tag}"), 1);
+                assert_ne!(updated, xml);
+                part.set_blob(updated.into_bytes());
+            }
+            Ok(())
+        })
+        .unwrap();
     package
 }
 

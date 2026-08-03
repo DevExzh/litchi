@@ -35,9 +35,10 @@ fn package_with_master_xml() -> Package {
     let mut package = Package::open(output.path()).unwrap();
     let part_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&part_name)
-        .unwrap()
-        .set_blob(MASTER_XML.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&part_name)?.set_blob(MASTER_XML.to_vec());
+            Ok(())
+        })
+        .unwrap();
     package
 }

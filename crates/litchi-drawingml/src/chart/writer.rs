@@ -971,12 +971,6 @@ fn write_bar_3d_chart<W: Write>(writer: &mut W, group: &Bar3DTypeGroup) -> std::
 }
 
 fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std::io::Result<()> {
-    validate_optional_u32_range(group.bubble_scale, 0, 300, "bubble chart scale")?;
-    if !matches!(group.size_represents.as_str(), "area" | "w") {
-        return Err(invalid_chart_input(
-            "bubble chart size representation must be 'area' or 'w'",
-        ));
-    }
     write!(writer, "<c:bubbleChart>")?;
     write!(
         writer,
@@ -990,15 +984,7 @@ fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std:
 
     write_group_data_labels(writer, &group.common)?;
 
-    write!(
-        writer,
-        r#"<c:bubble3D val="{}"/>"#,
-        if group.bubble_3d { "1" } else { "0" }
-    )?;
-
-    // bubbleScale defaults to 100 if not specified
-    let scale = group.bubble_scale.unwrap_or(100);
-    write!(writer, r#"<c:bubbleScale val="{}"/>"#, scale)?;
+    write!(writer, r#"<c:bubbleScale val="{}"/>"#, group.scale().get())?;
 
     write!(
         writer,
@@ -1012,7 +998,7 @@ fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std:
     write!(
         writer,
         r#"<c:sizeRepresents val="{}"/>"#,
-        escape_xml(&group.size_represents)
+        group.size().xml_value()
     )?;
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "bubble chart")?;

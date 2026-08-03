@@ -135,6 +135,7 @@ pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::InlineImage;
 pub use litchi_docx::{color, glossary, web};
+pub use litchi_opc::FontEmbedding;
 pub use mail_merge::{
     MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
     MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,

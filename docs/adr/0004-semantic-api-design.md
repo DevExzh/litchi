@@ -105,6 +105,47 @@ ranges, rows, sheets, and other developer-facing collections; native
 relationship IDs, part names, and physical style indexes stay below the facade.
 
 Properties with constrained wire domains use short types in focused modules.
+Bubble charts are the concrete DrawingML precedent: `chart::bubble::Size` is an
+enum for the exclusive `area`/`w` wire domain, while
+`chart::bubble::Scale` is a `repr(transparent)` `u16` newtype whose checked
+constructors admit only the inclusive `0..=300` schema range. `Scale`'s inner
+value and `BubbleTypeGroup`'s scale and size fields remain private, so safe
+client code cannot construct an invalid bubble scale or size-representation
+state, and the writer does not repeat late string or range validation. The
+group exposes the concise
+`scale`/`set_scale`/`with_scale` and `size`/`set_size`/`with_size` families.
+Reading validates both domains before constructing the group: numeric XML is
+checked before conversion to `Scale`, and size tokens are matched exactly by
+`Size::from_xml`. Writing maps `Size` directly to a borrowed static token, so
+domain-to-wire conversion performs no allocation. Unit tests cover scale
+boundaries and exact size-token conversion; the public integration tests cover
+typed builder access, writer/reader round trips, and rejection of an
+out-of-range scale or unknown size token.
+
+SpreadsheetML borders follow the same rule through the focused
+`xlsx::styles::border` module. `Line` replaces the open-ended style string;
+`Rgb` is an exact four-byte ARGB value; `Tint` admits only finite values in
+`-1.0..=1.0`; and `Color` distinguishes default, RGB, theme, indexed, and
+explicit automatic values. `Side` composes one visible line with that typed
+color. `Diagonal::new(Side, Dir)` makes a complete authored diagonal, while a
+private partial representation retains side-only or direction-only
+schema-valid producer states. `Border` is the single model shared by the style
+parser, worksheet facade, `CellFormat`, and writer, including physical or
+Strict logical edges, inside edges, and the outline setting. Absence is
+`Option<Side>` rather than a contradictory
+`Line::None`; there are no `BorderStyle`, `CellBorder`, or `CellBorderSide`
+compatibility aliases. Exact line tokens map to borrowed static strings,
+unknown tokens fail parsing, incompatible edge conventions fail writing, and
+full-value resource equality plus resolved cell-format keys prevent hash
+collisions from aliasing distinct borders.
+
+The standard permits `bubble3D` directly under `bubbleChart`, but desktop
+Microsoft Excel rejects that placement as documented by MS-OE376 section
+2.1.1458(b). The reader therefore accepts the standard form and projects its
+semantic value onto the typed series state, while the writer emits only the
+Office-compatible series-level element. This is a deliberate canonicalization
+at a measured native-application boundary, not an unchecked string workaround.
+
 The XLSX grid-property surface therefore uses `column::{Width, Props, State}`
 and `row::{Height, Props, State}` with one shared checked `Outline` type. Widths
 admit only finite Office widths, heights admit only finite Excel point heights,

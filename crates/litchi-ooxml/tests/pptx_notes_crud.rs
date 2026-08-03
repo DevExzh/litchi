@@ -71,7 +71,7 @@ fn selector_failures_do_not_mutate_the_notes_graph() {
     name_slide(&mut package, "/ppt/slides/slide1.xml", "Overview");
     name_slide(&mut package, "/ppt/slides/slide2.xml", "Appendix");
     let before = package.notes().unwrap().unwrap();
-    let before_parts = package.opc_package().part_count();
+    let before_parts = package.opc().unwrap().part_count();
 
     assert!(matches!(
         package.remove_notes(2usize),
@@ -84,7 +84,7 @@ fn selector_failures_do_not_mutate_the_notes_graph() {
         Err(OoxmlError::Pptx(litchi_pptx::Error::SlideNameNotFound(name)))
             if name == "Missing"
     ));
-    assert_eq!(package.opc_package().part_count(), before_parts);
+    assert_eq!(package.opc().unwrap().part_count(), before_parts);
     assert_eq!(package.notes().unwrap().unwrap(), before);
 
     name_slide(&mut package, "/ppt/slides/slide2.xml", "Overview");
@@ -179,21 +179,26 @@ fn authored_two_slide_deck() -> NamedTempFile {
 
 fn name_slide(package: &mut Package, slide_name: &str, name: &str) {
     let slide_name = PackURI::new(slide_name).unwrap();
-    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
-    let xml = std::str::from_utf8(slide.blob()).unwrap();
-    let named = if xml.contains("<p:cSld>") {
-        xml.replacen("<p:cSld>", &format!(r#"<p:cSld name="{name}">"#), 1)
-    } else {
-        let marker = " name=\"";
-        let root = xml.find("<p:cSld ").unwrap();
-        let end = root + xml[root..].find('>').unwrap();
-        let value_start = root + xml[root..end].find(marker).unwrap() + marker.len();
-        let value_end = value_start + xml[value_start..end].find('"').unwrap();
-        let mut named = xml.to_owned();
-        named.replace_range(value_start..value_end, name);
-        named
-    };
-    slide.set_blob(named.into_bytes());
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            let xml = std::str::from_utf8(slide.blob()).unwrap();
+            let named = if xml.contains("<p:cSld>") {
+                xml.replacen("<p:cSld>", &format!(r#"<p:cSld name="{name}">"#), 1)
+            } else {
+                let marker = " name=\"";
+                let root = xml.find("<p:cSld ").unwrap();
+                let end = root + xml[root..].find('>').unwrap();
+                let value_start = root + xml[root..end].find(marker).unwrap() + marker.len();
+                let value_end = value_start + xml[value_start..end].find('"').unwrap();
+                let mut named = xml.to_owned();
+                named.replace_range(value_start..value_end, name);
+                named
+            };
+            slide.set_blob(named.into_bytes());
+            Ok(())
+        })
+        .unwrap();
 }
 
 fn slide_text(package: &Package) -> Vec<String> {
@@ -234,16 +239,18 @@ fn assert_no_speaker_notes(package: &Package) {
     assert!(graph.slides().is_empty());
     assert!(
         package
-            .opc_package()
+            .opc()
+            .unwrap()
             .contains_part(&PackURI::new("/ppt/notesMasters/notesMaster1.xml").unwrap())
     );
     assert!(
         package
-            .opc_package()
+            .opc()
+            .unwrap()
             .iter_parts()
             .all(|part| part.content_type() != ct::PML_NOTES_SLIDE)
     );
-    assert!(package.opc_package().iter_parts().all(|part| {
+    assert!(package.opc().unwrap().iter_parts().all(|part| {
         part.rels()
             .iter()
             .all(|relationship| relationship.reltype() != rt::NOTES_SLIDE)

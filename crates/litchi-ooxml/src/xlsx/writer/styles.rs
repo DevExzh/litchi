@@ -4,13 +4,13 @@
 //! all the formatting information (fonts, fills, borders, number formats, and
 //! cell formats) used in an Excel workbook.
 
-use crate::xlsx::format::{
-    CellBorder, CellBorderSide, CellFill, CellFillPatternType, CellFont, CellFormat,
-};
+use crate::xlsx::format::{CellFill, CellFillPatternType, CellFont, CellFormat};
+use crate::xlsx::styles::border::{Border, Color, Conformance, Side};
 use litchi_core::sheet::Result as SheetResult;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
+use std::sync::Arc;
 
 /// Builder for generating styles.xml content.
 ///
@@ -27,17 +27,17 @@ pub struct StylesBuilder {
     /// Fill lookup (fill hash -> index)
     fill_map: HashMap<u64, usize>,
     /// Unique borders (index -> border)
-    borders: Vec<CellBorder>,
-    /// Border lookup (border hash -> index)
-    border_map: HashMap<u64, usize>,
+    borders: Vec<Arc<Border>>,
+    /// Full-value lookup; `Arc` shares the single owned border allocation.
+    border_map: HashMap<Arc<Border>, usize>,
     /// Unique number formats (index -> format string)
     number_formats: Vec<String>,
     /// Number format lookup (format string -> index)
     number_format_map: HashMap<String, usize>,
     /// Cell formats (XF records) - index -> (font_id, fill_id, border_id, num_fmt_id)
     cell_formats: Vec<(usize, usize, usize, usize)>,
-    /// Cell format lookup (format hash -> index)
-    cell_format_map: HashMap<u64, usize>,
+    /// Cell format lookup by resolved resource identity.
+    cell_format_map: HashMap<(usize, usize, usize, usize), usize>,
 }
 
 impl StylesBuilder {
@@ -94,13 +94,13 @@ impl StylesBuilder {
         );
 
         // Add default border (required by Excel)
-        builder.borders.push(CellBorder::default());
-        builder
-            .border_map
-            .insert(Self::hash_border(&CellBorder::default()), 0);
+        let border = Arc::new(Border::default());
+        builder.borders.push(Arc::clone(&border));
+        builder.border_map.insert(border, 0);
 
         // Add default cell format (style index 0)
         builder.cell_formats.push((0, 0, 0, 0)); // font=0, fill=0, border=0, numFmt=0
+        builder.cell_format_map.insert((0, 0, 0, 0), 0);
 
         builder
     }
@@ -109,13 +109,6 @@ impl StylesBuilder {
     ///
     /// If the format has already been added, returns the existing index.
     pub fn add_cell_format(&mut self, format: &CellFormat) -> usize {
-        let format_hash = Self::hash_cell_format(format);
-
-        // Check if this format already exists
-        if let Some(&index) = self.cell_format_map.get(&format_hash) {
-            return index;
-        }
-
         // Add font if present
         let font_id = if let Some(ref font) = format.font {
             self.add_font(font)
@@ -144,11 +137,15 @@ impl StylesBuilder {
             0 // General format
         };
 
+        let key = (font_id, fill_id, border_id, num_fmt_id);
+        if let Some(&index) = self.cell_format_map.get(&key) {
+            return index;
+        }
+
         // Add the cell format
         let index = self.cell_formats.len();
-        self.cell_formats
-            .push((font_id, fill_id, border_id, num_fmt_id));
-        self.cell_format_map.insert(format_hash, index);
+        self.cell_formats.push(key);
+        self.cell_format_map.insert(key, index);
 
         index
     }
@@ -180,15 +177,15 @@ impl StylesBuilder {
     }
 
     /// Add a border and return its index.
-    fn add_border(&mut self, border: &CellBorder) -> usize {
-        let hash = Self::hash_border(border);
-        if let Some(&index) = self.border_map.get(&hash) {
+    fn add_border(&mut self, border: &Border) -> usize {
+        if let Some(&index) = self.border_map.get(border) {
             return index;
         }
 
         let index = self.borders.len();
-        self.borders.push(border.clone());
-        self.border_map.insert(hash, index);
+        let border = Arc::new(border.clone());
+        self.borders.push(Arc::clone(&border));
+        self.border_map.insert(border, index);
         index
     }
 
@@ -207,12 +204,22 @@ impl StylesBuilder {
 
     /// Generate the complete styles.xml content.
     pub fn to_xml(&self) -> SheetResult<String> {
+        self.to_xml_in(Conformance::Transitional)
+    }
+
+    /// Generate styles using the requested SpreadsheetML conformance.
+    pub fn to_xml_in(&self, conformance: Conformance) -> SheetResult<String> {
         let mut xml = String::with_capacity(4096);
 
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(
-            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
-        );
+        let namespace = match conformance {
+            Conformance::Transitional => {
+                "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            },
+            Conformance::Strict => "http://purl.oclc.org/ooxml/spreadsheetml/main",
+        };
+        write!(xml, r#"<styleSheet xmlns="{namespace}">"#)
+            .map_err(|error| format!("XML write error: {error}"))?;
 
         // Write number formats (if any custom ones exist)
         if !self.number_formats.is_empty() {
@@ -258,7 +265,7 @@ impl StylesBuilder {
             .map_err(|e| format!("XML write error: {}", e))?;
 
         for border in &self.borders {
-            self.write_border(&mut xml, border)?;
+            self.write_border(&mut xml, border, conformance)?;
         }
 
         xml.push_str("</borders>");
@@ -371,14 +378,61 @@ impl StylesBuilder {
     }
 
     /// Write a border element to XML.
-    fn write_border(&self, xml: &mut String, border: &CellBorder) -> SheetResult<()> {
-        xml.push_str("<border>");
+    fn write_border(
+        &self,
+        xml: &mut String,
+        border: &Border,
+        conformance: Conformance,
+    ) -> SheetResult<()> {
+        match conformance {
+            Conformance::Transitional if border.start.is_some() || border.end.is_some() => {
+                return Err("strict start/end borders require strict SpreadsheetML".into());
+            },
+            Conformance::Strict if border.left.is_some() || border.right.is_some() => {
+                return Err(
+                    "physical left/right borders require transitional SpreadsheetML".into(),
+                );
+            },
+            _ => {},
+        }
 
-        self.write_border_side(xml, "left", border.left.as_ref())?;
-        self.write_border_side(xml, "right", border.right.as_ref())?;
+        xml.push_str("<border");
+        if let Some(direction) = border.diagonal.as_ref().and_then(|diagonal| diagonal.dir()) {
+            if direction.is_up() {
+                xml.push_str(r#" diagonalUp="1""#);
+            }
+            if direction.is_down() {
+                xml.push_str(r#" diagonalDown="1""#);
+            }
+        }
+        if let Some(outline) = border.outline {
+            write!(xml, r#" outline="{}""#, u8::from(outline))
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        xml.push('>');
+
+        match conformance {
+            Conformance::Transitional => {
+                self.write_border_side(xml, "left", border.left.as_ref())?;
+                self.write_border_side(xml, "right", border.right.as_ref())?;
+            },
+            Conformance::Strict => {
+                self.write_border_side(xml, "start", border.start.as_ref())?;
+                self.write_border_side(xml, "end", border.end.as_ref())?;
+            },
+        }
         self.write_border_side(xml, "top", border.top.as_ref())?;
         self.write_border_side(xml, "bottom", border.bottom.as_ref())?;
-        self.write_border_side(xml, "diagonal", border.diagonal.as_ref())?;
+        self.write_border_side(
+            xml,
+            "diagonal",
+            border
+                .diagonal
+                .as_ref()
+                .and_then(|diagonal| diagonal.side()),
+        )?;
+        self.write_border_side(xml, "vertical", border.vertical.as_ref())?;
+        self.write_border_side(xml, "horizontal", border.horizontal.as_ref())?;
 
         xml.push_str("</border>");
         Ok(())
@@ -389,15 +443,14 @@ impl StylesBuilder {
         &self,
         xml: &mut String,
         side: &str,
-        border_side: Option<&CellBorderSide>,
+        border_side: Option<&Side>,
     ) -> SheetResult<()> {
         if let Some(bs) = border_side {
-            write!(xml, r#"<{} style="{}">"#, side, bs.style.as_str())
+            write!(xml, r#"<{} style="{}">"#, side, bs.line.as_str())
                 .map_err(|e| format!("XML write error: {}", e))?;
 
-            if let Some(ref color) = bs.color {
-                write!(xml, r#"<color rgb="{}"/>"#, escape_xml(color))
-                    .map_err(|e| format!("XML write error: {}", e))?;
+            if let Some(color) = bs.color.as_ref() {
+                Self::write_border_color(xml, color)?;
             }
 
             write!(xml, "</{}>", side).map_err(|e| format!("XML write error: {}", e))?;
@@ -405,6 +458,35 @@ impl StylesBuilder {
             write!(xml, "<{}/>", side).map_err(|e| format!("XML write error: {}", e))?;
         }
 
+        Ok(())
+    }
+
+    fn write_border_color(xml: &mut String, color: &Color) -> SheetResult<()> {
+        xml.push_str("<color");
+        match color {
+            Color::Default { .. } => {},
+            Color::Rgb { value, .. } => {
+                write!(xml, r#" rgb="{value}""#)
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            },
+            Color::Theme { index, .. } => {
+                write!(xml, r#" theme="{index}""#)
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            },
+            Color::Indexed { index, .. } => {
+                write!(xml, r#" indexed="{index}""#)
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            },
+            Color::Auto { enabled, .. } => {
+                write!(xml, r#" auto="{}""#, u8::from(*enabled))
+                    .map_err(|error| format!("XML write error: {error}"))?;
+            },
+        }
+        if let Some(tint) = color.tint() {
+            write!(xml, r#" tint="{}""#, tint.get())
+                .map_err(|error| format!("XML write error: {error}"))?;
+        }
+        xml.push_str("/>");
         Ok(())
     }
 
@@ -445,53 +527,6 @@ impl StylesBuilder {
         }
         hasher.finish()
     }
-
-    /// Hash a border for deduplication.
-    fn hash_border(border: &CellBorder) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::Hasher;
-
-        let mut hasher = DefaultHasher::new();
-        Self::hash_border_side(&border.left, &mut hasher);
-        Self::hash_border_side(&border.right, &mut hasher);
-        Self::hash_border_side(&border.top, &mut hasher);
-        Self::hash_border_side(&border.bottom, &mut hasher);
-        Self::hash_border_side(&border.diagonal, &mut hasher);
-        hasher.finish()
-    }
-
-    /// Hash a border side.
-    fn hash_border_side(side: &Option<CellBorderSide>, hasher: &mut impl std::hash::Hasher) {
-        use std::hash::Hash;
-
-        if let Some(s) = side {
-            std::mem::discriminant(&s.style).hash(hasher);
-            if let Some(color) = &s.color {
-                color.hash(hasher);
-            }
-        }
-    }
-
-    /// Hash a cell format for deduplication.
-    fn hash_cell_format(format: &CellFormat) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        if let Some(ref font) = format.font {
-            Self::hash_font(font).hash(&mut hasher);
-        }
-        if let Some(ref fill) = format.fill {
-            Self::hash_fill(fill).hash(&mut hasher);
-        }
-        if let Some(ref border) = format.border {
-            Self::hash_border(border).hash(&mut hasher);
-        }
-        if let Some(ref num_fmt) = format.number_format {
-            num_fmt.hash(&mut hasher);
-        }
-        hasher.finish()
-    }
 }
 
 impl Default for StylesBuilder {
@@ -503,6 +538,8 @@ impl Default for StylesBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xlsx::styles::Styles;
+    use crate::xlsx::styles::border::{Diagonal, Dir, Line, Tint};
 
     #[test]
     fn test_create_default_styles() {
@@ -516,6 +553,7 @@ mod tests {
     #[test]
     fn test_add_cell_format() {
         let mut builder = StylesBuilder::new();
+        assert_eq!(builder.add_cell_format(&CellFormat::default()), 0);
 
         let format = CellFormat {
             font: Some(CellFont {
@@ -560,5 +598,93 @@ mod tests {
         assert!(xml.contains("<fills"));
         assert!(xml.contains("<borders"));
         assert!(xml.contains("<cellXfs"));
+    }
+
+    #[test]
+    fn typed_border_line_writes_its_exact_token() {
+        let mut builder = StylesBuilder::new();
+        let format = CellFormat {
+            border: Some(Border {
+                bottom: Some(
+                    Side::new(Line::MediumDashDot).with_color(Color::argb(0xFF, 0x10, 0x20, 0x30)),
+                ),
+                diagonal: Some(Diagonal::new(Side::new(Line::Hair), Dir::Both)),
+                ..Border::default()
+            }),
+            ..CellFormat::default()
+        };
+
+        builder.add_cell_format(&format);
+        let xml = builder.to_xml().unwrap();
+        assert!(xml.contains(r#"<bottom style="mediumDashDot"><color rgb="FF102030"/></bottom>"#));
+        assert!(xml.contains(r#"<border diagonalUp="1" diagonalDown="1">"#));
+    }
+
+    #[test]
+    fn border_dedup_uses_full_value_equality() {
+        let mut builder = StylesBuilder::new();
+        let left = CellFormat {
+            border: Some(Border {
+                left: Some(Side::new(Line::Thin)),
+                ..Border::default()
+            }),
+            ..CellFormat::default()
+        };
+        let bottom = CellFormat {
+            border: Some(Border {
+                bottom: Some(Side::new(Line::Thin)),
+                ..Border::default()
+            }),
+            ..CellFormat::default()
+        };
+
+        assert_ne!(
+            builder.add_cell_format(&left),
+            builder.add_cell_format(&bottom)
+        );
+        assert_eq!(builder.borders.len(), 3);
+    }
+
+    #[test]
+    fn strict_border_round_trips_all_typed_fields() {
+        let mut builder = StylesBuilder::new();
+        let tint = Tint::new(-0.25).unwrap();
+        let border = Border {
+            start: Some(Side::new(Line::Thin).with_color(Color::theme(2).with_tint(tint))),
+            end: Some(Side::new(Line::Dotted).with_color(Color::indexed(64))),
+            top: Some(Side::new(Line::Medium).with_color(Color::auto_value(false))),
+            vertical: Some(Side::new(Line::Hair).with_color(Color::rgb(1, 2, 3))),
+            horizontal: Some(Side::new(Line::Double)),
+            diagonal: Some(Diagonal::new(Side::new(Line::Dashed), Dir::Down)),
+            outline: Some(false),
+            ..Border::default()
+        };
+        builder.add_cell_format(&CellFormat {
+            border: Some(border.clone()),
+            ..CellFormat::default()
+        });
+
+        let xml = builder.to_xml_in(Conformance::Strict).unwrap();
+        assert!(xml.contains("http://purl.oclc.org/ooxml/spreadsheetml/main"));
+        assert!(xml.contains(r#"<border diagonalDown="1" outline="0">"#));
+        assert!(xml.contains(r#"<color theme="2" tint="-0.25"/>"#));
+        assert!(xml.contains(r#"<color indexed="64"/>"#));
+        assert!(xml.contains(r#"<color auto="0"/>"#));
+        assert!(xml.contains(r#"<color rgb="FF010203"/>"#));
+        let parsed = Styles::parse(&xml).unwrap();
+        assert_eq!(parsed.borders.get(1), Some(&border));
+    }
+
+    #[test]
+    fn edge_names_are_checked_against_conformance() {
+        let mut builder = StylesBuilder::new();
+        builder.add_cell_format(&CellFormat {
+            border: Some(Border {
+                start: Some(Side::new(Line::Thin)),
+                ..Border::default()
+            }),
+            ..CellFormat::default()
+        });
+        assert!(builder.to_xml().is_err());
     }
 }
