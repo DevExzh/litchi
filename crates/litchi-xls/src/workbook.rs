@@ -129,6 +129,23 @@ fn parse_shared_formula_template(
     })
 }
 
+fn pivot_cache_stream_paths(
+    paths: impl IntoIterator<Item = Vec<String>>,
+) -> Vec<(u16, Vec<String>)> {
+    let mut cache_paths = paths
+        .into_iter()
+        .filter_map(|path| {
+            if path.len() != 2 || !path[0].eq_ignore_ascii_case("_SX_DB_CUR") {
+                return None;
+            }
+            let stream_id = u16::from_str_radix(&path[1], 16).ok()?;
+            Some((stream_id, path))
+        })
+        .collect::<Vec<_>>();
+    cache_paths.sort_unstable_by_key(|(stream_id, _)| *stream_id);
+    cache_paths
+}
+
 /// XLS workbook implementation
 #[derive(Debug)]
 pub struct XlsWorkbook<R: Read + Seek> {
@@ -428,20 +445,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             }
         }
 
-        let mut cache_paths = self
-            .ole_file
-            .list_streams()
-            .into_iter()
-            .filter(|path| {
-                path.len() == 2
-                    && path[0].eq_ignore_ascii_case("_SX_DB_CUR")
-                    && u16::from_str_radix(&path[1], 16).is_ok()
-            })
-            .collect::<Vec<_>>();
-        cache_paths.sort_by_key(|path| u16::from_str_radix(&path[1], 16).unwrap());
+        let cache_paths = pivot_cache_stream_paths(self.ole_file.list_streams());
         let mut pivot_caches = Vec::with_capacity(cache_paths.len());
-        for path in cache_paths {
-            let expected_stream_id = u16::from_str_radix(&path[1], 16).unwrap();
+        for (expected_stream_id, path) in cache_paths {
             if expected_stream_id == 0 {
                 return Err(XlsError::InvalidRecord {
                     record_type: 0x00C6,
@@ -684,7 +690,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     if record.data.len() != 2 {
                         return Err(XlsError::InvalidLength { expected: 2, found: record.data.len() });
                     }
-                    let stream_id = u16::from_le_bytes(record.data[..2].try_into().expect("length checked"));
+                    let stream_id = litchi_core::binary::read_u16_le_at(&record.data, 0)?;
                     if stream_id == 0 || self.pivot_cache_stream_ids.contains(&stream_id) {
                         return Err(XlsError::InvalidRecord {
                             record_type: 0x00D5,
@@ -1962,6 +1968,27 @@ mod tests {
         data.extend_from_slice(&(tokens.len() as u16).to_le_bytes());
         data.extend_from_slice(tokens);
         data
+    }
+
+    #[test]
+    fn pivot_cache_stream_paths_are_sorted_without_unchecked_reparsing() {
+        let paths = pivot_cache_stream_paths(vec![
+            vec!["_SX_DB_CUR".into(), "0002".into()],
+            vec!["_sx_db_cur".into(), "0001".into()],
+            vec!["_SX_DB_CUR".into(), "not-hex".into()],
+            vec!["_SX_DB_CUR".into()],
+            vec!["Other".into(), "0003".into()],
+        ]);
+
+        assert_eq!(
+            paths
+                .iter()
+                .map(|(stream_id, _)| *stream_id)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(paths[0].1[1], "0001");
+        assert_eq!(paths[1].1[1], "0002");
     }
 
     #[test]
