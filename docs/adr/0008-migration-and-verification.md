@@ -2522,10 +2522,13 @@ the nine switches into a `u16` and rejects reserved bits, `Threads` enforces the
 `1..=1024` domain, and `Delta` excludes NaN, infinity, subnormal values, and
 negative zero. These are the checked-in `[MS-XLSB]` section 2.4.318 record rules
 and section 2.5.172 `Xnum` rules, not guessed ergonomic restrictions. `read`
-requires one exact 26-byte payload, while `write` streams those fields through
-the canonical raw writer without allocating an intermediate record buffer.
-The parsed workbook exposes `calc`; the authoring host uses `calc`, `calc_mut`,
-and move-accepting `put_calc`.
+accepts the canonical 26-byte payload and the exact 25-byte one-byte-option-tail
+form found in the checked-in Microsoft Excel 12 `Simple.xlsb` artifact. It
+zero-extends that historical tail directly from the borrowed cursor, rejects
+every other length, and does not weaken any semantic validation. `write`
+streams the canonical 26-byte form without allocating an intermediate record
+buffer. The parsed workbook exposes `calc`; the authoring host uses `calc`,
+`calc_mut`, and move-accepting `put_calc`.
 
 The `litchi-eval` production graph no longer contains Tokio or Reqwest.
 Feature-gated web functions accept an explicit borrowed `Fetch` capability via
@@ -2554,7 +2557,7 @@ rustdoc, formatting, and diff gates pass. The PPTX owner passes 24 unit tests
 and three documentation cases; four migration-host integration tests pass,
 including discovery of seven real LibreOffice tag parts. Its all-target
 warning-denied Clippy and warning-denied rustdoc gates pass. The XLSB owner
-passes two unit tests, seven calculation integration tests, 17 existing
+passes two unit tests, eight calculation integration tests, 17 existing
 raw-wire tests, one passing doctest, and two compile-fail doctests, plus
 all-target warning-denied Clippy. The evaluator passes 1,147 default-feature
 and 1,161 all-feature unit tests, including all 17 focused web-function tests,
@@ -3087,6 +3090,125 @@ interpretation of the frozen-pane records. This does not cover Office resave,
 all view combinations, or an application-version matrix. The compact layout is
 a structural result; cache, allocation, and latency claims still require
 measurement.
+
+## DOCX web-settings owner extraction
+
+`litchi-docx::web` now owns bounded Strict/Transitional web-settings parsing,
+semantic division and frameset CRUD, deterministic default bytes, and the
+optional package graph. Producer-visible division IDs are the ordinary
+selector; checked numeric source positions remain available for repair.
+Missing lookup is `None`, while ambiguity, invalid positions, malformed XML,
+mixed dialects, external/shared edges, and resource exhaustion are typed
+errors. Package writes consume the completed `Settings`; unchanged and
+semantic no-op stores retain exact producer bytes and signatures.
+
+The migration host now keeps only the wider DOCX adapter and exposes `web`,
+`put_web`, and `remove_web`. Its former parser, cache, writer, template
+accessor, and duplicate assets are deleted. The complete owner gate passes 43
+unit tests, two public API tests, and one doctest; focused host gates pass two
+owner integrations, seven web-settings package regressions, and four shared-
+color/underline regressions. Asset parity, warning-denied Clippy and rustdoc,
+formatting, stale-name, panic-name, and boundary checks pass. Semantic edits
+canonicalize the modeled XML and can drop unmodeled extensions; high-level
+frame-target CRUD and exhaustive border-style semantics remain follow-up work.
+
+The native Word gate caught two interoperability defects before this slice was
+accepted. Empty true `bodyDiv` and `blockQuote` elements are schema-valid but
+desktop Word rejected them; the owner now writes explicit numeric values while
+retaining permissive lexical reads. A diagnostic matrix also proved that a
+borderless plain division opens cleanly, so the API does not turn the producer
+corpus's all-bordered convention into a false schema requirement. Separately,
+the host heading helper confused `Heading 1`'s display name with style ID
+`Heading1` and omitted default Heading4 through Heading9 definitions. Exact-ID
+plus typed `Outline::{H1, ..., H9}` wire levels and save/reopen catalog
+regressions cover the correction. The final
+`owner_native_smoke` document contains scalar settings plus body and block-quote
+divisions; Word for macOS opened it without repair, rendered its Heading 1 and
+body text, and identified the heading with the native Heading 1 style. No
+Office edit/resave, Strict native check, version matrix, extension-preserving
+modeled edit, or measured-performance claim follows.
+
+## PPTX table-style owner extraction
+
+`litchi-pptx::table::style` now owns the bounded catalog model, exact source
+retention, deterministic default bytes, and optional presentation graph. The
+allocation-free GUID `Id` is the stable selector, checked `at` supports source-
+order repair, and `named` returns all duplicate display-name matches. `Parts`
+encodes the schema regions compactly and in normative sequence; detailed
+formatting remains bounded opaque XML. Unchanged stores move the original
+list-owned allocation back to OPC, while rename preserves a definition's
+opaque body and `reset_parts` is explicitly destructive.
+
+All six presentation/slideshow/template profiles are accepted in both macro
+families and both XML dialects. Graph mutation rejects mixed, external, orphan,
+shared, relationship-bearing, or wrong-content-type states before commit. The
+host exposes only `styles`, `put_styles`, and `remove_styles`; legacy
+Transitional slide materialization preserves an optional catalog edge's exact
+ID/type/target and propagates the generated master relationship ID. Strict
+legacy materialization is refused before mutation until that writer becomes
+dialect-aware. Semantic no-op comparison preserves inherited `xml:space` and
+all text in deeper opaque payloads, preventing whitespace-bearing extension
+edits from being silently discarded. The owner passes 71 unit tests, three
+doctests, and one compile-fail test; the focused host passes all eight
+integration tests and producer-asset parity passes. Warning-denied Clippy and
+rustdoc plus targeted formatting, diff, stale-name, and boundary gates pass.
+The `owner_native_smoke` example
+creates a typed definition used by a two-row table and verifies it after reopen.
+Desktop PowerPoint for macOS opened that Transitional artifact without repair,
+rendered the table and text, and exposed native Table Design and Table Layout
+tabs on selection. No Office edit/resave, Strict native check, version matrix,
+detailed-style rendering, or measured-performance claim follows.
+
+## Checked BIFF8 shape anchors and SortData
+
+The XLS writer now exposes `writer::shape::{Point, Anchor, Behavior, Rect}` and
+`writer::sort::{Row, Col, Range, Axis, Method, Parent, Dxf, IconSet, Icon, On,
+Key, Config}` instead of public raw field bags. The types prove grid, offset,
+ordering, group-rectangle, anchor-flag, packed Rw12/Col12, and axis/key
+invariants before retained state changes. Shape/group/comment insertion
+reserves storage before mutation and object-ID assignment; SortData uses
+move-returning `put_sort`, idempotent `remove_sort`, and borrowed `sort`.
+
+Thirty-nine focused tests cover exact bounds, wire round trips, failure
+atomicity, allocation ordering, explicit/automatic ID collisions, and related
+list-object writers. Strict Clippy, warning-denied rustdoc, formatting, diff,
+and no-run target compilation pass. The `odraw_native_smoke` example generated
+an XLS with a rectangle, text box, and grouped ellipse/text pair. Through the
+Computer Use skill, desktop Microsoft Excel for macOS opened it without repair
+in Compatibility Mode and rendered the expected objects, fills, text, and
+placement. No Excel edit/resave, SortData UI exercise, version matrix, or
+performance measurement was performed.
+
+## Failure-atomic XLSX late publication
+
+The common core-properties `Slot` now stages a candidate mutation through a
+lifetime-bound guard. Only consuming that guard after successful publication
+can clear its exact originating slot; dropping it retains dirty intent for a
+retry. The XLSX host avoids a package snapshot on unchanged opened saves. When
+late metadata or worksheet overlays require one, it structurally snapshots the
+graph while sharing built-in immutable part payloads, restores the original
+worksheet owners after the sink, and commits the property guard only after all
+late work succeeds. Metadata-only saves preserve producer application-
+properties bytes instead of regenerating them.
+
+Three focused host regressions prove the unchanged fast path, injected sink-
+failure restoration with a successful retry, and invalid-property rejection
+before the sink. The common guard regression proves drop-retains/commit-clears
+semantics. The earlier writer-model materialization phase, custom `Part` clone
+policies, and DOCX/PPTX save transactions remain explicit follow-up work. This
+is correctness evidence, not an allocation or latency result.
+
+Per explicit direction, no redundant manual full-workspace gate was scheduled.
+The repository's mandatory pre-commit hook nevertheless ran
+`cargo test --workspace --all-features --lib --tests` and the corresponding
+workspace doctests, and both passed. That integration gate also closed stale
+contracts exposed by the stricter owners: the umbrella table test now expects
+a typed orphan-core rejection for its malformed relationship fixture; the
+XLSB calculation owner accepts the exact one-byte option tail emitted by a
+checked-in Microsoft Excel 12 artifact while writing only canonical 26-byte
+records; a section-mutation fixture now supplies a conforming MCE Choice before
+Fallback; and the placeholder regression expects its decoding error through
+the canonical PPTX owner.
 
 ## Evidence levels
 

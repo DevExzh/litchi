@@ -31,6 +31,8 @@ Office round trips.
 | [0016](0016-biff8-writer-location-types.md) | Checked BIFF8 writer locations beyond ordinary cells |
 | [0017](0017-ooxml-producer-template-ownership.md) | Format-owned deterministic OOXML producer templates |
 | [0018](0018-xlsx-calculation-chain-ownership.md) | Typed XLSX calculation-chain ownership |
+| [0019](0019-docx-web-settings-ownership.md) | Typed DOCX web-settings ownership |
+| [0020](0020-pptx-table-style-ownership.md) | Typed PPTX table-style ownership |
 
 ## Decision hierarchy
 

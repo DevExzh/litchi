@@ -70,6 +70,27 @@ complete prospective view with a non-allocating four-pane bit mask before the
 first replacement. The old public option names, raw `set_zoom`,
 `set_worksheet_view`, and `split_panes` entry points are removed.
 
+The shape-anchor amendment replaces the public field bags with
+`writer::shape::{Point, Anchor, Behavior, Rect}`. `Point` proves the BIFF8 cell
+and offset domains in a six-byte representation; `Anchor` proves strict
+top-left/bottom-right ordering on both axes. `Behavior` exposes only the three
+OfficeArt flag combinations with defined semantics, and `Rect` rejects a
+degenerate group coordinate space. Shape, group, and comment insertion reserve
+all retained collections and strings before mutation or object-ID allocation.
+Requested child IDs are also reserved before automatic group IDs are chosen,
+so insertion order cannot create a later collision.
+
+The SortData amendment gives its packed signed four-byte field private checked
+`Rw12` and `Col12` components. Public `writer::sort::{Row, Col, Range, Axis,
+Method, Parent, Dxf, IconSet, Icon, On, Key, Config}` keeps those wire details
+out of the facade. `Range::new` accepts inclusive checked row and column ranges;
+`Key::col` is valid for row sorting and `Key::row` for column sorting, making an
+ambiguous two-dimensional key unrepresentable. `put_sort` consumes a complete
+configuration and returns the previous one, `remove_sort` is idempotent, and
+`sort` lends the current state. The older root `XlsSort*`, `set_sort_data`, and
+`sort_data` surface is removed; the separate legacy `set_sort` BIFF record is
+not a SortData alias and remains intentionally distinct.
+
 ## Consequences
 
 - Dedicated checked values introduced by this slice are representable in
@@ -85,17 +106,19 @@ first replacement. The old public option names, raw `set_zoom`,
   to `Window2`; this is a layout property, not a measured cache or latency
   result.
 - Some pre-existing internals still use wide private coordinate storage after
-  a checked operation boundary, including AutoFilter ranges, sort keys, pivot
-  locations, and data-table anchors. Hyperlinks, row and column properties,
-  conditional formatting, scenarios, consolidation, phonetic records, and
-  shape anchors remain later migration work.
-- `XlsSortData` still needs an explicit Rw12/Col12 policy. Data-table
-  range-overlap policy, save-time RTD topic encoding failures, and unrelated
-  production `unwrap` calls also remain open. Split-pane transactionality is
-  closed by the checked `Pane` plus failure-atomic `put_pane` boundary.
+  a checked operation boundary, including AutoFilter ranges, pivot locations,
+  and data-table anchors. Hyperlinks, row and column properties, conditional
+  formatting, scenarios, consolidation, and phonetic records remain later
+  migration work.
+- Shape/group/comment and SortData collection growth is failure-atomic, but an
+  ordinary `Write` implementation can still fail after emitting a prefix of a
+  BIFF stream. Data-table range-overlap policy, save-time RTD topic encoding
+  failures, and unrelated production `unwrap` calls remain open. Split-pane
+  transactionality is closed by checked `Pane` plus `put_pane`.
 - This is a type- and behavior-safety change. The compact fields make no
   allocation, throughput, or cache claim. Focused native open-and-inspect
-  evidence applies only to the generated pane artifact described below.
+  evidence applies only to the generated pane and shape artifacts described
+  below.
 
 ## Verification
 
@@ -120,6 +143,24 @@ that Excel interpreted the emitted frozen-pane records. No content edit or
 resave was performed, and the exact application version was not recorded; this
 does not certify every split-pane, selection, zoom, or view combination.
 
+The shape and SortData amendment adds 39 focused tests: six SortData unit
+tests, three shape-anchor units, six shape-group units, three SortData
+integrations, seven list-object integrations, five shape-writer integrations,
+four group-writer integrations, and five comment-writer integrations. They
+cover exact packed bounds, axis/key coupling, wire round trips, invalid flag and
+rectangle states, allocation failure ordering, explicit/automatic ID
+collisions, and move-returned CRUD state. The complete `litchi-xls` target also
+builds without running unrelated suites.
+
+The `odraw_native_smoke` example generated `odraw-smoke.xls` with a rectangle,
+text box, and grouped ellipse/text pair through the checked anchor API. Through
+the Computer Use skill, desktop Microsoft Excel for macOS opened it without a
+repair prompt in expected Compatibility Mode and rendered all objects, fills,
+text, and group placement. This is open-and-inspect evidence for that artifact
+only: Excel edit/resave, Litchi reverse-read after resave, an Office-version
+matrix, SortData UI behavior, and performance were not tested.
+
 Warning-denied Clippy and rustdoc, formatting, and diff validation are green
-for `litchi-xls`. Per explicit user direction, the previously green full
-workspace suite is not repeated.
+for `litchi-xls`. Per explicit user direction, no redundant manual full-
+workspace run was scheduled; the repository's mandatory pre-commit hook later
+ran and passed the workspace lib/integration and doctest gates.

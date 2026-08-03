@@ -224,15 +224,15 @@
       "order": 40,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-docx",
-      "reason": "The OOXML migration host temporarily supplies DOCX package anchoring around the extracted concrete font capability.",
-      "exit": "Move the remaining DOCX package and semantic model into litchi-docx, then delete the host adapter."
+      "reason": "The OOXML migration host temporarily supplies DOCX package anchoring around extracted font, alternative-format, and web-settings capabilities.",
+      "exit": "Move the remaining DOCX package and semantic model into litchi-docx, replace the focused adapters with direct ownership, then delete the host."
     },
     {
       "order": 41,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-pptx",
-      "reason": "The OOXML migration host temporarily anchors slides around extracted transition, shape, tag, and notes capabilities.",
-      "exit": "Move the remaining PPTX package and semantic model into litchi-pptx, then delete the host adapter."
+      "reason": "The OOXML migration host temporarily anchors slides around extracted transition, shape, tag, notes, and table-style capabilities.",
+      "exit": "Move the remaining PPTX package and semantic model into litchi-pptx, replace the focused adapters with direct ownership, then delete the host."
     },
     {
       "order": 42,

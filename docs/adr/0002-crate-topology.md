@@ -257,6 +257,22 @@ branch; full-document parsing also preserves inherited Strict and Transitional
 namespace aliases. Payload, XML, nesting, and anchor limits are enforced before
 unbounded package or parser work.
 
+`litchi-docx::web` owns the bounded WordprocessingML web-settings grammar,
+recursive frameset/division model, deterministic producer bytes, and optional
+OPC graph. Its contextual vocabulary is `Settings`, `Conformance`, `Key`,
+`Id`, `Twips`, `Div`, `Borders`, `Frameset`, and `Frame`; the shared theme-color
+vocabulary is `litchi-docx::color::Theme`. Nonzero producer-visible numeric
+division IDs are the primary selector and checked source positions are the
+repair fallback. `Div` carries all four schema-required margins as typed signed
+twips, so ordinary construction cannot omit them. Package
+`load`, consuming `put`, and `remove` validate dialect, ownership, frame edges,
+content type, and resource bounds before commit. Exact and semantic no-ops
+retain source bytes and signatures. The migration host exposes only `web`,
+`put_web`, and `remove_web` while the wider DOCX package remains there.
+Schema-valid `OnOff` lexical forms remain readable, but division-role markers
+write explicit numeric values because the native Word gate rejects empty true
+`bodyDiv` and `blockQuote` elements.
+
 `litchi-pptx::transition` owns the PresentationML transition model and bounded
 XML codec. Each `Kind` variant carries only the direction/orientation value
 valid for that effect, so invalid effect-option pairs are not representable.
@@ -341,6 +357,18 @@ signatures. The migration host retains only semantic slide selection and dirty-
 writer guards around `notes`, `put_notes`, `remove_notes`, and `clear_notes`;
 the former host owner and forwarding aliases are deleted.
 
+`litchi-pptx::table::style` owns the bounded DrawingML table-style catalog,
+deterministic producer bytes, and optional presentation graph. Its concise
+vocabulary is `Conformance`, allocation-free `Id`, compact `Parts`, `Def`, and
+`List`. Stable GUID identity is the primary selector, `at` is the checked raw-
+order fallback, and `named` returns every match because display names may be
+empty or duplicated. Definitions borrow checked ranges from one list-owned XML
+allocation; unchanged stores move that allocation back to OPC, while rename
+preserves opaque formatting content. Package `load`, consuming `put`, and
+`remove` validate all six main-document profiles, graph ownership, dialect,
+content type, schema order, and resource ceilings before mutation. The
+migration host exposes only `styles`, `put_styles`, and `remove_styles`.
+
 `litchi-xlsx::chain` owns SpreadsheetML calculation-chain grammar, its typed
 ordered model, and the single-part workbook relationship service. Short types
 `Sheet`, `Step`, `Flags`, `Cell`, and `Chain` encode the native sheet-ID range,
@@ -367,17 +395,20 @@ of silently rounding them. The kernel has no OPC, DrawingML, XLSX, runtime, or
 concrete peer dependency; XLSB semantic records remain in the concrete owner
 and migrate onto this substrate incrementally.
 
-`litchi-xlsb::calc` owns the exact 26-byte `BrtCalcProp` semantic record and
-streams it through the canonical raw `Cursor` and `Writer`. Its short public
-vocabulary is `Props`, `Mode`, `Opts`, `Delta`, and `Threads`. Private fields,
-checked setters, and consuming `with_*` builders make every `Props` value
-directly writable. `Opts` packs the nine switches into one `u16`; unknown bits
-are rejected. Checked-in `[MS-XLSB]` section 2.4.318 fixes the mode enumeration,
-reserved bits, and `1..=1024` thread-count domain, while section 2.5.172 makes
-NaN, infinity, subnormal values, and negative zero invalid `Delta` states. The
-migration host exposes concise `calc`, `calc_mut`, and move-accepting
-`put_calc` entry points instead of retaining the former long compatibility
-types.
+`litchi-xlsb::calc` owns the canonical 26-byte `BrtCalcProp` semantic record
+and streams it through the canonical raw `Cursor` and `Writer`. Reads also
+accept the exact 25-byte form emitted by an early Microsoft Excel 12 producer,
+zero-extending its one-byte option tail without allocating or copying; writes
+always emit the canonical 26-byte form. Every other length remains a typed
+error. Its short public vocabulary is `Props`, `Mode`, `Opts`, `Delta`, and
+`Threads`. Private fields, checked setters, and consuming `with_*` builders
+make every `Props` value directly writable. `Opts` packs the nine switches into
+one `u16`; unknown bits are rejected. Checked-in `[MS-XLSB]` section 2.4.318
+fixes the mode enumeration, reserved bits, and `1..=1024` thread-count domain,
+while section 2.5.172 makes NaN, infinity, subnormal values, and negative zero
+invalid `Delta` states. The migration host exposes concise `calc`, `calc_mut`,
+and move-accepting `put_calc` entry points instead of retaining the former long
+compatibility types.
 
 `litchi-eval` remains runtime-neutral when `web_functions` is enabled. External
 retrieval is an explicit caller capability: `FormulaEvaluator::with_fetch`

@@ -62,6 +62,21 @@ or rewrite metadata on save. The umbrella facade derives its generic
 another crate or silently discarding parse failures. No compatibility aliases
 for the old methods or type remain.
 
+The XLSX host's late save phase uses the common slot's type-bound `Stage<'a>`
+guard. Staging applies an edited value to the candidate OPC graph but retains
+dirty intent. The guard's mutable lifetime makes the exact originating slot
+the only value its consuming `commit` can clear; the host invokes that method
+only after its sink and worksheet restoration succeed. Dropping the guard after
+an error leaves the edit retryable.
+The host takes a structural package snapshot only when writer materialization,
+an edited core-property slot, or a staged worksheet overlay makes one
+necessary. Built-in immutable part payloads remain shared through `Arc`. A
+late failure restores the package snapshot, including producer application
+properties and original worksheet payload owners. An unchanged opened
+workbook writes directly without taking this snapshot. Extended application
+properties are regenerated only when the mutable writer model is materialized,
+not for a metadata-only or worksheet-overlay save.
+
 ## Consequences
 
 - Core-property create, read, update, clear, absence, and no-op behavior share
@@ -79,12 +94,18 @@ for the old methods or type remain.
   representative measurement.
 - Reduced-precision W3CDTF values remain exact in `Props` but cannot always be
   projected into the chrono-based fields of the generic `Metadata` facade.
-- The host still exposes mutable raw OPC access. A caller that changes the
-  core graph through that escape hatch can make the cached slot stale. Host
-  save pipelines are destination-file atomic, but a later save error after the
-  slot flush can leave the in-memory package changed and unsigned. Closing
-  those two transactional seams is follow-up work and is not hidden by the
-  concise facade.
+- The hosts still expose mutable raw OPC access. A caller that changes the core
+  graph through that escape hatch can make the cached slot stale. XLSX now
+  restores its in-memory package and retains dirty intent for failures in the
+  late publication phase, but mutations performed by its earlier writer-model
+  materialization are not yet one transaction. DOCX and PPTX still flush their
+  slots directly before later save work. Closing those seams remains follow-up
+  work and is not hidden by the concise facade.
+- The XLSX dirty path structurally clones package metadata and shares built-in
+  immutable payloads. Custom `Part` implementations retain their own clone
+  policy. This is a correctness boundary, not evidence of lower allocation or
+  latency; representative measurements remain required before a performance
+  claim.
 
 ## Verification
 
@@ -98,6 +119,16 @@ Five host integration tests create, update, clear, save, and reopen DOCX, PPTX,
 and XLSX packages through their public facades. Warning-denied Clippy and
 rustdoc are green for the common and host crates.
 
+The XLSX late-save amendment adds three focused regressions. One observes
+shared payload ownership during an unchanged opened save and proves that the
+snapshot fast path is not entered. One injects a sink failure, checks exact
+core/application payload identity restoration and retained edit intent, then
+successfully retries and reopens the serialized property. One supplies invalid
+property text, proves the sink was never called and the package identity was
+restored, then repairs and retries. The common slot test separately proves that
+dropping a staged guard retains dirty intent and that consuming it clears only
+its lifetime-bound origin.
+
 The `core_props_office` example generated the artifacts under
 `target/office-core-props`; its reproducible command is
 `cargo +1.89 run -p litchi-ooxml --example core_props_office --all-features`.
@@ -110,4 +141,6 @@ content. This supports open-and-inspect compatibility for those artifacts on
 the tested desktop applications; it does not certify every Office version,
 extension graph, or metadata lexical form. Office-side edit/resave and
 reverse-read were not performed for this slice. Per explicit user direction,
-the previously green full workspace suite is not repeated.
+no redundant manual full-workspace run was scheduled; the repository's
+mandatory pre-commit hook subsequently ran and passed the workspace lib/
+integration and doctest gates.
