@@ -87,6 +87,16 @@ struct GraphState {
     outgoing_refs: HashMap<ObjectId, Vec<ObjectId>>,
 }
 
+fn object_count(state: &GraphState) -> usize {
+    let outgoing = &state.outgoing_refs;
+    outgoing.len()
+        + state
+            .incoming_refs
+            .keys()
+            .filter(|object_id| !outgoing.contains_key(*object_id))
+            .count()
+}
+
 /// Object reference graph for tracking dependencies
 ///
 /// Maintains a bidirectional graph of object references with efficient
@@ -469,10 +479,11 @@ impl ReferenceGraph {
     ///
     /// # Performance
     ///
-    /// O(V) where V is the number of unique objects
+    /// O(V) where V is the number of unique objects, without allocating a
+    /// temporary set.
     #[inline]
     pub fn len(&self) -> usize {
-        self.all_objects().len()
+        object_count(&self.state)
     }
 
     /// Check if the graph is empty
@@ -582,13 +593,13 @@ impl ReferenceGraphSnapshot {
     /// Return the number of non-null objects in the snapshot.
     #[inline]
     pub fn len(&self) -> usize {
-        self.all_object_ids().len()
+        object_count(&self.state)
     }
 
     /// Return whether the snapshot contains no non-null object references.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.all_object_ids().is_empty()
+        self.state.incoming_refs.is_empty() && self.state.outgoing_refs.is_empty()
     }
 
     /// Return the number of stored non-duplicate edges with non-null endpoints.
@@ -778,6 +789,22 @@ mod tests {
         assert_eq!(snapshot.all_object_ids(), HashSet::from([one, two]));
         assert_eq!(snapshot.len(), 2);
         assert_eq!(snapshot.edge_count(), 1);
+    }
+
+    #[test]
+    fn graph_cardinality_counts_shared_endpoints_without_materializing_a_set() {
+        let mut graph = ReferenceGraph::new();
+        graph.add_reference(1, 2);
+        graph.add_reference(2, 3);
+
+        assert_eq!(graph.len(), 3);
+        let snapshot = graph.snapshot();
+        assert_eq!(snapshot.len(), 3);
+        assert!(!snapshot.is_empty());
+
+        let empty_snapshot = ReferenceGraph::new().snapshot();
+        assert_eq!(empty_snapshot.len(), 0);
+        assert!(empty_snapshot.is_empty());
     }
 
     #[test]
