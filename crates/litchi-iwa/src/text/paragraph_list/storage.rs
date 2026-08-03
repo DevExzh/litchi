@@ -480,6 +480,9 @@ fn required_varint(data: &[u8], field_number: u32, context: &str) -> Result<u64>
 mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject};
+    use crate::protobuf::{tsp, tswp};
+    use crate::wire::{append_varint_field, repeated_length_delimited_payloads};
+    use prost::Message;
 
     #[test]
     fn list_storage_lookup_rejects_malformed_recognized_storage() {
@@ -510,5 +513,87 @@ mod tests {
         let table = vec![0x0a, 0x01, 0x80];
 
         assert!(replace_boundary_table(&table, &[(0, 7)]).is_err());
+    }
+
+    #[test]
+    fn located_boundary_rewrite_preserves_unknown_wire_fields() {
+        let storage = tswp::StorageArchive {
+            text: vec!["First\nSecond".to_owned()],
+            table_list_style: Some(tswp::ObjectAttributeTable {
+                entries: vec![tswp::object_attribute_table::ObjectAttribute {
+                    character_index: 0,
+                    object: Some(tsp::Reference {
+                        identifier: 7,
+                        ..Default::default()
+                    }),
+                }],
+            }),
+            ..Default::default()
+        };
+        let mut data = storage.encode_to_vec();
+        data =
+            crate::wire::transform_length_delimited_field(&data, LIST_STYLE_TABLE_FIELD, |table| {
+                let table = crate::wire::transform_length_delimited_field(
+                    table,
+                    TABLE_ENTRIES_FIELD,
+                    |entry| {
+                        let mut entry = entry.to_vec();
+                        append_varint_field(&mut entry, 1_901, 101)?;
+                        Ok(entry)
+                    },
+                )?;
+                let mut table = table;
+                append_varint_field(&mut table, 1_902, 202)?;
+                Ok(table)
+            })
+            .unwrap();
+        append_varint_field(&mut data, 1_903, 303).unwrap();
+
+        let mut object = ArchiveObject::new(42, vec![RawMessage { type_: 2_001, data }]).unwrap();
+        object.archive_info.message_infos[0].object_references = vec![7];
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/Document.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        let located = locate_boundaries_with_archive(&package, 42).unwrap();
+        assert_eq!(located.location.boundaries, [(0, 7)]);
+        replace_boundaries_with_archive(&mut package, located, 42, &[7], &[(0, 11)]).unwrap();
+
+        let updated = package.archive("Index/Document.iwa").unwrap();
+        let raw = &updated.object(42).unwrap().messages[0].data;
+        assert_eq!(
+            required_varint(raw, 1_903, "root unknown field").unwrap(),
+            303
+        );
+        let table = repeated_length_delimited_payloads(raw, LIST_STYLE_TABLE_FIELD).unwrap();
+        let [table] = table.as_slice() else {
+            panic!("expected one list-style table");
+        };
+        assert_eq!(
+            required_varint(table, 1_902, "table unknown field").unwrap(),
+            202
+        );
+        let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD).unwrap();
+        let [entry] = entries.as_slice() else {
+            panic!("expected one list-style entry");
+        };
+        assert_eq!(
+            required_varint(entry, 1_901, "entry unknown field").unwrap(),
+            101
+        );
+        let decoded = tswp::StorageArchive::decode(raw.as_slice()).unwrap();
+        assert_eq!(
+            decoded.table_list_style.unwrap().entries[0]
+                .object
+                .unwrap()
+                .identifier,
+            11
+        );
     }
 }

@@ -135,9 +135,11 @@ fn collapse_or_clear_redundant_tiering(
     storage_id: u64,
     paragraph: ParagraphStart,
 ) -> Result<()> {
-    let boundaries = storage::locate_boundaries(package, storage_id)?;
-    let style_id = effective_style_id(&boundaries, paragraph)?;
-    if !style_isolated_to_paragraph(&boundaries, paragraph)?
+    let located = storage::locate_boundaries_with_archive(package, storage_id)?;
+    let boundaries = &located.location;
+    let storage_archive_name = boundaries.archive_name.clone();
+    let style_id = effective_style_id(boundaries, paragraph)?;
+    if !style_isolated_to_paragraph(boundaries, paragraph)?
         || !native::is_exclusive(package, style_id)?
     {
         return Ok(());
@@ -160,16 +162,15 @@ fn collapse_or_clear_redundant_tiering(
     let mut staged = package.clone();
     if override_count == 1 {
         let stylesheet_id = native::stylesheet_id(&staged, &style.style, style_id)?;
-        let replacements =
-            paragraph_boundaries_with_style(&boundaries, paragraph, parent_style_id)?;
+        let replacements = paragraph_boundaries_with_style(boundaries, paragraph, parent_style_id)?;
         let old_style_ids = boundaries
             .boundaries
             .iter()
             .map(|entry| entry.1)
             .collect::<Vec<_>>();
-        storage::replace_boundaries(
+        storage::replace_boundaries_with_archive(
             &mut staged,
-            &boundaries,
+            located,
             storage_id,
             &old_style_ids,
             &replacements,
@@ -183,7 +184,7 @@ fn collapse_or_clear_redundant_tiering(
         )?;
         unregister_private_style(
             &mut staged,
-            &boundaries.archive_name,
+            &storage_archive_name,
             &style.archive_name,
             style_id,
             Some(parent_style_id),
