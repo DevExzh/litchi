@@ -16,6 +16,7 @@ use super::number_attachment_object::{
 };
 use super::number_attachment_storage::{
     decoded_attachment_entries, insert_attachment_reference, locate_attachment_storage,
+    locate_attachment_storage_with_archive,
 };
 use super::number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
@@ -31,9 +32,9 @@ pub(crate) fn text_number_attachments(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<Vec<TextNumberAttachment>> {
-    let location = locate_attachment_storage(package, storage_id)?;
-    let entries = decoded_attachment_entries(storage_id, &location)?;
-    let archive = package.archive(&location.archive_name)?;
+    let located = locate_attachment_storage_with_archive(package, storage_id)?;
+    let entries = decoded_attachment_entries(storage_id, &located.location)?;
+    let archive = &located.archive;
     let mut seen = HashSet::new();
     let mut attachments = Vec::new();
     for entry in entries {
@@ -78,18 +79,18 @@ pub(crate) fn insert_text_number_attachment(
         position_usize..position_usize,
         OBJECT_REPLACEMENT_CHARACTER,
     )?;
+    let located = locate_attachment_storage_with_archive(&staged, storage_id)?;
+    decoded_attachment_entries(storage_id, &located.location)?;
     let identifier = next_object_identifier(&staged)?;
     let object = new_number_attachment_object(identifier, settings)?;
     insert_attachment_reference(
         &mut staged,
-        &location,
+        located,
         storage_id,
         position.utf16_index(),
         identifier,
+        object,
     )?;
-    staged.update_archive(&location.archive_name, |archive| {
-        archive.insert_object(object)
-    })?;
     set_package_last_object_identifier(&mut staged, identifier)?;
 
     let verified = roundtrip(&staged)?;
@@ -118,14 +119,9 @@ pub(crate) fn update_text_number_attachment(
         return Ok(current);
     }
     require_exclusive_storage_reference(package, storage_id, id.object_id(), "number attachment")?;
-    let location = locate_attachment_storage(package, storage_id)?;
+    let located = locate_attachment_storage_with_archive(package, storage_id)?;
     let mut staged = package.clone();
-    patch_number_attachment_settings(
-        &mut staged,
-        &location.archive_name,
-        id.object_id(),
-        settings,
-    )?;
+    patch_number_attachment_settings(&mut staged, located, id.object_id(), settings)?;
     let verified = roundtrip(&staged)?;
     let updated = number_attachment_by_id(&verified, storage_id, id)?;
     if updated.position != current.position || updated.settings != *settings {

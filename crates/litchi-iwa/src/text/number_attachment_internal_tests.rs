@@ -175,6 +175,37 @@ fn attachment_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
 }
 
 #[test]
+fn insertion_relocates_after_text_replacement_moves_existing_attachment() {
+    let (mut editor, storage_id) = fixture();
+    let first = editor
+        .insert_text_number_attachment(
+            storage_id,
+            TextPosition::from_utf16_index(5).unwrap(),
+            settings(TextNumberAttachmentKind::PageNumber),
+        )
+        .unwrap();
+
+    let second = editor
+        .insert_text_number_attachment(
+            storage_id,
+            TextPosition::from_utf16_index(0).unwrap(),
+            settings(TextNumberAttachmentKind::PageCount),
+        )
+        .unwrap();
+
+    let attachments = editor.text_number_attachments(storage_id).unwrap();
+    assert_eq!(second.position, TextPosition::from_utf16_index(0).unwrap());
+    assert_eq!(
+        attachments
+            .iter()
+            .find(|attachment| attachment.id == first.id)
+            .unwrap()
+            .position,
+        TextPosition::from_utf16_index(6).unwrap()
+    );
+}
+
+#[test]
 fn missing_kind_and_additional_owner_fail_transactionally() {
     let (mut editor, storage_id) = fixture();
     let attachment = editor

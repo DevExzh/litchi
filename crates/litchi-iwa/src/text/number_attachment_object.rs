@@ -14,6 +14,7 @@ use super::number_attachment_types::{
     TextNumberAttachmentFormat, TextNumberAttachmentKind, TextNumberAttachmentSettings,
     TextNumberAttachmentText,
 };
+use super::storage_wire::{LocatedStorage, update_parsed_archive};
 
 const SUPER_FIELD: u32 = 1;
 const STRING_EQUIVALENT_FIELD: u32 = 1;
@@ -109,11 +110,12 @@ pub(super) fn new_number_attachment_object(
 
 pub(super) fn patch_number_attachment_settings(
     package: &mut IWorkPackage,
-    archive_name: &str,
+    located: LocatedStorage,
     identifier: u64,
     settings: &TextNumberAttachmentSettings,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
+    let archive_name = located.location.archive_name;
+    update_parsed_archive(package, &archive_name, located.archive, |archive| {
         let object = archive.object_mut(identifier).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork number-attachment object {identifier} is missing"

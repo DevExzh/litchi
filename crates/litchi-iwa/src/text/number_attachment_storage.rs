@@ -2,7 +2,7 @@
 
 use prost::Message;
 
-use crate::archive::RawMessage;
+use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsp, tswp};
 use crate::wire::{
     patch_length_delimited_field, repeated_length_delimited_payloads,
@@ -10,7 +10,10 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::storage_wire::{StorageLocation, locate_storage, require_text_boundary, text_utf16_len};
+use super::storage_wire::{
+    LocatedStorage, StorageLocation, locate_storage_with_archive, require_text_boundary,
+    text_utf16_len, update_parsed_archive,
+};
 
 pub(super) const ATTACHMENT_TABLE_FIELD: u32 = 9;
 const TABLE_ENTRIES_FIELD: u32 = 1;
@@ -27,13 +30,21 @@ pub(super) fn locate_attachment_storage(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<StorageLocation> {
-    let location = locate_storage(package, storage_id, ATTACHMENT_TABLE_FIELD, "attachment")?;
-    if location.storage.table_attachment.is_some() != location.table_present {
+    locate_attachment_storage_with_archive(package, storage_id).map(|located| located.location)
+}
+
+pub(super) fn locate_attachment_storage_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<LocatedStorage> {
+    let located =
+        locate_storage_with_archive(package, storage_id, ATTACHMENT_TABLE_FIELD, "attachment")?;
+    if located.location.storage.table_attachment.is_some() != located.location.table_present {
         return Err(Error::InvalidFormat(format!(
             "iWork text storage {storage_id} attachment table wire state is inconsistent"
         )));
     }
-    Ok(location)
+    Ok(located)
 }
 
 pub(super) fn decoded_attachment_entries(
@@ -147,27 +158,29 @@ fn utf16_unit_at(text: &[String], requested: u32) -> Option<u16> {
 
 pub(super) fn insert_attachment_reference(
     package: &mut IWorkPackage,
-    location: &StorageLocation,
+    located: LocatedStorage,
     storage_id: u64,
     position: u32,
     identifier: u64,
+    object: ArchiveObject,
 ) -> Result<()> {
+    let LocatedStorage { location, archive } = located;
     if location.object_id != storage_id {
         return Err(Error::InvalidFormat(format!(
             "iWork text storage anchor {} does not match requested storage {storage_id}",
             location.object_id
         )));
     }
-    package.update_archive(&location.archive_name, |archive| {
-        let object = archive.object_mut(storage_id).ok_or_else(|| {
+    update_parsed_archive(package, &location.archive_name, archive, |archive| {
+        let storage_object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        if object.archive_info.identifier != Some(location.object_id) {
+        if storage_object.archive_info.identifier != Some(location.object_id) {
             return Err(Error::InvalidFormat(format!(
                 "iWork text storage {storage_id} has an invalid archive identity"
             )));
         }
-        if object
+        if storage_object
             .archive_info
             .message_infos
             .get(location.message_index)
@@ -179,12 +192,15 @@ pub(super) fn insert_attachment_reference(
             )));
         }
         let (message_type, data) = {
-            let original = object.messages.get(location.message_index).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "iWork text storage {} is missing anchored message {}",
-                    storage_id, location.message_index
-                ))
-            })?;
+            let original = storage_object
+                .messages
+                .get(location.message_index)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "iWork text storage {} is missing anchored message {}",
+                        storage_id, location.message_index
+                    ))
+                })?;
             if original.type_ != location.message_type {
                 return Err(Error::InvalidFormat(format!(
                     "iWork text storage {} anchored message {} changed type from {} to {}",
@@ -263,14 +279,14 @@ pub(super) fn insert_attachment_reference(
             )?;
             (original.type_, data)
         };
-        object.replace_message(
+        storage_object.replace_message(
             location.message_index,
             RawMessage {
                 type_: message_type,
                 data,
             },
         )?;
-        let info = object
+        let info = storage_object
             .archive_info
             .message_infos
             .get_mut(location.message_index)
@@ -286,6 +302,7 @@ pub(super) fn insert_attachment_reference(
             )));
         }
         info.object_references.push(identifier);
+        archive.insert_object(object)?;
         Ok(())
     })
 }
