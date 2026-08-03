@@ -1,8 +1,11 @@
+use crate::archive::RawMessage;
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::NumbersDocumentBuilder;
 use crate::pages::PagesEditor;
+use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::{IWorkTextEditor, ParagraphDropCapPlacement};
+use prost::Message;
 
 use super::*;
 
@@ -281,4 +284,59 @@ fn create_remove_restores_storage_object_exactly() {
     let after = archive.object(storage_id).unwrap();
     assert_eq!(after.archive_info, before_info);
     assert_eq!(after.messages, before_messages);
+}
+
+#[test]
+fn mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
+    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let (position, size) = text_box_geometry();
+    let created = pages
+        .add_text_box(4, "Storage preservation", position, size)
+        .unwrap();
+    let storage_id = created.storage.object_id;
+    let mut package = pages.into_package();
+    let location = super::storage::locate(&package, storage_id).unwrap();
+    let style_data = tswp::ParagraphStyleArchive {
+        super_: crate::protobuf::tss::StyleArchive::default(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    package
+        .update_archive(&location.archive_name, |archive| {
+            archive
+                .object_mut(storage_id)
+                .unwrap()
+                .push_message(RawMessage {
+                    type_: 2_022,
+                    data: style_data.clone(),
+                })?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkTextEditor::from_package(package);
+    editor
+        .set_paragraph_drop_cap(storage_id, ParagraphStart::ZERO, model(3, 1))
+        .unwrap();
+    editor
+        .set_paragraph_drop_cap(storage_id, ParagraphStart::ZERO, model(4, 2))
+        .unwrap();
+    editor
+        .remove_paragraph_drop_cap(storage_id, ParagraphStart::ZERO)
+        .unwrap();
+
+    let package = editor.into_package();
+    let location = super::storage::locate(&package, storage_id).unwrap();
+    let archive = package.archive(&location.archive_name).unwrap();
+    let object = archive.object(storage_id).unwrap();
+    assert_eq!(
+        object.messages[location.message_index].type_,
+        location.message_type
+    );
+    let sibling = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == 2_022 && message.data == style_data)
+        .unwrap();
+    assert_eq!(sibling.data, style_data);
 }

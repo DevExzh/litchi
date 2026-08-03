@@ -11,9 +11,7 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::types::ParagraphStart;
-use crate::text::style_registry::object_archive_name;
-
-const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+use crate::text::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
 const DROP_CAP_TABLE_FIELD: u32 = 28;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_CHARACTER_INDEX_FIELD: u32 = 1;
@@ -27,37 +25,27 @@ pub(super) struct DropCapEntry {
 }
 
 pub(super) struct DropCapStorageLocation {
+    pub(super) object_id: u64,
     pub(super) archive_name: String,
+    pub(super) message_index: usize,
+    pub(super) message_type: u32,
+    pub(super) table_present: bool,
     pub(super) stylesheet_id: u64,
     pub(super) text: String,
     pub(super) entries: Vec<DropCapEntry>,
 }
 
 pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<DropCapStorageLocation> {
-    let archive_name = object_archive_name(package, storage_id)?;
-    let archive = package.archive(&archive_name)?;
-    let object = archive.object(storage_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
-    })?;
-    let payloads = object
-        .messages
-        .iter()
-        .filter(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
-        .filter_map(|message| {
-            tswp::StorageArchive::decode(message.data.as_slice())
-                .ok()
-                .map(|storage| (message, storage))
-        })
-        .collect::<Vec<_>>();
-    let [(message, storage)] = payloads.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "iWork text storage {storage_id} must have exactly one writable payload"
-        )));
-    };
-    let raw_table_count =
-        repeated_length_delimited_payloads(&message.data, DROP_CAP_TABLE_FIELD)?.len();
-    let expected_table_count = usize::from(storage.table_drop_cap_style.is_some());
-    if raw_table_count != expected_table_count || raw_table_count > 1 {
+    let location = locate_native_storage(package, storage_id, DROP_CAP_TABLE_FIELD, "Drop Cap")?;
+    let StorageLocation {
+        object_id,
+        archive_name,
+        message_index,
+        message_type,
+        storage,
+        table_present,
+    } = location;
+    if storage.table_drop_cap_style.is_some() != table_present {
         return Err(Error::InvalidFormat(format!(
             "iWork text storage {storage_id} has a malformed Drop Cap table"
         )));
@@ -97,7 +85,11 @@ pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<DropCapS
         });
     }
     Ok(DropCapStorageLocation {
+        object_id,
         archive_name,
+        message_index,
+        message_type,
+        table_present,
         stylesheet_id,
         text,
         entries,
@@ -135,127 +127,156 @@ pub(super) fn validate_paragraph_start(text: &str, start: ParagraphStart) -> Res
 
 pub(super) fn patch_entry(
     package: &mut IWorkPackage,
-    storage_id: u64,
+    location: &DropCapStorageLocation,
     paragraph_start: ParagraphStart,
     old_style_id: Option<u64>,
     new_style_id: Option<u64>,
 ) -> Result<()> {
-    let location = locate(package, storage_id)?;
+    let storage_id = location.object_id;
     package.update_archive(&location.archive_name, |archive| {
-        let object = archive.object_mut(storage_id).ok_or_else(|| {
+        let object = archive.object_mut(location.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| {
-                STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                    && tswp::StorageArchive::decode(message.data.as_slice()).is_ok()
-            })
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [message_index] = indexes.as_slice() else {
+        if object.archive_info.identifier != Some(location.object_id) {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*message_index];
-        let raw_tables = repeated_length_delimited_payloads(&original.data, DROP_CAP_TABLE_FIELD)?;
-        if raw_tables.len() > 1 {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} has multiple Drop Cap tables"
+                "iWork text storage {storage_id} object identity changed unexpectedly"
             )));
         }
-        let table_present = !raw_tables.is_empty();
-        let table = raw_tables.first().copied().unwrap_or_default();
-        let mut entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?
-            .into_iter()
-            .map(|raw| decode_raw_entry(raw).map(|entry| (entry, raw.to_vec())))
-            .collect::<Result<Vec<_>>>()?;
-        let matches = entries
-            .iter()
-            .enumerate()
-            .filter(|(_, (entry, _))| entry.paragraph_start == paragraph_start)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        if matches.len() > 1 {
+        if object.messages.get(location.message_index).is_none() {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} has duplicate Drop Cap boundaries"
+                "iWork text storage {storage_id} writable payload index {} is missing",
+                location.message_index
             )));
         }
-        if matches.first().and_then(|index| entries[*index].0.style_id) != old_style_id
-            || (matches.is_empty() && old_style_id.is_some())
+        if object.messages[location.message_index].type_ != location.message_type {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} writable payload changed unexpectedly"
+            )));
+        }
+        if object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+            .is_none()
         {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} Drop Cap reference changed unexpectedly"
+                "iWork text storage {storage_id} writable payload metadata index {} is missing",
+                location.message_index
             )));
         }
-        if let Some(index) = matches.first().copied() {
-            entries[index].1 = patch_raw_entry(&entries[index].1, old_style_id, new_style_id)?;
-            entries[index].0.style_id = new_style_id;
-        } else if new_style_id.is_some() {
-            let entry = tswp::object_attribute_table::ObjectAttribute {
-                character_index: paragraph_start.utf16_index(),
-                object: new_style_id.map(reference),
-            };
-            entries.push((
-                DropCapEntry {
-                    paragraph_start,
-                    style_id: new_style_id,
+        let (message_type, data, change) = {
+            let original = &object.messages[location.message_index];
+            let raw_tables =
+                repeated_length_delimited_payloads(&original.data, DROP_CAP_TABLE_FIELD)?;
+            if raw_tables.len() != usize::from(location.table_present) {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} Drop Cap table wire state changed unexpectedly"
+                )));
+            }
+            let table = raw_tables.first().copied().unwrap_or_default();
+            let mut entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?
+                .into_iter()
+                .map(|raw| decode_raw_entry(raw).map(|entry| (entry, raw.to_vec())))
+                .collect::<Result<Vec<_>>>()?;
+            let matches = entries
+                .iter()
+                .enumerate()
+                .filter(|(_, (entry, _))| entry.paragraph_start == paragraph_start)
+                .map(|(index, _)| index)
+                .collect::<Vec<_>>();
+            if matches.len() > 1 {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} has duplicate Drop Cap boundaries"
+                )));
+            }
+            if matches.first().and_then(|index| entries[*index].0.style_id) != old_style_id
+                || (matches.is_empty() && old_style_id.is_some())
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} Drop Cap reference changed unexpectedly"
+                )));
+            }
+            if let Some(index) = matches.first().copied() {
+                entries[index].1 = patch_raw_entry(&entries[index].1, old_style_id, new_style_id)?;
+                entries[index].0.style_id = new_style_id;
+            } else if new_style_id.is_some() {
+                let entry = tswp::object_attribute_table::ObjectAttribute {
+                    character_index: paragraph_start.utf16_index(),
+                    object: new_style_id.map(reference),
+                };
+                entries.push((
+                    DropCapEntry {
+                        paragraph_start,
+                        style_id: new_style_id,
+                    },
+                    entry.encode_to_vec(),
+                ));
+            }
+            entries.sort_by_key(|(entry, _)| entry.paragraph_start);
+            if entries
+                .windows(2)
+                .any(|pair| pair[0].0.paragraph_start == pair[1].0.paragraph_start)
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} has duplicate Drop Cap boundaries"
+                )));
+            }
+            let encoded_entries = entries
+                .iter()
+                .map(|(_, raw)| raw.clone())
+                .collect::<Vec<_>>();
+            let table = rewrite_repeated_length_delimited_fields(
+                table,
+                TABLE_ENTRIES_FIELD,
+                &encoded_entries,
+            )?;
+            let data = patch_length_delimited_field(
+                &original.data,
+                DROP_CAP_TABLE_FIELD,
+                location.table_present,
+                Some(&table),
+            )?;
+            let before = tswp::StorageArchive::decode(original.data.as_slice())?;
+            let after = tswp::StorageArchive::decode(data.as_slice())?;
+            let old_count =
+                count_drop_cap_reference(before.table_drop_cap_style.as_ref(), old_style_id);
+            let new_before =
+                count_drop_cap_reference(before.table_drop_cap_style.as_ref(), new_style_id);
+            let old_after =
+                count_drop_cap_reference(after.table_drop_cap_style.as_ref(), old_style_id);
+            let new_after =
+                count_drop_cap_reference(after.table_drop_cap_style.as_ref(), new_style_id);
+            (
+                original.type_,
+                data,
+                ReferenceMetadataChange {
+                    old_style_id,
+                    new_style_id,
+                    old_count,
+                    old_after,
+                    new_before,
+                    new_after,
                 },
-                entry.encode_to_vec(),
-            ));
-        }
-        entries.sort_by_key(|(entry, _)| entry.paragraph_start);
-        if entries
-            .windows(2)
-            .any(|pair| pair[0].0.paragraph_start == pair[1].0.paragraph_start)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} has duplicate Drop Cap boundaries"
-            )));
-        }
-        let encoded_entries = entries
-            .iter()
-            .map(|(_, raw)| raw.clone())
-            .collect::<Vec<_>>();
-        let table =
-            rewrite_repeated_length_delimited_fields(table, TABLE_ENTRIES_FIELD, &encoded_entries)?;
-        let data = patch_length_delimited_field(
-            &original.data,
-            DROP_CAP_TABLE_FIELD,
-            table_present,
-            Some(&table),
-        )?;
-        let before = tswp::StorageArchive::decode(original.data.as_slice())?;
-        let after = tswp::StorageArchive::decode(data.as_slice())?;
-        let old_count =
-            count_drop_cap_reference(before.table_drop_cap_style.as_ref(), old_style_id);
-        let new_before =
-            count_drop_cap_reference(before.table_drop_cap_style.as_ref(), new_style_id);
-        let old_after = count_drop_cap_reference(after.table_drop_cap_style.as_ref(), old_style_id);
-        let new_after = count_drop_cap_reference(after.table_drop_cap_style.as_ref(), new_style_id);
-        let message_type = original.type_;
+            )
+        };
         object.replace_message(
-            *message_index,
+            location.message_index,
             RawMessage {
                 type_: message_type,
                 data,
             },
         )?;
-        let info = &mut object.archive_info.message_infos[*message_index];
-        update_reference_metadata(
-            info,
-            ReferenceMetadataChange {
-                old_style_id,
-                new_style_id,
-                old_count,
-                old_after,
-                new_before,
-                new_after,
-            },
-        )?;
+        let info = object
+            .archive_info
+            .message_infos
+            .get_mut(location.message_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork text storage {storage_id} writable payload metadata index {} is missing",
+                    location.message_index
+                ))
+            })?;
+        update_reference_metadata(info, change)?;
         Ok(())
     })
 }
