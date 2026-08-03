@@ -40,7 +40,7 @@ fn package_inventory_rejects_malformed_laser_trace_points() {
 
     assert!(matches!(
         package.laser_traces(),
-        Err(OoxmlError::InvalidFormat(message))
+        Err(OoxmlError::Pptx(litchi_pptx::Error::Invalid(message)))
             if message.contains("universal time offset")
     ));
 }
