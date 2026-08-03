@@ -1,3 +1,4 @@
+use std::collections::TryReserveError;
 use thiserror::Error;
 
 /// Result returned by canonical DOCX operations.
@@ -30,6 +31,16 @@ pub enum Error {
     /// Markup-compatibility preprocessing failed.
     #[error("DOCX markup compatibility error: {0}")]
     Mce(#[from] litchi_ooxml_common::MceError),
+
+    /// A bounded authoring operation could not reserve its planned buffer.
+    #[error("DOCX allocation failed for {resource}: {source}")]
+    Allocation {
+        /// Buffer or collection being reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
+    },
 }
 
 impl From<quick_xml::Error> for Error {

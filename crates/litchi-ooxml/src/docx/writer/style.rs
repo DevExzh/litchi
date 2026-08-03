@@ -2,6 +2,7 @@
 //!
 //! This module provides functionality for creating and writing document styles.
 use crate::docx::enums::WdStyleType;
+use crate::docx::styles::Outline;
 use crate::error::Result;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -72,6 +73,8 @@ pub struct MutableStyle {
     indent_right: Option<i32>,
     /// First line indent in twips (negative for hanging)
     indent_first_line: Option<i32>,
+    /// Typed Word paragraph outline level.
+    outline: Option<Outline>,
 }
 
 impl MutableStyle {
@@ -121,6 +124,7 @@ impl MutableStyle {
             indent_left: None,
             indent_right: None,
             indent_first_line: None,
+            outline: None,
         }
     }
 
@@ -267,6 +271,16 @@ impl MutableStyle {
         self.indent_first_line = indent_first_line;
     }
 
+    /// Set the paragraph outline level.
+    pub fn set_outline(&mut self, outline: Option<Outline>) {
+        self.outline = outline;
+    }
+
+    /// Return the paragraph outline level.
+    pub const fn outline(&self) -> Option<Outline> {
+        self.outline
+    }
+
     /// Generate XML for this style.
     pub(crate) fn to_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(512);
@@ -324,7 +338,8 @@ impl MutableStyle {
                 || self.line_spacing.is_some()
                 || self.indent_left.is_some()
                 || self.indent_right.is_some()
-                || self.indent_first_line.is_some();
+                || self.indent_first_line.is_some()
+                || self.outline.is_some();
 
             if has_para_props {
                 xml.push_str("<w:pPr>");
@@ -369,6 +384,10 @@ impl MutableStyle {
                         }
                     }
                     xml.push_str("/>");
+                }
+
+                if let Some(outline) = self.outline {
+                    write!(&mut xml, r#"<w:outlineLvl w:val="{}"/>"#, outline.level())?;
                 }
 
                 xml.push_str("</w:pPr>");
@@ -447,6 +466,7 @@ impl MutableStyle {
         style.set_color(Some("2F5496".to_string())); // Blue
         style.set_space_before(Some(240)); // 12pt before
         style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H1));
         style.set_priority(Some(9));
         style.set_quick_style(true);
         style
@@ -462,6 +482,7 @@ impl MutableStyle {
         style.set_color(Some("2F5496".to_string()));
         style.set_space_before(Some(40)); // 2pt before
         style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H2));
         style.set_priority(Some(9));
         style.set_quick_style(true);
         style
@@ -477,6 +498,107 @@ impl MutableStyle {
         style.set_color(Some("1F3763".to_string()));
         style.set_space_before(Some(40));
         style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H3));
+        style.set_priority(Some(9));
+        style.set_quick_style(true);
+        style
+    }
+
+    /// Create a "Heading 4" style.
+    pub fn heading_4() -> Self {
+        let mut style = Self::new("Heading4", "Heading 4", WdStyleType::Paragraph);
+        style.set_based_on(Some("Normal".to_string()));
+        style.set_custom(false);
+        style.set_font_name(Some("Calibri Light".to_string()));
+        style.set_font_size(Some(22));
+        style.set_italic(true);
+        style.set_color(Some("4F81BD".to_string()));
+        style.set_space_before(Some(200));
+        style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H4));
+        style.set_priority(Some(9));
+        style.set_quick_style(true);
+        style
+    }
+
+    /// Create a "Heading 5" style.
+    pub fn heading_5() -> Self {
+        let mut style = Self::new("Heading5", "Heading 5", WdStyleType::Paragraph);
+        style.set_based_on(Some("Normal".to_string()));
+        style.set_custom(false);
+        style.set_font_name(Some("Calibri Light".to_string()));
+        style.set_font_size(Some(22));
+        style.set_color(Some("243F60".to_string()));
+        style.set_space_before(Some(200));
+        style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H5));
+        style.set_priority(Some(9));
+        style.set_quick_style(true);
+        style
+    }
+
+    /// Create a "Heading 6" style.
+    pub fn heading_6() -> Self {
+        let mut style = Self::new("Heading6", "Heading 6", WdStyleType::Paragraph);
+        style.set_based_on(Some("Normal".to_string()));
+        style.set_custom(false);
+        style.set_font_name(Some("Calibri Light".to_string()));
+        style.set_font_size(Some(22));
+        style.set_italic(true);
+        style.set_color(Some("243F60".to_string()));
+        style.set_space_before(Some(200));
+        style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H6));
+        style.set_priority(Some(9));
+        style.set_quick_style(true);
+        style
+    }
+
+    /// Create a "Heading 7" style.
+    pub fn heading_7() -> Self {
+        let mut style = Self::new("Heading7", "Heading 7", WdStyleType::Paragraph);
+        style.set_based_on(Some("Normal".to_string()));
+        style.set_custom(false);
+        style.set_font_name(Some("Calibri Light".to_string()));
+        style.set_font_size(Some(22));
+        style.set_italic(true);
+        style.set_color(Some("404040".to_string()));
+        style.set_space_before(Some(200));
+        style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H7));
+        style.set_priority(Some(9));
+        style.set_quick_style(true);
+        style
+    }
+
+    /// Create a "Heading 8" style.
+    pub fn heading_8() -> Self {
+        let mut style = Self::new("Heading8", "Heading 8", WdStyleType::Paragraph);
+        style.set_based_on(Some("Normal".to_string()));
+        style.set_custom(false);
+        style.set_font_name(Some("Calibri Light".to_string()));
+        style.set_font_size(Some(20));
+        style.set_color(Some("4F81BD".to_string()));
+        style.set_space_before(Some(200));
+        style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H8));
+        style.set_priority(Some(9));
+        style.set_quick_style(true);
+        style
+    }
+
+    /// Create a "Heading 9" style.
+    pub fn heading_9() -> Self {
+        let mut style = Self::new("Heading9", "Heading 9", WdStyleType::Paragraph);
+        style.set_based_on(Some("Normal".to_string()));
+        style.set_custom(false);
+        style.set_font_name(Some("Calibri Light".to_string()));
+        style.set_font_size(Some(20));
+        style.set_italic(true);
+        style.set_color(Some("404040".to_string()));
+        style.set_space_before(Some(200));
+        style.set_space_after(Some(0));
+        style.set_outline(Some(Outline::H9));
         style.set_priority(Some(9));
         style.set_quick_style(true);
         style
@@ -690,12 +812,30 @@ mod tests {
         let h1 = MutableStyle::heading_1();
         assert_eq!(h1.style_id(), "Heading1");
         assert_eq!(h1.based_on(), Some("Normal"));
+        assert_eq!(h1.outline(), Some(Outline::H1));
 
         let h2 = MutableStyle::heading_2();
         assert_eq!(h2.style_id(), "Heading2");
+        assert_eq!(h2.outline(), Some(Outline::H2));
 
         let h3 = MutableStyle::heading_3();
         assert_eq!(h3.style_id(), "Heading3");
+        assert_eq!(h3.outline(), Some(Outline::H3));
+
+        for (level, style) in [
+            MutableStyle::heading_4(),
+            MutableStyle::heading_5(),
+            MutableStyle::heading_6(),
+            MutableStyle::heading_7(),
+            MutableStyle::heading_8(),
+            MutableStyle::heading_9(),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(style.style_id(), format!("Heading{}", level + 4));
+            assert_eq!(style.outline().unwrap().level(), (level + 3) as u8);
+        }
     }
 
     #[test]

@@ -1100,12 +1100,9 @@ impl<'a> Presentation<'a> {
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
-    /// Load the presentation's table styles part, if the package declares one.
-    ///
-    /// The returned inventory reports stored style metadata only; cell style
-    /// payloads are never resolved or rendered.
-    pub fn table_styles(&self) -> Result<Option<crate::pptx::table_styles::TableStyleList>> {
-        crate::pptx::table_styles::load_table_styles(self.package)
+    /// Load the presentation's typed, bounded table-style catalog.
+    pub fn styles(&self) -> Result<Option<litchi_pptx::table::style::List>> {
+        Ok(litchi_pptx::table::style::load(self.package)?)
     }
 
     /// Load typed presentation settings, if the package contains them.

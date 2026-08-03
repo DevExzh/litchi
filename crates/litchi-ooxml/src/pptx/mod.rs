@@ -96,7 +96,6 @@ pub mod slide;
 pub mod slide_sync;
 pub mod smartart;
 pub mod table;
-pub mod table_styles;
 pub mod template;
 pub mod theme;
 pub mod tracks;
@@ -256,7 +255,6 @@ pub use slide_sync::{
     store_slide_sync_properties,
 };
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
-pub use table_styles::{TableStyleDefinition, TableStyleList, TableStylePartKind};
 pub use theme::{
     AuthoredTheme, SystemColorKind, ThemeColorScheme, ThemeColorSlot, ThemeColorValue,
     ThemeFontFace, ThemeFontScheme, ThemeOverride, ThemeScriptFont, add_theme,

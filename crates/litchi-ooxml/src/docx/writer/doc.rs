@@ -399,7 +399,7 @@ impl MutableDocument {
         let style = if level == 0 {
             "Title".to_string()
         } else {
-            format!("Heading {}", level)
+            format!("Heading{level}")
         };
         let para = self.add_paragraph();
         para.set_style(&style);
@@ -3055,6 +3055,22 @@ mod tests {
         let mut doc = MutableDocument::new();
         doc.add_paragraph_with_text("Hello, World!");
         assert_eq!(doc.paragraph_count(), 1);
+    }
+
+    #[test]
+    fn headings_use_style_ids_instead_of_display_names() {
+        let mut doc = MutableDocument::new();
+        for level in 0..=9 {
+            doc.add_heading(&format!("Level {level}"), level).unwrap();
+        }
+
+        let xml = doc.to_xml().unwrap();
+        assert!(xml.contains(r#"<w:pStyle w:val="Title"/>"#));
+        for level in 1..=9 {
+            assert!(xml.contains(&format!(r#"<w:pStyle w:val="Heading{level}"/>"#)));
+            assert!(!xml.contains(&format!(r#"<w:pStyle w:val="Heading {level}"/>"#)));
+        }
+        assert!(doc.add_heading("invalid", 10).is_err());
     }
 
     #[test]

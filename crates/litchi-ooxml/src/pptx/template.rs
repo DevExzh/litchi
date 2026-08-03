@@ -97,11 +97,6 @@ pub fn default_theme_xml() -> &'static str {
     include_str!("resources/generated/theme/theme1.xml")
 }
 
-/// Generate a minimal valid tableStyles.xml content.
-pub fn default_table_styles_xml() -> &'static str {
-    include_str!("resources/generated/tableStyles.xml")
-}
-
 /// Generate a minimal valid viewProps.xml content.
 pub fn default_view_props_xml() -> &'static str {
     include_str!("resources/generated/viewProps.xml")

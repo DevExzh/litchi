@@ -449,6 +449,7 @@ fn rtf_merge(role: Option<litchi_rtf::TableCellMergeRole>) -> CellMerge {
 #[cfg(test)]
 mod tests {
     use super::super::{CellMerge, Document};
+    use crate::Error;
     use std::path::PathBuf;
 
     fn test_data_path() -> PathBuf {
@@ -573,7 +574,6 @@ mod tests {
     fn test_table_document_with_tables() {
         let test_files = [
             "ooxml/docx/table_footnotes.docx",
-            "ooxml/docx/table-indent.docx",
             "ooxml/docx/table-alignment.docx",
         ];
 
@@ -590,6 +590,23 @@ mod tests {
                         assert!(row_count > 0, "Expected at least one row in {}", file);
                     }
                 }
+            }
+        }
+
+        // This fixture uses the non-OPC
+        // `officedocument/.../metadata/core-properties` relationship type.
+        // Keep it as a regression for rejecting a present core-properties part
+        // that has no valid package-level owner rather than silently reading an
+        // incoherent package graph.
+        let invalid_path = test_data_path().join("ooxml/docx/table-indent.docx");
+        if invalid_path.exists() {
+            match Document::open(invalid_path) {
+                Err(Error::InvalidFormat(message)) => {
+                    assert!(message.contains("core-properties part"));
+                    assert!(message.contains("is orphaned"));
+                },
+                Err(error) => panic!("unexpected table-indent error: {error}"),
+                Ok(_) => panic!("table-indent unexpectedly accepted an orphaned core part"),
             }
         }
     }

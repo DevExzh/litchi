@@ -411,10 +411,14 @@ impl Default for Props {
     }
 }
 
-/// Read one exact `BrtCalcProp` payload with [`Cursor`].
+/// Read a canonical or historical Excel 12 `BrtCalcProp` payload with [`Cursor`].
 ///
-/// The 26-byte layout, mode enumeration, reserved option bits, thread-count
-/// range, and strict `Xnum` domain are all validated before a value is returned.
+/// Canonical records use the 26-byte layout in `[MS-XLSB]` section 2.4.318.
+/// Early Excel 12 producers emitted the final option word as one byte; that
+/// exact 25-byte form is accepted as a zero-extended option word. All other
+/// lengths, mode values, reserved option bits, thread counts, and `Xnum`
+/// values are rejected before a value is returned. [`write()`] always emits the
+/// canonical 26-byte form.
 pub fn read(payload: &[u8]) -> Result<Props> {
     let mut cursor = Cursor::new(payload, "BrtCalcProp");
     let id = cursor.read_u32()?;
@@ -422,7 +426,11 @@ pub fn read(payload: &[u8]) -> Result<Props> {
     let iters = cursor.read_u32()?;
     let delta = Delta::new(cursor.read_f64()?)?;
     let threads = Threads::from_wire(cursor.read_i32()?)?;
-    let opts = read_opts(cursor.read_u16()?)?;
+    let opts = if cursor.remaining() == 1 {
+        read_opts(u16::from(cursor.read_u8()?))?
+    } else {
+        read_opts(cursor.read_u16()?)?
+    };
     cursor.finish()?;
 
     Ok(Props {

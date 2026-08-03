@@ -22,14 +22,13 @@ use crate::docx::vba_project::{
     remove_vba_project as clear_vba_graph_from_document,
     store_vba_project as store_vba_project_in_document,
 };
-use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
 #[cfg(feature = "encryption")]
 use crate::encryption::{Limits, Mode};
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
 use litchi_docx::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_relationship};
-use litchi_docx::font;
+use litchi_docx::{font, web as docx_web};
 use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
@@ -117,10 +116,6 @@ pub struct Package {
     opc: OpcPackage,
     /// Mutable document for writing (cached)
     mutable_doc: Option<MutableDocument>,
-    /// Lazily loaded web-output settings for explicit edits.
-    mutable_web_settings: Option<WebSettings>,
-    /// Whether the web-settings part must be rewritten.
-    web_settings_dirty: bool,
     /// Authoritative, mutation-tracked core properties.
     properties: Slot,
     /// Custom document properties
@@ -321,6 +316,12 @@ impl Package {
             MutableStyle::heading_1(),
             MutableStyle::heading_2(),
             MutableStyle::heading_3(),
+            MutableStyle::heading_4(),
+            MutableStyle::heading_5(),
+            MutableStyle::heading_6(),
+            MutableStyle::heading_7(),
+            MutableStyle::heading_8(),
+            MutableStyle::heading_9(),
             MutableStyle::title(),
             MutableStyle::default_paragraph_font(),
             MutableStyle::toc_heading(),
@@ -378,10 +379,14 @@ impl Package {
         // Create webSettings.xml part
         let web_settings_partname = PackURI::new("/word/webSettings.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("webSettings partname: {}", e)))?;
+        let web_settings_xml = docx_web::write(
+            &docx_web::Settings::default(),
+            docx_web::Conformance::Transitional,
+        )?;
         let web_settings_part = BlobPart::new(
             web_settings_partname,
             ct::WML_WEB_SETTINGS.to_string(),
-            template::default_web_settings_xml().as_bytes().to_vec(),
+            web_settings_xml,
         );
 
         if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
@@ -455,8 +460,6 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc,
-            mutable_web_settings: None,
-            web_settings_dirty: false,
             properties,
             custom_props,
             #[cfg(feature = "encryption")]
@@ -494,8 +497,6 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc: None,
-            mutable_web_settings: None,
-            web_settings_dirty: false,
             properties,
             custom_props,
             #[cfg(feature = "encryption")]
@@ -555,8 +556,6 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc: None,
-            mutable_web_settings: None,
-            web_settings_dirty: false,
             properties,
             custom_props,
             #[cfg(feature = "encryption")]
@@ -597,8 +596,6 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc: None,
-            mutable_web_settings: None,
-            web_settings_dirty: false,
             properties,
             custom_props,
             #[cfg(feature = "encryption")]
@@ -1967,27 +1964,23 @@ impl Package {
             .collect()
     }
 
-    /// Get web-output settings for explicit package mutation.
-    ///
-    /// Existing settings are loaded lazily. If the package has no web-settings
-    /// relationship, this starts with an empty typed model and creates the part
-    /// on the next save. Merely editing document content does not rewrite the
-    /// existing web-settings part.
-    pub fn web_settings_mut(&mut self) -> Result<&mut WebSettings> {
-        if self.mutable_web_settings.is_none() {
-            self.mutable_web_settings = Some(self.load_web_settings()?.unwrap_or_default());
-        }
-        self.web_settings_dirty = true;
-        self.mutable_web_settings.as_mut().ok_or_else(|| {
-            OoxmlError::InvalidFormat("web-settings initialization did not complete".into())
-        })
+    /// Read typed web-output settings and their conformance family.
+    pub fn web(&self) -> Result<Option<(docx_web::Settings, docx_web::Conformance)>> {
+        Ok(docx_web::load(&self.opc)?)
     }
 
-    /// Replace the package's complete typed web-output settings.
-    pub fn set_web_settings(&mut self, settings: WebSettings) -> &mut Self {
-        self.mutable_web_settings = Some(settings);
-        self.web_settings_dirty = true;
-        self
+    /// Move complete web-output settings into package ownership.
+    pub fn put_web(
+        &mut self,
+        settings: docx_web::Settings,
+        conformance: docx_web::Conformance,
+    ) -> Result<bool> {
+        Ok(docx_web::put(&mut self.opc, settings, conformance)?)
+    }
+
+    /// Remove the document-owned web-settings part.
+    pub fn remove_web(&mut self) -> Result<bool> {
+        Ok(docx_web::remove(&mut self.opc)?)
     }
 
     /// Inspect the external template associated with this document without dereferencing it.
@@ -2132,30 +2125,6 @@ impl Package {
         DocumentVariables::extract_from_settings_part(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(count)
-    }
-
-    fn load_web_settings(&self) -> Result<Option<WebSettings>> {
-        let main_part = self.opc.main_document_part()?;
-        let mut matches = main_part
-            .rels()
-            .iter()
-            .filter(|relationship| is_web_settings_relationship(relationship.reltype()));
-        let Some(relationship) = matches.next() else {
-            return Ok(None);
-        };
-        if matches.next().is_some() {
-            return Err(OoxmlError::InvalidFormat(
-                "document has multiple web-settings relationships".into(),
-            ));
-        }
-        if relationship.is_external() {
-            return Err(OoxmlError::InvalidFormat(
-                "web-settings relationship cannot be external".into(),
-            ));
-        }
-        let target = relationship.target_partname()?;
-        let part = self.opc.get_part(&target)?;
-        Ok(Some(WebSettings::extract_from_part(part)?))
     }
 
     /// Load the typed glossary/building-block document, if present.
@@ -2915,19 +2884,6 @@ impl Package {
             self.mutable_doc = Some(mutable_doc);
         }
 
-        if self.web_settings_dirty {
-            let xml = self
-                .mutable_web_settings
-                .as_ref()
-                .ok_or_else(|| {
-                    OoxmlError::InvalidFormat("dirty web settings have no typed model".to_string())
-                })?
-                .to_xml()?
-                .into_bytes();
-            self.update_web_settings_part(xml)?;
-            self.web_settings_dirty = false;
-        }
-
         // Flush only an explicitly edited core-properties slot.
         self.properties.flush(&mut self.opc)?;
 
@@ -3213,79 +3169,6 @@ impl Package {
                 .relate_to("settings.xml", rt::SETTINGS);
         }
         self.opc.add_part(Box::new(part));
-        Ok(())
-    }
-
-    fn update_web_settings_part(&mut self, xml: Vec<u8>) -> Result<()> {
-        use litchi_opc::constants::relationship_type as rt;
-        use litchi_opc::part::{BlobPart, Part};
-
-        let doc_uri = PackURI::new("/word/document.xml")
-            .map_err(|error| OoxmlError::InvalidUri(format!("document URI: {error}")))?;
-        let (target, relationship_exists) = {
-            let document_part = self.opc.get_part(&doc_uri)?;
-            let mut matches = document_part
-                .rels()
-                .iter()
-                .filter(|relationship| is_web_settings_relationship(relationship.reltype()));
-            let relationship = matches.next();
-            if matches.next().is_some() {
-                return Err(OoxmlError::InvalidFormat(
-                    "document has multiple web-settings relationships".into(),
-                ));
-            }
-            match relationship {
-                Some(relationship) if relationship.is_external() => {
-                    return Err(OoxmlError::InvalidFormat(
-                        "web-settings relationship cannot be external".into(),
-                    ));
-                },
-                Some(relationship) => (relationship.target_partname()?, true),
-                None => (
-                    PackURI::new("/word/webSettings.xml").map_err(|error| {
-                        OoxmlError::InvalidUri(format!("webSettings URI: {error}"))
-                    })?,
-                    false,
-                ),
-            }
-        };
-
-        let (content_type, relationships) = match self.opc.get_part(&target) {
-            Ok(part) => (
-                part.content_type().to_owned(),
-                part.rels()
-                    .iter()
-                    .map(|relationship| {
-                        (
-                            relationship.reltype().to_owned(),
-                            relationship.target_ref().to_owned(),
-                            relationship.r_id().to_owned(),
-                            relationship.is_external(),
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-            ),
-            Err(_) if relationship_exists => {
-                return Err(OoxmlError::PartNotFound(format!(
-                    "web-settings part {target}"
-                )));
-            },
-            Err(_) => (ct::WML_WEB_SETTINGS.to_owned(), Vec::new()),
-        };
-
-        let mut part = BlobPart::new(target, content_type, xml);
-        for (reltype, target_ref, id, external) in relationships {
-            part.rels_mut()
-                .add_relationship(reltype, target_ref, id, external);
-        }
-        WebSettings::extract_from_part(&part)?;
-        self.opc.add_part(Box::new(part));
-
-        if !relationship_exists {
-            self.opc
-                .get_part_mut(&doc_uri)?
-                .relate_to("webSettings.xml", rt::WEB_SETTINGS);
-        }
         Ok(())
     }
 
@@ -3653,6 +3536,55 @@ mod tests {
             toc[0].heading_style_levels().unwrap(),
             vec![crate::docx::TableOfContentsLevelRange::new(1, 4).unwrap()]
         );
+    }
+
+    #[test]
+    fn all_supported_headings_resolve_in_the_saved_style_catalog() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            for level in 0..=9 {
+                document
+                    .add_heading(&format!("Heading {level}"), level)
+                    .unwrap();
+            }
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let ids = document
+            .paragraphs()
+            .unwrap()
+            .into_iter()
+            .map(|paragraph| paragraph.style_id().unwrap().unwrap())
+            .collect::<Vec<_>>();
+        let expected = std::iter::once("Title".to_string())
+            .chain((1..=9).map(|level| format!("Heading{level}")))
+            .collect::<Vec<_>>();
+        assert_eq!(ids, expected);
+
+        let mut styles = document.styles().unwrap();
+        let outlines = [
+            None,
+            Some(crate::docx::styles::Outline::H1),
+            Some(crate::docx::styles::Outline::H2),
+            Some(crate::docx::styles::Outline::H3),
+            Some(crate::docx::styles::Outline::H4),
+            Some(crate::docx::styles::Outline::H5),
+            Some(crate::docx::styles::Outline::H6),
+            Some(crate::docx::styles::Outline::H7),
+            Some(crate::docx::styles::Outline::H8),
+            Some(crate::docx::styles::Outline::H9),
+        ];
+        for (id, outline) in expected.into_iter().zip(outlines) {
+            let style = styles
+                .get_by_id(&id)
+                .unwrap()
+                .unwrap_or_else(|| panic!("missing {id}"));
+            assert_eq!(style.outline(), outline, "wrong outline for {id}");
+        }
     }
 
     #[test]
@@ -4729,6 +4661,17 @@ mod tests {
     }
 
     #[test]
+    fn new_package_uses_leaf_owned_web_settings_bytes() {
+        use litchi_docx::web::{Conformance, Settings, write};
+
+        let package = Package::new().unwrap();
+        let uri = PackURI::new("/word/webSettings.xml").unwrap();
+        let expected = write(&Settings::default(), Conformance::Transitional).unwrap();
+
+        assert_eq!(package.opc.get_part(&uri).unwrap().blob(), expected);
+    }
+
+    #[test]
     fn body_edits_preserve_web_settings_part_byte_for_byte() {
         let mut package = Package::new().unwrap();
         let web_settings_uri = PackURI::new("/word/webSettings.xml").unwrap();
@@ -4753,34 +4696,30 @@ mod tests {
 
     #[test]
     fn edits_web_settings_without_rewriting_document_content() {
+        use litchi_docx::web::{Conformance, Screen};
+
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
-        package
-            .web_settings_mut()
-            .unwrap()
+        let (mut settings, conformance) = package.web().unwrap().unwrap();
+        settings
             .set_allow_png(false)
             .set_optimize_for_browser(true)
-            .set_target_screen_size(crate::docx::web_settings::TargetScreenSize::Pixels1600x1200);
+            .set_target_screen_size(Screen::Pixels1600x1200);
+        assert_eq!(conformance, Conformance::Transitional);
+        assert!(package.put_web(settings, conformance).unwrap());
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
-        let settings = reopened
-            .document()
-            .unwrap()
-            .web_settings()
-            .unwrap()
-            .unwrap();
+        let (settings, conformance) = reopened.document().unwrap().web().unwrap().unwrap();
+        assert_eq!(conformance, Conformance::Transitional);
         assert_eq!(settings.allow_png(), Some(false));
         assert_eq!(settings.optimize_for_browser(), Some(true));
-        assert_eq!(
-            settings.target_screen_size(),
-            Some(crate::docx::web_settings::TargetScreenSize::Pixels1600x1200)
-        );
+        assert_eq!(settings.target_screen_size(), Some(Screen::Pixels1600x1200));
     }
 
     #[test]
     fn web_settings_updates_preserve_frame_relationship_ids() {
-        use crate::docx::web_settings::{FrameLayout, Frameset};
+        use litchi_docx::web::{Frameset, Layout};
 
         const FRAME_RELATIONSHIP: &str =
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/frame";
@@ -4793,51 +4732,41 @@ mod tests {
             .relate_to("frame1.html", FRAME_RELATIONSHIP);
 
         let mut frameset = Frameset::default();
-        frameset.set_layout(FrameLayout::Rows);
+        frameset.set_layout(Layout::Rows);
         frameset
             .add_frame()
+            .unwrap()
             .set_name("main")
-            .set_source_file_relationship_id(&relationship_id);
-        package.web_settings_mut().unwrap().set_frameset(frameset);
+            .unwrap()
+            .set_rel(&relationship_id)
+            .unwrap();
+        let (mut settings, conformance) = package.web().unwrap().unwrap();
+        settings.set_frameset(frameset);
+        assert!(package.put_web(settings, conformance).unwrap());
         package.to_stream(Cursor::new(Vec::new())).unwrap();
 
         let part = package.opc.get_part(&web_settings_uri).unwrap();
         let relationship = part.rels().get(&relationship_id).unwrap();
         assert_eq!(relationship.reltype(), FRAME_RELATIONSHIP);
         assert_eq!(relationship.target_ref(), "frame1.html");
-        assert!(
-            package
-                .document()
-                .unwrap()
-                .web_settings()
-                .unwrap()
-                .is_some()
-        );
+        assert!(package.document().unwrap().web().unwrap().is_some());
     }
 
     #[test]
     fn creates_a_web_settings_relationship_when_missing() {
+        use litchi_docx::web::{Conformance, Settings};
         use litchi_opc::constants::relationship_type as rt;
 
         let mut package = Package::new().unwrap();
         let doc_uri = PackURI::new("/word/document.xml").unwrap();
-        let relationship_id = package
-            .opc
-            .get_part(&doc_uri)
-            .unwrap()
-            .rels()
-            .part_with_reltype(rt::WEB_SETTINGS)
-            .unwrap()
-            .r_id()
-            .to_owned();
-        package
-            .opc
-            .get_part_mut(&doc_uri)
-            .unwrap()
-            .rels_mut()
-            .remove(&relationship_id);
-
-        package.web_settings_mut().unwrap().set_encoding("utf-8");
+        assert!(package.remove_web().unwrap());
+        let mut settings = Settings::default();
+        settings.set_encoding("utf-8").unwrap();
+        assert!(
+            package
+                .put_web(settings, Conformance::Transitional)
+                .unwrap()
+        );
         package.to_stream(Cursor::new(Vec::new())).unwrap();
 
         let relationship = package
@@ -4852,9 +4781,10 @@ mod tests {
             package
                 .document()
                 .unwrap()
-                .web_settings()
+                .web()
                 .unwrap()
                 .unwrap()
+                .0
                 .encoding(),
             Some("utf-8")
         );
@@ -4862,62 +4792,45 @@ mod tests {
 
     #[test]
     fn reads_and_updates_strict_web_settings_relationships() {
-        use crate::docx::web_settings::STRICT_WEB_SETTINGS_RELATIONSHIP;
+        use litchi_docx::web::{Conformance, Settings};
         use litchi_opc::constants::relationship_type as rt;
 
         let mut package = Package::new().unwrap();
-        let doc_uri = PackURI::new("/word/document.xml").unwrap();
+        assert!(package.remove_web().unwrap());
         let (relationship_id, target_ref) = {
             let relationship = package
                 .opc
-                .get_part(&doc_uri)
-                .unwrap()
                 .rels()
-                .part_with_reltype(rt::WEB_SETTINGS)
+                .part_with_reltype(rt::OFFICE_DOCUMENT)
                 .unwrap();
             (
                 relationship.r_id().to_owned(),
                 relationship.target_ref().to_owned(),
             )
         };
-        let document_part = package.opc.get_part_mut(&doc_uri).unwrap();
-        document_part.rels_mut().remove(&relationship_id);
-        document_part.rels_mut().add_relationship(
-            STRICT_WEB_SETTINGS_RELATIONSHIP.to_owned(),
+        package.opc.rels_mut().remove(&relationship_id);
+        package.opc.rels_mut().add_relationship(
+            rt::STRICT_OFFICE_DOCUMENT.to_owned(),
             target_ref,
             relationship_id.clone(),
             false,
         );
 
-        assert!(
-            package
-                .document()
-                .unwrap()
-                .web_settings()
-                .unwrap()
-                .is_some()
-        );
-        package
-            .web_settings_mut()
-            .unwrap()
-            .set_save_smart_tags_as_xml(true);
+        let mut settings = Settings::default();
+        settings.set_save_smart_tags_as_xml(true);
+        assert!(package.put_web(settings, Conformance::Strict).unwrap());
         package.to_stream(Cursor::new(Vec::new())).unwrap();
 
-        let relationship = package
-            .opc
-            .get_part(&doc_uri)
-            .unwrap()
-            .rels()
-            .get(&relationship_id)
-            .unwrap();
-        assert_eq!(relationship.reltype(), STRICT_WEB_SETTINGS_RELATIONSHIP);
+        let (_, conformance) = package.document().unwrap().web().unwrap().unwrap();
+        assert_eq!(conformance, Conformance::Strict);
         assert_eq!(
             package
                 .document()
                 .unwrap()
-                .web_settings()
+                .web()
                 .unwrap()
                 .unwrap()
+                .0
                 .save_smart_tags_as_xml(),
             Some(true)
         );
@@ -4925,7 +4838,7 @@ mod tests {
 
     #[test]
     fn rejects_ambiguous_or_external_web_settings_relationships() {
-        use crate::docx::web_settings::STRICT_WEB_SETTINGS_RELATIONSHIP;
+        use litchi_docx::web::{Conformance, Settings};
         use litchi_opc::constants::relationship_type as rt;
 
         let mut duplicate = Package::new().unwrap();
@@ -4936,13 +4849,18 @@ mod tests {
             .unwrap()
             .rels_mut()
             .add_relationship(
-                STRICT_WEB_SETTINGS_RELATIONSHIP.to_owned(),
+                Conformance::Strict.relationship().to_owned(),
                 "webSettings.xml".to_owned(),
                 "rIdDuplicateWebSettings".to_owned(),
                 false,
             );
-        assert!(duplicate.document().unwrap().web_settings().is_err());
-        assert!(duplicate.web_settings_mut().is_err());
+        assert!(duplicate.document().unwrap().web().is_err());
+        assert!(duplicate.web().is_err());
+        assert!(
+            duplicate
+                .put_web(Settings::default(), Conformance::Transitional)
+                .is_err()
+        );
 
         let mut external = Package::new().unwrap();
         let relationship_id = external
@@ -4962,8 +4880,8 @@ mod tests {
             relationship_id,
             true,
         );
-        assert!(external.document().unwrap().web_settings().is_err());
-        assert!(external.web_settings_mut().is_err());
+        assert!(external.document().unwrap().web().is_err());
+        assert!(external.web().is_err());
     }
 
     fn settings_state(package: &Package) -> (Vec<u8>, String) {

@@ -26,11 +26,6 @@ pub fn default_font_table_xml() -> &'static str {
     include_str!("resources/generated/fontTable.xml")
 }
 
-/// Generate a minimal valid webSettings.xml content.
-pub fn default_web_settings_xml() -> &'static str {
-    include_str!("resources/generated/webSettings.xml")
-}
-
 /// Generate a minimal valid core.xml (core properties) content.
 pub fn default_core_props_xml() -> &'static str {
     include_str!("resources/generated/docProps/core.xml")

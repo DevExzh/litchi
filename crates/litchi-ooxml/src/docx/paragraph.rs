@@ -1,3 +1,4 @@
+use crate::docx::UnderlineStyle;
 use crate::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::image::{InlineImage, parse_inline_images};
@@ -9,11 +10,11 @@ use crate::docx::namespace::{
 use crate::docx::numbering::ParagraphNumbering;
 use crate::docx::revision::{Revision, parse_revisions};
 use crate::docx::smart_tag::SmartTag;
-use crate::docx::{ThemeColor, UnderlineStyle};
 use crate::error::{OoxmlError, Result};
 /// Paragraph and Run structures for Word documents.
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
+use litchi_docx::color::Theme;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, extract_omml_formulas, omml_formula_xml, scan_omml_formula_ranges,
 };
@@ -1084,7 +1085,7 @@ pub struct RunUnderline {
     /// Direct automatic or RGB color.
     pub color: Option<RunUnderlineColor>,
     /// Theme color used instead of, or to transform, the direct color.
-    pub theme_color: Option<ThemeColor>,
+    pub theme_color: Option<Theme>,
     /// Theme tint transform byte.
     pub theme_tint: Option<u8>,
     /// Theme shade transform byte.
@@ -1252,7 +1253,7 @@ fn set_run_underline(
     let theme_color =
         run_underline_attribute(element, b"themeColor", decoder, resolver, fragment_prefix)?
             .map(|value| {
-                ThemeColor::from_xml(&value).ok_or_else(|| {
+                Theme::parse(&value).ok_or_else(|| {
                     OoxmlError::InvalidFormat(format!(
                         "invalid Word underline theme color '{value}'"
                     ))
@@ -2138,7 +2139,7 @@ mod tests {
             Some(RunUnderline {
                 style: UnderlineStyle::WavyDouble,
                 color: Some(RunUnderlineColor::Rgb([0xA0, 0xB1, 0xC2])),
-                theme_color: Some(ThemeColor::Accent4),
+                theme_color: Some(Theme::Accent4),
                 theme_tint: Some(0x0A),
                 theme_shade: Some(0xFF),
             })

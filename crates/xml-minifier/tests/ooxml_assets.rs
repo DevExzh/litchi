@@ -71,10 +71,6 @@ fn assets() -> Vec<Asset> {
             "docx/resources/theme/theme1.xml"
         ),
         asset!(
-            "../../litchi-ooxml/src/docx/resources/webSettings.xml",
-            "docx/resources/webSettings.xml"
-        ),
-        asset!(
             "../../litchi-ooxml/src/pptx/resources/docProps/app.xml",
             "pptx/resources/docProps/app.xml"
         ),
@@ -142,10 +138,6 @@ fn assets() -> Vec<Asset> {
         asset!(
             "../../litchi-ooxml/src/pptx/resources/slideMasters/slideMaster1.xml",
             "pptx/resources/slideMasters/slideMaster1.xml"
-        ),
-        asset!(
-            "../../litchi-ooxml/src/pptx/resources/tableStyles.xml",
-            "pptx/resources/tableStyles.xml"
         ),
         asset!(
             "../../litchi-ooxml/src/pptx/resources/theme/theme1.xml",

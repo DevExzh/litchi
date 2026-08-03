@@ -8,6 +8,47 @@ use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::collections::HashSet;
 
+/// A Word paragraph outline level tied to a built-in heading rank.
+///
+/// Word stores Heading 1 as wire level `0` and Heading 9 as wire level `8`.
+/// The enum keeps every public value inside that closed domain.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Outline {
+    H1 = 0,
+    H2 = 1,
+    H3 = 2,
+    H4 = 3,
+    H5 = 4,
+    H6 = 5,
+    H7 = 6,
+    H8 = 7,
+    H9 = 8,
+}
+
+impl Outline {
+    /// Convert a wire level into its typed heading rank.
+    pub const fn new(level: u8) -> Option<Self> {
+        match level {
+            0 => Some(Self::H1),
+            1 => Some(Self::H2),
+            2 => Some(Self::H3),
+            3 => Some(Self::H4),
+            4 => Some(Self::H5),
+            5 => Some(Self::H6),
+            6 => Some(Self::H7),
+            7 => Some(Self::H8),
+            8 => Some(Self::H9),
+            _ => None,
+        }
+    }
+
+    /// Return the zero-based WordprocessingML wire level.
+    pub const fn level(self) -> u8 {
+        self as u8
+    }
+}
+
 /// A collection of styles defined in a Word document.
 ///
 /// Provides access to paragraph, character, table, and list styles.
@@ -255,6 +296,24 @@ impl<'a> Styles<'a> {
                                     })?,
                             );
                         },
+                        b"outlineLvl" if in_ppr => {
+                            if builder.outline.is_some() {
+                                return Err(OoxmlError::InvalidFormat(
+                                    "style has duplicate outlineLvl".to_owned(),
+                                ));
+                            }
+                            let raw = required_style_value(&e, reader.decoder())?;
+                            let level = raw.parse::<u8>().map_err(|_| {
+                                OoxmlError::InvalidFormat(format!(
+                                    "invalid style outlineLvl '{raw}'"
+                                ))
+                            })?;
+                            builder.outline = Some(Outline::new(level).ok_or_else(|| {
+                                OoxmlError::InvalidFormat(format!(
+                                    "invalid style outlineLvl '{raw}'"
+                                ))
+                            })?);
+                        },
                         b"name" => {
                             // Parse name attribute
                             for attr in e.attributes().flatten() {
@@ -339,6 +398,7 @@ impl<'a> Styles<'a> {
                             is_custom: builder.is_custom,
                             based_on: builder.based_on,
                             numbering: builder.numbering,
+                            outline: builder.outline,
                             priority: builder.priority,
                             is_quick_style: builder.is_quick_style,
                             is_hidden: builder.is_hidden,
@@ -367,6 +427,7 @@ struct StyleBuilder {
     is_custom: bool,
     based_on: Option<String>,
     numbering: Option<ParagraphNumbering>,
+    outline: Option<Outline>,
     priority: Option<i32>,
     is_quick_style: bool,
     is_hidden: bool,
@@ -392,6 +453,7 @@ pub struct Style {
     /// ID of the style this is based on
     based_on: Option<String>,
     numbering: Option<ParagraphNumbering>,
+    outline: Option<Outline>,
     /// UI priority for display ordering
     priority: Option<i32>,
     /// Whether to show in quick style gallery
@@ -455,6 +517,12 @@ impl Style {
         self.numbering
     }
 
+    /// Direct outline level declared by this paragraph style.
+    #[inline]
+    pub const fn outline(&self) -> Option<Outline> {
+        self.outline
+    }
+
     /// Get the UI priority for this style.
     ///
     /// Lower values appear first in style lists.
@@ -498,7 +566,7 @@ fn required_style_value(
         }
     }
     Err(OoxmlError::InvalidFormat(
-        "style numbering property is missing val".to_owned(),
+        "style property is missing val".to_owned(),
     ))
 }
 
@@ -545,6 +613,23 @@ mod tests {
         });
         with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:pPr><w:numPr><w:ilvl w:val="9"/></w:numPr></w:pPr></w:style></w:styles>"#, |malformed| {
             assert!(malformed.len().is_err());
+        });
+    }
+
+    #[test]
+    fn outline_levels_are_typed_and_malformed_values_are_rejected() {
+        assert_eq!(Outline::new(0), Some(Outline::H1));
+        assert_eq!(Outline::new(8), Some(Outline::H9));
+        assert_eq!(Outline::new(9), None);
+
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Heading1"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>"#, |styles| {
+            assert_eq!(
+                styles.get_by_id("Heading1").unwrap().unwrap().outline(),
+                Some(Outline::H1)
+            );
+        });
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Bad"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style></w:styles>"#, |styles| {
+            assert!(styles.len().is_err());
         });
     }
 }

@@ -4,12 +4,14 @@
 //! [`transition`] owns slide-transition values and its bounded codec. [`tag`]
 //! owns inert programmable tag lists and package CRUD. [`notes`] owns bounded
 //! speaker-notes graphs, text encoding, and transactional package mutation.
+//! [`table::style`] owns typed table-style catalogs and their package graph.
 
 #![forbid(unsafe_code)]
 
 mod error;
 pub mod notes;
 pub mod shape;
+pub mod table;
 pub mod tag;
 pub mod transition;
 

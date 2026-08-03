@@ -315,7 +315,7 @@ impl Package {
         let table_styles_part = BlobPart::new(
             table_styles_partname,
             ct::PML_TABLE_STYLES.to_string(),
-            template::default_table_styles_xml().as_bytes().to_vec(),
+            litchi_pptx::table::style::default_xml().as_bytes().to_vec(),
         );
 
         // Add relationship from presentation to tableStyles
@@ -909,12 +909,22 @@ impl Package {
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
-    /// Load the presentation's table styles part, if the package declares one.
+    /// Load the presentation's typed, bounded table-style catalog.
+    pub fn styles(&self) -> Result<Option<litchi_pptx::table::style::List>> {
+        Ok(litchi_pptx::table::style::load(&self.opc)?)
+    }
+
+    /// Atomically create or replace the table-style catalog by value.
     ///
-    /// The returned inventory reports stored style metadata only; cell style
-    /// payloads are never resolved or rendered.
-    pub fn table_styles(&self) -> Result<Option<crate::pptx::table_styles::TableStyleList>> {
-        crate::pptx::table_styles::load_table_styles(&self.opc)
+    /// Returns `true` when package bytes changed and `false` for a semantic
+    /// no-op, allowing callers to retain signatures on unchanged documents.
+    pub fn put_styles(&mut self, styles: litchi_pptx::table::style::List) -> Result<bool> {
+        Ok(litchi_pptx::table::style::put(&mut self.opc, styles)?)
+    }
+
+    /// Atomically remove and return the optional table-style catalog.
+    pub fn remove_styles(&mut self) -> Result<Option<litchi_pptx::table::style::List>> {
+        Ok(litchi_pptx::table::style::remove(&mut self.opc)?)
     }
 
     /// Load the PowerPoint Revision Information part, if present.
@@ -1519,8 +1529,9 @@ impl Package {
         if should_update {
             // Take mutable_pres temporarily to avoid borrow issues
             if let Some(mutable_pres) = self.mutable_pres.take() {
-                self.update_presentation_parts(&mutable_pres)?;
+                let result = self.update_presentation_parts(&mutable_pres);
                 self.mutable_pres = Some(mutable_pres);
+                result?;
             }
         }
 
@@ -1544,6 +1555,23 @@ impl Package {
         use litchi_opc::constants::content_type as ct;
         use litchi_opc::constants::relationship_type as rt;
         use litchi_opc::part::{BlobPart, Part};
+
+        if litchi_pptx::table::style::conformance(&self.opc)?
+            == litchi_pptx::table::style::Conformance::Strict
+        {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: "materialize_presentation",
+                reason: "the legacy presentation writer emits Transitional markup and cannot safely rewrite a Strict package",
+            });
+        }
+        let table_styles = litchi_pptx::table::style::link(&self.opc)?.map(|link| {
+            (
+                link.kind().to_owned(),
+                link.target().to_owned(),
+                link.id().to_owned(),
+            )
+        });
 
         // Initialize relationship mapper
         let mut rel_mapper = RelationshipMapper::new();
@@ -1862,12 +1890,25 @@ impl Package {
         let mut temp_pres_part =
             BlobPart::new(pres_uri.clone(), presentation_content_type, Vec::new());
 
-        // Add relationship to slideMaster (this should be rId1)
-        temp_pres_part.relate_to("slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
+        // Preserve the validated optional table-style edge exactly. Adding it
+        // first reserves a producer-selected relationship ID; generated edges
+        // then select free IDs around it.
+        if let Some((kind, target, id)) = table_styles {
+            temp_pres_part.rels_mut().try_add_relationship(
+                kind,
+                target,
+                id,
+                litchi_opc::TargetMode::Internal,
+            )?;
+        }
+
+        // Add relationship to slideMaster and retain its allocated ID because
+        // a producer is allowed to use rId1 for another relationship.
+        let slide_master_rel_id =
+            temp_pres_part.relate_to("slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
 
         // Add other required relationships (in the order they were created in Package::new())
         // These relationships should be added even if not modified, as they're required for a valid PPTX
-        temp_pres_part.relate_to("tableStyles.xml", rt::TABLE_STYLES);
         temp_pres_part.relate_to("viewProps.xml", rt::VIEW_PROPS);
         temp_pres_part.relate_to("presProps.xml", rt::PRES_PROPS);
         temp_pres_part.relate_to("theme/theme1.xml", rt::THEME);
@@ -2155,6 +2196,7 @@ impl Package {
         // Now generate presentation XML with actual relationship IDs
         // Note: notesMasterIdLst is NOT required for handout master (per python-pptx reference)
         let pres_xml = pres.generate_presentation_xml_with_rels(
+            Some(&slide_master_rel_id),
             Some(&slide_rel_ids),
             Some(&notes_master_rel_id),
             handout_rel_id.as_deref(),

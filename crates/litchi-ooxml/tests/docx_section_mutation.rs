@@ -1,7 +1,7 @@
 use litchi_ooxml::docx::{Package, SectionProperties, WdHeaderFooter, WdSectionStart};
 use std::io::Cursor;
 
-const TRANSITIONAL: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test"><w:body><w:p><w:pPr><w:sectPr><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><mc:AlternateContent><mc:Fallback><x:opaque x:value="keep"/></mc:Fallback></mc:AlternateContent></w:sectPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>"#;
+const TRANSITIONAL: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test"><w:body><w:p><w:pPr><w:sectPr><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><mc:AlternateContent><mc:Choice Requires="x"><x:unsupported/></mc:Choice><mc:Fallback><x:opaque x:value="keep"/></mc:Fallback></mc:AlternateContent></w:sectPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>"#;
 
 #[test]
 fn mutates_moves_and_removes_paragraph_section_breaks_without_losing_mce() {

@@ -88,7 +88,6 @@ pub mod textbox;
 pub mod theme;
 pub mod variables;
 pub mod vba_project;
-pub mod web_settings;
 pub mod writer;
 
 pub use bibliography::{
@@ -141,6 +140,7 @@ pub use glossary::{
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::InlineImage;
+pub use litchi_docx::{color, web};
 pub use mail_merge::{
     MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
     MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
@@ -175,7 +175,7 @@ pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
 use litchi_docx::alt::Chunk;
 pub use litchi_drawingml::diagram::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use statistics::DocumentStatistics;
-pub use styles::{Style, Styles};
+pub use styles::{Outline, Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use textbox::{
     DocxTextBox, TextBoxAnchor, TextBoxAutofit, TextBoxBodyProperties, TextBoxInsets,
@@ -185,11 +185,6 @@ pub use textbox::{
 pub use theme::Theme;
 pub use variables::DocumentVariables;
 pub use vba_project::{VbaDocumentEvent, VbaMacroDescriptor, VbaProject, VbaSupplementalData};
-pub use web_settings::{
-    Frame, FrameLayout, FrameScrollbarVisibility, Frameset, FramesetChild, FramesetColor,
-    FramesetSplitBar, HtmlDiv, HtmlDivBorder, HtmlDivBorders, TargetScreenSize, ThemeColor,
-    WebSettings, WebSettingsConformance,
-};
 // Re-export shared formatting types
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 // Re-export writer types

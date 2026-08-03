@@ -31,10 +31,32 @@ fn exact_payload_round_trip_preserves_every_field() {
 }
 
 #[test]
-fn rejects_non_exact_payload_lengths() {
+fn accepts_excel_12_single_byte_options_and_writes_canonical_form() {
+    let full = payload(
+        0x0001_DD63,
+        1,
+        100,
+        0.001,
+        1,
+        (Opts::A1 | Opts::FULL_PRECISION | Opts::RECALC_ON_SAVE | Opts::MTR).bits(),
+    );
+    let legacy = &full[..calc::LEN - 1];
+
+    let props = calc::read(legacy).unwrap();
+    assert_eq!(props.id(), 0x0001_DD63);
+    assert!(props.has(Opts::A1 | Opts::FULL_PRECISION | Opts::RECALC_ON_SAVE | Opts::MTR));
+    assert!(!props.has(Opts::IGNORE_DEPS));
+
+    let mut canonical = Vec::new();
+    calc::write(&props, &mut Writer::new(&mut canonical)).unwrap();
+    assert_eq!(canonical, full);
+}
+
+#[test]
+fn rejects_payload_lengths_outside_supported_forms() {
     let full = payload(1, 1, 100, 0.001, 1, Opts::A1.bits());
     assert!(matches!(
-        calc::read(&full[..calc::LEN - 1]),
+        calc::read(&full[..calc::LEN - 2]),
         Err(Error::Wire(RawError::Truncated {
             stage: Stage::Value,
             ..

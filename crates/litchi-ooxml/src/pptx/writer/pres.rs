@@ -900,18 +900,20 @@ impl MutablePresentation {
 
     /// Generate presentation.xml content.
     pub fn generate_presentation_xml(&self) -> Result<String> {
-        self.generate_presentation_xml_with_rels(None, None, None)
+        self.generate_presentation_xml_with_rels(None, None, None, None)
     }
 
     /// Generate presentation.xml content with actual relationship IDs.
     ///
     /// # Arguments
+    /// * `slide_master_rel_id` - Optional relationship ID for the slide master
     /// * `slide_rel_ids` - Optional vector of relationship IDs for slides (e.g., ["rId5", "rId6", ...])
     ///   If None, will generate default IDs starting at rId2
     /// * `notes_master_rel_id` - Optional relationship ID for notes master
     /// * `handout_rel_id` - Optional relationship ID for handout master
     pub(crate) fn generate_presentation_xml_with_rels(
         &self,
+        slide_master_rel_id: Option<&str>,
         slide_rel_ids: Option<&[String]>,
         notes_master_rel_id: Option<&str>,
         handout_rel_id: Option<&str>,
@@ -923,7 +925,9 @@ impl MutablePresentation {
 
         // Write slide master ID list (required)
         xml.push_str("<p:sldMasterIdLst>");
-        xml.push_str(r#"<p:sldMasterId id="2147483648" r:id="rId1"/>"#);
+        xml.push_str(r#"<p:sldMasterId id="2147483648" r:id=""#);
+        xml.push_str(slide_master_rel_id.unwrap_or("rId1"));
+        xml.push_str(r#""/>"#);
         xml.push_str("</p:sldMasterIdLst>");
 
         // Write notes master ID list if present (MUST come before handoutMasterIdLst per OOXML spec)
