@@ -249,7 +249,7 @@ impl<'a> TableDataExtractor<'a> {
             };
             let Some(payload_object) = self
                 .object_index
-                .resolve_object(self.bundle, payload_reference.identifier)?
+                .resolve_id(self.bundle, payload_reference.identifier)?
             else {
                 continue;
             };
@@ -293,7 +293,7 @@ impl<'a> TableDataExtractor<'a> {
                 })?;
             let storage_object = self
                 .object_index
-                .resolve_object(self.bundle, storage_id)?
+                .resolve_id(self.bundle, storage_id)?
                 .ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Numbers comment storage object {storage_id} is missing"
@@ -346,7 +346,7 @@ impl<'a> TableDataExtractor<'a> {
     ) -> Result<Vec<tst::table_data_list::ListEntry>> {
         let resolved = self
             .object_index
-            .resolve_object(self.bundle, object_id)?
+            .resolve_id(self.bundle, object_id)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers table-data-list object {object_id} is missing"
@@ -392,7 +392,7 @@ impl<'a> TableDataExtractor<'a> {
             }
             let segment_object = self
                 .object_index
-                .resolve_object(self.bundle, reference.identifier)?
+                .resolve_id(self.bundle, reference.identifier)?
                 .ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Numbers table-data-list segment object {} is missing",
@@ -466,7 +466,7 @@ impl<'a> TableDataExtractor<'a> {
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, tile_id)? {
+        if let Some(resolved) = self.object_index.resolve_id(self.bundle, tile_id)? {
             for msg in &resolved.messages {
                 // Tile messages are typically in the TST namespace
                 if let Ok(tile) = tst::Tile::decode(&*msg.data) {
@@ -1210,7 +1210,7 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Extract rich text from a storage reference
     fn extract_rich_text(&self, storage_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, storage_id)? {
+        if let Some(resolved) = self.object_index.resolve_id(self.bundle, storage_id)? {
             // Look for TSWP.StorageArchive messages
             for msg in &resolved.messages {
                 if msg.type_ >= 2001

@@ -367,7 +367,7 @@ impl KeynoteDocument {
         if let Some(resolved) = self
             .state
             .object_index
-            .resolve_object(&self.state.bundle, build_id)?
+            .resolve_id(&self.state.bundle, build_id)?
         {
             for msg in &resolved.messages {
                 if let Ok(build_archive) = crate::protobuf::kn::BuildArchive::decode(&*msg.data) {
@@ -459,7 +459,7 @@ impl KeynoteDocument {
         if let Some(resolved) = self
             .state
             .object_index
-            .resolve_object(&self.state.bundle, drawable_id)?
+            .resolve_id(&self.state.bundle, drawable_id)?
         {
             let mut storage_id = None;
             for msg in &resolved.messages {
@@ -483,7 +483,7 @@ impl KeynoteDocument {
                 && let Some(storage_object) = self
                     .state
                     .object_index
-                    .resolve_object(&self.state.bundle, storage_id)?
+                    .resolve_id(&self.state.bundle, storage_id)?
             {
                 for message in storage_object.messages {
                     if let Ok(storage) =
@@ -505,7 +505,7 @@ impl KeynoteDocument {
         if let Some(resolved) = self
             .state
             .object_index
-            .resolve_object(&self.state.bundle, note_id)?
+            .resolve_id(&self.state.bundle, note_id)?
         {
             for msg in &resolved.messages {
                 if let Ok(note_archive) = crate::protobuf::kn::NoteArchive::decode(&*msg.data) {
@@ -514,7 +514,7 @@ impl KeynoteDocument {
                     if let Some(storage_obj) = self
                         .state
                         .object_index
-                        .resolve_object(&self.state.bundle, storage_id)?
+                        .resolve_id(&self.state.bundle, storage_id)?
                     {
                         for storage_msg in &storage_obj.messages {
                             if let Ok(storage) =

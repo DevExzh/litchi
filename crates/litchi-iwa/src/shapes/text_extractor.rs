@@ -134,7 +134,7 @@ impl<'a> ShapeTextExtractor<'a> {
 
     /// Extract text from a referenced object (used for group children)
     fn extract_text_from_referenced_object(&self, object_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, object_id)? {
+        if let Some(resolved) = self.object_index.resolve_id(self.bundle, object_id)? {
             // Check if it's a shape
             for msg in &resolved.messages {
                 if (msg.type_ == 3004 || msg.type_ == 3005)
@@ -155,7 +155,7 @@ impl<'a> ShapeTextExtractor<'a> {
     // when we implement full object graph traversal for shape text
     #[allow(dead_code)]
     fn _extract_text_from_storage_ref(&self, storage_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, storage_id)? {
+        if let Some(resolved) = self.object_index.resolve_id(self.bundle, storage_id)? {
             return self.extract_text_from_storage_object(&resolved);
         }
 
@@ -180,7 +180,7 @@ impl<'a> ShapeTextExtractor<'a> {
 
     /// Extract text from a specific shape by object ID
     pub fn extract_text_from_shape_id(&self, shape_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, shape_id)? {
+        if let Some(resolved) = self.object_index.resolve_id(self.bundle, shape_id)? {
             return self.extract_text_from_shape(&resolved);
         }
 

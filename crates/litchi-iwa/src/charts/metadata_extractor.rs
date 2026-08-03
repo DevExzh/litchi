@@ -168,7 +168,7 @@ impl<'a> ChartMetadataExtractor<'a> {
         };
         let Some(resolved) = self
             .object_index
-            .resolve_object(self.bundle, reference.identifier)?
+            .resolve_id(self.bundle, reference.identifier)?
         else {
             return Ok(None);
         };
@@ -193,7 +193,7 @@ impl<'a> ChartMetadataExtractor<'a> {
 
     /// Extract metadata from a specific chart by object ID
     pub fn extract_chart_by_id(&self, chart_id: u64) -> Result<Option<ChartMetadata>> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, chart_id)? {
+        if let Some(resolved) = self.object_index.resolve_id(self.bundle, chart_id)? {
             return self.extract_chart_metadata(&resolved);
         }
 

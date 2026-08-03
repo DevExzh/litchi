@@ -246,12 +246,12 @@ impl ObjectIndex {
     /// let graph = index.reference_graph();
     ///
     /// // Find what a table references
-    /// if let Some(refs) = graph.get_outgoing_refs(table_id) {
+    /// if let Some(refs) = graph.outgoing(table_id) {
     ///     println!("Table references {} objects", refs.len());
     /// }
     ///
     /// // Find what references a style
-    /// if let Some(refs) = graph.get_incoming_refs(style_id) {
+    /// if let Some(refs) = graph.incoming(style_id) {
     ///     println!("{} objects use this style", refs.len());
     /// }
     /// ```
@@ -272,6 +272,7 @@ impl ObjectIndex {
     /// Optional owned compatibility view of referenced object IDs.
     ///
     /// Prefer [`Self::dependencies`] for the allocation-free typed view.
+    #[deprecated(note = "use dependencies(ObjectId) for the typed, allocation-free view")]
     pub fn get_dependencies(&self, object_id: u64) -> Option<Vec<u64>> {
         let object_id = ObjectId::new(object_id)?;
         self.dependencies(object_id)
@@ -296,6 +297,7 @@ impl ObjectIndex {
     /// Optional owned compatibility view of referencing object IDs.
     ///
     /// Prefer [`Self::dependents`] for the allocation-free typed view.
+    #[deprecated(note = "use dependents(ObjectId) for the typed, allocation-free view")]
     pub fn get_dependents(&self, object_id: u64) -> Option<Vec<u64>> {
         let object_id = ObjectId::new(object_id)?;
         self.dependents(object_id)
@@ -350,6 +352,7 @@ impl ObjectIndex {
     /// # Performance
     ///
     /// O(V + E) where V is vertices and E is edges in the reachable subgraph
+    #[deprecated(note = "use reachable_from(ObjectId) for the typed traversal")]
     pub fn get_transitive_dependencies(&self, object_id: u64) -> Vec<u64> {
         let Some(object_id) = ObjectId::new(object_id) else {
             return Vec::new();
@@ -386,14 +389,28 @@ impl ObjectIndex {
     ///
     /// ```rust,ignore
     /// // Resolve a table's data_store reference
-    /// if let Some(data_store) = index.resolve_object(&bundle, data_store_id)? {
+    /// if let Some(data_store) = index.resolve(&bundle, data_store_id)? {
     ///     // Parse the TableDataList to get cell values
     ///     for msg in &data_store.messages {
     ///         // Process message data
     ///     }
     /// }
     /// ```
+    #[deprecated(note = "use resolve(ObjectId) for checked identity semantics")]
     pub fn resolve_object(
+        &self,
+        bundle: &Bundle,
+        object_id: u64,
+    ) -> Result<Option<ResolvedObject>> {
+        self.resolve_id(bundle, object_id)
+    }
+
+    /// Resolve a protobuf wire identifier for crate-internal readers.
+    ///
+    /// The raw numeric form is kept behind the crate boundary because parsed
+    /// protobuf references enter this module as `u64`. Public callers should
+    /// validate once and use [`Self::resolve`] with [`ObjectId`].
+    pub(crate) fn resolve_id(
         &self,
         bundle: &Bundle,
         object_id: u64,
@@ -432,7 +449,7 @@ impl ObjectIndex {
     }
     /// Batch resolve multiple object references
     ///
-    /// More efficient than calling `resolve_object` multiple times
+    /// More efficient than calling `resolve` multiple times
     /// as it minimizes archive lookups.
     ///
     /// # Arguments
@@ -444,24 +461,35 @@ impl ObjectIndex {
     ///
     /// Vector of successfully resolved objects in the caller's input order.
     /// The result may be smaller than the input if some IDs do not exist.
+    #[deprecated(note = "use resolve_many(&[ObjectId]) for checked identity semantics")]
     pub fn resolve_objects(
         &self,
         bundle: &Bundle,
         object_ids: &[u64],
     ) -> Result<Vec<ResolvedObject>> {
+        let object_ids = object_ids
+            .iter()
+            .copied()
+            .filter_map(ObjectId::new)
+            .collect::<Vec<_>>();
+        self.resolve_many_inner(bundle, &object_ids)
+    }
+
+    fn resolve_many_inner(
+        &self,
+        bundle: &Bundle,
+        object_ids: &[ObjectId],
+    ) -> Result<Vec<ResolvedObject>> {
         // Group object IDs by their archive to minimize archive lookups
-        let mut objects_by_archive: std::collections::HashMap<&str, HashSet<u64>> =
+        let mut objects_by_archive: std::collections::HashMap<&str, HashSet<ObjectId>> =
             std::collections::HashMap::new();
 
         for &object_id in object_ids {
-            let Some(object_id) = ObjectId::new(object_id) else {
-                continue;
-            };
             if let Some(entry) = self.entry(object_id) {
                 objects_by_archive
                     .entry(&entry.fragment_name)
                     .or_default()
-                    .insert(object_id.get());
+                    .insert(object_id);
             }
         }
 
@@ -472,18 +500,15 @@ impl ObjectIndex {
             if let Some(archive) = bundle.get_archive(archive_name) {
                 for object in &archive.objects {
                     if let Some(obj_id) = object.archive_info.identifier
-                        && ids.contains(&obj_id)
+                        && let Ok(object_id) = ObjectId::try_from(obj_id)
+                        && ids.contains(&object_id)
                     {
                         let resolved = ResolvedObject {
-                            id: ObjectId::try_from(obj_id).map_err(|_| {
-                                Error::Archive(format!(
-                                    "object {obj_id} has a null object identifier"
-                                ))
-                            })?,
+                            id: object_id,
                             archive_info: object.archive_info.clone(),
                             messages: object.messages.clone(),
                         };
-                        if resolved_by_id.insert(obj_id, resolved).is_some() {
+                        if resolved_by_id.insert(object_id, resolved).is_some() {
                             return Err(Error::Archive(format!(
                                 "object {obj_id} occurs in more than one archive"
                             )));
@@ -507,7 +532,7 @@ impl ObjectIndex {
     ) -> Result<Vec<ResolvedObject>> {
         let mut requested = HashSet::with_capacity(object_ids.len());
         for object_id in object_ids {
-            if !requested.insert(object_id.get()) {
+            if !requested.insert(*object_id) {
                 return Err(Error::Archive(format!(
                     "object {object_id:?} occurs more than once in a batch"
                 )));
@@ -520,12 +545,11 @@ impl ObjectIndex {
             }
         }
 
-        let raw_ids: Vec<_> = object_ids.iter().map(|object_id| object_id.get()).collect();
-        let resolved = self.resolve_objects(bundle, &raw_ids)?;
-        let resolved_ids: HashSet<_> = resolved.iter().map(|object| object.id().get()).collect();
+        let resolved = self.resolve_many_inner(bundle, object_ids)?;
+        let resolved_ids: HashSet<_> = resolved.iter().map(ResolvedObject::id).collect();
         if let Some(missing) = object_ids
             .iter()
-            .find(|object_id| !resolved_ids.contains(&object_id.get()))
+            .find(|object_id| !resolved_ids.contains(object_id))
         {
             return Err(Error::Bundle(format!(
                 "object {} could not be resolved from the bundle",
@@ -563,18 +587,27 @@ impl ObjectIndex {
     ///
     /// O(V + E) where V is the number of reachable objects and E is edges.
     /// Uses batch resolution to minimize archive lookups.
+    #[deprecated(note = "use resolve_reachable(ObjectId) for checked identity semantics")]
     pub fn resolve_with_dependencies(
         &self,
         bundle: &Bundle,
         object_id: u64,
     ) -> Result<Vec<ResolvedObject>> {
-        let all_ids = self.get_transitive_dependencies(object_id);
-        self.resolve_objects(bundle, &all_ids)
+        let Some(object_id) = ObjectId::new(object_id) else {
+            return Ok(Vec::new());
+        };
+        let all_ids = self
+            .reachable_from(object_id)
+            .into_iter()
+            .filter(|object_id| self.contains(*object_id))
+            .collect::<Vec<_>>();
+        self.resolve_many_inner(bundle, &all_ids)
     }
 
     /// Check if an object exists in the index
+    #[deprecated(note = "use contains(ObjectId) for checked identity semantics")]
     pub fn contains_object(&self, object_id: u64) -> bool {
-        self.entries.contains_key(&object_id)
+        ObjectId::new(object_id).is_some_and(|object_id| self.contains(object_id))
     }
 
     /// Check for an indexed object through the validated identity API.
@@ -660,6 +693,7 @@ impl ResolvedObject {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject, RawMessage};

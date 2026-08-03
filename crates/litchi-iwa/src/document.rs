@@ -188,9 +188,7 @@ impl Document {
     /// Get an object by its legacy raw numeric ID.
     #[deprecated(note = "use object(ObjectId) for checked identity semantics")]
     pub fn get_object(&self, id: u64) -> Result<Option<ResolvedObject>> {
-        self.state
-            .object_index
-            .resolve_object(&self.state.bundle, id)
+        self.state.object_index.resolve_id(&self.state.bundle, id)
     }
 
     /// Get the immutable typed object index backing this document.
