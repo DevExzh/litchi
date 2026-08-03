@@ -1,15 +1,16 @@
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::RawMessage;
 use crate::pages::PagesEditor;
+use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::highlight_object::validate_plain_highlight_graph;
 use crate::text::highlight_storage::locate_storage;
 use crate::text::highlight_storage::{HIGHLIGHT_TABLE_FIELD, TABLE_ENTRIES_FIELD};
-use crate::text::storage_wire::STORAGE_MESSAGE_TYPES;
 use crate::wire::{
     append_length_delimited_field, parse_wire_fields, patch_length_delimited_field,
     patch_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
+use prost::Message;
 
 use super::*;
 
@@ -32,12 +33,8 @@ fn range(start: usize, end: usize) -> TextRange {
     TextRange::from_utf16_indexes(start, end).unwrap()
 }
 
-fn storage_message_index(object: &ArchiveObject) -> usize {
-    object
-        .messages
-        .iter()
-        .position(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
-        .unwrap()
+fn storage_message_index(package: &crate::IWorkPackage, storage_id: u64) -> usize {
+    locate_storage(package, storage_id).unwrap().message_index
 }
 
 #[test]
@@ -46,11 +43,11 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
     let highlight = editor.add_text_highlight(storage_id, range(0, 5)).unwrap();
     let mut package = editor.into_package();
     let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
+    let message_index = storage_message_index(&package, storage_id);
     package
         .update_archive(&archive_name, |archive| {
             let storage = archive.object_mut(storage_id).unwrap();
-            let index = storage_message_index(storage);
-            let original = &storage.messages[index];
+            let original = &storage.messages[message_index];
             let data =
                 transform_length_delimited_field(&original.data, HIGHLIGHT_TABLE_FIELD, |table| {
                     let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?;
@@ -63,7 +60,7 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
                     patch_varint_field(&table, 99, false, Some(7))
                 })?;
             storage.replace_message(
-                index,
+                message_index,
                 RawMessage {
                     type_: original.type_,
                     data,
@@ -90,7 +87,7 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
     let package = editor.into_package();
     let archive = package.archive(&archive_name).unwrap();
     let storage = archive.object(storage_id).unwrap();
-    let message = &storage.messages[storage_message_index(storage)];
+    let message = &storage.messages[storage_message_index(&package, storage_id)];
     let table =
         repeated_length_delimited_payloads(&message.data, HIGHLIGHT_TABLE_FIELD).unwrap()[0];
     assert!(
@@ -121,17 +118,17 @@ fn duplicate_highlight_tables_fail_without_mutation() {
     editor.add_text_highlight(storage_id, range(0, 5)).unwrap();
     let mut package = editor.into_package();
     let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
+    let message_index = storage_message_index(&package, storage_id);
     package
         .update_archive(&archive_name, |archive| {
             let object = archive.object_mut(storage_id).unwrap();
-            let index = storage_message_index(object);
-            let original = &object.messages[index];
+            let original = &object.messages[message_index];
             let table =
                 repeated_length_delimited_payloads(&original.data, HIGHLIGHT_TABLE_FIELD)?[0];
             let mut data = original.data.clone();
             append_length_delimited_field(&mut data, HIGHLIGHT_TABLE_FIELD, table)?;
             object.replace_message(
-                index,
+                message_index,
                 RawMessage {
                     type_: original.type_,
                     data,
@@ -145,6 +142,53 @@ fn duplicate_highlight_tables_fail_without_mutation() {
     assert!(editor.text_highlights(storage_id).is_err());
     assert!(editor.add_text_highlight(storage_id, range(6, 10)).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn highlight_updates_use_the_resolved_storage_with_a_2022_style_sibling() {
+    let (editor, storage_id) = fixture();
+    let mut package = editor.into_package();
+    let location = locate_storage(&package, storage_id).unwrap();
+    let style_data = tswp::ParagraphStyleArchive {
+        super_: crate::protobuf::tss::StyleArchive::default(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    package
+        .update_archive(&location.archive_name, |archive| {
+            archive
+                .object_mut(storage_id)
+                .unwrap()
+                .push_message(RawMessage {
+                    type_: 2_022,
+                    data: style_data.clone(),
+                })?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let highlight = editor.add_text_highlight(storage_id, range(0, 5)).unwrap();
+    editor
+        .update_text_highlight(storage_id, highlight.id, range(6, 10))
+        .unwrap();
+    editor
+        .remove_text_highlight(storage_id, highlight.id)
+        .unwrap();
+    let package = editor.into_package();
+    let location = locate_storage(&package, storage_id).unwrap();
+    let archive = package.archive(&location.archive_name).unwrap();
+    let object = archive.object(storage_id).unwrap();
+    assert_eq!(
+        object.messages[location.message_index].type_,
+        location.message_type
+    );
+    let sibling = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == 2_022)
+        .unwrap();
+    assert_eq!(sibling.data, style_data);
 }
 
 #[test]

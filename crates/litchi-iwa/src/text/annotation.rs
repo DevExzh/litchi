@@ -104,17 +104,12 @@ pub(super) fn add_annotation(
     let comment_storage_id = annotation_id
         .checked_add(OBJECT_IDENTIFIER_INCREMENT)
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
-    patch_highlight_table(
-        &mut staged,
-        &location.archive_name,
-        storage_id,
-        |table, storage| {
-            let mut boundaries = raw_boundaries(storage_id, table, storage)?;
-            ensure_range_available(storage_id, range, &boundaries, None, &storage.text)?;
-            add_range(&mut boundaries, range, annotation_id)?;
-            encode_table(table, boundaries).map(|table| (Some(table), Some(annotation_id), None))
-        },
-    )?;
+    patch_highlight_table(&mut staged, &location, |table, storage| {
+        let mut boundaries = raw_boundaries(storage_id, table, storage)?;
+        ensure_range_available(storage_id, range, &boundaries, None, &storage.text)?;
+        add_range(&mut boundaries, range, annotation_id)?;
+        encode_table(table, boundaries).map(|table| (Some(table), Some(annotation_id), None))
+    })?;
     staged.update_archive(&location.archive_name, |archive| {
         archive.insert_object(new_highlight_object(annotation_id, comment_storage_id)?)
     })?;
@@ -178,18 +173,13 @@ pub(super) fn update_annotation(
 
     let mut staged = package.clone();
     if current.range != range {
-        patch_highlight_table(
-            &mut staged,
-            &location.archive_name,
-            storage_id,
-            |table, storage| {
-                let mut boundaries = raw_boundaries(storage_id, table, storage)?;
-                remove_range(&mut boundaries, object_id)?;
-                ensure_range_available(storage_id, range, &boundaries, None, &storage.text)?;
-                add_range(&mut boundaries, range, object_id)?;
-                encode_table(table, boundaries).map(|table| (Some(table), None, None))
-            },
-        )?;
+        patch_highlight_table(&mut staged, &location, |table, storage| {
+            let mut boundaries = raw_boundaries(storage_id, table, storage)?;
+            remove_range(&mut boundaries, object_id)?;
+            ensure_range_available(storage_id, range, &boundaries, None, &storage.text)?;
+            add_range(&mut boundaries, range, object_id)?;
+            encode_table(table, boundaries).map(|table| (Some(table), None, None))
+        })?;
     }
     if current.graph.body != body {
         update_annotation_comment_text(
@@ -223,23 +213,18 @@ pub(super) fn remove_annotation(
     require_exclusive_reference(package, storage_id, object_id, kind.label())?;
 
     let mut staged = package.clone();
-    patch_highlight_table(
-        &mut staged,
-        &location.archive_name,
-        storage_id,
-        |table, storage| {
-            let mut boundaries = raw_boundaries(storage_id, table, storage)?;
-            remove_range(&mut boundaries, object_id)?;
-            if boundaries
-                .iter()
-                .any(|boundary| boundary.object_id.is_some())
-            {
-                encode_table(table, boundaries).map(|table| (Some(table), None, Some(object_id)))
-            } else {
-                Ok((None, None, Some(object_id)))
-            }
-        },
-    )?;
+    patch_highlight_table(&mut staged, &location, |table, storage| {
+        let mut boundaries = raw_boundaries(storage_id, table, storage)?;
+        remove_range(&mut boundaries, object_id)?;
+        if boundaries
+            .iter()
+            .any(|boundary| boundary.object_id.is_some())
+        {
+            encode_table(table, boundaries).map(|table| (Some(table), None, Some(object_id)))
+        } else {
+            Ok((None, None, Some(object_id)))
+        }
+    })?;
     remove_detached_annotations(
         &mut staged,
         &location.archive_name,
