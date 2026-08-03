@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use super::show::KeynoteShow;
 use super::slide::KeynoteSlide;
-use crate::bundle::Bundle;
+use crate::bundle::{Bundle, BundleLimits};
 use crate::object_index::ObjectIndex;
 use crate::registry::{Application, detect_application_from_document};
 use crate::text::TextExtractor;
@@ -40,7 +40,12 @@ impl KeynoteDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let bundle = Bundle::open(path)?;
+        Self::open_with_limits(path, BundleLimits::default())
+    }
+
+    /// Open a Keynote document under caller-selected bundle ingress ceilings.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
+        let bundle = Bundle::open_with_limits(path, limits)?;
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
@@ -60,7 +65,13 @@ impl KeynoteDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let bundle = Bundle::from_bytes(bytes)?;
+        Self::from_bytes_with_limits(bytes, BundleLimits::default())
+    }
+
+    /// Open a Keynote document from bytes under caller-selected ingress
+    /// ceilings.
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+        let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
@@ -87,6 +98,12 @@ impl KeynoteDocument {
     /// [`Self::from_bytes`]; it does not accept a previously parsed archive.
     pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes)
+    }
+
+    /// Create a Keynote document from archive bytes under caller-selected
+    /// ingress ceilings.
+    pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, limits)
     }
 
     fn verify_application(bundle: &Bundle) -> Result<()> {
@@ -684,6 +701,16 @@ impl KeynoteDocument {
         &self.state.object_index
     }
 
+    /// Return a bounded, deterministic validation report for this snapshot.
+    pub fn validation_report(&self) -> crate::bundle::BundleValidationReport {
+        self.state.bundle.validation_report()
+    }
+
+    /// Validate this immutable snapshot without mutating it.
+    pub fn validate(&self) -> Result<()> {
+        self.validation_report().as_result()
+    }
+
     /// Get document statistics after resolving the presentation slides.
     pub fn stats(&self) -> Result<KeynoteDocumentStats> {
         let total_objects = self.state.object_index.all_object_ids().len();
@@ -736,6 +763,14 @@ mod tests {
 
         let doc = doc_result.unwrap();
         assert!(!doc.object_index().all_object_ids().is_empty());
+        assert!(doc.validate().is_ok());
+    }
+
+    #[test]
+    fn keynote_from_bytes_with_limits_enforces_input_budget() {
+        let limits = BundleLimits::new(1, 10, 100, 100, 100).unwrap();
+        let error = KeynoteDocument::from_bytes_with_limits(&[0, 1], limits).unwrap_err();
+        assert!(error.to_string().contains("iWork bundle input"));
     }
 
     #[test]
