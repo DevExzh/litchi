@@ -126,9 +126,10 @@ pub(super) fn set_paragraph_drop_cap(
         new_style_id,
         new_style,
     )?;
+    let located = storage::locate_with_archive(&staged, storage_id)?;
     storage::patch_entry(
         &mut staged,
-        &storage,
+        located,
         paragraph_start,
         old_reference_style_id,
         Some(new_style_id),
@@ -179,7 +180,8 @@ pub(super) fn remove_paragraph_drop_cap(
     native::plain_text_model(style_id, &location)?;
     let exclusive = native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
-    storage::patch_entry(&mut staged, &storage, paragraph_start, Some(style_id), None)?;
+    let located = storage::locate_with_archive(&staged, storage_id)?;
+    storage::patch_entry(&mut staged, located, paragraph_start, Some(style_id), None)?;
     if exclusive {
         let parent_style_id = native::parent_style_id(&location.style, style_id)?;
         remove_style_variation(

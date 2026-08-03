@@ -2,7 +2,7 @@
 
 use prost::Message;
 
-use crate::archive::RawMessage;
+use crate::archive::{Archive, RawMessage};
 use crate::protobuf::{tsp, tswp};
 use crate::wire::{
     parse_wire_fields, patch_length_delimited_field, patch_varint_field,
@@ -11,7 +11,10 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::types::ParagraphStart;
-use crate::text::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
+use crate::text::storage_wire::{
+    LocatedStorage, StorageLocation,
+    locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
+};
 const DROP_CAP_TABLE_FIELD: u32 = 28;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_CHARACTER_INDEX_FIELD: u32 = 1;
@@ -35,8 +38,22 @@ pub(super) struct DropCapStorageLocation {
     pub(super) entries: Vec<DropCapEntry>,
 }
 
+pub(super) struct LocatedDropCapStorage {
+    pub(super) location: DropCapStorageLocation,
+    pub(super) archive: Archive,
+    pub(super) storage: tswp::StorageArchive,
+}
+
 pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<DropCapStorageLocation> {
-    let location = locate_native_storage(package, storage_id, DROP_CAP_TABLE_FIELD, "Drop Cap")?;
+    locate_with_archive(package, storage_id).map(|located| located.location)
+}
+
+pub(super) fn locate_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<LocatedDropCapStorage> {
+    let LocatedStorage { location, archive } =
+        locate_native_storage_with_archive(package, storage_id, DROP_CAP_TABLE_FIELD, "Drop Cap")?;
     let StorageLocation {
         object_id,
         archive_name,
@@ -84,15 +101,19 @@ pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<DropCapS
             style_id,
         });
     }
-    Ok(DropCapStorageLocation {
-        object_id,
-        archive_name,
-        message_index,
-        message_type,
-        table_present,
-        stylesheet_id,
-        text,
-        entries,
+    Ok(LocatedDropCapStorage {
+        location: DropCapStorageLocation {
+            object_id,
+            archive_name,
+            message_index,
+            message_type,
+            table_present,
+            stylesheet_id,
+            text,
+            entries,
+        },
+        archive,
+        storage,
     })
 }
 
@@ -127,13 +148,18 @@ pub(super) fn validate_paragraph_start(text: &str, start: ParagraphStart) -> Res
 
 pub(super) fn patch_entry(
     package: &mut IWorkPackage,
-    location: &DropCapStorageLocation,
+    located: LocatedDropCapStorage,
     paragraph_start: ParagraphStart,
     old_style_id: Option<u64>,
     new_style_id: Option<u64>,
 ) -> Result<()> {
+    let LocatedDropCapStorage {
+        location,
+        archive,
+        storage,
+    } = located;
     let storage_id = location.object_id;
-    package.update_archive(&location.archive_name, |archive| {
+    update_parsed_archive(package, &location.archive_name, archive, |archive| {
         let object = archive.object_mut(location.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
@@ -236,12 +262,11 @@ pub(super) fn patch_entry(
                 location.table_present,
                 Some(&table),
             )?;
-            let before = tswp::StorageArchive::decode(original.data.as_slice())?;
             let after = tswp::StorageArchive::decode(data.as_slice())?;
             let old_count =
-                count_drop_cap_reference(before.table_drop_cap_style.as_ref(), old_style_id);
+                count_drop_cap_reference(storage.table_drop_cap_style.as_ref(), old_style_id);
             let new_before =
-                count_drop_cap_reference(before.table_drop_cap_style.as_ref(), new_style_id);
+                count_drop_cap_reference(storage.table_drop_cap_style.as_ref(), new_style_id);
             let old_after =
                 count_drop_cap_reference(after.table_drop_cap_style.as_ref(), old_style_id);
             let new_after =
