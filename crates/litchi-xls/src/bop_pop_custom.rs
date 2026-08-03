@@ -27,6 +27,55 @@ fn invalid(message: impl Into<String>) -> XlsError {
     }
 }
 
+/// Checked reader for the fixed-width fields in a `BopPopCustom` payload.
+///
+/// The public parser currently rejects any payload whose length is not exact,
+/// but keeping offset arithmetic and field extraction checked here prevents a
+/// future layout change from reintroducing panic paths.
+struct BopPopCustomReader<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> BopPopCustomReader<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+        let end = self
+            .offset
+            .checked_add(N)
+            .ok_or_else(|| invalid("BopPopCustom field offset overflows usize"))?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(XlsError::InvalidLength {
+                expected: end,
+                found: self.data.len(),
+            })?;
+        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+            expected: N,
+            found: bytes.len(),
+        })?;
+        self.offset = end;
+        Ok(value)
+    }
+
+    fn read_u16(&mut self) -> XlsResult<u16> {
+        Ok(u16::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_remaining(&mut self) -> XlsResult<&'a [u8]> {
+        let bytes = self
+            .data
+            .get(self.offset..)
+            .ok_or_else(|| invalid("BopPopCustom field offset is outside payload"))?;
+        self.offset = self.data.len();
+        Ok(bytes)
+    }
+}
+
 /// Typed `BopPopCustom` record content (MS-XLS 2.4.26): which data points of
 /// the series are contained in the secondary bar/pie instead of the primary
 /// pie.
@@ -48,13 +97,8 @@ pub struct XlsBopPopCustom {
 impl XlsBopPopCustom {
     /// Parse a `BopPopCustom` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
-        if data.len() < 2 {
-            return Err(XlsError::InvalidLength {
-                expected: 2,
-                found: data.len(),
-            });
-        }
-        let cxi = u16::from_le_bytes([data[0], data[1]]);
+        let mut reader = BopPopCustomReader::new(data);
+        let cxi = reader.read_u16()?;
         if cxi >= MAX_CXI_EXCLUSIVE {
             return Err(invalid(format!(
                 "BopPopCustom cxi {cxi} is not less than {MAX_CXI_EXCLUSIVE}"
@@ -68,7 +112,7 @@ impl XlsBopPopCustom {
                 found: data.len(),
             });
         }
-        let bits = data[2..].to_vec();
+        let bits = reader.read_remaining()?.to_vec();
         // MS-XLS 2.4.26: when the final least significant bit is 1 (the
         // secondary bar/pie contains no data points), every other bit MUST
         // be 0.
@@ -80,10 +124,13 @@ impl XlsBopPopCustom {
         // secondary bar/pie contains no data points), every other bit MUST
         // be 0.
         if parsed.secondary_is_empty() {
-            let mut others = parsed.bits.clone();
-            let last = others.len() - 1;
-            others[last] &= !0x01;
-            if others.iter().any(|byte| *byte != 0) {
+            let mut bytes = parsed.bits.iter().copied();
+            let Some(last) = bytes.next_back() else {
+                return Err(invalid(
+                    "BopPopCustom rggrbit is missing the empty-secondary bit",
+                ));
+            };
+            if bytes.any(|byte| byte != 0) || last & !0x01 != 0 {
                 return Err(invalid(
                     "BopPopCustom rggrbit sets data point bits while the empty-secondary bit is 1",
                 ));
@@ -124,7 +171,9 @@ impl XlsBopPopCustom {
         let total_bits = self.bits.len() * 8;
         let padding = total_bits - usize::from(self.data_point_count_plus_one);
         let position = padding + usize::from(index);
-        Some(self.bits[position / 8] & (0x80 >> (position % 8)) != 0)
+        self.bits
+            .get(position / 8)
+            .map(|byte| *byte & (0x80 >> (position % 8)) != 0)
     }
 
     /// Whether the final least significant bit is set, marking that the
@@ -200,5 +249,26 @@ mod tests {
         // rggrbit size mismatch.
         assert!(XlsBopPopCustom::parse(&record(5, &[0, 0])).is_err());
         assert!(XlsBopPopCustom::parse(&record(9, &[0])).is_err());
+    }
+
+    #[test]
+    fn rejects_every_truncated_payload() {
+        let bytes = record(5, &[0b0001_0010]);
+        for length in 0..bytes.len() {
+            assert!(
+                XlsBopPopCustom::parse(&bytes[..length]).is_err(),
+                "length {length}"
+            );
+        }
+    }
+
+    #[test]
+    fn reader_rejects_offset_overflow() {
+        let mut reader = BopPopCustomReader {
+            data: &[],
+            offset: usize::MAX,
+        };
+
+        assert!(reader.read_bytes::<1>().is_err());
     }
 }

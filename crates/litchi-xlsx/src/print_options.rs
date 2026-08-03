@@ -64,8 +64,13 @@ pub fn parse_worksheet_print_options(xml: &[u8]) -> Result<Option<WorksheetPrint
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
-    let validated =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    let limits = MceLimits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        ..MceLimits::default()
+    };
+    let validated = process_markup_compatibility(xml, &MceCapabilities::default(), &limits)?;
     if validated.xml.len() > MAX_XML_BYTES {
         return Err(invalid("processed worksheet XML is too large"));
     }

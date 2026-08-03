@@ -47,7 +47,6 @@ pub mod ole_objects;
 pub mod outline_properties;
 pub mod page_setup;
 pub mod parsers;
-pub mod phonetic_properties;
 pub mod pivot;
 pub mod pivot_chart;
 pub mod printer_settings;
@@ -99,6 +98,7 @@ pub use litchi_xlsx::calculation_properties;
 pub use litchi_xlsx::cell_watches;
 pub use litchi_xlsx::ignored_errors;
 pub use litchi_xlsx::page_margins;
+pub use litchi_xlsx::phonetic_properties;
 pub use litchi_xlsx::print_options;
 pub use litchi_xlsx::scenarios;
 pub use litchi_xlsx::sheet_calculation_properties;
@@ -190,6 +190,10 @@ pub use litchi_xlsx::ignored_errors::{
 pub use litchi_xlsx::page_margins::{
     PageMargin, WorksheetPageMargins, parse_worksheet_page_margins,
 };
+pub use litchi_xlsx::phonetic_properties::{
+    WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
+    parse_worksheet_phonetic_properties,
+};
 pub use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use litchi_xlsx::sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
@@ -212,10 +216,6 @@ pub use ole_objects::{
 };
 pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
 pub use page_setup::parse_worksheet_page_setup;
-pub use phonetic_properties::{
-    WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
-    parse_worksheet_phonetic_properties,
-};
 pub use printer_settings::{
     PrinterSettingsConformance, PrinterSettingsResource, WorksheetPrinterSettings,
     WorksheetPrinterSettingsReference, load_worksheet_printer_settings,

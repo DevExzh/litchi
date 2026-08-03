@@ -33,6 +33,71 @@ const FRT_FLAGS_FORBIDDEN: u16 = 0x0003;
 /// `XLUnicodeStringNoCch` flag: `fHighByte` (double-byte characters).
 const HIGH_BYTE: u8 = 0x01;
 
+/// Checked cursor for the fixed-width and length-prefixed fields in the
+/// extended data-label records.
+struct DataLabReader<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> DataLabReader<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+        let end = self.offset.checked_add(N).ok_or_else(|| {
+            invalid(
+                DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
+                "field offset overflows usize",
+            )
+        })?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(XlsError::InvalidLength {
+                expected: end,
+                found: self.data.len(),
+            })?;
+        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+            expected: N,
+            found: bytes.len(),
+        })?;
+        self.offset = end;
+        Ok(value)
+    }
+
+    fn read_u8(&mut self) -> XlsResult<u8> {
+        Ok(u8::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_u16(&mut self) -> XlsResult<u16> {
+        Ok(u16::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_vec(&mut self, len: usize) -> XlsResult<Vec<u8>> {
+        let end = self.offset.checked_add(len).ok_or_else(|| {
+            invalid(
+                DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
+                "field offset overflows usize",
+            )
+        })?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(XlsError::InvalidLength {
+                expected: end,
+                found: self.data.len(),
+            })?;
+        self.offset = end;
+        Ok(bytes.to_vec())
+    }
+
+    fn remaining(&self) -> usize {
+        self.data.len().saturating_sub(self.offset)
+    }
+}
+
 fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     XlsError::InvalidRecord {
         record_type,
@@ -43,30 +108,26 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 /// Validate an `FrtHeader` (MS-XLS 2.5.135): the `rt` field and the
 /// `fFrtRef`/`fFrtAlert` bits that MUST be zero, returning the raw flags
 /// word and reserved bytes.
-fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> XlsResult<(u16, [u8; 8])> {
-    if data.len() < FRT_HEADER_LEN {
-        return Err(XlsError::InvalidLength {
-            expected: FRT_HEADER_LEN,
-            found: data.len(),
-        });
-    }
-    if u16::from_le_bytes([data[0], data[1]]) != record_type {
+fn validate_frt_header(
+    reader: &mut DataLabReader<'_>,
+    record_type: u16,
+    name: &str,
+) -> XlsResult<(u16, [u8; 8])> {
+    let found_type = reader.read_u16()?;
+    if found_type != record_type {
         return Err(invalid(
             record_type,
             format!("{name} FrtHeader.rt mismatch"),
         ));
     }
-    let flags = u16::from_le_bytes([data[2], data[3]]);
+    let flags = reader.read_u16()?;
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
         return Err(invalid(
             record_type,
             format!("{name} FrtHeader.grbitFrt {flags:#06X} sets fFrtRef or fFrtAlert"),
         ));
     }
-    Ok((
-        flags,
-        data[4..FRT_HEADER_LEN].try_into().expect("length checked"),
-    ))
+    Ok((flags, reader.read_bytes()?))
 }
 
 /// Typed `DataLabExt` record content (MS-XLS 2.4.75): the beginning of an
@@ -92,8 +153,9 @@ impl XlsDataLabExt {
                 found: data.len(),
             });
         }
+        let mut reader = DataLabReader::new(data);
         let (frt_flags, frt_reserved) =
-            validate_frt_header(data, DATA_LAB_EXT_RECORD_TYPE, "DataLabExt")?;
+            validate_frt_header(&mut reader, DATA_LAB_EXT_RECORD_TYPE, "DataLabExt")?;
         Ok(Self {
             frt_flags,
             frt_reserved,
@@ -162,16 +224,18 @@ impl XlsDataLabExtContents {
                 found: data.len(),
             });
         }
+        let mut reader = DataLabReader::new(data);
         let (frt_flags, frt_reserved) = validate_frt_header(
-            data,
+            &mut reader,
             DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
             "DataLabExtContents",
         )?;
-        let separator_len = u16::from_le_bytes([data[14], data[15]]);
+        let flags = reader.read_u16()?;
+        let separator_len = reader.read_u16()?;
         // MS-XLS 2.5.295: st MUST exist if and only if cch is greater than
         // zero; MS-XLS 2.5.296: rgb holds cch or 2*cch bytes.
         if separator_len == 0 {
-            if data.len() != MIN_LEN {
+            if reader.remaining() != 0 {
                 return Err(XlsError::InvalidLength {
                     expected: MIN_LEN,
                     found: data.len(),
@@ -180,40 +244,46 @@ impl XlsDataLabExtContents {
             return Ok(Self {
                 frt_flags,
                 frt_reserved,
-                flags: u16::from_le_bytes([data[12], data[13]]),
+                flags,
                 separator_len,
                 separator_flags: 0,
                 separator_bytes: Vec::new(),
             });
         }
-        if data.len() < MIN_LEN + 1 {
+        if reader.remaining() < 1 {
             return Err(XlsError::InvalidLength {
                 expected: MIN_LEN + 1,
                 found: data.len(),
             });
         }
-        let separator_flags = data[MIN_LEN];
+        let separator_flags = reader.read_u8()?;
         let byte_len = if separator_flags & HIGH_BYTE != 0 {
-            usize::from(separator_len) * 2
+            usize::from(separator_len).checked_mul(2).ok_or_else(|| {
+                invalid(
+                    DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
+                    "separator byte length overflows usize",
+                )
+            })?
         } else {
             usize::from(separator_len)
         };
-        if data.len() - (MIN_LEN + 1) != byte_len {
+        if reader.remaining() != byte_len {
             return Err(invalid(
                 DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
                 format!(
                     "DataLabExtContents rgchSep holds {} bytes for cch {separator_len}",
-                    data.len() - (MIN_LEN + 1)
+                    reader.remaining()
                 ),
             ));
         }
+        let separator_bytes = reader.read_vec(byte_len)?;
         Ok(Self {
             frt_flags,
             frt_reserved,
-            flags: u16::from_le_bytes([data[12], data[13]]),
+            flags,
             separator_len,
             separator_flags,
-            separator_bytes: data[MIN_LEN + 1..].to_vec(),
+            separator_bytes,
         })
     }
 
@@ -393,5 +463,35 @@ mod tests {
         let mut wide_mismatch = contents_record(0, &[0x41, 0x00], true);
         wide_mismatch[14..16].copy_from_slice(&2u16.to_le_bytes());
         assert!(XlsDataLabExtContents::parse(&wide_mismatch).is_err());
+    }
+
+    #[test]
+    fn rejects_every_truncated_payload() {
+        let header = frt_header(DATA_LAB_EXT_RECORD_TYPE);
+        for length in 0..FRT_HEADER_LEN {
+            assert!(
+                XlsDataLabExt::parse(&header[..length]).is_err(),
+                "DataLabExt length {length}"
+            );
+        }
+
+        let contents = contents_record(0x0001, b"ab", false);
+        for length in 0..contents.len() {
+            assert!(
+                XlsDataLabExtContents::parse(&contents[..length]).is_err(),
+                "DataLabExtContents length {length}"
+            );
+        }
+    }
+
+    #[test]
+    fn reader_rejects_offset_overflow() {
+        let mut reader = DataLabReader {
+            data: &[],
+            offset: usize::MAX,
+        };
+
+        assert!(reader.read_bytes::<1>().is_err());
+        assert!(reader.read_vec(1).is_err());
     }
 }

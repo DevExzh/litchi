@@ -34,9 +34,6 @@ use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::outline_properties::WorksheetOutlineProperties;
 use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
-use super::phonetic_properties::{
-    WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
-};
 use super::query_table::{
     QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
     parse_query_table,
@@ -70,6 +67,9 @@ use super::{
 use litchi_xlsx::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
 use litchi_xlsx::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
 use litchi_xlsx::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
+use litchi_xlsx::phonetic_properties::{
+    WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
+};
 use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};
