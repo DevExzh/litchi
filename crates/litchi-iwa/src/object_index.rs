@@ -4,7 +4,7 @@
 //! locations in IWA files. This allows objects to reference each other
 //! across different archive files.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
@@ -950,7 +950,7 @@ impl ObjectIndex {
         let mut resolved = Vec::with_capacity(object_ids.len());
 
         // Group object IDs by their archive to minimize archive lookups
-        let mut objects_by_archive: std::collections::HashMap<&str, Vec<u64>> =
+        let mut objects_by_archive: std::collections::HashMap<&str, HashSet<u64>> =
             std::collections::HashMap::new();
 
         for &object_id in object_ids {
@@ -958,7 +958,7 @@ impl ObjectIndex {
                 objects_by_archive
                     .entry(&entry.fragment_name)
                     .or_default()
-                    .push(object_id);
+                    .insert(object_id);
             }
         }
 
