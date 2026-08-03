@@ -82,7 +82,7 @@ pub(crate) fn insert_text_number_attachment(
     let object = new_number_attachment_object(identifier, settings)?;
     insert_attachment_reference(
         &mut staged,
-        &location.archive_name,
+        &location,
         storage_id,
         position.utf16_index(),
         identifier,
