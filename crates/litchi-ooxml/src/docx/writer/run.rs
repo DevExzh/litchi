@@ -44,16 +44,12 @@ pub struct MutableRun {
 }
 
 #[cfg(feature = "fonts")]
-use litchi_fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
-use roaring::RoaringBitmap;
-#[cfg(feature = "fonts")]
-use std::collections::HashMap;
+use litchi_fonts::{CollectGlyphs, GlyphMap, Request, Style as FontStyle};
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutableRun {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
         if let RunContent::Text(text) = &self.content
             && !text.is_empty()
         {
@@ -63,9 +59,13 @@ impl CollectGlyphs for MutableRun {
                 .font_name
                 .clone()
                 .unwrap_or_else(|| "Calibri".to_string());
-            let bitmap = glyphs.entry(font_name).or_insert_with(RoaringBitmap::new);
+            let style = FontStyle::from_flags(
+                self.properties.bold == Some(true),
+                self.properties.italic == Some(true),
+            );
+            let bitmap = glyphs.entry(Request::new(font_name, style)).or_default();
             for c in text.chars() {
-                bitmap.insert(c as u32);
+                bitmap.insert(c);
             }
         }
         glyphs

@@ -112,6 +112,47 @@ pub fn unqualified_attribute_value(
     Ok(value)
 }
 
+/// Return whether `value` is an XML 1.0 Fifth Edition NCName.
+///
+/// Relationship IDs and namespace prefixes use this Unicode-aware grammar;
+/// ASCII-only approximations reject valid producer documents.
+pub fn is_ncname(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_character)
+}
+
+fn is_ncname_start(character: char) -> bool {
+    character != ':' && is_name_start(character)
+}
+
+fn is_ncname_character(character: char) -> bool {
+    character != ':'
+        && (is_name_start(character)
+            || matches!(
+                character,
+                '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}'
+            ))
+}
+
+fn is_name_start(character: char) -> bool {
+    matches!(
+        character,
+        ':' | 'A'..='Z' | '_' | 'a'..='z'
+            | '\u{C0}'..='\u{D6}'
+            | '\u{D8}'..='\u{F6}'
+            | '\u{F8}'..='\u{2FF}'
+            | '\u{370}'..='\u{37D}'
+            | '\u{37F}'..='\u{1FFF}'
+            | '\u{200C}'..='\u{200D}'
+            | '\u{2070}'..='\u{218F}'
+            | '\u{2C00}'..='\u{2FEF}'
+            | '\u{3001}'..='\u{D7FF}'
+            | '\u{F900}'..='\u{FDCF}'
+            | '\u{FDF0}'..='\u{FFFD}'
+            | '\u{10000}'..='\u{EFFFF}'
+    )
+}
+
 pub fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
     if name.local_name().as_ref() != local_name {
         return false;
@@ -273,6 +314,17 @@ mod tests {
             error,
             XmlError::Malformed(_) | XmlError::Invalid(_)
         ));
+    }
+
+    #[test]
+    fn ncname_accepts_unicode_and_rejects_colons_or_invalid_starts() {
+        assert!(is_ncname("rId1"));
+        assert!(is_ncname("关系一"));
+        assert!(is_ncname("éclair.一"));
+        assert!(!is_ncname(""));
+        assert!(!is_ncname("1relationship"));
+        assert!(!is_ncname("r:id"));
+        assert!(!is_ncname("relationship id"));
     }
 
     #[test]

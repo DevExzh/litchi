@@ -66,7 +66,6 @@ pub mod color_map;
 pub mod comments;
 pub mod controls;
 pub mod customshow;
-pub mod embedded_fonts;
 pub mod extended_guides;
 pub mod format;
 pub mod handout;
@@ -132,14 +131,6 @@ pub use controls::{
     Persistence as ControlPersistence, PptxControlBinary, PptxControlDescriptor, PptxSlideControl,
 };
 pub use customshow::{CustomShow, CustomShowList};
-pub use embedded_fonts::{
-    EmbeddedFont, EmbeddedFontConformance, EmbeddedFontFace, EmbeddedFontLicensing,
-    EmbeddedFontResource, EmbeddedFontStyle, PresentationEmbeddedFonts, add_embedded_font,
-    deobfuscate_embedded_font_data, find_embedded_font, load_embedded_fonts,
-    obfuscate_embedded_font_data, parse_embedded_fonts, remove_embedded_font,
-    reorder_embedded_fonts, replace_embedded_font, store_embedded_fonts, update_embedded_font,
-    write_embedded_font_list,
-};
 pub use extended_guides::{
     ExtendedGuide, ExtendedGuideColor, ExtendedGuideColorKind, ExtendedGuideList,
     ExtendedGuideOrientation, PresentationExtendedGuides,
@@ -164,6 +155,7 @@ pub(crate) mod slide_patch;
 pub use laser::{
     LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint, store_slide_laser_trace,
 };
+pub use litchi_pptx::font;
 pub use litchi_pptx::tag;
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,

@@ -78,7 +78,7 @@ rtf = ["dep:litchi-rtf"]
 # Additional functionality features
 formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
 imgconv = ["dep:litchi-imgconv", "dep:litchi-odraw"]
-fonts = ["dep:allsorts", "dep:litchi-fonts"]
+fonts = ["dep:allsorts", "dep:litchi-fonts", "litchi-ooxml?/fonts"]
 sign = ["dep:litchi-sign"]
 eval_engine = ["dep:litchi-eval"]
 # Formula I/O is caller-injected through litchi-eval::Fetch; no runtime is selected here.

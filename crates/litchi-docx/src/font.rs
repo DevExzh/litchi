@@ -6,6 +6,8 @@ use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, XmlPart};
 use quick_xml::{XmlVersion, events::Event, reader::Reader};
 use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 use unicode_normalization::UnicodeNormalization;
 
@@ -121,20 +123,116 @@ impl License {
     }
 }
 
+/// Compact OOXML font-obfuscation GUID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct FontKey([u8; 16]);
+
+impl FontKey {
+    /// Construct a key from its binary GUID representation.
+    pub const fn new(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Borrow the binary GUID representation.
+    pub const fn bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+
+    /// Move out the binary GUID representation.
+    pub const fn into_bytes(self) -> [u8; 16] {
+        self.0
+    }
+}
+
+impl From<[u8; 16]> for FontKey {
+    fn from(bytes: [u8; 16]) -> Self {
+        Self::new(bytes)
+    }
+}
+
+impl FromStr for FontKey {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        let bytes = value.as_bytes();
+        let valid = bytes.len() == 38
+            && bytes.first() == Some(&b'{')
+            && bytes.last() == Some(&b'}')
+            && [9, 14, 19, 24]
+                .iter()
+                .all(|index| bytes.get(*index) == Some(&b'-'))
+            && bytes.get(1..37).is_some_and(|body| {
+                body.iter().enumerate().all(|(index, byte)| {
+                    [8, 13, 18, 23].contains(&index)
+                        || byte.is_ascii_digit()
+                        || (b'A'..=b'F').contains(byte)
+                })
+            });
+        if !valid {
+            return Err(invalid(format!("invalid font key '{value}'")));
+        }
+
+        let mut key = [0u8; 16];
+        let mut digits = bytes
+            .get(1..37)
+            .ok_or_else(|| invalid("font key body is missing"))?
+            .iter()
+            .copied()
+            .filter(|byte| *byte != b'-');
+        for output in &mut key {
+            let high = digits
+                .next()
+                .and_then(hex_digit)
+                .ok_or_else(|| invalid("font key has an invalid high nibble"))?;
+            let low = digits
+                .next()
+                .and_then(hex_digit)
+                .ok_or_else(|| invalid("font key has an invalid low nibble"))?;
+            *output = (high << 4) | low;
+        }
+        Ok(Self(key))
+    }
+}
+
+impl fmt::Display for FontKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("{")?;
+        for (index, byte) in self.0.iter().enumerate() {
+            if matches!(index, 4 | 6 | 8 | 10) {
+                formatter.write_str("-")?;
+            }
+            write!(formatter, "{byte:02X}")?;
+        }
+        formatter.write_str("}")
+    }
+}
+
+const fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
 /// Apply the reversible OOXML GUID XOR transformation to the first 32 bytes.
-pub fn obfuscate(data: &mut [u8], font_key: &str) -> Result<()> {
+pub fn obfuscate(data: &mut [u8], font_key: FontKey) -> Result<()> {
     if data.len() < 32 {
         return Err(invalid("OOXML font obfuscation requires at least 32 bytes"));
     }
-    let key = parse_font_key_bytes(font_key)?;
-    for (byte, key_byte) in data.iter_mut().take(32).zip(key.iter().rev().cycle()) {
+    for (byte, key_byte) in data
+        .iter_mut()
+        .take(32)
+        .zip(font_key.bytes().iter().rev().cycle())
+    {
         *byte ^= *key_byte;
     }
     Ok(())
 }
 
 /// Reverse [`obfuscate`]. XOR makes both operations identical.
-pub fn deobfuscate(data: &mut [u8], font_key: &str) -> Result<()> {
+pub fn deobfuscate(data: &mut [u8], font_key: FontKey) -> Result<()> {
     obfuscate(data, font_key)
 }
 
@@ -198,6 +296,8 @@ impl Pitch {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Charset {
     Ansi,
+    Default,
+    Symbol,
     Macintosh,
     ShiftJis,
     Hangeul,
@@ -213,12 +313,16 @@ pub enum Charset {
     Russian,
     Thai,
     EastEurope,
+    Oem,
     Legacy(u8),
 }
 impl Charset {
-    fn legacy(v: u8) -> Self {
+    /// Convert a legacy one-byte Word charset code into a typed value.
+    pub fn from_legacy(v: u8) -> Self {
         match v {
             0x00 => Self::Ansi,
+            0x01 => Self::Default,
+            0x02 => Self::Symbol,
             0x4D => Self::Macintosh,
             0x80 => Self::ShiftJis,
             0x81 => Self::Hangeul,
@@ -234,6 +338,7 @@ impl Charset {
             0xCC => Self::Russian,
             0xDE => Self::Thai,
             0xEE => Self::EastEurope,
+            0xFF => Self::Oem,
             x => Self::Legacy(x),
         }
     }
@@ -261,6 +366,8 @@ impl Charset {
     pub fn legacy_code(self) -> u8 {
         match self {
             Self::Ansi => 0x00,
+            Self::Default => 0x01,
+            Self::Symbol => 0x02,
             Self::Macintosh => 0x4D,
             Self::ShiftJis => 0x80,
             Self::Hangeul => 0x81,
@@ -276,12 +383,14 @@ impl Charset {
             Self::Russian => 0xCC,
             Self::Thai => 0xDE,
             Self::EastEurope => 0xEE,
+            Self::Oem => 0xFF,
             Self::Legacy(v) => v,
         }
     }
     pub fn strict_name(self) -> Option<&'static str> {
         Some(match self {
             Self::Ansi => "iso-8859-1",
+            Self::Default | Self::Symbol | Self::Oem => return None,
             Self::Macintosh => "macintosh",
             Self::ShiftJis => "shift_jis",
             Self::Hangeul => "ks_c-5601-1987",
@@ -428,31 +537,26 @@ impl Resource {
 pub struct Embed {
     style: Style,
     relationship_id: String,
-    font_key: Option<String>,
+    font_key: Option<FontKey>,
     subsetted: Option<bool>,
     resource: Option<Resource>,
     extension_attributes: Vec<raw::Attr>,
 }
 impl Embed {
-    pub fn new(style: Style, font_key: impl Into<String>, resource: Resource) -> Result<Self> {
-        let font_key = font_key.into();
-        parse_font_key_bytes(&font_key)?;
-        Ok(Self {
+    pub fn new(style: Style, font_key: FontKey, resource: Resource) -> Self {
+        Self {
             style,
             relationship_id: String::new(),
             font_key: Some(font_key),
             subsetted: None,
             resource: Some(resource),
             extension_attributes: Vec::new(),
-        })
+        }
     }
 
     /// Replace the OOXML GUID used to obfuscate this payload.
-    pub fn rekey(&mut self, font_key: impl Into<String>) -> Result<()> {
-        let font_key = font_key.into();
-        parse_font_key_bytes(&font_key)?;
-        self.font_key = Some(font_key);
-        Ok(())
+    pub fn rekey(&mut self, font_key: FontKey) -> Option<FontKey> {
+        self.font_key.replace(font_key)
     }
 
     pub fn with_subset(mut self, subsetted: bool) -> Self {
@@ -464,8 +568,8 @@ impl Embed {
         self.style
     }
 
-    pub fn key(&self) -> Option<&str> {
-        self.font_key.as_deref()
+    pub fn key(&self) -> Option<FontKey> {
+        self.font_key
     }
 
     pub fn subsetted(&self) -> Option<bool> {
@@ -532,6 +636,10 @@ impl Font {
         self.character_set = Some(value);
         self
     }
+    /// Replace or clear the character-set hint.
+    pub fn set_charset(&mut self, value: Option<Charset>) -> Option<Charset> {
+        std::mem::replace(&mut self.character_set, value)
+    }
     pub fn with_family(mut self, value: Family) -> Self {
         self.family = Some(value);
         self
@@ -572,6 +680,32 @@ impl Font {
         self.embedded_fonts.push(value);
         self.embedded_fonts.sort_by_key(|embed| embed.style.rank());
         Ok(())
+    }
+
+    /// Add or replace one embedded face by its typed style.
+    pub fn put(&mut self, value: Embed) -> Result<Option<Embed>> {
+        if let Some(index) = self
+            .embedded_fonts
+            .iter()
+            .position(|embedded| embedded.style == value.style)
+        {
+            let len = self.embedded_fonts.len();
+            let slot = self
+                .embedded_fonts
+                .get_mut(index)
+                .ok_or_else(|| invalid(format!("embedded-font index {index} exceeds {len}")))?;
+            return Ok(Some(std::mem::replace(slot, value)));
+        }
+        self.add_embed(value)?;
+        Ok(None)
+    }
+
+    /// Remove and return one embedded face, if present.
+    pub fn remove(&mut self, style: Style) -> Option<Embed> {
+        self.embedded_fonts
+            .iter()
+            .position(|embedded| embedded.style == style)
+            .map(|index| self.embedded_fonts.remove(index))
     }
 
     pub fn name(&self) -> &str {
@@ -894,7 +1028,7 @@ pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
 /// package signatures immediately before the mutation phase. Moving a default,
 /// empty [`Table`] removes the optional font-table graph and any font resources
 /// that become unreferenced.
-pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance) -> Result<()> {
+pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance) -> Result<bool> {
     validate_package_conformance(package, conformance)?;
     let old = read(package)?.unwrap_or_default();
     let (main_name, old_table_name, old_table_relationship_id) = locate_font_table(package)?;
@@ -902,14 +1036,16 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
         && value.namespaces.is_empty()
         && value.extension_attributes.is_empty()
     {
-        remove_graph(
+        return remove_graph(
             package,
             &old,
             &main_name,
             old_table_name.as_ref(),
             old_table_relationship_id.as_deref(),
-        )?;
-        return Ok(());
+        );
+    }
+    if old == value {
+        return Ok(false);
     }
     allocate_font_identifiers(package, &mut value)?;
     validate_table_value(&value, true)?;
@@ -1108,7 +1244,7 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
             package.remove_part(&uri);
         }
     }
-    Ok(())
+    Ok(true)
 }
 
 /// Remove the optional font-table graph and every font resource that becomes
@@ -1690,9 +1826,7 @@ fn validate_font_entry(font: &Font, require_resources: bool) -> Result<()> {
                 "embedded-font relationship ID is empty or too long",
             ));
         }
-        if let Some(key) = &embedded.font_key {
-            font_key(key)?;
-        } else if require_resources {
+        if embedded.font_key.is_none() && require_resources {
             return Err(invalid("fontKey is required for package storage"));
         }
         if require_resources && embedded.resource.is_none() {
@@ -1721,24 +1855,6 @@ fn validate_font_name(value: &str, kind: &str) -> Result<()> {
     } else {
         Ok(())
     }
-}
-
-fn parse_font_key_bytes(value: &str) -> Result<[u8; 16]> {
-    font_key(value)?;
-    let value = value
-        .strip_prefix('{')
-        .and_then(|value| value.strip_suffix('}'))
-        .unwrap_or(value);
-    let digits = value
-        .bytes()
-        .filter(|byte| *byte != b'-')
-        .collect::<Vec<_>>();
-    let mut key = [0u8; 16];
-    for (output, pair) in key.iter_mut().zip(digits.chunks_exact(2)) {
-        let pair = std::str::from_utf8(pair).map_err(xml_error)?;
-        *output = u8::from_str_radix(pair, 16).map_err(xml_error)?;
-    }
-    Ok(key)
 }
 
 #[derive(Clone)]
@@ -2127,7 +2243,7 @@ fn parse_charset(n: &Node) -> Result<Option<Charset>> {
                 return Err(invalid(format!("invalid charset '{v}'")));
             }
             u8::from_str_radix(&v, 16)
-                .map(Charset::legacy)
+                .map(Charset::from_legacy)
                 .map_err(xml_error)
         })
         .transpose()?;
@@ -2157,10 +2273,10 @@ fn parse_sig(n: &Node) -> Result<Signature> {
 fn parse_embed(n: &Node, style: Style) -> Result<Embed> {
     leaf(n)?;
     let a = Attributes::new(n, &["fontKey", "subsetted"], &["id"])?;
-    let key = a.opt("fontKey")?;
-    if let Some(v) = &key {
-        font_key(v)?
-    }
+    let key = a
+        .opt("fontKey")?
+        .map(|value| value.parse::<FontKey>())
+        .transpose()?;
     Ok(Embed {
         style,
         relationship_id: a.rel("id")?,
@@ -2259,9 +2375,8 @@ fn write_font(o: &mut Vec<u8>, f: &Font, c: Conformance) -> Result<()> {
         o.extend_from_slice(e.style.element().as_bytes());
         extensions(o, &e.extension_attributes)?;
         ra(o, "id", &e.relationship_id);
-        if let Some(v) = &e.font_key {
-            font_key(v)?;
-            wa(o, "fontKey", v)
+        if let Some(v) = e.font_key {
+            wa(o, "fontKey", &v.to_string())
         }
         if let Some(v) = e.subsetted {
             wa(o, "subsetted", if v { "1" } else { "0" })
@@ -2379,27 +2494,6 @@ fn on_off(v: &str) -> Result<bool> {
         _ => Err(invalid(format!("invalid on/off value '{v}'"))),
     }
 }
-fn font_key(v: &str) -> Result<()> {
-    let b = v.as_bytes();
-    let ok = b.len() == 38
-        && b.first() == Some(&b'{')
-        && b.last() == Some(&b'}')
-        && [9, 14, 19, 24]
-            .iter()
-            .all(|index| b.get(*index) == Some(&b'-'))
-        && b.get(1..37).is_some_and(|body| {
-            body.iter().enumerate().all(|(index, byte)| {
-                [8, 13, 18, 23].contains(&index)
-                    || byte.is_ascii_digit()
-                    || (b'A'..=b'F').contains(byte)
-            })
-        });
-    if ok {
-        Ok(())
-    } else {
-        Err(invalid(format!("invalid font key '{v}'")))
-    }
-}
 fn require(n: &Node, name: &str) -> Result<()> {
     if word_ns(&n.ns) && n.local == name {
         Ok(())
@@ -2452,7 +2546,10 @@ fn invalid(e: impl Into<String>) -> Error {
 mod tests {
     use super::*;
 
-    const KEY: &str = "{00112233-4455-6677-8899-AABBCCDDEEFF}";
+    const KEY: FontKey = FontKey::new([
+        0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
+        0xFF,
+    ]);
 
     fn package() -> OpcPackage {
         let mut package = OpcPackage::new();
@@ -2565,7 +2662,8 @@ mod tests {
         deobfuscate(&mut data, KEY).expect("deobfuscate");
         assert_eq!(data, original);
         assert!(obfuscate(&mut [0; 31], KEY).is_err());
-        assert!(obfuscate(&mut [0; 32], "bad").is_err());
+        assert!("bad".parse::<FontKey>().is_err());
+        assert_eq!(KEY.to_string(), "{00112233-4455-6677-8899-AABBCCDDEEFF}");
 
         assert!(License::new(0).expect("license").installable());
         let editable = License::new(0x0108).expect("license");
@@ -2589,11 +2687,7 @@ mod tests {
             .with_family(Family::Swiss)
             .with_pitch(Pitch::Variable)
             .with_signature(Signature::new([1, 2, 3, 4], [5, 6]))
-            .with_embed(
-                Embed::new(Style::Regular, KEY, shared.clone())
-                    .expect("embed")
-                    .with_subset(true),
-            )
+            .with_embed(Embed::new(Style::Regular, KEY, shared.clone()).with_subset(true))
             .expect("face")
             .with_attr(raw::Attr::new("x:flag", "kept").expect("attribute"));
         let mut table = Table::new()
@@ -2607,7 +2701,7 @@ mod tests {
             .add(
                 Font::new("Beta")
                     .expect("font")
-                    .with_embed(Embed::new(Style::Regular, KEY, shared).expect("embed"))
+                    .with_embed(Embed::new(Style::Regular, KEY, shared))
                     .expect("face"),
             )
             .expect("add");
@@ -2674,14 +2768,11 @@ mod tests {
         let mut package = package();
         let font = Font::new("Shared")
             .expect("font")
-            .with_embed(
-                Embed::new(
-                    Style::Regular,
-                    KEY,
-                    Resource::new(vec![0; 32]).expect("resource"),
-                )
-                .expect("embed"),
-            )
+            .with_embed(Embed::new(
+                Style::Regular,
+                KEY,
+                Resource::new(vec![0; 32]).expect("resource"),
+            ))
             .expect("face");
         let mut table = Table::new();
         table.add(font).expect("add");
@@ -2722,14 +2813,7 @@ mod tests {
         assert!(Font::new("").is_err());
         assert!(Font::new("12345678901234567890123456789012").is_err());
         assert!(Resource::new(vec![0; 31]).is_err());
-        assert!(
-            Embed::new(
-                Style::Regular,
-                "bad",
-                Resource::new(vec![0; 32]).expect("resource")
-            )
-            .is_err()
-        );
+        assert!("bad".parse::<FontKey>().is_err());
         assert!(raw::Attr::new("", "value").is_err());
 
         let mut table = Table::new();

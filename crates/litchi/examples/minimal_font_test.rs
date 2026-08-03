@@ -7,7 +7,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pkg = Package::new()?;
 
     // Enable font embedding
-    pkg.opc_package_mut().with_font_embedding(true, true);
+    pkg.opc_package_mut()
+        .with_fonts(litchi_opc::FontEmbedding::Subset);
 
     // Add simple paragraph with Liberation Sans
     {

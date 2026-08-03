@@ -120,6 +120,53 @@ pub enum Error {
         index: usize,
     },
 
+    /// No embedded font has the requested semantic typeface.
+    #[error("embedded font '{0}' was not found")]
+    FontNotFound(String),
+
+    /// Malformed producer input contains multiple caseless-equivalent typefaces.
+    #[error("embedded font '{name}' is ambiguous ({matches} matches)")]
+    AmbiguousFontName {
+        /// Selector spelling supplied by the caller.
+        name: String,
+        /// Number of matching physical entries.
+        matches: usize,
+    },
+
+    /// A numeric embedded-font selector is outside the checked list bounds.
+    #[error("embedded-font index {index} is outside a list of length {len}")]
+    FontIndexOutOfBounds {
+        /// Requested zero-based index.
+        index: usize,
+        /// Current embedded-font count.
+        len: usize,
+    },
+
+    /// A mutation would create a Unicode-caseless duplicate typeface.
+    #[error("embedded font '{name}' conflicts with {matches} existing font(s)")]
+    DuplicateFontName {
+        /// Typeface spelling supplied by the caller.
+        name: String,
+        /// Number of conflicting fonts.
+        matches: usize,
+    },
+
+    /// A complete embedded-font reorder has the wrong number of selectors.
+    #[error("embedded-font reorder has {actual} selectors; expected {expected}")]
+    FontOrderLength {
+        /// Required selector count.
+        expected: usize,
+        /// Supplied selector count.
+        actual: usize,
+    },
+
+    /// A reorder selects the same physical embedded font more than once.
+    #[error("embedded-font reorder selects index {index} more than once")]
+    DuplicateFontSelection {
+        /// Repeated physical index.
+        index: usize,
+    },
+
     /// A semantic shape selector is missing, ambiguous, or outside checked bounds.
     #[error("PresentationML shape lookup error: {0}")]
     ShapeLookup(#[from] crate::shape::LookupError),

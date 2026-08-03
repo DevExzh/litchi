@@ -36,7 +36,7 @@ pub mod sign;
 pub use content_type::ContentType;
 pub use error::{OpcError, Result};
 pub use members::{NonPartMember, NonPartReason};
-pub use package::OpcPackage;
+pub use package::{FontEmbedding, OpcPackage, SaveOptions};
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
 pub use pkgwriter::PackageWriter;

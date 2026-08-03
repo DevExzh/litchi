@@ -65,13 +65,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &font.properties {
         Some(props) => {
             println!("properties :");
-            println!("  panose : {:?}", props.panose);
-            println!("  charset: {:?}", props.charset);
-            println!("  family : {:?}", props.family);
-            println!("  pitch  : {:?}", props.pitch);
-            if let Some((u0, u1, u2, u3, c0, c1)) = &props.sig {
-                println!("  sig    : usb=({u0} {u1} {u2} {u3}) csb=({c0} {c1})");
+            println!("  license: {:?}", props.license());
+            println!("  panose : {:02X?}", props.panose().bytes());
+            match props.charset() {
+                Some(charset) => println!("  charset: {}", charset.code()),
+                None => println!("  charset: <absent or ambiguous>"),
             }
+            println!("  family : {:?}", props.family());
+            println!("  pitch  : {:?}", props.pitch());
+            println!(
+                "  sig    : usb={:08X?} csb={:08X?}",
+                props.signature().unicode(),
+                props.signature().code_pages()
+            );
         },
         None => {
             println!("properties : <none extracted — font lacks an OS/2 table or is too short>");

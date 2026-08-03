@@ -444,8 +444,8 @@ impl<'a> Presentation<'a> {
     ///
     /// Font programs are returned only as inert stored bytes. This does not
     /// parse, load, install, render, or execute a font program.
-    pub fn embedded_fonts(&self) -> Result<Option<crate::pptx::PresentationEmbeddedFonts>> {
-        crate::pptx::load_embedded_fonts(self.package)
+    pub fn fonts(&self) -> Result<Option<litchi_pptx::font::Fonts>> {
+        Ok(litchi_pptx::font::load(self.package)?)
     }
 
     /// Get the validated list of custom slide shows.

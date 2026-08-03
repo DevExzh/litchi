@@ -1,7 +1,8 @@
-use litchi_ooxml::pptx::{EmbeddedFontStyle, Package};
+use litchi_ooxml::pptx::Package;
 use litchi_ooxml::{OoxmlError, PackURI};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
+use litchi_pptx::font::Style;
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/embedded-fonts/presentation.xml");
@@ -12,28 +13,14 @@ const FONT_CONTENT_TYPE: &str = "application/x-fontdata";
 #[test]
 fn presentation_embedded_fonts_resolve_inert_resources() {
     let package = package_with_embedded_font();
-    let embedded_fonts = package
-        .presentation()
-        .unwrap()
-        .embedded_fonts()
-        .unwrap()
-        .unwrap();
+    let fonts = package.presentation().unwrap().fonts().unwrap().unwrap();
 
-    assert_eq!(embedded_fonts.fonts.len(), 1);
-    assert_eq!(embedded_fonts.fonts[0].typeface, "Example Sans");
-    assert_eq!(embedded_fonts.fonts[0].faces.len(), 1);
-    assert_eq!(
-        embedded_fonts.fonts[0].faces[0].style,
-        EmbeddedFontStyle::Regular
-    );
-    assert_eq!(
-        embedded_fonts.fonts[0].faces[0].relationship_id,
-        "rIdFontRegular"
-    );
-    let resource = embedded_fonts.fonts[0].faces[0].resource.as_ref().unwrap();
-    assert_eq!(resource.part_name, "/ppt/fonts/example.odttf");
-    assert_eq!(resource.content_type, FONT_CONTENT_TYPE);
-    assert_eq!(resource.data, FONT_DATA);
+    assert_eq!(fonts.len(), 1);
+    let font = fonts.get("Example Sans").unwrap();
+    assert_eq!(font.name(), "Example Sans");
+    assert_eq!(font.faces().len(), 1);
+    assert_eq!(font.faces()[0].style(), Style::Regular);
+    assert_eq!(font.faces()[0].data().bytes(), FONT_DATA);
 }
 
 #[test]
@@ -53,9 +40,9 @@ fn presentation_embedded_fonts_validate_font_relationships() {
     );
 
     assert!(matches!(
-        package.presentation().unwrap().embedded_fonts(),
-        Err(OoxmlError::InvalidFormat(message))
-            if message.contains("is not a font relationship")
+        package.presentation().unwrap().fonts(),
+        Err(OoxmlError::Pptx(litchi_pptx::Error::Invalid(message)))
+            if message.contains("does not match the presentation conformance")
     ));
 }
 

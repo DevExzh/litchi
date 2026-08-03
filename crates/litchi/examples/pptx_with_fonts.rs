@@ -14,7 +14,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut pkg = Package::new()?;
 
     // Enable font embedding with subsetting
-    pkg.opc_package_mut().with_font_embedding(true, true);
+    pkg.opc_package_mut()
+        .with_fonts(litchi_opc::FontEmbedding::Subset);
 
     // Get mutable presentation
     let pres = pkg.presentation_mut()?;

@@ -36,41 +36,33 @@ pub struct MutableSlide {
 }
 
 #[cfg(feature = "fonts")]
-use litchi_fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
-use roaring::RoaringBitmap;
-#[cfg(feature = "fonts")]
-use std::collections::HashMap;
+use litchi_fonts::{CollectGlyphs, GlyphMap, Request};
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutableSlide {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
 
         // Collect from title
         if let Some(title) = &self.title {
-            let bitmap = glyphs
-                .entry("Calibri".to_string())
-                .or_insert_with(RoaringBitmap::new);
+            let bitmap = glyphs.entry(Request::regular("Calibri")).or_default();
             for c in title.chars() {
-                bitmap.insert(c as u32);
+                bitmap.insert(c);
             }
         }
 
         // Collect from shapes
         for shape in &self.shapes {
             for (font, bitmap) in shape.collect_glyphs() {
-                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                *glyphs.entry(font).or_default() |= bitmap;
             }
         }
 
         // Collect from notes
         if let Some(notes) = &self.notes {
-            let bitmap = glyphs
-                .entry("Calibri".to_string())
-                .or_insert_with(RoaringBitmap::new);
+            let bitmap = glyphs.entry(Request::regular("Calibri")).or_default();
             for c in notes.chars() {
-                bitmap.insert(c as u32);
+                bitmap.insert(c);
             }
         }
 
@@ -535,6 +527,11 @@ impl MutableSlide {
     /// Check if the slide has been modified.
     pub fn is_modified(&self) -> bool {
         self.modified
+    }
+
+    /// Mark the current serialized state as the new clean baseline.
+    pub(crate) fn mark_clean(&mut self) {
+        self.modified = false;
     }
 
     // ========================================================================

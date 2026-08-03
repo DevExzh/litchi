@@ -1,14 +1,16 @@
 use litchi_docx::font::{
-    Charset, Conformance, Embed, Family, Font, Key, Pitch, Resource, Signature, Style, Table, put,
-    read, remove, write,
+    Charset, Conformance, Embed, Family, Font, FontKey, Key, Pitch, Resource, Signature, Style,
+    Table, put, read, remove, write,
 };
 use litchi_opc::{OpcPackage, PackURI, XmlPart};
 
-const KEY: &str = "{00112233-4455-6677-8899-AABBCCDDEEFF}";
+const KEY: FontKey = FontKey::new([
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+]);
 
 #[test]
 fn downstream_surface_is_short_safe_and_move_first() -> litchi_docx::Result<()> {
-    let face = Embed::new(Style::Regular, KEY, Resource::new(vec![0; 32])?)?;
+    let face = Embed::new(Style::Regular, KEY, Resource::new(vec![0; 32])?);
     let font = Font::new("Example")?
         .with_charset(Charset::Ansi)
         .with_family(Family::Swiss)

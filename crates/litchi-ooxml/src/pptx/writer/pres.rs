@@ -91,17 +91,15 @@ pub struct MutablePresentation {
 }
 
 #[cfg(feature = "fonts")]
-use litchi_fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
-use roaring::RoaringBitmap;
+use litchi_fonts::{CollectGlyphs, GlyphMap};
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutablePresentation {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
         for slide in &self.slides {
             for (font, bitmap) in slide.collect_glyphs() {
-                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                *glyphs.entry(font).or_default() |= bitmap;
             }
         }
         glyphs
@@ -224,6 +222,14 @@ impl MutablePresentation {
     /// Check if the presentation has been modified.
     pub fn is_modified(&self) -> bool {
         self.modified || self.slides.iter().any(|s| s.is_modified())
+    }
+
+    /// Mark the current serialized state as the new clean baseline.
+    pub(crate) fn mark_clean(&mut self) {
+        self.modified = false;
+        for slide in &mut self.slides {
+            slide.mark_clean();
+        }
     }
 
     // ========================================================================

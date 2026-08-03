@@ -33,22 +33,18 @@ pub struct MutableHyperlink {
 }
 
 #[cfg(feature = "fonts")]
-use litchi_fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
-use roaring::RoaringBitmap;
-#[cfg(feature = "fonts")]
-use std::collections::HashMap;
+use litchi_fonts::{CollectGlyphs, GlyphMap, Request};
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutableHyperlink {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
 
         // Collect from elements (runs)
         for element in &self.elements {
             if let HyperlinkElement::Run(run) = element {
                 for (font, bitmap) in run.collect_glyphs() {
-                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                    *glyphs.entry(font).or_default() |= bitmap;
                 }
             }
         }
@@ -60,9 +56,9 @@ impl CollectGlyphs for MutableHyperlink {
             // Hyperlink style usually defaults to Calibri in Word,
             // but here we just use the default font name for fallback text.
             let font_name = "Calibri".to_string();
-            let bitmap = glyphs.entry(font_name).or_insert_with(RoaringBitmap::new);
+            let bitmap = glyphs.entry(Request::regular(font_name)).or_default();
             for c in text.chars() {
-                bitmap.insert(c as u32);
+                bitmap.insert(c);
             }
         }
 

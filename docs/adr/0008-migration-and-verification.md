@@ -3299,6 +3299,58 @@ open/discover/insert/resave result in the observed Word Compatibility Mode on
 that build, not evidence for images, fields, arbitrary dependency graphs,
 Strict, a version matrix, or performance.
 
+## PPTX embedded-font owner extraction
+
+The PresentationML embedded-font grammar, semantic model, and package graph now
+reside in `litchi-pptx::font`. The migration host deletes its duplicate module
+and long raw-field exports, and exposes short `fonts`, `put_fonts`, and
+`remove_fonts` adapters. `Font`, `Face`, typed styles, closed pitch/family
+values, typed signed-byte charset, fixed-size PANOSE, compact licensing
+metadata, and consuming collection CRUD replace public relationship IDs, part
+paths, MIME strings, and optional resource bags. A documented library
+Unicode-caseless key powers semantic selection; checked positions remain usable
+for producer-duplicate repair.
+
+Loaded payloads use shared immutable allocations, including repeated rIds and
+targets, and unique-resource limits no longer multiply one physical program by
+its number of face references. Fresh PowerPoint authoring validates or creates
+an Embedded OpenType container under `application/x-fontdata`, sets
+`embedTrueTypeFonts`, and
+allocates canonical collision-free names. Standards-only `x-font-ttf` is an
+explicit preservation profile. PPTX no longer exposes or emits Word-only font
+obfuscation. The optional discovery/subsetting path is split into a pure owned
+preparation phase plus DOCX/PPTX publishers, surfaces `OS/2.fsType`, applies
+licensing and no-subsetting policy, and performs one bulk typed PPTX put. The
+collector exposes scalar-only `Glyphs` keyed by typed family/style `Request`,
+so automatic Bold/Italic faces are no longer mislabeled Regular. The OPC save
+policy is `FontEmbedding::{None, Full, Subset}` instead of two booleans. Word's
+obfuscation GUID is `FontKey([u8; 16])`, and raw strings exist only at the XML
+codec boundary. Incomplete opened-document scans and unsupported full TTC face
+extraction fail explicitly rather than silently publishing incomplete data.
+
+Exact no-ops return before serialization and retain signatures. Real changes
+validate and round-trip a candidate, then mutate and unsign only an Arc-sharing
+OPC snapshot before final assignment. Unit and downstream API tests cover
+semantic CRUD, shared allocations, collisions, unknown XML, failure atomicity,
+Strict/Transitional reference packages, graph rejection, and the host adapter.
+Feature-on and feature-off compilation cover the split authoring path.
+
+Computer Use verified the generated Transitional artifact
+`target/office-verification/pptx-font-crud-generated.pptx` in desktop
+PowerPoint for macOS. It opened without a repair, recovery, compatibility, or
+font-license warning; rendered the visible Boldonse `Test`; and reported
+`Boldonse` in the font control when the text box was selected. The text was
+changed to `Test Test`, saved as
+`pptx-font-crud-powerpoint.pptx`, closed, and reopened without repair. The saved
+ZIP passed integrity checks. The canonical reverse reader recovered the edited
+text, the one-face Boldonse catalog, its presentation relationship, and its
+inert EOT resource. The observed Office copy retained the exact 36,187-byte
+payload and its original SHA-256, but the reusable verifier accepts a
+structurally valid Office normalization rather than requiring byte identity.
+This is evidence for that producer EOT artifact and desktop build only; it is
+not a native gate for the automatic uncompressed-EOT wrapper, Strict,
+`x-font-ttf`, other Office versions, or measured performance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

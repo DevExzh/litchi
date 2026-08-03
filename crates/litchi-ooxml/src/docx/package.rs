@@ -139,129 +139,324 @@ struct SettingsPartSnapshot {
 }
 
 #[cfg(feature = "fonts")]
-use crate::fonts::{EmbedFonts, embed_fonts_in_package};
+use crate::fonts::{EmbedFonts, PreparedFont, prepare_fonts};
+#[cfg(feature = "fonts")]
+use litchi_core::id::generate_guid_bytes;
 #[cfg(feature = "fonts")]
 use litchi_fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
-use roaring::RoaringBitmap;
-#[cfg(feature = "fonts")]
-use std::collections::HashMap;
-
-#[cfg(feature = "fonts")]
-impl CollectGlyphs for Package {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        if let Some(doc) = &self.mutable_doc {
-            doc.collect_glyphs()
-        } else if let Ok(_doc) = self.document() {
-            // For now, only mutable documents support scanning as they are in-memory.
-            // Future enhancement: parse document.xml part directly for glyphs.
-            HashMap::new()
-        } else {
-            HashMap::new()
-        }
-    }
-}
 
 #[cfg(feature = "fonts")]
 impl EmbedFonts for Package {
     fn embed_fonts(&mut self) -> Result<()> {
-        let glyphs = self.collect_glyphs();
-        let font_table_uri = PackURI::new("/word/fontTable.xml")
-            .map_err(|e| OoxmlError::Other(format!("Invalid fontTable URI: {}", e)))?;
-
-        // Embed fonts and get relationship IDs with fontKey
-        let embedded_fonts =
-            embed_fonts_in_package(glyphs, &mut self.opc, "/word/fonts", &font_table_uri)?;
-
-        if embedded_fonts.is_empty() {
+        let options = self.opc.save_options().clone();
+        let subset = match options.fonts {
+            litchi_opc::FontEmbedding::None => return Ok(()),
+            litchi_opc::FontEmbedding::Full => false,
+            litchi_opc::FontEmbedding::Subset => true,
+        };
+        let document = self.mutable_doc.as_ref().ok_or(OoxmlError::UnsafeEdit {
+            format: "DOCX",
+            operation: "embed_fonts",
+            reason: "font discovery is unavailable until the document has a complete mutable model",
+        })?;
+        if !document.glyphs_are_complete() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation: "embed_fonts",
+                reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
+            });
+        }
+        let glyphs = document.collect_glyphs();
+        let prepared = prepare_fonts(glyphs, subset)?;
+        if prepared.is_empty() {
             return Ok(());
         }
-
-        // Update settings.xml to include embedTrueTypeFonts flag
-        let settings_uri = PackURI::new("/word/settings.xml")
-            .map_err(|e| OoxmlError::Other(format!("Invalid settings URI: {}", e)))?;
-
-        if let Ok(settings_part) = self.opc.get_part_mut(&settings_uri) {
-            let xml_content = std::str::from_utf8(settings_part.blob())
-                .map_err(|e| OoxmlError::Other(format!("Invalid settings.xml: {}", e)))?;
-
-            // Check if embedTrueTypeFonts already exists
-            if !xml_content.contains("<w:embedTrueTypeFonts") {
-                let mut updated_xml = xml_content.to_string();
-
-                // Insert after <w:settings> opening tag or before </w:settings>
-                if let Some(pos) = updated_xml.find("</w:settings>") {
-                    updated_xml.insert_str(pos, "<w:embedTrueTypeFonts/>");
-                    settings_part.set_blob(updated_xml.into_bytes());
-                }
-            }
+        let subsetted = prepared.iter().any(|font| font.subsetted);
+        let conformance = word_font_conformance(&self.opc)?;
+        let mut staged = self.opc.clone();
+        let mut table = font::read(&staged)?.unwrap_or_default();
+        let mut fonts_changed = false;
+        for prepared in prepared {
+            fonts_changed |= merge_word_font(&mut table, prepared, conformance)?;
         }
-
-        // Update fontTable.xml content with embedded font references
-        if let Ok(font_table_part) = self.opc.get_part_mut(&font_table_uri) {
-            let xml_content = std::str::from_utf8(font_table_part.blob())
-                .map_err(|e| OoxmlError::Other(format!("Invalid fontTable.xml: {}", e)))?;
-
-            let mut updated_xml = xml_content.to_string();
-
-            for (font_name, info) in embedded_fonts {
-                // Find the <w:font w:name="Font Name"> element
-                let search_pattern = format!("w:name=\"{}\"", font_name);
-                if let Some(pos) = updated_xml.find(&search_pattern) {
-                    // Find the closing tag of this font entry or the next property
-                    if let Some(font_end_pos) = updated_xml[pos..].find("</w:font>") {
-                        let absolute_end_pos = pos + font_end_pos;
-                        // Include w:fontKey attribute (GUID) - required for Office to recognize embedded fonts
-                        let embed_xml = format!(
-                            "<w:embedRegular r:id=\"{}\" w:fontKey=\"{}\"/>",
-                            info.relationship_id, info.font_key
-                        );
-                        // Insert before </w:font>
-                        updated_xml.insert_str(absolute_end_pos, &embed_xml);
-                    }
-                } else {
-                    // Font not in table, append new entry before </w:fonts>
-                    if let Some(fonts_end_pos) = updated_xml.rfind("</w:fonts>") {
-                        let mut new_font_xml = format!("<w:font w:name=\"{}\">", font_name);
-
-                        // Add font properties if available (required for Office recognition)
-                        if let Some(ref props) = info.properties {
-                            if let Some(ref panose) = props.panose {
-                                new_font_xml
-                                    .push_str(&format!("<w:panose1 w:val=\"{}\"/>", panose));
-                            }
-                            if let Some(ref charset) = props.charset {
-                                new_font_xml
-                                    .push_str(&format!("<w:charset w:val=\"{}\"/>", charset));
-                            }
-                            if let Some(ref family) = props.family {
-                                new_font_xml.push_str(&format!("<w:family w:val=\"{}\"/>", family));
-                            }
-                            if let Some(ref pitch) = props.pitch {
-                                new_font_xml.push_str(&format!("<w:pitch w:val=\"{}\"/>", pitch));
-                            }
-                            if let Some(ref sig) = props.sig {
-                                new_font_xml.push_str(&format!(
-                                    "<w:sig w:usb0=\"{}\" w:usb1=\"{}\" w:usb2=\"{}\" w:usb3=\"{}\" w:csb0=\"{}\" w:csb1=\"{}\"/>",
-                                    sig.0, sig.1, sig.2, sig.3, sig.4, sig.5
-                                ));
-                            }
-                        }
-
-                        new_font_xml.push_str(&format!(
-                            "<w:embedRegular r:id=\"{}\" w:fontKey=\"{}\"/></w:font>",
-                            info.relationship_id, info.font_key
-                        ));
-                        updated_xml.insert_str(fonts_end_pos, &new_font_xml);
-                    }
-                }
-            }
-
-            font_table_part.set_blob(updated_xml.into_bytes());
+        if fonts_changed {
+            let _ = font::put(&mut staged, table, conformance)?;
         }
-
+        let settings_changed = ensure_word_font_settings(&mut staged, conformance, subsetted)?;
+        if fonts_changed || settings_changed {
+            self.opc = staged;
+        }
         Ok(())
     }
+}
+
+#[cfg(feature = "fonts")]
+fn merge_word_font(
+    table: &mut font::Table,
+    prepared: PreparedFont,
+    conformance: font::Conformance,
+) -> Result<bool> {
+    let PreparedFont {
+        name,
+        data,
+        style,
+        properties,
+        subsetted,
+    } = prepared;
+    let current = table.get(name.as_str())?.cloned();
+    let mut next = match &current {
+        Some(font) => font.clone(),
+        None => font::Font::new(&name)?,
+    };
+    next = next
+        .with_panose(properties.panose().into_bytes())
+        .with_family(word_family(properties.family()))
+        .with_pitch(word_pitch(properties.pitch()))
+        .with_signature(word_signature(properties.signature()));
+    let charset = properties
+        .charset()
+        .map(|charset| font::Charset::from_legacy(charset.code()))
+        .filter(|charset| {
+            conformance == font::Conformance::Transitional || charset.strict_name().is_some()
+        });
+    let _ = next.set_charset(charset);
+
+    let style = word_style(style);
+    if !word_face_matches(&next, style, &data, subsetted)? {
+        let key = font::FontKey::new(generate_guid_bytes());
+        let mut obfuscated = data;
+        font::obfuscate(&mut obfuscated, key)?;
+        let mut embedded = font::Embed::new(style, key, font::Resource::new(obfuscated)?);
+        if subsetted {
+            embedded = embedded.with_subset(true);
+        }
+        let _ = next.put(embedded)?;
+    }
+
+    if current.as_ref() == Some(&next) {
+        return Ok(false);
+    }
+    match current {
+        Some(_) => {
+            let replaced = table.replace(name.as_str(), next)?;
+            if replaced.is_none() {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "font '{name}' disappeared during replacement"
+                )));
+            }
+        },
+        None => table.add(next)?,
+    }
+    Ok(true)
+}
+
+#[cfg(feature = "fonts")]
+fn word_face_matches(
+    font: &font::Font,
+    style: font::Style,
+    clear: &[u8],
+    subsetted: bool,
+) -> Result<bool> {
+    let Some(embedded) = font
+        .embeds()
+        .iter()
+        .find(|embedded| embedded.style() == style)
+    else {
+        return Ok(false);
+    };
+    let subset_matches = if subsetted {
+        embedded.subsetted() == Some(true)
+    } else {
+        embedded.subsetted() != Some(true)
+    };
+    if !subset_matches {
+        return Ok(false);
+    }
+    let (Some(key), Some(resource)) = (embedded.key(), embedded.resource()) else {
+        return Ok(false);
+    };
+    let encoded = resource.bytes();
+    if encoded.len() != clear.len() {
+        return Ok(false);
+    }
+    let (Some(encoded_prefix), Some(clear_prefix)) = (encoded.get(..32), clear.get(..32)) else {
+        return Ok(false);
+    };
+    let mut decoded_prefix = [0; 32];
+    decoded_prefix.copy_from_slice(encoded_prefix);
+    font::deobfuscate(&mut decoded_prefix, key)?;
+    Ok(decoded_prefix == clear_prefix && encoded.get(32..) == clear.get(32..))
+}
+
+#[cfg(feature = "fonts")]
+fn word_style(value: litchi_fonts::Style) -> font::Style {
+    match value {
+        litchi_fonts::Style::Regular => font::Style::Regular,
+        litchi_fonts::Style::Bold => font::Style::Bold,
+        litchi_fonts::Style::Italic => font::Style::Italic,
+        litchi_fonts::Style::BoldItalic => font::Style::BoldItalic,
+    }
+}
+
+#[cfg(feature = "fonts")]
+fn word_family(value: litchi_fonts::Family) -> font::Family {
+    match value {
+        litchi_fonts::Family::Auto => font::Family::Auto,
+        litchi_fonts::Family::Roman => font::Family::Roman,
+        litchi_fonts::Family::Swiss => font::Family::Swiss,
+        litchi_fonts::Family::Modern => font::Family::Modern,
+        litchi_fonts::Family::Script => font::Family::Script,
+        litchi_fonts::Family::Decorative => font::Family::Decorative,
+    }
+}
+
+#[cfg(feature = "fonts")]
+fn word_pitch(value: litchi_fonts::Pitch) -> font::Pitch {
+    match value {
+        litchi_fonts::Pitch::Default => font::Pitch::Default,
+        litchi_fonts::Pitch::Fixed => font::Pitch::Fixed,
+        litchi_fonts::Pitch::Variable => font::Pitch::Variable,
+    }
+}
+
+#[cfg(feature = "fonts")]
+fn word_signature(value: litchi_fonts::Signature) -> font::Signature {
+    font::Signature::new(*value.unicode(), *value.code_pages())
+}
+
+#[cfg(feature = "fonts")]
+fn word_font_conformance(package: &OpcPackage) -> Result<font::Conformance> {
+    const STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument";
+    let mut relationships = package.rels().iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::OFFICE_DOCUMENT | STRICT
+        )
+    });
+    let relationship = relationships
+        .next()
+        .ok_or_else(|| OoxmlError::InvalidFormat("main-document relationship is missing".into()))?;
+    if relationships.next().is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "package has multiple main-document relationships".into(),
+        ));
+    }
+    Ok(if relationship.reltype() == STRICT {
+        font::Conformance::Strict
+    } else {
+        font::Conformance::Transitional
+    })
+}
+
+#[cfg(feature = "fonts")]
+fn ensure_word_font_settings(
+    package: &mut OpcPackage,
+    conformance: font::Conformance,
+    subsetted: bool,
+) -> Result<bool> {
+    const STRICT_SETTINGS: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
+    const TRANSITIONAL_WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const STRICT_WORD: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+
+    let (document_uri, target, exists) = {
+        let document = package.main_document_part()?;
+        let document_uri = document.partname().clone();
+        let mut relationships = document.rels().iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::SETTINGS | STRICT_SETTINGS
+            )
+        });
+        let relationship = relationships.next();
+        if relationships.next().is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "document has multiple settings relationships".into(),
+            ));
+        }
+        let target = match relationship {
+            Some(relationship) if relationship.is_external() => {
+                return Err(OoxmlError::InvalidFormat(
+                    "settings relationship cannot be external".into(),
+                ));
+            },
+            Some(relationship) => {
+                let expected = match conformance {
+                    font::Conformance::Transitional => {
+                        litchi_opc::constants::relationship_type::SETTINGS
+                    },
+                    font::Conformance::Strict => STRICT_SETTINGS,
+                };
+                if relationship.reltype() != expected {
+                    return Err(OoxmlError::InvalidFormat(
+                        "settings relationship uses the wrong conformance namespace".into(),
+                    ));
+                }
+                relationship.target_partname()?
+            },
+            None => PackURI::new("/word/settings.xml")
+                .map_err(|error| OoxmlError::InvalidUri(error.to_string()))?,
+        };
+        (document_uri, target, relationship.is_some())
+    };
+
+    let original = match package.get_part(&target) {
+        Ok(part) if exists => {
+            if part.content_type() != ct::WML_SETTINGS {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "settings part has content type {:?}, expected {:?}",
+                    part.content_type(),
+                    ct::WML_SETTINGS
+                )));
+            }
+            DocumentSettings::extract_from_part(part)?;
+            part.blob().to_vec()
+        },
+        Ok(_) => {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "unowned settings part collision at '{target}'"
+            )));
+        },
+        Err(_) if exists => {
+            return Err(OoxmlError::PartNotFound(format!("settings part {target}")));
+        },
+        Err(_) => {
+            let word = match conformance {
+                font::Conformance::Transitional => TRANSITIONAL_WORD,
+                font::Conformance::Strict => STRICT_WORD,
+            };
+            format!(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="{word}"/>"#
+            )
+            .into_bytes()
+        },
+    };
+    let updated = crate::docx::settings::patch_font_embedding(&original, subsetted)?;
+    if updated == original {
+        return Ok(false);
+    }
+
+    package.unsign();
+    if exists {
+        let part = package.get_part(&target)?;
+        let mut checked = part.clone_part();
+        checked.set_blob(updated.clone());
+        DocumentSettings::extract_from_part(&*checked)?;
+        package.get_part_mut(&target)?.set_blob(updated);
+    } else {
+        let part = BlobPart::new(target.clone(), ct::WML_SETTINGS.to_owned(), updated);
+        DocumentSettings::extract_from_part(&part)?;
+        package.try_add_part(Box::new(part))?;
+        let relationship_type = match conformance {
+            font::Conformance::Transitional => litchi_opc::constants::relationship_type::SETTINGS,
+            font::Conformance::Strict => STRICT_SETTINGS,
+        };
+        let target_ref = target.relative_ref(document_uri.base_uri());
+        package
+            .get_part_mut(&document_uri)?
+            .relate_to(&target_ref, relationship_type);
+    }
+    Ok(true)
 }
 
 impl Package {
@@ -758,9 +953,8 @@ impl Package {
         &mut self,
         table: font::Table,
         conformance: font::Conformance,
-    ) -> Result<&mut Self> {
-        font::put(&mut self.opc, table, conformance)?;
-        Ok(self)
+    ) -> Result<bool> {
+        Ok(font::put(&mut self.opc, table, conformance)?)
     }
 
     /// Remove the font table and font resources that become unreferenced.
@@ -3351,6 +3545,30 @@ mod tests {
         let text = reopened_again.document().unwrap().text().unwrap();
         assert!(text.contains("round-trip text"));
         assert!(text.contains("appended after reopen"));
+    }
+
+    #[cfg(feature = "fonts")]
+    #[test]
+    fn opened_document_font_embedding_fails_when_glyph_scan_is_incomplete() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut source = Package::new().unwrap();
+        source
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("preserved text");
+        source.save(file.path()).unwrap();
+
+        let mut opened = Package::open(file.path()).unwrap();
+        opened
+            .opc_package_mut()
+            .with_fonts(litchi_opc::FontEmbedding::Subset);
+        assert!(matches!(
+            opened.embed_fonts(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "embed_fonts",
+                ..
+            })
+        ));
     }
 
     #[test]

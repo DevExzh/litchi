@@ -100,102 +100,106 @@ pub struct Package {
 }
 
 #[cfg(feature = "fonts")]
-use crate::fonts::{EmbedFonts, embed_fonts_in_package};
+use crate::fonts::{EmbedFonts, powerpoint_data, prepare_fonts};
 #[cfg(feature = "fonts")]
 use litchi_fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
-use roaring::RoaringBitmap;
-#[cfg(feature = "fonts")]
-use std::collections::HashMap;
-
-#[cfg(feature = "fonts")]
-impl CollectGlyphs for Package {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        if let Some(pres) = &self.mutable_pres {
-            pres.collect_glyphs()
-        } else {
-            HashMap::new()
-        }
-    }
-}
 
 #[cfg(feature = "fonts")]
 impl EmbedFonts for Package {
     fn embed_fonts(&mut self) -> Result<()> {
-        let glyphs = self.collect_glyphs();
-        let pres_uri = PackURI::new("/ppt/presentation.xml")
-            .map_err(|e| OoxmlError::Other(format!("Invalid presentation URI: {}", e)))?;
-
-        // Embed fonts and get relationship IDs with fontKey
-        let embedded_fonts =
-            embed_fonts_in_package(glyphs, &mut self.opc, "/ppt/fonts", &pres_uri)?;
-
-        if embedded_fonts.is_empty() {
+        let options = self.opc.save_options().clone();
+        let subset = match options.fonts {
+            litchi_opc::FontEmbedding::None => return Ok(()),
+            litchi_opc::FontEmbedding::Full => false,
+            litchi_opc::FontEmbedding::Subset => true,
+        };
+        let presentation = self.mutable_pres.as_ref().ok_or(OoxmlError::UnsafeEdit {
+            format: "PPTX",
+            operation: "embed_fonts",
+            reason: "font discovery is unavailable for an opened presentation without a complete mutable model",
+        })?;
+        let glyphs = presentation.collect_glyphs();
+        let prepared = prepare_fonts(glyphs, subset)?;
+        if prepared.is_empty() {
             return Ok(());
         }
+        let mut fonts = litchi_pptx::font::load(&self.opc)?.unwrap_or_default();
+        let mut changed = false;
+        for mut prepared in prepared {
+            let current = match fonts.get(prepared.name.as_str()) {
+                Ok(font) => Some(font.clone()),
+                Err(litchi_pptx::Error::FontNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
+            let mut font = match &current {
+                Some(font) => font.clone(),
+                None => litchi_pptx::font::Font::new(&prepared.name)?,
+            };
+            font.set_panose(Some(litchi_pptx::font::Panose::new(
+                prepared.properties.panose().into_bytes(),
+            )));
+            font.set_pitch_family(Some(litchi_pptx::font::PitchFamily::new(
+                prepared_pitch(prepared.properties.pitch()),
+                prepared_family(prepared.properties.family()),
+            )));
+            font.set_charset(
+                prepared
+                    .properties
+                    .charset()
+                    .map(|value| litchi_pptx::font::Charset::new(value.code())),
+            );
 
-        // Update presentation.xml content with embedded font references
-        if let Ok(pres_part) = self.opc.get_part_mut(&pres_uri) {
-            let xml_content = std::str::from_utf8(pres_part.blob())
-                .map_err(|e| OoxmlError::Other(format!("Invalid presentation.xml: {}", e)))?;
-
-            let mut updated_xml = xml_content.to_string();
-
-            // Prepare the embedded font list XML
-            let mut font_list_xml = String::new();
-            font_list_xml.push_str("<p:embeddedFontLst>");
-            for (font_name, info) in embedded_fonts {
-                font_list_xml.push_str("<p:embeddedFont>");
-
-                // Build <p:font> element with properties (required for Office recognition)
-                let mut font_xml = format!("<p:font typeface=\"{}\"", font_name);
-
-                if let Some(ref props) = info.properties {
-                    if let Some(ref panose) = props.panose {
-                        font_xml.push_str(&format!(" panose=\"{}\"", panose));
-                    }
-                    if let Some(ref charset) = props.charset {
-                        font_xml.push_str(&format!(" charset=\"{}\"", charset));
-                    }
-                    // pitchFamily combines pitch and family
-                    if let (Some(pitch), Some(family)) = (&props.pitch, &props.family) {
-                        let pitch_val = match pitch.as_str() {
-                            "variable" => 2,
-                            "fixed" => 1,
-                            _ => 0,
-                        };
-                        let family_val = match family.as_str() {
-                            "roman" => 1,
-                            "swiss" => 2,
-                            "modern" => 3,
-                            "script" => 4,
-                            "decorative" => 5,
-                            _ => 0,
-                        };
-                        let pitch_family = (family_val << 4) | pitch_val;
-                        font_xml.push_str(&format!(" pitchFamily=\"{}\"", pitch_family));
-                    }
-                }
-
-                font_xml.push_str("/>");
-                font_list_xml.push_str(&font_xml);
-
-                font_list_xml.push_str(&format!("<p:regular r:id=\"{}\"/>", info.relationship_id));
-                font_list_xml.push_str("</p:embeddedFont>");
+            let style = prepared_style(prepared.style);
+            let data = litchi_pptx::font::Data::powerpoint(powerpoint_data(&mut prepared)?)?;
+            if font.get(style).is_none_or(|face| face.data() != &data) {
+                let _ = font.put(litchi_pptx::font::Face::new(style, data))?;
             }
-            font_list_xml.push_str("</p:embeddedFontLst>");
-
-            // Insert before <p:extLst> or </p:presentation>
-            if let Some(pos) = updated_xml.find("<p:extLst>") {
-                updated_xml.insert_str(pos, &font_list_xml);
-            } else if let Some(pos) = updated_xml.rfind("</p:presentation>") {
-                updated_xml.insert_str(pos, &font_list_xml);
+            if current.as_ref() == Some(&font) {
+                continue;
             }
-
-            pres_part.set_blob(updated_xml.into_bytes());
+            match current {
+                Some(_) => {
+                    let _ = fonts.replace(prepared.name.as_str(), font)?;
+                },
+                None => fonts.add(font)?,
+            }
+            changed = true;
         }
-
+        if changed {
+            let _ = litchi_pptx::font::put(&mut self.opc, fonts)?;
+        }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fonts")]
+fn prepared_style(value: litchi_fonts::Style) -> litchi_pptx::font::Style {
+    match value {
+        litchi_fonts::Style::Regular => litchi_pptx::font::Style::Regular,
+        litchi_fonts::Style::Bold => litchi_pptx::font::Style::Bold,
+        litchi_fonts::Style::Italic => litchi_pptx::font::Style::Italic,
+        litchi_fonts::Style::BoldItalic => litchi_pptx::font::Style::BoldItalic,
+    }
+}
+
+#[cfg(feature = "fonts")]
+fn prepared_pitch(value: litchi_fonts::Pitch) -> litchi_pptx::font::Pitch {
+    match value {
+        litchi_fonts::Pitch::Fixed => litchi_pptx::font::Pitch::Fixed,
+        litchi_fonts::Pitch::Variable => litchi_pptx::font::Pitch::Variable,
+        litchi_fonts::Pitch::Default => litchi_pptx::font::Pitch::Default,
+    }
+}
+
+#[cfg(feature = "fonts")]
+fn prepared_family(value: litchi_fonts::Family) -> litchi_pptx::font::Family {
+    match value {
+        litchi_fonts::Family::Roman => litchi_pptx::font::Family::Roman,
+        litchi_fonts::Family::Swiss => litchi_pptx::font::Family::Swiss,
+        litchi_fonts::Family::Modern => litchi_pptx::font::Family::Modern,
+        litchi_fonts::Family::Script => litchi_pptx::font::Family::Script,
+        litchi_fonts::Family::Decorative => litchi_pptx::font::Family::Decorative,
+        litchi_fonts::Family::Auto => litchi_pptx::font::Family::None,
     }
 }
 
@@ -909,6 +913,25 @@ impl Package {
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
+    /// Load the presentation's typed embedded-font collection.
+    pub fn fonts(&self) -> Result<Option<litchi_pptx::font::Fonts>> {
+        Ok(litchi_pptx::font::load(&self.opc)?)
+    }
+
+    /// Atomically publish a complete embedded-font collection by value.
+    ///
+    /// Returns `false` for an exact no-op, preserving valid signatures.
+    pub fn put_fonts(&mut self, fonts: litchi_pptx::font::Fonts) -> Result<bool> {
+        self.flush_presentation()?;
+        Ok(litchi_pptx::font::put(&mut self.opc, fonts)?)
+    }
+
+    /// Atomically remove and return the embedded-font collection.
+    pub fn remove_fonts(&mut self) -> Result<Option<litchi_pptx::font::Fonts>> {
+        self.flush_presentation()?;
+        Ok(litchi_pptx::font::remove(&mut self.opc)?)
+    }
+
     /// Load the presentation's typed, bounded table-style catalog.
     pub fn styles(&self) -> Result<Option<litchi_pptx::table::style::List>> {
         Ok(litchi_pptx::table::style::load(&self.opc)?)
@@ -1519,21 +1542,7 @@ impl Package {
     }
 
     fn prepare_for_save(&mut self) -> Result<()> {
-        // If we have a mutable presentation, update the presentation parts
-        let should_update = self
-            .mutable_pres
-            .as_ref()
-            .map(|p| p.is_modified())
-            .unwrap_or(false);
-
-        if should_update {
-            // Take mutable_pres temporarily to avoid borrow issues
-            if let Some(mutable_pres) = self.mutable_pres.take() {
-                let result = self.update_presentation_parts(&mutable_pres);
-                self.mutable_pres = Some(mutable_pres);
-                result?;
-            }
-        }
+        self.flush_presentation()?;
 
         // Flush only an explicitly edited core-properties slot.
         self.properties.flush(&mut self.opc)?;
@@ -1544,6 +1553,46 @@ impl Package {
             self.embed_fonts()?;
         }
         Ok(())
+    }
+
+    /// Materialize pending legacy-writer state without allowing it to erase
+    /// font relationships or leave orphan font parts behind.
+    ///
+    /// OPC part payloads are `Arc` backed, so the rollback snapshot shares
+    /// immutable bytes and copies only bounded package metadata.
+    fn flush_presentation(&mut self) -> Result<()> {
+        let should_update = self
+            .mutable_pres
+            .as_ref()
+            .is_some_and(MutablePresentation::is_modified);
+        if !should_update {
+            return Ok(());
+        }
+
+        let Some(mut presentation) = self.mutable_pres.take() else {
+            return Ok(());
+        };
+        let original = self.opc.clone();
+        let result = (|| {
+            // The legacy writer replaces presentation.xml and its
+            // relationships. Detach the typed graph first, then republish it
+            // after materialization so source payload allocations are moved
+            // through the operation without copying their bytes.
+            let fonts = litchi_pptx::font::remove(&mut self.opc)?;
+            self.update_presentation_parts(&presentation)?;
+            if let Some(fonts) = fonts {
+                litchi_pptx::font::put(&mut self.opc, fonts)?;
+            }
+            Ok(())
+        })();
+
+        if result.is_ok() {
+            presentation.mark_clean();
+        } else {
+            self.opc = original;
+        }
+        self.mutable_pres = Some(presentation);
+        result
     }
 
     /// Update presentation parts with modified data.
@@ -2215,6 +2264,10 @@ mod tests {
     use super::*;
     use tempfile::NamedTempFile;
 
+    fn workspace() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    }
+
     #[test]
     fn saves_and_reopens_package() {
         let file = NamedTempFile::with_suffix(".pptx").unwrap();
@@ -2224,5 +2277,63 @@ mod tests {
 
         let reopened = Package::open(file.path()).unwrap();
         assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 1);
+        assert!(
+            !package
+                .mutable_pres
+                .as_ref()
+                .is_some_and(MutablePresentation::is_modified)
+        );
+    }
+
+    #[cfg(feature = "fonts")]
+    #[test]
+    fn opened_presentation_font_embedding_fails_without_a_complete_model() {
+        let file = NamedTempFile::with_suffix(".pptx").unwrap();
+        let mut source = Package::new().unwrap();
+        source.presentation_mut().unwrap().add_slide().unwrap();
+        source.save(file.path()).unwrap();
+
+        let mut opened = Package::open(file.path()).unwrap();
+        opened
+            .opc_package_mut()
+            .with_fonts(litchi_opc::FontEmbedding::Subset);
+        assert!(matches!(
+            opened.embed_fonts(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "embed_fonts",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn pending_writer_flush_preserves_font_graph_across_later_saves() {
+        let source = workspace()
+            .join("test-data/libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx");
+        let source = Package::open(source).unwrap();
+        let fonts = source.fonts().unwrap().unwrap();
+
+        let first = NamedTempFile::with_suffix(".pptx").unwrap();
+        let second = NamedTempFile::with_suffix(".pptx").unwrap();
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        assert!(package.put_fonts(fonts).unwrap());
+        assert!(
+            !package
+                .mutable_pres
+                .as_ref()
+                .is_some_and(MutablePresentation::is_modified)
+        );
+        package.save(first.path()).unwrap();
+
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        package.save(second.path()).unwrap();
+        package.save(second.path()).unwrap();
+
+        let reopened = Package::open(second.path()).unwrap();
+        assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 2);
+        let fonts = reopened.fonts().unwrap().unwrap();
+        assert_eq!(fonts.len(), 1);
+        assert_eq!(fonts.get("boldonse").unwrap().faces().len(), 1);
     }
 }

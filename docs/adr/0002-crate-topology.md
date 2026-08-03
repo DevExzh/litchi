@@ -402,6 +402,26 @@ preserves opaque formatting content. Package `load`, consuming `put`, and
 content type, schema order, and resource ceilings before mutation. The
 migration host exposes only `styles`, `put_styles`, and `remove_styles`.
 
+`litchi-pptx::font` owns the bounded PresentationML embedded-font grammar,
+typed semantic values, and optional package graph. Its concise vocabulary is
+`Fonts`, `Font`, `Face`, `Data`, `Style`, `Format`, `PitchFamily`, and `Key`;
+physical relationship IDs, part names, and content-type strings remain private.
+Typeface-first Unicode-caseless lookup is backed by one cached library-defined
+identity, while checked positions remain available for malformed-producer
+repair. Font programs use shared immutable allocations, and aggregate limits
+count unique resources rather than face references. Package `load`, consuming
+`put`, and `remove` validate both conformance families and all six main-part
+profiles, preserve exact signed no-ops, and publish real changes atomically.
+PowerPoint-compatible authoring validates an Embedded OpenType container for
+`application/x-fontdata`; the standards-only raw `x-font-ttf` profile is
+explicit, and Word-only obfuscation is absent. The migration host exposes `fonts`,
+`put_fonts`, and `remove_fonts` and owns no duplicate embedded-font model.
+Shared automatic discovery keys its roaring-backed, scalar-only `Glyphs` by a
+typed family-and-face `Request`; concrete adapters map that neutral four-style
+enum into their own font owner. `litchi-opc::FontEmbedding` owns the closed
+None/Full/Subset save policy. DOCX alone owns the typed 16-byte `FontKey` and
+its XML-boundary lexical codec.
+
 `litchi-xlsx::chain` owns SpreadsheetML calculation-chain grammar, its typed
 ordered model, and the single-part workbook relationship service. Short types
 `Sheet`, `Step`, `Flags`, `Cell`, and `Chain` encode the native sheet-ID range,

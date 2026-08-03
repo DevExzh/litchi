@@ -10,19 +10,17 @@
 //!   1. Loads a system font (with graceful fallbacks),
 //!   2. Implements `CollectGlyphs` on a tiny in-memory document type to
 //!      show how callers integrate with the trait,
-//!   3. Builds a `RoaringBitmap` of code points used in a sample string,
+//!   3. Builds a typed `Glyphs` set from the sample's Unicode scalars,
 //!   4. Maps a handful of code points to glyph IDs and runs the
 //!      concrete `AllsortsSubsetter` to produce a smaller font blob.
 //!
 //! Like `load_font.rs`, the example exits cleanly when no candidate font
 //! is available on the host so it remains usable in CI.
 
-use std::collections::HashMap;
-
 use litchi_fonts::{
-    AllsortsSubsetter, CollectGlyphs, FontData, FontError, FontLoader, FontSubsetter,
+    AllsortsSubsetter, CollectGlyphs, FontData, FontError, FontLoader, FontSubsetter, GlyphMap,
+    Request,
 };
-use roaring::RoaringBitmap;
 
 const CANDIDATE_FAMILIES: &[&str] = &[
     "Arial",
@@ -41,12 +39,12 @@ struct SimpleDocument<'a> {
 }
 
 impl CollectGlyphs for SimpleDocument<'_> {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut out: HashMap<String, RoaringBitmap> = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut out = GlyphMap::new();
         for (font_name, text) in &self.runs {
-            let bitmap = out.entry((*font_name).to_string()).or_default();
+            let bitmap = out.entry(Request::regular(*font_name)).or_default();
             for ch in text.chars() {
-                bitmap.insert(ch as u32);
+                bitmap.insert(ch);
             }
         }
         out
@@ -81,10 +79,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let glyph_map = doc.collect_glyphs();
     println!("CollectGlyphs result:");
-    for (font_name, bitmap) in &glyph_map {
+    for (request, bitmap) in &glyph_map {
         println!(
             "  font '{font_name}' -> {} unique code points",
-            bitmap.len()
+            bitmap.len(),
+            font_name = request.family(),
         );
     }
 

@@ -19,10 +19,20 @@ use std::path::Path;
 /// Options for saving an OPC package.
 #[derive(Debug, Clone, Default)]
 pub struct SaveOptions {
-    /// Whether to embed fonts used in the document.
-    pub embed_fonts: bool,
-    /// Whether to subset fonts (only embed used glyphs).
-    pub subset_fonts: bool,
+    /// Typed font-embedding policy; invalid boolean combinations are impossible.
+    pub fonts: FontEmbedding,
+}
+
+/// Font publication policy used when an Office package is saved.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FontEmbedding {
+    /// Do not discover or publish fonts.
+    #[default]
+    None,
+    /// Publish complete selected font faces.
+    Full,
+    /// Publish only the glyphs known to be used by the document.
+    Subset,
 }
 
 /// Main API class for working with OPC packages.
@@ -88,10 +98,9 @@ impl OpcPackage {
         &self.save_options
     }
 
-    /// Configure font embedding.
-    pub fn with_font_embedding(&mut self, embed: bool, subset: bool) -> &mut Self {
-        self.save_options.embed_fonts = embed;
-        self.save_options.subset_fonts = subset;
+    /// Configure font embedding with one self-documenting policy.
+    pub fn with_fonts(&mut self, policy: FontEmbedding) -> &mut Self {
+        self.save_options.fonts = policy;
         self
     }
 
@@ -649,6 +658,16 @@ mod tests {
         let pkg = OpcPackage::from_reader(cursor).unwrap();
 
         assert!(pkg.part_count() > 0);
+    }
+
+    #[test]
+    fn font_embedding_policy_has_only_three_valid_states() {
+        let mut package = OpcPackage::new();
+        assert_eq!(package.save_options().fonts, FontEmbedding::None);
+        package.with_fonts(FontEmbedding::Subset);
+        assert_eq!(package.save_options().fonts, FontEmbedding::Subset);
+        package.with_fonts(FontEmbedding::Full);
+        assert_eq!(package.save_options().fonts, FontEmbedding::Full);
     }
 
     #[test]

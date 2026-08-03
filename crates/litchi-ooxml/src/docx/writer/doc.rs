@@ -94,16 +94,12 @@ pub struct DocumentProtection {
 #[cfg(feature = "fonts")]
 use super::smart_tag::MutableSmartTag;
 #[cfg(feature = "fonts")]
-use litchi_fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
-use roaring::RoaringBitmap;
-#[cfg(feature = "fonts")]
-use std::collections::HashMap;
+use litchi_fonts::{CollectGlyphs, GlyphMap};
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutableDocument {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
 
         // Collect from body elements
         for element in &self.body.elements {
@@ -117,7 +113,7 @@ impl CollectGlyphs for MutableDocument {
                 | BodyElement::PreservedOther(_) => continue,
             };
             for (font, bitmap) in element_glyphs {
-                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                *glyphs.entry(font).or_default() |= bitmap;
             }
         }
 
@@ -125,7 +121,7 @@ impl CollectGlyphs for MutableDocument {
         if let Some(headers) = &self.header {
             for p in headers {
                 for (font, bitmap) in p.collect_glyphs() {
-                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                    *glyphs.entry(font).or_default() |= bitmap;
                 }
             }
         }
@@ -134,7 +130,7 @@ impl CollectGlyphs for MutableDocument {
         if let Some(footers) = &self.footer {
             for p in footers {
                 for (font, bitmap) in p.collect_glyphs() {
-                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                    *glyphs.entry(font).or_default() |= bitmap;
                 }
             }
         }
@@ -143,7 +139,7 @@ impl CollectGlyphs for MutableDocument {
         for note in self.footnotes.iter().chain(self.endnotes.iter()) {
             for p in &note.paragraphs {
                 for (font, bitmap) in p.collect_glyphs() {
-                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                    *glyphs.entry(font).or_default() |= bitmap;
                 }
             }
         }
@@ -154,8 +150,8 @@ impl CollectGlyphs for MutableDocument {
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutableParagraph {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
         for element in &self.elements {
             let element_glyphs = match element {
                 ParagraphElement::Run(r) => r.collect_glyphs(),
@@ -164,7 +160,7 @@ impl CollectGlyphs for MutableParagraph {
                 _ => continue,
             };
             for (font, bitmap) in element_glyphs {
-                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                *glyphs.entry(font).or_default() |= bitmap;
             }
         }
         glyphs
@@ -173,8 +169,8 @@ impl CollectGlyphs for MutableParagraph {
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutableSmartTag {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
         for element in &self.elements {
             let element_glyphs = match element {
                 ParagraphElement::Run(run) => run.collect_glyphs(),
@@ -183,7 +179,7 @@ impl CollectGlyphs for MutableSmartTag {
                 _ => continue,
             };
             for (font, bitmap) in element_glyphs {
-                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                *glyphs.entry(font).or_default() |= bitmap;
             }
         }
         glyphs
@@ -192,13 +188,13 @@ impl CollectGlyphs for MutableSmartTag {
 
 #[cfg(feature = "fonts")]
 impl CollectGlyphs for MutableTable {
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
-        let mut glyphs = HashMap::new();
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
         for row in &self.rows {
             for cell in &row.cells {
                 for p in &cell.paragraphs {
                     for (font, bitmap) in p.collect_glyphs() {
-                        *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                        *glyphs.entry(font).or_default() |= bitmap;
                     }
                 }
             }
@@ -263,6 +259,11 @@ impl MutableDocument {
             next_vml_shape_number: FIRST_VML_SHAPE_NUMBER,
             next_smartart_anchor: 1,
         })
+    }
+
+    /// Whether glyph collection covers every text-bearing node in this value.
+    pub(crate) fn glyphs_are_complete(&self) -> bool {
+        self.preserved_prefix.is_none()
     }
 
     /// Get a mutable reference to the section properties.

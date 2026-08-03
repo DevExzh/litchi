@@ -30,6 +30,9 @@ pub const ATTACHED_TEMPLATE_RELATIONSHIP: &str =
 pub const STRICT_ATTACHED_TEMPLATE_RELATIONSHIP: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/attachedTemplate";
 const MAX_ATTACHED_TEMPLATE_TARGET_LEN: usize = 32 * 1024;
+const MAX_SETTINGS_XML_BYTES: usize = 16 * 1024 * 1024;
+const MAX_SETTINGS_XML_NODES: usize = 250_000;
+const MAX_SETTINGS_XML_DEPTH: usize = 256;
 
 /// An inert reference to the external template associated with a document.
 ///
@@ -1539,6 +1542,18 @@ fn validate_attached_template_relationship(
 }
 
 struct SettingsXmlLayout {
+    #[cfg(any(feature = "fonts", test))]
+    embed_true_type_fonts_range: Option<Range<usize>>,
+    #[cfg(any(feature = "fonts", test))]
+    embed_true_type_fonts_enabled: Option<bool>,
+    #[cfg(any(feature = "fonts", test))]
+    embed_true_type_fonts_insert_at: Option<usize>,
+    #[cfg(any(feature = "fonts", test))]
+    save_subset_fonts_range: Option<Range<usize>>,
+    #[cfg(any(feature = "fonts", test))]
+    save_subset_fonts_enabled: Option<bool>,
+    #[cfg(any(feature = "fonts", test))]
+    save_subset_fonts_insert_at: Option<usize>,
     attached_template_range: Option<Range<usize>>,
     doc_vars_range: Option<Range<usize>>,
     doc_vars_insert_at: Option<usize>,
@@ -1550,6 +1565,124 @@ struct SettingsXmlLayout {
     word_prefix: Option<Vec<u8>>,
     relationship_prefix: Option<Vec<u8>>,
     strict: bool,
+}
+
+#[cfg(any(feature = "fonts", test))]
+#[derive(Clone, Copy)]
+enum FontFlag {
+    EmbedTrueType,
+    SaveSubset,
+}
+
+#[cfg(any(feature = "fonts", test))]
+impl FontFlag {
+    const fn local_name(self) -> &'static str {
+        match self {
+            Self::EmbedTrueType => "embedTrueTypeFonts",
+            Self::SaveSubset => "saveSubsetFonts",
+        }
+    }
+}
+
+/// Losslessly enable Word font embedding and synchronize subset intent.
+#[cfg(any(feature = "fonts", test))]
+pub(crate) fn patch_font_embedding(xml: &[u8], subsetted: bool) -> Result<Vec<u8>> {
+    let xml = patch_font_flag(xml, FontFlag::EmbedTrueType, true)?;
+    patch_font_flag(&xml, FontFlag::SaveSubset, subsetted)
+}
+
+#[cfg(any(feature = "fonts", test))]
+fn patch_font_flag(xml: &[u8], flag: FontFlag, enabled: bool) -> Result<Vec<u8>> {
+    DocumentSettings::extract_from_xml(xml)?;
+    let layout = scan_settings_xml_layout(xml)?;
+    let (range, current, insert_at) = match flag {
+        FontFlag::EmbedTrueType => (
+            layout.embed_true_type_fonts_range.clone(),
+            layout.embed_true_type_fonts_enabled,
+            layout.embed_true_type_fonts_insert_at,
+        ),
+        FontFlag::SaveSubset => (
+            layout.save_subset_fonts_range.clone(),
+            layout.save_subset_fonts_enabled,
+            layout.save_subset_fonts_insert_at,
+        ),
+    };
+    if current == Some(enabled) || (!enabled && range.is_none()) {
+        return Ok(xml.to_vec());
+    }
+    let replacement = if enabled {
+        word_empty_element(&layout, flag)
+    } else {
+        String::new()
+    };
+    if let Some(range) = range {
+        let capacity = xml
+            .len()
+            .checked_sub(range.len())
+            .and_then(|size| size.checked_add(replacement.len()))
+            .ok_or_else(|| OoxmlError::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer(capacity)?;
+        output.extend_from_slice(&xml[..range.start]);
+        output.extend_from_slice(replacement.as_bytes());
+        output.extend_from_slice(&xml[range.end..]);
+        return Ok(output);
+    }
+    if let Some(range) = layout.root_empty_range {
+        let root = &xml[range.clone()];
+        let slash = root
+            .windows(2)
+            .rposition(|window| window == b"/>")
+            .ok_or_else(|| OoxmlError::InvalidFormat("invalid empty settings root".into()))?;
+        let capacity = xml
+            .len()
+            .checked_add(replacement.len())
+            .and_then(|size| size.checked_add(layout.root_qname.len()))
+            .and_then(|size| size.checked_add(4))
+            .ok_or_else(|| OoxmlError::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer(capacity)?;
+        output.extend_from_slice(&xml[..range.start]);
+        output.extend_from_slice(&root[..slash]);
+        output.push(b'>');
+        output.extend_from_slice(replacement.as_bytes());
+        output.extend_from_slice(b"</");
+        output.extend_from_slice(&layout.root_qname);
+        output.push(b'>');
+        output.extend_from_slice(&xml[range.end..]);
+        return Ok(output);
+    }
+    let insert_at = insert_at
+        .or(layout.root_end)
+        .ok_or_else(|| OoxmlError::InvalidFormat("settings root has no insertion point".into()))?;
+    let capacity = xml
+        .len()
+        .checked_add(replacement.len())
+        .ok_or_else(|| OoxmlError::InvalidFormat("settings patch size overflow".into()))?;
+    let mut output = settings_patch_buffer(capacity)?;
+    output.extend_from_slice(&xml[..insert_at]);
+    output.extend_from_slice(replacement.as_bytes());
+    output.extend_from_slice(&xml[insert_at..]);
+    Ok(output)
+}
+
+#[cfg(any(feature = "fonts", test))]
+fn word_empty_element(layout: &SettingsXmlLayout, flag: FontFlag) -> String {
+    let local_name = flag.local_name();
+    match &layout.word_prefix {
+        Some(prefix) => format!("<{}:{local_name}/>", String::from_utf8_lossy(prefix)),
+        None => format!("<{local_name}/>"),
+    }
+}
+
+#[cfg(any(feature = "fonts", test))]
+fn settings_patch_buffer(capacity: usize) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|source| OoxmlError::Allocation {
+            resource: "Word settings XML patch",
+            source,
+        })?;
+    Ok(output)
 }
 
 pub(crate) fn patch_mail_merge(
@@ -1708,14 +1841,39 @@ pub(crate) fn patch_attached_template(
 }
 
 fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
+    if xml.len() > MAX_SETTINGS_XML_BYTES {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
+        )));
+    }
+    std::str::from_utf8(xml).map_err(|_| {
+        OoxmlError::InvalidFormat("lossless settings mutation currently requires UTF-8 XML".into())
+    })?;
     let mut reader = NsReader::from_reader(xml);
     let mut depth = 0usize;
+    let mut nodes = 0usize;
     let mut root_qname = None;
     let mut word_prefix = None;
     let mut relationship_prefix = None;
     let mut strict = false;
     let mut root_empty_range = None;
     let mut root_end = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut embed_true_type_fonts_range = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut embed_true_type_fonts_enabled = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut embed_true_type_fonts_start = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut embed_true_type_fonts_insert_at = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut save_subset_fonts_range = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut save_subset_fonts_enabled = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut save_subset_fonts_start = None;
+    #[cfg(any(feature = "fonts", test))]
+    let mut save_subset_fonts_insert_at = None;
     let mut attached_template_range = None;
     let mut attached_start = None;
     let mut doc_vars_range = None;
@@ -1737,11 +1895,27 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
 
+        if !matches!(&event, Event::Eof) {
+            nodes = nodes.checked_add(1).ok_or_else(|| {
+                OoxmlError::InvalidFormat("settings XML node count overflow".into())
+            })?;
+            if nodes > MAX_SETTINGS_XML_NODES {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "settings XML exceeds {MAX_SETTINGS_XML_NODES} nodes"
+                )));
+            }
+        }
+
         match event {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or_else(|| {
                     OoxmlError::InvalidFormat("settings XML nesting is too deep".into())
                 })?;
+                if depth > MAX_SETTINGS_XML_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
+                    )));
+                }
                 if depth == 1 {
                     capture_settings_root(
                         &namespace,
@@ -1782,11 +1956,54 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 {
                     doc_vars_insert_at = Some(event_start);
                 }
+                #[cfg(any(feature = "fonts", test))]
+                if depth == 2 && is_wordprocessing_namespace(&namespace) {
+                    let local = element.local_name();
+                    let local = local.as_ref();
+                    if local == b"embedTrueTypeFonts" {
+                        if embed_true_type_fonts_start.is_some()
+                            || embed_true_type_fonts_range.is_some()
+                        {
+                            return Err(OoxmlError::InvalidFormat(
+                                "settings has multiple embedTrueTypeFonts elements".into(),
+                            ));
+                        }
+                        let enabled = parse_on_off(&element, reader.decoder(), &resolver)?;
+                        embed_true_type_fonts_enabled = Some(enabled);
+                        embed_true_type_fonts_start = Some(event_start);
+                    } else if local == b"saveSubsetFonts" {
+                        if save_subset_fonts_start.is_some() || save_subset_fonts_range.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "settings has multiple saveSubsetFonts elements".into(),
+                            ));
+                        }
+                        let enabled = parse_on_off(&element, reader.decoder(), &resolver)?;
+                        save_subset_fonts_enabled = Some(enabled);
+                        save_subset_fonts_start = Some(event_start);
+                    }
+                    if embed_true_type_fonts_insert_at.is_none()
+                        && local != b"embedTrueTypeFonts"
+                        && !is_before_embed_true_type_fonts(local)
+                    {
+                        embed_true_type_fonts_insert_at = Some(event_start);
+                    }
+                    if save_subset_fonts_insert_at.is_none()
+                        && local != b"saveSubsetFonts"
+                        && !is_before_save_subset_fonts(local)
+                    {
+                        save_subset_fonts_insert_at = Some(event_start);
+                    }
+                }
             },
             Event::Empty(element) => {
                 let child_depth = depth.checked_add(1).ok_or_else(|| {
                     OoxmlError::InvalidFormat("settings XML nesting is too deep".into())
                 })?;
+                if child_depth > MAX_SETTINGS_XML_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
+                    )));
+                }
                 if child_depth == 1 {
                     capture_settings_root(
                         &namespace,
@@ -1828,8 +2045,58 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 {
                     doc_vars_insert_at = Some(event_start);
                 }
+                #[cfg(any(feature = "fonts", test))]
+                if child_depth == 2 && is_wordprocessing_namespace(&namespace) {
+                    let local = element.local_name();
+                    let local = local.as_ref();
+                    if local == b"embedTrueTypeFonts" {
+                        if embed_true_type_fonts_start.is_some()
+                            || embed_true_type_fonts_range.is_some()
+                        {
+                            return Err(OoxmlError::InvalidFormat(
+                                "settings has multiple embedTrueTypeFonts elements".into(),
+                            ));
+                        }
+                        embed_true_type_fonts_enabled =
+                            Some(parse_on_off(&element, reader.decoder(), &resolver)?);
+                        embed_true_type_fonts_range = Some(event_start..event_end);
+                    } else if local == b"saveSubsetFonts" {
+                        if save_subset_fonts_start.is_some() || save_subset_fonts_range.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "settings has multiple saveSubsetFonts elements".into(),
+                            ));
+                        }
+                        save_subset_fonts_enabled =
+                            Some(parse_on_off(&element, reader.decoder(), &resolver)?);
+                        save_subset_fonts_range = Some(event_start..event_end);
+                    }
+                    if embed_true_type_fonts_insert_at.is_none()
+                        && local != b"embedTrueTypeFonts"
+                        && !is_before_embed_true_type_fonts(local)
+                    {
+                        embed_true_type_fonts_insert_at = Some(event_start);
+                    }
+                    if save_subset_fonts_insert_at.is_none()
+                        && local != b"saveSubsetFonts"
+                        && !is_before_save_subset_fonts(local)
+                    {
+                        save_subset_fonts_insert_at = Some(event_start);
+                    }
+                }
             },
             Event::End(_) => {
+                #[cfg(any(feature = "fonts", test))]
+                if depth == 2
+                    && let Some(start) = embed_true_type_fonts_start.take()
+                {
+                    embed_true_type_fonts_range = Some(start..event_end);
+                }
+                #[cfg(any(feature = "fonts", test))]
+                if depth == 2
+                    && let Some(start) = save_subset_fonts_start.take()
+                {
+                    save_subset_fonts_range = Some(start..event_end);
+                }
                 if depth == 2
                     && let Some(start) = attached_start.take()
                 {
@@ -1858,6 +2125,18 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     }
 
     Ok(SettingsXmlLayout {
+        #[cfg(any(feature = "fonts", test))]
+        embed_true_type_fonts_range,
+        #[cfg(any(feature = "fonts", test))]
+        embed_true_type_fonts_enabled,
+        #[cfg(any(feature = "fonts", test))]
+        embed_true_type_fonts_insert_at,
+        #[cfg(any(feature = "fonts", test))]
+        save_subset_fonts_range,
+        #[cfg(any(feature = "fonts", test))]
+        save_subset_fonts_enabled,
+        #[cfg(any(feature = "fonts", test))]
+        save_subset_fonts_insert_at,
         attached_template_range,
         doc_vars_range,
         doc_vars_insert_at,
@@ -1871,6 +2150,30 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
         relationship_prefix,
         strict,
     })
+}
+
+#[cfg(any(feature = "fonts", test))]
+fn is_before_embed_true_type_fonts(local_name: &[u8]) -> bool {
+    matches!(
+        local_name,
+        b"writeProtection"
+            | b"view"
+            | b"zoom"
+            | b"linkStyles"
+            | b"removePersonalInformation"
+            | b"removeDateAndTime"
+            | b"doNotDisplayPageBoundaries"
+            | b"displayBackgroundShape"
+            | b"printPostScriptOverText"
+            | b"printFractionalCharacterWidth"
+            | b"printFormsData"
+    )
+}
+
+#[cfg(any(feature = "fonts", test))]
+fn is_before_save_subset_fonts(local_name: &[u8]) -> bool {
+    is_before_embed_true_type_fonts(local_name)
+        || matches!(local_name, b"embedTrueTypeFonts" | b"embedSystemFonts")
 }
 
 fn is_after_mail_merge(local_name: &[u8]) -> bool {
@@ -2427,6 +2730,86 @@ mod tests {
         assert!(reject(br#"<w:clrSchemeMapping/><w:clrSchemeMapping/>"#).is_err());
         assert!(reject(br#"<w:writeProtection/><w:writeProtection/>"#).is_err());
         assert!(reject(br#"<w:writeProtection w:val="maybe"/>"#).is_err());
+    }
+
+    #[test]
+    fn font_embedding_inserts_each_missing_flag_in_schema_order() {
+        let missing_embed = br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><q:printFormsData/><q:saveSubsetFonts q:val="on"/><q:saveFormsData/></q:settings>"#;
+        let patched = patch_font_embedding(missing_embed, true).unwrap();
+        assert_eq!(
+            patched,
+            br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><q:printFormsData/><q:embedTrueTypeFonts/><q:saveSubsetFonts q:val="on"/><q:saveFormsData/></q:settings>"#
+        );
+
+        let missing_subset = br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><q:printFormsData/><q:embedTrueTypeFonts q:val="true"/><q:embedSystemFonts/><q:saveFormsData/></q:settings>"#;
+        let patched = patch_font_embedding(missing_subset, true).unwrap();
+        assert_eq!(
+            patched,
+            br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><q:printFormsData/><q:embedTrueTypeFonts q:val="true"/><q:embedSystemFonts/><q:saveSubsetFonts/><q:saveFormsData/></q:settings>"#
+        );
+    }
+
+    #[test]
+    fn font_embedding_rewrites_false_word_flags_without_touching_foreign_twins() {
+        let xml = br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-wordprocessingml"><x:embedTrueTypeFonts x:val="off"/><q:embedTrueTypeFonts q:val="false" x:val="true"><x:keep/></q:embedTrueTypeFonts><q:saveSubsetFonts q:val="0"/><x:saveSubsetFonts/></q:settings>"#;
+        let enabled = patch_font_embedding(xml, true).unwrap();
+        assert_eq!(
+            enabled,
+            br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-wordprocessingml"><x:embedTrueTypeFonts x:val="off"/><q:embedTrueTypeFonts/><q:saveSubsetFonts/><x:saveSubsetFonts/></q:settings>"#
+        );
+
+        let full_font = patch_font_embedding(&enabled, false).unwrap();
+        assert_eq!(
+            full_font,
+            br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-wordprocessingml"><x:embedTrueTypeFonts x:val="off"/><q:embedTrueTypeFonts/><x:saveSubsetFonts/></q:settings>"#
+        );
+    }
+
+    #[test]
+    fn font_embedding_expands_self_closing_strict_root() {
+        let xml = br#"<?xml version="1.0"?><s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"/>"#;
+        assert_eq!(
+            patch_font_embedding(xml, true).unwrap(),
+            br#"<?xml version="1.0"?><s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:embedTrueTypeFonts/><s:saveSubsetFonts/></s:settings>"#
+        );
+        assert_eq!(
+            patch_font_embedding(xml, false).unwrap(),
+            br#"<?xml version="1.0"?><s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:embedTrueTypeFonts/></s:settings>"#
+        );
+
+        let default_namespace =
+            br#"<settings xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+        assert_eq!(
+            patch_font_embedding(default_namespace, true).unwrap(),
+            br#"<settings xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><embedTrueTypeFonts/><saveSubsetFonts/></settings>"#
+        );
+    }
+
+    #[test]
+    fn font_embedding_matching_flags_are_an_exact_namespace_aware_noop() {
+        let xml = br#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-wordprocessingml"><!--keep--><x:embedTrueTypeFonts x:val="off"/><q:embedTrueTypeFonts x:val="off"/><q:saveSubsetFonts q:val="on" x:val="off"/><x:saveSubsetFonts/></q:settings>"#;
+        assert_eq!(patch_font_embedding(xml, true).unwrap(), xml);
+
+        let explicit_false = br#"<q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><q:embedTrueTypeFonts/><q:saveSubsetFonts q:val="off"/></q:settings>"#;
+        assert_eq!(
+            patch_font_embedding(explicit_false, false).unwrap(),
+            explicit_false
+        );
+    }
+
+    #[test]
+    fn font_embedding_rejects_duplicate_or_invalid_word_flags() {
+        let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:embedTrueTypeFonts/><w:embedTrueTypeFonts/></w:settings>"#;
+        assert!(patch_font_embedding(duplicate, true).is_err());
+
+        let invalid = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:embedTrueTypeFonts w:val="maybe"/></w:settings>"#;
+        assert!(patch_font_embedding(invalid, true).is_err());
+
+        let mut utf16 = vec![0xFF, 0xFE];
+        for unit in r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#.encode_utf16() {
+            utf16.extend_from_slice(&unit.to_le_bytes());
+        }
+        assert!(patch_font_embedding(&utf16, true).is_err());
     }
 
     #[test]
