@@ -2,7 +2,7 @@
 
 use prost::Message;
 
-use crate::archive::RawMessage;
+use crate::archive::{Archive, RawMessage};
 use crate::protobuf::{tsp, tswp};
 use crate::wire::{
     parse_wire_fields, patch_varint_field, repeated_length_delimited_payloads,
@@ -10,7 +10,10 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
+use super::super::storage_wire::{
+    LocatedStorage, StorageLocation,
+    locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
+};
 
 const LIST_STYLE_TABLE_FIELD: u32 = 7;
 const TABLE_ENTRIES_FIELD: u32 = 1;
@@ -33,6 +36,11 @@ pub(super) struct ListBoundaryStorage {
     pub(super) message_type: u32,
     pub(super) boundaries: Vec<(u32, u64)>,
     pub(super) paragraph_starts: Vec<u32>,
+}
+
+pub(super) struct LocatedListBoundaryStorage {
+    pub(super) location: ListBoundaryStorage,
+    pub(super) archive: Archive,
 }
 
 pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<ListStorageLocation> {
@@ -76,7 +84,14 @@ pub(super) fn locate_boundaries(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<ListBoundaryStorage> {
-    let location = locate_storage(package, storage_id)?;
+    locate_boundaries_with_archive(package, storage_id).map(|located| located.location)
+}
+
+pub(super) fn locate_boundaries_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<LocatedListBoundaryStorage> {
+    let LocatedStorage { location, archive } = locate_storage_with_archive(package, storage_id)?;
     let Some(table) = location.storage.table_list_style.as_ref() else {
         return Err(Error::InvalidFormat(format!(
             "iWork text storage {storage_id} must contain one list-style table, found 0"
@@ -119,13 +134,16 @@ pub(super) fn locate_boundaries(
             "iWork text storage {storage_id} list style must begin at UTF-16 index zero"
         )));
     }
-    Ok(ListBoundaryStorage {
-        object_id: location.object_id,
-        archive_name: location.archive_name,
-        message_index: location.message_index,
-        message_type: location.message_type,
-        boundaries,
-        paragraph_starts,
+    Ok(LocatedListBoundaryStorage {
+        location: ListBoundaryStorage {
+            object_id: location.object_id,
+            archive_name: location.archive_name,
+            message_index: location.message_index,
+            message_type: location.message_type,
+            boundaries,
+            paragraph_starts,
+        },
+        archive,
     })
 }
 
@@ -136,74 +154,98 @@ pub(super) fn replace_boundaries(
     old_style_ids: &[u64],
     boundaries: &[(u32, u64)],
 ) -> Result<()> {
-    package.update_archive(&location.archive_name, |archive| {
-        let object = archive.object_mut(storage_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
+    let archive_name = location.archive_name.clone();
+    package.update_archive(&archive_name, |archive| {
+        replace_boundaries_in_archive(archive, location, storage_id, old_style_ids, boundaries)
+    })
+}
+
+pub(super) fn replace_boundaries_with_archive(
+    package: &mut IWorkPackage,
+    located: LocatedListBoundaryStorage,
+    storage_id: u64,
+    old_style_ids: &[u64],
+    boundaries: &[(u32, u64)],
+) -> Result<()> {
+    let LocatedListBoundaryStorage { location, archive } = located;
+    let archive_name = location.archive_name.clone();
+    update_parsed_archive(package, &archive_name, archive, |archive| {
+        replace_boundaries_in_archive(archive, &location, storage_id, old_style_ids, boundaries)
+    })
+}
+
+fn replace_boundaries_in_archive(
+    archive: &mut Archive,
+    location: &ListBoundaryStorage,
+    storage_id: u64,
+    old_style_ids: &[u64],
+    boundaries: &[(u32, u64)],
+) -> Result<()> {
+    let object = archive.object_mut(storage_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
+    })?;
+    if object.archive_info.identifier != Some(location.object_id) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} object identity changed unexpectedly"
+        )));
+    }
+    let (original_type, data) = {
+        let original = object.messages.get(location.message_index).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} writable payload index {} is missing",
+                location.message_index
+            ))
         })?;
-        if object.archive_info.identifier != Some(location.object_id) {
+        if original.type_ != location.message_type {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} object identity changed unexpectedly"
+                "iWork text storage {storage_id} writable payload changed unexpectedly"
             )));
         }
-        let (original_type, data) = {
-            let original = object.messages.get(location.message_index).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "iWork text storage {storage_id} writable payload index {} is missing",
-                    location.message_index
-                ))
+        let data =
+            transform_length_delimited_field(&original.data, LIST_STYLE_TABLE_FIELD, |table| {
+                replace_boundary_table(table, boundaries)
             })?;
-            if original.type_ != location.message_type {
-                return Err(Error::InvalidFormat(format!(
-                    "iWork text storage {storage_id} writable payload changed unexpectedly"
-                )));
-            }
-            let data = transform_length_delimited_field(
-                &original.data,
-                LIST_STYLE_TABLE_FIELD,
-                |table| replace_boundary_table(table, boundaries),
+        (original.type_, data)
+    };
+    object.replace_message(
+        location.message_index,
+        RawMessage {
+            type_: original_type,
+            data,
+        },
+    )?;
+    let replacements = boundaries.iter().map(|entry| entry.1).collect::<Vec<_>>();
+    let info = object
+        .archive_info
+        .message_infos
+        .get_mut(location.message_index)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} writable payload metadata index {} is missing",
+                location.message_index
+            ))
+        })?;
+    replace_reference_sequence(
+        &mut info.object_references,
+        old_style_ids,
+        &replacements,
+        storage_id,
+    )?;
+    for field in &mut info.field_infos {
+        if field
+            .object_references
+            .iter()
+            .any(|reference| old_style_ids.contains(reference))
+        {
+            replace_reference_sequence(
+                &mut field.object_references,
+                old_style_ids,
+                &replacements,
+                storage_id,
             )?;
-            (original.type_, data)
-        };
-        object.replace_message(
-            location.message_index,
-            RawMessage {
-                type_: original_type,
-                data,
-            },
-        )?;
-        let replacements = boundaries.iter().map(|entry| entry.1).collect::<Vec<_>>();
-        let info = object
-            .archive_info
-            .message_infos
-            .get_mut(location.message_index)
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "iWork text storage {storage_id} writable payload metadata index {} is missing",
-                    location.message_index
-                ))
-            })?;
-        replace_reference_sequence(
-            &mut info.object_references,
-            old_style_ids,
-            &replacements,
-            storage_id,
-        )?;
-        for field in &mut info.field_infos {
-            if field
-                .object_references
-                .iter()
-                .any(|reference| old_style_ids.contains(reference))
-            {
-                replace_reference_sequence(
-                    &mut field.object_references,
-                    old_style_ids,
-                    &replacements,
-                    storage_id,
-                )?;
-            }
         }
-        Ok(())
-    })
+    }
+    Ok(())
 }
 
 fn replace_boundary_table(table: &[u8], boundaries: &[(u32, u64)]) -> Result<Vec<u8>> {
@@ -379,8 +421,17 @@ pub(super) fn patch_style_reference(
 }
 
 fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
-    let location =
-        locate_native_storage(package, storage_id, LIST_STYLE_TABLE_FIELD, "list-style")?;
+    locate_storage_with_archive(package, storage_id).map(|located| located.location)
+}
+
+fn locate_storage_with_archive(package: &IWorkPackage, storage_id: u64) -> Result<LocatedStorage> {
+    let located = locate_native_storage_with_archive(
+        package,
+        storage_id,
+        LIST_STYLE_TABLE_FIELD,
+        "list-style",
+    )?;
+    let location = &located.location;
     if location.storage.table_list_style.is_some() != location.table_present {
         return Err(Error::InvalidFormat(format!(
             "iWork text storage {storage_id} list-style table wire state is inconsistent"
@@ -391,7 +442,7 @@ fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLoca
             "iWork text storage {storage_id} must contain one list-style table, found 0"
         )));
     }
-    Ok(location)
+    Ok(located)
 }
 
 fn required_payload<'a>(data: &'a [u8], field: u32, context: &str) -> Result<&'a [u8]> {
