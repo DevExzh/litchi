@@ -20,6 +20,7 @@ use crate::bundle::Bundle;
 use crate::media::{MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject};
 use crate::registry::{Application, detect_application, detect_application_from_document};
+use crate::ref_graph::ObjectId;
 use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
@@ -150,25 +151,45 @@ impl Document {
 
     /// Get all objects in the document
     pub fn objects(&self) -> Vec<ResolvedObject> {
-        self.state
-            .object_index
-            .all_object_ids()
-            .iter()
-            .filter_map(|&id| {
-                self.state
-                    .object_index
-                    .resolve_object(&self.state.bundle, id)
-                    .ok()
-                    .flatten()
-            })
-            .collect()
+        self.try_objects().unwrap_or_default()
     }
 
-    /// Get an object by ID
+    /// Resolve all indexed objects in deterministic object-ID order.
+    ///
+    /// This is the fallible counterpart to [`Self::objects`]. It uses the
+    /// typed object index and batches archive lookups, so callers that need to
+    /// distinguish malformed state from an empty document can retain the
+    /// original error instead of silently receiving an empty vector.
+    pub fn try_objects(&self) -> Result<Vec<ResolvedObject>> {
+        let object_ids = self.state.object_index.object_ids()?;
+        self.state
+            .object_index
+            .resolve_many(&self.state.bundle, &object_ids)
+    }
+
+    /// Get an object through the validated identity API.
+    pub fn object(&self, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
+        self.state
+            .object_index
+            .resolve(&self.state.bundle, object_id)
+    }
+
+    /// Get an object by its legacy raw numeric ID.
+    #[deprecated(note = "use object(ObjectId) for checked identity semantics")]
     pub fn get_object(&self, id: u64) -> Result<Option<ResolvedObject>> {
         self.state
             .object_index
             .resolve_object(&self.state.bundle, id)
+    }
+
+    /// Get the immutable typed object index backing this document.
+    pub fn object_index(&self) -> &ObjectIndex {
+        &self.state.object_index
+    }
+
+    /// Get all validated object identities in deterministic numeric order.
+    pub fn object_ids(&self) -> Result<Vec<ObjectId>> {
+        self.state.object_index.object_ids()
     }
 
     /// Get the application type
