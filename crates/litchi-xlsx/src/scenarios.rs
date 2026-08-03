@@ -756,94 +756,147 @@ pub fn write_worksheet_scenarios(
             "scenarios exceeds safety limit {MAX_SCENARIOS}"
         )));
     }
-    let mut xml = String::new();
-    xml.push_str("<scenarios xmlns=\"");
-    xml.push_str(conformance.main_namespace());
-    xml.push('"');
+    let mut xml = BoundedXml::new();
+    xml.push_str("<scenarios xmlns=\"")?;
+    xml.push_str(conformance.main_namespace())?;
+    xml.push_char('"')?;
     if let Some(current) = value.current {
-        write_u32_attribute(&mut xml, "current", current);
+        write_u32_attribute(&mut xml, "current", current)?;
     }
     if let Some(show) = value.show {
-        write_u32_attribute(&mut xml, "show", show);
+        write_u32_attribute(&mut xml, "show", show)?;
     }
     if !value.ranges.is_empty() {
-        xml.push_str(" sqref=\"");
+        xml.push_str(" sqref=\"")?;
         for (index, range) in value.ranges.iter().enumerate() {
             if index > 0 {
-                xml.push(' ');
+                xml.push_char(' ')?;
             }
-            xml.push_str(range.as_str());
+            xml.push_str(range.as_str())?;
         }
-        xml.push('"');
+        xml.push_char('"')?;
     }
-    xml.push('>');
+    xml.push_char('>')?;
     for scenario in &value.scenarios {
-        xml.push_str("<scenario");
-        write_attribute(&mut xml, "name", &scenario.name);
-        write_true_attribute(&mut xml, "locked", scenario.locked);
-        write_true_attribute(&mut xml, "hidden", scenario.hidden);
+        xml.push_str("<scenario")?;
+        write_attribute(&mut xml, "name", &scenario.name)?;
+        write_true_attribute(&mut xml, "locked", scenario.locked)?;
+        write_true_attribute(&mut xml, "hidden", scenario.hidden)?;
         if let Some(count) = scenario.count {
-            write_u32_attribute(&mut xml, "count", count);
+            write_u32_attribute(&mut xml, "count", count)?;
         }
         if let Some(user) = &scenario.user {
-            write_attribute(&mut xml, "user", user);
+            write_attribute(&mut xml, "user", user)?;
         }
         if let Some(comment) = &scenario.comment {
-            write_attribute(&mut xml, "comment", comment);
+            write_attribute(&mut xml, "comment", comment)?;
         }
         if scenario.input_cells.is_empty() {
-            xml.push_str("/>");
+            xml.push_str("/>")?;
             continue;
         }
-        xml.push('>');
+        xml.push_char('>')?;
         for cell in &scenario.input_cells {
-            xml.push_str("<inputCells");
-            write_attribute(&mut xml, "r", cell.reference.as_str());
-            write_true_attribute(&mut xml, "deleted", cell.deleted);
-            write_true_attribute(&mut xml, "undone", cell.undone);
-            write_attribute(&mut xml, "val", &cell.value);
+            xml.push_str("<inputCells")?;
+            write_attribute(&mut xml, "r", cell.reference.as_str())?;
+            write_true_attribute(&mut xml, "deleted", cell.deleted)?;
+            write_true_attribute(&mut xml, "undone", cell.undone)?;
+            write_attribute(&mut xml, "val", &cell.value)?;
             if let Some(number_format_id) = cell.number_format_id {
-                write_u32_attribute(&mut xml, "numFmtId", number_format_id);
+                write_u32_attribute(&mut xml, "numFmtId", number_format_id)?;
             }
-            xml.push_str("/>");
+            xml.push_str("/>")?;
         }
-        xml.push_str("</scenario>");
+        xml.push_str("</scenario>")?;
     }
-    xml.push_str("</scenarios>");
-    Ok(xml)
+    xml.push_str("</scenarios>")?;
+    xml.finish()
 }
 
-fn write_true_attribute(xml: &mut String, name: &str, value: bool) {
+fn write_true_attribute(xml: &mut BoundedXml, name: &str, value: bool) -> Result<()> {
     if value {
-        xml.push(' ');
-        xml.push_str(name);
-        xml.push_str("=\"1\"");
+        xml.push_char(' ')?;
+        xml.push_str(name)?;
+        xml.push_str("=\"1\"")?;
     }
+    Ok(())
 }
 
-fn write_u32_attribute(xml: &mut String, name: &str, value: u32) {
-    xml.push(' ');
-    xml.push_str(name);
-    xml.push_str("=\"");
-    xml.push_str(&value.to_string());
-    xml.push('"');
+fn write_u32_attribute(xml: &mut BoundedXml, name: &str, value: u32) -> Result<()> {
+    xml.push_char(' ')?;
+    xml.push_str(name)?;
+    xml.push_str("=\"")?;
+    let value = value.to_string();
+    xml.push_str(&value)?;
+    xml.push_char('"')?;
+    Ok(())
 }
 
-fn write_attribute(xml: &mut String, name: &str, value: &str) {
-    xml.push(' ');
-    xml.push_str(name);
-    xml.push_str("=\"");
-    for character in value.chars() {
-        match character {
-            '&' => xml.push_str("&amp;"),
-            '<' => xml.push_str("&lt;"),
-            '>' => xml.push_str("&gt;"),
-            '"' => xml.push_str("&quot;"),
-            '\'' => xml.push_str("&apos;"),
-            _ => xml.push(character),
+fn write_attribute(xml: &mut BoundedXml, name: &str, value: &str) -> Result<()> {
+    xml.push_char(' ')?;
+    xml.push_str(name)?;
+    xml.push_str("=\"")?;
+    let mut plain_start = 0;
+    for (index, character) in value.char_indices() {
+        let escaped = match character {
+            '&' => Some("&amp;"),
+            '<' => Some("&lt;"),
+            '>' => Some("&gt;"),
+            '"' => Some("&quot;"),
+            '\'' => Some("&apos;"),
+            _ => None,
+        };
+        if let Some(escaped) = escaped {
+            xml.push_str(&value[plain_start..index])?;
+            xml.push_str(escaped)?;
+            plain_start = index + character.len_utf8();
         }
     }
-    xml.push('"');
+    xml.push_str(&value[plain_start..])?;
+    xml.push_char('"')?;
+    Ok(())
+}
+
+/// Fallible XML sink that checks the serialized part limit before each append.
+struct BoundedXml {
+    bytes: Vec<u8>,
+}
+
+impl BoundedXml {
+    fn new() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.push_bytes(value.as_bytes())
+    }
+
+    fn push_char(&mut self, value: char) -> Result<()> {
+        let mut encoded = [0; 4];
+        let length = value.encode_utf8(&mut encoded).len();
+        self.push_bytes(&encoded[..length])
+    }
+
+    fn push_bytes(&mut self, value: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(value.len())
+            .ok_or_else(|| invalid("serialized scenarios XML length overflows"))?;
+        if length > MAX_XML_BYTES {
+            return Err(invalid("serialized scenarios XML exceeds safety limit"));
+        }
+        self.bytes
+            .try_reserve_exact(value.len())
+            .map_err(|_| invalid("serialized scenarios XML output allocation failed"))?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn finish(self) -> Result<String> {
+        String::from_utf8(self.bytes)
+            .map_err(|_| invalid("serialized scenarios XML is not valid UTF-8"))
+    }
 }
 
 fn namespace_kind(result: ResolveResult<'_>) -> Result<NamespaceKind> {
@@ -1132,6 +1185,22 @@ mod tests {
                 .unwrap();
             assert_eq!(parsed, expected);
         }
+    }
+
+    #[test]
+    fn writer_rejects_output_over_limit_before_final_append() {
+        let long_name = "x".repeat(MAX_XSTRING_CHARS);
+        let scenarios = (0..1_025)
+            .map(|_| WorksheetScenario::new(long_name.clone()).unwrap())
+            .collect();
+        let value = WorksheetScenarios::new(scenarios).unwrap();
+        let error = write_worksheet_scenarios(&value, WorksheetScenarioConformance::Transitional)
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("serialized scenarios XML exceeds safety limit")
+        );
     }
 
     #[test]
