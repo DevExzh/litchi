@@ -794,7 +794,8 @@ fn set_property(
     property: ParagraphProperty<'_>,
 ) -> Result<()> {
     let storage = storage::locate(package, storage_id)?;
-    let style = native::locate_style(package, storage.style_id)?;
+    let located_style = native::locate_style_with_archive(package, storage.style_id)?;
+    let style = &located_style.location;
     let stylesheet_id = native::stylesheet_id(&style.style, storage.style_id)?;
     let stylesheet_archive_name = object_archive_name(package, stylesheet_id)?;
     if stylesheet_archive_name != style.archive_name {
@@ -848,7 +849,7 @@ fn set_property(
         let replacement =
             native::variation_object(storage.style_id, parent_style_id, stylesheet_id, overrides)?;
         let mut staged = package.clone();
-        native::replace_variation(&mut staged, &style, replacement)?;
+        native::replace_variation_with_archive(&mut staged, located_style, replacement)?;
         validate_property(&staged, storage_id, property)?;
         *package = staged;
         return Ok(());
@@ -888,7 +889,8 @@ fn reset_property(
     kind: ParagraphPropertyKind,
 ) -> Result<bool> {
     let storage = storage::locate(package, storage_id)?;
-    let style = native::locate_style(package, storage.style_id)?;
+    let located_style = native::locate_style_with_archive(package, storage.style_id)?;
+    let style = &located_style.location;
     let Some(mut overrides) = native::direct_overrides(&style.style, &style.message.data)? else {
         return Ok(false);
     };
@@ -920,7 +922,7 @@ fn reset_property(
     } else {
         let replacement =
             native::variation_object(storage.style_id, parent_style_id, stylesheet_id, overrides)?;
-        native::replace_variation(&mut staged, &style, replacement)?;
+        native::replace_variation_with_archive(&mut staged, located_style, replacement)?;
     }
     validate_expected_property(&staged, storage_id, expected)?;
     *package = staged;

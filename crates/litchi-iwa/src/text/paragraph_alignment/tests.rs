@@ -4795,6 +4795,7 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
     );
 
     let mut stale = package.clone();
+    let stale_located = native::locate_style_with_archive(&stale, style_after.object_id).unwrap();
     stale
         .update_archive(&style_after.archive_name, |archive| {
             let object = archive.object_mut(style_after.object_id).unwrap();
@@ -4817,7 +4818,9 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
         }],
     )
     .unwrap();
-    assert!(native::replace_variation(&mut stale, &style_after, replacement).is_err());
+    assert!(
+        native::replace_variation_with_archive(&mut stale, stale_located, replacement).is_err()
+    );
     assert_eq!(
         stale.entry(&style_after.archive_name).unwrap(),
         before.as_slice()

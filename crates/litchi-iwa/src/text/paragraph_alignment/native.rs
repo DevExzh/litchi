@@ -5,12 +5,13 @@ mod tabs;
 
 use prost::Message;
 
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::protobuf::{tsd, tsp, tss, tswp};
 use crate::shapes::{
     RgbaColor, StrokeCap, StrokeJoin, color_from_native, color_to_native, shadow_from_native,
     shadow_to_native, stroke_from_native, stroke_to_native,
 };
+use crate::text::storage_wire::update_parsed_archive;
 use crate::wire::{
     overlay_singular_wire_fields, parse_wire_fields, patch_length_delimited_field,
     patch_varint_field, repeated_length_delimited_payloads,
@@ -129,6 +130,12 @@ pub(crate) struct ParagraphStyleLocation {
     pub(crate) message_type: u32,
     pub(crate) message: RawMessage,
     pub(crate) style: tswp::ParagraphStyleArchive,
+}
+
+pub(crate) struct LocatedParagraphStyle {
+    pub(crate) location: ParagraphStyleLocation,
+    pub(crate) archive: Archive,
+    package_revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -274,6 +281,13 @@ pub(crate) fn locate_style(
     package: &IWorkPackage,
     style_id: u64,
 ) -> Result<ParagraphStyleLocation> {
+    locate_style_with_archive(package, style_id).map(|located| located.location)
+}
+
+pub(crate) fn locate_style_with_archive(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<LocatedParagraphStyle> {
     let (archive_name, archive) = object_archive(package, style_id)?;
     let object = archive.object(style_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork paragraph style {style_id} is missing"))
@@ -303,13 +317,17 @@ pub(crate) fn locate_style(
         )));
     }
     let style = tswp::ParagraphStyleArchive::decode(message.data.as_slice())?;
-    Ok(ParagraphStyleLocation {
-        object_id: style_id,
-        archive_name,
-        message_index: *message_index,
-        message_type: message.type_,
-        message: (*message).clone(),
-        style,
+    Ok(LocatedParagraphStyle {
+        location: ParagraphStyleLocation {
+            object_id: style_id,
+            archive_name,
+            message_index: *message_index,
+            message_type: message.type_,
+            message: (*message).clone(),
+            style,
+        },
+        archive,
+        package_revision: package.mutation_revision(),
     })
 }
 
@@ -1290,11 +1308,18 @@ pub(crate) fn variation_object(
     Ok(object)
 }
 
-pub(crate) fn replace_variation(
-    package: &mut IWorkPackage,
+struct PreparedVariationReplacement {
+    message: RawMessage,
+    has_text_fill_info: bool,
+    has_text_stroke_info: bool,
+    has_text_shadow_info: bool,
+    has_text_background_info: bool,
+}
+
+fn prepare_variation_replacement(
     location: &ParagraphStyleLocation,
     replacement: ArchiveObject,
-) -> Result<()> {
+) -> Result<PreparedVariationReplacement> {
     let style_id = location.object_id;
     if replacement.archive_info.identifier != Some(style_id)
         || replacement.messages.is_empty()
@@ -1349,86 +1374,138 @@ pub(crate) fn replace_variation(
         .field_infos
         .iter()
         .any(is_text_background_field_info);
-    let message = replacement_message.clone();
-    package.update_archive(&location.archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork paragraph style {style_id} is missing"))
-        })?;
-        if object.archive_info.identifier != Some(style_id) {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} object identity changed unexpectedly"
-            )));
-        }
-        if object.messages.get(location.message_index).is_none() {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} anchored payload index {} is missing",
-                location.message_index
-            )));
-        }
-        if object.messages[location.message_index].type_ != location.message_type {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} anchored payload type changed unexpectedly"
-            )));
-        }
-        if object.messages[location.message_index].data != location.message.data {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} anchored payload changed unexpectedly"
-            )));
-        }
-        let current_length = u32::try_from(object.messages[location.message_index].data.len())
-            .map_err(|_| {
-                Error::InvalidFormat(
-                    "anchored paragraph style payload exceeds u32 length".to_owned(),
-                )
-            })?;
-        let Some(info) = object
-            .archive_info
-            .message_infos
-            .get(location.message_index)
-        else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} anchored metadata index {} is missing",
-                location.message_index
-            )));
-        };
-        if info.type_ != location.message_type {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} anchored metadata type changed unexpectedly"
-            )));
-        }
-        if info.length != current_length {
-            return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} anchored metadata length changed unexpectedly"
-            )));
-        }
-        object.replace_message(location.message_index, message)?;
-        let info = &mut object.archive_info.message_infos[location.message_index];
-        sync_managed_field_info(
-            &mut info.field_infos,
-            has_text_fill_info,
-            is_text_fill_field_info,
-            text_fill_field_info,
-        );
-        sync_managed_field_info(
-            &mut info.field_infos,
-            has_text_stroke_info,
-            is_text_stroke_field_info,
-            text_stroke_field_info,
-        );
-        sync_managed_field_info(
-            &mut info.field_infos,
-            has_text_shadow_info,
-            is_text_shadow_field_info,
-            text_shadow_field_info,
-        );
-        sync_managed_field_info(
-            &mut info.field_infos,
-            has_text_background_info,
-            is_text_background_field_info,
-            text_background_field_info,
-        );
-        Ok(())
+    Ok(PreparedVariationReplacement {
+        message: replacement_message.clone(),
+        has_text_fill_info,
+        has_text_stroke_info,
+        has_text_shadow_info,
+        has_text_background_info,
     })
+}
+
+pub(crate) fn replace_variation(
+    package: &mut IWorkPackage,
+    location: &ParagraphStyleLocation,
+    replacement: ArchiveObject,
+) -> Result<()> {
+    let replacement = prepare_variation_replacement(location, replacement)?;
+    let archive_name = location.archive_name.clone();
+    package.update_archive(&archive_name, |archive| {
+        replace_variation_in_archive(archive, location, replacement)
+    })
+}
+
+pub(crate) fn replace_variation_with_archive(
+    package: &mut IWorkPackage,
+    located: LocatedParagraphStyle,
+    replacement: ArchiveObject,
+) -> Result<()> {
+    let LocatedParagraphStyle {
+        location,
+        archive,
+        package_revision,
+    } = located;
+    if package.mutation_revision() != package_revision {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {} package changed unexpectedly",
+            location.object_id
+        )));
+    }
+    let replacement = prepare_variation_replacement(&location, replacement)?;
+    let archive_name = location.archive_name.clone();
+    update_parsed_archive(package, &archive_name, archive, |archive| {
+        replace_variation_in_archive(archive, &location, replacement)
+    })
+}
+
+fn replace_variation_in_archive(
+    archive: &mut Archive,
+    location: &ParagraphStyleLocation,
+    replacement: PreparedVariationReplacement,
+) -> Result<()> {
+    let style_id = location.object_id;
+    let PreparedVariationReplacement {
+        message,
+        has_text_fill_info,
+        has_text_stroke_info,
+        has_text_shadow_info,
+        has_text_background_info,
+    } = replacement;
+    let object = archive.object_mut(style_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork paragraph style {style_id} is missing"))
+    })?;
+    if object.archive_info.identifier != Some(style_id) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} object identity changed unexpectedly"
+        )));
+    }
+    if object.messages.get(location.message_index).is_none() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} anchored payload index {} is missing",
+            location.message_index
+        )));
+    }
+    if object.messages[location.message_index].type_ != location.message_type {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} anchored payload type changed unexpectedly"
+        )));
+    }
+    if object.messages[location.message_index].data != location.message.data {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} anchored payload changed unexpectedly"
+        )));
+    }
+    let current_length = u32::try_from(object.messages[location.message_index].data.len())
+        .map_err(|_| {
+            Error::InvalidFormat("anchored paragraph style payload exceeds u32 length".to_owned())
+        })?;
+    let Some(info) = object
+        .archive_info
+        .message_infos
+        .get(location.message_index)
+    else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} anchored metadata index {} is missing",
+            location.message_index
+        )));
+    };
+    if info.type_ != location.message_type {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} anchored metadata type changed unexpectedly"
+        )));
+    }
+    if info.length != current_length {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} anchored metadata length changed unexpectedly"
+        )));
+    }
+    object.replace_message(location.message_index, message)?;
+    let info = &mut object.archive_info.message_infos[location.message_index];
+    sync_managed_field_info(
+        &mut info.field_infos,
+        has_text_fill_info,
+        is_text_fill_field_info,
+        text_fill_field_info,
+    );
+    sync_managed_field_info(
+        &mut info.field_infos,
+        has_text_stroke_info,
+        is_text_stroke_field_info,
+        text_stroke_field_info,
+    );
+    sync_managed_field_info(
+        &mut info.field_infos,
+        has_text_shadow_info,
+        is_text_shadow_field_info,
+        text_shadow_field_info,
+    );
+    sync_managed_field_info(
+        &mut info.field_infos,
+        has_text_background_info,
+        is_text_background_field_info,
+        text_background_field_info,
+    );
+    Ok(())
 }
 
 pub(crate) fn redefine_named_style(
