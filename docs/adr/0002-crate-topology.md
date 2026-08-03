@@ -273,6 +273,39 @@ Schema-valid `OnOff` lexical forms remain readable, but division-role markers
 write explicit numeric values because the native Word gate rejects empty true
 `bodyDiv` and `blockQuote` elements.
 
+`litchi-docx::glossary` owns the bounded WordprocessingML glossary-document
+grammar, semantic building-block catalog, and auxiliary OPC graph. Its ordinary
+vocabulary is contextual (`Catalog`, `Entry`, `Props`, `Name`, `Category`,
+`Gallery`, `Id`, `Kind`, `Insert`, and `Conformance`); physical `Graph`, `Part`,
+and `Rel` values are isolated under `glossary::raw`. Canonical Unicode-caseless
+names are the primary selectors and checked source positions are the repair
+fallback for lookup, replacement, rename, removal, and reorder. A private name
+index plus checked per-entry and catalog size totals keep repeated CRUD
+proportional to the selected entry rather than the entire catalog. Fresh entries
+require the properties and name needed by Word 2007,
+while the reader retains valid empty or less-constrained producer catalogs.
+Entry payloads move across semantic mutations, while low-level graph publication
+borrows its recovery copy. Package `load`, consuming semantic `put`, and `remove`
+validate dialect, role-derived relationship permissions and target modes, every
+target, content type, graph-wide bounds, reserved part names, and package-wide
+inbound ownership before publication. Internal hyperlinks remain references
+rather than owned dependencies. Producer duplicate names remain readable and
+make semantic lookup ambiguous; new conflicts are rejected. Unchanged bound
+catalogs and canonical/exact raw no-ops retain producer paths, bytes, and
+signatures. Relationship-bearing semantic catalogs are privately bound to their
+validated physical resources, and every referencing entry/background carries
+per-value lineage, preventing cross-package `r:id` rebinding; a real update
+stages all fallible work before commit. Untouched direct producer entries
+retain bounded serialized inactive/ignorable MCE content and its relationship
+references across unrelated CRUD. Shared namespace scopes avoid per-descendant
+copies, while aggregate projection/snapshot and DOM-allocation budgets prevent
+cross-entry amplification. Fresh semantic authoring allocates canonical-first
+free names for glossary-local styles, settings, font-table, and web-settings
+resources; `Package::new_template()` selects the DOTX container used by native
+AutoText. The migration host exposes short document/package adapters plus the
+canonical owner module as a contextual re-export, and owns no duplicate glossary
+model or legacy type alias.
+
 `litchi-pptx::transition` owns the PresentationML transition model and bounded
 XML codec. Each `Kind` variant carries only the direction/orientation value
 valid for that effect, so invalid effect-option pairs are not representable.

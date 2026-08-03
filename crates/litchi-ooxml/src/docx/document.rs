@@ -18,7 +18,6 @@ use crate::docx::field::{
     TableOfAuthoritiesField, TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
-use crate::docx::glossary::GlossaryDocument;
 use crate::docx::header_footer::HeaderFooter;
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::mail_merge::{MailMergeRecipients, is_settings_relationship};
@@ -120,10 +119,16 @@ impl<'a> Document<'a> {
         self.part.extract_text()
     }
 
-    /// Return the package's glossary/building-block document, if present.
-    pub fn glossary_document(&self) -> Result<Option<GlossaryDocument>> {
-        crate::docx::glossary::load_from_package(self.opc)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+    /// Return the package's glossary/building-block catalog and dialect.
+    pub fn glossary(
+        &self,
+    ) -> Result<
+        Option<(
+            litchi_docx::glossary::Catalog,
+            litchi_docx::glossary::Conformance,
+        )>,
+    > {
+        Ok(litchi_docx::glossary::load(self.opc)?)
     }
 
     /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored

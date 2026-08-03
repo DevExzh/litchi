@@ -62,7 +62,6 @@ pub mod enums;
 pub mod field;
 pub mod footnote;
 pub mod format;
-pub mod glossary;
 pub mod header_footer;
 pub mod hyperlink;
 pub mod image;
@@ -132,15 +131,10 @@ pub use field::{
     UserIdentityFieldKind, UserIdentityFormatting,
 };
 pub use footnote::{Note, NoteType};
-pub use glossary::{
-    DocPartCategory, DocPartGallery, DocPartName, DocPartProperties, DocPartType,
-    GlossaryAuxiliaryPart, GlossaryDocument, GlossaryEntry, GlossaryPackage, GlossaryRelationship,
-    InsertionBehavior,
-};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::InlineImage;
-pub use litchi_docx::{color, web};
+pub use litchi_docx::{color, glossary, web};
 pub use mail_merge::{
     MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
     MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,

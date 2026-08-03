@@ -33,6 +33,7 @@ Office round trips.
 | [0018](0018-xlsx-calculation-chain-ownership.md) | Typed XLSX calculation-chain ownership |
 | [0019](0019-docx-web-settings-ownership.md) | Typed DOCX web-settings ownership |
 | [0020](0020-pptx-table-style-ownership.md) | Typed PPTX table-style ownership |
+| [0021](0021-docx-glossary-ownership.md) | Typed DOCX glossary and building-block ownership |
 
 ## Decision hierarchy
 

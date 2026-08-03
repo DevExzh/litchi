@@ -1,4 +1,4 @@
-//! Generate DOCX web-settings and PPTX table-style artifacts for native Office checks.
+//! Generate DOCX web-settings/glossary and PPTX table-style artifacts for native Office checks.
 //!
 //! Run with:
 //!
@@ -10,6 +10,10 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+use litchi_docx::glossary::{
+    Catalog, Category, Conformance as GlossaryConformance, Entry, Gallery, Id as GlossaryId,
+    Insert, Kind, Name, Props,
+};
 use litchi_docx::web::{Div, Id as DivId, Screen};
 use litchi_ooxml::{docx, pptx};
 use litchi_pptx::table::style::{Def, Id, Parts};
@@ -26,9 +30,67 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&directory)?;
 
     create_docx(&directory)?;
+    create_glossary_docx(&directory)?;
+    let word_round_trip = directory.join("glossary-owner-word.dotx");
+    if word_round_trip.exists() {
+        verify_glossary_docx(&word_round_trip)?;
+    }
     create_pptx(&directory)?;
 
     println!("{}", directory.canonicalize()?.display());
+    Ok(())
+}
+
+fn create_glossary_docx(directory: &Path) -> Result<()> {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const BUILDING_BLOCK_TEXT: &str = "Litchi reusable native building block";
+
+    let destination = directory.join("glossary-owner.dotx");
+    let mut package = docx::Package::new_template()?;
+    package
+        .document_mut()?
+        .add_heading("Litchi DOCX glossary owner", 1)?;
+    package
+        .document_mut()?
+        .add_paragraph_with_text("This document carries a typed AutoText building block.");
+
+    let body = format!(
+        r#"<w:docPartBody xmlns:w="{W}"><w:p><w:r><w:t>{BUILDING_BLOCK_TEXT}</w:t></w:r></w:p></w:docPartBody>"#
+    );
+    let props = Props {
+        category: Some(Category::new("General", Gallery::new("autoTxt")?)?),
+        kinds: Kind::NORMAL,
+        inserts: Insert::CONTENT,
+        description: Some("Litchi native Word verification building block".to_owned()),
+        id: Some(GlossaryId::new("{B81EC3D0-09F5-4E43-9D1A-934D27B13F36}")?),
+        ..Props::new(Name::new("Litchi AutoText")?)
+    };
+    let mut catalog = Catalog::new();
+    catalog.add(Entry::new("Litchi AutoText", body.into_bytes())?.with_props(props)?)?;
+    let _ = package.put_glossary(catalog, GlossaryConformance::Transitional)?;
+    package.save(&destination)?;
+
+    verify_glossary_docx(&destination)
+}
+
+fn verify_glossary_docx(path: &Path) -> Result<()> {
+    const BUILDING_BLOCK_TEXT: &str = "Litchi reusable native building block";
+
+    let reopened = docx::Package::open(path)?;
+    let (catalog, conformance) = reopened
+        .glossary()?
+        .ok_or_else(|| missing("DOCX glossary catalog"))?;
+    let stored = catalog
+        .get("litchi autotext")?
+        .ok_or_else(|| missing("DOCX glossary entry"))?;
+    if conformance != GlossaryConformance::Transitional
+        || !stored.body().is_some_and(|body| {
+            body.windows(BUILDING_BLOCK_TEXT.len())
+                .any(|window| window == BUILDING_BLOCK_TEXT.as_bytes())
+        })
+    {
+        return Err(missing("round-tripped DOCX glossary values").into());
+    }
     Ok(())
 }
 

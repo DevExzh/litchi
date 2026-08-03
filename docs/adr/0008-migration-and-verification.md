@@ -3210,6 +3210,95 @@ records; a section-mutation fixture now supplies a conforming MCE Choice before
 Fallback; and the placeholder regression expects its decoding error through
 the canonical PPTX owner.
 
+## DOCX glossary owner extraction
+
+The glossary-document grammar, semantic building-block catalog, and complete
+owned OPC graph now reside in `litchi-docx::glossary`. The OOXML migration host
+exposes short package/document adapters plus the canonical module as a
+contextual re-export, and deletes its duplicate implementation and legacy
+aliases.
+Name-first Unicode-caseless CRUD has a private normalized-name index, checked
+numeric replacement/rename/removal/reorder repair selectors, and typed
+ambiguity/out-of-bounds failures. Checked per-entry and catalog output sizes
+update by selected-entry deltas instead of replanning unrelated bodies. Fresh
+authoring requires a checked name while the reader accepts base-standard
+producer states where `docPartPr` and its name may be absent and `<guid>` may be
+present without `guid/@w:val`. It also retains Word's native
+present-but-empty `<w:types/>` state without making it authorable through fresh
+typed values. Untouched direct producer entries retain bounded serialized
+inactive or ignorable MCE subtrees and all of their relationship references
+across unrelated CRUD. XML 1.0 values,
+content events, producer snapshots, projected opaque XML, and owned DOM
+allocations have aggregate budgets; the streaming namespace resolver avoids a
+depth-times-binding scan. Carriage returns remain distinct from line feeds.
+Strict reads reject mixed relationship namespaces, Transitional-only on/off
+lexicals, and active VML, while Transitional VML remains readable and writable
+only in its own dialect.
+
+The raw layer borrows its graph for failure-safe publication and shares
+auxiliary payload owners. Repeated publication of an edited loaded graph is a
+true signature-preserving no-op after canonicalization. Real changes unsign the
+candidate before staging package mutations; signature infrastructure, OPC
+manifests, and relationship-part names are forbidden graph payloads. Owner edges
+rebase to a different destination main-part base and allocate a fresh ID on
+collision.
+Destination-bound semantic catalogs return before reserialization when their
+catalog is unchanged. Relationship-bearing entries and backgrounds also carry
+per-value lineage, so transplanting one entry cannot silently reuse a colliding
+destination `r:id`. Shared auxiliary payloads use pointer identity before byte
+comparison, and reference validation borrows cached IDs without cloning them.
+Per-part and graph-wide payload, relationship, and metadata budgets; validated
+MIME types and XML IDs; fallible reservations; and keyed linear graph comparison
+address the reviewed raw-graph algorithmic-scaling hazards. Persistent namespace
+frames and node/attribute/content/depth/namespace/owned-allocation budgets bound
+the glossary XML codec and opaque semantic subtrees; extracted roots share an
+aggregate output ceiling and inert auxiliary bytes are not structurally decoded.
+Raw remove returns a graph that raw put can restore within the same published
+limits.
+
+The standards matrix is driven by the role assigned by an incoming edge rather
+than by a payload's self-selected content type. It covers the normative root,
+rich-story, settings, font-table, numbering, web-settings,
+chart/chart-user-shapes, Custom XML data/properties, ActiveX descriptor/binary,
+SmartArt, embedded object/package, and Microsoft customization edges in both
+conformance families. This includes generic inert controls, settings recipient
+data, chart theme overrides, 2011 and 2012 chart styles, the chart/chart-drawing
+cycle, chart-drawing Custom XML, and diagram hyperlinks. Only exact ActiveX
+descriptors may own ActiveX binaries. Target modes and content profiles are
+checked independently. Internal hyperlinks are validated references and are
+neither moved into nor deleted with the glossary graph. Conventional
+`/word/glossary/` paths do not establish ownership without a typed relationship
+edge. The Transitional relationship spelling is the normative case-sensitive
+`aFChunk`; direct themes are rejected because the Word glossary part is not a
+permitted theme owner.
+
+Fresh semantic publication seeds canonical-first, collision-free glossary-local
+styles, settings, font-table, and web-settings parts, sharing an existing
+self-contained main-document blob where possible. `Package::new_template()`
+selects a DOTX main content type.
+Focused verification covers the owner unit suite, the host integration suite,
+warning-denied Clippy, rustdoc, formatting, manifest sorting, and executable
+crate-boundary checks; this slice intentionally does not schedule another
+manual full-workspace run after the previously green workspace gate.
+
+Computer Use produced both negative and positive native evidence in Microsoft
+Word for macOS. The first DOCX, which lacked the later four-resource seed,
+opened without repair in Compatibility Mode but did not expose the custom
+AutoText entry; Word removed the glossary graph on resave. This is consistent
+with templates being the native AutoText authoring container, but the subsequent
+seeded DOTX also changed the resource graph and is not a controlled causal
+comparison. The seeded DOTX opened without repair. Insert → AutoText showed the
+exact `Litchi AutoText` row and enabled insertion; inserting it placed `Litchi
+reusable native building block` into the document. Word saved the template to
+the Mac.
+The saved archive passed ZIP integrity, and the public example
+reverse-read the entry and payload from the Word-saved copy through the
+canonical owner, including Word's native `<w:types/>` rewrite. This is one
+Transitional text-only AutoText
+open/discover/insert/resave result in the observed Word Compatibility Mode on
+that build, not evidence for images, fields, arbitrary dependency graphs,
+Strict, a version matrix, or performance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

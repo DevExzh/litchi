@@ -24,6 +24,26 @@ pub enum Error {
     #[error("invalid DOCX data: {0}")]
     Invalid(String),
 
+    /// A semantic selector matched more than one producer object.
+    #[error("{object} selector '{key}' is ambiguous")]
+    Ambiguous {
+        /// Kind of object being selected.
+        object: &'static str,
+        /// User-facing semantic selector.
+        key: String,
+    },
+
+    /// A checked numeric selector was outside the current collection.
+    #[error("{object} index {index} is out of bounds for length {len}")]
+    OutOfBounds {
+        /// Kind of object being selected.
+        object: &'static str,
+        /// Requested zero-based index.
+        index: usize,
+        /// Collection length at validation time.
+        len: usize,
+    },
+
     /// An OPC part URI is invalid.
     #[error("invalid DOCX part URI: {0}")]
     Uri(String),

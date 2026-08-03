@@ -10,6 +10,7 @@ mod error;
 pub mod alt;
 pub mod color;
 pub mod font;
+pub mod glossary;
 pub mod web;
 
 pub use error::{Error, Result};

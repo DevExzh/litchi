@@ -4,10 +4,6 @@ use crate::docx::bibliography::{
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::{Binding, NewStore};
 use crate::docx::document::Document;
-use crate::docx::glossary::{
-    GlossaryDocument, GlossaryEntry, GlossaryPackage, load_from_package, load_package_from_package,
-    remove_from_package, store_in_package,
-};
 use crate::docx::mail_merge::{
     MailMergeConformance, MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
 };
@@ -28,7 +24,7 @@ use crate::encryption::{Limits, Mode};
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
 use litchi_docx::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_relationship};
-use litchi_docx::{font, web as docx_web};
+use litchi_docx::{font, glossary, web as docx_web};
 use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
@@ -467,7 +463,21 @@ impl Package {
         })
     }
 
-    /// Open a .docx, .docm, or .dotm package from a file path.
+    /// Create a new empty macro-free Word template (`.dotx`) package.
+    ///
+    /// Template packages are the native container for reusable AutoText and
+    /// other building blocks authored through [`Self::put_glossary`].
+    pub fn new_template() -> Result<Self> {
+        let mut package = Self::new()?;
+        let main = package.opc.main_document_part()?.partname().clone();
+        package
+            .opc
+            .get_part_mut(&main)?
+            .set_content_type(ct::WML_TEMPLATE_MAIN.to_owned())?;
+        Ok(package)
+    }
+
+    /// Open a .docx, .docm, .dotx, or .dotm package from a file path.
     ///
     /// # Arguments
     ///
@@ -2127,156 +2137,41 @@ impl Package {
         Ok(count)
     }
 
-    /// Load the typed glossary/building-block document, if present.
-    pub fn glossary_document(&self) -> Result<Option<GlossaryDocument>> {
-        load_from_package(&self.opc).map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+    /// Load the typed glossary/building-block catalog and its dialect.
+    pub fn glossary(&self) -> Result<Option<(glossary::Catalog, glossary::Conformance)>> {
+        Ok(glossary::load(&self.opc)?)
     }
 
-    /// Load the glossary together with its owned auxiliary relationship graph.
-    pub fn glossary_package(&self) -> Result<Option<GlossaryPackage>> {
-        load_package_from_package(&self.opc)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
-    }
-
-    /// Atomically install or replace a glossary while preserving its existing graph.
-    pub fn set_glossary_document(&mut self, document: GlossaryDocument) -> Result<()> {
-        let mut package = self.glossary_package()?.unwrap_or_else(|| {
-            let strict = self.opc.main_document_part().is_ok_and(|part| {
-                std::str::from_utf8(part.blob()).is_ok_and(|xml| {
-                    xml.contains("http://purl.oclc.org/ooxml/wordprocessingml/main")
-                })
-            });
-            GlossaryPackage::new(GlossaryDocument::default(), strict)
-        });
-        package.document = document;
-        store_in_package(&mut self.opc, package)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
-    }
-
-    /// Atomically install a complete glossary and auxiliary OPC graph.
-    pub fn set_glossary_package(&mut self, package: GlossaryPackage) -> Result<()> {
-        store_in_package(&mut self.opc, package)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
-    }
-
-    /// Atomically edit the glossary document while preserving auxiliary parts.
-    pub fn update_glossary_document<F>(&mut self, update: F) -> Result<()>
-    where
-        F: FnOnce(&mut GlossaryDocument) -> Result<()>,
-    {
-        let mut package = self
-            .glossary_package()?
-            .ok_or_else(|| OoxmlError::PartNotFound("glossary document".into()))?;
-        update(&mut package.document)?;
-        store_in_package(&mut self.opc, package)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
-    }
-
-    /// Add one building block and return its insertion-order index.
-    pub fn add_glossary_entry(&mut self, entry: GlossaryEntry) -> Result<usize> {
-        let mut index = 0;
-        if self.glossary_document()?.is_some() {
-            self.update_glossary_document(|document| {
-                index = document
-                    .add_entry(entry)
-                    .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?;
-                Ok(())
-            })?;
-        } else {
-            let mut document = GlossaryDocument::default();
-            index = document
-                .add_entry(entry)
-                .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?;
-            self.set_glossary_document(document)?;
-        }
-        Ok(index)
-    }
-
-    /// Replace one building block atomically.
-    pub fn replace_glossary_entry(
+    /// Move a complete semantic catalog into the package.
+    pub fn put_glossary(
         &mut self,
-        index: usize,
-        entry: GlossaryEntry,
-    ) -> Result<GlossaryEntry> {
-        let mut previous = None;
-        self.update_glossary_document(|document| {
-            previous = Some(
-                document
-                    .replace_entry(index, entry)
-                    .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
-            );
-            Ok(())
-        })?;
-        previous.ok_or_else(|| OoxmlError::Other("glossary replacement failed".into()))
+        catalog: glossary::Catalog,
+        conformance: glossary::Conformance,
+    ) -> Result<bool> {
+        Ok(glossary::put(&mut self.opc, catalog, conformance)?)
     }
 
-    /// Atomically update one building block in place.
-    pub fn update_glossary_entry<F>(&mut self, index: usize, update: F) -> Result<()>
-    where
-        F: FnOnce(&mut GlossaryEntry) -> Result<()>,
-    {
-        self.update_glossary_document(|document| {
-            document
-                .update_entry(index, |entry| {
-                    update(entry).map_err(|error| {
-                        Box::new(error) as Box<dyn std::error::Error + Send + Sync>
-                    })
-                })
-                .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
-        })
+    /// Load the complete low-level glossary OPC graph without copying payloads.
+    pub fn glossary_graph(&self) -> Result<Option<glossary::raw::Graph>> {
+        Ok(glossary::raw::load(&self.opc)?)
     }
 
-    /// Reorder one building block while preserving all other insertion positions.
-    pub fn move_glossary_entry(&mut self, from: usize, to: usize) -> Result<()> {
-        self.update_glossary_document(|document| {
-            document
-                .move_entry(from, to)
-                .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
-        })
+    /// Publish a complete low-level glossary OPC graph into the package.
+    ///
+    /// Returns `false` when the graph is already identical, preserving package
+    /// bytes and digital signatures.
+    pub fn put_glossary_graph(&mut self, graph: &glossary::raw::Graph) -> Result<bool> {
+        Ok(glossary::raw::put(&mut self.opc, graph)?)
     }
 
-    /// Find a building block by case-insensitive name.
-    pub fn find_glossary_entry(&self, name: &str) -> Result<Option<(usize, GlossaryEntry)>> {
-        Ok(self.glossary_document()?.and_then(|document| {
-            document
-                .find_entry(name)
-                .map(|(index, entry)| (index, entry.clone()))
-        }))
+    /// Remove and return the complete low-level glossary OPC graph.
+    pub fn take_glossary_graph(&mut self) -> Result<Option<glossary::raw::Graph>> {
+        Ok(glossary::raw::remove(&mut self.opc)?)
     }
 
-    /// Remove one building block while preserving the remaining order.
-    pub fn remove_glossary_entry(&mut self, index: usize) -> Result<GlossaryEntry> {
-        let mut removed = None;
-        self.update_glossary_document(|document| {
-            removed = Some(
-                document
-                    .remove_entry(index)
-                    .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
-            );
-            Ok(())
-        })?;
-        removed.ok_or_else(|| OoxmlError::Other("glossary removal failed".into()))
-    }
-
-    /// Remove every building block but retain the glossary part and its graph.
-    pub fn clear_glossary_entries(&mut self) -> Result<usize> {
-        let mut count = 0;
-        self.update_glossary_document(|document| {
-            count = document.clear_entries();
-            Ok(())
-        })?;
-        Ok(count)
-    }
-
-    /// Remove the glossary relationship and only reachable glossary-owned parts.
-    pub fn remove_glossary_document(&mut self) -> Result<Option<GlossaryDocument>> {
-        remove_from_package(&mut self.opc)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
-    }
-
-    /// Alias for removing the complete glossary graph.
-    pub fn clear_glossary_document(&mut self) -> Result<Option<GlossaryDocument>> {
-        self.remove_glossary_document()
+    /// Remove the complete glossary-owned graph.
+    pub fn remove_glossary(&mut self) -> Result<bool> {
+        Ok(glossary::remove(&mut self.opc)?)
     }
 
     /// Save the package to a file.
