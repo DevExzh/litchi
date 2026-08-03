@@ -40,7 +40,10 @@ const MODEL_CHARACTER_SCALE_FIELD: u32 = 14;
 const TEXT_DROP_CAP_TYPE: i32 = 0;
 
 pub(super) struct DropCapStyleLocation {
+    pub(super) object_id: u64,
     pub(super) archive_name: String,
+    pub(super) message_index: usize,
+    pub(super) message_type: u32,
     pub(super) message: RawMessage,
     pub(super) style: tswp::DropCapStyleArchive,
 }
@@ -59,22 +62,22 @@ pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<Drop
     let payloads = object
         .messages
         .iter()
-        .filter(|message| message.type_ == DROP_CAP_STYLE_MESSAGE_TYPE)
-        .filter_map(|message| {
-            tswp::DropCapStyleArchive::decode(message.data.as_slice())
-                .ok()
-                .map(|style| (message.clone(), style))
-        })
+        .enumerate()
+        .filter(|(_, message)| message.type_ == DROP_CAP_STYLE_MESSAGE_TYPE)
         .collect::<Vec<_>>();
-    let [(message, style)] = payloads.as_slice() else {
+    let [(message_index, message)] = payloads.as_slice() else {
         return Err(Error::InvalidFormat(format!(
             "iWork Drop Cap style {style_id} must have exactly one DropCapStyle payload"
         )));
     };
+    let style = tswp::DropCapStyleArchive::decode(message.data.as_slice())?;
     Ok(DropCapStyleLocation {
+        object_id: style_id,
         archive_name,
-        message: message.clone(),
-        style: style.clone(),
+        message_index: *message_index,
+        message_type: message.type_,
+        message: (*message).clone(),
+        style,
     })
 }
 
@@ -184,7 +187,10 @@ pub(super) fn variation_object(
     .encode_to_vec();
     let decoded = tswp::DropCapStyleArchive::decode(data.as_slice())?;
     let location = DropCapStyleLocation {
+        object_id: identifier,
         archive_name: String::new(),
+        message_index: 0,
+        message_type: DROP_CAP_STYLE_MESSAGE_TYPE,
         message: RawMessage {
             type_: DROP_CAP_STYLE_MESSAGE_TYPE,
             data: data.clone(),
@@ -206,35 +212,73 @@ pub(super) fn variation_object(
 
 pub(super) fn replace_variation(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &DropCapStyleLocation,
     mut replacement: ArchiveObject,
 ) -> Result<()> {
+    let style_id = location.object_id;
+    if replacement.archive_info.identifier != Some(style_id)
+        || replacement.messages.len() != 1
+        || replacement.archive_info.message_infos.len() != 1
+    {
+        return Err(Error::InvalidFormat(
+            "replacement Drop Cap style does not contain exactly one object-aligned payload"
+                .to_owned(),
+        ));
+    }
+    if replacement.messages[0].type_ != location.message_type {
+        return Err(Error::InvalidFormat(
+            "replacement Drop Cap style payload type does not match its anchor".to_owned(),
+        ));
+    }
+    if replacement.archive_info.message_infos[0].type_ != location.message_type {
+        return Err(Error::InvalidFormat(
+            "replacement Drop Cap style metadata type does not match its anchor".to_owned(),
+        ));
+    }
     let message = replacement.messages.pop().ok_or_else(|| {
         Error::InvalidFormat("replacement Drop Cap style has no payload".to_owned())
     })?;
-    if !replacement.messages.is_empty() {
-        return Err(Error::InvalidFormat(
-            "replacement Drop Cap style has multiple payloads".to_owned(),
-        ));
-    }
-    package.update_archive(archive_name, |archive| {
+    package.update_archive(&location.archive_name, |archive| {
         let object = archive.object_mut(style_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork Drop Cap style {style_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, candidate)| candidate.type_ == DROP_CAP_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+        if object.archive_info.identifier != Some(style_id) {
             return Err(Error::InvalidFormat(format!(
-                "iWork Drop Cap style {style_id} must have exactly one payload"
+                "iWork Drop Cap style {style_id} object identity changed unexpectedly"
+            )));
+        }
+        if object.messages.get(location.message_index).is_none() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork Drop Cap style {style_id} anchored payload index {} is missing",
+                location.message_index
+            )));
+        }
+        if object.messages[location.message_index].type_ != location.message_type {
+            return Err(Error::InvalidFormat(format!(
+                "iWork Drop Cap style {style_id} anchored payload type changed unexpectedly"
+            )));
+        }
+        if object.messages[location.message_index].data != location.message.data {
+            return Err(Error::InvalidFormat(format!(
+                "iWork Drop Cap style {style_id} anchored payload changed unexpectedly"
+            )));
+        }
+        let Some(info) = object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+        else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork Drop Cap style {style_id} anchored metadata index {} is missing",
+                location.message_index
             )));
         };
-        object.replace_message(*index, message)?;
+        if info.type_ != location.message_type {
+            return Err(Error::InvalidFormat(format!(
+                "iWork Drop Cap style {style_id} anchored metadata type changed unexpectedly"
+            )));
+        }
+        object.replace_message(location.message_index, message)?;
         Ok(())
     })
 }
@@ -449,11 +493,84 @@ mod tests {
         let object = variation_object(9, 7, 3, expected).unwrap();
         let message = object.messages[0].clone();
         let location = DropCapStyleLocation {
+            object_id: 9,
             archive_name: String::new(),
+            message_index: 0,
+            message_type: DROP_CAP_STYLE_MESSAGE_TYPE,
             style: tswp::DropCapStyleArchive::decode(message.data.as_slice()).unwrap(),
             message,
         };
         assert_eq!(plain_text_model(9, &location).unwrap(), expected);
+    }
+
+    #[test]
+    fn style_replacement_uses_exact_message_anchor_with_sibling_payload() {
+        let original_model = ParagraphDropCap::new(
+            DropCapLineCount::new(3).unwrap(),
+            DropCapCharacterCount::new(1).unwrap(),
+        );
+        let replacement_model = ParagraphDropCap::new(
+            DropCapLineCount::new(5).unwrap(),
+            DropCapCharacterCount::new(2).unwrap(),
+        );
+        let original = variation_object(9, 7, 3, original_model).unwrap();
+        let original_message = original.messages[0].clone();
+        let sibling = tswp::ParagraphStyleArchive::default().encode_to_vec();
+        let object = ArchiveObject::new(
+            9,
+            vec![
+                RawMessage {
+                    type_: 2_022,
+                    data: sibling.clone(),
+                },
+                original_message,
+            ],
+        )
+        .unwrap();
+        let archive = crate::archive::Archive {
+            objects: vec![object],
+        };
+        let mut package = IWorkPackage::new();
+        package.replace_archive("Index/One.iwa", &archive).unwrap();
+
+        let location = locate_style(&package, 9).unwrap();
+        assert_eq!(location.message_index, 1);
+        assert_eq!(location.message_type, DROP_CAP_STYLE_MESSAGE_TYPE);
+        replace_variation(
+            &mut package,
+            &location,
+            variation_object(9, 7, 3, replacement_model).unwrap(),
+        )
+        .unwrap();
+
+        let updated = package.archive("Index/One.iwa").unwrap();
+        let updated_object = updated.object(9).unwrap();
+        assert_eq!(updated_object.messages[0].data, sibling);
+        assert_eq!(updated_object.messages[0].type_, 2_022);
+        assert_eq!(
+            plain_text_model(9, &locate_style(&package, 9).unwrap()).unwrap(),
+            replacement_model
+        );
+
+        let mut stale = package.clone();
+        stale
+            .update_archive("Index/One.iwa", |archive| {
+                let object = archive.object_mut(9).unwrap();
+                object.messages[1].type_ = DROP_CAP_STYLE_MESSAGE_TYPE + 1;
+                object.archive_info.message_infos[1].type_ = DROP_CAP_STYLE_MESSAGE_TYPE + 1;
+                Ok(())
+            })
+            .unwrap();
+        let before = stale.entry("Index/One.iwa").unwrap().to_vec();
+        assert!(
+            replace_variation(
+                &mut stale,
+                &location,
+                variation_object(9, 7, 3, original_model).unwrap(),
+            )
+            .is_err()
+        );
+        assert_eq!(stale.entry("Index/One.iwa").unwrap(), before.as_slice());
     }
 
     #[test]

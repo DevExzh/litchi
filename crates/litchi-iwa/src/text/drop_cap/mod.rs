@@ -103,7 +103,7 @@ pub(super) fn set_paragraph_drop_cap(
                 drop_cap,
             )?;
             let mut staged = package.clone();
-            native::replace_variation(&mut staged, &location.archive_name, style_id, replacement)?;
+            native::replace_variation(&mut staged, &location, replacement)?;
             validate_drop_cap(&staged, storage_id, paragraph_start, Some(drop_cap))?;
             *package = staged;
             return Ok(());
