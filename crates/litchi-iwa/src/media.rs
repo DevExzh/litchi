@@ -23,6 +23,9 @@ const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 const DATA_METADATA_MAP_MESSAGE_TYPE: u32 = 11_015;
 const DEFAULT_MAX_REPLACEMENT_BYTES: usize = 1024 * 1024 * 1024;
+const DEFAULT_MAX_MEDIA_ASSETS: usize = 100_000;
+const DEFAULT_MAX_MEDIA_ASSET_BYTES: u64 = 512 * 1024 * 1024;
+const DEFAULT_MAX_MEDIA_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Types of media assets that can be found in iWork documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -150,6 +153,83 @@ impl MediaAsset {
     }
 }
 
+/// Resource ceilings for media discovery and extraction.
+///
+/// These limits apply to directory bundles as well as package-backed media.
+/// The checked constructor only permits tighter profiles than the format-wide
+/// safety ceilings, so callers cannot accidentally disable the allocation
+/// guardrails while selecting a smaller workload budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MediaLimits {
+    max_assets: usize,
+    max_asset_bytes: u64,
+    max_total_bytes: u64,
+}
+
+impl MediaLimits {
+    /// Hard ceiling for the number of discovered media members.
+    pub const HARD_MAX_ASSETS: usize = DEFAULT_MAX_MEDIA_ASSETS;
+    /// Hard ceiling for one materialized media member.
+    pub const HARD_MAX_ASSET_BYTES: u64 = DEFAULT_MAX_MEDIA_ASSET_BYTES;
+    /// Hard ceiling for the aggregate discovered media size.
+    pub const HARD_MAX_TOTAL_BYTES: u64 = DEFAULT_MAX_MEDIA_TOTAL_BYTES;
+
+    /// Construct a checked media resource profile.
+    pub fn new(max_assets: usize, max_asset_bytes: u64, max_total_bytes: u64) -> Result<Self> {
+        if max_assets == 0 || max_asset_bytes == 0 || max_total_bytes == 0 {
+            return Err(Error::Bundle("Media limits must be non-zero".to_owned()));
+        }
+        if max_assets > Self::HARD_MAX_ASSETS {
+            return Err(Error::Bundle(format!(
+                "Media asset-count limit exceeds {} entries",
+                Self::HARD_MAX_ASSETS
+            )));
+        }
+        if max_asset_bytes > Self::HARD_MAX_ASSET_BYTES {
+            return Err(Error::Bundle(format!(
+                "Media member limit exceeds {} bytes",
+                Self::HARD_MAX_ASSET_BYTES
+            )));
+        }
+        if max_total_bytes > Self::HARD_MAX_TOTAL_BYTES {
+            return Err(Error::Bundle(format!(
+                "Media total-size limit exceeds {} bytes",
+                Self::HARD_MAX_TOTAL_BYTES
+            )));
+        }
+        Ok(Self {
+            max_assets,
+            max_asset_bytes,
+            max_total_bytes,
+        })
+    }
+
+    /// Maximum number of assets this profile may retain.
+    pub const fn max_assets(self) -> usize {
+        self.max_assets
+    }
+
+    /// Maximum size of one asset this profile may retain or extract.
+    pub const fn max_asset_bytes(self) -> u64 {
+        self.max_asset_bytes
+    }
+
+    /// Maximum aggregate size of all discovered assets.
+    pub const fn max_total_bytes(self) -> u64 {
+        self.max_total_bytes
+    }
+}
+
+impl Default for MediaLimits {
+    fn default() -> Self {
+        Self {
+            max_assets: DEFAULT_MAX_MEDIA_ASSETS,
+            max_asset_bytes: DEFAULT_MAX_MEDIA_ASSET_BYTES,
+            max_total_bytes: DEFAULT_MAX_MEDIA_TOTAL_BYTES,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum MediaSource {
     Directory(PathBuf),
@@ -162,29 +242,50 @@ enum MediaSource {
 pub struct MediaManager {
     source: MediaSource,
     assets: HashMap<String, MediaAsset>,
+    limits: MediaLimits,
 }
 
 impl MediaManager {
     /// Open a directory bundle or a single-file `.pages`, `.numbers`, or `.key` package.
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::new_with_limits(path, MediaLimits::default())
+    }
+
+    /// Open a media source under caller-selected resource ceilings.
+    pub fn new_with_limits<P: AsRef<Path>>(path: P, limits: MediaLimits) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        if path.is_dir() {
+        let metadata = fs::symlink_metadata(&path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Error::Bundle(format!("Media source does not exist: {}", path.display()))
+            } else {
+                error.into()
+            }
+        })?;
+        if metadata.file_type().is_symlink() {
+            return Err(Error::Bundle(format!(
+                "Media source must not be a symbolic link: {}",
+                path.display()
+            )));
+        }
+        if metadata.is_dir() {
             let mut assets = HashMap::new();
-            Self::scan_directory_bundle(&path, &mut assets)?;
+            Self::scan_directory_bundle(&path, &mut assets, limits)?;
             Ok(Self {
                 source: MediaSource::Directory(path),
                 assets,
+                limits,
             })
-        } else if path.is_file() {
+        } else if metadata.is_file() {
             let package = IWorkPackage::open(&path)?;
-            let assets = Self::scan_package(&package)?;
+            let assets = Self::scan_package(&package, limits)?;
             Ok(Self {
                 source: MediaSource::File(path),
                 assets,
+                limits,
             })
         } else {
             Err(Error::Bundle(format!(
-                "Media source does not exist: {}",
+                "Media source is not a regular file or directory: {}",
                 path.display()
             )))
         }
@@ -192,25 +293,55 @@ impl MediaManager {
 
     /// Open read-only media access over an in-memory iWork package.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+        Self::from_bytes_with_limits(bytes, MediaLimits::default())
+    }
+
+    /// Open an in-memory iWork package under caller-selected resource ceilings.
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: MediaLimits) -> Result<Self> {
+        Self::from_package_with_limits(IWorkPackage::from_bytes(bytes)?, limits)
     }
 
     /// Create read-only media access from an already parsed package.
     pub fn from_package(package: IWorkPackage) -> Result<Self> {
-        let assets = Self::scan_package(&package)?;
+        Self::from_package_with_limits(package, MediaLimits::default())
+    }
+
+    /// Create read-only media access from a package under explicit limits.
+    pub fn from_package_with_limits(package: IWorkPackage, limits: MediaLimits) -> Result<Self> {
+        let assets = Self::scan_package(&package, limits)?;
         Ok(Self {
             source: MediaSource::Package(package),
             assets,
+            limits,
         })
     }
 
     fn scan_directory_bundle(
         bundle_path: &Path,
         assets: &mut HashMap<String, MediaAsset>,
+        limits: MediaLimits,
     ) -> Result<()> {
         let data_dir = bundle_path.join("Data");
-        if data_dir.is_dir() {
-            Self::scan_directory_recursive(&data_dir, bundle_path, assets)?;
+        match fs::symlink_metadata(&data_dir) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::Bundle(format!(
+                    "Media Data directory is a symbolic link: {}",
+                    data_dir.display()
+                )));
+            },
+            Ok(metadata) if metadata.is_dir() => {
+                let mut total_size = 0;
+                Self::scan_directory_recursive(
+                    &data_dir,
+                    bundle_path,
+                    assets,
+                    limits,
+                    &mut total_size,
+                )?;
+            },
+            Ok(_) => {},
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+            Err(error) => return Err(error.into()),
         }
         Ok(())
     }
@@ -219,26 +350,44 @@ impl MediaManager {
         directory: &Path,
         bundle_root: &Path,
         assets: &mut HashMap<String, MediaAsset>,
+        limits: MediaLimits,
+        total_size: &mut u64,
     ) -> Result<()> {
         for entry in fs::read_dir(directory)? {
             let entry = entry?;
+            let file_type = entry.file_type()?;
             let path = entry.path();
-            if path.is_dir() {
-                Self::scan_directory_recursive(&path, bundle_root, assets)?;
-            } else if path.is_file() {
+            if file_type.is_symlink() {
+                return Err(Error::Bundle(format!(
+                    "Media bundle contains a symbolic link: {}",
+                    path.display()
+                )));
+            }
+            if file_type.is_dir() {
+                Self::scan_directory_recursive(&path, bundle_root, assets, limits, total_size)?;
+            } else if file_type.is_file() {
                 let relative = path
                     .strip_prefix(bundle_root)
-                    .unwrap_or(&path)
+                    .map_err(|_| {
+                        Error::Bundle(format!(
+                            "Media path escapes its bundle root: {}",
+                            path.display()
+                        ))
+                    })?
                     .to_path_buf();
                 let asset = MediaAsset::new(relative, entry.metadata()?.len());
-                insert_unique_asset(assets, asset)?;
+                insert_unique_asset(assets, asset, limits, total_size)?;
             }
         }
         Ok(())
     }
 
-    fn scan_package(package: &IWorkPackage) -> Result<HashMap<String, MediaAsset>> {
+    fn scan_package(
+        package: &IWorkPackage,
+        limits: MediaLimits,
+    ) -> Result<HashMap<String, MediaAsset>> {
         let mut assets = HashMap::new();
+        let mut total_size = 0;
         for name in package
             .entry_names()
             .filter(|name| name.starts_with("Data/"))
@@ -248,13 +397,23 @@ impl MediaManager {
             })?;
             let size = u64::try_from(data.len())
                 .map_err(|_| Error::Bundle(format!("Media asset is too large: {name}")))?;
-            insert_unique_asset(&mut assets, MediaAsset::new(PathBuf::from(name), size))?;
+            insert_unique_asset(
+                &mut assets,
+                MediaAsset::new(PathBuf::from(name), size),
+                limits,
+                &mut total_size,
+            )?;
         }
         Ok(assets)
     }
 
     pub fn assets(&self) -> &HashMap<String, MediaAsset> {
         &self.assets
+    }
+
+    /// Return the checked resource profile used by this manager.
+    pub const fn limits(&self) -> MediaLimits {
+        self.limits
     }
 
     pub fn get(&self, filename: &str) -> Option<&MediaAsset> {
@@ -285,19 +444,55 @@ impl MediaManager {
         let asset = self
             .get(filename)
             .ok_or_else(|| Error::Bundle(format!("Media asset not found: {filename}")))?;
+        if asset.size > self.limits.max_asset_bytes {
+            return Err(Error::Bundle(format!(
+                "Media asset {filename} is {} bytes, exceeding the configured {}-byte limit",
+                asset.size, self.limits.max_asset_bytes
+            )));
+        }
         match &self.source {
             MediaSource::Directory(root) => {
-                let mut file = fs::File::open(root.join(&asset.path))?;
-                let capacity = usize::try_from(asset.size).unwrap_or(0);
-                let mut data = Vec::with_capacity(capacity);
-                file.read_to_end(&mut data)?;
+                let path = root.join(&asset.path);
+                let file = fs::File::open(&path)?;
+                let size = file.metadata()?.len();
+                if size > self.limits.max_asset_bytes {
+                    return Err(Error::Bundle(format!(
+                        "Media asset {} grew to {} bytes, exceeding the configured {}-byte limit",
+                        path.display(),
+                        size,
+                        self.limits.max_asset_bytes
+                    )));
+                }
+                let capacity = usize::try_from(size).map_err(|_| {
+                    Error::Bundle(format!(
+                        "Media asset {} does not fit in memory on this target",
+                        path.display()
+                    ))
+                })?;
+                let mut data = Vec::new();
+                data.try_reserve_exact(capacity).map_err(|error| {
+                    Error::Bundle(format!(
+                        "Unable to reserve {} bytes for media asset {}: {error}",
+                        capacity,
+                        path.display()
+                    ))
+                })?;
+                file.take(self.limits.max_asset_bytes.saturating_add(1))
+                    .read_to_end(&mut data)?;
+                if u64::try_from(data.len()).unwrap_or(u64::MAX) > self.limits.max_asset_bytes {
+                    return Err(Error::Bundle(format!(
+                        "Media asset {} exceeded the configured {}-byte limit while reading",
+                        path.display(),
+                        self.limits.max_asset_bytes
+                    )));
+                }
                 Ok(data)
             },
             MediaSource::File(path) => {
                 let package = IWorkPackage::open(path)?;
-                extract_package_entry(&package, asset)
+                extract_package_entry(&package, asset, self.limits)
             },
-            MediaSource::Package(package) => extract_package_entry(package, asset),
+            MediaSource::Package(package) => extract_package_entry(package, asset, self.limits),
         }
     }
 
@@ -325,28 +520,76 @@ impl MediaManager {
     }
 }
 
-fn insert_unique_asset(assets: &mut HashMap<String, MediaAsset>, asset: MediaAsset) -> Result<()> {
-    if let Some(previous) = assets.insert(asset.filename.clone(), asset.clone()) {
+fn insert_unique_asset(
+    assets: &mut HashMap<String, MediaAsset>,
+    asset: MediaAsset,
+    limits: MediaLimits,
+    total_size: &mut u64,
+) -> Result<()> {
+    if let Some(previous) = assets.get(&asset.filename) {
         return Err(Error::Bundle(format!(
             "Media basenames are ambiguous: {} and {}",
             previous.path.display(),
             asset.path.display()
         )));
     }
+    if assets.len() >= limits.max_assets {
+        return Err(Error::Bundle(format!(
+            "Media asset count exceeds the configured {}-entry limit",
+            limits.max_assets
+        )));
+    }
+    if asset.size > limits.max_asset_bytes {
+        return Err(Error::Bundle(format!(
+            "Media asset {} is {} bytes, exceeding the configured {}-byte limit",
+            asset.path.display(),
+            asset.size,
+            limits.max_asset_bytes
+        )));
+    }
+    let new_total = total_size
+        .checked_add(asset.size)
+        .ok_or_else(|| Error::Bundle("Aggregate media size overflows u64".to_owned()))?;
+    if new_total > limits.max_total_bytes {
+        return Err(Error::Bundle(format!(
+            "Aggregate media size exceeds the configured {}-byte limit",
+            limits.max_total_bytes
+        )));
+    }
+    assets.insert(asset.filename.clone(), asset);
+    *total_size = new_total;
     Ok(())
 }
 
-fn extract_package_entry(package: &IWorkPackage, asset: &MediaAsset) -> Result<Vec<u8>> {
+fn extract_package_entry(
+    package: &IWorkPackage,
+    asset: &MediaAsset,
+    limits: MediaLimits,
+) -> Result<Vec<u8>> {
     let name = asset.path.to_str().ok_or_else(|| {
         Error::Bundle(format!(
             "Media path is not valid UTF-8: {}",
             asset.path.display()
         ))
     })?;
-    package
+    let data = package
         .entry(name)
-        .map(<[u8]>::to_vec)
-        .ok_or_else(|| Error::Bundle(format!("Media package entry not found: {name}")))
+        .ok_or_else(|| Error::Bundle(format!("Media package entry not found: {name}")))?;
+    if u64::try_from(data.len()).unwrap_or(u64::MAX) > limits.max_asset_bytes {
+        return Err(Error::Bundle(format!(
+            "Media package entry {name} exceeds the configured {}-byte limit",
+            limits.max_asset_bytes
+        )));
+    }
+    let mut output = Vec::new();
+    output.try_reserve_exact(data.len()).map_err(|error| {
+        Error::Bundle(format!(
+            "Unable to reserve {} bytes for media package entry {name}: {error}",
+            data.len()
+        ))
+    })?;
+    output.extend_from_slice(data);
+    Ok(output)
 }
 
 /// Metadata-backed view of one `TSP.DataInfo` record.
@@ -1511,6 +1754,47 @@ mod tests {
             disk.extract("image-7.png").unwrap(),
             memory.extract("image-7.png").unwrap()
         );
+    }
+
+    #[test]
+    fn media_limits_bound_discovery_and_extraction() {
+        let package = synthetic_package();
+        let bytes = package.to_bytes().unwrap();
+        let tight = MediaLimits::new(1, 1, 1).unwrap();
+        assert!(MediaManager::from_bytes_with_limits(&bytes, tight).is_err());
+
+        let limits = MediaLimits::new(1, PNG.len() as u64, PNG.len() as u64).unwrap();
+        let manager = MediaManager::from_package_with_limits(package, limits).unwrap();
+        assert_eq!(manager.limits().max_assets(), 1);
+        assert_eq!(manager.limits().max_asset_bytes(), PNG.len() as u64);
+        assert_eq!(manager.limits().max_total_bytes(), PNG.len() as u64);
+
+        assert!(MediaLimits::new(0, 1, 1).is_err());
+        assert!(MediaLimits::new(1, 0, 1).is_err());
+        assert!(MediaLimits::new(1, 1, 0).is_err());
+        assert!(MediaLimits::new(MediaLimits::HARD_MAX_ASSETS + 1, 1, 1).is_err());
+        assert!(MediaLimits::new(1, MediaLimits::HARD_MAX_ASSET_BYTES + 1, 1).is_err());
+        assert!(MediaLimits::new(1, 1, MediaLimits::HARD_MAX_TOTAL_BYTES + 1).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_media_rejects_symbolic_links() -> std::io::Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let bundle = tempfile::tempdir()?;
+        let data = bundle.path().join("Data");
+        fs::create_dir(&data)?;
+        let outside = bundle.path().join("outside.png");
+        fs::write(&outside, PNG)?;
+        symlink(&outside, data.join("linked.png"))?;
+
+        assert!(MediaManager::new(bundle.path()).is_err());
+
+        let source_link = bundle.path().with_extension("-link");
+        symlink(bundle.path(), &source_link)?;
+        assert!(MediaManager::new(&source_link).is_err());
+        Ok(())
     }
 
     #[test]
