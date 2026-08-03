@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use crate::archive::Archive;
 use crate::package_metadata::{
     component_identifier_for_entry, component_identifier_for_object_uuid, next_object_identifier,
     release_package_identifier_suffix, remove_component_external_references_to_object,
@@ -15,8 +16,8 @@ use super::bookmark_object::{
 use super::bookmark_types::{TextBookmark, TextBookmarkId, TextBookmarkSettings};
 use super::hyperlink_storage::{
     Boundary, RangedObjectTable, add_range, decoded_boundaries, encode_table,
-    ensure_range_available, locate_storage, locate_storage_with_archive, patch_ranged_object_table,
-    raw_boundaries, remove_range, validate_range,
+    ensure_range_available, locate_storage_with_archive, patch_ranged_object_table, raw_boundaries,
+    remove_range, validate_range,
 };
 use super::position::{TextPosition, TextRange};
 use super::smart_field_object::{
@@ -27,9 +28,10 @@ use super::storage_wire::{StorageLocation, text_utf16_len};
 const BOOKMARK_TABLE: RangedObjectTable = RangedObjectTable::Bookmark;
 
 pub(crate) fn text_bookmarks(package: &IWorkPackage, storage_id: u64) -> Result<Vec<TextBookmark>> {
-    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
-    let boundaries = decoded_boundaries(storage_id, &location, BOOKMARK_TABLE)?;
-    collect_bookmarks(package, storage_id, &location, &boundaries)
+    let located = locate_storage_with_archive(package, storage_id, BOOKMARK_TABLE)?;
+    let location = &located.location;
+    let boundaries = decoded_boundaries(storage_id, location, BOOKMARK_TABLE)?;
+    collect_bookmarks(storage_id, location, &located.archive, &boundaries)
 }
 
 pub(crate) fn add_text_bookmark(
@@ -291,13 +293,12 @@ fn bookmark_by_id(
 }
 
 fn collect_bookmarks(
-    package: &IWorkPackage,
     storage_id: u64,
     location: &StorageLocation,
+    archive: &Archive,
     boundaries: &[Boundary],
 ) -> Result<Vec<TextBookmark>> {
     let text_len = text_utf16_len(&location.storage.text)?;
-    let archive = package.archive(&location.archive_name)?;
     let mut seen = HashSet::new();
     let mut bookmarks = Vec::new();
     for (position, boundary) in boundaries.iter().enumerate() {

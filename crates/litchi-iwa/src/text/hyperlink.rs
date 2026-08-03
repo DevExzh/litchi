@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use crate::archive::Archive;
 use crate::package_metadata::{
     component_identifier_for_entry, component_identifier_for_object_uuid, next_object_identifier,
     release_package_identifier_suffix, remove_component_external_references_to_object,
@@ -14,8 +15,8 @@ use super::hyperlink_object::{
 };
 use super::hyperlink_storage::{
     Boundary, RangedObjectTable, add_range, decoded_boundaries, encode_table,
-    ensure_range_available, locate_storage, locate_storage_with_archive, patch_ranged_object_table,
-    raw_boundaries, remove_range, validate_range,
+    ensure_range_available, locate_storage_with_archive, patch_ranged_object_table, raw_boundaries,
+    remove_range, validate_range,
 };
 use super::hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 use super::position::{TextPosition, TextRange};
@@ -29,9 +30,10 @@ pub(crate) fn text_hyperlinks(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<Vec<TextHyperlink>> {
-    let location = locate_storage(package, storage_id, RangedObjectTable::SmartField)?;
-    let boundaries = decoded_boundaries(storage_id, &location, RangedObjectTable::SmartField)?;
-    collect_hyperlinks(package, storage_id, &location, &boundaries)
+    let located = locate_storage_with_archive(package, storage_id, RangedObjectTable::SmartField)?;
+    let location = &located.location;
+    let boundaries = decoded_boundaries(storage_id, location, RangedObjectTable::SmartField)?;
+    collect_hyperlinks(storage_id, location, &located.archive, &boundaries)
 }
 
 /// Create a hyperlink over a currently unoccupied smart-field range.
@@ -308,13 +310,12 @@ fn hyperlink_by_id(
 }
 
 fn collect_hyperlinks(
-    package: &IWorkPackage,
     storage_id: u64,
     location: &StorageLocation,
+    archive: &Archive,
     boundaries: &[Boundary],
 ) -> Result<Vec<TextHyperlink>> {
     let text_len = text_utf16_len(&location.storage.text)?;
-    let archive = package.archive(&location.archive_name)?;
     let mut seen = HashSet::new();
     let mut hyperlinks = Vec::new();
     for (position, boundary) in boundaries.iter().enumerate() {

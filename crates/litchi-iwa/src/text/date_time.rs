@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use crate::archive::Archive;
 use crate::package_metadata::{
     component_identifier_for_entry, component_identifier_for_object_uuid, next_object_identifier,
     release_package_identifier_suffix, remove_component_external_references_to_object,
@@ -33,9 +34,10 @@ pub(crate) fn text_date_time_fields(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<Vec<TextDateTimeField>> {
-    let location = locate_storage(package, storage_id, SMART_FIELD_TABLE)?;
-    let boundaries = decoded_boundaries(storage_id, &location, SMART_FIELD_TABLE)?;
-    collect_date_time_fields(package, storage_id, &location, &boundaries)
+    let located = locate_storage_with_archive(package, storage_id, SMART_FIELD_TABLE)?;
+    let location = &located.location;
+    let boundaries = decoded_boundaries(storage_id, location, SMART_FIELD_TABLE)?;
+    collect_date_time_fields(storage_id, location, &located.archive, &boundaries)
 }
 
 pub(crate) fn add_text_date_time_field(
@@ -333,13 +335,12 @@ fn date_time_field_by_id(
 }
 
 fn collect_date_time_fields(
-    package: &IWorkPackage,
     storage_id: u64,
     location: &StorageLocation,
+    archive: &Archive,
     boundaries: &[Boundary],
 ) -> Result<Vec<TextDateTimeField>> {
     let text_len = text_utf16_len(&location.storage.text)?;
-    let archive = package.archive(&location.archive_name)?;
     let mut seen = HashSet::new();
     let mut fields = Vec::new();
     for (position, boundary) in boundaries.iter().enumerate() {
