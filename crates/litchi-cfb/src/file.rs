@@ -414,6 +414,7 @@ impl<R: Read + Seek> OleFile<R> {
             ole.load_minifat(first_minifat_sector, num_minifat_sectors)?;
         }
         ole.validate_stream_allocations()?;
+        ole.validate_physical_sector_layout()?;
 
         Ok(ole)
     }
@@ -725,6 +726,34 @@ impl<R: Read + Seek> OleFile<R> {
                     "regular stream",
                 )?;
                 self.claim_chain(&chain, PhysicalSectorRole::RegularStream)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Ensure the physical file is reconciled with the FAT after all chains
+    /// have been claimed. FAT sectors contain padding entries for their full
+    /// sector width, but only entries addressing physical sectors may carry
+    /// allocation markers.
+    fn validate_physical_sector_layout(&self) -> Result<(), OleError> {
+        let physical_sector_count = self.sector_roles.len();
+        for (sector, role) in self.sector_roles.iter().enumerate() {
+            let entry = self.fat.get(sector).copied().ok_or_else(|| {
+                OleError::CorruptedFile(format!(
+                    "FAT does not contain an entry for physical sector {sector}"
+                ))
+            })?;
+            if *role == PhysicalSectorRole::Unclaimed && entry != FREESECT {
+                return Err(OleError::CorruptedFile(format!(
+                    "unclaimed physical sector {sector} has FAT marker 0x{entry:08X}"
+                )));
+            }
+        }
+        for (sector, entry) in self.fat.iter().enumerate().skip(physical_sector_count) {
+            if *entry != FREESECT {
+                return Err(OleError::CorruptedFile(format!(
+                    "FAT entry {sector} beyond the physical file is not FREESECT"
+                )));
             }
         }
         Ok(())
@@ -1866,6 +1895,26 @@ mod tests {
         assert!(matches!(
             file.read_sector(0),
             Err(OleError::CorruptedFile(message)) if message.contains("outside the file")
+        ));
+    }
+
+    #[test]
+    fn rejects_nonfree_fat_padding_beyond_the_physical_file() {
+        let mut data = sample_file();
+        let physical_sector_count = data.len() / 512 - 1;
+        let fat_sector = u32::from_le_bytes(data[0x4c..0x50].try_into().unwrap());
+        let fat_offset = (usize::try_from(fat_sector).unwrap() + 1) * 512;
+        let padding_offset = fat_offset + physical_sector_count * 4;
+        assert_eq!(
+            &data[padding_offset..padding_offset + 4],
+            &FREESECT.to_le_bytes()
+        );
+        data[padding_offset..padding_offset + 4].copy_from_slice(&ENDOFCHAIN.to_le_bytes());
+
+        assert!(matches!(
+            OleFile::open(Cursor::new(data)),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("beyond the physical file")
         ));
     }
 

@@ -15,8 +15,23 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     }
 }
 
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes([data[offset], data[offset + 1]])
+fn read_u8(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u8> {
+    data.get(offset)
+        .copied()
+        .ok_or_else(|| invalid(record_type, format!("truncated {field}")))
+}
+
+fn read_u16(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u16> {
+    let end = offset
+        .checked_add(2)
+        .ok_or_else(|| invalid(record_type, format!("{field} offset overflows")))?;
+    let bytes = data
+        .get(offset..end)
+        .ok_or_else(|| invalid(record_type, format!("truncated {field}")))?;
+    let bytes: [u8; 2] = bytes
+        .try_into()
+        .map_err(|_| invalid(record_type, format!("truncated {field}")))?;
+    Ok(u16::from_le_bytes(bytes))
 }
 
 /// Logical pane containing an active cell or selection.
@@ -312,10 +327,12 @@ fn parse_window2(data: &[u8]) -> XlsResult<XlsWorksheetView> {
             format!("WINDOW2 payload must be 18 bytes, found {}", data.len()),
         ));
     }
-    let flags = read_u16(data, 0);
-    let first_visible_row = read_u16(data, 2);
-    let first_visible_column = read_u16(data, 4);
-    let gridline_color_index = read_u16(data, 6);
+    let flags = read_u16(data, 0, WINDOW2_RECORD_TYPE, "WINDOW2.flags")?;
+    let first_visible_row = read_u16(data, 2, WINDOW2_RECORD_TYPE, "WINDOW2.first_visible_row")?;
+    let first_visible_column =
+        read_u16(data, 4, WINDOW2_RECORD_TYPE, "WINDOW2.first_visible_column")?;
+    let gridline_color_index =
+        read_u16(data, 6, WINDOW2_RECORD_TYPE, "WINDOW2.gridline_color_index")?;
     if flags & 0xf000 != 0 {
         return Err(invalid(
             WINDOW2_RECORD_TYPE,
@@ -347,7 +364,9 @@ fn parse_window2(data: &[u8]) -> XlsResult<XlsWorksheetView> {
             "WINDOW2 gridline color and default-color flag disagree",
         ));
     }
-    if read_u16(data, 8) != 0 || read_u16(data, 16) != 0 {
+    if read_u16(data, 8, WINDOW2_RECORD_TYPE, "WINDOW2.reserved1")? != 0
+        || read_u16(data, 16, WINDOW2_RECORD_TYPE, "WINDOW2.reserved2")? != 0
+    {
         return Err(invalid(
             WINDOW2_RECORD_TYPE,
             "WINDOW2 reserved fields must be zero",
@@ -360,12 +379,12 @@ fn parse_window2(data: &[u8]) -> XlsResult<XlsWorksheetView> {
         first_visible_column: first_visible_column as u8,
         gridline_color_index,
         page_break_zoom_percent: parse_zoom_percent(
-            read_u16(data, 10),
+            read_u16(data, 10, WINDOW2_RECORD_TYPE, "WINDOW2.page_break_zoom")?,
             WINDOW2_RECORD_TYPE,
             "page-break zoom",
         )?,
         normal_zoom_percent: parse_zoom_percent(
-            read_u16(data, 12),
+            read_u16(data, 12, WINDOW2_RECORD_TYPE, "WINDOW2.normal_zoom")?,
             WINDOW2_RECORD_TYPE,
             "normal zoom",
         )?,
@@ -382,8 +401,8 @@ fn parse_scl(data: &[u8]) -> XlsResult<(u16, u16)> {
             format!("SCL payload must be 4 bytes, found {}", data.len()),
         ));
     }
-    let numerator = read_u16(data, 0);
-    let denominator = read_u16(data, 2);
+    let numerator = read_u16(data, 0, SCL_RECORD_TYPE, "SCL.numerator")?;
+    let denominator = read_u16(data, 2, SCL_RECORD_TYPE, "SCL.denominator")?;
     if numerator == 0
         || denominator == 0
         || numerator > i16::MAX as u16
@@ -412,9 +431,10 @@ fn parse_pane(data: &[u8], frozen: bool) -> XlsResult<XlsPane> {
             format!("PANE payload must be 10 bytes, found {}", data.len()),
         ));
     }
-    let horizontal_split = read_u16(data, 0);
-    let vertical_split = read_u16(data, 2);
-    let right_pane_left_column = read_u16(data, 6);
+    let horizontal_split = read_u16(data, 0, PANE_RECORD_TYPE, "PANE.horizontal_split")?;
+    let vertical_split = read_u16(data, 2, PANE_RECORD_TYPE, "PANE.vertical_split")?;
+    let right_pane_left_column =
+        read_u16(data, 6, PANE_RECORD_TYPE, "PANE.right_pane_left_column")?;
     if (frozen && horizontal_split > 255)
         || (!frozen && (horizontal_split > 32767 || vertical_split > 32767))
     {
@@ -429,15 +449,18 @@ fn parse_pane(data: &[u8], frozen: bool) -> XlsResult<XlsPane> {
             "PANE right-pane column exceeds 255",
         ));
     }
-    if data[9] != 0 {
+    if read_u8(data, 9, PANE_RECORD_TYPE, "PANE.reserved")? != 0 {
         return Err(invalid(PANE_RECORD_TYPE, "PANE reserved byte must be zero"));
     }
     Ok(XlsPane {
         horizontal_split,
         vertical_split,
-        bottom_pane_top_row: read_u16(data, 4),
+        bottom_pane_top_row: read_u16(data, 4, PANE_RECORD_TYPE, "PANE.bottom_pane_top_row")?,
         right_pane_left_column: right_pane_left_column as u8,
-        active_pane: XlsPaneType::parse(data[8], PANE_RECORD_TYPE)?,
+        active_pane: XlsPaneType::parse(
+            read_u8(data, 8, PANE_RECORD_TYPE, "PANE.active_pane")?,
+            PANE_RECORD_TYPE,
+        )?,
     })
 }
 
@@ -448,9 +471,19 @@ fn parse_selection(data: &[u8]) -> XlsResult<XlsSelection> {
             "SELECTION payload is shorter than 9 bytes",
         ));
     }
-    let active_column = read_u16(data, 3);
-    let active_range_index = read_u16(data, 5);
-    let range_count = usize::from(read_u16(data, 7));
+    let active_column = read_u16(data, 3, SELECTION_RECORD_TYPE, "SELECTION.active_column")?;
+    let active_range_index = read_u16(
+        data,
+        5,
+        SELECTION_RECORD_TYPE,
+        "SELECTION.active_range_index",
+    )?;
+    let range_count = usize::from(read_u16(
+        data,
+        7,
+        SELECTION_RECORD_TYPE,
+        "SELECTION.range_count",
+    )?);
     if active_column > 255 {
         return Err(invalid(
             SELECTION_RECORD_TYPE,
@@ -470,12 +503,15 @@ fn parse_selection(data: &[u8]) -> XlsResult<XlsSelection> {
         ));
     }
     let mut ranges = Vec::with_capacity(range_count);
-    for chunk in data[9..].chunks_exact(6) {
+    let range_data = data
+        .get(9..)
+        .ok_or_else(|| invalid(SELECTION_RECORD_TYPE, "truncated SELECTION ranges"))?;
+    for chunk in range_data.chunks_exact(6) {
         let range = XlsSelectionRange {
-            first_row: read_u16(chunk, 0),
-            last_row: read_u16(chunk, 2),
-            first_column: chunk[4],
-            last_column: chunk[5],
+            first_row: read_u16(chunk, 0, SELECTION_RECORD_TYPE, "SELECTION.first_row")?,
+            last_row: read_u16(chunk, 2, SELECTION_RECORD_TYPE, "SELECTION.last_row")?,
+            first_column: read_u8(chunk, 4, SELECTION_RECORD_TYPE, "SELECTION.first_column")?,
+            last_column: read_u8(chunk, 5, SELECTION_RECORD_TYPE, "SELECTION.last_column")?,
         };
         if range.first_row > range.last_row || range.first_column > range.last_column {
             return Err(invalid(
@@ -486,8 +522,11 @@ fn parse_selection(data: &[u8]) -> XlsResult<XlsSelection> {
         ranges.push(range);
     }
     Ok(XlsSelection {
-        pane: XlsPaneType::parse(data[0], SELECTION_RECORD_TYPE)?,
-        active_row: read_u16(data, 1),
+        pane: XlsPaneType::parse(
+            read_u8(data, 0, SELECTION_RECORD_TYPE, "SELECTION.pane")?,
+            SELECTION_RECORD_TYPE,
+        )?,
+        active_row: read_u16(data, 1, SELECTION_RECORD_TYPE, "SELECTION.active_row")?,
         active_column: active_column as u8,
         active_range_index,
         ranges,
@@ -627,6 +666,28 @@ mod tests {
 
     fn selection(pane: u8) -> [u8; 15] {
         [pane, 7, 0, 34, 0, 0, 0, 1, 0, 7, 0, 7, 0, 34, 34]
+    }
+
+    #[test]
+    fn binary_field_reads_return_typed_errors_for_truncation_and_overflow() {
+        let truncated = read_u16(&[0], 0, WINDOW2_RECORD_TYPE, "WINDOW2.flags").unwrap_err();
+        assert!(matches!(
+            truncated,
+            XlsError::InvalidRecord {
+                record_type: WINDOW2_RECORD_TYPE,
+                message,
+            } if message == "truncated WINDOW2.flags"
+        ));
+
+        let overflowing =
+            read_u16(&[], usize::MAX, WINDOW2_RECORD_TYPE, "WINDOW2.flags").unwrap_err();
+        assert!(matches!(
+            overflowing,
+            XlsError::InvalidRecord {
+                record_type: WINDOW2_RECORD_TYPE,
+                message,
+            } if message == "WINDOW2.flags offset overflows"
+        ));
     }
 
     #[test]
