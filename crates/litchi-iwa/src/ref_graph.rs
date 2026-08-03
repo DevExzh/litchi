@@ -114,6 +114,25 @@ fn object_ids_in_order(state: &GraphState) -> Vec<ObjectId> {
     object_ids
 }
 
+fn graph_statistics(state: &GraphState) -> ReferenceGraphStats {
+    ReferenceGraphStats {
+        total_objects: object_count(state),
+        total_edges: state.outgoing_refs.values().map(Vec::len).sum(),
+        max_out_degree: state
+            .outgoing_refs
+            .values()
+            .map(Vec::len)
+            .max()
+            .unwrap_or(0),
+        max_in_degree: state
+            .incoming_refs
+            .values()
+            .map(Vec::len)
+            .max()
+            .unwrap_or(0),
+    }
+}
+
 /// Object reference graph for tracking dependencies
 ///
 /// Maintains a bidirectional graph of object references with efficient
@@ -153,6 +172,30 @@ impl Iterator for ObjectIdIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().copied()
+    }
+}
+
+/// Deterministic cardinality and degree measurements for a reference graph.
+///
+/// The degree values are zero for an empty graph. The value is cheap to copy
+/// and can be retained independently of the graph or one of its snapshots.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct ReferenceGraphStats {
+    /// Number of unique objects that participate in at least one edge.
+    pub total_objects: usize,
+    /// Number of deduplicated directed references.
+    pub total_edges: usize,
+    /// Largest outgoing edge list on any object.
+    pub max_out_degree: usize,
+    /// Largest incoming edge list on any object.
+    pub max_in_degree: usize,
+}
+
+impl ReferenceGraphStats {
+    /// Return whether the graph contains no objects or references.
+    #[inline]
+    pub const fn is_empty(self) -> bool {
+        self.total_objects == 0
     }
 }
 
@@ -535,40 +578,28 @@ impl ReferenceGraph {
         self.state.outgoing_refs.values().map(|v| v.len()).sum()
     }
 
-    /// Get statistics about the reference graph
+    /// Get named statistics about the reference graph.
     ///
-    /// Returns a tuple of:
-    /// - `total_objects`: Number of unique objects in the graph
-    /// - `total_edges`: Total number of references
-    /// - `max_out_degree`: Maximum number of outgoing references from any object
-    /// - `max_in_degree`: Maximum number of incoming references to any object
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let (objects, edges, max_out, max_in) = graph.stats();
-    /// println!("Graph: {} objects, {} edges", objects, edges);
-    /// println!("Max out-degree: {}, max in-degree: {}", max_out, max_in);
-    /// ```
-    pub fn stats(&self) -> (usize, usize, usize, usize) {
-        let total_objects = self.len();
-        let total_edges: usize = self.state.outgoing_refs.values().map(|v| v.len()).sum();
-        let max_out_degree = self
-            .state
-            .outgoing_refs
-            .values()
-            .map(|v| v.len())
-            .max()
-            .unwrap_or(0);
-        let max_in_degree = self
-            .state
-            .incoming_refs
-            .values()
-            .map(|v| v.len())
-            .max()
-            .unwrap_or(0);
+    /// This computes counts directly from the compact bidirectional indexes
+    /// and allocates no temporary collection. The returned value is independent
+    /// of the graph and can be compared with a snapshot's statistics.
+    pub fn statistics(&self) -> ReferenceGraphStats {
+        graph_statistics(&self.state)
+    }
 
-        (total_objects, total_edges, max_out_degree, max_in_degree)
+    /// Get the legacy tuple representation of the graph statistics.
+    ///
+    /// Prefer [`Self::statistics`] for named fields. This compatibility method
+    /// remains available for callers of the original tuple-based API.
+    #[deprecated(note = "use statistics() for named reference-graph fields")]
+    pub fn stats(&self) -> (usize, usize, usize, usize) {
+        let stats = self.statistics();
+        (
+            stats.total_objects,
+            stats.total_edges,
+            stats.max_out_degree,
+            stats.max_in_degree,
+        )
     }
 }
 
@@ -643,6 +674,11 @@ impl ReferenceGraphSnapshot {
     #[inline]
     pub fn edge_count(&self) -> usize {
         self.state.outgoing_refs.values().map(Vec::len).sum()
+    }
+
+    /// Return named cardinality and degree statistics for this immutable view.
+    pub fn statistics(&self) -> ReferenceGraphStats {
+        graph_statistics(&self.state)
     }
 }
 
@@ -742,11 +778,13 @@ mod tests {
         graph.add_reference(1, 4);
         graph.add_reference(2, 3);
 
-        let (objects, edges, max_out, max_in) = graph.stats();
-        assert_eq!(objects, 4);
-        assert_eq!(edges, 4);
-        assert_eq!(max_out, 3); // Node 1 has 3 outgoing edges
-        assert_eq!(max_in, 2); // Node 3 has 2 incoming edges
+        let stats = graph.statistics();
+        assert_eq!(stats.total_objects, 4);
+        assert_eq!(stats.total_edges, 4);
+        assert_eq!(stats.max_out_degree, 3); // Node 1 has 3 outgoing edges
+        assert_eq!(stats.max_in_degree, 2); // Node 3 has 2 incoming edges
+        assert_eq!(graph.stats(), (4, 4, 3, 2));
+        assert_eq!(graph.snapshot().statistics(), stats);
     }
 
     #[test]
@@ -756,11 +794,11 @@ mod tests {
         assert!(graph.is_empty());
         assert_eq!(graph.len(), 0);
 
-        let (objects, edges, max_out, max_in) = graph.stats();
-        assert_eq!(objects, 0);
-        assert_eq!(edges, 0);
-        assert_eq!(max_out, 0);
-        assert_eq!(max_in, 0);
+        let stats = graph.statistics();
+        assert_eq!(stats, ReferenceGraphStats::default());
+        assert!(stats.is_empty());
+        assert_eq!(graph.stats(), (0, 0, 0, 0));
+        assert_eq!(graph.snapshot().statistics(), stats);
     }
 
     #[test]
