@@ -29,8 +29,12 @@ impl TextExtractor {
         ];
 
         for type_id in storage_types {
-            let objects = bundle.find_objects_by_type(type_id);
-            for (_archive_name, object) in objects {
+            for (_archive_name, object) in bundle.iter_objects().filter(|(_, object)| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == type_id)
+            }) {
                 if let Ok(storage) = self.extract_from_object(object)
                     && !storage.is_empty()
                 {

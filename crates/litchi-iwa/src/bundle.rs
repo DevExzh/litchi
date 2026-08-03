@@ -588,6 +588,20 @@ impl Bundle {
         self.iter_archives().collect()
     }
 
+    /// Enumerate every object in deterministic archive-name/source-object order.
+    ///
+    /// The iterator borrows the immutable archive catalog and performs no
+    /// allocation. Use [`Self::all_objects`] when an owned collection is
+    /// required by a compatibility or batch API.
+    pub fn iter_objects(&self) -> impl Iterator<Item = (&str, &ArchiveObject)> {
+        self.iter_archives().flat_map(|(archive_name, archive)| {
+            archive
+                .objects
+                .iter()
+                .map(move |object| (archive_name, object))
+        })
+    }
+
     /// Capture a cheap immutable snapshot that shares all parsed bundle state.
     pub fn snapshot(&self) -> Self {
         self.clone()
@@ -938,28 +952,19 @@ impl Bundle {
 
     /// Get all objects across all archives in archive-name/source-object order.
     pub fn all_objects(&self) -> Vec<(&str, &ArchiveObject)> {
-        let mut objects = Vec::new();
-        for (archive_name, archive) in self.iter_archives() {
-            for object in &archive.objects {
-                objects.push((archive_name, object));
-            }
-        }
-        objects
+        self.iter_objects().collect()
     }
 
     /// Find objects by message type in archive-name/source-object order.
     pub fn find_objects_by_type(&self, message_type: u32) -> Vec<(&str, &ArchiveObject)> {
-        let mut matching_objects = Vec::new();
-
-        for (archive_name, archive) in self.iter_archives() {
-            for object in &archive.objects {
-                if object.messages.iter().any(|msg| msg.type_ == message_type) {
-                    matching_objects.push((archive_name, object));
-                }
-            }
-        }
-
-        matching_objects
+        self.iter_objects()
+            .filter(|(_, object)| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == message_type)
+            })
+            .collect()
     }
 }
 
@@ -1403,6 +1408,12 @@ mod tests {
                 ("Index/Z.iwa", Some(4)),
             ]
         );
+
+        let borrowed_object_order: Vec<_> = bundle
+            .iter_objects()
+            .map(|(archive, object)| (archive, object.archive_info.identifier))
+            .collect();
+        assert_eq!(borrowed_object_order, object_order);
 
         let archive_order: Vec<_> = bundle
             .archives_in_order()
