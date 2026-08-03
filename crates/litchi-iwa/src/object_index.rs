@@ -695,9 +695,11 @@ impl ObjectIndex {
         self.fragment_objects.get(fragment_name)
     }
 
-    /// Get all object IDs
+    /// Get all object IDs in deterministic numeric order.
     pub fn all_object_ids(&self) -> Vec<u64> {
-        self.entries.keys().cloned().collect()
+        let mut object_ids: Vec<_> = self.entries.keys().copied().collect();
+        object_ids.sort_unstable();
+        object_ids
     }
 
     /// Get all indexed object identities in deterministic numeric order.
@@ -730,17 +732,22 @@ impl ObjectIndex {
             .transpose()
     }
 
-    /// Get all entries
+    /// Get all entries in deterministic numeric object-ID order.
     pub fn all_entries(&self) -> Vec<&ObjectIndexEntry> {
-        self.entries.values().collect()
+        let mut entries: Vec<_> = self.entries.values().collect();
+        entries.sort_unstable_by_key(|entry| entry.id);
+        entries
     }
 
-    /// Find objects by type
+    /// Find objects by type in deterministic numeric object-ID order.
     pub fn find_objects_by_type(&self, object_type: u32) -> Vec<&ObjectIndexEntry> {
-        self.entries
+        let mut entries: Vec<_> = self
+            .entries
             .values()
             .filter(|entry| entry.object_type == object_type)
-            .collect()
+            .collect();
+        entries.sort_unstable_by_key(|entry| entry.id);
+        entries
     }
 
     /// Get the reference graph for advanced queries
@@ -952,14 +959,13 @@ impl ObjectIndex {
     ///
     /// # Returns
     ///
-    /// Vector of successfully resolved objects (may be smaller than input if some IDs don't exist)
+    /// Vector of successfully resolved objects in the caller's input order.
+    /// The result may be smaller than the input if some IDs do not exist.
     pub fn resolve_objects(
         &self,
         bundle: &Bundle,
         object_ids: &[u64],
     ) -> Result<Vec<ResolvedObject>> {
-        let mut resolved = Vec::with_capacity(object_ids.len());
-
         // Group object IDs by their archive to minimize archive lookups
         let mut objects_by_archive: std::collections::HashMap<&str, HashSet<u64>> =
             std::collections::HashMap::new();
@@ -973,6 +979,8 @@ impl ObjectIndex {
             }
         }
 
+        let mut resolved_by_id = HashMap::with_capacity(object_ids.len());
+
         // Resolve objects archive by archive
         for (archive_name, ids) in objects_by_archive {
             if let Some(archive) = bundle.get_archive(archive_name) {
@@ -980,17 +988,25 @@ impl ObjectIndex {
                     if let Some(obj_id) = object.archive_info.identifier
                         && ids.contains(&obj_id)
                     {
-                        resolved.push(ResolvedObject {
+                        let resolved = ResolvedObject {
                             id: obj_id,
                             archive_info: object.archive_info.clone(),
                             messages: object.messages.clone(),
-                        });
+                        };
+                        if resolved_by_id.insert(obj_id, resolved).is_some() {
+                            return Err(Error::Archive(format!(
+                                "object {obj_id} occurs in more than one archive"
+                            )));
+                        }
                     }
                 }
             }
         }
 
-        Ok(resolved)
+        Ok(object_ids
+            .iter()
+            .filter_map(|object_id| resolved_by_id.remove(object_id))
+            .collect())
     }
 
     /// Batch-resolve objects through the validated identity API.
@@ -1015,7 +1031,7 @@ impl ObjectIndex {
         }
 
         let raw_ids: Vec<_> = object_ids.iter().map(|object_id| object_id.get()).collect();
-        let mut resolved = self.resolve_objects(bundle, &raw_ids)?;
+        let resolved = self.resolve_objects(bundle, &raw_ids)?;
         let resolved_ids: HashSet<_> = resolved.iter().map(|object| object.id).collect();
         if let Some(missing) = object_ids
             .iter()
@@ -1026,13 +1042,6 @@ impl ObjectIndex {
                 missing.get()
             )));
         }
-        let order: HashMap<_, _> = object_ids
-            .iter()
-            .enumerate()
-            .map(|(position, object_id)| (object_id.get(), position))
-            .collect();
-        resolved
-            .sort_unstable_by_key(|object| order.get(&object.id).copied().unwrap_or(usize::MAX));
         Ok(resolved)
     }
 
@@ -1393,6 +1402,91 @@ mod tests {
         );
         assert!(!index.has_cycle_from(source));
         assert!(index.contains(source));
+    }
+
+    #[test]
+    fn compatibility_object_queries_are_deterministically_ordered() {
+        let objects = [(30, 7), (10, 7), (20, 8)]
+            .into_iter()
+            .map(|(id, object_type)| {
+                let mut object = ArchiveObject::new(
+                    id,
+                    vec![RawMessage {
+                        type_: object_type,
+                        data: Vec::new(),
+                    }],
+                )
+                .unwrap();
+                object.archive_info.message_infos[0].type_ = object_type;
+                object
+            })
+            .collect();
+        let mut index = ObjectIndex::new();
+        index
+            .parse_archive("Index/Test.iwa", &Archive { objects })
+            .unwrap();
+
+        assert_eq!(index.all_object_ids(), vec![10, 20, 30]);
+        assert_eq!(
+            index
+                .all_entries()
+                .into_iter()
+                .map(|entry| entry.id)
+                .collect::<Vec<_>>(),
+            vec![10, 20, 30]
+        );
+        assert_eq!(
+            index
+                .find_objects_by_type(7)
+                .into_iter()
+                .map(|entry| entry.id)
+                .collect::<Vec<_>>(),
+            vec![10, 30]
+        );
+    }
+
+    #[test]
+    fn batch_resolution_preserves_request_order_across_fragments() {
+        let first = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 41,
+                        data: Vec::new(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let second = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: 42,
+                        data: Vec::new(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let mut package = crate::IWorkPackage::new();
+        package.replace_archive("Index/First.iwa", &first).unwrap();
+        package
+            .replace_archive("Index/Second.iwa", &second)
+            .unwrap();
+        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let index = ObjectIndex::from_bundle(&bundle).unwrap();
+
+        let resolved = index.resolve_objects(&bundle, &[2, 1]).unwrap();
+        assert_eq!(
+            resolved
+                .into_iter()
+                .map(|object| object.id)
+                .collect::<Vec<_>>(),
+            vec![2, 1]
+        );
     }
 
     #[test]
