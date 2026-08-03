@@ -190,24 +190,20 @@ pub fn parallel_signature_check(data: &[u8], signatures: &[&[u8]]) -> SmallVec<[
 /// assert!(!mask.is_rtf());
 /// ```
 pub fn check_office_signatures(data: &[u8]) -> FormatSignatureMask {
-    if data.len() < 8 {
-        return FormatSignatureMask::empty();
-    }
-
     let mut mask = FormatSignatureMask::empty();
 
     // Check OLE2 signature (8 bytes)
-    if signature_matches(&data[0..8], crate::detection::utils::OLE2_SIGNATURE) {
+    if signature_matches(data, crate::detection::utils::OLE2_SIGNATURE) {
         mask |= FormatSignatureMask::OLE2;
     }
 
     // Check ZIP signature (4 bytes)
-    if signature_matches(&data[0..4], crate::detection::utils::ZIP_SIGNATURE) {
+    if signature_matches(data, crate::detection::utils::ZIP_SIGNATURE) {
         mask |= FormatSignatureMask::ZIP;
     }
 
     // Check RTF signature (5 bytes)
-    if data.len() >= 5 && signature_matches(&data[0..5], b"{\\rtf") {
+    if signature_matches(data, b"{\\rtf") {
         mask |= FormatSignatureMask::RTF;
     }
 
@@ -607,6 +603,25 @@ mod tests {
         let mask = check_office_signatures(unknown_data);
         assert!(!mask.has_match());
         assert_eq!(mask.count(), 0);
+    }
+
+    #[test]
+    fn test_check_office_signatures_accepts_minimum_signature_lengths() {
+        let zip_data = b"PK\x03\x04";
+        let mask = check_office_signatures(zip_data);
+        assert!(mask.is_zip());
+        assert!(!mask.is_ole2());
+        assert!(!mask.is_rtf());
+
+        let rtf_data = b"{\\rtf";
+        let mask = check_office_signatures(rtf_data);
+        assert!(mask.is_rtf());
+        assert!(!mask.is_ole2());
+        assert!(!mask.is_zip());
+
+        for incomplete in [b"PK\x03".as_slice(), b"{\\rt".as_slice()] {
+            assert!(!check_office_signatures(incomplete).has_match());
+        }
     }
 
     #[test]
