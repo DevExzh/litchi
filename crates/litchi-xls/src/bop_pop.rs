@@ -35,6 +35,58 @@ fn invalid(message: impl Into<String>) -> XlsError {
     }
 }
 
+/// Checked reader for the fixed-width fields in a `BopPop` payload.
+///
+/// The public parser currently rejects any payload whose length is not exact,
+/// but keeping offset arithmetic and field extraction checked here prevents a
+/// future layout change from reintroducing panic paths.
+struct BopPopReader<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> BopPopReader<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+        let end = self
+            .offset
+            .checked_add(N)
+            .ok_or_else(|| invalid("BopPop field offset overflows usize"))?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(XlsError::InvalidLength {
+                expected: end,
+                found: self.data.len(),
+            })?;
+        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+            expected: N,
+            found: bytes.len(),
+        })?;
+        self.offset = end;
+        Ok(value)
+    }
+
+    fn read_u8(&mut self) -> XlsResult<u8> {
+        Ok(u8::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_u16(&mut self) -> XlsResult<u16> {
+        Ok(u16::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_i16(&mut self) -> XlsResult<i16> {
+        Ok(i16::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_f64(&mut self) -> XlsResult<f64> {
+        Ok(f64::from_le_bytes(self.read_bytes()?))
+    }
+}
+
 /// The `pst` chart group subtype (MS-XLS 2.4.25).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -127,8 +179,20 @@ impl XlsBopPop {
                 found: data.len(),
             });
         }
+
+        let mut reader = BopPopReader::new(data);
+        let subtype = reader.read_u8()?;
+        let auto_split = reader.read_u8()?;
+        let split = reader.read_u16()?;
+        let split_position = reader.read_i16()?;
+        let split_percent = reader.read_i16()?;
+        let pie2_size_percent = reader.read_i16()?;
+        let gap_percent = reader.read_i16()?;
+        let split_value = reader.read_f64()?;
+        let flags = reader.read_u16()?;
+
         // Boolean (MS-XLS 2.5.14): only 0x00 and 0x01 are legal.
-        let auto_split = match data[1] {
+        let auto_split = match auto_split {
             0x00 => false,
             0x01 => true,
             other => {
@@ -137,34 +201,31 @@ impl XlsBopPop {
                 )));
             },
         };
-        let split_position = i16::from_le_bytes([data[4], data[5]]);
         if !(0..=MAX_SPLIT_POSITION).contains(&split_position) {
             return Err(invalid(format!(
                 "BopPop iSplitPos {split_position} is outside 0..={MAX_SPLIT_POSITION}"
             )));
         }
-        let pie2_size_percent = i16::from_le_bytes([data[8], data[9]]);
         if !(MIN_PIE2_SIZE..=MAX_PIE2_SIZE).contains(&pie2_size_percent) {
             return Err(invalid(format!(
                 "BopPop pcPie2Size {pie2_size_percent} is outside {MIN_PIE2_SIZE}..={MAX_PIE2_SIZE}"
             )));
         }
-        let gap_percent = i16::from_le_bytes([data[10], data[11]]);
         if !(0..=MAX_GAP).contains(&gap_percent) {
             return Err(invalid(format!(
                 "BopPop pcGap {gap_percent} is outside 0..={MAX_GAP}"
             )));
         }
         Ok(Self {
-            subtype: XlsBopPopSubtype::parse(data[0])?,
+            subtype: XlsBopPopSubtype::parse(subtype)?,
             auto_split,
-            split: XlsBopPopSplit::parse(u16::from_le_bytes([data[2], data[3]]))?,
+            split: XlsBopPopSplit::parse(split)?,
             split_position,
-            split_percent: i16::from_le_bytes([data[6], data[7]]),
+            split_percent,
             pie2_size_percent,
             gap_percent,
-            split_value: f64::from_le_bytes(data[12..20].try_into().expect("length checked")),
-            flags: u16::from_le_bytes([data[20], data[21]]),
+            split_value,
+            flags,
         })
     }
 
@@ -322,5 +383,27 @@ mod tests {
         assert!(XlsBopPop::parse(&record(0x01, 0, 0, [0, 0, 201, 0], 0.0, 0)).is_err());
         assert!(XlsBopPop::parse(&record(0x01, 0, 0, [0, 0, 5, -1], 0.0, 0)).is_err());
         assert!(XlsBopPop::parse(&record(0x01, 0, 0, [0, 0, 5, 501], 0.0, 0)).is_err());
+    }
+
+    #[test]
+    fn rejects_every_truncated_payload() {
+        let bytes = record(0x01, 0, 0, [0, 0, 5, 0], 0.0, 0);
+
+        for length in 0..PAYLOAD_LEN {
+            assert!(
+                XlsBopPop::parse(&bytes[..length]).is_err(),
+                "length {length}"
+            );
+        }
+    }
+
+    #[test]
+    fn reader_rejects_offset_overflow() {
+        let mut reader = BopPopReader {
+            data: &[],
+            offset: usize::MAX,
+        };
+
+        assert!(reader.read_bytes::<1>().is_err());
     }
 }

@@ -32,7 +32,6 @@ use super::format::{CellFill, CellFont, CellFormat};
 use super::header_footer::{WorksheetHeaderFooter, parse_worksheet_header_footer};
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::outline_properties::WorksheetOutlineProperties;
-use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
 use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
 use super::phonetic_properties::{
@@ -70,6 +69,7 @@ use super::{
 };
 use litchi_xlsx::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
 use litchi_xlsx::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
+use litchi_xlsx::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
 use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};

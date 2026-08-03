@@ -6,7 +6,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{OoxmlError, Result};
+use crate::error::{Error, Result};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -74,8 +74,13 @@ pub fn parse_worksheet_page_margins(xml: &[u8]) -> Result<Option<WorksheetPageMa
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
-    let validated =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    let limits = MceLimits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        ..MceLimits::default()
+    };
+    let validated = process_markup_compatibility(xml, &MceCapabilities::default(), &limits)?;
     if validated.xml.len() > MAX_XML_BYTES {
         return Err(invalid("processed worksheet XML is too large"));
     }
@@ -302,7 +307,7 @@ fn parse_margin(raw: &str, name: &[u8]) -> Result<PageMargin> {
     Ok(PageMargin(value))
 }
 
-fn missing(name: &str) -> OoxmlError {
+fn missing(name: &str) -> Error {
     invalid(format!(
         "pageMargins is missing required '{name}' attribute"
     ))
@@ -313,11 +318,13 @@ fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
 fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected)
 }
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(format!(
+        "invalid worksheet page-margin XML: {error}"
+    )))
 }
 
 #[cfg(test)]

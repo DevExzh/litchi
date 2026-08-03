@@ -45,7 +45,6 @@ pub mod named_sheet_view;
 mod namespace;
 pub mod ole_objects;
 pub mod outline_properties;
-pub mod page_margins;
 pub mod page_setup;
 pub mod parsers;
 pub mod phonetic_properties;
@@ -99,6 +98,7 @@ pub use chartsheet::{
 pub use litchi_xlsx::calculation_properties;
 pub use litchi_xlsx::cell_watches;
 pub use litchi_xlsx::ignored_errors;
+pub use litchi_xlsx::page_margins;
 pub use litchi_xlsx::print_options;
 pub use litchi_xlsx::scenarios;
 pub use litchi_xlsx::sheet_calculation_properties;
@@ -187,6 +187,9 @@ pub use litchi_xlsx::ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
+pub use litchi_xlsx::page_margins::{
+    PageMargin, WorksheetPageMargins, parse_worksheet_page_margins,
+};
 pub use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use litchi_xlsx::sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
@@ -208,7 +211,6 @@ pub use ole_objects::{
     parse_worksheet_ole_objects, store_worksheet_ole_objects, write_worksheet_ole_objects,
 };
 pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
-pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
 pub use page_setup::parse_worksheet_page_setup;
 pub use phonetic_properties::{
     WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
