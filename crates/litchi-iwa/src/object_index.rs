@@ -781,11 +781,13 @@ impl ObjectIndex {
     ///
     /// # Returns
     ///
-    /// Optional slice of referenced object IDs, or None if object has no outgoing references
-    pub fn get_dependencies(&self, object_id: u64) -> Option<&[u64]> {
-        self.reference_graph
-            .get_outgoing_refs(object_id)
-            .map(|v| v.as_slice())
+    /// Optional owned compatibility view of referenced object IDs.
+    ///
+    /// Prefer [`Self::dependencies`] for the allocation-free typed view.
+    pub fn get_dependencies(&self, object_id: u64) -> Option<Vec<u64>> {
+        let object_id = ObjectId::new(object_id)?;
+        self.dependencies(object_id)
+            .map(|references| references.map(ObjectId::get).collect())
     }
 
     /// Get typed dependencies without exposing raw sentinel IDs.
@@ -803,11 +805,13 @@ impl ObjectIndex {
     ///
     /// # Returns
     ///
-    /// Optional slice of referencing object IDs, or None if no objects reference this one
-    pub fn get_dependents(&self, object_id: u64) -> Option<&[u64]> {
-        self.reference_graph
-            .get_incoming_refs(object_id)
-            .map(|v| v.as_slice())
+    /// Optional owned compatibility view of referencing object IDs.
+    ///
+    /// Prefer [`Self::dependents`] for the allocation-free typed view.
+    pub fn get_dependents(&self, object_id: u64) -> Option<Vec<u64>> {
+        let object_id = ObjectId::new(object_id)?;
+        self.dependents(object_id)
+            .map(|references| references.map(ObjectId::get).collect())
     }
 
     /// Get typed dependents without exposing raw sentinel IDs.
@@ -858,7 +862,13 @@ impl ObjectIndex {
     ///
     /// O(V + E) where V is vertices and E is edges in the reachable subgraph
     pub fn get_transitive_dependencies(&self, object_id: u64) -> Vec<u64> {
-        self.reference_graph.get_reachable(object_id)
+        let Some(object_id) = ObjectId::new(object_id) else {
+            return Vec::new();
+        };
+        self.reachable_from(object_id)
+            .into_iter()
+            .map(ObjectId::get)
+            .collect()
     }
 
     /// Get typed transitive dependencies, including the starting object.
@@ -1216,8 +1226,8 @@ mod tests {
         let mut index = ObjectIndex::new();
         index.parse_archive("Index/Test.iwa", &archive).unwrap();
 
-        assert_eq!(index.get_dependencies(10), Some([20, 30].as_slice()));
-        assert_eq!(index.get_dependents(20), Some([10].as_slice()));
+        assert_eq!(index.get_dependencies(10), Some(vec![20, 30]));
+        assert_eq!(index.get_dependents(20), Some(vec![10]));
         assert_eq!(index.stats().total_references, 2);
     }
 
@@ -1393,8 +1403,8 @@ mod tests {
         };
         let mut index = ObjectIndex::new();
         index.parse_archive("Index/Test.iwa", &archive).unwrap();
-        assert_eq!(index.get_dependencies(10), Some([20].as_slice()));
-        assert_eq!(index.get_dependencies(20), Some([30].as_slice()));
+        assert_eq!(index.get_dependencies(10), Some(vec![20]));
+        assert_eq!(index.get_dependencies(20), Some(vec![30]));
     }
 
     #[test]
@@ -1424,7 +1434,7 @@ mod tests {
         };
         let mut index = ObjectIndex::new();
         index.parse_archive("Index/Comments.iwa", &archive).unwrap();
-        assert_eq!(index.get_dependencies(10), Some([20, 30].as_slice()));
+        assert_eq!(index.get_dependencies(10), Some(vec![20, 30]));
     }
 
     #[test]

@@ -25,8 +25,8 @@
 //! graph.add_reference(2, 3);  // Object 2 references object 3
 //!
 //! // Query dependencies
-//! assert_eq!(graph.get_outgoing_refs(1), Some(&vec![2, 3]));
-//! assert_eq!(graph.get_incoming_refs(3), Some(&vec![1, 2]));
+//! assert_eq!(graph.get_outgoing_refs(1), Some(vec![2, 3]));
+//! assert_eq!(graph.get_incoming_refs(3), Some(vec![1, 2]));
 //!
 //! // Check for cycles
 //! assert!(!graph.has_cycle_from(1));
@@ -83,8 +83,8 @@ impl std::error::Error for ObjectIdError {}
 
 #[derive(Debug, Clone, Default)]
 struct GraphState {
-    incoming_refs: HashMap<u64, Vec<u64>>,
-    outgoing_refs: HashMap<u64, Vec<u64>>,
+    incoming_refs: HashMap<ObjectId, Vec<ObjectId>>,
+    outgoing_refs: HashMap<ObjectId, Vec<ObjectId>>,
 }
 
 /// Object reference graph for tracking dependencies
@@ -118,14 +118,14 @@ pub struct ReferenceGraphSnapshot {
 /// Allocation-free iterator over validated object IDs in one edge list.
 #[derive(Debug, Clone)]
 pub struct ObjectIdIter<'a> {
-    inner: std::slice::Iter<'a, u64>,
+    inner: std::slice::Iter<'a, ObjectId>,
 }
 
 impl Iterator for ObjectIdIter<'_> {
     type Item = ObjectId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.find_map(|&raw| ObjectId::new(raw))
+        self.inner.next().copied()
     }
 }
 
@@ -163,7 +163,7 @@ impl ReferenceGraph {
     pub fn incoming(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
         self.state
             .incoming_refs
-            .get(&object_id.get())
+            .get(&object_id)
             .map(|ids| ObjectIdIter { inner: ids.iter() })
     }
 
@@ -173,13 +173,22 @@ impl ReferenceGraph {
     pub fn outgoing(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
         self.state
             .outgoing_refs
-            .get(&object_id.get())
+            .get(&object_id)
             .map(|ids| ObjectIdIter { inner: ids.iter() })
     }
 
     /// Add a reference through the checked typed identity path.
     pub fn add_object_reference(&mut self, source: ObjectId, target: ObjectId) {
-        self.add_reference(source.get(), target.get());
+        let state = Arc::make_mut(&mut self.state);
+        let outgoing = state.outgoing_refs.entry(source).or_default();
+        if !outgoing.contains(&target) {
+            outgoing.push(target);
+        }
+
+        let incoming = state.incoming_refs.entry(target).or_default();
+        if !incoming.contains(&source) {
+            incoming.push(source);
+        }
     }
 
     /// Add a reference from source to target
@@ -205,24 +214,11 @@ impl ReferenceGraph {
     /// let mut graph = ReferenceGraph::new();
     /// graph.add_reference(1, 2);
     /// graph.add_reference(1, 2);  // Duplicate - will be ignored
-    /// assert_eq!(graph.get_outgoing_refs(1), Some(&vec![2]));
+    /// assert_eq!(graph.get_outgoing_refs(1), Some(vec![2]));
     /// ```
     pub fn add_reference(&mut self, source_id: u64, target_id: u64) {
-        if source_id == 0 || target_id == 0 {
-            return;
-        }
-
-        let state = Arc::make_mut(&mut self.state);
-        // Add to outgoing refs with deduplication
-        let outgoing = state.outgoing_refs.entry(source_id).or_default();
-        if !outgoing.contains(&target_id) {
-            outgoing.push(target_id);
-        }
-
-        // Add to incoming refs with deduplication
-        let incoming = state.incoming_refs.entry(target_id).or_default();
-        if !incoming.contains(&source_id) {
-            incoming.push(source_id);
+        if let (Some(source), Some(target)) = (ObjectId::new(source_id), ObjectId::new(target_id)) {
+            self.add_object_reference(source, target);
         }
     }
 
@@ -236,7 +232,9 @@ impl ReferenceGraph {
     ///
     /// # Returns
     ///
-    /// Optional reference to a vector of referencing object IDs
+    /// Optional owned view of the referencing object IDs.
+    ///
+    /// Prefer [`Self::incoming`] for the allocation-free typed view.
     ///
     /// # Example
     ///
@@ -244,10 +242,13 @@ impl ReferenceGraph {
     /// let mut graph = ReferenceGraph::new();
     /// graph.add_reference(1, 2);
     /// graph.add_reference(3, 2);
-    /// assert_eq!(graph.get_incoming_refs(2), Some(&vec![1, 3]));
+    /// assert_eq!(graph.get_incoming_refs(2), Some(vec![1, 3]));
     /// ```
-    pub fn get_incoming_refs(&self, object_id: u64) -> Option<&Vec<u64>> {
-        self.state.incoming_refs.get(&object_id)
+    #[deprecated(note = "use incoming(ObjectId) for the typed, allocation-free view")]
+    pub fn get_incoming_refs(&self, object_id: u64) -> Option<Vec<u64>> {
+        let object_id = ObjectId::new(object_id)?;
+        self.incoming(object_id)
+            .map(|references| references.map(ObjectId::get).collect())
     }
 
     /// Get objects referenced by the given object (outgoing edges)
@@ -260,7 +261,9 @@ impl ReferenceGraph {
     ///
     /// # Returns
     ///
-    /// Optional reference to a vector of referenced object IDs
+    /// Optional owned view of the referenced object IDs.
+    ///
+    /// Prefer [`Self::outgoing`] for the allocation-free typed view.
     ///
     /// # Example
     ///
@@ -268,10 +271,13 @@ impl ReferenceGraph {
     /// let mut graph = ReferenceGraph::new();
     /// graph.add_reference(1, 2);
     /// graph.add_reference(1, 3);
-    /// assert_eq!(graph.get_outgoing_refs(1), Some(&vec![2, 3]));
+    /// assert_eq!(graph.get_outgoing_refs(1), Some(vec![2, 3]));
     /// ```
-    pub fn get_outgoing_refs(&self, object_id: u64) -> Option<&Vec<u64>> {
-        self.state.outgoing_refs.get(&object_id)
+    #[deprecated(note = "use outgoing(ObjectId) for the typed, allocation-free view")]
+    pub fn get_outgoing_refs(&self, object_id: u64) -> Option<Vec<u64>> {
+        let object_id = ObjectId::new(object_id)?;
+        self.outgoing(object_id)
+            .map(|references| references.map(ObjectId::get).collect())
     }
 
     /// Get all object IDs in the graph
@@ -293,10 +299,25 @@ impl ReferenceGraph {
     /// assert_eq!(all.len(), 3);
     /// ```
     pub fn all_objects(&self) -> std::collections::HashSet<u64> {
-        let mut all = std::collections::HashSet::new();
-        all.extend(self.state.incoming_refs.keys());
-        all.extend(self.state.outgoing_refs.keys());
-        all
+        self.all_object_ids()
+            .into_iter()
+            .map(ObjectId::get)
+            .collect()
+    }
+
+    /// Get all validated object IDs in the graph.
+    pub fn all_object_ids(&self) -> HashSet<ObjectId> {
+        self.state
+            .incoming_refs
+            .keys()
+            .chain(self.state.outgoing_refs.keys())
+            .copied()
+            .collect()
+    }
+
+    /// Check for a cycle through the typed identity API.
+    pub fn has_cycle(&self, start_id: ObjectId) -> bool {
+        self.has_cycle_ids(start_id)
     }
 
     /// Check if there's a cycle reachable from the given object
@@ -329,6 +350,13 @@ impl ReferenceGraph {
     /// assert!(graph.has_cycle_from(1));
     /// ```
     pub fn has_cycle_from(&self, start_id: u64) -> bool {
+        let Some(start_id) = ObjectId::new(start_id) else {
+            return false;
+        };
+        self.has_cycle_ids(start_id)
+    }
+
+    fn has_cycle_ids(&self, start_id: ObjectId) -> bool {
         // 0 = unseen, 1 = active, 2 = complete. Each node is pushed once to
         // enter and once to leave, replacing recursive DFS with bounded stack
         // growth in the heap.
@@ -350,7 +378,7 @@ impl ReferenceGraph {
             colors.insert(node, 1);
             stack.push((node, true));
 
-            if let Some(neighbors) = self.get_outgoing_refs(node) {
+            if let Some(neighbors) = self.state.outgoing_refs.get(&node) {
                 for &neighbor in neighbors.iter().rev() {
                     match colors.get(&neighbor).copied() {
                         Some(1) => return true,
@@ -395,7 +423,7 @@ impl ReferenceGraph {
     /// let reachable = graph.get_reachable(1);
     /// assert_eq!(reachable.len(), 4);  // [1, 2, 3, 4]
     /// ```
-    pub fn get_reachable(&self, start_id: u64) -> Vec<u64> {
+    pub fn reachable(&self, start_id: ObjectId) -> Vec<ObjectId> {
         use std::collections::{HashSet, VecDeque};
 
         let mut visited = HashSet::new();
@@ -411,7 +439,7 @@ impl ReferenceGraph {
             result.push(node);
 
             // Add all unvisited neighbors to the queue
-            if let Some(neighbors) = self.get_outgoing_refs(node) {
+            if let Some(neighbors) = self.state.outgoing_refs.get(&node) {
                 for &neighbor in neighbors {
                     if visited.insert(neighbor) {
                         queue.push_back(neighbor);
@@ -421,6 +449,18 @@ impl ReferenceGraph {
         }
 
         result
+    }
+
+    /// Get all objects reachable from a legacy raw ID.
+    #[deprecated(note = "use reachable(ObjectId) for the typed traversal")]
+    pub fn get_reachable(&self, start_id: u64) -> Vec<u64> {
+        let Some(start_id) = ObjectId::new(start_id) else {
+            return Vec::new();
+        };
+        self.reachable(start_id)
+            .into_iter()
+            .map(ObjectId::get)
+            .collect()
     }
 
     /// Get the number of objects in the graph
@@ -499,7 +539,7 @@ impl ReferenceGraphSnapshot {
     pub fn incoming(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
         self.state
             .incoming_refs
-            .get(&object_id.get())
+            .get(&object_id)
             .map(|ids| ObjectIdIter { inner: ids.iter() })
     }
 
@@ -509,7 +549,7 @@ impl ReferenceGraphSnapshot {
     pub fn outgoing(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
         self.state
             .outgoing_refs
-            .get(&object_id.get())
+            .get(&object_id)
             .map(|ids| ObjectIdIter { inner: ids.iter() })
     }
 
@@ -519,7 +559,7 @@ impl ReferenceGraphSnapshot {
             .incoming_refs
             .keys()
             .chain(self.state.outgoing_refs.keys())
-            .filter_map(|&raw| ObjectId::new(raw))
+            .copied()
             .collect()
     }
 
@@ -528,7 +568,7 @@ impl ReferenceGraphSnapshot {
         ReferenceGraph {
             state: Arc::clone(&self.state),
         }
-        .has_cycle_from(object_id.get())
+        .has_cycle(object_id)
     }
 
     /// Return the non-null objects reachable from `object_id`, including it.
@@ -536,10 +576,7 @@ impl ReferenceGraphSnapshot {
         ReferenceGraph {
             state: Arc::clone(&self.state),
         }
-        .get_reachable(object_id.get())
-        .into_iter()
-        .filter_map(ObjectId::new)
-        .collect()
+        .reachable(object_id)
     }
 
     /// Return the number of non-null objects in the snapshot.
@@ -557,21 +594,12 @@ impl ReferenceGraphSnapshot {
     /// Return the number of stored non-duplicate edges with non-null endpoints.
     #[inline]
     pub fn edge_count(&self) -> usize {
-        self.state
-            .outgoing_refs
-            .iter()
-            .filter_map(|(&source, targets)| ObjectId::new(source).map(|_| targets))
-            .map(|targets| {
-                targets
-                    .iter()
-                    .filter(|&&target| ObjectId::new(target).is_some())
-                    .count()
-            })
-            .sum()
+        self.state.outgoing_refs.values().map(Vec::len).sum()
     }
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 
@@ -583,8 +611,8 @@ mod tests {
         graph.add_reference(1, 3);
         graph.add_reference(2, 3);
 
-        assert_eq!(graph.get_outgoing_refs(1), Some(&vec![2, 3]));
-        assert_eq!(graph.get_incoming_refs(3), Some(&vec![1, 2]));
+        assert_eq!(graph.get_outgoing_refs(1), Some(vec![2, 3]));
+        assert_eq!(graph.get_incoming_refs(3), Some(vec![1, 2]));
         assert_eq!(graph.get_incoming_refs(1), None);
     }
 
@@ -598,8 +626,8 @@ mod tests {
         graph.add_reference(1, 2);
 
         // Should only appear once
-        assert_eq!(graph.get_outgoing_refs(1), Some(&vec![2]));
-        assert_eq!(graph.get_incoming_refs(2), Some(&vec![1]));
+        assert_eq!(graph.get_outgoing_refs(1), Some(vec![2]));
+        assert_eq!(graph.get_incoming_refs(2), Some(vec![1]));
     }
 
     #[test]
