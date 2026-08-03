@@ -389,6 +389,25 @@ impl DirectoryBuilder {
     ///
     /// * `Vec<u8>` - Concatenated directory entries (128 bytes each)
     pub fn generate_directory_stream(&mut self) -> Result<Vec<u8>, OleError> {
+        // Prepare all fallible serialization work before linking the sibling
+        // trees.  A name can be mutated through the public `name` field after
+        // construction; `to_bytes` rejects that stale cached state.  Keeping
+        // this validation (and the output allocation) ahead of tree mutation
+        // makes serialization-preparation failures leave the builder unchanged.
+        let byte_len = self
+            .entries
+            .len()
+            .checked_mul(DIRENTRY_SIZE)
+            .ok_or_else(|| {
+                OleError::InvalidData("CFB directory stream size overflows usize".to_string())
+            })?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(byte_len)
+            .map_err(|source| OleError::allocation("directory stream", source))?;
+        for entry in &self.entries {
+            entry.to_bytes()?;
+        }
+
         let mut storage_sids = Vec::new();
         storage_sids
             .try_reserve_exact(self.entries.len())
@@ -413,12 +432,6 @@ impl DirectoryBuilder {
         }
 
         // Serialize entries in SID order
-        let byte_len = entries.len().checked_mul(DIRENTRY_SIZE).ok_or_else(|| {
-            OleError::InvalidData("CFB directory stream size overflows usize".to_string())
-        })?;
-        let mut data = Vec::new();
-        data.try_reserve_exact(byte_len)
-            .map_err(|source| OleError::allocation("directory stream", source))?;
         for entry in entries {
             data.extend_from_slice(&entry.to_bytes()?);
         }
@@ -758,6 +771,24 @@ mod tests {
             }
             let bytes = directory.generate_directory_stream().unwrap();
             assert_eq!(bytes.len(), (count as usize + 1) * DIRENTRY_SIZE);
+        }
+    }
+
+    #[test]
+    fn failed_serialization_does_not_mutate_sibling_tree() {
+        let mut directory = DirectoryBuilder::new(0, 0);
+        let first = directory.add_stream("First".to_string(), 0, 0).unwrap();
+        let second = directory.add_stream("Second".to_string(), 1, 0).unwrap();
+
+        directory.entries[first as usize].name.push('x');
+        assert!(directory.generate_directory_stream().is_err());
+
+        assert_eq!(directory.entries[0].sid_child, NOSTREAM);
+        for sid in [first, second] {
+            let entry = &directory.entries[sid as usize];
+            assert_eq!(entry.sid_left, NOSTREAM);
+            assert_eq!(entry.sid_right, NOSTREAM);
+            assert_eq!(entry.node_color, NodeColor::Black);
         }
     }
 }

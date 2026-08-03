@@ -4,8 +4,6 @@
 //! edits elsewhere. This module parses and serializes the worksheet
 //! `cellWatches` collection; it never evaluates the watched cells.
 
-use std::fmt::Write;
-
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -14,9 +12,11 @@ use quick_xml::reader::NsReader;
 use crate::error::{OoxmlError, Result};
 use litchi_ooxml_common::mce::process_str;
 
-const TRANSITIONAL_MAIN: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT_MAIN: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const MAX_CELL_WATCHES: usize = 65_536;
+const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 256;
 const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;
 
@@ -30,8 +30,8 @@ pub enum WorksheetCellWatchConformance {
 impl WorksheetCellWatchConformance {
     fn main_namespace(self) -> &'static str {
         match self {
-            Self::Transitional => std::str::from_utf8(TRANSITIONAL_MAIN).unwrap(),
-            Self::Strict => std::str::from_utf8(STRICT_MAIN).unwrap(),
+            Self::Transitional => TRANSITIONAL_MAIN,
+            Self::Strict => STRICT_MAIN,
         }
     }
 }
@@ -93,14 +93,25 @@ enum NamespaceKind {
 
 /// Parses the direct worksheet `cellWatches` child after applying shared MCE processing.
 pub fn parse_worksheet_cell_watches(xml: &[u8]) -> Result<Option<WorksheetCellWatches>> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("worksheet XML exceeds safety limit"));
+    }
     let source = std::str::from_utf8(xml)
         .map_err(|error| invalid(format!("worksheet XML is not UTF-8: {error}")))?;
     let processed = process_str(source)?;
+    if processed.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML exceeds safety limit"));
+    }
     let mut reader = NsReader::from_reader(processed.as_bytes());
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut scopes = Vec::new();
     let mut references: Option<Vec<CellWatchReference>> = None;
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
 
     loop {
         let (resolved, event) = reader
@@ -109,6 +120,18 @@ pub fn parse_worksheet_cell_watches(xml: &[u8]) -> Result<Option<WorksheetCellWa
         let namespace = namespace_kind(resolved)?;
         match event {
             Event::Start(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if scopes.is_empty() && root_seen {
+                    return Err(invalid("worksheet XML contains multiple roots"));
+                }
+                let next_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML depth overflow"))?;
+                if next_depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
                 let scope = begin_element(
                     &reader,
                     &element,
@@ -116,21 +139,65 @@ pub fn parse_worksheet_cell_watches(xml: &[u8]) -> Result<Option<WorksheetCellWa
                     scopes.last().copied(),
                     &mut references,
                 )?;
+                if scopes.is_empty() {
+                    root_seen = true;
+                }
+                depth = next_depth;
                 scopes.push(scope);
             },
             Event::Empty(element) => {
-                begin_element(
-                    &reader,
-                    &element,
-                    namespace,
-                    scopes.last().copied(),
-                    &mut references,
-                )?;
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if scopes.is_empty() {
+                    if root_seen {
+                        return Err(invalid("worksheet XML contains multiple roots"));
+                    }
+                    begin_element(&reader, &element, namespace, None, &mut references)?;
+                    root_seen = true;
+                    root_closed = true;
+                } else {
+                    begin_element(
+                        &reader,
+                        &element,
+                        namespace,
+                        scopes.last().copied(),
+                        &mut references,
+                    )?;
+                }
             },
-            Event::End(_) => {
-                scopes
+            Event::End(element) => {
+                let scope = scopes
                     .pop()
                     .ok_or_else(|| invalid("unexpected worksheet end element"))?;
+                match scope {
+                    Scope::Worksheet => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"worksheet"
+                        {
+                            return Err(invalid("mismatched worksheet end element"));
+                        }
+                        root_closed = true;
+                    },
+                    Scope::CellWatches => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"cellWatches"
+                        {
+                            return Err(invalid("mismatched cellWatches end element"));
+                        }
+                    },
+                    Scope::CellWatch => {
+                        if namespace != NamespaceKind::Main
+                            || element.local_name().as_ref() != b"cellWatch"
+                        {
+                            return Err(invalid("mismatched cellWatch end element"));
+                        }
+                    },
+                    Scope::Other => {},
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("worksheet XML depth underflow"))?;
             },
             Event::Text(text)
                 if matches!(scopes.last(), Some(Scope::CellWatches | Scope::CellWatch))
@@ -138,21 +205,44 @@ pub fn parse_worksheet_cell_watches(xml: &[u8]) -> Result<Option<WorksheetCellWa
             {
                 return Err(invalid("cellWatches family cannot contain text"));
             },
+            Event::Text(text)
+                if matches!(scopes.last(), Some(Scope::Worksheet))
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("worksheet cannot contain direct text"));
+            },
             Event::CData(text)
                 if matches!(scopes.last(), Some(Scope::CellWatches | Scope::CellWatch))
                     && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
             {
                 return Err(invalid("cellWatches family cannot contain CDATA"));
             },
-            Event::DocType(_) => {
-                return Err(invalid("worksheet XML cannot contain a document type"));
+            Event::CData(_) if matches!(scopes.last(), Some(Scope::Worksheet)) => {
+                return Err(invalid("worksheet cannot contain direct CDATA"));
+            },
+            Event::Text(text)
+                if scopes.is_empty() && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("worksheet XML text is outside root"));
+            },
+            Event::CData(_) if scopes.is_empty() => {
+                return Err(invalid("worksheet XML CDATA is outside root"));
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
             _ => {},
         }
         buffer.clear();
     }
-    if !scopes.is_empty() {
+    if !root_seen || !root_closed || depth != 0 || !scopes.is_empty() {
         return Err(invalid("unterminated worksheet XML"));
     }
     match references {
@@ -221,7 +311,7 @@ fn parse_cell_watch_attributes(
     element: &BytesStart<'_>,
 ) -> Result<CellWatchReference> {
     let mut reference = None;
-    for attribute in element.attributes() {
+    for attribute in element.attributes().with_checks(true) {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid cellWatch attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -256,13 +346,10 @@ pub fn write_worksheet_cell_watches(
             "cellWatches exceeds safety limit {MAX_CELL_WATCHES}"
         )));
     }
-    let mut xml = String::new();
-    write!(
-        xml,
-        "<cellWatches xmlns=\"{}\">",
-        conformance.main_namespace()
-    )
-    .unwrap();
+    let mut xml = String::with_capacity(64 + conformance.main_namespace().len());
+    xml.push_str("<cellWatches xmlns=\"");
+    xml.push_str(conformance.main_namespace());
+    xml.push_str("\">");
     for reference in &value.references {
         xml.push_str("<cellWatch r=\"");
         xml.push_str(reference.as_str());
@@ -301,7 +388,7 @@ fn namespace_kind(result: ResolveResult<'_>) -> Result<NamespaceKind> {
 }
 
 fn is_main_namespace(namespace: &[u8]) -> bool {
-    namespace == TRANSITIONAL_MAIN || namespace == STRICT_MAIN
+    namespace == TRANSITIONAL_MAIN.as_bytes() || namespace == STRICT_MAIN.as_bytes()
 }
 
 fn is_namespace_declaration(name: &[u8]) -> bool {
@@ -412,6 +499,35 @@ mod tests {
             "<cellWatches><cellWatch r=\"A1\"/></cellWatches><cellWatches><cellWatch r=\"B2\"/></cellWatches>"
         )
         .is_err());
+    }
+
+    #[test]
+    fn rejects_unsafe_document_boundaries_and_depth() {
+        for xml in [
+            format!(r#"<worksheet xmlns="{NS}"/><worksheet xmlns="{NS}"/>"#),
+            format!(r#"<worksheet xmlns="{NS}">text</worksheet>"#),
+            format!(r#"<worksheet xmlns="{NS}"></workbook>"#),
+            format!(
+                r#"<worksheet xmlns="{NS}"><cellWatches><cellWatch r="A1"></cellWatches></worksheet>"#
+            ),
+            format!(r#"<worksheet xmlns="{NS}"/><trailing/>"#),
+            format!(r#"<!DOCTYPE worksheet><worksheet xmlns="{NS}"/>"#),
+        ] {
+            assert!(
+                parse_worksheet_cell_watches(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = format!(r#"<worksheet xmlns="{NS}">"#);
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_worksheet_cell_watches(xml.as_bytes()).is_err());
     }
 
     #[test]
