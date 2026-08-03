@@ -96,7 +96,10 @@ mod tests {
 
     fn storage() -> ListBoundaryStorage {
         ListBoundaryStorage {
+            object_id: 42,
             archive_name: "Index/Test.iwa".to_owned(),
+            message_index: 0,
+            message_type: 2_001,
             boundaries: vec![(0, 10), (20, 11)],
             paragraph_starts: vec![0, 10, 20],
         }

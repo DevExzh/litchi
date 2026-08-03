@@ -82,7 +82,7 @@ pub(in crate::text) fn set_paragraph_list_label_color(
             .collect::<Vec<_>>();
         storage::replace_boundaries(
             &mut staged,
-            &boundaries.archive_name,
+            &boundaries,
             storage_id,
             &old_style_ids,
             &replacements,
@@ -155,7 +155,7 @@ fn collapse_or_clear_redundant_color(
             .collect::<Vec<_>>();
         storage::replace_boundaries(
             &mut staged,
-            &boundaries.archive_name,
+            &boundaries,
             storage_id,
             &old_style_ids,
             &replacements,

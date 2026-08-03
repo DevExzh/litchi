@@ -48,16 +48,16 @@ pub(super) fn locate_text_storages(package: &IWorkPackage) -> Result<Vec<Storage
             let Some(object_id) = object.archive_info.identifier else {
                 continue;
             };
-            let Some(location) =
-                resolve_object_storage(archive_name, object_id, &object.messages, None)?
-            else {
-                continue;
-            };
             if !seen.insert(object_id) {
                 return Err(Error::InvalidFormat(format!(
                     "Text storage object {object_id} occurs in multiple IWA components"
                 )));
             }
+            let Some(location) =
+                resolve_object_storage(archive_name, object_id, &object.messages, None)?
+            else {
+                continue;
+            };
             locations.push(location);
         }
     }
@@ -70,11 +70,18 @@ fn locate_storage_in_package(
     table: Option<(u32, &str)>,
 ) -> Result<StorageLocation> {
     let mut found = None;
+    let mut object_found = false;
     for archive_name in package.iwa_entry_names() {
         let archive = package.archive(archive_name)?;
         let Some(object) = archive.object(storage_id) else {
             continue;
         };
+        if object_found {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} occurs in multiple archives"
+            )));
+        }
+        object_found = true;
         let Some(location) =
             resolve_object_storage(archive_name, storage_id, &object.messages, table)?
         else {
@@ -185,6 +192,8 @@ pub(super) fn text_utf16_len(text: &[String]) -> Result<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{Archive, ArchiveObject};
+    use prost::Message;
 
     #[test]
     fn scalar_boundaries_span_fragments_without_joining_text() {
@@ -196,5 +205,38 @@ mod tests {
             assert!(require_text_boundary(1, invalid, &text).is_err());
         }
         assert_eq!(text_utf16_len(&text).unwrap(), 4);
+    }
+
+    #[test]
+    fn rejects_duplicate_object_when_one_copy_has_no_storage_payload() {
+        let recognized = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 2_001,
+                data: crate::protobuf::tswp::StorageArchive::default().encode_to_vec(),
+            }],
+        )
+        .unwrap();
+        let unrecognized = ArchiveObject::new(42, Vec::new()).unwrap();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/One.iwa",
+                &Archive {
+                    objects: vec![recognized],
+                },
+            )
+            .unwrap();
+        package
+            .replace_archive(
+                "Index/Two.iwa",
+                &Archive {
+                    objects: vec![unrecognized],
+                },
+            )
+            .unwrap();
+
+        assert!(locate_text_storage(&package, 42).is_err());
+        assert!(locate_text_storages(&package).is_err());
     }
 }

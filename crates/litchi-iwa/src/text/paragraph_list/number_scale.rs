@@ -93,7 +93,7 @@ pub(in crate::text) fn set_paragraph_list_number_scale(
             .collect::<Vec<_>>();
         storage::replace_boundaries(
             &mut staged,
-            &boundaries.archive_name,
+            &boundaries,
             storage_id,
             &old_style_ids,
             &replacements,
@@ -170,7 +170,7 @@ fn collapse_or_clear_redundant_scale(
             .collect::<Vec<_>>();
         storage::replace_boundaries(
             &mut staged,
-            &boundaries.archive_name,
+            &boundaries,
             storage_id,
             &old_style_ids,
             &replacements,

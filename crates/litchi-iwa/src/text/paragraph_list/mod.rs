@@ -196,7 +196,7 @@ pub(super) fn set_paragraph_lists(
         .collect::<Vec<_>>();
     storage::replace_boundaries(
         &mut staged,
-        &storage.archive_name,
+        &storage,
         storage_id,
         &old_style_ids,
         &boundaries,
@@ -312,7 +312,7 @@ pub(super) fn set_paragraph_list(
     }
     storage::patch_style_reference(
         &mut staged,
-        &storage.archive_name,
+        &storage,
         storage_id,
         storage.style_id,
         target_style_id,

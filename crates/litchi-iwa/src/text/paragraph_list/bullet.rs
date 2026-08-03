@@ -92,7 +92,7 @@ pub(in crate::text) fn set_paragraph_list_bullet(
             .collect::<Vec<_>>();
         storage::replace_boundaries(
             &mut staged,
-            &boundaries.archive_name,
+            &boundaries,
             storage_id,
             &old_style_ids,
             &replacements,
@@ -169,7 +169,7 @@ fn collapse_redundant_variation(
     let mut staged = package.clone();
     storage::replace_boundaries(
         &mut staged,
-        &boundaries.archive_name,
+        &boundaries,
         storage_id,
         &old_style_ids,
         &replacements,
