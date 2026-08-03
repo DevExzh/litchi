@@ -5,6 +5,7 @@
 //! across different archive files.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
@@ -38,9 +39,9 @@ impl ObjectIndexEntry {
 #[derive(Debug, Clone)]
 pub struct ObjectIndex {
     /// Map from object ID to index entry
-    entries: HashMap<u64, ObjectIndexEntry>,
+    entries: Arc<HashMap<u64, ObjectIndexEntry>>,
     /// Map from fragment name to list of object IDs
-    fragment_objects: HashMap<String, Vec<u64>>,
+    fragment_objects: Arc<HashMap<String, Vec<u64>>>,
     /// Reference graph tracking object dependencies
     reference_graph: ReferenceGraph,
 }
@@ -55,8 +56,8 @@ impl ObjectIndex {
     /// Create an empty object index
     pub fn new() -> Self {
         Self {
-            entries: HashMap::new(),
-            fragment_objects: HashMap::new(),
+            entries: Arc::new(HashMap::new()),
+            fragment_objects: Arc::new(HashMap::new()),
             reference_graph: ReferenceGraph::new(),
         }
     }
@@ -111,8 +112,8 @@ impl ObjectIndex {
                 object_type,
             };
 
-            self.entries.insert(identifier, entry);
-            self.fragment_objects
+            Arc::make_mut(&mut self.entries).insert(identifier, entry);
+            Arc::make_mut(&mut self.fragment_objects)
                 .entry(archive_name.to_string())
                 .or_default()
                 .push(identifier);
@@ -1199,6 +1200,67 @@ mod tests {
         let index = ObjectIndex::new();
         assert!(index.entries.is_empty());
         assert!(index.fragment_objects.is_empty());
+    }
+
+    #[test]
+    fn object_index_clones_share_maps_until_indexing_mutates() {
+        let object = ArchiveObject::new(
+            10,
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let mut index = ObjectIndex::new();
+        index
+            .parse_archive(
+                "Index/First.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        let snapshot = index.clone();
+        assert!(Arc::ptr_eq(&index.entries, &snapshot.entries));
+        assert!(Arc::ptr_eq(
+            &index.fragment_objects,
+            &snapshot.fragment_objects
+        ));
+
+        let second = ArchiveObject::new(
+            20,
+            vec![RawMessage {
+                type_: 43,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let mut edited = snapshot.clone();
+        edited
+            .parse_archive(
+                "Index/Second.iwa",
+                &Archive {
+                    objects: vec![second],
+                },
+            )
+            .unwrap();
+
+        assert_eq!(index.object_count(), 1);
+        assert_eq!(edited.object_count(), 2);
+        assert!(!Arc::ptr_eq(&index.entries, &edited.entries));
+        assert!(!Arc::ptr_eq(
+            &index.fragment_objects,
+            &edited.fragment_objects
+        ));
+    }
+
+    #[test]
+    fn object_indexes_are_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<ObjectIndex>();
     }
 
     #[test]
