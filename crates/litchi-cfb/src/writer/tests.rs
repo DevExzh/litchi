@@ -206,6 +206,52 @@ fn test_write_update_delete() {
 }
 
 #[test]
+fn test_delete_storage_removes_descendants_when_serialized() {
+    let mut writer = OleWriter::new();
+    writer.create_storage(&["Root"]).unwrap();
+    writer.create_storage(&["Root", "Nested"]).unwrap();
+    writer.create_storage(&["RootSibling"]).unwrap();
+    writer.set_storage_clsid(&["Root"], [0x11; 16]).unwrap();
+    writer
+        .set_storage_clsid(&["Root", "Nested"], [0x22; 16])
+        .unwrap();
+    writer
+        .set_storage_clsid(&["RootSibling"], [0x44; 16])
+        .unwrap();
+
+    writer
+        .create_stream(&["Root", "Nested", "Removed"], b"removed")
+        .unwrap();
+    writer
+        .create_stream(&["RootSibling", "Preserved"], b"preserved")
+        .unwrap();
+    writer.delete_storage(&["Root"]).unwrap();
+
+    let mut buffer = Cursor::new(Vec::new());
+    writer.write_to(&mut buffer).unwrap();
+
+    let mut ole = OleFile::open(Cursor::new(buffer.into_inner())).unwrap();
+    assert!(!ole.directory_exists(&["Root"]));
+    assert!(ole.directory_exists(&["RootSibling"]));
+    assert!(ole.open_stream(&["Root", "Nested", "Removed"]).is_err());
+    assert_eq!(
+        ole.open_stream(&["RootSibling", "Preserved"]).unwrap(),
+        b"preserved"
+    );
+
+    let root_entries = ole.list_directory_entries(&[]).unwrap();
+    assert!(root_entries.iter().all(|entry| entry.name != "Root"));
+    let preserved_storage = root_entries
+        .iter()
+        .find(|entry| entry.name == "RootSibling")
+        .expect("same-prefix sibling storage");
+    assert_eq!(
+        preserved_storage.clsid,
+        "44444444-4444-4444-4444-444444444444"
+    );
+}
+
+#[test]
 fn test_write_sector_size_4096() {
     let mut writer = OleWriter::with_sector_size(4096).unwrap();
     writer.create_stream(&["Test"], b"Hello, 4096!").unwrap();

@@ -393,20 +393,29 @@ impl OleWriter {
     ///
     /// * `Result<(), OleError>` - Success or error if storage doesn't exist
     ///
-    /// # Implementation Notes
-    ///
-    /// Currently only supports deleting empty storages. Recursive deletion
-    /// of child streams and storages is planned for a future enhancement
-    /// when nested storage support is added.
+    /// The root entry is represented by an empty path and cannot be deleted.
+    /// A successful deletion removes the target storage and every stream,
+    /// storage, and storage CLSID whose full path is beneath it.
     pub fn delete_storage(&mut self, path: &[&str]) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+
         let owned_path = own_path(path, "storage path", "storage path component")?;
 
-        if self.storages.remove(&owned_path).is_none() {
+        // Validate the complete operation before mutating any table. The
+        // retain calls below are infallible, so a failed lookup leaves the
+        // writer unchanged.
+        if !self.storages.contains_key(&owned_path) {
             return Err(OleError::InvalidFormat("Storage not found".to_string()));
         }
 
-        // Note: Recursive deletion of child streams/storages will be implemented
-        // when nested storage support is added
+        self.streams
+            .retain(|(candidate, _)| !candidate.starts_with(owned_path.as_slice()));
+        self.storages
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+        self.storage_clsids
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
 
         Ok(())
     }
@@ -1034,6 +1043,122 @@ mod tests {
         let mut writer = OleWriter::new();
         writer.create_storage(&["Storage"]).unwrap();
         assert_eq!(writer.storages.len(), 1);
+    }
+
+    #[test]
+    fn delete_storage_removes_descendants_and_clsids_without_prefix_collisions() {
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["Root"]).unwrap();
+        writer.create_storage(&["Root", "Nested"]).unwrap();
+        writer.create_storage(&["Root", "Nested", "Deep"]).unwrap();
+        writer.create_storage(&["Root", "Sibling"]).unwrap();
+        writer.create_storage(&["RootSibling"]).unwrap();
+
+        let root_clsid = [0x11; 16];
+        let nested_clsid = [0x22; 16];
+        let deep_clsid = [0x33; 16];
+        let removed_sibling_clsid = [0x44; 16];
+        let sibling_clsid = [0x55; 16];
+        writer.set_storage_clsid(&["Root"], root_clsid).unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Nested"], nested_clsid)
+            .unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Nested", "Deep"], deep_clsid)
+            .unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Sibling"], removed_sibling_clsid)
+            .unwrap();
+        writer
+            .set_storage_clsid(&["RootSibling"], sibling_clsid)
+            .unwrap();
+
+        writer
+            .create_stream(&["Root", "Nested", "Removed"], b"removed")
+            .unwrap();
+        writer
+            .create_stream(&["Root", "Nested", "Deep", "AlsoRemoved"], b"removed")
+            .unwrap();
+        writer
+            .create_stream(&["Root", "Sibling", "Removed"], b"removed")
+            .unwrap();
+        writer
+            .create_stream(&["RootSibling", "Preserved"], b"preserved")
+            .unwrap();
+
+        writer.delete_storage(&["Root"]).unwrap();
+
+        let root = vec!["Root".to_string()];
+        let nested = vec!["Root".to_string(), "Nested".to_string()];
+        let deep = vec!["Root".to_string(), "Nested".to_string(), "Deep".to_string()];
+        let nested_sibling = vec!["Root".to_string(), "Sibling".to_string()];
+        let root_sibling = vec!["RootSibling".to_string()];
+
+        assert!(!writer.storages.contains_key(&root));
+        assert!(!writer.storages.contains_key(&nested));
+        assert!(!writer.storages.contains_key(&deep));
+        assert!(!writer.storages.contains_key(&nested_sibling));
+        assert!(writer.storages.contains_key(&root_sibling));
+
+        assert!(!writer.storage_clsids.contains_key(&root));
+        assert!(!writer.storage_clsids.contains_key(&nested));
+        assert!(!writer.storage_clsids.contains_key(&deep));
+        assert!(!writer.storage_clsids.contains_key(&nested_sibling));
+        assert_eq!(
+            writer.storage_clsids.get(&root_sibling),
+            Some(&sibling_clsid)
+        );
+
+        assert!(
+            writer
+                .streams
+                .iter()
+                .all(|(path, _)| !path.starts_with(root.as_slice()))
+        );
+        assert!(writer.streams.iter().any(|(path, data)| {
+            path == &["RootSibling".to_string(), "Preserved".to_string()] && data == b"preserved"
+        }));
+    }
+
+    #[test]
+    fn delete_storage_rejects_root_and_missing_paths_atomically() {
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["Root"]).unwrap();
+        writer.create_storage(&["Root", "Nested"]).unwrap();
+        writer
+            .create_stream(&["Root", "Nested", "Stream"], b"payload")
+            .unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Nested"], [0x55; 16])
+            .unwrap();
+
+        let streams_before = writer.streams.clone();
+        let storages_before = writer.storages.clone();
+        let clsids_before = writer.storage_clsids.clone();
+
+        assert!(matches!(
+            writer.delete_storage(&[]),
+            Err(OleError::InvalidData(message)) if message == "Empty path"
+        ));
+        assert_eq!(writer.streams, streams_before);
+        assert_eq!(writer.storages, storages_before);
+        assert_eq!(writer.storage_clsids, clsids_before);
+
+        assert!(matches!(
+            writer.delete_storage(&["Missing"]),
+            Err(OleError::InvalidFormat(message)) if message == "Storage not found"
+        ));
+        assert_eq!(writer.streams, streams_before);
+        assert_eq!(writer.storages, storages_before);
+        assert_eq!(writer.storage_clsids, clsids_before);
+
+        assert!(matches!(
+            writer.delete_storage(&["Root", "Nested", "Stream"]),
+            Err(OleError::InvalidFormat(message)) if message == "Storage not found"
+        ));
+        assert_eq!(writer.streams, streams_before);
+        assert_eq!(writer.storages, storages_before);
+        assert_eq!(writer.storage_clsids, clsids_before);
     }
 
     #[test]
