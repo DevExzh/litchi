@@ -8,9 +8,12 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::borrow::Cow;
 
 const NS: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_NS: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const NS_TEXT: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_NS_TEXT: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies";
 const STRICT_REL: &str =
@@ -110,77 +113,66 @@ impl VolatileDependencies {
 
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         validate_document(self)?;
-        let ns = if strict {
-            std::str::from_utf8(STRICT_NS).unwrap()
-        } else {
-            std::str::from_utf8(NS).unwrap()
-        };
-        let mut out = String::from(
+        let ns = if strict { STRICT_NS_TEXT } else { NS_TEXT };
+        let mut out = BoundedXml::new();
+        out.push_str(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><volTypes xmlns=\"",
-        );
-        escape_attr(&mut out, ns);
-        out.push_str("\">");
+        )?;
+        escape_attr(&mut out, ns)?;
+        out.push_str("\">")?;
         for ty in &self.types {
-            out.push_str("<volType type=\"");
+            out.push_str("<volType type=\"")?;
             out.push_str(match ty.dependency_type {
                 VolatileDependencyType::RealTimeData => "realTimeData",
                 VolatileDependencyType::OlapFunctions => "olapFunctions",
-            });
-            out.push_str("\">");
+            })?;
+            out.push_str("\">")?;
             for main in &ty.mains {
-                out.push_str("<main first=\"");
-                escape_attr(&mut out, &main.first);
-                out.push_str("\">");
+                out.push_str("<main first=\"")?;
+                escape_attr(&mut out, &main.first)?;
+                out.push_str("\">")?;
                 for topic in &main.topics {
-                    out.push_str("<tp");
-                    let number = match &topic.value {
-                        VolatileValue::Number(v) => Some(v.to_string()),
-                        _ => None,
-                    };
+                    out.push_str("<tp")?;
                     let (kind, value) = match &topic.value {
-                        VolatileValue::Unspecified(v) => (None, v.as_str()),
-                        VolatileValue::Boolean(v) => (Some("b"), if *v { "1" } else { "0" }),
-                        VolatileValue::Number(_) => (Some("n"), number.as_deref().unwrap()),
-                        VolatileValue::Error(v) => (Some("e"), v.as_str()),
-                        VolatileValue::String(v) => (Some("s"), v.as_str()),
+                        VolatileValue::Unspecified(v) => (None, Cow::Borrowed(v.as_str())),
+                        VolatileValue::Boolean(v) => {
+                            (Some("b"), Cow::Borrowed(if *v { "1" } else { "0" }))
+                        },
+                        VolatileValue::Number(v) => (Some("n"), Cow::Owned(v.to_string())),
+                        VolatileValue::Error(v) => (Some("e"), Cow::Borrowed(v.as_str())),
+                        VolatileValue::String(v) => (Some("s"), Cow::Borrowed(v.as_str())),
                     };
                     if let Some(kind) = kind {
-                        out.push_str(" t=\"");
-                        out.push_str(kind);
-                        out.push('"');
+                        out.push_str(" t=\"")?;
+                        out.push_str(kind)?;
+                        out.push_char('"')?;
                     }
-                    out.push_str("><v>");
-                    escape_text(&mut out, value);
-                    out.push_str("</v>");
+                    out.push_str("><v>")?;
+                    escape_text(&mut out, value.as_ref())?;
+                    out.push_str("</v>")?;
                     for value in &topic.subtopics {
-                        out.push_str("<stp>");
-                        escape_text(&mut out, value);
-                        out.push_str("</stp>");
+                        out.push_str("<stp>")?;
+                        escape_text(&mut out, value)?;
+                        out.push_str("</stp>")?;
                     }
                     for reference in &topic.references {
-                        out.push_str("<tr r=\"");
-                        escape_attr(&mut out, &reference.cell_reference);
-                        out.push_str("\" s=\"");
-                        out.push_str(&reference.sheet_id.to_string());
-                        out.push_str("\"/>");
+                        out.push_str("<tr r=\"")?;
+                        escape_attr(&mut out, &reference.cell_reference)?;
+                        out.push_str("\" s=\"")?;
+                        out.push_str(&reference.sheet_id.to_string())?;
+                        out.push_str("\"/>")?;
                     }
-                    out.push_str("</tp>");
+                    out.push_str("</tp>")?;
                 }
-                out.push_str("</main>");
+                out.push_str("</main>")?;
             }
-            out.push_str("</volType>");
+            out.push_str("</volType>")?;
         }
-        let mut bytes = out.into_bytes();
         if let Some(ext) = &self.extension_list_xml {
-            bytes.extend_from_slice(ext);
+            out.push_bytes(ext)?;
         }
-        bytes.extend_from_slice(b"</volTypes>");
-        if bytes.len() > MAX_PART_BYTES {
-            return Err(invalid(
-                "serialized volatile-dependencies part exceeds 8 MiB",
-            ));
-        }
-        Ok(bytes)
+        out.push_str("</volTypes>")?;
+        Ok(out.finish())
     }
 }
 
@@ -531,6 +523,50 @@ struct MainBuilder {
 struct TypeBuilder {
     dependency_type: VolatileDependencyType,
     mains: Vec<MainBuilder>,
+}
+
+/// A fallible serializer sink that enforces the part-size limit before every
+/// allocation or append.
+struct BoundedXml {
+    bytes: Vec<u8>,
+}
+
+impl BoundedXml {
+    fn new() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.push_bytes(value.as_bytes())
+    }
+
+    fn push_char(&mut self, value: char) -> Result<()> {
+        let mut encoded = [0; 4];
+        let length = value.encode_utf8(&mut encoded).len();
+        self.push_bytes(&encoded[..length])
+    }
+
+    fn push_bytes(&mut self, value: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(value.len())
+            .ok_or_else(|| invalid("serialized volatile-dependencies length overflows"))?;
+        if length > MAX_PART_BYTES {
+            return Err(invalid(
+                "serialized volatile-dependencies part exceeds 8 MiB",
+            ));
+        }
+        self.bytes
+            .try_reserve_exact(value.len())
+            .map_err(|_| invalid("serialized volatile-dependencies output allocation failed"))?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
 }
 
 fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
@@ -1070,28 +1106,30 @@ fn valid_cell_reference(v: &str) -> bool {
     }
     i == b.len() && i > row && b[row] != b'0'
 }
-fn escape_attr(o: &mut String, v: &str) {
+fn escape_attr(o: &mut BoundedXml, v: &str) -> Result<()> {
     for c in v.chars() {
         match c {
-            '&' => o.push_str("&amp;"),
-            '<' => o.push_str("&lt;"),
-            '"' => o.push_str("&quot;"),
-            '\r' => o.push_str("&#xD;"),
-            '\n' => o.push_str("&#xA;"),
-            '\t' => o.push_str("&#x9;"),
-            _ => o.push(c),
+            '&' => o.push_str("&amp;")?,
+            '<' => o.push_str("&lt;")?,
+            '"' => o.push_str("&quot;")?,
+            '\r' => o.push_str("&#xD;")?,
+            '\n' => o.push_str("&#xA;")?,
+            '\t' => o.push_str("&#x9;")?,
+            _ => o.push_char(c)?,
         }
     }
+    Ok(())
 }
-fn escape_text(o: &mut String, v: &str) {
+fn escape_text(o: &mut BoundedXml, v: &str) -> Result<()> {
     for c in v.chars() {
         match c {
-            '&' => o.push_str("&amp;"),
-            '<' => o.push_str("&lt;"),
-            '>' => o.push_str("&gt;"),
-            _ => o.push(c),
+            '&' => o.push_str("&amp;")?,
+            '<' => o.push_str("&lt;")?,
+            '>' => o.push_str("&gt;")?,
+            _ => o.push_char(c)?,
         }
     }
+    Ok(())
 }
 fn invalid(message: impl Into<String>) -> Box<dyn std::error::Error + Send + Sync> {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()).into()
@@ -1183,6 +1221,19 @@ mod tests {
             assert_eq!(VolatileDependencies::parse(&strict).unwrap(), parsed);
         }
     }
+
+    #[test]
+    fn serializer_rejects_oversized_output_before_appending_extension() {
+        let mut value = value();
+        value.extension_list_xml = Some(vec![b'x'; MAX_PART_BYTES]);
+
+        let error = value.to_xml(false).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "serialized volatile-dependencies part exceeds 8 MiB"
+        );
+    }
+
     #[test]
     fn applies_mce_fallback() {
         let xml = format!(
