@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Component, Path};
+use std::sync::Arc;
 
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use tempfile::NamedTempFile;
@@ -18,9 +19,20 @@ use crate::{Error, Result};
 /// All ZIP members are retained as raw uncompressed bytes. IWA entries can be
 /// parsed, updated transactionally, and written back while media, previews, and
 /// metadata remain byte-for-byte unchanged.
+///
+/// Cloning a package is cheap: the entry table is shared until a mutation is
+/// attempted. This keeps editor staging paths memory-efficient when a
+/// transaction is rejected and discarded. The first mutation of a shared
+/// package performs the required copy-on-write detachment.
 #[derive(Debug, Clone, Default)]
 pub struct IWorkPackage {
-    entries: Vec<(String, Vec<u8>)>,
+    entries: Arc<Vec<(String, Vec<u8>)>>,
+}
+
+/// An immutable, cheaply shareable package snapshot.
+#[derive(Debug, Clone)]
+pub struct Snapshot {
+    entries: Arc<Vec<(String, Vec<u8>)>>,
 }
 
 impl IWorkPackage {
@@ -63,7 +75,9 @@ impl IWorkPackage {
             })?;
             entries.push((name.to_owned(), data));
         }
-        Ok(Self { entries })
+        Ok(Self {
+            entries: Arc::new(entries),
+        })
     }
 
     /// Expand the pre-iWork '13 nested bundle representation into the modern,
@@ -120,7 +134,9 @@ impl IWorkPackage {
             })?;
             entries.push((name.to_owned(), data));
         }
-        Ok(Self { entries })
+        Ok(Self {
+            entries: Arc::new(entries),
+        })
     }
 
     pub fn len(&self) -> usize {
@@ -129,6 +145,13 @@ impl IWorkPackage {
 
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Capture an immutable package snapshot without copying package entries.
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            entries: Arc::clone(&self.entries),
+        }
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
@@ -181,7 +204,7 @@ impl IWorkPackage {
 
     pub fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let position = self.entry_position(normalize_entry_name(name))?;
-        Some(&mut self.entries[position].1)
+        Some(&mut Arc::make_mut(&mut self.entries)[position].1)
     }
 
     /// Create or replace a package member.
@@ -194,7 +217,10 @@ impl IWorkPackage {
         let name = normalize_entry_name(&supplied_name).to_string();
         validate_entry_name(&name)?;
         if let Some(position) = self.entry_position(&name) {
-            return Ok(Some(std::mem::replace(&mut self.entries[position].1, data)));
+            return Ok(Some(std::mem::replace(
+                &mut Arc::make_mut(&mut self.entries)[position].1,
+                data,
+            )));
         }
         self.insert_new_entry(name, data);
         Ok(None)
@@ -203,7 +229,7 @@ impl IWorkPackage {
     /// Delete a package member.
     pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
         let position = self.entry_position(normalize_entry_name(name))?;
-        Some(self.entries.remove(position).1)
+        Some(Arc::make_mut(&mut self.entries).remove(position).1)
     }
 
     /// Parse a compressed `.iwa` package member.
@@ -263,7 +289,7 @@ impl IWorkPackage {
             .entry_position(before)
             .ok_or_else(|| Error::Bundle(format!("IWA insertion anchor not found: {before}")))?;
         let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-        self.entries.insert(position, (normalized, compressed));
+        Arc::make_mut(&mut self.entries).insert(position, (normalized, compressed));
         Ok(())
     }
 
@@ -286,7 +312,7 @@ impl IWorkPackage {
     /// discovery, so newly-created document indexes are inserted first.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut writer = StreamingArchiveWriter::new();
-        for (name, data) in &self.entries {
+        for (name, data) in self.entries.iter() {
             writer.write_stored(name, data).map_err(|error| {
                 Error::Bundle(format!("Failed to write package entry {name}: {error}"))
             })?;
@@ -325,11 +351,50 @@ impl IWorkPackage {
     }
 
     fn insert_new_entry(&mut self, name: String, data: Vec<u8>) {
+        let entries = Arc::make_mut(&mut self.entries);
         if name == "Index/Document.iwa" {
-            self.entries.insert(0, (name, data));
+            entries.insert(0, (name, data));
         } else {
-            self.entries.push((name, data));
+            entries.push((name, data));
         }
+    }
+}
+
+impl Snapshot {
+    /// Return the number of retained package members.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Report whether the package contains no members.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Enumerate package members in preserved source order.
+    pub fn entry_names(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(|(name, _)| name.as_str())
+    }
+
+    /// Borrow one package member without copying it.
+    pub fn entry(&self, name: &str) -> Option<&[u8]> {
+        let name = normalize_entry_name(name);
+        self.entries
+            .iter()
+            .find(|(candidate, _)| candidate == name)
+            .map(|(_, data)| data.as_slice())
+    }
+
+    /// Start a mutable copy-on-write edit from this snapshot.
+    pub fn edit(&self) -> IWorkPackage {
+        IWorkPackage {
+            entries: Arc::clone(&self.entries),
+        }
+    }
+
+    /// Encode the unchanged snapshot as an iWork ZIP package.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.edit().to_bytes()
     }
 }
 
@@ -466,6 +531,44 @@ mod tests {
             Some(b"plist".to_vec())
         );
         assert_eq!(reparsed.entry_names().next(), Some("Index/Document.iwa"));
+    }
+
+    #[test]
+    fn snapshots_share_storage_until_the_first_mutation() {
+        let mut package = IWorkPackage::new();
+        package
+            .insert_entry("Data/original", b"original".to_vec())
+            .unwrap();
+
+        let snapshot = package.snapshot();
+        let mut edit = snapshot.edit();
+        assert_eq!(
+            snapshot.entry("Data/original"),
+            Some(b"original".as_slice())
+        );
+        assert_eq!(edit.entry("Data/original"), Some(b"original".as_slice()));
+
+        edit.insert_entry("Data/changed", b"changed".to_vec())
+            .unwrap();
+        assert_eq!(snapshot.len(), 1);
+        assert_eq!(snapshot.entry("Data/changed"), None);
+        assert_eq!(edit.len(), 2);
+        assert_eq!(edit.entry("Data/changed"), Some(b"changed".as_slice()));
+    }
+
+    #[test]
+    fn cloning_a_package_does_not_copy_entries_before_mutation() {
+        let mut package = IWorkPackage::new();
+        package.insert_entry("Data/asset", vec![7; 1024]).unwrap();
+        let clone = package.clone();
+
+        assert!(Arc::ptr_eq(&package.entries, &clone.entries));
+        assert_eq!(package.entry("Data/asset"), clone.entry("Data/asset"));
+
+        package.entry_mut("Data/asset").unwrap()[0] = 9;
+        assert_eq!(package.entry("Data/asset").unwrap()[0], 9);
+        assert_eq!(clone.entry("Data/asset").unwrap()[0], 7);
+        assert!(!Arc::ptr_eq(&package.entries, &clone.entries));
     }
 
     #[test]
