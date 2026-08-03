@@ -186,6 +186,8 @@ impl ReferenceGraph {
     ///
     /// Automatically deduplicates to avoid storing the same edge multiple times.
     /// This is important because protobuf messages may contain duplicate references.
+    /// A zero endpoint is the protobuf null sentinel and is ignored at this
+    /// compatibility boundary.
     ///
     /// # Arguments
     ///
@@ -206,6 +208,10 @@ impl ReferenceGraph {
     /// assert_eq!(graph.get_outgoing_refs(1), Some(&vec![2]));
     /// ```
     pub fn add_reference(&mut self, source_id: u64, target_id: u64) {
+        if source_id == 0 || target_id == 0 {
+            return;
+        }
+
         let state = Arc::make_mut(&mut self.state);
         // Add to outgoing refs with deduplication
         let outgoing = state.outgoing_refs.entry(source_id).or_default();
@@ -724,7 +730,7 @@ mod tests {
 
         graph.add_object_reference(one, two);
         // Keep the legacy wire-facing path covered: null protobuf references
-        // are tolerated at the boundary but never exposed by the typed view.
+        // are ignored at the boundary and never enter the graph.
         graph.add_reference(one.get(), 0);
         assert_eq!(graph.outgoing(one).unwrap().collect::<Vec<_>>(), vec![two]);
         let snapshot = graph.snapshot();
@@ -744,6 +750,18 @@ mod tests {
         assert_eq!(snapshot.all_object_ids(), HashSet::from([one, two]));
         assert_eq!(snapshot.len(), 2);
         assert_eq!(snapshot.edge_count(), 1);
+    }
+
+    #[test]
+    fn legacy_raw_insertion_rejects_null_endpoints() {
+        let mut graph = ReferenceGraph::new();
+
+        graph.add_reference(0, 1);
+        graph.add_reference(1, 0);
+
+        assert!(graph.is_empty());
+        assert_eq!(graph.edge_count(), 0);
+        assert!(graph.all_objects().is_empty());
     }
 
     #[test]
