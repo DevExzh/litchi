@@ -288,16 +288,17 @@ impl SnappyStream {
             decompressed.try_reserve(expected_length).map_err(|error| {
                 Error::Snappy(format!("Unable to reserve decompression buffer: {error}"))
             })?;
-            let chunk_decompressed = decoder
-                .decompress_vec(&compressed)
+            let previous_length = decompressed.len();
+            decompressed.resize(total_length, 0);
+            let decoded_length = decoder
+                .decompress(&compressed, &mut decompressed[previous_length..])
                 .map_err(|error| Error::Snappy(format!("Decompression failed: {error}")))?;
-            if chunk_decompressed.len() != expected_length {
+            if decoded_length != expected_length {
+                decompressed.truncate(previous_length);
                 return Err(Error::Snappy(format!(
-                    "Snappy block decoded to {} bytes, expected {expected_length}",
-                    chunk_decompressed.len()
+                    "Snappy block decoded to {decoded_length} bytes, expected {expected_length}"
                 )));
             }
-            decompressed.extend(chunk_decompressed);
         }
 
         Ok(SnappyStream { decompressed })
