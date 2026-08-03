@@ -487,6 +487,26 @@ impl ObjectIndex {
         }))
     }
 
+    /// Borrow every indexed object in deterministic numeric-ID order.
+    ///
+    /// The iterator performs no collection allocation. Each item validates
+    /// the indexed source position and returns a borrowed view tied to the
+    /// supplied immutable bundle. Use [`Self::resolve_many_refs`] when an
+    /// owned collection of views is required.
+    pub fn iter_refs<'a>(
+        &'a self,
+        bundle: &'a Bundle,
+    ) -> impl Iterator<Item = Result<ResolvedObjectRef<'a>>> + 'a {
+        self.iter_entries().map(move |entry| {
+            self.resolve_ref(bundle, entry.id())?.ok_or_else(|| {
+                Error::Bundle(format!(
+                    "object {} could not be resolved from the bundle",
+                    entry.id().get()
+                ))
+            })
+        })
+    }
+
     /// Resolve an object through the validated identity API.
     pub fn resolve(&self, bundle: &Bundle, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
         self.resolve_ref(bundle, object_id)
@@ -1199,6 +1219,21 @@ mod tests {
         assert_eq!(borrowed[0].primary_message_type(), Some(42));
         assert_eq!(borrowed[0].message_types().collect::<Vec<_>>(), vec![42]);
         assert_eq!(borrowed[0].messages[0].data, Vec::<u8>::new());
+
+        let streamed = index
+            .iter_refs(&bundle)
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(
+            streamed
+                .iter()
+                .map(|object| object.id())
+                .collect::<Vec<_>>(),
+            [
+                ObjectId::try_from(1).unwrap(),
+                ObjectId::try_from(2).unwrap()
+            ]
+        );
 
         let resolved = index.resolve_objects(&bundle, &[2, 1]).unwrap();
         assert_eq!(

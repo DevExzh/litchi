@@ -202,10 +202,16 @@ impl Document {
     /// returned views borrow this immutable document snapshot and therefore do
     /// not duplicate archive payload allocations.
     pub fn object_views(&self) -> Result<Vec<ResolvedObjectRef<'_>>> {
-        let object_ids = self.state.object_index.object_ids()?;
-        self.state
-            .object_index
-            .resolve_many_refs(&self.state.bundle, &object_ids)
+        self.object_view_iter().collect()
+    }
+
+    /// Stream all indexed object views in deterministic object-ID order.
+    ///
+    /// Each item borrows this immutable document snapshot. The iterator does
+    /// not allocate an object-ID list or a result collection; use
+    /// [`Self::object_views`] when an owned vector is more convenient.
+    pub fn object_view_iter(&self) -> impl Iterator<Item = Result<ResolvedObjectRef<'_>>> + '_ {
+        self.state.object_index.iter_refs(&self.state.bundle)
     }
 
     /// Get an object by its legacy raw numeric ID.
