@@ -10,6 +10,71 @@ use std::io::{self, Cursor, Read};
 
 use crate::Error;
 
+/// Caller-selectable decompression ceilings for one iWork Snappy stream.
+///
+/// The constructor only accepts limits at or below the format-wide hard
+/// ceilings. This lets a caller impose a tighter budget without creating an
+/// escape hatch around the parser's memory-safety guardrails.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnappyLimits {
+    max_uncompressed_chunk: usize,
+    max_decompressed_stream: usize,
+}
+
+impl SnappyLimits {
+    /// Build a checked pair of per-chunk and aggregate decompression limits.
+    pub fn new(
+        max_uncompressed_chunk: usize,
+        max_decompressed_stream: usize,
+    ) -> Result<Self, Error> {
+        if max_uncompressed_chunk == 0 || max_decompressed_stream == 0 {
+            return Err(Error::Snappy(
+                "Snappy decompression limits must be non-zero".to_owned(),
+            ));
+        }
+        if max_uncompressed_chunk > SnappyStream::MAX_UNCOMPRESSED_CHUNK {
+            return Err(Error::Snappy(format!(
+                "Snappy chunk limit exceeds the {} byte hard ceiling",
+                SnappyStream::MAX_UNCOMPRESSED_CHUNK
+            )));
+        }
+        if max_decompressed_stream > SnappyStream::MAX_DECOMPRESSED_STREAM {
+            return Err(Error::Snappy(format!(
+                "Snappy stream limit exceeds the {} byte hard ceiling",
+                SnappyStream::MAX_DECOMPRESSED_STREAM
+            )));
+        }
+        if max_uncompressed_chunk > max_decompressed_stream {
+            return Err(Error::Snappy(
+                "Snappy chunk limit cannot exceed the stream limit".to_owned(),
+            ));
+        }
+        Ok(Self {
+            max_uncompressed_chunk,
+            max_decompressed_stream,
+        })
+    }
+
+    /// Maximum uncompressed size accepted for one block.
+    pub const fn max_uncompressed_chunk(self) -> usize {
+        self.max_uncompressed_chunk
+    }
+
+    /// Maximum aggregate uncompressed size accepted for one stream.
+    pub const fn max_decompressed_stream(self) -> usize {
+        self.max_decompressed_stream
+    }
+}
+
+impl Default for SnappyLimits {
+    fn default() -> Self {
+        Self {
+            max_uncompressed_chunk: SnappyStream::MAX_UNCOMPRESSED_CHUNK,
+            max_decompressed_stream: SnappyStream::MAX_DECOMPRESSED_STREAM,
+        }
+    }
+}
+
 /// Custom Snappy stream decompressor for iWork IWA files
 #[derive(Debug)]
 pub struct SnappyStream {
@@ -35,6 +100,14 @@ impl SnappyStream {
     /// - length is a 24-bit little-endian integer
     /// - No stream identifier, no CRC checksums
     pub fn decompress<R: Read>(reader: &mut R) -> Result<Self, Error> {
+        Self::decompress_with_limits(reader, SnappyLimits::default())
+    }
+
+    /// Decompress an IWA stream under caller-supplied, checked memory limits.
+    pub fn decompress_with_limits<R: Read>(
+        reader: &mut R,
+        limits: SnappyLimits,
+    ) -> Result<Self, Error> {
         let mut decompressed = Vec::new();
         let mut decoder = Decoder::new();
 
@@ -71,20 +144,20 @@ impl SnappyStream {
 
             let expected_length = decompress_len(&compressed)
                 .map_err(|error| Error::Snappy(format!("Invalid Snappy block: {error}")))?;
-            if expected_length > Self::MAX_UNCOMPRESSED_CHUNK {
+            if expected_length > limits.max_uncompressed_chunk {
                 return Err(Error::Snappy(format!(
                     "Snappy block expands to {expected_length} bytes, exceeding the {} byte limit",
-                    Self::MAX_UNCOMPRESSED_CHUNK
+                    limits.max_uncompressed_chunk
                 )));
             }
             let total_length = decompressed
                 .len()
                 .checked_add(expected_length)
                 .ok_or_else(|| Error::Snappy("Decompressed stream length overflow".to_owned()))?;
-            if total_length > Self::MAX_DECOMPRESSED_STREAM {
+            if total_length > limits.max_decompressed_stream {
                 return Err(Error::Snappy(format!(
                     "Snappy stream expands to more than {} bytes",
-                    Self::MAX_DECOMPRESSED_STREAM
+                    limits.max_decompressed_stream
                 )));
             }
             decompressed.try_reserve(expected_length).map_err(|error| {
@@ -195,6 +268,54 @@ mod tests {
         let compressed = SnappyStream::compress(&input).unwrap();
         let decompressed = SnappyStream::decompress(&mut Cursor::new(compressed)).unwrap();
         assert_eq!(decompressed.data(), input);
+    }
+
+    #[test]
+    fn custom_limits_can_only_tighten_hard_ceilings() {
+        assert!(SnappyLimits::new(0, 1).is_err());
+        assert!(SnappyLimits::new(1, 0).is_err());
+        assert!(
+            SnappyLimits::new(
+                SnappyStream::MAX_UNCOMPRESSED_CHUNK + 1,
+                SnappyStream::MAX_DECOMPRESSED_STREAM
+            )
+            .is_err()
+        );
+        assert!(
+            SnappyLimits::new(
+                SnappyStream::MAX_UNCOMPRESSED_CHUNK,
+                SnappyStream::MAX_DECOMPRESSED_STREAM + 1
+            )
+            .is_err()
+        );
+        assert!(SnappyLimits::new(2, 1).is_err());
+
+        let limits = SnappyLimits::new(8, 16).unwrap();
+        assert_eq!(limits.max_uncompressed_chunk(), 8);
+        assert_eq!(limits.max_decompressed_stream(), 16);
+    }
+
+    #[test]
+    fn custom_chunk_limit_rejects_a_valid_block() {
+        let compressed = SnappyStream::compress(b"0123456789").unwrap();
+        let limits = SnappyLimits::new(9, 9).unwrap();
+        let error =
+            SnappyStream::decompress_with_limits(&mut Cursor::new(compressed), limits).unwrap_err();
+        assert!(error.to_string().contains("exceeding the 9 byte limit"));
+    }
+
+    #[test]
+    fn custom_stream_limit_rejects_a_second_valid_block() {
+        let input = vec![42; SnappyStream::WRITE_CHUNK_SIZE + 17];
+        let compressed = SnappyStream::compress(&input).unwrap();
+        let limits = SnappyLimits::new(
+            SnappyStream::WRITE_CHUNK_SIZE,
+            SnappyStream::WRITE_CHUNK_SIZE,
+        )
+        .unwrap();
+        let error =
+            SnappyStream::decompress_with_limits(&mut Cursor::new(compressed), limits).unwrap_err();
+        assert!(error.to_string().contains("more than 65536 bytes"));
     }
 
     #[test]

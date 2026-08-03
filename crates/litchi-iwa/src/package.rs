@@ -14,6 +14,10 @@ use crate::snappy::SnappyStream;
 use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
 use crate::{Error, Result};
 
+#[path = "package_state.rs"]
+mod package_state;
+use package_state::PackageState;
+
 /// A mutable single-file Pages, Numbers, or Keynote package.
 ///
 /// All ZIP members are retained as raw uncompressed bytes. IWA entries can be
@@ -26,13 +30,13 @@ use crate::{Error, Result};
 /// package performs the required copy-on-write detachment.
 #[derive(Debug, Clone, Default)]
 pub struct IWorkPackage {
-    entries: Arc<Vec<(String, Vec<u8>)>>,
+    state: Arc<PackageState>,
 }
 
 /// An immutable, cheaply shareable package snapshot.
 #[derive(Debug, Clone)]
 pub struct Snapshot {
-    entries: Arc<Vec<(String, Vec<u8>)>>,
+    state: Arc<PackageState>,
 }
 
 impl IWorkPackage {
@@ -76,7 +80,7 @@ impl IWorkPackage {
             entries.push((name.to_owned(), data));
         }
         Ok(Self {
-            entries: Arc::new(entries),
+            state: Arc::new(PackageState::from_entries(entries)),
         })
     }
 
@@ -135,27 +139,27 @@ impl IWorkPackage {
             entries.push((name.to_owned(), data));
         }
         Ok(Self {
-            entries: Arc::new(entries),
+            state: Arc::new(PackageState::from_entries(entries)),
         })
     }
 
     pub fn len(&self) -> usize {
-        self.entries.len()
+        self.state.entries.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.state.entries.is_empty()
     }
 
     /// Capture an immutable package snapshot without copying package entries.
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
-            entries: Arc::clone(&self.entries),
+            state: Arc::clone(&self.state),
         }
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.entries.iter().map(|(name, _)| name.as_str())
+        self.state.entries.iter().map(|(name, _)| name.as_str())
     }
 
     /// Enumerate package members that contain IWA object archives.
@@ -164,7 +168,8 @@ impl IWorkPackage {
     /// `bvxn` payload is a separate operation-log format. It is intentionally
     /// retained as a raw entry but excluded from object-archive scans.
     pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
-        self.entries
+        self.state
+            .entries
             .iter()
             .filter(|(name, data)| {
                 name.ends_with(".iwa") && !is_legacy_operation_storage(name, data)
@@ -199,12 +204,12 @@ impl IWorkPackage {
 
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
         let position = self.entry_position(normalize_entry_name(name))?;
-        Some(self.entries[position].1.as_slice())
+        Some(self.state.entries[position].1.as_slice())
     }
 
     pub fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let position = self.entry_position(normalize_entry_name(name))?;
-        Some(&mut Arc::make_mut(&mut self.entries)[position].1)
+        Some(&mut Arc::make_mut(&mut self.state).entries[position].1)
     }
 
     /// Create or replace a package member.
@@ -218,7 +223,7 @@ impl IWorkPackage {
         validate_entry_name(&name)?;
         if let Some(position) = self.entry_position(&name) {
             return Ok(Some(std::mem::replace(
-                &mut Arc::make_mut(&mut self.entries)[position].1,
+                &mut Arc::make_mut(&mut self.state).entries[position].1,
                 data,
             )));
         }
@@ -229,7 +234,10 @@ impl IWorkPackage {
     /// Delete a package member.
     pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
         let position = self.entry_position(normalize_entry_name(name))?;
-        Some(Arc::make_mut(&mut self.entries).remove(position).1)
+        let state = Arc::make_mut(&mut self.state);
+        let removed = state.entries.remove(position).1;
+        state.rebuild_positions();
+        Some(removed)
     }
 
     /// Parse a compressed `.iwa` package member.
@@ -289,7 +297,9 @@ impl IWorkPackage {
             .entry_position(before)
             .ok_or_else(|| Error::Bundle(format!("IWA insertion anchor not found: {before}")))?;
         let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-        Arc::make_mut(&mut self.entries).insert(position, (normalized, compressed));
+        let state = Arc::make_mut(&mut self.state);
+        state.entries.insert(position, (normalized, compressed));
+        state.rebuild_positions();
         Ok(())
     }
 
@@ -312,7 +322,7 @@ impl IWorkPackage {
     /// discovery, so newly-created document indexes are inserted first.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut writer = StreamingArchiveWriter::new();
-        for (name, data) in self.entries.iter() {
+        for (name, data) in &self.state.entries {
             writer.write_stored(name, data).map_err(|error| {
                 Error::Bundle(format!("Failed to write package entry {name}: {error}"))
             })?;
@@ -345,56 +355,92 @@ impl IWorkPackage {
     }
 
     fn entry_position(&self, name: &str) -> Option<usize> {
-        self.entries
-            .iter()
-            .position(|(candidate, _)| candidate == name)
+        self.state.position(name)
     }
 
     fn insert_new_entry(&mut self, name: String, data: Vec<u8>) {
-        let entries = Arc::make_mut(&mut self.entries);
+        let state = Arc::make_mut(&mut self.state);
         if name == "Index/Document.iwa" {
-            entries.insert(0, (name, data));
+            state.entries.insert(0, (name, data));
         } else {
-            entries.push((name, data));
+            state.entries.push((name, data));
         }
+        state.rebuild_positions();
     }
 }
 
 impl Snapshot {
     /// Return the number of retained package members.
     pub fn len(&self) -> usize {
-        self.entries.len()
+        self.state.entries.len()
     }
 
     /// Report whether the package contains no members.
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.state.entries.is_empty()
     }
 
     /// Enumerate package members in preserved source order.
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.entries.iter().map(|(name, _)| name.as_str())
+        self.state.entries.iter().map(|(name, _)| name.as_str())
     }
 
     /// Borrow one package member without copying it.
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
         let name = normalize_entry_name(name);
-        self.entries
-            .iter()
-            .find(|(candidate, _)| candidate == name)
-            .map(|(_, data)| data.as_slice())
+        let position = self.state.position(name)?;
+        Some(self.state.entries[position].1.as_slice())
     }
 
     /// Start a mutable copy-on-write edit from this snapshot.
     pub fn edit(&self) -> IWorkPackage {
         IWorkPackage {
-            entries: Arc::clone(&self.entries),
+            state: Arc::clone(&self.state),
         }
     }
 
     /// Encode the unchanged snapshot as an iWork ZIP package.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.edit().to_bytes()
+    }
+
+    /// Report whether a normalized package member exists without creating an
+    /// editable package view.
+    pub fn contains_entry(&self, name: &str) -> bool {
+        self.state.position(normalize_entry_name(name)).is_some()
+    }
+
+    /// Enumerate object-archive members in preserved source order.
+    pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
+        self.state
+            .entries
+            .iter()
+            .filter(|(name, data)| {
+                name.ends_with(".iwa") && !is_legacy_operation_storage(name, data)
+            })
+            .map(|(name, _)| name.as_str())
+    }
+
+    /// Locate the package's calculation-engine component without first
+    /// materializing an editable package.
+    pub fn calculation_engine_entry_name(&self) -> Result<Option<&str>> {
+        let mut entries = self
+            .iwa_entry_names()
+            .filter(|name| is_calculation_engine_entry_name(name));
+        let Some(entry) = entries.next() else {
+            return Ok(None);
+        };
+        if entries.next().is_some() {
+            return Err(Error::InvalidFormat(
+                "iWork package contains multiple CalculationEngine components".to_owned(),
+            ));
+        }
+        Ok(Some(entry))
+    }
+
+    /// Parse a compressed `.iwa` member from this immutable snapshot.
+    pub fn archive(&self, name: &str) -> Result<Archive> {
+        self.edit().archive(name)
     }
 }
 
@@ -562,13 +608,78 @@ mod tests {
         package.insert_entry("Data/asset", vec![7; 1024]).unwrap();
         let clone = package.clone();
 
-        assert!(Arc::ptr_eq(&package.entries, &clone.entries));
+        assert!(Arc::ptr_eq(&package.state, &clone.state));
         assert_eq!(package.entry("Data/asset"), clone.entry("Data/asset"));
 
         package.entry_mut("Data/asset").unwrap()[0] = 9;
         assert_eq!(package.entry("Data/asset").unwrap()[0], 9);
         assert_eq!(clone.entry("Data/asset").unwrap()[0], 7);
-        assert!(!Arc::ptr_eq(&package.entries, &clone.entries));
+        assert!(!Arc::ptr_eq(&package.state, &clone.state));
+    }
+
+    #[test]
+    fn snapshots_expose_indexed_read_operations_without_editing() {
+        let mut package = IWorkPackage::new();
+        package
+            .insert_entry("Index/CalculationEngine-174.iwa", vec![1])
+            .unwrap();
+        package
+            .insert_entry(
+                "Index/Document.iwa",
+                SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap(),
+            )
+            .unwrap();
+
+        let snapshot = package.snapshot();
+        assert!(snapshot.contains_entry("/Index/Document.iwa"));
+        assert_eq!(
+            snapshot.iwa_entry_names().collect::<Vec<_>>(),
+            ["Index/Document.iwa", "Index/CalculationEngine-174.iwa"]
+        );
+        assert_eq!(
+            snapshot.calculation_engine_entry_name().unwrap(),
+            Some("Index/CalculationEngine-174.iwa")
+        );
+        assert_eq!(
+            snapshot
+                .archive("Index/Document.iwa")
+                .unwrap()
+                .objects
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn structural_mutations_rebuild_the_shared_name_index() {
+        let mut package = IWorkPackage::new();
+        let expected_archive = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
+        package.insert_entry("Data/a", vec![1]).unwrap();
+        package.insert_entry("Data/b", vec![2]).unwrap();
+        package
+            .insert_archive_before("Index/Document.iwa", &archive(), "Data/b")
+            .unwrap();
+
+        assert_eq!(
+            package.entry("Index/Document.iwa"),
+            Some(expected_archive.as_slice())
+        );
+        assert_eq!(package.entry("Data/a"), Some(&[1][..]));
+        assert_eq!(package.entry("Data/b"), Some(&[2][..]));
+        assert_eq!(
+            package.remove_entry("Index/Document.iwa"),
+            Some(expected_archive)
+        );
+        assert!(!package.contains_entry("Index/Document.iwa"));
+        assert_eq!(package.entry("Data/a"), Some(&[1][..]));
+        assert_eq!(package.entry("Data/b"), Some(&[2][..]));
+    }
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn snapshots_are_send_and_sync() {
+        assert_send_sync::<Snapshot>();
     }
 
     #[test]
