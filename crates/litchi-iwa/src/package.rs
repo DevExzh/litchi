@@ -435,6 +435,12 @@ impl IWorkPackage {
         Some(self.state.entries[position].1.as_slice())
     }
 
+    /// Borrow a raw package member for low-level mutation.
+    ///
+    /// The returned vector is intentionally an escape hatch for format-specific
+    /// editors. Package entry, aggregate, and ZIP safety budgets are rechecked
+    /// before serialization, so an oversized direct mutation cannot be
+    /// published accidentally.
     pub fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let position = self.entry_position(normalize_entry_name(name))?;
         Some(&mut Arc::make_mut(&mut self.state).entries[position].1)
@@ -449,7 +455,9 @@ impl IWorkPackage {
         let supplied_name = name.into();
         let name = normalize_entry_name(&supplied_name).to_string();
         validate_entry_name(&name)?;
-        if let Some(position) = self.entry_position(&name) {
+        let position = self.entry_position(&name);
+        self.validate_entry_update(position, &data)?;
+        if let Some(position) = position {
             return Ok(Some(std::mem::replace(
                 &mut Arc::make_mut(&mut self.state).entries[position].1,
                 data,
@@ -529,7 +537,10 @@ impl IWorkPackage {
         let position = self
             .entry_position(before)
             .ok_or_else(|| Error::Bundle(format!("IWA insertion anchor not found: {before}")))?;
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        let data = archive.to_bytes()?;
+        self.limits.check_iwa_stream_size(data.len())?;
+        let compressed = SnappyStream::compress(&data)?;
+        self.validate_entry_update(None, &compressed)?;
         let state = Arc::make_mut(&mut self.state);
         state.entries.insert(position, (normalized, compressed));
         state.rebuild_positions();
@@ -554,6 +565,7 @@ impl IWorkPackage {
     /// Pages and Numbers use a leading `Index/Document.iwa` for package type
     /// discovery, so newly-created document indexes are inserted first.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.validate_state()?;
         let mut writer = StreamingArchiveWriter::new();
         for (name, data) in &self.state.entries {
             writer.write_stored(name, data).map_err(|error| {
@@ -589,6 +601,80 @@ impl IWorkPackage {
 
     fn entry_position(&self, name: &str) -> Option<usize> {
         self.state.position(name)
+    }
+
+    fn validate_entry_update(&self, position: Option<usize>, data: &[u8]) -> Result<()> {
+        let current_total = self.validate_state()?;
+        self.validate_entry_data(data)?;
+        if position.is_none() && self.state.entries.len() >= self.limits.max_entries {
+            return Err(Error::Bundle(format!(
+                "iWork package entry count exceeds the {} entry limit",
+                self.limits.max_entries
+            )));
+        }
+
+        let previous_size = position
+            .map(|index| self.state.entries[index].1.len())
+            .unwrap_or(0);
+        let previous_size = u64::try_from(previous_size)
+            .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
+        let data_size = u64::try_from(data.len())
+            .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
+        let projected_total = current_total
+            .checked_sub(previous_size)
+            .and_then(|total| total.checked_add(data_size))
+            .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))?;
+        if projected_total > self.limits.max_total_bytes {
+            return Err(Error::Bundle(format!(
+                "iWork package total size exceeds the {} byte limit",
+                self.limits.max_total_bytes
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_state(&self) -> Result<u64> {
+        if self.state.entries.len() > self.limits.max_entries {
+            return Err(Error::Bundle(format!(
+                "iWork package entry count exceeds the {} entry limit",
+                self.limits.max_entries
+            )));
+        }
+        for (name, data) in &self.state.entries {
+            validate_entry_name(name)?;
+            self.validate_entry_data(data)?;
+        }
+        let total = self
+            .state
+            .entries
+            .iter()
+            .try_fold(0_u64, |total, (_, data)| {
+                let size = u64::try_from(data.len()).map_err(|_| {
+                    Error::Bundle("package member length does not fit u64".to_owned())
+                })?;
+                total
+                    .checked_add(size)
+                    .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))
+            })?;
+        if total > self.limits.max_total_bytes {
+            return Err(Error::Bundle(format!(
+                "iWork package total size exceeds the {} byte limit",
+                self.limits.max_total_bytes
+            )));
+        }
+        Ok(total)
+    }
+
+    fn validate_entry_data(&self, data: &[u8]) -> Result<()> {
+        let size = u64::try_from(data.len())
+            .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
+        if size > self.limits.max_entry_bytes {
+            return Err(Error::Bundle(format!(
+                "iWork package member is {size} bytes, exceeding the {} byte limit",
+                self.limits.max_entry_bytes
+            )));
+        }
+        Ok(())
     }
 
     fn insert_new_entry(&mut self, name: String, data: Vec<u8>) {
@@ -783,6 +869,11 @@ mod tests {
         outer.finish_to_bytes().unwrap()
     }
 
+    fn empty_package_with_limits(limits: PackageLimits) -> IWorkPackage {
+        let bytes = StreamingArchiveWriter::new().finish_to_bytes().unwrap();
+        IWorkPackage::from_bytes_with_limits(&bytes, limits).unwrap()
+    }
+
     #[test]
     fn package_limits_are_checked_and_exposed() {
         let limits = PackageLimits::new(7, 11, 23).unwrap();
@@ -881,6 +972,36 @@ mod tests {
         std::fs::write(file.path(), &bytes).unwrap();
         let error = IWorkPackage::open_with_limits(file.path(), input_limits).unwrap_err();
         assert!(error.to_string().contains("iWork package input"));
+    }
+
+    #[test]
+    fn package_mutations_respect_entry_and_aggregate_budgets() {
+        let entry_limits = PackageLimits::new(1, 4, 4).unwrap();
+        let mut package = empty_package_with_limits(entry_limits);
+        let error = package
+            .insert_entry("Data/too-large", vec![1, 2, 3, 4, 5])
+            .unwrap_err();
+        assert!(error.to_string().contains("member"));
+        assert!(package.is_empty());
+
+        package
+            .insert_entry("Data/asset", vec![1, 2, 3, 4])
+            .unwrap();
+        let error = package.insert_entry("Data/second", vec![5]).unwrap_err();
+        assert!(error.to_string().contains("entry count"));
+        assert_eq!(package.len(), 1);
+
+        let total_limits = PackageLimits::new(10, 4, 4).unwrap();
+        let mut package = empty_package_with_limits(total_limits);
+        package
+            .insert_entry("Data/asset", vec![1, 2, 3, 4])
+            .unwrap();
+        let error = package.insert_entry("Data/second", vec![5]).unwrap_err();
+        assert!(error.to_string().contains("total size"));
+
+        package.entry_mut("Data/asset").unwrap().push(5);
+        let error = package.to_bytes().unwrap_err();
+        assert!(error.to_string().contains("member"));
     }
 
     #[test]
