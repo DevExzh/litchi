@@ -9,21 +9,33 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::collections::HashSet;
-use std::fmt::Write as _;
+use std::collections::{HashSet, TryReserveError};
+use std::fmt;
 use std::ops::Range;
 
-const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
-const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
-const XM: &[u8] = b"http://schemas.microsoft.com/office/excel/2006/main";
-const X12AC: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac";
-const XR: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2014/revision";
+const CORE_URI: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_URI: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+const X14_URI: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
+const XM_URI: &str = "http://schemas.microsoft.com/office/excel/2006/main";
+const X12AC_URI: &str = "http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac";
+const XR_URI: &str = "http://schemas.microsoft.com/office/spreadsheetml/2014/revision";
+const CORE: &[u8] = CORE_URI.as_bytes();
+const STRICT: &[u8] = STRICT_URI.as_bytes();
+const X14: &[u8] = X14_URI.as_bytes();
+const XM: &[u8] = XM_URI.as_bytes();
+const X12AC: &[u8] = X12AC_URI.as_bytes();
+const XR: &[u8] = XR_URI.as_bytes();
 const EXTENSION_URI: &str = "{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}";
+const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 128;
+const MAX_EVENTS: usize = 1_000_000;
+const MAX_NODES: usize = 1_000_000;
+const MAX_CAPTURED_COLLECTIONS: usize = 1_024;
 const MAX_VALIDATIONS: usize = 65_534;
 const MAX_REFERENCES: usize = 32_767;
 const MAX_FRAGMENT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_FORMULA_BYTES: usize = 1024 * 1024;
+const MAX_ATTRIBUTE_BYTES: usize = MAX_FORMULA_BYTES;
 const MAX_RETAINED_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,8 +47,8 @@ pub enum DataValidationConformance {
 impl DataValidationConformance {
     fn namespace(self) -> &'static str {
         match self {
-            Self::Transitional => std::str::from_utf8(CORE).unwrap(),
-            Self::Strict => std::str::from_utf8(STRICT).unwrap(),
+            Self::Transitional => CORE_URI,
+            Self::Strict => STRICT_URI,
         }
     }
 }
@@ -216,7 +228,11 @@ impl DataValidationRange {
         if sqref.ranges.len() != 1 {
             return Err(invalid("data-validation range must contain one reference"));
         }
-        Ok(sqref.ranges.into_iter().next().unwrap())
+        sqref
+            .ranges
+            .into_iter()
+            .next()
+            .ok_or_else(|| invalid("data-validation range is empty"))
     }
 
     pub fn as_str(&self) -> &str {
@@ -545,7 +561,138 @@ struct Captured {
     bytes: Vec<u8>,
 }
 
+fn allocation(resource: &'static str, source: TryReserveError) -> OoxmlError {
+    OoxmlError::Allocation { resource, source }
+}
+
+fn reserve_vec<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> Result<()> {
+    values
+        .try_reserve_exact(additional)
+        .map_err(|source| allocation(resource, source))
+}
+
+fn append_limited_text(
+    value: &mut String,
+    addition: &str,
+    limit: usize,
+    field: &str,
+) -> Result<()> {
+    let length = value
+        .len()
+        .checked_add(addition.len())
+        .ok_or_else(|| invalid(format!("{field} length overflow")))?;
+    if length > limit {
+        return Err(invalid(format!("{field} is too large")));
+    }
+    value
+        .try_reserve_exact(addition.len())
+        .map_err(|source| allocation("data-validation text", source))?;
+    value.push_str(addition);
+    Ok(())
+}
+
+/// A fallible, bounded formatter used by the XML writer.
+struct BoundedXml {
+    value: String,
+    allocation: Option<TryReserveError>,
+    exceeded: bool,
+}
+
+impl BoundedXml {
+    fn new() -> Self {
+        Self {
+            value: String::new(),
+            allocation: None,
+            exceeded: false,
+        }
+    }
+
+    fn write_arguments(&mut self, arguments: fmt::Arguments<'_>) -> Result<()> {
+        if fmt::write(self, arguments).is_ok() {
+            return Ok(());
+        }
+        if let Some(source) = self.allocation.take() {
+            return Err(allocation("data-validation XML output", source));
+        }
+        if self.exceeded {
+            Err(invalid("data-validation XML output exceeds resource limit"))
+        } else {
+            Err(invalid("failed to format data-validation XML"))
+        }
+    }
+
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.write_arguments(format_args!("{value}"))
+    }
+
+    fn finish(self) -> String {
+        self.value
+    }
+}
+
+impl fmt::Write for BoundedXml {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        let length = self
+            .value
+            .len()
+            .checked_add(value.len())
+            .ok_or(fmt::Error)?;
+        if length > MAX_XML_BYTES {
+            self.exceeded = true;
+            return Err(fmt::Error);
+        }
+        if let Err(source) = self.value.try_reserve_exact(value.len()) {
+            self.allocation = Some(source);
+            return Err(fmt::Error);
+        }
+        self.value.push_str(value);
+        Ok(())
+    }
+}
+
+fn append_bounded_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    let length = output
+        .len()
+        .checked_add(bytes.len())
+        .ok_or_else(|| invalid("data-validation XML output length overflow"))?;
+    if length > MAX_XML_BYTES {
+        return Err(invalid("data-validation XML output exceeds resource limit"));
+    }
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| allocation("data-validation XML output", source))?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn retain_capture(
+    values: &mut Vec<Captured>,
+    retained: &mut usize,
+    captured: Captured,
+) -> Result<()> {
+    if values.len() >= MAX_CAPTURED_COLLECTIONS {
+        return Err(invalid("too many data-validation collections"));
+    }
+    let size = captured
+        .prefix
+        .len()
+        .checked_add(captured.bytes.len())
+        .ok_or_else(|| invalid("data-validation retained-byte overflow"))?;
+    *retained = retained
+        .checked_add(size)
+        .ok_or_else(|| invalid("data-validation retained-byte overflow"))?;
+    if *retained > MAX_RETAINED_BYTES {
+        return Err(invalid("data-validation content exceeds resource limit"));
+    }
+    reserve_vec(values, 1, "data-validation collections")?;
+    values.push(captured);
+    Ok(())
+}
+
 pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<DataValidationCollection>> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("data-validation worksheet XML is too large"));
+    }
     let mut capabilities = MceCapabilities::default();
     capabilities
         .understand_namespace(String::from_utf8_lossy(X14).into_owned())
@@ -556,23 +703,26 @@ pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<DataValidatio
         namespace: String::from_utf8_lossy(X14).into_owned(),
         local_name: "dataValidations".into(),
     });
-    let validated = process_markup_compatibility(xml, &capabilities, &MceLimits::default())?;
+    let limits = MceLimits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        ..MceLimits::default()
+    };
+    let validated = process_markup_compatibility(xml, &capabilities, &limits)?;
+    if validated.xml.len() > MAX_XML_BYTES {
+        return Err(invalid("processed data-validation XML is too large"));
+    }
     let selected = if validated.report.alternate_content_count == 0 {
         xml
     } else {
         validated.xml.as_ref()
     };
     let fragments = capture_collections(selected)?;
-    let mut values = Vec::with_capacity(fragments.len());
+    let mut values = Vec::new();
+    reserve_vec(&mut values, fragments.len(), "data-validation collections")?;
     let mut count = 0usize;
-    let mut retained = 0usize;
     for fragment in fragments {
-        retained = retained
-            .checked_add(fragment.bytes.len())
-            .ok_or_else(|| invalid("data-validation retained-byte overflow"))?;
-        if retained > MAX_RETAINED_BYTES {
-            return Err(invalid("data-validation content exceeds resource limit"));
-        }
         let value = parse_collection(&fragment)?;
         count = count
             .checked_add(value.validations.len())
@@ -582,6 +732,7 @@ pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<DataValidatio
         }
         values.push(value);
     }
+    validate_data_validation_collections(&values)?;
     Ok(values)
 }
 
@@ -590,20 +741,62 @@ type CaptureState = Option<(usize, DataValidationSource, Vec<u8>, Writer<Vec<u8>
 
 fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
     let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut values = Vec::new();
     let mut depth = 0usize;
     let mut extension_depth = None;
     let mut capture: CaptureState = None;
+    let mut events = 0usize;
+    let mut nodes = 0usize;
+    let mut retained = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("data-validation XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("data-validation XML exceeds event limit"));
+        }
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
+        if matches!(&event, Event::Eof) {
+            if capture.is_some() || depth != 0 {
+                return Err(invalid("unterminated data-validation worksheet XML"));
+            }
+            break;
+        }
+        if matches!(&event, Event::Start(_) | Event::Empty(_) | Event::End(_)) {
+            nodes = nodes
+                .checked_add(1)
+                .ok_or_else(|| invalid("data-validation XML node count overflow"))?;
+            if nodes > MAX_NODES {
+                return Err(invalid("data-validation XML exceeds node limit"));
+            }
+        }
         if let Some((capture_depth, _, _, writer)) = capture.as_mut() {
             writer.write_event(event.clone()).map_err(xml_error)?;
+            if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
+                return Err(invalid("dataValidations fragment is too large"));
+            }
             match event {
-                Event::Start(_) => *capture_depth += 1,
-                Event::End(_) => *capture_depth -= 1,
+                Event::Start(_) => {
+                    if *capture_depth >= MAX_DEPTH {
+                        return Err(invalid("dataValidations nesting is too deep"));
+                    }
+                    *capture_depth = capture_depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("dataValidations nesting overflow"))?;
+                },
+                Event::End(_) => {
+                    *capture_depth = capture_depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("invalid dataValidations nesting"))?;
+                },
                 _ => {},
             }
             if *capture_depth == 0 {
@@ -611,60 +804,93 @@ fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                     return Err(invalid("dataValidations capture state disappeared"));
                 };
                 let bytes = writer.into_inner();
-                if bytes.len() > MAX_FRAGMENT_BYTES {
-                    return Err(invalid("dataValidations fragment is too large"));
-                }
-                values.push(Captured {
-                    source,
-                    prefix,
-                    bytes,
-                });
+                retain_capture(
+                    &mut values,
+                    &mut retained,
+                    Captured {
+                        source,
+                        prefix,
+                        bytes,
+                    },
+                )?;
             }
             continue;
         }
         match event {
             Event::Start(element)
                 if element.local_name().as_ref() == b"dataValidations"
+                    && depth > 0
+                    && depth == 1
                     && spreadsheet(&namespace) =>
             {
-                let prefix = prefix(element.name().as_ref());
+                let prefix = prefix(element.name().as_ref())?;
                 let mut writer = Writer::new(Vec::new());
                 writer
                     .write_event(Event::Start(element))
                     .map_err(xml_error)?;
+                if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
+                    return Err(invalid("dataValidations fragment is too large"));
+                }
                 capture = Some((1, DataValidationSource::Core, prefix, writer));
             },
             Event::Start(element)
                 if element.local_name().as_ref() == b"dataValidations"
+                    && depth > 0
                     && exact(&namespace, X14)
                     && extension_depth.is_some() =>
             {
-                let prefix = prefix(element.name().as_ref());
+                let prefix = prefix(element.name().as_ref())?;
                 let mut writer = Writer::new(Vec::new());
                 writer
                     .write_event(Event::Start(element))
                     .map_err(xml_error)?;
+                if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
+                    return Err(invalid("dataValidations fragment is too large"));
+                }
                 capture = Some((1, DataValidationSource::Office2010, prefix, writer));
             },
             Event::Empty(element)
                 if element.local_name().as_ref() == b"dataValidations"
+                    && depth == 1
                     && spreadsheet(&namespace) =>
             {
-                let prefix = prefix(element.name().as_ref());
+                let prefix = prefix(element.name().as_ref())?;
                 let mut writer = Writer::new(Vec::new());
                 writer
                     .write_event(Event::Empty(element))
                     .map_err(xml_error)?;
-                values.push(Captured {
-                    source: DataValidationSource::Core,
-                    prefix,
-                    bytes: writer.into_inner(),
-                });
+                if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
+                    return Err(invalid("dataValidations fragment is too large"));
+                }
+                retain_capture(
+                    &mut values,
+                    &mut retained,
+                    Captured {
+                        source: DataValidationSource::Core,
+                        prefix,
+                        bytes: writer.into_inner(),
+                    },
+                )?;
             },
             Event::Start(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if depth == 0 {
+                    if root_seen
+                        || !spreadsheet(&namespace)
+                        || element.local_name().as_ref() != b"worksheet"
+                    {
+                        return Err(invalid("data-validation parser requires a worksheet root"));
+                    }
+                    root_seen = true;
+                }
+                if depth >= MAX_DEPTH {
+                    return Err(invalid("worksheet nesting is too deep"));
+                }
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| invalid("worksheet nesting is too deep"))?;
+                    .ok_or_else(|| invalid("worksheet nesting overflow"))?;
                 if spreadsheet(&namespace)
                     && element.local_name().as_ref() == b"ext"
                     && optional_attr(&element, b"uri", decoder)?.as_deref() == Some(EXTENSION_URI)
@@ -672,30 +898,76 @@ fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                     extension_depth = Some(depth);
                 }
             },
-            Event::End(_) => {
+            Event::Empty(element) if depth == 0 => {
+                if root_seen
+                    || !spreadsheet(&namespace)
+                    || element.local_name().as_ref() != b"worksheet"
+                {
+                    return Err(invalid("data-validation parser requires a worksheet root"));
+                }
+                root_seen = true;
+                root_closed = true;
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("invalid worksheet nesting"));
+                }
+                if depth == 1
+                    && (!spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet")
+                {
+                    return Err(invalid("invalid worksheet closing element"));
+                }
                 if extension_depth == Some(depth) {
                     extension_depth = None;
                 }
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| invalid("invalid worksheet nesting"))?;
+                if depth == 0 {
+                    // The namespace/local-name check is performed by the XML reader for
+                    // qualified names; this branch only records the root boundary.
+                    root_closed = true;
+                }
+            },
+            Event::Text(value) => {
+                if (!root_seen || root_closed)
+                    && !value.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("worksheet XML text is outside root"));
+                }
+                if depth == 1 && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet cannot contain direct text"));
+                }
+            },
+            Event::CData(_) if depth == 1 || !root_seen || root_closed => {
+                return Err(invalid("worksheet XML contains unexpected CDATA"));
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
-            Event::Eof => break,
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
+            },
+            Event::GeneralRef(reference) => {
+                decode_xml_reference(&reference)?;
+            },
             _ => {},
         }
     }
-    if capture.is_some() {
-        return Err(invalid("unterminated dataValidations"));
+    if !root_seen || !root_closed || depth != 0 {
+        return Err(invalid("incomplete worksheet data-validation XML"));
     }
     Ok(values)
 }
 
 fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
-    let wrapped = wrap(&fragment.prefix, &fragment.bytes);
+    let wrapped = wrap(&fragment.prefix, &fragment.bytes)?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut root_depth = None;
     let mut closed = false;
@@ -705,26 +977,65 @@ fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
     let mut y_window = None;
     let mut validations = Vec::new();
     let mut capture: Option<(usize, Writer<Vec<u8>>)> = None;
+    let mut events = 0usize;
+    let mut nodes = 0usize;
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("dataValidations event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("dataValidations exceeds event limit"));
+        }
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
+        if matches!(&event, Event::Eof) {
+            if capture.is_some() || depth != 0 || !closed {
+                return Err(invalid("unterminated dataValidations"));
+            }
+            break;
+        }
+        if matches!(&event, Event::Start(_) | Event::Empty(_) | Event::End(_)) {
+            nodes = nodes
+                .checked_add(1)
+                .ok_or_else(|| invalid("dataValidations node count overflow"))?;
+            if nodes > MAX_NODES {
+                return Err(invalid("dataValidations exceeds node limit"));
+            }
+        }
         if let Some((capture_depth, writer)) = capture.as_mut() {
             writer.write_event(event.clone()).map_err(xml_error)?;
+            if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
+                return Err(invalid("dataValidation rule is too large"));
+            }
             match event {
-                Event::Start(_) => *capture_depth += 1,
-                Event::End(_) => *capture_depth -= 1,
+                Event::Start(_) => {
+                    if *capture_depth >= MAX_DEPTH {
+                        return Err(invalid("dataValidation nesting is too deep"));
+                    }
+                    *capture_depth = capture_depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("dataValidation nesting overflow"))?;
+                },
+                Event::End(_) => {
+                    *capture_depth = capture_depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("invalid dataValidation nesting"))?;
+                },
                 _ => {},
             }
             if *capture_depth == 0 {
                 let Some((_, writer)) = capture.take() else {
                     return Err(invalid("dataValidation capture state disappeared"));
                 };
-                validations.push(parse_rule(&writer.into_inner(), fragment.source)?);
-                if validations.len() > MAX_VALIDATIONS {
+                if validations.len() >= MAX_VALIDATIONS {
                     return Err(invalid("too many data validations"));
                 }
+                let raw = writer.into_inner();
+                let value = parse_rule(&raw, fragment.source)?;
+                reserve_vec(&mut validations, 1, "data-validation rules")?;
+                validations.push(value);
             }
             continue;
         }
@@ -736,9 +1047,17 @@ fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
                 if root_depth.is_some() {
                     return Err(invalid("nested dataValidations"));
                 }
-                depth += 1;
+                if closed || depth >= MAX_DEPTH {
+                    return Err(invalid("dataValidations nesting is too deep"));
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("dataValidations nesting overflow"))?;
                 root_depth = Some(depth);
                 expected = optional_u32(&element, b"count", decoder)?;
+                if expected.is_some_and(|value| value as usize > MAX_VALIDATIONS) {
+                    return Err(invalid("too many data validations"));
+                }
                 disable = optional_bool(&element, b"disablePrompts", decoder)?.unwrap_or(false);
                 x_window = optional_u32(&element, b"xWindow", decoder)?;
                 y_window = optional_u32(&element, b"yWindow", decoder)?;
@@ -748,10 +1067,16 @@ fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
                     && source_ns(fragment.source, &namespace)
                     && root_depth == Some(depth) =>
             {
+                if closed {
+                    return Err(invalid("content follows dataValidations"));
+                }
                 let mut writer = Writer::new(Vec::new());
                 writer
                     .write_event(Event::Start(element))
                     .map_err(xml_error)?;
+                if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
+                    return Err(invalid("dataValidation rule is too large"));
+                }
                 capture = Some((1, writer));
             },
             Event::Empty(element)
@@ -759,18 +1084,33 @@ fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
                     && source_ns(fragment.source, &namespace)
                     && root_depth == Some(depth) =>
             {
+                if closed || validations.len() >= MAX_VALIDATIONS {
+                    return Err(invalid("too many data validations"));
+                }
                 let mut writer = Writer::new(Vec::new());
                 writer
                     .write_event(Event::Empty(element))
                     .map_err(xml_error)?;
-                validations.push(parse_rule(&writer.into_inner(), fragment.source)?);
+                if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
+                    return Err(invalid("dataValidation rule is too large"));
+                }
+                let raw = writer.into_inner();
+                let value = parse_rule(&raw, fragment.source)?;
+                reserve_vec(&mut validations, 1, "data-validation rules")?;
+                validations.push(value);
             },
             Event::Start(_) => {
+                if depth >= MAX_DEPTH {
+                    return Err(invalid("dataValidations nesting is too deep"));
+                }
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| invalid("dataValidations nesting is too deep"))?
+                    .ok_or_else(|| invalid("dataValidations nesting overflow"))?
             },
             Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("unexpected dataValidations closing element"));
+                }
                 if root_depth == Some(depth)
                     && element.local_name().as_ref() == b"dataValidations"
                     && source_ns(fragment.source, &namespace)
@@ -781,15 +1121,26 @@ fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
                     .checked_sub(1)
                     .ok_or_else(|| invalid("invalid dataValidations nesting"))?;
             },
+            Event::Text(value) => {
+                if !value.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("dataValidations must not contain text"));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) => {
+                return Err(invalid("dataValidations must not contain character data"));
+            },
+            Event::Decl(_) => {
+                return Err(invalid(
+                    "XML declarations are not allowed in dataValidations",
+                ));
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
-            Event::Eof => break,
-            _ => {},
+            Event::Empty(_) => {},
+            Event::Comment(_) => {},
+            Event::Eof => return Err(invalid("unexpected EOF in dataValidations")),
         }
-    }
-    if !closed {
-        return Err(invalid("unterminated dataValidations"));
     }
     if validations.is_empty() {
         return Err(invalid("dataValidations must contain at least one rule"));
@@ -815,6 +1166,34 @@ enum TextTarget {
     List,
 }
 
+fn text_target_matches(
+    target: TextTarget,
+    source: DataValidationSource,
+    namespace: &ResolveResult<'_>,
+    local: &[u8],
+) -> bool {
+    match target {
+        TextTarget::Formula1 => {
+            (source == DataValidationSource::Core
+                && local == b"formula1"
+                && source_ns(source, namespace))
+                || (source == DataValidationSource::Office2010
+                    && local == b"f"
+                    && exact(namespace, XM))
+        },
+        TextTarget::Formula2 => {
+            (source == DataValidationSource::Core
+                && local == b"formula2"
+                && source_ns(source, namespace))
+                || (source == DataValidationSource::Office2010
+                    && local == b"f"
+                    && exact(namespace, XM))
+        },
+        TextTarget::Sqref => local == b"sqref" && exact(namespace, XM),
+        TextTarget::List => local == b"list" && exact(namespace, X12AC),
+    }
+}
+
 fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataValidation> {
     if raw.len() > MAX_FRAGMENT_BYTES {
         return Err(invalid("dataValidation rule is too large"));
@@ -826,8 +1205,10 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
             b"x14"
         },
         raw,
-    );
+    )?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut rule_depth = None;
     let mut closed = false;
@@ -849,19 +1230,46 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
     ) = (None, None, None);
     let mut wrapper: Option<(u8, usize, bool)> = None;
     let mut text: Option<(usize, TextTarget, String)> = None;
+    let mut events = 0usize;
+    let mut nodes = 0usize;
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("dataValidation event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("dataValidation exceeds event limit"));
+        }
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
+        if matches!(&event, Event::Eof) {
+            break;
+        }
+        if matches!(&event, Event::Start(_) | Event::Empty(_) | Event::End(_)) {
+            nodes = nodes
+                .checked_add(1)
+                .ok_or_else(|| invalid("dataValidation node count overflow"))?;
+            if nodes > MAX_NODES {
+                return Err(invalid("dataValidation exceeds node limit"));
+            }
+        }
         match event {
             Event::Start(element) => {
+                if closed {
+                    return Err(invalid("content follows dataValidation"));
+                }
                 let local = element.local_name();
                 if local.as_ref() == b"dataValidation"
                     && source_ns(source, &namespace)
                     && rule_depth.is_none()
                 {
-                    depth += 1;
+                    if depth >= MAX_DEPTH {
+                        return Err(invalid("dataValidation nesting is too deep"));
+                    }
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("dataValidation nesting overflow"))?;
                     rule_depth = Some(depth);
                     kind = ParsedDataValidationType::parse(
                         optional_attr(&element, b"type", decoder)?
@@ -916,8 +1324,14 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     if wrapper.is_some() {
                         return Err(invalid("nested data-validation formula wrapper"));
                     }
-                    wrapper = Some((number, depth + 1, false));
-                    depth += 1;
+                    let target_depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("dataValidation nesting overflow"))?;
+                    wrapper = Some((number, target_depth, false));
+                    if target_depth > MAX_DEPTH {
+                        return Err(invalid("dataValidation nesting is too deep"));
+                    }
+                    depth = target_depth;
                     if source == DataValidationSource::Core {
                         text = Some((
                             depth,
@@ -931,7 +1345,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     }
                 } else if source == DataValidationSource::Office2010
                     && wrapper.is_some()
-                    && depth == rule_depth.unwrap_or(0) + 1
+                    && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, XM)
                     && local.as_ref() == b"f"
                 {
@@ -951,7 +1365,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     text = Some((depth, target, String::new()));
                 } else if source == DataValidationSource::Office2010
                     && wrapper.is_some()
-                    && depth == rule_depth.unwrap_or(0) + 1
+                    && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, X12AC)
                     && local.as_ref() == b"list"
                 {
@@ -977,39 +1391,65 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     }
                     order = 3;
                     let flags = sqref_flags(&element, decoder)?;
-                    depth += 1;
-                    text = Some((depth, TextTarget::Sqref, encode_flags(flags)));
-                } else {
                     depth = depth
                         .checked_add(1)
-                        .ok_or_else(|| invalid("dataValidation nesting is too deep"))?;
+                        .ok_or_else(|| invalid("dataValidation nesting overflow"))?;
+                    if depth > MAX_DEPTH {
+                        return Err(invalid("dataValidation nesting is too deep"));
+                    }
+                    text = Some((depth, TextTarget::Sqref, encode_flags(flags)));
+                } else {
+                    if depth >= MAX_DEPTH {
+                        return Err(invalid("dataValidation nesting is too deep"));
+                    }
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("dataValidation nesting overflow"))?;
                 }
             },
             Event::Text(value) => {
                 if let Some((_, _, buffer)) = text.as_mut() {
-                    buffer.push_str(&value.decode().map_err(xml_error)?);
-                    if buffer.len() > MAX_FORMULA_BYTES {
-                        return Err(invalid("data-validation text is too large"));
-                    }
+                    let decoded = value.decode().map_err(xml_error)?;
+                    append_limited_text(
+                        buffer,
+                        &decoded,
+                        MAX_FORMULA_BYTES,
+                        "data-validation text",
+                    )?;
+                } else if !value.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("dataValidation contains unexpected text"));
                 }
             },
             Event::CData(value) => {
                 if let Some((_, _, buffer)) = text.as_mut() {
-                    buffer.push_str(&value.decode().map_err(xml_error)?);
-                    if buffer.len() > MAX_FORMULA_BYTES {
-                        return Err(invalid("data-validation text is too large"));
-                    }
+                    let decoded = value.decode().map_err(xml_error)?;
+                    append_limited_text(
+                        buffer,
+                        &decoded,
+                        MAX_FORMULA_BYTES,
+                        "data-validation text",
+                    )?;
+                } else {
+                    return Err(invalid("dataValidation contains unexpected CDATA"));
                 }
             },
             Event::GeneralRef(value) => {
                 if let Some((_, _, buffer)) = text.as_mut() {
-                    buffer.push_str(&decode_xml_reference(&value)?);
-                    if buffer.len() > MAX_FORMULA_BYTES {
-                        return Err(invalid("data-validation text is too large"));
-                    }
+                    let decoded = decode_xml_reference(&value)?;
+                    append_limited_text(
+                        buffer,
+                        &decoded,
+                        MAX_FORMULA_BYTES,
+                        "data-validation text",
+                    )?;
+                } else {
+                    return Err(invalid("dataValidation contains unexpected entity text"));
                 }
             },
             Event::Empty(element) => {
+                if closed {
+                    return Err(invalid("content follows dataValidation"));
+                }
                 let local = element.local_name();
                 if source == DataValidationSource::Core
                     && rule_depth == Some(depth)
@@ -1038,7 +1478,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     }
                 } else if source == DataValidationSource::Office2010
                     && wrapper.is_some()
-                    && depth == rule_depth.unwrap_or(0) + 1
+                    && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, XM)
                     && local.as_ref() == b"f"
                 {
@@ -1067,7 +1507,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     }
                 } else if source == DataValidationSource::Office2010
                     && wrapper.is_some()
-                    && depth == rule_depth.unwrap_or(0) + 1
+                    && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, X12AC)
                     && local.as_ref() == b"list"
                 {
@@ -1093,10 +1533,21 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                 }
             },
             Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("unexpected dataValidation closing element"));
+                }
                 if text.as_ref().is_some_and(|(target, _, _)| *target == depth) {
                     let Some((_, target, value)) = text.take() else {
                         return Err(invalid("data-validation text state disappeared"));
                     };
+                    if !text_target_matches(
+                        target,
+                        source,
+                        &namespace,
+                        element.local_name().as_ref(),
+                    ) {
+                        return Err(invalid("invalid data-validation text closing element"));
+                    }
                     match target {
                         TextTarget::Formula1 => {
                             if formula1.is_some() {
@@ -1126,11 +1577,18 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                 if wrapper
                     .as_ref()
                     .is_some_and(|(_, target, _)| *target == depth)
-                    && matches!(element.local_name().as_ref(), b"formula1" | b"formula2")
                 {
-                    let Some((_, _, seen)) = wrapper.take() else {
+                    let Some((number, _, seen)) = wrapper.take() else {
                         return Err(invalid("data-validation wrapper state disappeared"));
                     };
+                    let expected = if number == 1 {
+                        b"formula1"
+                    } else {
+                        b"formula2"
+                    };
+                    if !source_ns(source, &namespace) || element.local_name().as_ref() != expected {
+                        return Err(invalid("invalid data-validation wrapper closing element"));
+                    }
                     if source == DataValidationSource::Office2010 && !seen {
                         return Err(invalid(
                             "x14 formula wrapper must contain exactly one value",
@@ -1150,11 +1608,16 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
-            Event::Eof => break,
-            _ => {},
+            Event::Decl(_) => {
+                return Err(invalid(
+                    "XML declarations are not allowed in dataValidation",
+                ));
+            },
+            Event::Comment(_) => {},
+            Event::Eof => return Err(invalid("unexpected EOF in dataValidation")),
         }
     }
-    if !closed || wrapper.is_some() || text.is_some() {
+    if !closed || wrapper.is_some() || text.is_some() || depth != 0 {
         return Err(invalid("unterminated dataValidation"));
     }
     let sqref = sqref.ok_or_else(|| invalid("dataValidation is missing sqref"))?;
@@ -1275,7 +1738,7 @@ fn validate_rule(value: &ParsedDataValidation) -> Result<()> {
         ));
     }
     parse_sqref(
-        &sqref_text(&value.sqref),
+        &sqref_text(&value.sqref)?,
         value.sqref.edited,
         value.sqref.split,
         value.sqref.adjusted,
@@ -1330,13 +1793,20 @@ fn validate_xml_chars(value: &str, field: &str) -> Result<()> {
     Ok(())
 }
 
-fn sqref_text(value: &DataValidationSqref) -> String {
-    value
-        .ranges
-        .iter()
-        .map(|range| range.0.as_str())
-        .collect::<Vec<_>>()
-        .join(" ")
+fn sqref_text(value: &DataValidationSqref) -> Result<String> {
+    let mut text = String::new();
+    for (index, range) in value.ranges.iter().enumerate() {
+        if index != 0 {
+            append_limited_text(&mut text, " ", MAX_FRAGMENT_BYTES, "data-validation sqref")?;
+        }
+        append_limited_text(
+            &mut text,
+            range.0.as_str(),
+            MAX_FRAGMENT_BYTES,
+            "data-validation sqref",
+        )?;
+    }
+    Ok(text)
 }
 
 fn parse_sqref(
@@ -1346,6 +1816,9 @@ fn parse_sqref(
     adjusted: bool,
     adjust: bool,
 ) -> Result<DataValidationSqref> {
+    if value.len() > MAX_FRAGMENT_BYTES {
+        return Err(invalid("data-validation sqref is too large"));
+    }
     if adjusted && !adjust {
         return Err(invalid("sqref adjusted requires adjust"));
     }
@@ -1355,11 +1828,14 @@ fn parse_sqref(
             return Err(invalid("too many data-validation references"));
         }
         let mut parts = item.split(':');
-        let first = parts.next().unwrap_or("");
+        let Some(first) = parts.next() else {
+            return Err(invalid("invalid empty data-validation range"));
+        };
         let second = parts.next();
         if parts.next().is_some() || !valid_cell(first) || second.is_some_and(|v| !valid_cell(v)) {
             return Err(invalid(format!("invalid data-validation range '{item}'")));
         }
+        reserve_vec(&mut ranges, 1, "data-validation references")?;
         ranges.push(DataValidationRange(item.to_owned()));
     }
     if ranges.is_empty() {
@@ -1399,11 +1875,10 @@ fn valid_cell(value: &str) -> bool {
     if i < raw.len() && raw[i] == b'$' {
         i += 1;
     }
-    let Ok(row) = std::str::from_utf8(&raw[i..])
-        .ok()
-        .unwrap_or("")
-        .parse::<u32>()
-    else {
+    let Ok(row_text) = std::str::from_utf8(&raw[i..]) else {
+        return false;
+    };
+    let Ok(row) = row_text.parse::<u32>() else {
         return false;
     };
     (1..=1_048_576).contains(&row)
@@ -1455,6 +1930,9 @@ fn uid_attr(
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
                 .map_err(xml_error)?
                 .into_owned();
+            if value.len() > MAX_ATTRIBUTE_BYTES {
+                return Err(invalid("data-validation uid is too large"));
+            }
             if !valid_guid(&value) {
                 return Err(invalid("invalid data-validation uid"));
             }
@@ -1490,12 +1968,17 @@ fn optional_attr(
                     String::from_utf8_lossy(name)
                 )));
             }
-            result = Some(
-                attribute
-                    .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
-                    .map_err(xml_error)?
-                    .into_owned(),
-            );
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map_err(xml_error)?
+                .into_owned();
+            if value.len() > MAX_ATTRIBUTE_BYTES {
+                return Err(invalid(format!(
+                    "data-validation attribute '{}' is too large",
+                    String::from_utf8_lossy(name)
+                )));
+            }
+            result = Some(value);
         }
     }
     Ok(result)
@@ -1541,27 +2024,40 @@ fn bounded_attr(
     Ok(value)
 }
 
-fn wrap(prefix: &[u8], fragment: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(fragment.len() + 700);
-    out.extend_from_slice(br#"<root xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:s="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main" xmlns:x12ac="http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision""#);
-    if !prefix.is_empty() && !matches!(prefix, b"s" | b"x14") {
-        out.extend_from_slice(b" xmlns:");
-        out.extend_from_slice(prefix);
-        out.extend_from_slice(if prefix == b"x" {
-            b"=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""
-        } else {
-            b"=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\""
-        });
+fn wrap(prefix: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
+    if fragment.len() > MAX_FRAGMENT_BYTES {
+        return Err(invalid("data-validation fragment is too large"));
     }
-    out.push(b'>');
-    out.extend_from_slice(fragment);
-    out.extend_from_slice(b"</root>");
-    out
+    let mut out = Vec::new();
+    append_bounded_bytes(
+        &mut out,
+        br#"<root xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:s="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main" xmlns:x12ac="http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision""#,
+    )?;
+    if !prefix.is_empty() && !matches!(prefix, b"s" | b"x14") {
+        append_bounded_bytes(&mut out, b" xmlns:")?;
+        append_bounded_bytes(&mut out, prefix)?;
+        append_bounded_bytes(
+            &mut out,
+            if prefix == b"x" {
+                b"=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""
+            } else {
+                b"=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\""
+            },
+        )?;
+    }
+    append_bounded_bytes(&mut out, b">")?;
+    append_bounded_bytes(&mut out, fragment)?;
+    append_bounded_bytes(&mut out, b"</root>")?;
+    Ok(out)
 }
-fn prefix(name: &[u8]) -> Vec<u8> {
-    name.iter()
-        .position(|v| *v == b':')
-        .map_or_else(Vec::new, |i| name[..i].to_vec())
+fn prefix(name: &[u8]) -> Result<Vec<u8>> {
+    let Some(index) = name.iter().position(|value| *value == b':') else {
+        return Ok(Vec::new());
+    };
+    let mut value = Vec::new();
+    reserve_vec(&mut value, index, "data-validation namespace prefix")?;
+    value.extend_from_slice(&name[..index]);
+    Ok(value)
 }
 fn source_ns(source: DataValidationSource, ns: &ResolveResult<'_>) -> bool {
     match source {
@@ -1587,9 +2083,12 @@ pub fn write_data_validation_collections(
     values: &[DataValidationCollection],
     conformance: DataValidationConformance,
 ) -> Result<String> {
-    let mut xml = write_data_validation_core(values, conformance)?;
-    xml.push_str(&write_data_validation_extensions(values, conformance)?);
-    Ok(xml)
+    let core = write_data_validation_core(values, conformance)?;
+    let extensions = write_data_validation_extensions(values, conformance)?;
+    let mut xml = BoundedXml::new();
+    xml.push_str(&core)?;
+    xml.push_str(&extensions)?;
+    Ok(xml.finish())
 }
 
 pub(crate) fn write_data_validation_core(
@@ -1597,26 +2096,24 @@ pub(crate) fn write_data_validation_core(
     conformance: DataValidationConformance,
 ) -> Result<String> {
     validate_data_validation_collections(values)?;
-    let mut xml = String::new();
+    let mut xml = BoundedXml::new();
     if let Some(collection) = values
         .iter()
         .find(|collection| collection.source == DataValidationSource::Core)
     {
-        write!(
-            xml,
+        xml.write_arguments(format_args!(
             "<dataValidations xmlns=\"{}\" xmlns:xr=\"{}\"",
             conformance.namespace(),
-            std::str::from_utf8(XR).unwrap()
-        )
-        .unwrap();
-        write_collection_attributes(&mut xml, collection);
-        xml.push('>');
+            XR_URI
+        ))?;
+        write_collection_attributes(&mut xml, collection)?;
+        xml.push_str(">")?;
         for rule in &collection.validations {
             write_rule(&mut xml, rule)?;
         }
-        xml.push_str("</dataValidations>");
+        xml.push_str("</dataValidations>")?;
     }
-    Ok(xml)
+    Ok(xml.finish())
 }
 
 pub(crate) fn write_data_validation_extensions(
@@ -1624,64 +2121,69 @@ pub(crate) fn write_data_validation_extensions(
     conformance: DataValidationConformance,
 ) -> Result<String> {
     validate_data_validation_collections(values)?;
-    let mut xml = String::new();
+    let mut xml = BoundedXml::new();
     if let Some(collection) = values
         .iter()
         .find(|collection| collection.source == DataValidationSource::Office2010)
     {
-        write!(
-            xml,
+        xml.write_arguments(format_args!(
             "<extLst xmlns=\"{}\"><ext uri=\"{}\"><x14:dataValidations xmlns:x14=\"{}\" xmlns:xm=\"{}\" xmlns:x12ac=\"{}\" xmlns:xr=\"{}\"",
             conformance.namespace(),
             EXTENSION_URI,
-            std::str::from_utf8(X14).unwrap(),
-            std::str::from_utf8(XM).unwrap(),
-            std::str::from_utf8(X12AC).unwrap(),
-            std::str::from_utf8(XR).unwrap(),
-        )
-        .unwrap();
-        write_collection_attributes(&mut xml, collection);
-        xml.push('>');
+            X14_URI,
+            XM_URI,
+            X12AC_URI,
+            XR_URI,
+        ))?;
+        write_collection_attributes(&mut xml, collection)?;
+        xml.push_str(">")?;
         for rule in &collection.validations {
             write_rule(&mut xml, rule)?;
         }
-        xml.push_str("</x14:dataValidations></ext></extLst>");
+        xml.push_str("</x14:dataValidations></ext></extLst>")?;
     }
-    Ok(xml)
+    Ok(xml.finish())
 }
 
-fn write_collection_attributes(xml: &mut String, value: &DataValidationCollection) {
+fn write_collection_attributes(
+    xml: &mut BoundedXml,
+    value: &DataValidationCollection,
+) -> Result<()> {
     if value.disable_prompts {
-        xml.push_str(" disablePrompts=\"1\"");
+        xml.push_str(" disablePrompts=\"1\"")?;
     }
     if let Some(value) = value.x_window {
-        write!(xml, " xWindow=\"{value}\"").unwrap();
+        xml.write_arguments(format_args!(" xWindow=\"{value}\""))?;
     }
     if let Some(value) = value.y_window {
-        write!(xml, " yWindow=\"{value}\"").unwrap();
+        xml.write_arguments(format_args!(" yWindow=\"{value}\""))?;
     }
-    write!(xml, " count=\"{}\"", value.validations.len()).unwrap();
+    xml.write_arguments(format_args!(" count=\"{}\"", value.validations.len()))?;
+    Ok(())
 }
 
-fn write_rule(xml: &mut String, value: &ParsedDataValidation) -> Result<()> {
+fn write_rule(xml: &mut BoundedXml, value: &ParsedDataValidation) -> Result<()> {
     validate_rule(value)?;
     let prefix = if value.source == DataValidationSource::Office2010 {
         "x14:"
     } else {
         ""
     };
-    write!(xml, "<{prefix}dataValidation").unwrap();
+    xml.write_arguments(format_args!("<{prefix}dataValidation"))?;
     if value.validation_type != ParsedDataValidationType::None {
-        write!(xml, " type=\"{}\"", value.validation_type.as_str()).unwrap();
+        xml.write_arguments(format_args!(" type=\"{}\"", value.validation_type.as_str()))?;
     }
     if value.operator != ParsedDataValidationOperator::Between {
-        write!(xml, " operator=\"{}\"", value.operator.as_str()).unwrap();
+        xml.write_arguments(format_args!(" operator=\"{}\"", value.operator.as_str()))?;
     }
     if value.error_style != ParsedDataValidationErrorStyle::Stop {
-        write!(xml, " errorStyle=\"{}\"", value.error_style.as_str()).unwrap();
+        xml.write_arguments(format_args!(
+            " errorStyle=\"{}\"",
+            value.error_style.as_str()
+        ))?;
     }
     if value.ime_mode != ParsedDataValidationImeMode::NoControl {
-        write!(xml, " imeMode=\"{}\"", value.ime_mode.as_str()).unwrap();
+        xml.write_arguments(format_args!(" imeMode=\"{}\"", value.ime_mode.as_str()))?;
     }
     for (name, enabled) in [
         ("allowBlank", value.allow_blank),
@@ -1690,7 +2192,7 @@ fn write_rule(xml: &mut String, value: &ParsedDataValidation) -> Result<()> {
         ("showErrorMessage", value.show_error_message),
     ] {
         if enabled {
-            write!(xml, " {name}=\"1\"").unwrap();
+            xml.write_arguments(format_args!(" {name}=\"1\""))?;
         }
     }
     for (name, text) in [
@@ -1700,27 +2202,23 @@ fn write_rule(xml: &mut String, value: &ParsedDataValidation) -> Result<()> {
         ("prompt", value.prompt.as_deref()),
     ] {
         if let Some(text) = text {
-            write!(xml, " {name}=\"{}\"", escape_xml(text)).unwrap();
+            xml.write_arguments(format_args!(" {name}=\"{}\"", escape_xml(text)))?;
         }
     }
     if let Some(uid) = value.uid.as_deref() {
-        write!(xml, " xr:uid=\"{}\"", escape_xml(uid)).unwrap();
+        xml.write_arguments(format_args!(" xr:uid=\"{}\"", escape_xml(uid)))?;
     }
     if value.source == DataValidationSource::Core {
-        write!(xml, " sqref=\"{}\"", escape_xml(&sqref_text(&value.sqref))).unwrap();
+        let sqref = sqref_text(&value.sqref)?;
+        xml.write_arguments(format_args!(" sqref=\"{}\"", escape_xml(&sqref)))?;
     }
-    xml.push('>');
+    xml.push_str(">")?;
     write_formula(xml, prefix, 1, value.formula1.as_ref())?;
     if let Some(formula) = value.formula2.as_ref() {
-        write_formula(
-            xml,
-            prefix,
-            2,
-            Some(&ValidationListSource::Formula(formula.clone())),
-        )?;
+        write_formula_source(xml, prefix, 2, FormulaSource::Formula(&formula.0))?;
     }
     if value.source == DataValidationSource::Office2010 {
-        xml.push_str("<xm:sqref");
+        xml.push_str("<xm:sqref")?;
         for (name, enabled) in [
             ("edited", value.sqref.edited),
             ("split", value.sqref.split),
@@ -1728,17 +2226,23 @@ fn write_rule(xml: &mut String, value: &ParsedDataValidation) -> Result<()> {
             ("adjust", value.sqref.adjust),
         ] {
             if enabled {
-                write!(xml, " {name}=\"1\"").unwrap();
+                xml.write_arguments(format_args!(" {name}=\"1\""))?;
             }
         }
-        write!(xml, ">{}</xm:sqref>", escape_xml(&sqref_text(&value.sqref))).unwrap();
+        let sqref = sqref_text(&value.sqref)?;
+        xml.write_arguments(format_args!(">{}</xm:sqref>", escape_xml(&sqref)))?;
     }
-    write!(xml, "</{prefix}dataValidation>").unwrap();
+    xml.write_arguments(format_args!("</{prefix}dataValidation>"))?;
     Ok(())
 }
 
+enum FormulaSource<'a> {
+    Formula(&'a str),
+    QuotedList(&'a str),
+}
+
 fn write_formula(
-    xml: &mut String,
+    xml: &mut BoundedXml,
     prefix: &str,
     number: u8,
     value: Option<&ValidationListSource>,
@@ -1746,22 +2250,40 @@ fn write_formula(
     let Some(value) = value else {
         return Ok(());
     };
-    write!(xml, "<{prefix}formula{number}>").unwrap();
+    let source = match value {
+        ValidationListSource::Formula(value) => FormulaSource::Formula(&value.0),
+        ValidationListSource::QuotedList(value) => FormulaSource::QuotedList(value),
+    };
+    write_formula_source(xml, prefix, number, source)
+}
+
+fn write_formula_source(
+    xml: &mut BoundedXml,
+    prefix: &str,
+    number: u8,
+    value: FormulaSource<'_>,
+) -> Result<()> {
+    xml.write_arguments(format_args!("<{prefix}formula{number}>"))?;
     match (prefix.is_empty(), value) {
-        (true, ValidationListSource::Formula(value)) => xml.push_str(&escape_xml(&value.0)),
-        (true, ValidationListSource::QuotedList(_)) => {
+        (true, FormulaSource::Formula(value)) => {
+            xml.push_str(&escape_xml(value))?;
+        },
+        (true, FormulaSource::QuotedList(_)) => {
             return Err(invalid(
                 "quoted-list source requires Office 2010 data validation",
             ));
         },
-        (false, ValidationListSource::Formula(value)) => {
-            write!(xml, "<xm:f>{}</xm:f>", escape_xml(&value.0)).unwrap();
+        (false, FormulaSource::Formula(value)) => {
+            xml.write_arguments(format_args!("<xm:f>{}</xm:f>", escape_xml(value)))?;
         },
-        (false, ValidationListSource::QuotedList(value)) => {
-            write!(xml, "<x12ac:list>{}</x12ac:list>", escape_xml(value)).unwrap();
+        (false, FormulaSource::QuotedList(value)) => {
+            xml.write_arguments(format_args!(
+                "<x12ac:list>{}</x12ac:list>",
+                escape_xml(value)
+            ))?;
         },
     }
-    write!(xml, "</{prefix}formula{number}>").unwrap();
+    xml.write_arguments(format_args!("</{prefix}formula{number}>"))?;
     Ok(())
 }
 
@@ -1798,40 +2320,49 @@ pub fn replace_data_validation_collections(
     }
     let core = write_data_validation_core(values, scan.conformance)?;
     let extensions = write_data_validation_extensions(values, scan.conformance)?;
-    let mut edits: Vec<(Range<usize>, Vec<u8>)> = scan
+    let edit_count = scan
         .core_ranges
-        .iter()
-        .chain(scan.x14_ranges.iter())
-        .cloned()
-        .map(|range| (range, Vec::new()))
-        .collect();
+        .len()
+        .checked_add(scan.x14_ranges.len())
+        .ok_or_else(|| invalid("data-validation edit count overflow"))?;
+    let mut edits = Vec::new();
+    reserve_vec(&mut edits, edit_count, "data-validation edits")?;
+    edits.extend(
+        scan.core_ranges
+            .iter()
+            .chain(scan.x14_ranges.iter())
+            .cloned()
+            .map(|range| (range, Vec::new())),
+    );
     if !core.is_empty() {
         if let Some(range) = scan.core_ranges.first() {
-            edits
-                .iter_mut()
-                .find(|(candidate, _)| candidate == range)
-                .unwrap()
-                .1 = core.into_bytes();
+            let Some(edit) = edits.iter_mut().find(|(candidate, _)| candidate == range) else {
+                return Err(invalid("missing core data-validation edit"));
+            };
+            edit.1 = core.into_bytes();
         } else {
+            reserve_vec(&mut edits, 1, "data-validation edits")?;
             edits.push((scan.core_insert..scan.core_insert, core.into_bytes()));
         }
     }
     if !extensions.is_empty() {
         let inner = data_validation_extension_inner(&extensions)?;
         if let Some(range) = scan.x14_ranges.first() {
-            edits
-                .iter_mut()
-                .find(|(candidate, _)| candidate == range)
-                .unwrap()
-                .1 = inner.into_bytes();
+            let Some(edit) = edits.iter_mut().find(|(candidate, _)| candidate == range) else {
+                return Err(invalid("missing Office 2010 data-validation edit"));
+            };
+            edit.1 = inner.into_bytes();
         } else if let Some(position) = scan.matching_ext_close {
+            reserve_vec(&mut edits, 1, "data-validation edits")?;
             edits.push((position..position, inner.into_bytes()));
         } else if let Some(position) = scan.ext_lst_close {
+            reserve_vec(&mut edits, 1, "data-validation edits")?;
             edits.push((
                 position..position,
-                data_validation_extension_wrapper(&inner, scan.conformance).into_bytes(),
+                data_validation_extension_wrapper(&inner, scan.conformance)?.into_bytes(),
             ));
         } else {
+            reserve_vec(&mut edits, 1, "data-validation edits")?;
             edits.push((
                 scan.worksheet_close..scan.worksheet_close,
                 extensions.into_bytes(),
@@ -1855,12 +2386,14 @@ fn data_validation_extension_inner(fragment: &str) -> Result<String> {
 fn data_validation_extension_wrapper(
     inner: &str,
     conformance: DataValidationConformance,
-) -> String {
-    format!(
+) -> Result<String> {
+    let mut wrapper = BoundedXml::new();
+    wrapper.write_arguments(format_args!(
         "<ext xmlns=\"{}\" uri=\"{}\">{inner}</ext>",
         conformance.namespace(),
         EXTENSION_URI
-    )
+    ))?;
+    Ok(wrapper.finish())
 }
 
 fn apply_data_validation_edits(
@@ -1868,25 +2401,39 @@ fn apply_data_validation_edits(
     mut edits: Vec<(Range<usize>, Vec<u8>)>,
 ) -> Result<Vec<u8>> {
     edits.sort_by_key(|(range, _)| (range.start, range.end));
-    let mut output = Vec::with_capacity(xml.len());
+    let mut output = Vec::new();
+    reserve_vec(&mut output, xml.len(), "data-validation XML output")?;
     let mut cursor = 0usize;
     for (range, replacement) in edits {
         if range.start < cursor || range.end < range.start || range.end > xml.len() {
             return Err(invalid("overlapping data-validation XML edits"));
         }
-        output.extend_from_slice(&xml[cursor..range.start]);
-        output.extend_from_slice(&replacement);
+        append_bounded_bytes(&mut output, &xml[cursor..range.start])?;
+        append_bounded_bytes(&mut output, &replacement)?;
         cursor = range.end;
     }
-    output.extend_from_slice(&xml[cursor..]);
+    append_bounded_bytes(&mut output, &xml[cursor..])?;
     let reparsed = parse_data_validation_collections(&output)?;
     validate_data_validation_collections(&reparsed)?;
     Ok(output)
 }
 
+fn push_scan_range(ranges: &mut Vec<Range<usize>>, range: Range<usize>) -> Result<()> {
+    if ranges.len() >= MAX_CAPTURED_COLLECTIONS {
+        return Err(invalid("too many physical data-validation collections"));
+    }
+    reserve_vec(ranges, 1, "data-validation scan ranges")?;
+    ranges.push(range);
+    Ok(())
+}
+
 fn scan_data_validation_xml(xml: &[u8]) -> Result<DataValidationXmlScan> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("data-validation worksheet XML is too large"));
+    }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut previous = 0usize;
     let mut conformance = None;
@@ -1900,19 +2447,53 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<DataValidationXmlScan> {
     let mut matching_ext_close = None;
     let mut ext_lst_depth = None;
     let mut ext_lst_close = None;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
+    let mut events = 0usize;
+    let mut nodes = 0usize;
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("data-validation worksheet event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("data-validation worksheet exceeds event limit"));
+        }
         let start = previous;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = reader.buffer_position() as usize;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("data-validation XML offset overflow"))?;
         previous = end;
         let decoder = reader.decoder();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
+        if matches!(&event, Event::Eof) {
+            break;
+        }
+        if matches!(&event, Event::Start(_) | Event::Empty(_) | Event::End(_)) {
+            nodes = nodes
+                .checked_add(1)
+                .ok_or_else(|| invalid("data-validation worksheet node count overflow"))?;
+            if nodes > MAX_NODES {
+                return Err(invalid("data-validation worksheet exceeds node limit"));
+            }
+        }
         match event {
             Event::Start(element) => {
-                depth += 1;
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if depth == 0 && root_seen {
+                    return Err(invalid("worksheet XML contains multiple roots"));
+                }
+                if depth >= MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
                 let local = element.local_name();
-                if depth == 1 && local.as_ref() == b"worksheet" {
+                if depth == 1 {
                     conformance = match namespace {
                         ResolveResult::Bound(value) if value.as_ref() == CORE => {
                             Some(DataValidationConformance::Transitional)
@@ -1922,12 +2503,19 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<DataValidationXmlScan> {
                         },
                         _ => None,
                     };
+                    if conformance.is_none() || local.as_ref() != b"worksheet" {
+                        return Err(invalid("invalid worksheet namespace"));
+                    }
+                    root_seen = true;
                 } else if depth == 2 {
                     if local.as_ref() == b"dataValidations" && !spreadsheet(&namespace) {
                         return Err(invalid("spoofed dataValidations element namespace"));
                     }
                     if spreadsheet(&namespace) {
                         if local.as_ref() == b"dataValidations" {
+                            if core_start.is_some() {
+                                return Err(invalid("duplicate core dataValidations element"));
+                            }
                             core_start = Some((depth, start));
                         } else if core_insert.is_none() && validation_schema_after(local.as_ref()) {
                             core_insert = Some(start);
@@ -1941,24 +2529,41 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<DataValidationXmlScan> {
                     && local.as_ref() == b"ext"
                     && optional_attr(&element, b"uri", decoder)?.as_deref() == Some(EXTENSION_URI)
                 {
+                    if matching_ext_depth.is_some() {
+                        return Err(invalid("nested data-validation extension"));
+                    }
                     matching_ext_depth = Some(depth);
                 }
                 if local.as_ref() == b"dataValidations" && matching_ext_depth.is_some() {
                     if !exact(&namespace, X14) {
                         return Err(invalid("spoofed x14 dataValidations element namespace"));
                     }
+                    if x14_start.is_some() {
+                        return Err(invalid("duplicate Office 2010 dataValidations element"));
+                    }
                     x14_start = Some((depth, start));
                 }
             },
             Event::Empty(element) => {
+                if root_closed || depth == 0 {
+                    return Err(invalid("worksheet XML contains an element outside root"));
+                }
                 let local = element.local_name();
-                let element_depth = depth + 1;
+                let element_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
+                if element_depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
                 if element_depth == 2 {
                     if local.as_ref() == b"dataValidations" && !spreadsheet(&namespace) {
                         return Err(invalid("spoofed dataValidations element namespace"));
                     }
                     if spreadsheet(&namespace) && local.as_ref() == b"dataValidations" {
-                        core_ranges.push(start..end);
+                        if core_start.is_some() {
+                            return Err(invalid("duplicate core dataValidations element"));
+                        }
+                        push_scan_range(&mut core_ranges, start..end)?;
                     } else if spreadsheet(&namespace)
                         && core_insert.is_none()
                         && validation_schema_after(local.as_ref())
@@ -1970,17 +2575,24 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<DataValidationXmlScan> {
                     if !exact(&namespace, X14) {
                         return Err(invalid("spoofed x14 dataValidations element namespace"));
                     }
-                    x14_ranges.push(start..end);
+                    push_scan_range(&mut x14_ranges, start..end)?;
                 }
             },
             Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("unexpected worksheet closing element"));
+                }
                 if core_start.is_some_and(|(element_depth, _)| element_depth == depth) {
-                    let (_, range_start) = core_start.take().unwrap();
-                    core_ranges.push(range_start..end);
+                    let Some((_, range_start)) = core_start.take() else {
+                        return Err(invalid("missing core data-validation scan state"));
+                    };
+                    push_scan_range(&mut core_ranges, range_start..end)?;
                 }
                 if x14_start.is_some_and(|(element_depth, _)| element_depth == depth) {
-                    let (_, range_start) = x14_start.take().unwrap();
-                    x14_ranges.push(range_start..end);
+                    let Some((_, range_start)) = x14_start.take() else {
+                        return Err(invalid("missing Office 2010 data-validation scan state"));
+                    };
+                    push_scan_range(&mut x14_ranges, range_start..end)?;
                 }
                 if matching_ext_depth == Some(depth) {
                     matching_ext_close = Some(start);
@@ -1991,16 +2603,49 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<DataValidationXmlScan> {
                     ext_lst_depth = None;
                 }
                 if depth == 1 && element.local_name().as_ref() == b"worksheet" {
+                    if !spreadsheet(&namespace) {
+                        return Err(invalid("invalid worksheet closing namespace"));
+                    }
+                    root_closed = true;
                     worksheet_close = Some(start);
+                } else if depth == 1 {
+                    return Err(invalid("invalid worksheet closing element"));
                 }
-                depth = depth.saturating_sub(1);
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("worksheet XML nesting underflow"))?;
             },
-            Event::Eof => break,
+            Event::Text(value) => {
+                if (!root_seen || root_closed)
+                    && !value.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("worksheet XML text is outside root"));
+                }
+                if depth == 1 && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet cannot contain direct text"));
+                }
+            },
+            Event::CData(_) => {
+                return Err(invalid("worksheet XML contains unexpected CDATA"));
+            },
+            Event::GeneralRef(reference) => {
+                decode_xml_reference(&reference)?;
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
-            _ => {},
+            Event::Comment(_) => {},
+            Event::Eof => break,
         }
+    }
+    if !root_seen || !root_closed || depth != 0 || core_start.is_some() || x14_start.is_some() {
+        return Err(invalid("incomplete worksheet data-validation XML"));
     }
     let worksheet_close = worksheet_close.ok_or_else(|| invalid("worksheet is not closed"))?;
     Ok(DataValidationXmlScan {

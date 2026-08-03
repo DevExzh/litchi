@@ -19,6 +19,9 @@ const SORT_CONDITION_FIXED_LEN: usize = 30;
 const MAX_CONTINUE_RGB_LEN: usize = 8_212;
 const MAX_ROW_INDEX: u32 = 0x000f_ffff;
 const MAX_COLUMN_INDEX: u32 = 0x0000_3fff;
+const FRT_REF_FLAG: u16 = 0x0001;
+const FRT_ALERT_FLAG: u16 = 0x0002;
+const FRT_KNOWN_FLAGS: u16 = FRT_REF_FLAG | FRT_ALERT_FLAG;
 
 fn invalid(message: impl Into<String>) -> XlsError {
     XlsError::InvalidData(message.into())
@@ -61,61 +64,85 @@ fn read_i32(data: &[u8], offset: usize) -> XlsResult<i32> {
 }
 
 /// Checked native value for the signed four-byte `[MS-XLS]` `Rw12` field.
+///
+/// The private representation is an `i32` because that is the wire scalar's
+/// signed type. Its invariant is the non-negative `Rw12` domain from
+/// `[MS-XLS]` 2.5.228, not the complete `i32` domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct Rw12(u32);
+struct Rw12(i32);
 
 impl Rw12 {
     fn new(value: u32) -> XlsResult<Self> {
         if value > MAX_ROW_INDEX {
             return Err(invalid("sort row exceeds the Rw12 maximum"));
         }
+        let value = i32::try_from(value)
+            .map_err(|_| invalid("sort row cannot be represented by signed Rw12"))?;
         Ok(Self(value))
     }
 
     const fn index(self) -> u32 {
+        self.0 as u32
+    }
+
+    fn from_wire(value: i32) -> XlsResult<Self> {
+        if value < 0 {
+            return Err(invalid("sort Rw12 is negative"));
+        }
+        Self::new(value as u32)
+    }
+
+    const fn wire_value(self) -> i32 {
         self.0
     }
 
     fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
-        let value = read_i32(data, offset)?;
-        let value = u32::try_from(value).map_err(|_| invalid("sort Rw12 is negative"))?;
-        Self::new(value)
+        Self::from_wire(read_i32(data, offset)?)
     }
 
     fn write_to(self, output: &mut Vec<u8>) {
-        output.extend_from_slice(&self.0.to_le_bytes());
+        output.extend_from_slice(&self.wire_value().to_le_bytes());
     }
 }
 
 /// Checked native value for the signed four-byte `[MS-XLS]` `Col12` field.
 ///
-/// The wire field is four bytes, but its valid domain fits in two bytes. The
-/// retained representation therefore does not pay for impossible values.
+/// The wire field is four bytes, but its valid signed domain fits in an `i16`.
+/// The retained representation therefore does not pay for impossible values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct Col12(u16);
+struct Col12(i16);
 
 impl Col12 {
     fn new(value: u32) -> XlsResult<Self> {
         if value > MAX_COLUMN_INDEX {
             return Err(invalid("sort column exceeds the Col12 maximum"));
         }
-        let value = u16::try_from(value)
-            .map_err(|_| invalid("sort column cannot be represented by Col12"))?;
+        let value = i16::try_from(value)
+            .map_err(|_| invalid("sort column cannot be represented by signed Col12"))?;
         Ok(Self(value))
     }
 
     const fn index(self) -> u16 {
-        self.0
+        self.0 as u16
+    }
+
+    fn from_wire(value: i32) -> XlsResult<Self> {
+        if value < 0 {
+            return Err(invalid("sort Col12 is negative"));
+        }
+        Self::new(value as u32)
+    }
+
+    const fn wire_value(self) -> i32 {
+        self.0 as i32
     }
 
     fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
-        let value = read_i32(data, offset)?;
-        let value = u32::try_from(value).map_err(|_| invalid("sort Col12 is negative"))?;
-        Self::new(value)
+        Self::from_wire(read_i32(data, offset)?)
     }
 
     fn write_to(self, output: &mut Vec<u8>) {
-        output.extend_from_slice(&u32::from(self.0).to_le_bytes());
+        output.extend_from_slice(&self.wire_value().to_le_bytes());
     }
 }
 
@@ -238,10 +265,10 @@ impl Range {
 
     fn bytes(self) -> [u8; 16] {
         let mut bytes = [0; 16];
-        bytes[..4].copy_from_slice(&self.first_row.0.to_le_bytes());
-        bytes[4..8].copy_from_slice(&self.last_row.0.to_le_bytes());
-        bytes[8..12].copy_from_slice(&u32::from(self.first_col.0).to_le_bytes());
-        bytes[12..].copy_from_slice(&u32::from(self.last_col.0).to_le_bytes());
+        bytes[..4].copy_from_slice(&self.first_row.wire_value().to_le_bytes());
+        bytes[4..8].copy_from_slice(&self.last_row.wire_value().to_le_bytes());
+        bytes[8..12].copy_from_slice(&self.first_col.wire_value().to_le_bytes());
+        bytes[12..].copy_from_slice(&self.last_col.wire_value().to_le_bytes());
         bytes
     }
 }
@@ -670,6 +697,84 @@ fn write_record_header<W: Write>(writer: &mut W, record_type: u16, len: usize) -
     Ok(())
 }
 
+fn validate_sort_data_frt_header(data: &[u8]) -> XlsResult<()> {
+    let echoed_type = read_u16(data, 0)?;
+    if echoed_type != SORT_DATA_RECORD_TYPE {
+        return Err(XlsError::UnexpectedRecordType {
+            expected: SORT_DATA_RECORD_TYPE,
+            found: echoed_type,
+        });
+    }
+    let flags = read_u16(data, 2)?;
+    if flags & !FRT_KNOWN_FLAGS != 0 {
+        return Err(invalid(
+            "SortData FrtHeader contains nonzero reserved flag bits",
+        ));
+    }
+    if flags != 0 {
+        return Err(invalid(
+            "SortData FrtHeader fFrtRef and fFrtAlert must be zero",
+        ));
+    }
+    if data[4..FRT_HEADER_LEN].iter().any(|byte| *byte != 0) {
+        return Err(invalid(
+            "SortData FrtHeader contains nonzero reserved bytes",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_continue_frt_header(data: &[u8]) -> XlsResult<()> {
+    let echoed_type = read_u16(data, 0)?;
+    if echoed_type != CONTINUE_FRT12_RECORD_TYPE {
+        return Err(XlsError::UnexpectedRecordType {
+            expected: CONTINUE_FRT12_RECORD_TYPE,
+            found: echoed_type,
+        });
+    }
+    let flags = read_u16(data, 2)?;
+    if flags & !FRT_KNOWN_FLAGS != 0 {
+        return Err(invalid(
+            "ContinueFrt12 FrtRefHeader contains nonzero reserved flag bits",
+        ));
+    }
+    if flags & FRT_ALERT_FLAG != 0 {
+        return Err(invalid("ContinueFrt12 fFrtAlert must be zero"));
+    }
+    let reference = &data[4..FRT_HEADER_LEN];
+    if flags & FRT_REF_FLAG == 0 {
+        if reference.iter().any(|byte| *byte != 0) {
+            return Err(invalid(
+                "ContinueFrt12 has a reference while fFrtRef is zero",
+            ));
+        }
+    } else {
+        validate_ref8(reference)?;
+    }
+    Ok(())
+}
+
+fn validate_ref8(data: &[u8]) -> XlsResult<()> {
+    let first_row = read_u16(data, 0)?;
+    let last_row = read_u16(data, 2)?;
+    let first_col = read_u16(data, 4)?;
+    let last_col = read_u16(data, 6)?;
+    if first_row > last_row {
+        return Err(invalid("ContinueFrt12 Ref8 first row exceeds last row"));
+    }
+    if first_col > last_col {
+        return Err(invalid(
+            "ContinueFrt12 Ref8 first column exceeds last column",
+        ));
+    }
+    if last_col > u16::from(u8::MAX) {
+        return Err(invalid(
+            "ContinueFrt12 Ref8 column exceeds the BIFF8 cell-grid maximum",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_on(on: &On) -> XlsResult<()> {
     let On::Values {
         custom_list: Some(custom_list),
@@ -786,16 +891,7 @@ pub(crate) fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> XlsResult
             found: base.len(),
         });
     }
-    let echoed_type = read_u16(base, 0)?;
-    if echoed_type != SORT_DATA_RECORD_TYPE {
-        return Err(XlsError::UnexpectedRecordType {
-            expected: SORT_DATA_RECORD_TYPE,
-            found: echoed_type,
-        });
-    }
-    if read_u16(base, 2)? & 0x0003 != 0 {
-        return Err(invalid("SortData FrtHeader flags violate [MS-XLS] 2.5.135"));
-    }
+    validate_sort_data_frt_header(base)?;
     let flags = read_u16(base, 12)?;
     let parent_kind = (flags >> 3) & 0x0007;
     let range = Range::parse(base, 14)?;
@@ -943,22 +1039,7 @@ fn parse_continuation(data: &[u8], axis: Axis) -> XlsResult<Key> {
     if data.len() - FRT_HEADER_LEN > MAX_CONTINUE_RGB_LEN {
         return Err(invalid("ContinueFrt12 rgb exceeds 8,212 bytes"));
     }
-    let echoed_type = read_u16(data, 0)?;
-    if echoed_type != CONTINUE_FRT12_RECORD_TYPE {
-        return Err(XlsError::UnexpectedRecordType {
-            expected: CONTINUE_FRT12_RECORD_TYPE,
-            found: echoed_type,
-        });
-    }
-    let frt_flags = read_u16(data, 2)?;
-    if frt_flags & 0x0002 != 0 {
-        return Err(invalid("ContinueFrt12 fFrtAlert must be zero"));
-    }
-    if frt_flags & 0x0001 == 0 && data[4..12].iter().any(|byte| *byte != 0) {
-        return Err(invalid(
-            "ContinueFrt12 has a reference while fFrtRef is zero",
-        ));
-    }
+    validate_continue_frt_header(data)?;
 
     let body = &data[FRT_HEADER_LEN..];
     let flags = read_u16(body, 0)?;
@@ -1164,6 +1245,8 @@ mod tests {
 
     #[test]
     fn exact_domains_use_narrow_checked_storage() {
+        assert_eq!(std::mem::size_of::<Rw12>(), 4);
+        assert_eq!(std::mem::size_of::<Col12>(), 2);
         assert_eq!(std::mem::size_of::<Row>(), 4);
         assert_eq!(std::mem::size_of::<Col>(), 2);
         assert_eq!(std::mem::size_of::<Range>(), 12);
@@ -1173,6 +1256,185 @@ mod tests {
         assert_eq!(range.last_row().index(), MAX_ROW_INDEX);
         assert_eq!(range.first_col().index(), 0);
         assert_eq!(u32::from(range.last_col().index()), MAX_COLUMN_INDEX);
+    }
+
+    #[test]
+    fn signed_rfx_fields_have_explicit_four_byte_wire_round_trip() {
+        let range = Range::new(0..=MAX_ROW_INDEX, 0..=MAX_COLUMN_INDEX).unwrap();
+        let mut encoded = Vec::new();
+        range.write_to(&mut encoded);
+
+        assert_eq!(&encoded[0..4], &0i32.to_le_bytes());
+        assert_eq!(
+            &encoded[4..8],
+            &i32::try_from(MAX_ROW_INDEX).unwrap().to_le_bytes()
+        );
+        assert_eq!(&encoded[8..12], &0i32.to_le_bytes());
+        assert_eq!(
+            &encoded[12..16],
+            &i32::try_from(MAX_COLUMN_INDEX).unwrap().to_le_bytes()
+        );
+        assert_eq!(Range::parse(&encoded, 0).unwrap(), range);
+
+        let max_range = Range::new(
+            MAX_ROW_INDEX..=MAX_ROW_INDEX,
+            MAX_COLUMN_INDEX..=MAX_COLUMN_INDEX,
+        )
+        .unwrap();
+        let mut max_base = Config::new(max_range, Parent::Sheet);
+        max_base
+            .add(
+                Key::col(
+                    Range::new(
+                        MAX_ROW_INDEX..=MAX_ROW_INDEX,
+                        MAX_COLUMN_INDEX..=MAX_COLUMN_INDEX,
+                    )
+                    .unwrap(),
+                    false,
+                    On::Values { custom_list: None },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let mut bytes = Vec::new();
+        max_base.write_biff_records(&mut bytes).unwrap();
+        let records = split_records(&bytes);
+        assert_eq!(
+            &records[0].1[14..30],
+            &[
+                i32::try_from(MAX_ROW_INDEX).unwrap().to_le_bytes(),
+                i32::try_from(MAX_ROW_INDEX).unwrap().to_le_bytes(),
+                i32::try_from(MAX_COLUMN_INDEX).unwrap().to_le_bytes(),
+                i32::try_from(MAX_COLUMN_INDEX).unwrap().to_le_bytes(),
+            ]
+            .concat()
+        );
+        assert_eq!(
+            parse_sort_data(&records[0].1, &[&records[1].1]).unwrap(),
+            max_base
+        );
+    }
+
+    #[test]
+    fn rejects_negative_and_out_of_domain_signed_rfx_values_without_unwind() {
+        let value = Config::new(Range::new(0..=0, 0..=0).unwrap(), Parent::Sheet);
+        let mut bytes = Vec::new();
+        value.write_biff_records(&mut bytes).unwrap();
+        let records = split_records(&bytes);
+        let base = &records[0].1;
+
+        for (offset, value) in [
+            (14, -1i32),
+            (18, -1i32),
+            (22, -1i32),
+            (26, -1i32),
+            (14, i32::MIN),
+            (18, i32::MIN),
+            (22, i32::MIN),
+            (26, i32::MIN),
+            (14, i32::try_from(MAX_ROW_INDEX).unwrap() + 1),
+            (18, i32::try_from(MAX_ROW_INDEX).unwrap() + 1),
+            (22, i32::try_from(MAX_COLUMN_INDEX).unwrap() + 1),
+            (26, i32::try_from(MAX_COLUMN_INDEX).unwrap() + 1),
+        ] {
+            let mut malformed = base.clone();
+            malformed[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            let parsed = std::panic::catch_unwind(|| parse_sort_data(&malformed, &[]));
+            assert!(
+                matches!(parsed, Ok(Err(_))),
+                "offset {offset}, value {value}"
+            );
+        }
+    }
+
+    #[test]
+    fn validates_frt_reserved_bits_and_conditional_ref8_without_rejecting_ignored_fields() {
+        let value = Config::new(Range::new(0..=0, 0..=0).unwrap(), Parent::Sheet);
+        let mut bytes = Vec::new();
+        value.write_biff_records(&mut bytes).unwrap();
+        let records = split_records(&bytes);
+
+        let mut ignored = records[0].1.clone();
+        ignored[12..14].copy_from_slice(&0xff80u16.to_le_bytes());
+        ignored[34..38].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(parse_sort_data(&ignored, &[]).unwrap(), value);
+
+        for (offset, flags) in [(2, 0x0001u16), (2, 0x0002), (2, 0x0004), (2, 0x8000)] {
+            let mut malformed = records[0].1.clone();
+            malformed[offset..offset + 2].copy_from_slice(&flags.to_le_bytes());
+            let parsed = std::panic::catch_unwind(|| parse_sort_data(&malformed, &[]));
+            assert!(matches!(parsed, Ok(Err(_))), "SortData flags {flags:#06x}");
+        }
+
+        let mut reserved_bytes = records[0].1.clone();
+        reserved_bytes[4] = 1;
+        assert!(parse_sort_data(&reserved_bytes, &[]).is_err());
+
+        let range = Range::new(0..=5, 0..=0).unwrap();
+        let mut with_key = Config::new(range, Parent::AutoFilter);
+        with_key
+            .add(Key::col(range, false, On::Values { custom_list: None }).unwrap())
+            .unwrap();
+        let mut key_bytes = Vec::new();
+        with_key.write_biff_records(&mut key_bytes).unwrap();
+        let key_records = split_records(&key_bytes);
+        let continuation = &key_records[1].1;
+
+        let mut valid_ref = continuation.clone();
+        valid_ref[2..4].copy_from_slice(&FRT_REF_FLAG.to_le_bytes());
+        valid_ref[4..12].copy_from_slice(&[0, 0, 5, 0, 0, 0, 0, 0]);
+        assert_eq!(
+            parse_sort_data(&key_records[0].1, &[&valid_ref]).unwrap(),
+            with_key
+        );
+
+        for flags in [0x0002u16, 0x0004, 0x8000] {
+            let mut malformed = continuation.clone();
+            malformed[2..4].copy_from_slice(&flags.to_le_bytes());
+            let parsed = std::panic::catch_unwind(|| {
+                parse_sort_data(&key_records[0].1, &[malformed.as_slice()])
+            });
+            assert!(
+                matches!(parsed, Ok(Err(_))),
+                "ContinueFrt12 flags {flags:#06x}"
+            );
+        }
+
+        let mut missing_ref = continuation.clone();
+        missing_ref[4] = 1;
+        assert!(parse_sort_data(&key_records[0].1, &[&missing_ref]).is_err());
+
+        let mut reversed_ref = valid_ref.clone();
+        reversed_ref[4..6].copy_from_slice(&6u16.to_le_bytes());
+        assert!(parse_sort_data(&key_records[0].1, &[&reversed_ref]).is_err());
+
+        let mut wide_ref = valid_ref;
+        wide_ref[10..12].copy_from_slice(&0x0100u16.to_le_bytes());
+        assert!(parse_sort_data(&key_records[0].1, &[&wide_ref]).is_err());
+    }
+
+    #[test]
+    fn rejects_truncated_sort_data_and_continuations_without_unwind() {
+        let range = Range::new(0..=0, 0..=0).unwrap();
+        let mut value = Config::new(range, Parent::Sheet);
+        value
+            .add(Key::col(range, false, On::Values { custom_list: None }).unwrap())
+            .unwrap();
+        let mut bytes = Vec::new();
+        value.write_biff_records(&mut bytes).unwrap();
+        let records = split_records(&bytes);
+        let base = &records[0].1;
+        let continuation = &records[1].1;
+
+        for length in 0..base.len() {
+            let parsed = std::panic::catch_unwind(|| parse_sort_data(&base[..length], &[]));
+            assert!(matches!(parsed, Ok(Err(_))), "base length {length}");
+        }
+        for length in 0..continuation.len() {
+            let parsed =
+                std::panic::catch_unwind(|| parse_sort_data(base, &[&continuation[..length]]));
+            assert!(matches!(parsed, Ok(Err(_))), "continuation length {length}");
+        }
     }
 
     #[test]
