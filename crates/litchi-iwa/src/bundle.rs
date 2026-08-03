@@ -33,14 +33,30 @@ impl Bundle {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let bundle_path = path.as_ref().to_path_buf();
 
-        if bundle_path.is_dir() {
+        let metadata = fs::symlink_metadata(&bundle_path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Error::Bundle(format!("Path does not exist: {}", bundle_path.display()))
+            } else {
+                error.into()
+            }
+        })?;
+        if metadata.file_type().is_symlink() {
+            return Err(Error::Bundle(format!(
+                "Bundle path must not be a symbolic link: {}",
+                bundle_path.display()
+            )));
+        }
+        if metadata.is_dir() {
             // Traditional bundle directory structure
             Self::open_directory_bundle(&bundle_path)
-        } else if bundle_path.is_file() {
+        } else if metadata.is_file() {
             // Single file bundle (zip archive)
             Self::open_file_bundle(&bundle_path)
         } else {
-            Err(Error::Bundle("Path does not exist".to_string()))
+            Err(Error::Bundle(format!(
+                "Bundle path is not a regular file or directory: {}",
+                bundle_path.display()
+            )))
         }
     }
 
@@ -163,14 +179,26 @@ impl Bundle {
     fn validate_bundle_structure(bundle_path: &Path) -> Result<()> {
         // Check for Index.zip
         let index_zip = bundle_path.join("Index.zip");
-        if !index_zip.exists() {
-            return Err(Error::Bundle("Index.zip not found in bundle".to_string()));
-        }
+        ensure_regular_file(&index_zip, "Index.zip")?;
 
         // Check for Metadata directory (optional but common)
         let metadata_dir = bundle_path.join("Metadata");
-        if !metadata_dir.exists() || !metadata_dir.is_dir() {
-            // Some bundles might not have metadata, continue anyway
+        match fs::symlink_metadata(&metadata_dir) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::Bundle(format!(
+                    "Metadata path must not be a symbolic link: {}",
+                    metadata_dir.display()
+                )));
+            },
+            Ok(metadata) if !metadata.is_dir() => {
+                return Err(Error::Bundle(format!(
+                    "Metadata path is not a directory: {}",
+                    metadata_dir.display()
+                )));
+            },
+            Ok(_) => {},
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+            Err(error) => return Err(error.into()),
         }
 
         Ok(())
@@ -216,7 +244,7 @@ impl Bundle {
 
         // Parse Properties.plist
         let properties_path = metadata_dir.join("Properties.plist");
-        if properties_path.exists() {
+        if optional_regular_file(&properties_path, "Properties.plist")? {
             metadata.has_properties = true;
             if let Ok(value) = Value::from_file(&properties_path) {
                 metadata.properties = Self::parse_plist_value(&value);
@@ -232,7 +260,7 @@ impl Bundle {
 
         // Parse BuildVersionHistory.plist
         let build_version_path = metadata_dir.join("BuildVersionHistory.plist");
-        if build_version_path.exists() {
+        if optional_regular_file(&build_version_path, "BuildVersionHistory.plist")? {
             metadata.has_build_version_history = true;
             if let Ok(value) = Value::from_file(&build_version_path) {
                 metadata.build_versions = Self::parse_build_versions(&value);
@@ -241,7 +269,7 @@ impl Bundle {
 
         // Read DocumentIdentifier
         let doc_id_path = metadata_dir.join("DocumentIdentifier");
-        if doc_id_path.exists() {
+        if optional_regular_file(&doc_id_path, "DocumentIdentifier")? {
             metadata.has_document_identifier = true;
             if let Ok(id) = fs::read_to_string(&doc_id_path) {
                 metadata.document_id = Some(id.trim().to_string());
@@ -552,33 +580,54 @@ impl BundleMetadata {
 
 /// Detect the application type from a bundle path
 pub fn detect_application_type<P: AsRef<Path>>(bundle_path: P) -> Result<String> {
-    let path = bundle_path.as_ref();
-
-    // Check file extension or directory structure
-    if let Some(extension) = path.extension() {
-        match extension.to_str() {
-            Some("pages") => return Ok("Pages".to_string()),
-            Some("key") => return Ok("Keynote".to_string()),
-            Some("numbers") => return Ok("Numbers".to_string()),
-            _ => {},
-        }
+    Ok(match crate::detect::path(bundle_path) {
+        Some(crate::detect::Format::Pages) => "Pages",
+        Some(crate::detect::Format::Keynote) => "Keynote",
+        Some(crate::detect::Format::Numbers) => "Numbers",
+        None => "Unknown",
     }
+    .to_owned())
+}
 
-    // Check for application-specific files in Index.zip
-    if path.is_dir() {
-        let index_zip = path.join("Index.zip");
-        if index_zip.exists() {
-            // This would require opening the zip and checking for app-specific files
-            // For now, return "Unknown"
-        }
+fn ensure_regular_file(path: &Path, label: &str) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(Error::Bundle(format!(
+            "{label} must not be a symbolic link: {}",
+            path.display()
+        ))),
+        Ok(metadata) if metadata.is_file() => Ok(()),
+        Ok(_) => Err(Error::Bundle(format!(
+            "{label} is not a regular file: {}",
+            path.display()
+        ))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Err(Error::Bundle(format!(
+            "{label} not found in bundle: {}",
+            path.display()
+        ))),
+        Err(error) => Err(error.into()),
     }
+}
 
-    Ok("Unknown".to_string())
+fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(Error::Bundle(format!(
+            "{label} must not be a symbolic link: {}",
+            path.display()
+        ))),
+        Ok(metadata) if metadata.is_file() => Ok(true),
+        Ok(_) => Err(Error::Bundle(format!(
+            "{label} is not a regular file: {}",
+            path.display()
+        ))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_bundle_validation() {
@@ -694,5 +743,40 @@ mod tests {
         );
         assert_eq!(metadata.latest_build_version(), Some("7029"));
         assert_eq!(metadata.document_identifier(), None);
+    }
+
+    #[test]
+    fn application_detection_uses_content_not_filename_extension() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let file = temp.path().join("looks-like.numbers");
+        fs::write(&file, b"not an iWork archive")?;
+        assert_eq!(detect_application_type(&file)?, "Unknown");
+
+        let directory = temp.path().join("looks-like.pages");
+        fs::create_dir(&directory)?;
+        fs::write(directory.join("index.apxl"), [])?;
+        assert_eq!(detect_application_type(&directory)?, "Keynote");
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bundle_ingress_rejects_symbolic_links() -> std::io::Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir()?;
+        let target = temp.path().join("target");
+        fs::create_dir(&target)?;
+        fs::write(target.join("Index.zip"), b"not a zip")?;
+
+        let index_link = target.join("Index-link.zip");
+        symlink(target.join("Index.zip"), &index_link)?;
+        assert!(ensure_regular_file(&index_link, "Index.zip").is_err());
+
+        let bundle_link = temp.path().join("bundle.pages");
+        symlink(&target, &bundle_link)?;
+        let error = Bundle::open(&bundle_link).unwrap_err();
+        assert!(error.to_string().contains("symbolic link"));
+        Ok(())
     }
 }
