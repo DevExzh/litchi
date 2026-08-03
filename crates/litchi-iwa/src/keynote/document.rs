@@ -612,8 +612,8 @@ impl KeynoteDocument {
         }
 
         // Extract application name (Keynote applications)
-        if let Some(app) = bundle_metadata.detected_application.as_ref() {
-            metadata.application = Some(app.clone());
+        if let Some(app) = bundle_metadata.detected_application() {
+            metadata.application = Some(app.to_owned());
             has_data = true;
         } else {
             // Default to Keynote if not detected

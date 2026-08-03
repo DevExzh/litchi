@@ -187,7 +187,7 @@ pub mod shapes;
 
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
-pub use bundle::{Bundle, BundleMetadata, PropertyValue};
+pub use bundle::{Bundle, BundleMetadata, PropertyMap, PropertyValue};
 pub use comments::{
     DrawableCommentInfo, DrawableCommentReplyInfo, IWorkComment, IWorkCommentUuid,
     IWorkDrawableCommentEditor, IWorkDrawableInfo, IWorkTableCellCommentInfo,

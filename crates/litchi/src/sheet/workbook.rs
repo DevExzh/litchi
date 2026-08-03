@@ -588,8 +588,8 @@ impl Workbook {
         }
 
         // Extract application name
-        if let Some(app) = bundle_metadata.detected_application.as_ref() {
-            metadata.application = Some(app.clone());
+        if let Some(app) = bundle_metadata.detected_application() {
+            metadata.application = Some(app.to_owned());
         } else {
             metadata.application = Some("Numbers".to_string());
         }

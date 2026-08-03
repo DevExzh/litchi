@@ -6,7 +6,7 @@
 //! - `Metadata/`: Document metadata and properties
 //! - Preview images at root level
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -462,8 +462,8 @@ impl Bundle {
             has_build_version_history: true,
             has_document_identifier: true,
             detected_application: None,
-            properties: HashMap::new(),
-            build_versions: Vec::new(),
+            properties: PropertyMap::default(),
+            build_versions: Vec::new().into_boxed_slice(),
             document_id: None,
         };
 
@@ -500,8 +500,8 @@ impl Bundle {
             has_build_version_history: true,
             has_document_identifier: true,
             detected_application: None,
-            properties: HashMap::new(),
-            build_versions: Vec::new(),
+            properties: PropertyMap::default(),
+            build_versions: Vec::new().into_boxed_slice(),
             document_id: None,
         };
 
@@ -541,8 +541,8 @@ impl Bundle {
             has_build_version_history: true,
             has_document_identifier: true,
             detected_application: None,
-            properties: HashMap::new(),
-            build_versions: Vec::new(),
+            properties: PropertyMap::default(),
+            build_versions: Vec::new().into_boxed_slice(),
             document_id: None,
         };
 
@@ -701,7 +701,7 @@ impl Bundle {
         if optional_regular_file(&build_version_path, "BuildVersionHistory.plist")? {
             metadata.has_build_version_history = true;
             if let Ok(value) = Value::from_file(&build_version_path) {
-                metadata.build_versions = Self::parse_build_versions(&value);
+                metadata.build_versions = Self::parse_build_versions(&value).into_boxed_slice();
             }
         }
 
@@ -718,16 +718,14 @@ impl Bundle {
     }
 
     /// Parse a plist Value into our PropertyValue structure
-    fn parse_plist_value(value: &Value) -> HashMap<String, PropertyValue> {
-        let mut result = HashMap::new();
-
-        if let Value::Dictionary(dict) = value {
-            for (key, val) in dict {
-                result.insert(key.clone(), Self::convert_plist_value(val));
-            }
+    fn parse_plist_value(value: &Value) -> PropertyMap {
+        match value {
+            Value::Dictionary(dict) => dict
+                .iter()
+                .map(|(key, value)| (key.clone(), Self::convert_plist_value(value)))
+                .collect(),
+            _ => PropertyMap::default(),
         }
-
-        result
     }
 
     /// Convert a plist Value to PropertyValue
@@ -741,13 +739,11 @@ impl Bundle {
             Value::Array(arr) => {
                 PropertyValue::Array(arr.iter().map(Self::convert_plist_value).collect())
             },
-            Value::Dictionary(dict) => {
-                let mut map = HashMap::new();
-                for (k, v) in dict {
-                    map.insert(k.clone(), Self::convert_plist_value(v));
-                }
-                PropertyValue::Dictionary(map)
-            },
+            Value::Dictionary(dict) => PropertyValue::Dictionary(
+                dict.iter()
+                    .map(|(key, value)| (key.clone(), Self::convert_plist_value(value)))
+                    .collect(),
+            ),
             Value::Data(_) => PropertyValue::String("<binary data>".to_string()),
             _ => PropertyValue::String("<unknown>".to_string()),
         }
@@ -979,26 +975,74 @@ pub struct BundleStats {
     pub largest_archive: Option<(String, usize)>,
 }
 
-/// Metadata associated with an iWork bundle
+/// An immutable, deterministic property catalog parsed from an iWork plist.
+///
+/// The map keeps its storage private so callers use validated lookup and
+/// borrowed traversal rather than depending on the parser's hash-table
+/// representation. Entries are ordered lexicographically by key.
 #[derive(Debug, Clone, Default)]
-pub struct BundleMetadata {
-    /// Whether Properties.plist exists
-    pub has_properties: bool,
-    /// Whether BuildVersionHistory.plist exists
-    pub has_build_version_history: bool,
-    /// Whether DocumentIdentifier exists
-    pub has_document_identifier: bool,
-    /// Application type detected from the bundle
-    pub detected_application: Option<String>,
-    /// Parsed properties from Properties.plist
-    pub properties: HashMap<String, PropertyValue>,
-    /// Build version history
-    pub build_versions: Vec<String>,
-    /// Document identifier
-    pub document_id: Option<String>,
+pub struct PropertyMap {
+    entries: Box<[(String, PropertyValue)]>,
 }
 
-/// Represents a property value from plist
+impl PropertyMap {
+    fn from_entries(entries: impl IntoIterator<Item = (String, PropertyValue)>) -> Self {
+        let mut ordered = BTreeMap::new();
+        for (key, value) in entries {
+            ordered.insert(key, value);
+        }
+        Self {
+            entries: ordered.into_iter().collect(),
+        }
+    }
+
+    /// Return the value associated with `key`, if present.
+    pub fn get(&self, key: &str) -> Option<&PropertyValue> {
+        self.entries
+            .binary_search_by(|(entry_key, _)| entry_key.as_str().cmp(key))
+            .ok()
+            .map(|index| &self.entries[index].1)
+    }
+
+    /// Iterate over properties in deterministic key order.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &PropertyValue)> + '_ {
+        self.entries
+            .iter()
+            .map(|(key, value)| (key.as_str(), value))
+    }
+
+    /// Return the number of properties in the catalog.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return whether the catalog contains no properties.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl FromIterator<(String, PropertyValue)> for PropertyMap {
+    fn from_iter<T: IntoIterator<Item = (String, PropertyValue)>>(iter: T) -> Self {
+        Self::from_entries(iter)
+    }
+}
+
+/// Metadata associated with an iWork bundle.
+#[derive(Debug, Clone, Default)]
+pub struct BundleMetadata {
+    has_properties: bool,
+    has_build_version_history: bool,
+    has_document_identifier: bool,
+    detected_application: Option<String>,
+    properties: PropertyMap,
+    build_versions: Box<[String]>,
+    document_id: Option<String>,
+}
+
+/// Represents a property value from plist.
 #[derive(Debug, Clone)]
 pub enum PropertyValue {
     /// String value
@@ -1014,24 +1058,54 @@ pub enum PropertyValue {
     /// Array of values
     Array(Vec<PropertyValue>),
     /// Dictionary of values
-    Dictionary(HashMap<String, PropertyValue>),
+    Dictionary(PropertyMap),
 }
 
 impl BundleMetadata {
+    /// Return whether `Properties.plist` was present.
+    pub const fn has_properties(&self) -> bool {
+        self.has_properties
+    }
+
+    /// Return whether `BuildVersionHistory.plist` was present.
+    pub const fn has_build_version_history(&self) -> bool {
+        self.has_build_version_history
+    }
+
+    /// Return whether `DocumentIdentifier` was present.
+    pub const fn has_document_identifier(&self) -> bool {
+        self.has_document_identifier
+    }
+
+    /// Return the detected source application, if metadata identified one.
+    pub fn detected_application(&self) -> Option<&str> {
+        self.detected_application.as_deref()
+    }
+
+    /// Borrow the immutable property catalog.
+    pub const fn properties(&self) -> &PropertyMap {
+        &self.properties
+    }
+
+    /// Look up one parsed property without exposing the backing container.
+    pub fn property(&self, key: &str) -> Option<&PropertyValue> {
+        self.properties.get(key)
+    }
+
     /// Get a summary of the metadata
     pub fn summary(&self) -> String {
         format!(
             "Properties: {}, BuildVersion: {}, DocumentID: {}, App: {}",
-            self.has_properties,
-            self.has_build_version_history,
-            self.has_document_identifier,
-            self.detected_application.as_deref().unwrap_or("unknown")
+            self.has_properties(),
+            self.has_build_version_history(),
+            self.has_document_identifier(),
+            self.detected_application().unwrap_or("unknown")
         )
     }
 
     /// Get a property value as a string
     pub fn get_property_string(&self, key: &str) -> Option<String> {
-        match self.properties.get(key)? {
+        match self.property(key)? {
             PropertyValue::String(s) => Some(s.clone()),
             PropertyValue::Integer(i) => Some(i.to_string()),
             PropertyValue::Real(r) => Some(r.to_string()),
@@ -1043,7 +1117,7 @@ impl BundleMetadata {
 
     /// Get a property value as an integer
     pub fn get_property_int(&self, key: &str) -> Option<i64> {
-        match self.properties.get(key)? {
+        match self.property(key)? {
             PropertyValue::Integer(i) => Some(*i),
             _ => None,
         }
@@ -1051,7 +1125,7 @@ impl BundleMetadata {
 
     /// Get a property value as a boolean
     pub fn get_property_bool(&self, key: &str) -> Option<bool> {
-        match self.properties.get(key)? {
+        match self.property(key)? {
             PropertyValue::Boolean(b) => Some(*b),
             _ => None,
         }
@@ -1216,11 +1290,10 @@ mod tests {
 
     #[test]
     fn test_metadata_summary() {
-        let mut properties = HashMap::new();
-        properties.insert(
+        let properties = PropertyMap::from_entries([(
             "Title".to_string(),
             PropertyValue::String("Test Doc".to_string()),
-        );
+        )]);
 
         let metadata = BundleMetadata {
             has_properties: true,
@@ -1228,7 +1301,7 @@ mod tests {
             has_document_identifier: false,
             detected_application: Some("Pages".to_string()),
             properties,
-            build_versions: vec!["7029".to_string()],
+            build_versions: vec!["7029".to_string()].into_boxed_slice(),
             document_id: None,
         };
 
@@ -1237,6 +1310,15 @@ mod tests {
         assert!(summary.contains("BuildVersion: true"));
         assert!(summary.contains("DocumentID: false"));
         assert!(summary.contains("App: Pages"));
+        assert!(metadata.has_properties());
+        assert!(metadata.has_build_version_history());
+        assert!(!metadata.has_document_identifier());
+        assert_eq!(metadata.detected_application(), Some("Pages"));
+        assert_eq!(metadata.properties().len(), 1);
+        assert!(matches!(
+            metadata.property("Title"),
+            Some(PropertyValue::String(value)) if value == "Test Doc"
+        ));
 
         // Test property accessors
         assert_eq!(
@@ -1245,6 +1327,31 @@ mod tests {
         );
         assert_eq!(metadata.latest_build_version(), Some("7029"));
         assert_eq!(metadata.document_identifier(), None);
+    }
+
+    #[test]
+    fn property_map_is_sorted_and_duplicate_keys_are_deterministic() {
+        let properties: PropertyMap = [
+            (
+                "zeta".to_string(),
+                PropertyValue::String("first".to_string()),
+            ),
+            ("alpha".to_string(), PropertyValue::Integer(7)),
+            ("zeta".to_string(), PropertyValue::Boolean(true)),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(properties.len(), 2);
+        assert_eq!(
+            properties.iter().map(|(key, _)| key).collect::<Vec<_>>(),
+            vec!["alpha", "zeta"]
+        );
+        assert!(matches!(
+            properties.get("zeta"),
+            Some(PropertyValue::Boolean(true))
+        ));
+        assert!(properties.get("missing").is_none());
     }
 
     #[test]
