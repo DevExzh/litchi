@@ -65,6 +65,9 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     let document = Document::open(path)?;
     assert_send_sync::<litchi_iwa::Bundle>();
     assert_send_sync::<litchi_iwa::Document>();
+    assert_send_sync::<PagesDocument>();
+    assert_send_sync::<NumbersDocument>();
+    assert_send_sync::<KeynoteDocument>();
     assert_eq!(document.application(), application);
     assert_eq!(document.stats().application, application);
     assert!(document.stats().total_objects > 0);
@@ -89,15 +92,30 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     match expected {
         Format::Pages => {
             PagesEditor::open(path)?;
-            PagesDocument::open(path)?;
+            let specialized = PagesDocument::open(path)?;
+            let snapshot = specialized.snapshot();
+            assert_eq!(
+                snapshot.stats().total_objects,
+                specialized.stats().total_objects
+            );
         },
         Format::Numbers => {
             NumbersEditor::open(path)?;
-            NumbersDocument::open(path)?;
+            let specialized = NumbersDocument::open(path)?;
+            let snapshot = specialized.snapshot();
+            assert_eq!(
+                snapshot.stats().total_objects,
+                specialized.stats().total_objects
+            );
         },
         Format::Keynote => {
             KeynoteEditor::open(path)?;
-            KeynoteDocument::open(path)?;
+            let specialized = KeynoteDocument::open(path)?;
+            let snapshot = specialized.snapshot();
+            assert_eq!(
+                snapshot.stats().total_objects,
+                specialized.stats().total_objects
+            );
         },
     }
 

@@ -3,6 +3,7 @@
 //! Provides high-level API for working with Apple Numbers spreadsheets.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use super::sheet::NumbersSheet;
 use super::table::NumbersTable;
@@ -13,7 +14,13 @@ use crate::text::TextExtractor;
 use crate::{Error, Result};
 
 /// High-level interface for Numbers documents
+#[derive(Debug, Clone)]
 pub struct NumbersDocument {
+    state: Arc<NumbersDocumentState>,
+}
+
+#[derive(Debug)]
+struct NumbersDocumentState {
     /// Underlying bundle
     bundle: Bundle,
     /// Object index for cross-referencing
@@ -37,10 +44,7 @@ impl NumbersDocument {
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+        Ok(Self::from_parts(bundle, object_index))
     }
 
     /// Open a Numbers document from raw bytes
@@ -60,10 +64,21 @@ impl NumbersDocument {
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+        Ok(Self::from_parts(bundle, object_index))
+    }
+
+    fn from_parts(bundle: Bundle, object_index: ObjectIndex) -> Self {
+        Self {
+            state: Arc::new(NumbersDocumentState {
+                bundle,
+                object_index,
+            }),
+        }
+    }
+
+    /// Capture a cheap immutable snapshot that shares all parsed document state.
+    pub fn snapshot(&self) -> Self {
+        self.clone()
     }
 
     /// Create a Numbers document from raw bytes (ZIP archive data).
@@ -113,7 +128,7 @@ impl NumbersDocument {
     /// ```
     pub fn text(&self) -> Result<String> {
         let mut extractor = TextExtractor::new();
-        extractor.extract_from_bundle(&self.bundle)?;
+        extractor.extract_from_bundle(&self.state.bundle)?;
         Ok(extractor.get_text())
     }
 
@@ -142,11 +157,12 @@ impl NumbersDocument {
     pub fn sheets(&self) -> Result<Vec<NumbersSheet>> {
         use super::table_extractor::TableDataExtractor;
 
-        let document = Self::root_document(&self.bundle)?;
-        let extractor = TableDataExtractor::new(&self.bundle, &self.object_index);
+        let document = Self::root_document(&self.state.bundle)?;
+        let extractor = TableDataExtractor::new(&self.state.bundle, &self.state.object_index);
         let mut sheets = Vec::with_capacity(document.sheets.len());
         for (index, reference) in document.sheets.into_iter().enumerate() {
             let object = self
+                .state
                 .bundle
                 .archives()
                 .values()
@@ -210,8 +226,9 @@ impl NumbersDocument {
         use prost::Message;
 
         let resolved = self
+            .state
             .object_index
-            .resolve_object(&self.bundle, drawable_id)?
+            .resolve_object(&self.state.bundle, drawable_id)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers sheet references missing drawable object {drawable_id}"
@@ -227,8 +244,9 @@ impl NumbersDocument {
             };
             let table_model_id = table_info.table_model.identifier;
             let Some(model) = self
+                .state
                 .object_index
-                .resolve_object(&self.bundle, table_model_id)?
+                .resolve_object(&self.state.bundle, table_model_id)?
             else {
                 continue;
             };
@@ -254,8 +272,9 @@ impl NumbersDocument {
         extractor: &super::table_extractor::TableDataExtractor<'_>,
     ) -> Result<NumbersTable> {
         if let Some(resolved) = self
+            .state
             .object_index
-            .resolve_object(&self.bundle, table_model_id)?
+            .resolve_object(&self.state.bundle, table_model_id)?
             && let Some(table) = extractor.extract_table_from_object(&resolved)?
         {
             return Ok(table);
@@ -268,17 +287,17 @@ impl NumbersDocument {
 
     /// Get the underlying bundle
     pub fn bundle(&self) -> &Bundle {
-        &self.bundle
+        &self.state.bundle
     }
 
     /// Get the object index
     pub fn object_index(&self) -> &ObjectIndex {
-        &self.object_index
+        &self.state.object_index
     }
 
     /// Get document statistics
     pub fn stats(&self) -> NumbersDocumentStats {
-        let total_objects = self.object_index.all_object_ids().len();
+        let total_objects = self.state.object_index.all_object_ids().len();
         let sheets_result = self.sheets();
         let sheet_count = sheets_result.as_ref().map(|s| s.len()).unwrap_or(0);
         let table_count = sheets_result
@@ -312,6 +331,13 @@ pub struct NumbersDocumentStats {
 mod tests {
     use super::*;
 
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn numbers_documents_are_send_and_sync() {
+        assert_send_sync::<NumbersDocument>();
+    }
+
     #[test]
     fn test_numbers_document_open() {
         let doc_path = std::path::Path::new("test.numbers");
@@ -328,7 +354,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index.all_object_ids().is_empty());
+        assert!(!doc.object_index().all_object_ids().is_empty());
     }
 
     #[test]

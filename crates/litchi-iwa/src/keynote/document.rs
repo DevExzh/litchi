@@ -3,6 +3,7 @@
 //! Provides high-level API for working with Apple Keynote presentations.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use super::show::KeynoteShow;
 use super::slide::KeynoteSlide;
@@ -13,7 +14,13 @@ use crate::text::TextExtractor;
 use crate::{Error, Result};
 
 /// High-level interface for Keynote documents
+#[derive(Debug, Clone)]
 pub struct KeynoteDocument {
+    state: Arc<KeynoteDocumentState>,
+}
+
+#[derive(Debug)]
+struct KeynoteDocumentState {
     /// Underlying bundle
     bundle: Bundle,
     /// Object index for cross-referencing
@@ -37,10 +44,7 @@ impl KeynoteDocument {
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+        Ok(Self::from_parts(bundle, object_index))
     }
 
     /// Open a Keynote document from raw bytes
@@ -60,10 +64,21 @@ impl KeynoteDocument {
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+        Ok(Self::from_parts(bundle, object_index))
+    }
+
+    fn from_parts(bundle: Bundle, object_index: ObjectIndex) -> Self {
+        Self {
+            state: Arc::new(KeynoteDocumentState {
+                bundle,
+                object_index,
+            }),
+        }
+    }
+
+    /// Capture a cheap immutable snapshot that shares all parsed document state.
+    pub fn snapshot(&self) -> Self {
+        self.clone()
     }
 
     /// Create a Keynote document from raw bytes (ZIP archive data).
@@ -113,7 +128,7 @@ impl KeynoteDocument {
     /// ```
     pub fn text(&self) -> Result<String> {
         let mut extractor = TextExtractor::new();
-        extractor.extract_from_bundle(&self.bundle)?;
+        extractor.extract_from_bundle(&self.state.bundle)?;
         Ok(extractor.get_text())
     }
 
@@ -159,7 +174,7 @@ impl KeynoteDocument {
     fn slide_ids(&self) -> Result<Vec<u64>> {
         use prost::Message;
 
-        let document = Self::root_document(&self.bundle)?;
+        let document = Self::root_document(&self.state.bundle)?;
         let show_object = self
             .bundle_object(document.show.identifier)
             .ok_or_else(|| {
@@ -208,7 +223,8 @@ impl KeynoteDocument {
     }
 
     fn bundle_object(&self, identifier: u64) -> Option<&crate::archive::ArchiveObject> {
-        self.bundle
+        self.state
+            .bundle
             .archives()
             .values()
             .find_map(|archive| archive.object(identifier))
@@ -331,7 +347,11 @@ impl KeynoteDocument {
         use super::slide::{BuildAnimation, BuildAnimationType};
         use prost::Message;
 
-        if let Some(resolved) = self.object_index.resolve_object(&self.bundle, build_id)? {
+        if let Some(resolved) = self
+            .state
+            .object_index
+            .resolve_object(&self.state.bundle, build_id)?
+        {
             for msg in &resolved.messages {
                 if let Ok(build_archive) = crate::protobuf::kn::BuildArchive::decode(&*msg.data) {
                     let animation_type = Self::parse_build_delivery(&build_archive.delivery);
@@ -420,8 +440,9 @@ impl KeynoteDocument {
         use prost::Message;
 
         if let Some(resolved) = self
+            .state
             .object_index
-            .resolve_object(&self.bundle, drawable_id)?
+            .resolve_object(&self.state.bundle, drawable_id)?
         {
             let mut storage_id = None;
             for msg in &resolved.messages {
@@ -442,8 +463,10 @@ impl KeynoteDocument {
             }
 
             if let Some(storage_id) = storage_id
-                && let Some(storage_object) =
-                    self.object_index.resolve_object(&self.bundle, storage_id)?
+                && let Some(storage_object) = self
+                    .state
+                    .object_index
+                    .resolve_object(&self.state.bundle, storage_id)?
             {
                 for message in storage_object.messages {
                     if let Ok(storage) =
@@ -462,13 +485,19 @@ impl KeynoteDocument {
     fn extract_speaker_notes(&self, note_id: u64) -> Result<String> {
         use prost::Message;
 
-        if let Some(resolved) = self.object_index.resolve_object(&self.bundle, note_id)? {
+        if let Some(resolved) = self
+            .state
+            .object_index
+            .resolve_object(&self.state.bundle, note_id)?
+        {
             for msg in &resolved.messages {
                 if let Ok(note_archive) = crate::protobuf::kn::NoteArchive::decode(&*msg.data) {
                     // The note contains a reference to a TSWP.StorageArchive
                     let storage_id = note_archive.contained_storage.identifier;
-                    if let Some(storage_obj) =
-                        self.object_index.resolve_object(&self.bundle, storage_id)?
+                    if let Some(storage_obj) = self
+                        .state
+                        .object_index
+                        .resolve_object(&self.state.bundle, storage_id)?
                     {
                         for storage_msg in &storage_obj.messages {
                             if let Ok(storage) =
@@ -517,7 +546,7 @@ impl KeynoteDocument {
     /// ```
     #[allow(unused_assignments)] // has_data is intentionally reassigned to track if any field was set
     pub fn metadata(&self) -> Result<Option<litchi_core::Metadata>> {
-        let bundle_metadata = self.bundle.metadata();
+        let bundle_metadata = self.state.bundle.metadata();
 
         // Extract standard metadata fields from Properties.plist and bundle structure
         let mut metadata = litchi_core::Metadata::default();
@@ -630,7 +659,7 @@ impl KeynoteDocument {
         let mut show = KeynoteShow::new();
 
         // Extract show metadata from ShowArchive (message type 2 is KN.ShowArchive)
-        let show_objects = self.bundle.find_objects_by_type(1101);
+        let show_objects = self.state.bundle.find_objects_by_type(1101);
         if let Some((_archive_name, object)) = show_objects.first() {
             let text_parts = object.extract_text();
             show.title = text_parts.first().cloned();
@@ -647,17 +676,17 @@ impl KeynoteDocument {
 
     /// Get the underlying bundle
     pub fn bundle(&self) -> &Bundle {
-        &self.bundle
+        &self.state.bundle
     }
 
     /// Get the object index
     pub fn object_index(&self) -> &ObjectIndex {
-        &self.object_index
+        &self.state.object_index
     }
 
     /// Get document statistics
     pub fn stats(&self) -> KeynoteDocumentStats {
-        let total_objects = self.object_index.all_object_ids().len();
+        let total_objects = self.state.object_index.all_object_ids().len();
         let slides_result = self.slides();
         let slide_count = slides_result.as_ref().map(|s| s.len()).unwrap_or(0);
 
@@ -684,6 +713,13 @@ pub struct KeynoteDocumentStats {
 mod tests {
     use super::*;
 
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn keynote_documents_are_send_and_sync() {
+        assert_send_sync::<KeynoteDocument>();
+    }
+
     #[test]
     fn test_keynote_document_open() {
         let doc_path = std::path::Path::new("test.key");
@@ -700,7 +736,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index.all_object_ids().is_empty());
+        assert!(!doc.object_index().all_object_ids().is_empty());
     }
 
     #[test]

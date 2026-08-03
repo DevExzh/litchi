@@ -3,6 +3,7 @@
 //! Provides high-level API for working with Apple Pages documents.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use prost::Message;
 
@@ -15,7 +16,13 @@ use crate::text::{TextExtractor, TextStorage};
 use crate::{Error, Result};
 
 /// High-level interface for Pages documents
+#[derive(Debug, Clone)]
 pub struct PagesDocument {
+    state: Arc<PagesDocumentState>,
+}
+
+#[derive(Debug)]
+struct PagesDocumentState {
     /// Underlying bundle
     bundle: Bundle,
     /// Object index for cross-referencing
@@ -42,10 +49,7 @@ impl PagesDocument {
 
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+        Ok(Self::from_parts(bundle, object_index))
     }
 
     /// Open a Pages document from raw bytes
@@ -68,10 +72,21 @@ impl PagesDocument {
 
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+        Ok(Self::from_parts(bundle, object_index))
+    }
+
+    fn from_parts(bundle: Bundle, object_index: ObjectIndex) -> Self {
+        Self {
+            state: Arc::new(PagesDocumentState {
+                bundle,
+                object_index,
+            }),
+        }
+    }
+
+    /// Capture a cheap immutable snapshot that shares all parsed document state.
+    pub fn snapshot(&self) -> Self {
+        self.clone()
     }
 
     /// Create a Pages document from raw bytes (ZIP archive data).
@@ -103,13 +118,15 @@ impl PagesDocument {
     }
 
     fn body_storage(&self) -> Result<Option<TextStorage>> {
-        let Some(reference) = Self::root_document(&self.bundle).and_then(|doc| doc.body_storage)
+        let Some(reference) =
+            Self::root_document(&self.state.bundle).and_then(|doc| doc.body_storage)
         else {
             return Ok(None);
         };
         let Some(object) = self
+            .state
             .object_index
-            .resolve_object(&self.bundle, reference.identifier)?
+            .resolve_object(&self.state.bundle, reference.identifier)?
         else {
             return Err(Error::InvalidFormat(format!(
                 "Pages body storage object {} is missing",
@@ -146,7 +163,7 @@ impl PagesDocument {
     /// ```
     pub fn text(&self) -> Result<String> {
         let mut extractor = TextExtractor::new();
-        extractor.extract_from_bundle(&self.bundle)?;
+        extractor.extract_from_bundle(&self.state.bundle)?;
         Ok(extractor.get_text())
     }
 
@@ -181,7 +198,7 @@ impl PagesDocument {
         let mut sections = Vec::new();
         let mut section = PagesSection::new(0, PagesSectionType::Body);
         let mut extractor = TextExtractor::new();
-        extractor.extract_from_bundle(&self.bundle)?;
+        extractor.extract_from_bundle(&self.state.bundle)?;
         section.text_storages.extend(
             extractor
                 .storages()
@@ -197,17 +214,17 @@ impl PagesDocument {
 
     /// Get the underlying bundle
     pub fn bundle(&self) -> &Bundle {
-        &self.bundle
+        &self.state.bundle
     }
 
     /// Get the object index
     pub fn object_index(&self) -> &ObjectIndex {
-        &self.object_index
+        &self.state.object_index
     }
 
     /// Get document statistics
     pub fn stats(&self) -> PagesDocumentStats {
-        let total_objects = self.object_index.all_object_ids().len();
+        let total_objects = self.state.object_index.all_object_ids().len();
         let sections_result = self.sections();
         let section_count = sections_result.as_ref().map(|s| s.len()).unwrap_or(0);
 
@@ -237,6 +254,13 @@ mod tests {
     use crate::archive::{Archive, ArchiveObject, RawMessage};
     use crate::protobuf::tsp::Reference;
 
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn pages_documents_are_send_and_sync() {
+        assert_send_sync::<PagesDocument>();
+    }
+
     #[test]
     fn test_pages_document_open() {
         let doc_path = std::path::Path::new("test.pages");
@@ -253,7 +277,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index.all_object_ids().is_empty());
+        assert!(!doc.object_index().all_object_ids().is_empty());
     }
 
     #[test]
