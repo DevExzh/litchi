@@ -17,8 +17,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::bundle::{Bundle, BundleLimits};
-use crate::media::{MediaManager, MediaStats};
+use crate::media::{MediaLimits, MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::package::PackageLimits;
 use crate::ref_graph::ObjectId;
 use crate::registry::{Application, detect_application_from_document};
 use crate::structured::{self, StructuredData};
@@ -60,8 +61,17 @@ impl Document {
         // applications and are not safe evidence for a fallback guess.
         let application = detect_bundle_application(&bundle).unwrap_or(Application::Common);
 
-        // Try to create media manager (may fail for single-file bundles)
-        let media_manager = MediaManager::new(path_ref).ok();
+        // Keep media discovery and later file-backed extraction under the same
+        // caller-selected package and aggregate media ceilings as document
+        // ingress. Media is optional, so a source without a usable Data tree
+        // remains a valid document.
+        let (media_limits, package_limits) = media_profiles(limits)?;
+        let media_manager = MediaManager::new_with_limits_and_package_limits(
+            path_ref,
+            media_limits,
+            package_limits,
+        )
+        .ok();
 
         Ok(Self::from_parts(
             bundle,
@@ -74,8 +84,8 @@ impl Document {
     /// Open an iWork document from raw bytes
     ///
     /// This allows parsing iWork documents directly from memory without
-    /// requiring file system access. Note that media extraction is not
-    /// available when opening from bytes.
+    /// requiring file system access. Media extraction remains available when
+    /// the in-memory package contains materialized `Data/*` assets.
     ///
     /// # Examples
     ///
@@ -96,13 +106,20 @@ impl Document {
     /// Open an iWork document from bytes under caller-selected bundle limits.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
-        let media_manager = MediaManager::from_bytes(bytes).ok();
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         // Application ownership is established only by the validated root
         // DocumentArchive envelope. Numeric message IDs overlap across iWork
         // applications and are not safe evidence for a fallback guess.
         let application = detect_bundle_application(&bundle).unwrap_or(Application::Common);
+
+        let (media_limits, package_limits) = media_profiles(limits)?;
+        let media_manager = MediaManager::from_bytes_with_limits_and_package_limits(
+            bytes,
+            media_limits,
+            package_limits,
+        )
+        .ok();
 
         Ok(Self::from_parts(
             bundle,
@@ -250,6 +267,22 @@ impl Document {
             media_stats,
         })
     }
+}
+
+fn media_profiles(limits: BundleLimits) -> Result<(MediaLimits, PackageLimits)> {
+    let package_limits = PackageLimits::new_with_limits(
+        limits.max_input_bytes(),
+        limits.max_entries(),
+        limits.max_entry_bytes(),
+        limits.max_total_bytes(),
+        limits.max_iwa_stream_bytes(),
+    )?;
+    let media_limits = MediaLimits::new(
+        limits.max_entries(),
+        limits.max_entry_bytes(),
+        limits.max_total_bytes(),
+    )?;
+    Ok((media_limits, package_limits))
 }
 
 fn detect_bundle_application(bundle: &Bundle) -> Option<Application> {
@@ -420,6 +453,21 @@ mod tests {
 
         let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert_eq!(document.application(), Application::Common);
+    }
+
+    #[test]
+    fn document_media_profiles_follow_bundle_limits() {
+        let limits = BundleLimits::new(31, 7, 11, 23, 47).unwrap();
+        let (media_limits, package_limits) = media_profiles(limits).unwrap();
+
+        assert_eq!(media_limits.max_assets(), 7);
+        assert_eq!(media_limits.max_asset_bytes(), 11);
+        assert_eq!(media_limits.max_total_bytes(), 23);
+        assert_eq!(package_limits.max_input_bytes(), 31);
+        assert_eq!(package_limits.max_entries(), 7);
+        assert_eq!(package_limits.max_entry_bytes(), 11);
+        assert_eq!(package_limits.max_total_bytes(), 23);
+        assert_eq!(package_limits.max_iwa_stream_bytes(), 47);
     }
 
     #[test]

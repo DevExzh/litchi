@@ -15,7 +15,7 @@ use prost::Message;
 use sha1::{Digest, Sha1};
 
 use crate::archive::RawMessage;
-use crate::package::IWorkPackage;
+use crate::package::{IWorkPackage, PackageLimits};
 use crate::protobuf;
 use crate::varint::{decode_varint_from_bytes, encode_varint};
 use crate::{Error, Result};
@@ -249,6 +249,7 @@ struct MediaManagerState {
     source: MediaSource,
     assets: HashMap<String, MediaAsset>,
     limits: MediaLimits,
+    package_limits: PackageLimits,
 }
 
 impl MediaManager {
@@ -256,12 +257,14 @@ impl MediaManager {
         source: MediaSource,
         assets: HashMap<String, MediaAsset>,
         limits: MediaLimits,
+        package_limits: PackageLimits,
     ) -> Self {
         Self {
             state: Arc::new(MediaManagerState {
                 source,
                 assets,
                 limits,
+                package_limits,
             }),
         }
     }
@@ -278,6 +281,19 @@ impl MediaManager {
 
     /// Open a media source under caller-selected resource ceilings.
     pub fn new_with_limits<P: AsRef<Path>>(path: P, limits: MediaLimits) -> Result<Self> {
+        Self::new_with_limits_and_package_limits(path, limits, PackageLimits::default())
+    }
+
+    /// Open a media source with separate media and package resource ceilings.
+    ///
+    /// File-backed packages retain the package profile for later extraction;
+    /// reopening an asset therefore cannot silently fall back to a broader
+    /// default ZIP or Snappy budget.
+    pub fn new_with_limits_and_package_limits<P: AsRef<Path>>(
+        path: P,
+        limits: MediaLimits,
+        package_limits: PackageLimits,
+    ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let metadata = fs::symlink_metadata(&path).map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
@@ -299,11 +315,17 @@ impl MediaManager {
                 MediaSource::Directory(path),
                 assets,
                 limits,
+                package_limits,
             ))
         } else if metadata.is_file() {
-            let package = IWorkPackage::open(&path)?;
+            let package = IWorkPackage::open_with_limits(&path, package_limits)?;
             let assets = Self::scan_package(&package, limits)?;
-            Ok(Self::from_parts(MediaSource::File(path), assets, limits))
+            Ok(Self::from_parts(
+                MediaSource::File(path),
+                assets,
+                limits,
+                package_limits,
+            ))
         } else {
             Err(Error::Bundle(format!(
                 "Media source is not a regular file or directory: {}",
@@ -319,7 +341,19 @@ impl MediaManager {
 
     /// Open an in-memory iWork package under caller-selected resource ceilings.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: MediaLimits) -> Result<Self> {
-        Self::from_package_with_limits(IWorkPackage::from_bytes(bytes)?, limits)
+        Self::from_bytes_with_limits_and_package_limits(bytes, limits, PackageLimits::default())
+    }
+
+    /// Open an in-memory package with separate media and package ceilings.
+    pub fn from_bytes_with_limits_and_package_limits(
+        bytes: &[u8],
+        limits: MediaLimits,
+        package_limits: PackageLimits,
+    ) -> Result<Self> {
+        Self::from_package_with_limits(
+            IWorkPackage::from_bytes_with_limits(bytes, package_limits)?,
+            limits,
+        )
     }
 
     /// Create read-only media access from an already parsed package.
@@ -329,11 +363,13 @@ impl MediaManager {
 
     /// Create read-only media access from a package under explicit limits.
     pub fn from_package_with_limits(package: IWorkPackage, limits: MediaLimits) -> Result<Self> {
+        let package_limits = package.limits();
         let assets = Self::scan_package(&package, limits)?;
         Ok(Self::from_parts(
             MediaSource::Package(package),
             assets,
             limits,
+            package_limits,
         ))
     }
 
@@ -437,6 +473,11 @@ impl MediaManager {
         self.state.limits
     }
 
+    /// Return the package profile retained for file-backed reopen operations.
+    pub fn package_limits(&self) -> PackageLimits {
+        self.state.package_limits
+    }
+
     pub fn get(&self, filename: &str) -> Option<&MediaAsset> {
         self.state.assets.get(filename)
     }
@@ -516,7 +557,7 @@ impl MediaManager {
                 Ok(data)
             },
             MediaSource::File(path) => {
-                let package = IWorkPackage::open(path)?;
+                let package = IWorkPackage::open_with_limits(path, self.state.package_limits)?;
                 extract_package_entry(&package, asset, self.state.limits)
             },
             MediaSource::Package(package) => {
@@ -1854,6 +1895,37 @@ mod tests {
         assert!(MediaLimits::new(MediaLimits::HARD_MAX_ASSETS + 1, 1, 1).is_err());
         assert!(MediaLimits::new(1, MediaLimits::HARD_MAX_ASSET_BYTES + 1, 1).is_err());
         assert!(MediaLimits::new(1, 1, MediaLimits::HARD_MAX_TOTAL_BYTES + 1).is_err());
+    }
+
+    #[test]
+    fn package_limits_are_reused_for_media_discovery_and_later_file_reads() {
+        let package = synthetic_package();
+        let bytes = package.to_bytes().unwrap();
+        let media_limits = MediaLimits::new(1, 1024, 1024).unwrap();
+        let package_limits = PackageLimits::new(
+            PackageLimits::MAX_ENTRIES,
+            PackageLimits::MAX_ENTRY_BYTES,
+            PackageLimits::MAX_TOTAL_BYTES,
+        )
+        .unwrap()
+        .with_input_bytes(u64::try_from(bytes.len()).unwrap())
+        .unwrap();
+
+        let file = tempfile::NamedTempFile::new().unwrap();
+        fs::write(file.path(), &bytes).unwrap();
+        let manager = MediaManager::new_with_limits_and_package_limits(
+            file.path(),
+            media_limits,
+            package_limits,
+        )
+        .unwrap();
+        assert_eq!(manager.package_limits(), package_limits);
+
+        let mut grown = bytes;
+        grown.push(0);
+        fs::write(file.path(), grown).unwrap();
+        let error = manager.extract("image-7.png").unwrap_err();
+        assert!(error.to_string().contains("iWork package input"));
     }
 
     #[cfg(unix)]
