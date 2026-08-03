@@ -3,7 +3,6 @@ use super::{
     keyword::Item,
 };
 use crate::{Error, Result};
-use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::rel::TargetMode;
@@ -114,11 +113,11 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Props) -> Result<bool> {
 
 pub(super) fn encode(props: &Props, dialect: Dialect) -> Result<String> {
     let encoded_bytes = preflight(props, dialect)?;
-    let mut xml = String::with_capacity(encoded_bytes);
-    xml.push_str(XML_DECLARATION);
-    xml.push_str(CORE_OPEN_PREFIX);
-    xml.push_str(dialect.namespace());
-    xml.push_str(CORE_OPEN_SUFFIX);
+    let mut xml = BoundedXml::with_capacity(encoded_bytes)?;
+    xml.push_str(XML_DECLARATION)?;
+    xml.push_str(CORE_OPEN_PREFIX)?;
+    xml.push_str(dialect.namespace())?;
+    xml.push_str(CORE_OPEN_SUFFIX)?;
 
     push_text(&mut xml, "dc:title", props.title.as_deref())?;
     push_text(&mut xml, "dc:subject", props.subject.as_deref())?;
@@ -142,26 +141,26 @@ pub(super) fn encode(props: &Props, dialect: Dialect) -> Result<String> {
     push_text(&mut xml, "dc:language", props.language.as_deref())?;
     if let Some(created) = props.created.as_ref() {
         validate_text(created.as_str(), "dcterms:created")?;
-        xml.push_str(r#"<dcterms:created xsi:type="dcterms:W3CDTF">"#);
-        xml.push_str(&escape_xml(created.as_str()));
-        xml.push_str("</dcterms:created>");
+        xml.push_str(r#"<dcterms:created xsi:type="dcterms:W3CDTF">"#)?;
+        push_escaped(&mut xml, created.as_str())?;
+        xml.push_str("</dcterms:created>")?;
     }
     if let Some(modified) = props.modified.as_ref() {
         validate_text(modified.as_str(), "dcterms:modified")?;
-        xml.push_str(r#"<dcterms:modified xsi:type="dcterms:W3CDTF">"#);
-        xml.push_str(&escape_xml(modified.as_str()));
-        xml.push_str("</dcterms:modified>");
+        xml.push_str(r#"<dcterms:modified xsi:type="dcterms:W3CDTF">"#)?;
+        push_escaped(&mut xml, modified.as_str())?;
+        xml.push_str("</dcterms:modified>")?;
     }
     if let Some(last_printed) = props.last_printed.as_ref() {
         push_text(&mut xml, "cp:lastPrinted", Some(last_printed.as_str()))?;
     }
-    xml.push_str(CORE_CLOSE);
+    xml.push_str(CORE_CLOSE)?;
     if xml.len() != encoded_bytes {
         return Err(Error::Invalid(
             "core-properties encoded-size invariant failed".to_owned(),
         ));
     }
-    Ok(xml)
+    xml.finish()
 }
 
 fn preflight(props: &Props, dialect: Dialect) -> Result<usize> {
@@ -335,18 +334,108 @@ fn add_xml_bytes(total: &mut usize, additional: usize) -> Result<()> {
     Ok(())
 }
 
-fn push_keywords(xml: &mut String, keywords: Option<&Keywords>) -> Result<()> {
+/// A fallible XML output sink bounded by the core-properties part limit.
+///
+/// The sink checks the resulting length before reserving or appending bytes.
+/// `encode` preflights the exact output length, so the initial reservation is
+/// both bounded and sufficient for the complete document.
+struct BoundedXml {
+    bytes: Vec<u8>,
+}
+
+impl BoundedXml {
+    fn with_capacity(capacity: usize) -> Result<Self> {
+        if capacity > MAX_XML_BYTES {
+            return Err(Error::Limit {
+                resource: "core-properties XML bytes",
+                max: MAX_XML_BYTES,
+                actual: capacity,
+            });
+        }
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(capacity).map_err(|_| {
+            Error::Invalid("core-properties XML output allocation failed".to_owned())
+        })?;
+        Ok(Self { bytes })
+    }
+
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.push_bytes(value.as_bytes())
+    }
+
+    fn push_bytes(&mut self, value: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(value.len())
+            .ok_or(Error::Limit {
+                resource: "core-properties XML bytes",
+                max: MAX_XML_BYTES,
+                actual: usize::MAX,
+            })?;
+        if length > MAX_XML_BYTES {
+            return Err(Error::Limit {
+                resource: "core-properties XML bytes",
+                max: MAX_XML_BYTES,
+                actual: length,
+            });
+        }
+        self.bytes.try_reserve_exact(value.len()).map_err(|_| {
+            Error::Invalid("core-properties XML output allocation failed".to_owned())
+        })?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn push_char(&mut self, value: char) -> Result<()> {
+        let mut encoded = [0; 4];
+        let length = value.encode_utf8(&mut encoded).len();
+        self.push_bytes(&encoded[..length])
+    }
+
+    fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    fn finish(self) -> Result<String> {
+        String::from_utf8(self.bytes)
+            .map_err(|_| Error::Invalid("core-properties XML output was not UTF-8".to_owned()))
+    }
+}
+
+fn push_escaped(xml: &mut BoundedXml, value: &str) -> Result<()> {
+    let mut start = 0;
+    for (index, character) in value.char_indices() {
+        let replacement = match character {
+            '&' => Some("&amp;"),
+            '<' => Some("&lt;"),
+            '>' => Some("&gt;"),
+            '"' => Some("&quot;"),
+            '\'' => Some("&apos;"),
+            _ => None,
+        };
+        let Some(replacement) = replacement else {
+            continue;
+        };
+        xml.push_str(&value[start..index])?;
+        xml.push_str(replacement)?;
+        start = index + character.len_utf8();
+    }
+    xml.push_str(&value[start..])
+}
+
+fn push_keywords(xml: &mut BoundedXml, keywords: Option<&Keywords>) -> Result<()> {
     let Some(keywords) = keywords else {
         return Ok(());
     };
-    xml.push_str("<cp:keywords");
+    xml.push_str("<cp:keywords")?;
     if let Some(language) = keywords.lang.as_ref() {
         validate_text(language.as_str(), "cp:keywords xml:lang")?;
-        xml.push_str(r#" xml:lang=""#);
-        xml.push_str(&escape_xml(language.as_str()));
-        xml.push('"');
+        xml.push_str(r#" xml:lang=""#)?;
+        push_escaped(xml, language.as_str())?;
+        xml.push_char('"')?;
     }
-    xml.push('>');
+    xml.push_char('>')?;
 
     let mut bytes = 0usize;
     for item in &keywords.items {
@@ -354,25 +443,25 @@ fn push_keywords(xml: &mut String, keywords: Option<&Keywords>) -> Result<()> {
             Item::Text(text) => {
                 add_keyword_bytes(&mut bytes, text.len())?;
                 validate_xml_text(text, "cp:keywords")?;
-                xml.push_str(&escape_xml(text));
+                push_escaped(xml, text)?;
             },
             Item::Value(value) => {
                 add_keyword_bytes(&mut bytes, value.text.len())?;
                 validate_xml_text(&value.text, "cp:value")?;
-                xml.push_str("<cp:value");
+                xml.push_str("<cp:value")?;
                 if let Some(language) = value.lang.as_ref() {
                     validate_text(language.as_str(), "cp:value xml:lang")?;
-                    xml.push_str(r#" xml:lang=""#);
-                    xml.push_str(&escape_xml(language.as_str()));
-                    xml.push('"');
+                    xml.push_str(r#" xml:lang=""#)?;
+                    push_escaped(xml, language.as_str())?;
+                    xml.push_char('"')?;
                 }
-                xml.push('>');
-                xml.push_str(&escape_xml(&value.text));
-                xml.push_str("</cp:value>");
+                xml.push_char('>')?;
+                push_escaped(xml, &value.text)?;
+                xml.push_str("</cp:value>")?;
             },
         }
     }
-    xml.push_str("</cp:keywords>");
+    xml.push_str("</cp:keywords>")?;
     Ok(())
 }
 
@@ -392,18 +481,18 @@ fn add_keyword_bytes(total: &mut usize, additional: usize) -> Result<()> {
     Ok(())
 }
 
-fn push_text(xml: &mut String, element: &str, value: Option<&str>) -> Result<()> {
+fn push_text(xml: &mut BoundedXml, element: &str, value: Option<&str>) -> Result<()> {
     let Some(value) = value else {
         return Ok(());
     };
     validate_text(value, element)?;
-    xml.push('<');
-    xml.push_str(element);
-    xml.push('>');
-    xml.push_str(&escape_xml(value));
-    xml.push_str("</");
-    xml.push_str(element);
-    xml.push('>');
+    xml.push_char('<')?;
+    xml.push_str(element)?;
+    xml.push_char('>')?;
+    push_escaped(xml, value)?;
+    xml.push_str("</")?;
+    xml.push_str(element)?;
+    xml.push_char('>')?;
     Ok(())
 }
 
@@ -679,6 +768,24 @@ mod tests {
                 .blob(),
             original
         );
+    }
+
+    #[test]
+    fn bounded_output_rejects_oversized_append_before_mutation() {
+        let mut xml = BoundedXml::with_capacity(MAX_XML_BYTES - 1).unwrap();
+        xml.bytes.resize(MAX_XML_BYTES - 1, b'x');
+
+        let result = xml.push_str("xx");
+
+        assert!(matches!(
+            result,
+            Err(Error::Limit {
+                resource: "core-properties XML bytes",
+                max: MAX_XML_BYTES,
+                actual,
+            }) if actual == MAX_XML_BYTES + 1
+        ));
+        assert_eq!(xml.len(), MAX_XML_BYTES - 1);
     }
 
     #[test]
