@@ -283,7 +283,7 @@ impl Document {
 
     /// Get document statistics after resolving the indexed object set.
     pub fn stats(&self) -> Result<DocumentStats> {
-        let total_objects = self.state.object_index.all_object_ids().len();
+        let total_objects = self.state.object_index.object_ids()?.len();
         let archives_count = self.state.bundle.archives().len();
 
         let mut message_type_counts = HashMap::new();

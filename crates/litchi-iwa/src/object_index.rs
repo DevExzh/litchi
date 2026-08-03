@@ -17,8 +17,8 @@ mod reference_extraction;
 /// Represents an entry in the object index
 #[derive(Debug, Clone)]
 pub struct ObjectIndexEntry {
-    /// Unique object identifier
-    pub id: u64,
+    /// Unique, validated object identifier.
+    id: ObjectId,
     /// Which IWA file contains this object
     pub fragment_name: String,
     /// Offset within the IWA file
@@ -30,10 +30,15 @@ pub struct ObjectIndexEntry {
 }
 
 impl ObjectIndexEntry {
+    /// Return the validated object identity.
+    pub const fn id(&self) -> ObjectId {
+        self.id
+    }
+
     /// Return the validated object identity, if this compatibility entry is
     /// non-null.
     pub fn object_id(&self) -> Option<ObjectId> {
-        ObjectId::new(self.id)
+        Some(self.id)
     }
 }
 
@@ -119,7 +124,7 @@ impl ObjectIndex {
             let object_type = object.messages.first().map(|msg| msg.type_).unwrap_or(0);
 
             let entry = ObjectIndexEntry {
-                id: identifier,
+                id: object_id,
                 fragment_name: archive_name.to_string(),
                 // Use actual byte offsets from the parsed archive
                 // These match the approach used in libetonyek's ObjectRecord
@@ -158,6 +163,7 @@ impl ObjectIndex {
     }
 
     /// Get an object entry by ID
+    #[deprecated(note = "use entry(ObjectId) for checked identity semantics")]
     pub fn get_entry(&self, id: u64) -> Option<&ObjectIndexEntry> {
         self.entries.get(&id)
     }
@@ -168,11 +174,13 @@ impl ObjectIndex {
     }
 
     /// Get all objects in a specific fragment
+    #[deprecated(note = "use fragment_object_ids for checked identity semantics")]
     pub fn get_fragment_objects(&self, fragment_name: &str) -> Option<&Vec<u64>> {
         self.fragment_objects.get(fragment_name)
     }
 
     /// Get all object IDs in deterministic numeric order.
+    #[deprecated(note = "use object_ids for checked identity semantics")]
     pub fn all_object_ids(&self) -> Vec<u64> {
         let mut object_ids: Vec<_> = self.entries.keys().copied().collect();
         object_ids.sort_unstable();
@@ -194,7 +202,8 @@ impl ObjectIndex {
 
     /// Get typed object identities for one fragment in source order.
     pub fn fragment_object_ids(&self, fragment_name: &str) -> Result<Option<Vec<ObjectId>>> {
-        self.get_fragment_objects(fragment_name)
+        self.fragment_objects
+            .get(fragment_name)
             .map(|ids| {
                 ids.iter()
                     .copied()
@@ -212,7 +221,7 @@ impl ObjectIndex {
     /// Get all entries in deterministic numeric object-ID order.
     pub fn all_entries(&self) -> Vec<&ObjectIndexEntry> {
         let mut entries: Vec<_> = self.entries.values().collect();
-        entries.sort_unstable_by_key(|entry| entry.id);
+        entries.sort_unstable_by_key(|entry| entry.id());
         entries
     }
 
@@ -223,7 +232,7 @@ impl ObjectIndex {
             .values()
             .filter(|entry| entry.object_type == object_type)
             .collect();
-        entries.sort_unstable_by_key(|entry| entry.id);
+        entries.sort_unstable_by_key(|entry| entry.id());
         entries
     }
 
@@ -394,7 +403,15 @@ impl ObjectIndex {
         bundle: &Bundle,
         object_id: u64,
     ) -> Result<Option<ResolvedObject>> {
-        let Some(entry) = self.get_entry(object_id) else {
+        let Some(object_id) = ObjectId::new(object_id) else {
+            return Ok(None);
+        };
+        self.resolve(bundle, object_id)
+    }
+
+    /// Resolve an object through the validated identity API.
+    pub fn resolve(&self, bundle: &Bundle, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
+        let Some(entry) = self.entry(object_id) else {
             return Ok(None);
         };
 
@@ -407,7 +424,7 @@ impl ObjectIndex {
 
         // Find the object in the archive
         for object in &archive.objects {
-            if object.archive_info.identifier == Some(object_id) {
+            if object.archive_info.identifier == Some(object_id.get()) {
                 return Ok(Some(ResolvedObject {
                     id: object_id,
                     archive_info: object.archive_info.clone(),
@@ -418,12 +435,6 @@ impl ObjectIndex {
 
         Ok(None)
     }
-
-    /// Resolve an object through the validated identity API.
-    pub fn resolve(&self, bundle: &Bundle, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
-        self.resolve_object(bundle, object_id.get())
-    }
-
     /// Batch resolve multiple object references
     ///
     /// More efficient than calling `resolve_object` multiple times
@@ -448,11 +459,14 @@ impl ObjectIndex {
             std::collections::HashMap::new();
 
         for &object_id in object_ids {
-            if let Some(entry) = self.get_entry(object_id) {
+            let Some(object_id) = ObjectId::new(object_id) else {
+                continue;
+            };
+            if let Some(entry) = self.entry(object_id) {
                 objects_by_archive
                     .entry(&entry.fragment_name)
                     .or_default()
-                    .insert(object_id);
+                    .insert(object_id.get());
             }
         }
 
@@ -466,7 +480,11 @@ impl ObjectIndex {
                         && ids.contains(&obj_id)
                     {
                         let resolved = ResolvedObject {
-                            id: obj_id,
+                            id: ObjectId::try_from(obj_id).map_err(|_| {
+                                Error::Archive(format!(
+                                    "object {obj_id} has a null object identifier"
+                                ))
+                            })?,
                             archive_info: object.archive_info.clone(),
                             messages: object.messages.clone(),
                         };
@@ -509,7 +527,7 @@ impl ObjectIndex {
 
         let raw_ids: Vec<_> = object_ids.iter().map(|object_id| object_id.get()).collect();
         let resolved = self.resolve_objects(bundle, &raw_ids)?;
-        let resolved_ids: HashSet<_> = resolved.iter().map(|object| object.id).collect();
+        let resolved_ids: HashSet<_> = resolved.iter().map(|object| object.id().get()).collect();
         if let Some(missing) = object_ids
             .iter()
             .find(|object_id| !resolved_ids.contains(&object_id.get()))
@@ -615,8 +633,8 @@ pub struct ObjectIndexStats {
 /// A resolved object with its full data
 #[derive(Debug, Clone)]
 pub struct ResolvedObject {
-    /// Object identifier
-    pub id: u64,
+    /// Validated object identifier.
+    id: ObjectId,
     /// Archive information
     pub archive_info: crate::archive::ArchiveInfo,
     /// Raw message data
@@ -624,10 +642,15 @@ pub struct ResolvedObject {
 }
 
 impl ResolvedObject {
+    /// Return the validated object identity.
+    pub const fn id(&self) -> ObjectId {
+        self.id
+    }
+
     /// Return the validated object identity, if the compatibility payload is
     /// non-null.
     pub fn object_id(&self) -> Option<ObjectId> {
-        ObjectId::new(self.id)
+        Some(self.id)
     }
 
     /// Get the primary message type
@@ -721,14 +744,14 @@ mod tests {
     #[test]
     fn test_object_index_entry() {
         let entry = ObjectIndexEntry {
-            id: 123,
+            id: ObjectId::try_from(123).unwrap(),
             fragment_name: "Document.iwa".to_string(),
             data_offset: 100,
             data_length: 200,
             object_type: 42,
         };
 
-        assert_eq!(entry.id, 123);
+        assert_eq!(entry.id().get(), 123);
         assert_eq!(entry.fragment_name, "Document.iwa");
         assert_eq!(entry.object_type, 42);
         assert_eq!(entry.object_id(), ObjectId::new(123));
@@ -851,6 +874,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn compatibility_object_queries_are_deterministically_ordered() {
         let objects = [(30, 7), (10, 7), (20, 8)]
             .into_iter()
@@ -877,7 +901,7 @@ mod tests {
             index
                 .all_entries()
                 .into_iter()
-                .map(|entry| entry.id)
+                .map(|entry| entry.id().get())
                 .collect::<Vec<_>>(),
             vec![10, 20, 30]
         );
@@ -885,7 +909,7 @@ mod tests {
             index
                 .find_objects_by_type(7)
                 .into_iter()
-                .map(|entry| entry.id)
+                .map(|entry| entry.id().get())
                 .collect::<Vec<_>>(),
             vec![10, 30]
         );
@@ -929,7 +953,7 @@ mod tests {
         assert_eq!(
             resolved
                 .into_iter()
-                .map(|object| object.id)
+                .map(|object| object.id().get())
                 .collect::<Vec<_>>(),
             vec![2, 1]
         );

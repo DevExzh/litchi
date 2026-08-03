@@ -95,7 +95,7 @@ impl<'a> ChartMetadataExtractor<'a> {
             let chart_entries = self.object_index.find_objects_by_type(chart_type);
 
             for entry in chart_entries {
-                if let Some(resolved) = self.object_index.resolve_object(self.bundle, entry.id)?
+                if let Some(resolved) = self.object_index.resolve(self.bundle, entry.id())?
                     && let Some(metadata) = self.extract_chart_metadata(&resolved)?
                 {
                     charts.push(metadata);
@@ -113,12 +113,12 @@ impl<'a> ChartMetadataExtractor<'a> {
                 CHART_DRAWABLE_MESSAGE_TYPE => {
                     let drawable = IWorkChartArchive::decode(&message.data)?;
                     if let Some(chart) = drawable.chart {
-                        return Ok(Some(self.parse_chart(object.id, &chart)?));
+                        return Ok(Some(self.parse_chart(object.id().get(), &chart)?));
                     }
                 },
                 LEGACY_CHART_MESSAGE_TYPE => {
                     let chart = tsch::pre_uff::ChartInfoArchive::decode(message.data.as_slice())?;
-                    return Ok(Some(Self::parse_legacy_chart(object.id, &chart)));
+                    return Ok(Some(Self::parse_legacy_chart(object.id().get(), &chart)));
                 },
                 _ => {},
             }

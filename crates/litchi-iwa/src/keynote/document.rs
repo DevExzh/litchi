@@ -713,7 +713,7 @@ impl KeynoteDocument {
 
     /// Get document statistics after resolving the presentation slides.
     pub fn stats(&self) -> Result<KeynoteDocumentStats> {
-        let total_objects = self.state.object_index.all_object_ids().len();
+        let total_objects = self.state.object_index.object_ids()?.len();
         let slide_count = self.slides()?.len();
 
         Ok(KeynoteDocumentStats {
@@ -762,7 +762,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index().all_object_ids().is_empty());
+        assert!(!doc.object_index().object_ids().unwrap().is_empty());
         assert!(doc.validate().is_ok());
     }
 

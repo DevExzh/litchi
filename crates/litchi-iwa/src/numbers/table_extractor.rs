@@ -142,7 +142,7 @@ impl<'a> TableDataExtractor<'a> {
         let mut tables = Vec::new();
 
         for entry in entries {
-            if let Some(resolved) = self.object_index.resolve_object(self.bundle, entry.id)?
+            if let Some(resolved) = self.object_index.resolve(self.bundle, entry.id())?
                 && let Some(table) = self.extract_table_from_object(&resolved)?
             {
                 tables.push(table);

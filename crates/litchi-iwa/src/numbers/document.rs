@@ -324,7 +324,7 @@ impl NumbersDocument {
 
     /// Get document statistics after resolving the document sheets.
     pub fn stats(&self) -> Result<NumbersDocumentStats> {
-        let total_objects = self.state.object_index.all_object_ids().len();
+        let total_objects = self.state.object_index.object_ids()?.len();
         let sheets = self.sheets()?;
         let sheet_count = sheets.len();
         let table_count = sheets.iter().map(|sheet| sheet.table_count()).sum();
@@ -378,7 +378,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index().all_object_ids().is_empty());
+        assert!(!doc.object_index().object_ids().unwrap().is_empty());
         assert!(doc.validate().is_ok());
     }
 
