@@ -1711,7 +1711,12 @@ impl Settings {
                             })?;
                         } else if is_scalar_setting(element.local_name().as_ref()) {
                             parse_setting(&element, decoder, &resolver, &mut settings)?;
-                            finish_leaf(&mut reader, "web setting", &mut budget)?;
+                            finish_leaf(
+                                &mut reader,
+                                element.local_name().as_ref(),
+                                "web setting",
+                                &mut budget,
+                            )?;
                             depth = depth.checked_sub(1).ok_or_else(|| {
                                 Error::Invalid("invalid Word web-settings XML nesting".into())
                             })?;
@@ -2867,7 +2872,12 @@ fn parse_frameset(
                     b"sz" => {
                         let value = required_value(&element, decoder, &resolver, "frame size")?;
                         set_once(&mut frameset.size, value, "frameset size")?;
-                        finish_leaf(reader, "frameset size", budget)?;
+                        finish_leaf(
+                            reader,
+                            element.local_name().as_ref(),
+                            "frameset size",
+                            budget,
+                        )?;
                     },
                     b"framesetSplitbar" => {
                         let split_bar = parse_frameset_split_bar(reader, budget)?;
@@ -2876,7 +2886,12 @@ fn parse_frameset(
                     b"frameLayout" => {
                         let layout = parse_frame_layout(&element, decoder, &resolver)?;
                         set_once(&mut frameset.layout, layout, "frame layout")?;
-                        finish_leaf(reader, "frame layout", budget)?;
+                        finish_leaf(
+                            reader,
+                            element.local_name().as_ref(),
+                            "frame layout",
+                            budget,
+                        )?;
                     },
                     b"frameset" => {
                         reserve_one(&mut frameset.children, "parsed frameset child")?;
@@ -3092,7 +3107,12 @@ fn parse_html_div(
                 match element.local_name().as_ref() {
                     name if is_html_div_leaf(name) => {
                         parse_html_div_leaf(&element, decoder, &resolver, &mut div)?;
-                        finish_leaf(reader, "HTML division property", budget)?;
+                        finish_leaf(
+                            reader,
+                            element.local_name().as_ref(),
+                            "HTML division property",
+                            budget,
+                        )?;
                     },
                     b"divBdr" => {
                         div.advance(6)?;
@@ -3253,7 +3273,12 @@ fn parse_html_div_borders(
                     && is_html_div_border_side(element.local_name().as_ref()) =>
             {
                 set_html_div_border(&mut borders, &element, decoder, &resolver)?;
-                finish_leaf(reader, "HTML division border", budget)?;
+                finish_leaf(
+                    reader,
+                    element.local_name().as_ref(),
+                    "HTML division border",
+                    budget,
+                )?;
             },
             Event::Empty(element)
                 if is_wordprocessing_namespace(&namespace)
@@ -3342,7 +3367,12 @@ fn parse_frame(reader: &mut NsReader<&[u8]>, budget: &mut ParseBudget) -> Result
             Event::Start(element) if is_wordprocessing_namespace(&namespace) => {
                 if is_frame_property(element.local_name().as_ref()) {
                     parse_frame_property(&element, decoder, &resolver, &mut frame)?;
-                    finish_leaf(reader, "frame property", budget)?;
+                    finish_leaf(
+                        reader,
+                        element.local_name().as_ref(),
+                        "frame property",
+                        budget,
+                    )?;
                 } else {
                     skip_element(reader, budget)?;
                 }
@@ -3457,7 +3487,12 @@ fn parse_frameset_split_bar(
             Event::Start(element) if is_wordprocessing_namespace(&namespace) => {
                 if is_split_bar_property(element.local_name().as_ref()) {
                     parse_split_bar_property(&element, decoder, &resolver, &mut split_bar)?;
-                    finish_leaf(reader, "frameset split-bar property", budget)?;
+                    finish_leaf(
+                        reader,
+                        element.local_name().as_ref(),
+                        "frameset split-bar property",
+                        budget,
+                    )?;
                 } else {
                     skip_element(reader, budget)?;
                 }
@@ -3672,16 +3707,30 @@ fn required_relationship_id(
 
 fn finish_leaf(
     reader: &mut NsReader<&[u8]>,
+    expected_name: &[u8],
     description: &str,
     budget: &mut ParseBudget,
 ) -> Result<()> {
     loop {
         budget.event()?;
-        match reader
+        let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
-        {
-            Event::End(_) => return Ok(()),
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::End(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == expected_name =>
+            {
+                return Ok(());
+            },
+            Event::End(_) => {
+                return Err(invalid(format!(
+                    "Word {description} has a mismatched closing element"
+                )));
+            },
             Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
             Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => {
@@ -4049,6 +4098,22 @@ mod tests {
         let result = std::panic::catch_unwind(|| Settings::parse_xml(xml.as_bytes()));
         assert!(result.is_ok());
         assert!(result.unwrap().is_err());
+    }
+
+    #[test]
+    fn rejects_mismatched_leaf_end_tags() {
+        const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        for xml in [
+            format!(r#"<w:webSettings xmlns:w="{W}"><w:allowPNG></w:encoding></w:webSettings>"#),
+            format!(
+                r#"<w:webSettings xmlns:w="{W}"><w:frameset><w:sz w:val="1*"></w:name></w:frameset></w:webSettings>"#
+            ),
+            format!(
+                r#"<w:webSettings xmlns:w="{W}"><w:divs><w:div w:id="1"><w:marLeft w:val="0"></w:marRight><w:marRight w:val="0"/><w:marTop w:val="0"/><w:marBottom w:val="0"/></w:div></w:divs></w:webSettings>"#
+            ),
+        ] {
+            assert!(parse_settings(xml.as_bytes()).is_err(), "accepted {xml}");
+        }
     }
 
     #[test]
