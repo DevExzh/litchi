@@ -138,6 +138,38 @@ struct SettingsPartSnapshot {
     relationships: Vec<StoredRelationship>,
 }
 
+/// Owns the DOCX state that is unpublished until the sink accepts the package.
+///
+/// The OPC snapshot is structural: built-in part payloads remain shared through
+/// their `Arc` allocations. The mutable document stays owned by this guard while
+/// materialization runs, so an error or unwind cannot drop the retryable writer.
+struct WriteRollbackGuard {
+    package_before: OpcPackage,
+    mutable_doc: Option<MutableDocument>,
+}
+
+impl WriteRollbackGuard {
+    fn new(package: &mut Package) -> Self {
+        Self {
+            package_before: package.opc.clone(),
+            mutable_doc: package.mutable_doc.take(),
+        }
+    }
+
+    fn mutable_doc_mut(&mut self) -> Option<&mut MutableDocument> {
+        self.mutable_doc.as_mut()
+    }
+
+    fn publish(self, package: &mut Package) {
+        package.mutable_doc = self.mutable_doc;
+    }
+
+    fn rollback(self, package: &mut Package) {
+        package.opc = self.package_before;
+        package.mutable_doc = self.mutable_doc;
+    }
+}
+
 #[cfg(feature = "fonts")]
 use crate::fonts::{EmbedFonts, PreparedFont, prepare_fonts};
 #[cfg(feature = "fonts")]
@@ -154,11 +186,34 @@ impl EmbedFonts for Package {
             litchi_opc::FontEmbedding::Full => false,
             litchi_opc::FontEmbedding::Subset => true,
         };
-        let document = self.mutable_doc.as_ref().ok_or(OoxmlError::UnsafeEdit {
-            format: "DOCX",
-            operation: "embed_fonts",
-            reason: "font discovery is unavailable until the document has a complete mutable model",
-        })?;
+        let glyphs = {
+            let document = self.mutable_doc.as_ref().ok_or(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation: "embed_fonts",
+                reason: "font discovery is unavailable until the document has a complete mutable model",
+            })?;
+            if !document.glyphs_are_complete() {
+                return Err(OoxmlError::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "embed_fonts",
+                    reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
+                });
+            }
+            document.collect_glyphs()
+        };
+        self.embed_fonts_with_glyphs(glyphs, subset)
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl Package {
+    fn embed_fonts_for_document(&mut self, document: &MutableDocument) -> Result<()> {
+        let options = self.opc.save_options().clone();
+        let subset = match options.fonts {
+            litchi_opc::FontEmbedding::None => return Ok(()),
+            litchi_opc::FontEmbedding::Full => false,
+            litchi_opc::FontEmbedding::Subset => true,
+        };
         if !document.glyphs_are_complete() {
             return Err(OoxmlError::UnsafeEdit {
                 format: "DOCX",
@@ -166,7 +221,14 @@ impl EmbedFonts for Package {
                 reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
             });
         }
-        let glyphs = document.collect_glyphs();
+        self.embed_fonts_with_glyphs(document.collect_glyphs(), subset)
+    }
+
+    fn embed_fonts_with_glyphs(
+        &mut self,
+        glyphs: litchi_fonts::GlyphMap,
+        subset: bool,
+    ) -> Result<()> {
         let prepared = prepare_fonts(glyphs, subset)?;
         if prepared.is_empty() {
             return Ok(());
@@ -2507,11 +2569,15 @@ impl Package {
         // document rebuilds many related parts; an error half-way through must
         // leave the caller with the same retryable edit rather than a dropped
         // writer and a partially rewritten package.
-        let package_before = self.opc.clone();
-        let mut mutable_doc = self.mutable_doc.take();
-        let result = (|| -> Result<()> {
+        let mut rollback = WriteRollbackGuard::new(self);
+        // A sink or a late writer hook may unwind instead of returning an
+        // error. Catch the unwind long enough to put both owned pieces of the
+        // host state back before resuming it; the staged-properties guard is
+        // dropped while unwinding the closure and therefore keeps its dirty
+        // intent for the next attempt.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<()> {
             // If we have a mutable document, update the document.xml part
-            if let Some(mutable_doc) = mutable_doc.as_mut()
+            if let Some(mutable_doc) = rollback.mutable_doc_mut()
                 && mutable_doc.is_modified()
             {
                 // Generate TOC if configured (must happen before serialization)
@@ -2979,19 +3045,23 @@ impl Package {
                 }
             }
 
-            // Stage only an explicitly edited core-properties slot. The guard
-            // keeps edit intent dirty until the output sink accepts the complete
-            // package, so a failed stream remains retryable.
-            let staged_properties = self.properties.stage(&mut self.opc)?;
-
             // Update or remove the custom-properties package graph atomically.
             self.custom_props.write(&mut self.opc)?;
 
             // Embed fonts if feature enabled and requested in options
             #[cfg(feature = "fonts")]
             {
-                self.embed_fonts()?;
+                if let Some(mutable_doc) = rollback.mutable_doc_mut() {
+                    self.embed_fonts_for_document(mutable_doc)?;
+                } else {
+                    self.embed_fonts()?;
+                }
             }
+
+            // Stage only an explicitly edited core-properties slot. The guard
+            // keeps edit intent dirty until the output sink accepts the complete
+            // package, so a failed stream remains retryable.
+            let staged_properties = self.properties.stage(&mut self.opc)?;
 
             self.opc.to_stream(writer).map_err(|e| {
                 OoxmlError::Io(std::io::Error::other(format!(
@@ -3001,14 +3071,22 @@ impl Package {
             })?;
             staged_properties.commit();
             Ok(())
-        })();
+        }));
 
-        self.mutable_doc = mutable_doc;
-        if let Err(error) = result {
-            self.opc = package_before;
-            return Err(error);
+        match result {
+            Ok(Ok(())) => {
+                rollback.publish(self);
+                Ok(())
+            },
+            Ok(Err(error)) => {
+                rollback.rollback(self);
+                Err(error)
+            },
+            Err(payload) => {
+                rollback.rollback(self);
+                std::panic::resume_unwind(payload);
+            },
         }
-        Ok(())
     }
 
     /// Borrows the document core properties, retaining package absence.
@@ -3532,6 +3610,7 @@ fn mail_merge_target_as_source(target: MailMergeTarget) -> MailMergeSource {
 mod tests {
     use super::*;
     use std::io::{Cursor, Seek, Write};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
     use tempfile::NamedTempFile;
 
     struct FailingWriter;
@@ -3549,6 +3628,24 @@ mod tests {
     impl Seek for FailingWriter {
         fn seek(&mut self, _position: std::io::SeekFrom) -> std::io::Result<u64> {
             Err(std::io::Error::other("injected DOCX seek failure"))
+        }
+    }
+
+    struct PanickingWriter;
+
+    impl Write for PanickingWriter {
+        fn write(&mut self, _buffer: &[u8]) -> std::io::Result<usize> {
+            panic!("injected DOCX sink panic")
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Seek for PanickingWriter {
+        fn seek(&mut self, _position: std::io::SeekFrom) -> std::io::Result<u64> {
+            panic!("injected DOCX seek panic")
         }
     }
 
@@ -3591,24 +3688,35 @@ mod tests {
             .unwrap()
             .add_paragraph_with_text("retryable document");
         package.put_props(Props::new().title("retryable properties"));
-        let document_before = package.opc.main_document_part().unwrap().blob().to_vec();
+        let document_before = package.opc.main_document_part().unwrap().blob_arc();
         let core_properties_uri = PackURI::new("/docProps/core.xml").unwrap();
         let core_properties_before = package
             .opc
             .get_part(&core_properties_uri)
             .unwrap()
-            .blob()
-            .to_vec();
+            .blob_arc();
 
         assert!(package.to_plain_stream(FailingWriter).is_err());
         assert_eq!(
             package.opc.main_document_part().unwrap().blob(),
             document_before.as_slice()
         );
+        assert!(std::sync::Arc::ptr_eq(
+            &document_before,
+            &package.opc.main_document_part().unwrap().blob_arc()
+        ));
         assert_eq!(
             package.opc.get_part(&core_properties_uri).unwrap().blob(),
             core_properties_before.as_slice()
         );
+        assert!(std::sync::Arc::ptr_eq(
+            &core_properties_before,
+            &package
+                .opc
+                .get_part(&core_properties_uri)
+                .unwrap()
+                .blob_arc()
+        ));
         assert!(
             package
                 .mutable_doc
@@ -3625,6 +3733,113 @@ mod tests {
         package.to_plain_stream(&mut output).unwrap();
         assert!(!output.into_inner().is_empty());
         assert!(!package.properties.is_dirty());
+    }
+
+    #[test]
+    fn panicking_stream_restores_package_and_retryable_state() {
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            document.add_heading("panic-safe heading", 1).unwrap();
+            document
+                .add_toc(crate::docx::TableOfContents::new())
+                .unwrap();
+        }
+        package.put_props(Props::new().title("panic-safe properties"));
+        package
+            .custom_props_mut()
+            .insert("RetryMarker", "panic-safe custom property")
+            .unwrap();
+
+        let package_before = litchi_opc::PackageWriter::to_bytes(&package.opc).unwrap();
+        let document_before = package.mutable_doc.as_ref().unwrap().to_xml().unwrap();
+
+        let unwind = catch_unwind(AssertUnwindSafe(|| {
+            package.to_plain_stream(PanickingWriter).unwrap();
+        }));
+        assert!(unwind.is_err());
+        assert_eq!(
+            litchi_opc::PackageWriter::to_bytes(&package.opc).unwrap(),
+            package_before
+        );
+        let document_after = package.mutable_doc.as_ref().unwrap().to_xml().unwrap();
+        // TOC materialization is a one-shot semantic mutation: it consumes the
+        // pending configuration and inserts the generated field before the sink
+        // runs. The rollback restores that same writer value and its edit
+        // intent, so retryability is checked through the retained heading/TOC
+        // semantics rather than an impossible byte-identical writer snapshot.
+        assert_ne!(document_after, document_before);
+        assert!(document_after.contains("panic-safe heading"));
+        assert!(document_after.contains("TOC"));
+        assert!(
+            package
+                .mutable_doc
+                .as_ref()
+                .is_some_and(MutableDocument::is_modified)
+        );
+        assert!(package.properties.is_dirty());
+
+        let mut output = Cursor::new(Vec::new());
+        package.to_plain_stream(&mut output).unwrap();
+        let output = output.into_inner();
+        assert!(!output.is_empty());
+        assert!(!package.properties.is_dirty());
+        let reopened = Package::from_opc_package(OpcPackage::from_bytes(&output).unwrap()).unwrap();
+        assert!(
+            reopened
+                .document()
+                .unwrap()
+                .text()
+                .unwrap()
+                .contains("panic-safe heading")
+        );
+        assert_eq!(
+            reopened
+                .document()
+                .unwrap()
+                .table_of_contents_count()
+                .unwrap(),
+            1
+        );
+        assert!(reopened.custom_props().contains("RetryMarker"));
+    }
+
+    #[test]
+    fn unchanged_stream_preserves_exact_bytes_and_part_payload_sharing() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut source = Package::new().unwrap();
+        source
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("unchanged package");
+        source.save(file.path()).unwrap();
+
+        let mut package = Package::open(file.path()).unwrap();
+        let before = litchi_opc::PackageWriter::to_bytes(package.opc_package()).unwrap();
+        let document_uri = PackURI::new("/word/document.xml").unwrap();
+        let core_properties_uri = PackURI::new("/docProps/core.xml").unwrap();
+        let document_before = package.opc.get_part(&document_uri).unwrap().blob_arc();
+        let core_properties_before = package
+            .opc
+            .get_part(&core_properties_uri)
+            .unwrap()
+            .blob_arc();
+
+        let mut output = Cursor::new(Vec::new());
+        package.to_plain_stream(&mut output).unwrap();
+        assert_eq!(output.into_inner(), before);
+        assert!(std::sync::Arc::ptr_eq(
+            &document_before,
+            &package.opc.get_part(&document_uri).unwrap().blob_arc()
+        ));
+        assert!(std::sync::Arc::ptr_eq(
+            &core_properties_before,
+            &package
+                .opc
+                .get_part(&core_properties_uri)
+                .unwrap()
+                .blob_arc()
+        ));
     }
 
     #[cfg(feature = "fonts")]

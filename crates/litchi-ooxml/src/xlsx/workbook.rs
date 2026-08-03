@@ -67,6 +67,7 @@ use litchi_xlsx::chain::{self, Chain, Conformance as ChainConformance};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::web::{Bindings, Refs};
 use std::collections::{HashMap, HashSet};
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::sync::Arc;
 
 use super::parsers::workbook_parser;
@@ -221,6 +222,80 @@ pub struct Workbook {
     /// Encryption profile of the opened outer package.
     #[cfg(feature = "encryption")]
     source_encryption: Option<Mode>,
+}
+
+/// Rollback boundary for the mutable XLSX writer's late save transaction.
+///
+/// The writer mutates an in-memory OPC graph while it materializes worksheet
+/// and workbook state. Keeping the source package here means an error or a
+/// panic in materialization, worksheet staging, metadata publication, or the
+/// caller-owned sink cannot publish a partial candidate. The package clone
+/// retains the OPC parts' immutable `Arc` payloads; it is only created when a
+/// pending mutation makes the transaction necessary.
+struct WriteRollbackGuard<'a> {
+    workbook: &'a mut Workbook,
+    package_before: OpcPackage,
+    reload_caches: bool,
+    worksheet_protection_mutations_before: HashMap<usize, WorksheetProtectionMetadata>,
+    worksheet_data_validation_mutations_before: HashMap<usize, Vec<DataValidationCollection>>,
+    worksheet_web_binding_mutations_before: HashMap<usize, Bindings>,
+    committed: bool,
+}
+
+impl<'a> WriteRollbackGuard<'a> {
+    fn new(workbook: &'a mut Workbook, reload_caches: bool) -> Self {
+        Self {
+            package_before: workbook.package.clone(),
+            worksheet_protection_mutations_before: workbook.worksheet_protection_mutations.clone(),
+            worksheet_data_validation_mutations_before: workbook
+                .worksheet_data_validation_mutations
+                .clone(),
+            worksheet_web_binding_mutations_before: workbook
+                .worksheet_web_binding_mutations
+                .clone(),
+            workbook,
+            reload_caches,
+            committed: false,
+        }
+    }
+
+    fn commit(&mut self) {
+        self.committed = true;
+    }
+
+    fn rollback(&mut self) -> SheetResult<()> {
+        if self.committed {
+            return Ok(());
+        }
+
+        let reload_caches = self.reload_caches;
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            self.workbook.package = self.package_before.clone();
+            self.workbook.worksheet_protection_mutations =
+                self.worksheet_protection_mutations_before.clone();
+            self.workbook.worksheet_data_validation_mutations =
+                self.worksheet_data_validation_mutations_before.clone();
+            self.workbook.worksheet_web_binding_mutations =
+                self.worksheet_web_binding_mutations_before.clone();
+            if reload_caches {
+                self.workbook.reload_read_side_caches()?;
+            }
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+        }));
+        self.committed = true;
+        match result {
+            Ok(result) => result,
+            Err(_) => Err("XLSX rollback panicked".into()),
+        }
+    }
+}
+
+impl Drop for WriteRollbackGuard<'_> {
+    fn drop(&mut self) {
+        if !self.committed {
+            let _ = self.rollback();
+        }
+    }
 }
 
 fn patch_workbook_external_references(
@@ -2455,6 +2530,51 @@ impl Workbook {
         &mut self,
         write: impl FnOnce(&OpcPackage) -> SheetResult<T>,
     ) -> SheetResult<T> {
+        let should_update = self
+            .mutable_data
+            .as_ref()
+            .map(|data| data.is_modified())
+            .unwrap_or(false);
+        let has_worksheet_mutations = !self.worksheet_protection_mutations.is_empty()
+            || !self.worksheet_data_validation_mutations.is_empty()
+            || !self.worksheet_web_binding_mutations.is_empty();
+
+        // Keep the unchanged opened-workbook path entirely direct. Besides
+        // avoiding the structural snapshot, this retains the original Arc
+        // ownership behavior for a read-only save.
+        if !should_update && !self.properties.is_dirty() && !has_worksheet_mutations {
+            return self.write_with_unprotected(write);
+        }
+
+        let mut transaction = WriteRollbackGuard::new(self, should_update);
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            transaction.workbook.write_with_unprotected(write)
+        }));
+        match result {
+            Ok(Ok(value)) => {
+                transaction.commit();
+                Ok(value)
+            },
+            Ok(Err(error)) => {
+                if let Err(rollback_error) = transaction.rollback() {
+                    return Err(format!(
+                        "XLSX save failed ({error}); restoring the source state also failed ({rollback_error})"
+                    )
+                    .into());
+                }
+                Err(error)
+            },
+            Err(payload) => {
+                let _ = transaction.rollback();
+                resume_unwind(payload);
+            },
+        }
+    }
+
+    fn write_with_unprotected<T>(
+        &mut self,
+        write: impl FnOnce(&OpcPackage) -> SheetResult<T>,
+    ) -> SheetResult<T> {
         if self.mutable_data.is_some() && !self.writer_is_fresh {
             return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
                 format: "XLSX",
@@ -2479,134 +2599,144 @@ impl Workbook {
             // malformed companion part or writer output cannot consume the
             // retryable edit state or publish a half-rebuilt package.
             if let Some(mut mutable_data) = self.mutable_data.take() {
-                let materialization = (|| -> SheetResult<()> {
-                    let worksheet_web_bindings = (0..self.worksheets.len())
-                        .filter(|index| self.is_spreadsheetml_worksheet(*index))
-                        .map(|index| {
-                            let bindings = self.worksheet_web_bindings(index)?;
-                            Ok((!bindings.is_empty()
-                                || self.worksheet_web_binding_mutations.contains_key(&index))
-                            .then_some((index, bindings)))
-                        })
-                        .collect::<SheetResult<Vec<_>>>()?
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    materialized_worksheet_web_binding_indexes
-                        .extend(worksheet_web_bindings.iter().map(|(index, _)| *index));
-                    // The mutable writer rebuilds workbook and worksheet relationship
-                    // collections. Detach inert companion parts first so old targets
-                    // do not become orphaned, then restore them after materialization.
-                    let named_sheet_views =
-                        self.detach_named_sheet_views_before_materialization()?;
-                    let active_x_controls = (0..self.worksheets.len())
-                        .filter(|index| self.is_spreadsheetml_worksheet(*index))
-                        .map(|index| {
-                            let info = self
-                                .worksheets
-                                .get(index)
-                                .ok_or("Worksheet index out of bounds")?;
-                            let uri = self.worksheet_part_uri(info)?;
-                            let controls = load_worksheet_active_x(&self.package, &uri)?;
-                            Ok((!controls.controls.is_empty()).then_some((uri, controls)))
-                        })
-                        .collect::<SheetResult<Vec<_>>>()?
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    for (uri, _) in &active_x_controls {
-                        remove_worksheet_active_x(&mut self.package, uri)?;
-                    }
-                    let volatile_dependencies = load_volatile_dependencies(&self.package)?;
-                    let xml_maps = load_xml_maps(&self.package)?;
-                    if self.chain.is_some() {
-                        chain::remove(&mut self.package)?;
-                    }
-                    if volatile_dependencies.is_some() {
-                        remove_volatile_dependencies(&mut self.package)?;
-                    }
-                    if xml_maps.is_some() {
-                        remove_xml_maps(&mut self.package)?;
-                    }
-                    self.update_workbook_parts(&mut mutable_data)?;
-                    self.restore_chain_after_materialization()?;
-                    self.restore_volatile_dependencies_after_materialization(
-                        &volatile_dependencies,
-                    )?;
-                    self.restore_xml_maps_after_materialization(&xml_maps)?;
-                    self.restore_named_sheet_views_after_materialization(&named_sheet_views)?;
-                    for (worksheet_index, (uri, mut controls)) in
-                        active_x_controls.into_iter().enumerate()
-                    {
-                        let mut occupied = self
-                            .package
-                            .get_part(&uri)?
-                            .rels()
-                            .iter()
-                            .map(|relationship| relationship.r_id().to_string())
-                            .collect::<HashSet<_>>();
-                        for (control_index, item) in controls.controls.iter_mut().enumerate() {
-                            item.descriptor_uri = next_active_x_part_uri(
-                                &self.package,
-                                "/xl/activeX",
-                                &format!("litchiControl{worksheet_index}_{control_index}"),
-                                "xml",
-                            )?;
-                            for (binary_index, binary) in item.binaries.iter_mut().enumerate() {
-                                binary.part_uri = next_active_x_part_uri(
+                let materialization = catch_unwind(AssertUnwindSafe(|| {
+                    (|| -> SheetResult<()> {
+                        let worksheet_web_bindings = (0..self.worksheets.len())
+                            .filter(|index| self.is_spreadsheetml_worksheet(*index))
+                            .map(|index| {
+                                let bindings = self.worksheet_web_bindings(index)?;
+                                Ok((!bindings.is_empty()
+                                    || self.worksheet_web_binding_mutations.contains_key(&index))
+                                .then_some((index, bindings)))
+                            })
+                            .collect::<SheetResult<Vec<_>>>()?
+                            .into_iter()
+                            .flatten()
+                            .collect::<Vec<_>>();
+                        materialized_worksheet_web_binding_indexes
+                            .extend(worksheet_web_bindings.iter().map(|(index, _)| *index));
+                        // The mutable writer rebuilds workbook and worksheet relationship
+                        // collections. Detach inert companion parts first so old targets
+                        // do not become orphaned, then restore them after materialization.
+                        let named_sheet_views =
+                            self.detach_named_sheet_views_before_materialization()?;
+                        let active_x_controls = (0..self.worksheets.len())
+                            .filter(|index| self.is_spreadsheetml_worksheet(*index))
+                            .map(|index| {
+                                let info = self
+                                    .worksheets
+                                    .get(index)
+                                    .ok_or("Worksheet index out of bounds")?;
+                                let uri = self.worksheet_part_uri(info)?;
+                                let controls = load_worksheet_active_x(&self.package, &uri)?;
+                                Ok((!controls.controls.is_empty()).then_some((uri, controls)))
+                            })
+                            .collect::<SheetResult<Vec<_>>>()?
+                            .into_iter()
+                            .flatten()
+                            .collect::<Vec<_>>();
+                        for (uri, _) in &active_x_controls {
+                            remove_worksheet_active_x(&mut self.package, uri)?;
+                        }
+                        let volatile_dependencies = load_volatile_dependencies(&self.package)?;
+                        let xml_maps = load_xml_maps(&self.package)?;
+                        if self.chain.is_some() {
+                            chain::remove(&mut self.package)?;
+                        }
+                        if volatile_dependencies.is_some() {
+                            remove_volatile_dependencies(&mut self.package)?;
+                        }
+                        if xml_maps.is_some() {
+                            remove_xml_maps(&mut self.package)?;
+                        }
+                        self.update_workbook_parts(&mut mutable_data)?;
+                        self.restore_chain_after_materialization()?;
+                        self.restore_volatile_dependencies_after_materialization(
+                            &volatile_dependencies,
+                        )?;
+                        self.restore_xml_maps_after_materialization(&xml_maps)?;
+                        self.restore_named_sheet_views_after_materialization(&named_sheet_views)?;
+                        for (worksheet_index, (uri, mut controls)) in
+                            active_x_controls.into_iter().enumerate()
+                        {
+                            let mut occupied = self
+                                .package
+                                .get_part(&uri)?
+                                .rels()
+                                .iter()
+                                .map(|relationship| relationship.r_id().to_string())
+                                .collect::<HashSet<_>>();
+                            for (control_index, item) in controls.controls.iter_mut().enumerate() {
+                                item.descriptor_uri = next_active_x_part_uri(
                                     &self.package,
                                     "/xl/activeX",
-                                    &format!(
-                                        "litchiControl{worksheet_index}_{control_index}Binary{binary_index}"
-                                    ),
-                                    "bin",
+                                    &format!("litchiControl{worksheet_index}_{control_index}"),
+                                    "xml",
                                 )?;
-                            }
-                            item.control.relationship_id =
-                                next_active_x_relationship_id(&mut occupied, control_index, false);
-                            if let Some(preview) = item.preview.as_mut() {
-                                preview.part_uri = next_active_x_part_uri(
-                                    &self.package,
-                                    "/xl/media",
-                                    &format!(
-                                        "litchiControl{worksheet_index}_{control_index}Preview"
-                                    ),
-                                    "img",
-                                )?;
-                                let id = next_active_x_relationship_id(
+                                for (binary_index, binary) in item.binaries.iter_mut().enumerate() {
+                                    binary.part_uri = next_active_x_part_uri(
+                                        &self.package,
+                                        "/xl/activeX",
+                                        &format!(
+                                            "litchiControl{worksheet_index}_{control_index}Binary{binary_index}"
+                                        ),
+                                        "bin",
+                                    )?;
+                                }
+                                item.control.relationship_id = next_active_x_relationship_id(
                                     &mut occupied,
                                     control_index,
-                                    true,
+                                    false,
                                 );
-                                preview.relationship_id = id.clone();
-                                if let Some(properties) = item.control.properties.as_mut() {
-                                    properties.preview_relationship_id = Some(id);
+                                if let Some(preview) = item.preview.as_mut() {
+                                    preview.part_uri = next_active_x_part_uri(
+                                        &self.package,
+                                        "/xl/media",
+                                        &format!(
+                                            "litchiControl{worksheet_index}_{control_index}Preview"
+                                        ),
+                                        "img",
+                                    )?;
+                                    let id = next_active_x_relationship_id(
+                                        &mut occupied,
+                                        control_index,
+                                        true,
+                                    );
+                                    preview.relationship_id = id.clone();
+                                    if let Some(properties) = item.control.properties.as_mut() {
+                                        properties.preview_relationship_id = Some(id);
+                                    }
                                 }
                             }
+                            store_worksheet_active_x(&mut self.package, &uri, &controls)?;
                         }
-                        store_worksheet_active_x(&mut self.package, &uri, &controls)?;
-                    }
-                    self.restore_worksheet_web_bindings_after_materialization(
-                        &mutable_data,
-                        &worksheet_web_bindings,
-                    )?;
+                        self.restore_worksheet_web_bindings_after_materialization(
+                            &mutable_data,
+                            &worksheet_web_bindings,
+                        )?;
 
-                    // Re-sync the read-side model (worksheet relationship IDs,
-                    // defined names, shared strings, styles) with the parts
-                    // just written, so a second save resolves the same state
-                    // as a reopened workbook.
-                    self.load_workbook_info()?;
-                    self.load_shared_strings()?;
-                    self.load_styles()?;
-                    Ok(())
-                })();
+                        // Re-sync the read-side model (worksheet relationship IDs,
+                        // defined names, shared strings, styles) with the parts
+                        // just written, so a second save resolves the same state
+                        // as a reopened workbook.
+                        self.load_workbook_info()?;
+                        self.load_shared_strings()?;
+                        self.load_styles()?;
+                        Ok(())
+                    })()
+                }));
+
+                self.mutable_data = Some(mutable_data);
+                let materialization = match materialization {
+                    Ok(result) => result,
+                    Err(payload) => resume_unwind(payload),
+                };
 
                 if let Err(error) = materialization {
                     let Some(package_before) = package_before_materialization.as_ref() else {
                         return Err("missing XLSX materialization snapshot".into());
                     };
                     self.package = package_before.clone();
-                    self.mutable_data = Some(mutable_data);
                     // Materialization reparses the newly written workbook
                     // before publishing it. If that reparse fails after one
                     // cache was refreshed, rebuild all read-side caches from
@@ -2621,8 +2751,6 @@ impl Workbook {
                     }
                     return Err(error);
                 }
-
-                self.mutable_data = Some(mutable_data);
             }
         }
 
@@ -2693,17 +2821,15 @@ impl Workbook {
             for (uri, original) in originals {
                 self.package.get_part_mut(&uri)?.set_blob_shared(original);
             }
+            for index in &materialized_worksheet_web_binding_indexes {
+                self.worksheet_web_binding_mutations.remove(index);
+            }
             staged_properties.commit();
             Ok(value)
         })();
 
         match result {
-            Ok(value) => {
-                for index in materialized_worksheet_web_binding_indexes {
-                    self.worksheet_web_binding_mutations.remove(&index);
-                }
-                Ok(value)
-            },
+            Ok(value) => Ok(value),
             Err(error) => {
                 self.package = package_before;
                 if should_update && let Err(rollback_error) = self.reload_read_side_caches() {
@@ -4589,6 +4715,7 @@ mod tests {
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part};
     use litchi_xlsx::web::{Binding as SheetBinding, Bindings};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
 
     use crate::xlsx::{
         ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
@@ -4719,6 +4846,78 @@ mod tests {
             .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
             .unwrap();
         assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn materialized_late_unwind_restores_transaction_for_retry() {
+        let mut workbook = Workbook::create().unwrap();
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "retryable unwind");
+        workbook.props_mut().unwrap().title = Some("Retry after unwind".to_owned());
+        workbook
+            .replace_worksheet_protection(0, crate::xlsx::WorksheetProtectionMetadata::default())
+            .unwrap();
+
+        let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        let core_uri = PackURI::new("/docProps/core.xml").unwrap();
+        let worksheet_before = workbook
+            .package
+            .get_part(&worksheet_uri)
+            .unwrap()
+            .blob_arc();
+        let core_before = workbook.package.get_part(&core_uri).unwrap().blob_arc();
+        let worksheet_names_before = workbook.worksheet_names.clone();
+
+        let unwind = catch_unwind(AssertUnwindSafe(|| {
+            let _ = workbook.write_with::<()>(|_| {
+                panic!("injected late-save unwind");
+            });
+        }));
+        assert!(unwind.is_err());
+        assert!(std::sync::Arc::ptr_eq(
+            &worksheet_before,
+            &workbook
+                .package
+                .get_part(&worksheet_uri)
+                .unwrap()
+                .blob_arc()
+        ));
+        assert!(std::sync::Arc::ptr_eq(
+            &core_before,
+            &workbook.package.get_part(&core_uri).unwrap().blob_arc()
+        ));
+        assert_eq!(workbook.worksheet_names, worksheet_names_before);
+        assert!(workbook.worksheet_protection_mutations.contains_key(&0));
+        assert!(
+            workbook
+                .mutable_data
+                .as_ref()
+                .is_some_and(|data| data.is_modified())
+        );
+        assert_eq!(
+            workbook.props().and_then(|props| props.title.as_deref()),
+            Some("Retry after unwind")
+        );
+
+        let output = workbook
+            .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
+            .unwrap();
+        let reopened = Workbook::new(OpcPackage::from_bytes(&output).unwrap()).unwrap();
+        assert_eq!(
+            reopened.props().and_then(|props| props.title.as_deref()),
+            Some("Retry after unwind")
+        );
+        assert_eq!(
+            reopened
+                .worksheet_by_index(0)
+                .unwrap()
+                .cell_value(1, 1)
+                .unwrap()
+                .as_ref(),
+            &CellValue::String("retryable unwind".to_owned())
+        );
     }
 
     #[test]

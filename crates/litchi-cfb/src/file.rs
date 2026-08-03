@@ -84,6 +84,20 @@ fn try_filled_vec<T: Clone>(
     Ok(values)
 }
 
+fn read_u16_le(bytes: &[u8], description: &str) -> Result<u16, OleError> {
+    let bytes: [u8; 2] = bytes
+        .try_into()
+        .map_err(|_| OleError::InvalidFormat(format!("{description} is truncated")))?;
+    Ok(u16::from_le_bytes(bytes))
+}
+
+fn read_u32_le(bytes: &[u8], description: &str) -> Result<u32, OleError> {
+    let bytes: [u8; 4] = bytes
+        .try_into()
+        .map_err(|_| OleError::InvalidFormat(format!("{description} is truncated")))?;
+    Ok(u32::from_le_bytes(bytes))
+}
+
 /// Raw OLE directory entry structure (128 bytes)
 ///
 /// This represents the on-disk format of a directory entry.
@@ -352,42 +366,18 @@ impl<R: Read + Seek> OleFile<R> {
         }
 
         // Parse header fields (little-endian)
-        let dll_version = U16::<LE>::read_from_bytes(&header[0x1A..0x1C])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let byte_order = U16::<LE>::read_from_bytes(&header[0x1C..0x1E])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let sector_shift = U16::<LE>::read_from_bytes(&header[0x1E..0x20])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let mini_sector_shift = U16::<LE>::read_from_bytes(&header[0x20..0x22])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let num_dir_sectors = U32::<LE>::read_from_bytes(&header[0x28..0x2C])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let first_dir_sector = U32::<LE>::read_from_bytes(&header[0x30..0x34])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let num_fat_sectors = U32::<LE>::read_from_bytes(&header[0x2C..0x30])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let mini_stream_cutoff = U32::<LE>::read_from_bytes(&header[0x38..0x3C])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let first_minifat_sector = U32::<LE>::read_from_bytes(&header[0x3C..0x40])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let num_minifat_sectors = U32::<LE>::read_from_bytes(&header[0x40..0x44])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let first_difat_sector = U32::<LE>::read_from_bytes(&header[0x44..0x48])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let num_difat_sectors = U32::<LE>::read_from_bytes(&header[0x48..0x4C])
-            .map(|v| v.get())
-            .unwrap_or(0);
+        let dll_version = read_u16_le(&header[0x1A..0x1C], "DLL version")?;
+        let byte_order = read_u16_le(&header[0x1C..0x1E], "byte order")?;
+        let sector_shift = read_u16_le(&header[0x1E..0x20], "sector shift")?;
+        let mini_sector_shift = read_u16_le(&header[0x20..0x22], "mini sector shift")?;
+        let num_dir_sectors = read_u32_le(&header[0x28..0x2C], "directory sector count")?;
+        let first_dir_sector = read_u32_le(&header[0x30..0x34], "directory start sector")?;
+        let num_fat_sectors = read_u32_le(&header[0x2C..0x30], "FAT sector count")?;
+        let mini_stream_cutoff = read_u32_le(&header[0x38..0x3C], "mini-stream cutoff")?;
+        let first_minifat_sector = read_u32_le(&header[0x3C..0x40], "MiniFAT start sector")?;
+        let num_minifat_sectors = read_u32_le(&header[0x40..0x44], "MiniFAT sector count")?;
+        let first_difat_sector = read_u32_le(&header[0x44..0x48], "DIFAT start sector")?;
+        let num_difat_sectors = read_u32_le(&header[0x48..0x4C], "DIFAT sector count")?;
 
         // Validate byte order (must be little-endian)
         if byte_order != 0xFFFE {
@@ -546,9 +536,7 @@ impl<R: Read + Seek> OleFile<R> {
         let header_fat_count = HEADER_DIFAT_ENTRIES.min(expected_fat_sectors);
         for i in 0..header_fat_count {
             let offset = HEADER_DIFAT_OFFSET + i * 4;
-            let sector = U32::<LE>::read_from_bytes(&header[offset..offset + 4])
-                .map(|v| v.get())
-                .unwrap_or(0);
+            let sector = read_u32_le(&header[offset..offset + 4], "header DIFAT entry")?;
             if sector == FREESECT || sector == ENDOFCHAIN {
                 return Err(OleError::CorruptedFile(
                     "FAT sector list ends before its declared count".to_string(),
@@ -573,9 +561,7 @@ impl<R: Read + Seek> OleFile<R> {
 
             for i in 0..entries_per_sector {
                 let offset = i * 4;
-                let sector = U32::<LE>::read_from_bytes(&sector_data[offset..offset + 4])
-                    .map(|v| v.get())
-                    .unwrap_or(0);
+                let sector = read_u32_le(&sector_data[offset..offset + 4], "DIFAT entry")?;
                 if fat_sectors.len() < expected_fat_sectors {
                     if sector >= MAXREGSECT {
                         return Err(OleError::CorruptedFile(
@@ -592,9 +578,10 @@ impl<R: Read + Seek> OleFile<R> {
             }
 
             let next_offset = entries_per_sector * 4;
-            let next = U32::<LE>::read_from_bytes(&sector_data[next_offset..next_offset + 4])
-                .map(|v| v.get())
-                .unwrap_or(0);
+            let next = read_u32_le(
+                &sector_data[next_offset..next_offset + 4],
+                "DIFAT continuation entry",
+            )?;
             if difat_index + 1 == expected_difat_sectors {
                 if next != ENDOFCHAIN {
                     return Err(OleError::CorruptedFile(
@@ -630,9 +617,7 @@ impl<R: Read + Seek> OleFile<R> {
 
             // Parse sector as array of u32 (little-endian) - use chunks for efficiency
             for chunk in sector_data.chunks_exact(4) {
-                let entry = U32::<LE>::read_from_bytes(chunk)
-                    .map(|v| v.get())
-                    .unwrap_or(0);
+                let entry = read_u32_le(chunk, "FAT entry")?;
                 try_push(&mut fat, entry, "FAT entries")?;
             }
         }
@@ -695,9 +680,8 @@ impl<R: Read + Seek> OleFile<R> {
             .map_err(|source| OleError::allocation("MiniFAT entries", source))?;
 
         for chunk in minifat_data.chunks_exact(4) {
-            let entry = U32::<LE>::read_from_bytes(chunk)
-                .map_err(|_| OleError::InvalidFormat("Failed to read u32".to_string()))?;
-            try_push(&mut minifat, entry.get(), "MiniFAT entries")?;
+            let entry = read_u32_le(chunk, "MiniFAT entry")?;
+            try_push(&mut minifat, entry, "MiniFAT entries")?;
         }
         self.minifat = minifat;
 
@@ -1158,9 +1142,13 @@ impl<R: Read + Seek> OleFile<R> {
             .map_err(|_| OleError::InvalidFormat("Failed to parse directory entry".to_string()))?;
 
         // Decode name from UTF-16LE
-        let name_len = raw.name_len.get() as usize;
-        let name_bytes = &raw.name[0..name_len.saturating_sub(2).min(64)];
-        let name = decode_utf16le(name_bytes);
+        let name_len = usize::from(raw.name_len.get());
+        if !(2..=64).contains(&name_len) || !name_len.is_multiple_of(2) {
+            return Err(OleError::CorruptedFile(format!(
+                "invalid CFB directory name length {name_len} at SID {sid}"
+            )));
+        }
+        let name = decode_utf16le(&raw.name[..name_len - 2])?;
 
         // Format CLSID
         let clsid = format_clsid(&raw.clsid);
@@ -1893,28 +1881,31 @@ fn mask_v3_stream_size(stream_size: u64, sector_size: usize) -> u64 {
 /// Decode UTF-16LE bytes to String (optimized version)
 ///
 /// Pre-allocates the UTF-16 buffer with exact capacity to avoid reallocations.
-fn decode_utf16le(bytes: &[u8]) -> String {
-    // Pre-allocate with exact capacity needed
-    let capacity = bytes.len() / 2;
-    let mut utf16_chars = Vec::with_capacity(capacity);
-
-    for chunk in bytes.chunks_exact(2) {
-        let code_unit = U16::<LE>::read_from_bytes(chunk)
-            .map(|v| v.get())
-            .unwrap_or(0);
-        utf16_chars.push(code_unit);
+fn decode_utf16le(bytes: &[u8]) -> Result<String, OleError> {
+    if !bytes.len().is_multiple_of(2) {
+        return Err(OleError::InvalidFormat(
+            "UTF-16LE directory name has an odd byte length".to_string(),
+        ));
     }
-
-    // Decode UTF-16 to String, replacing invalid sequences
-    // Note: trim_end_matches returns a &str, so we only allocate once
-    let decoded = String::from_utf16_lossy(&utf16_chars);
-
-    // Check if trimming is needed to avoid unnecessary allocation
-    if decoded.ends_with('\0') {
-        decoded.trim_end_matches('\0').to_string()
-    } else {
-        decoded
+    let unit_count = bytes.len() / 2;
+    let capacity = unit_count.checked_mul(4).ok_or_else(|| {
+        OleError::InvalidFormat("UTF-16LE directory name is too large".to_string())
+    })?;
+    let mut decoded = String::new();
+    decoded
+        .try_reserve(capacity)
+        .map_err(|source| OleError::allocation("decoded CFB directory name", source))?;
+    for value in std::char::decode_utf16(
+        bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+    ) {
+        decoded.push(value.unwrap_or('\u{FFFD}'));
     }
+    while decoded.ends_with('\0') {
+        decoded.pop();
+    }
+    Ok(decoded)
 }
 
 /// Format CLSID as a human-readable string (SIMD-optimized version)
@@ -2019,6 +2010,16 @@ mod tests {
         assert!(matches!(
             OleFile::open(Cursor::new(data)),
             Err(OleError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn directory_name_decoder_checks_utf16_extents_without_panicking() {
+        assert_eq!(decode_utf16le(b"A\0\0\0").unwrap(), "A");
+        assert_eq!(decode_utf16le(&[0x00, 0xD8]).unwrap(), "\u{FFFD}");
+        assert!(matches!(
+            decode_utf16le(&[0x41]),
+            Err(OleError::InvalidFormat(message)) if message.contains("odd byte length")
         ));
     }
 
