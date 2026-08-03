@@ -1,7 +1,7 @@
 use prost::Message;
 
 use super::*;
-use crate::archive::RawMessage;
+use crate::archive::{ArchiveObject, MessageInfo, RawMessage};
 use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use crate::pages::PagesEditor;
@@ -4734,4 +4734,92 @@ fn paragraph_style_anchor_rejects_a_stale_message_type_transactionally() {
         .is_err()
     );
     assert_eq!(package.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload() {
+    let mut pages = PagesEditor::create_with_text("Alignment").unwrap();
+    let created = pages
+        .add_text_box(
+            9,
+            "Paragraph style",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    pages
+        .set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)
+        .unwrap();
+    let storage_id = created.storage.object_id;
+    let mut package = pages.into_package();
+    let storage = storage::locate(&package, storage_id).unwrap();
+    let style = native::locate_style(&package, storage.style_id).unwrap();
+    let sibling_data = vec![0x98, 0x06, 0x07];
+    package
+        .update_archive(&style.archive_name, |archive| {
+            let object = archive.object_mut(style.object_id).unwrap();
+            object.messages.insert(
+                style.message_index,
+                RawMessage {
+                    type_: 2_023,
+                    data: sibling_data.clone(),
+                },
+            );
+            object.archive_info.message_infos.insert(
+                style.message_index,
+                MessageInfo::new(
+                    2_023,
+                    u32::try_from(sibling_data.len()).expect("test payload fits u32"),
+                ),
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkTextEditor::from_package(package);
+    editor
+        .set_paragraph_alignment(storage_id, TextAlignment::Right)
+        .unwrap();
+    let package = editor.into_package();
+    let style_after = native::locate_style(&package, storage.style_id).unwrap();
+    assert_eq!(style_after.message_index, style.message_index + 1);
+    let archive = package.archive(&style_after.archive_name).unwrap();
+    let object = archive.object(style_after.object_id).unwrap();
+    assert_eq!(object.messages[style.message_index].data, sibling_data);
+    assert_eq!(
+        object.archive_info.message_infos[style.message_index].type_,
+        2_023
+    );
+
+    let mut stale = package.clone();
+    stale
+        .update_archive(&style_after.archive_name, |archive| {
+            let object = archive.object_mut(style_after.object_id).unwrap();
+            object.replace_message(
+                style_after.message_index,
+                RawMessage {
+                    type_: 99_999,
+                    data: style_after.message.data.clone(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = stale.entry(&style_after.archive_name).unwrap().to_vec();
+    let replacement = ArchiveObject::new(
+        style_after.object_id,
+        vec![RawMessage {
+            type_: style_after.message_type,
+            data: style_after.message.data.clone(),
+        }],
+    )
+    .unwrap();
+    assert!(native::replace_variation(&mut stale, &style_after, replacement).is_err());
+    assert_eq!(
+        stale.entry(&style_after.archive_name).unwrap(),
+        before.as_slice()
+    );
 }

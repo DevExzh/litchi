@@ -986,12 +986,7 @@ fn set_property(
             stylesheet_id(&current_style.style, current_style_id)?,
             overrides,
         )?;
-        replace_variation(
-            &mut staged,
-            &current_style.archive_name,
-            current_style_id,
-            replacement,
-        )?;
+        replace_variation(&mut staged, &current_style, replacement)?;
         verify_property(&staged, table_id, row, column, &value)?;
         *package = staged;
         return Ok(());
@@ -1146,7 +1141,7 @@ fn reset_property(
                 stylesheet_id(&style.style, style_id)?,
                 overrides,
             )?;
-            replace_variation(&mut staged, &style.archive_name, style_id, replacement)?;
+            replace_variation(&mut staged, &style, replacement)?;
         }
         verify_property(&staged, table_id, row, column, &inherited)?;
         *package = staged;

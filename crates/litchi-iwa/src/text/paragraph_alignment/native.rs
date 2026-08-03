@@ -123,7 +123,10 @@ const MAXIMUM_LINE_SPACING_MODE: i32 = 3;
 const BETWEEN_LINE_SPACING_MODE: i32 = 4;
 
 pub(crate) struct ParagraphStyleLocation {
+    pub(crate) object_id: u64,
     pub(crate) archive_name: String,
+    pub(crate) message_index: usize,
+    pub(crate) message_type: u32,
     pub(crate) message: RawMessage,
     pub(crate) style: tswp::ParagraphStyleArchive,
 }
@@ -279,22 +282,35 @@ pub(crate) fn locate_style(
     let payloads = object
         .messages
         .iter()
-        .filter(|message| message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
-        .filter_map(|message| {
-            tswp::ParagraphStyleArchive::decode(message.data.as_slice())
-                .ok()
-                .map(|style| (message.clone(), style))
-        })
+        .enumerate()
+        .filter(|(_, message)| message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
         .collect::<Vec<_>>();
-    let [(message, style)] = payloads.as_slice() else {
+    let [(message_index, message)] = payloads.as_slice() else {
         return Err(Error::InvalidFormat(format!(
             "iWork paragraph style {style_id} must have exactly one paragraph-style payload"
         )));
     };
+    let Some(info) = object.archive_info.message_infos.get(*message_index) else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} payload metadata is missing"
+        )));
+    };
+    let message_length = u32::try_from(message.data.len()).map_err(|_| {
+        Error::InvalidFormat("paragraph style payload exceeds u32 length".to_owned())
+    })?;
+    if info.type_ != message.type_ || info.length != message_length {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} payload metadata does not match its message"
+        )));
+    }
+    let style = tswp::ParagraphStyleArchive::decode(message.data.as_slice())?;
     Ok(ParagraphStyleLocation {
+        object_id: style_id,
         archive_name,
-        message: message.clone(),
-        style: style.clone(),
+        message_index: *message_index,
+        message_type: message.type_,
+        message: (*message).clone(),
+        style,
     })
 }
 
@@ -1278,70 +1294,141 @@ pub(crate) fn variation_object(
 
 pub(crate) fn replace_variation(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
-    mut replacement: ArchiveObject,
+    location: &ParagraphStyleLocation,
+    replacement: ArchiveObject,
 ) -> Result<()> {
-    let has_text_fill_info = replacement.archive_info.message_infos[0]
+    let style_id = location.object_id;
+    if replacement.archive_info.identifier != Some(style_id)
+        || replacement.messages.is_empty()
+        || replacement.archive_info.message_infos.len() != replacement.messages.len()
+    {
+        return Err(Error::InvalidFormat(
+            "replacement paragraph style does not contain an object-aligned payload set".to_owned(),
+        ));
+    }
+    let replacement_index = if replacement.messages.len() == 1 {
+        0
+    } else {
+        location.message_index
+    };
+    let Some(replacement_message) = replacement.messages.get(replacement_index) else {
+        return Err(Error::InvalidFormat(format!(
+            "replacement paragraph style has no payload at anchored index {replacement_index}"
+        )));
+    };
+    let replacement_info = &replacement.archive_info.message_infos[replacement_index];
+    let replacement_length = u32::try_from(replacement_message.data.len()).map_err(|_| {
+        Error::InvalidFormat("replacement paragraph style payload exceeds u32 length".to_owned())
+    })?;
+    if replacement_message.type_ != location.message_type {
+        return Err(Error::InvalidFormat(
+            "replacement paragraph style payload type does not match its anchor".to_owned(),
+        ));
+    }
+    if replacement_info.type_ != location.message_type {
+        return Err(Error::InvalidFormat(
+            "replacement paragraph style metadata type does not match its anchor".to_owned(),
+        ));
+    }
+    if replacement_info.length != replacement_length {
+        return Err(Error::InvalidFormat(
+            "replacement paragraph style metadata length does not match its payload".to_owned(),
+        ));
+    }
+    let has_text_fill_info = replacement_info
         .field_infos
         .iter()
         .any(is_text_fill_field_info);
-    let has_text_stroke_info = replacement.archive_info.message_infos[0]
+    let has_text_stroke_info = replacement_info
         .field_infos
         .iter()
         .any(is_text_stroke_field_info);
-    let has_text_shadow_info = replacement.archive_info.message_infos[0]
+    let has_text_shadow_info = replacement_info
         .field_infos
         .iter()
         .any(is_text_shadow_field_info);
-    let has_text_background_info = replacement.archive_info.message_infos[0]
+    let has_text_background_info = replacement_info
         .field_infos
         .iter()
         .any(is_text_background_field_info);
-    let message = replacement.messages.pop().ok_or_else(|| {
-        Error::InvalidFormat("replacement paragraph style has no payload".to_owned())
-    })?;
-    if !replacement.messages.is_empty() {
-        return Err(Error::InvalidFormat(
-            "replacement paragraph style has multiple payloads".to_owned(),
-        ));
-    }
-    package.update_archive(archive_name, |archive| {
+    let message = replacement_message.clone();
+    package.update_archive(&location.archive_name, |archive| {
         let object = archive.object_mut(style_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork paragraph style {style_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, candidate)| candidate.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+        if object.archive_info.identifier != Some(style_id) {
             return Err(Error::InvalidFormat(format!(
-                "iWork paragraph style {style_id} must have exactly one payload"
+                "iWork paragraph style {style_id} object identity changed unexpectedly"
+            )));
+        }
+        if object.messages.get(location.message_index).is_none() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {style_id} anchored payload index {} is missing",
+                location.message_index
+            )));
+        }
+        if object.messages[location.message_index].type_ != location.message_type {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {style_id} anchored payload type changed unexpectedly"
+            )));
+        }
+        if object.messages[location.message_index].data != location.message.data {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {style_id} anchored payload changed unexpectedly"
+            )));
+        }
+        let current_length = u32::try_from(object.messages[location.message_index].data.len())
+            .map_err(|_| {
+                Error::InvalidFormat(
+                    "anchored paragraph style payload exceeds u32 length".to_owned(),
+                )
+            })?;
+        let Some(info) = object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+        else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {style_id} anchored metadata index {} is missing",
+                location.message_index
             )));
         };
-        object.replace_message(*index, message)?;
-        let info = &mut object.archive_info.message_infos[*index];
-        info.field_infos.retain(|field| {
-            !is_text_fill_field_info(field)
-                && !is_text_stroke_field_info(field)
-                && !is_text_shadow_field_info(field)
-                && !is_text_background_field_info(field)
-        });
-        if has_text_fill_info {
-            info.field_infos.push(text_fill_field_info());
+        if info.type_ != location.message_type {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {style_id} anchored metadata type changed unexpectedly"
+            )));
         }
-        if has_text_stroke_info {
-            info.field_infos.push(text_stroke_field_info());
+        if info.length != current_length {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {style_id} anchored metadata length changed unexpectedly"
+            )));
         }
-        if has_text_shadow_info {
-            info.field_infos.push(text_shadow_field_info());
-        }
-        if has_text_background_info {
-            info.field_infos.push(text_background_field_info());
-        }
+        object.replace_message(location.message_index, message)?;
+        let info = &mut object.archive_info.message_infos[location.message_index];
+        sync_managed_field_info(
+            &mut info.field_infos,
+            has_text_fill_info,
+            is_text_fill_field_info,
+            text_fill_field_info,
+        );
+        sync_managed_field_info(
+            &mut info.field_infos,
+            has_text_stroke_info,
+            is_text_stroke_field_info,
+            text_stroke_field_info,
+        );
+        sync_managed_field_info(
+            &mut info.field_infos,
+            has_text_shadow_info,
+            is_text_shadow_field_info,
+            text_shadow_field_info,
+        );
+        sync_managed_field_info(
+            &mut info.field_infos,
+            has_text_background_info,
+            is_text_background_field_info,
+            text_background_field_info,
+        );
         Ok(())
     })
 }
@@ -1364,20 +1451,26 @@ pub(crate) fn redefine_named_style(
     let mut replacement = ArchiveObject::new(style_id, source.messages.clone())?;
     replacement.archive_info.message_infos = source.archive_info.message_infos.clone();
     replacement.archive_info.should_merge = source.archive_info.should_merge;
-    let indexes = replacement
+    let message_index = location.message_index;
+    if replacement
         .messages
-        .iter()
-        .enumerate()
-        .filter_map(|(index, message)| {
-            (message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE).then_some(index)
-        })
-        .collect::<Vec<_>>();
-    let [message_index] = indexes.as_slice() else {
+        .get(message_index)
+        .is_none_or(|message| message.type_ != location.message_type)
+    {
         return Err(Error::InvalidFormat(format!(
-            "iWork paragraph style {style_id} must have exactly one payload"
+            "iWork paragraph style {style_id} anchored payload changed unexpectedly"
         )));
-    };
-    let message_index = *message_index;
+    }
+    if replacement
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .is_none_or(|info| info.type_ != location.message_type)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} anchored metadata changed unexpectedly"
+        )));
+    }
     let old_following = location
         .style
         .para_properties
@@ -1424,40 +1517,42 @@ pub(crate) fn redefine_named_style(
     {
         info.object_references.push(new_following);
     }
-    info.field_infos.retain(|field| {
-        !is_text_fill_field_info(field)
-            && !is_text_stroke_field_info(field)
-            && !is_text_shadow_field_info(field)
-            && !is_text_background_field_info(field)
-    });
-    if decoded
-        .char_properties
-        .as_ref()
-        .is_some_and(|properties| properties.tsd_fill.is_some())
-    {
-        info.field_infos.push(text_fill_field_info());
-    }
-    if decoded
-        .char_properties
-        .as_ref()
-        .is_some_and(|properties| properties.tsd_stroke.is_some())
-    {
-        info.field_infos.push(text_stroke_field_info());
-    }
-    if decoded
-        .char_properties
-        .as_ref()
-        .is_some_and(|properties| properties.shadow.is_some())
-    {
-        info.field_infos.push(text_shadow_field_info());
-    }
-    if decoded
-        .char_properties
-        .as_ref()
-        .is_some_and(|properties| properties.background_color.is_some())
-    {
-        info.field_infos.push(text_background_field_info());
-    }
+    sync_managed_field_info(
+        &mut info.field_infos,
+        decoded
+            .char_properties
+            .as_ref()
+            .is_some_and(|properties| properties.tsd_fill.is_some()),
+        is_text_fill_field_info,
+        text_fill_field_info,
+    );
+    sync_managed_field_info(
+        &mut info.field_infos,
+        decoded
+            .char_properties
+            .as_ref()
+            .is_some_and(|properties| properties.tsd_stroke.is_some()),
+        is_text_stroke_field_info,
+        text_stroke_field_info,
+    );
+    sync_managed_field_info(
+        &mut info.field_infos,
+        decoded
+            .char_properties
+            .as_ref()
+            .is_some_and(|properties| properties.shadow.is_some()),
+        is_text_shadow_field_info,
+        text_shadow_field_info,
+    );
+    sync_managed_field_info(
+        &mut info.field_infos,
+        decoded
+            .char_properties
+            .as_ref()
+            .is_some_and(|properties| properties.background_color.is_some()),
+        is_text_background_field_info,
+        text_background_field_info,
+    );
     replacement.replace_message(
         message_index,
         RawMessage {
@@ -1465,7 +1560,7 @@ pub(crate) fn redefine_named_style(
             data,
         },
     )?;
-    replace_variation(package, &location.archive_name, style_id, replacement)
+    replace_variation(package, &location, replacement)
 }
 
 fn known_property_count(data: &[u8]) -> Result<u32> {
@@ -2045,6 +2140,21 @@ fn is_text_background_field_info(field: &tsp::FieldInfo) -> bool {
             STYLE_CHARACTER_PROPERTIES_FIELD,
             CHARACTER_BACKGROUND_COLOR_FIELD,
         ]
+}
+
+fn sync_managed_field_info(
+    field_infos: &mut Vec<tsp::FieldInfo>,
+    present: bool,
+    is_managed: fn(&tsp::FieldInfo) -> bool,
+    canonical: fn() -> tsp::FieldInfo,
+) {
+    if present {
+        if !field_infos.iter().any(is_managed) {
+            field_infos.push(canonical());
+        }
+    } else {
+        field_infos.retain(|field| !is_managed(field));
+    }
 }
 
 pub(in crate::text) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {

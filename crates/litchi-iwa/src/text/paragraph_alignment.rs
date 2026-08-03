@@ -848,12 +848,7 @@ fn set_property(
         let replacement =
             native::variation_object(storage.style_id, parent_style_id, stylesheet_id, overrides)?;
         let mut staged = package.clone();
-        native::replace_variation(
-            &mut staged,
-            &style.archive_name,
-            storage.style_id,
-            replacement,
-        )?;
+        native::replace_variation(&mut staged, &style, replacement)?;
         validate_property(&staged, storage_id, property)?;
         *package = staged;
         return Ok(());
@@ -925,12 +920,7 @@ fn reset_property(
     } else {
         let replacement =
             native::variation_object(storage.style_id, parent_style_id, stylesheet_id, overrides)?;
-        native::replace_variation(
-            &mut staged,
-            &style.archive_name,
-            storage.style_id,
-            replacement,
-        )?;
+        native::replace_variation(&mut staged, &style, replacement)?;
     }
     validate_expected_property(&staged, storage_id, expected)?;
     *package = staged;
