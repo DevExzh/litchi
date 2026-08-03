@@ -11,7 +11,10 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::super::drop_cap::ParagraphStart;
-use super::super::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
+use super::super::storage_wire::{
+    LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
+    locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
+};
 use super::types::{ParagraphListLevel, ParagraphListLevelPlacement};
 
 const PARAGRAPH_DATA_TABLE_FIELD: u32 = 6;
@@ -78,9 +81,9 @@ pub(in crate::text) fn set_paragraph_list_level(
     if paragraph_list_level(package, storage_id, paragraph)? == level {
         return Ok(());
     }
-    let location = locate_storage(package, storage_id)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
     let mut staged = package.clone();
-    patch_level(&mut staged, location, storage_id, paragraph, level)?;
+    patch_level(&mut staged, located, storage_id, paragraph, level)?;
     if paragraph_list_level(&staged, storage_id, paragraph)? != level {
         return Err(Error::InvalidFormat(
             "iWork paragraph list-level update failed validation".to_owned(),
@@ -104,35 +107,47 @@ pub(in crate::text) fn reset_paragraph_list_level(
 
 fn patch_level(
     package: &mut IWorkPackage,
-    location: StorageLocation,
+    located: LocatedStorage,
     storage_id: u64,
     paragraph: ParagraphStart,
     level: ParagraphListLevel,
 ) -> Result<()> {
-    let StorageLocation {
-        archive_name,
-        message_index,
-        message_type,
-        storage,
-        ..
-    } = location;
-    package.update_archive(&archive_name, |archive| {
+    let LocatedStorage { location, archive } = located;
+    update_parsed_archive(package, &location.archive_name, archive, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        let original = object.messages.get(message_index).ok_or_else(|| {
+        if object.archive_info.identifier != Some(location.object_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} object identity changed unexpectedly"
+            )));
+        }
+        if object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+            .is_none()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} writable payload metadata index {} is missing",
+                location.message_index
+            )));
+        }
+        let original = object.messages.get(location.message_index).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} writable payload index {message_index} is missing"
+                "iWork text storage {storage_id} writable payload index {} is missing",
+                location.message_index
             ))
         })?;
-        if original.type_ != message_type {
+        if original.type_ != location.message_type {
             return Err(Error::InvalidFormat(format!(
                 "iWork text storage {storage_id} writable payload changed unexpectedly"
             )));
         }
-        let starts = paragraph_starts(&storage.text)?;
+        let starts = paragraph_starts(&location.storage.text)?;
         require_paragraph_start(storage_id, paragraph, &starts)?;
-        let decoded = storage
+        let decoded = location
+            .storage
             .table_para_data
             .as_ref()
             .map(|table| table.entries.as_slice())
@@ -144,9 +159,9 @@ fn patch_level(
             |table| patch_table(table, storage_id, paragraph, level, &starts),
         )?;
         object.replace_message(
-            message_index,
+            location.message_index,
             RawMessage {
-                type_: message_type,
+                type_: location.message_type,
                 data,
             },
         )?;
@@ -253,6 +268,26 @@ fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLoca
         )));
     }
     Ok(location)
+}
+
+fn locate_storage_with_archive(package: &IWorkPackage, storage_id: u64) -> Result<LocatedStorage> {
+    let located = locate_native_storage_with_archive(
+        package,
+        storage_id,
+        PARAGRAPH_DATA_TABLE_FIELD,
+        "paragraph-data",
+    )?;
+    if located.location.storage.table_para_data.is_some() != located.location.table_present {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} paragraph-data table wire state is inconsistent"
+        )));
+    }
+    if !located.location.table_present {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} must contain one paragraph-data table, found 0"
+        )));
+    }
+    Ok(located)
 }
 
 fn validate_entries(

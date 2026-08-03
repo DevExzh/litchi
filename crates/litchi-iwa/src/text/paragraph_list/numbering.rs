@@ -11,7 +11,10 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
+use super::super::storage_wire::{
+    LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
+    locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
+};
 use super::levels::{paragraph_starts, require_paragraph_start};
 use super::paragraph_lists;
 use super::types::{ParagraphList, ParagraphListNumbering};
@@ -55,9 +58,9 @@ pub(in crate::text) fn set_paragraph_list_numbering(
     if matches!(numbering, ParagraphListNumbering::StartAt(_)) {
         require_numbered_paragraph(package, storage_id, paragraph)?;
     }
-    let location = locate_storage(package, storage_id)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
     let mut staged = package.clone();
-    patch_numbering(&mut staged, location, storage_id, paragraph, numbering)?;
+    patch_numbering(&mut staged, located, storage_id, paragraph, numbering)?;
     if paragraph_list_numbering(&staged, storage_id, paragraph)? != numbering {
         return Err(Error::InvalidFormat(
             "iWork paragraph list-numbering update failed validation".to_owned(),
@@ -94,33 +97,44 @@ fn require_numbered_paragraph(
 
 fn patch_numbering(
     package: &mut IWorkPackage,
-    location: StorageLocation,
+    located: LocatedStorage,
     storage_id: u64,
     paragraph: ParagraphStart,
     numbering: ParagraphListNumbering,
 ) -> Result<()> {
-    let StorageLocation {
-        archive_name,
-        message_index,
-        message_type,
-        storage,
-        ..
-    } = location;
-    package.update_archive(&archive_name, |archive| {
+    let LocatedStorage { location, archive } = located;
+    update_parsed_archive(package, &location.archive_name, archive, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        let original = object.messages.get(message_index).ok_or_else(|| {
+        if object.archive_info.identifier != Some(location.object_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} object identity changed unexpectedly"
+            )));
+        }
+        if object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+            .is_none()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} writable payload metadata index {} is missing",
+                location.message_index
+            )));
+        }
+        let original = object.messages.get(location.message_index).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} writable payload index {message_index} is missing"
+                "iWork text storage {storage_id} writable payload index {} is missing",
+                location.message_index
             ))
         })?;
-        if original.type_ != message_type {
+        if original.type_ != location.message_type {
             return Err(Error::InvalidFormat(format!(
                 "iWork text storage {storage_id} writable payload changed unexpectedly"
             )));
         }
-        let starts = paragraph_starts(&storage.text)?;
+        let starts = paragraph_starts(&location.storage.text)?;
         require_paragraph_start(storage_id, paragraph, &starts)?;
         let table_count =
             repeated_length_delimited_payloads(&original.data, PARAGRAPH_START_TABLE_FIELD)?.len();
@@ -129,7 +143,7 @@ fn patch_numbering(
                 "iWork text storage {storage_id} contains duplicate paragraph-start tables"
             )));
         }
-        if let Some(table) = storage.table_para_starts.as_ref() {
+        if let Some(table) = location.storage.table_para_starts.as_ref() {
             validate_entries(storage_id, &table.entries, &starts)?;
         }
         let data = if table_count == 1 {
@@ -148,9 +162,9 @@ fn patch_numbering(
             )?
         };
         object.replace_message(
-            message_index,
+            location.message_index,
             RawMessage {
-                type_: message_type,
+                type_: location.message_type,
                 data,
             },
         )?;
@@ -272,6 +286,21 @@ fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLoca
         PARAGRAPH_START_TABLE_FIELD,
         "paragraph-start",
     )
+}
+
+fn locate_storage_with_archive(package: &IWorkPackage, storage_id: u64) -> Result<LocatedStorage> {
+    let located = locate_native_storage_with_archive(
+        package,
+        storage_id,
+        PARAGRAPH_START_TABLE_FIELD,
+        "paragraph-start",
+    )?;
+    if located.location.storage.table_para_starts.is_some() != located.location.table_present {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} paragraph-start table wire state is inconsistent"
+        )));
+    }
+    Ok(located)
 }
 
 fn validate_entries(
