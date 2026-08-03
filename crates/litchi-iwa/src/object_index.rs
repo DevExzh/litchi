@@ -52,14 +52,14 @@ impl ObjectIndexEntry {
 #[derive(Debug, Clone)]
 pub struct ObjectIndex {
     /// Map from object ID to index entry
-    entries: Arc<HashMap<u64, ObjectIndexEntry>>,
+    entries: Arc<HashMap<ObjectId, ObjectIndexEntry>>,
     /// Object identities in deterministic numeric order.
     ///
     /// Keeping this compact order catalog beside the hash map lets readers
     /// traverse entries without allocating and sorting a temporary vector.
     ordered_ids: Arc<Vec<ObjectId>>,
     /// Map from fragment name to list of object IDs
-    fragment_objects: Arc<HashMap<String, Vec<u64>>>,
+    fragment_objects: Arc<HashMap<String, Vec<ObjectId>>>,
     /// Reference graph tracking object dependencies
     reference_graph: ReferenceGraph,
 }
@@ -119,7 +119,7 @@ impl ObjectIndex {
                 ))
             })?;
 
-            if let Some(existing) = self.entries.get(&identifier) {
+            if let Some(existing) = self.entries.get(&object_id) {
                 return Err(Error::Archive(format!(
                     "object {identifier} occurs in archives {} and {archive_name}",
                     existing.fragment_name
@@ -140,12 +140,12 @@ impl ObjectIndex {
                 object_type,
             };
 
-            Arc::make_mut(&mut self.entries).insert(identifier, entry);
+            Arc::make_mut(&mut self.entries).insert(object_id, entry);
             Arc::make_mut(&mut self.ordered_ids).push(object_id);
             Arc::make_mut(&mut self.fragment_objects)
                 .entry(archive_name.to_string())
                 .or_default()
-                .push(identifier);
+                .push(object_id);
 
             // MessageInfo is the authoritative, application-independent
             // reference index emitted by iWork for every payload.
@@ -174,26 +174,26 @@ impl ObjectIndex {
     /// Get an object entry by ID
     #[deprecated(note = "use entry(ObjectId) for checked identity semantics")]
     pub fn get_entry(&self, id: u64) -> Option<&ObjectIndexEntry> {
-        self.entries.get(&id)
+        ObjectId::new(id).and_then(|object_id| self.entries.get(&object_id))
     }
 
     /// Get an object entry through the validated identity API.
     pub fn entry(&self, object_id: ObjectId) -> Option<&ObjectIndexEntry> {
-        self.entries.get(&object_id.get())
+        self.entries.get(&object_id)
     }
 
     /// Get all objects in a specific fragment
     #[deprecated(note = "use fragment_object_ids for checked identity semantics")]
-    pub fn get_fragment_objects(&self, fragment_name: &str) -> Option<&Vec<u64>> {
-        self.fragment_objects.get(fragment_name)
+    pub fn get_fragment_objects(&self, fragment_name: &str) -> Option<Vec<u64>> {
+        self.fragment_objects
+            .get(fragment_name)
+            .map(|ids| ids.iter().map(|object_id| object_id.get()).collect())
     }
 
     /// Get all object IDs in deterministic numeric order.
     #[deprecated(note = "use object_ids for checked identity semantics")]
     pub fn all_object_ids(&self) -> Vec<u64> {
-        let mut object_ids: Vec<_> = self.entries.keys().copied().collect();
-        object_ids.sort_unstable();
-        object_ids
+        self.iter_object_ids().map(ObjectId::get).collect()
     }
 
     /// Borrow all validated object identities in deterministic numeric order.
@@ -214,29 +214,19 @@ impl ObjectIndex {
         self.iter_object_ids().collect()
     }
 
-    /// Get typed object identities for one fragment in source order.
-    pub fn fragment_object_ids(&self, fragment_name: &str) -> Result<Option<Vec<ObjectId>>> {
-        self.fragment_objects
-            .get(fragment_name)
-            .map(|ids| {
-                ids.iter()
-                    .copied()
-                    .map(ObjectId::try_from)
-                    .collect::<std::result::Result<Vec<_>, _>>()
-                    .map_err(|_| {
-                        Error::Archive(format!(
-                            "fragment {fragment_name} contains a null object identifier"
-                        ))
-                    })
-            })
-            .transpose()
+    /// Borrow typed object identities for one fragment in source order.
+    ///
+    /// The identities are validated while the index is built, so this view
+    /// performs no allocation or repeated wire-boundary conversion.
+    pub fn fragment_object_ids(&self, fragment_name: &str) -> Option<&[ObjectId]> {
+        self.fragment_objects.get(fragment_name).map(Vec::as_slice)
     }
 
     /// Borrow all entries in deterministic numeric object-ID order.
     pub fn iter_entries(&self) -> impl Iterator<Item = &ObjectIndexEntry> {
         self.ordered_ids
             .iter()
-            .filter_map(|object_id| self.entries.get(&object_id.get()))
+            .filter_map(|object_id| self.entries.get(object_id))
     }
 
     /// Get entries of one type in deterministic numeric object-ID order.
@@ -718,7 +708,7 @@ impl ObjectIndex {
 
     /// Check for an indexed object through the validated identity API.
     pub fn contains(&self, object_id: ObjectId) -> bool {
-        self.entries.contains_key(&object_id.get())
+        self.entries.contains_key(&object_id)
     }
 
     /// Get the total number of indexed objects
@@ -1100,10 +1090,14 @@ mod tests {
         assert_eq!(index.object_ids(), vec![source]);
         assert_eq!(index.iter_object_ids().collect::<Vec<_>>(), vec![source]);
         assert_eq!(
-            index.fragment_object_ids("Index/Test.iwa").unwrap(),
-            Some(vec![source])
+            index.fragment_object_ids("Index/Test.iwa"),
+            Some([source].as_slice())
         );
-        assert_eq!(index.fragment_object_ids("missing.iwa").unwrap(), None);
+        assert_eq!(
+            index.get_fragment_objects("Index/Test.iwa"),
+            Some(vec![source.get()])
+        );
+        assert_eq!(index.fragment_object_ids("missing.iwa"), None);
         assert_eq!(
             index.dependencies(source).unwrap().collect::<Vec<_>>(),
             vec![target, ObjectId::try_from(30).unwrap()]
