@@ -66,8 +66,15 @@ impl ObjectIndex {
     pub fn from_bundle(bundle: &Bundle) -> Result<Self> {
         let mut index = Self::new();
 
-        // Parse all archives to build the index
-        for (archive_name, archive) in bundle.archives() {
+        // Parse archives by name so fragment and reverse-reference order does
+        // not depend on the backing HashMap's randomized iteration order.
+        let mut archive_names: Vec<_> =
+            bundle.archives().keys().map(|name| name.as_str()).collect();
+        archive_names.sort_unstable();
+        for archive_name in archive_names {
+            let archive = bundle.get_archive(archive_name).ok_or_else(|| {
+                Error::Bundle(format!("bundle archive disappeared: {archive_name}"))
+            })?;
             index.parse_archive(archive_name, archive)?;
         }
 
@@ -1486,6 +1493,57 @@ mod tests {
                 .map(|object| object.id)
                 .collect::<Vec<_>>(),
             vec![2, 1]
+        );
+    }
+
+    #[test]
+    fn bundle_index_builds_reverse_references_in_archive_name_order() {
+        let mut first = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 41,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        first.archive_info.message_infos[0].object_references = vec![3];
+        let mut second = ArchiveObject::new(
+            2,
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        second.archive_info.message_infos[0].object_references = vec![3];
+
+        let mut package = crate::IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/Z.iwa",
+                &Archive {
+                    objects: vec![second],
+                },
+            )
+            .unwrap();
+        package
+            .replace_archive(
+                "Index/A.iwa",
+                &Archive {
+                    objects: vec![first],
+                },
+            )
+            .unwrap();
+        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let index = ObjectIndex::from_bundle(&bundle).unwrap();
+
+        let target = ObjectId::try_from(3).unwrap();
+        assert_eq!(
+            index.dependents(target).unwrap().collect::<Vec<_>>(),
+            vec![
+                ObjectId::try_from(1).unwrap(),
+                ObjectId::try_from(2).unwrap()
+            ]
         );
     }
 
