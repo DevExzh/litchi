@@ -111,7 +111,10 @@ use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
 use super::position::{TextPosition, TextRange};
-use super::storage_wire::{locate_text_storage, locate_text_storages};
+use super::storage_wire::{
+    locate_text_storage, locate_text_storage_with_archive, locate_text_storages,
+    update_parsed_archive,
+};
 use super::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
     ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
@@ -2212,13 +2215,15 @@ pub(super) fn replace_storage_text(
     range: Range<usize>,
     replacement: &str,
 ) -> Result<()> {
-    let location = locate_text_storage(package, object_id)?;
+    let located = locate_text_storage_with_archive(package, object_id)?;
+    let location = located.location;
+    let archive = located.archive;
     let archive_name = location.archive_name;
     let message_index = location.message_index;
     let message_type = location.message_type;
     let mut storage = location.storage;
     let mut removed_references = std::collections::HashSet::new();
-    package.update_archive(&archive_name, |archive| {
+    update_parsed_archive(package, &archive_name, archive, |archive| {
         let object = archive.object_mut(object_id).ok_or_else(|| {
             Error::ParseError(format!("Text storage object {object_id} not found"))
         })?;

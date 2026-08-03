@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use prost::Message;
 
-use crate::archive::RawMessage;
+use crate::archive::{Archive, RawMessage};
 use crate::protobuf::tswp::StorageArchive;
 use crate::wire::repeated_length_delimited_payloads;
 use crate::{Error, IWorkPackage, Result};
@@ -20,6 +20,14 @@ pub(super) struct StorageLocation {
     pub table_present: bool,
 }
 
+/// A validated storage location together with the archive parsed during
+/// discovery. The archive is intentionally operation-scoped; callers must
+/// publish it through [`update_parsed_archive`] after their staged mutation.
+pub(super) struct LocatedStorage {
+    pub location: StorageLocation,
+    pub archive: Archive,
+}
+
 /// Locate one writable storage and validate one optional singular table field.
 pub(super) fn locate_storage(
     package: &IWorkPackage,
@@ -27,6 +35,17 @@ pub(super) fn locate_storage(
     table_field: u32,
     table_label: &str,
 ) -> Result<StorageLocation> {
+    locate_storage_with_archive(package, storage_id, table_field, table_label)
+        .map(|located| located.location)
+}
+
+/// Locate one writable storage and retain its already-parsed archive.
+pub(super) fn locate_storage_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+    table_field: u32,
+    table_label: &str,
+) -> Result<LocatedStorage> {
     locate_storage_in_package(package, storage_id, Some((table_field, table_label)))
 }
 
@@ -35,6 +54,14 @@ pub(super) fn locate_text_storage(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<StorageLocation> {
+    locate_text_storage_with_archive(package, storage_id).map(|located| located.location)
+}
+
+/// Locate one writable text storage and retain its already-parsed archive.
+pub(super) fn locate_text_storage_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<LocatedStorage> {
     locate_storage_in_package(package, storage_id, None)
 }
 
@@ -68,7 +95,7 @@ fn locate_storage_in_package(
     package: &IWorkPackage,
     storage_id: u64,
     table: Option<(u32, &str)>,
-) -> Result<StorageLocation> {
+) -> Result<LocatedStorage> {
     let mut found = None;
     let mut object_found = false;
     for archive_name in package.iwa_entry_names() {
@@ -92,9 +119,26 @@ fn locate_storage_in_package(
                 "iWork text storage {storage_id} occurs in multiple archives"
             )));
         }
-        found = Some(location);
+        found = Some(LocatedStorage { location, archive });
     }
     found.ok_or_else(|| Error::InvalidFormat(format!("iWork text storage {storage_id} is missing")))
+}
+
+/// Apply a validated staged archive edit without parsing the target component
+/// a second time.
+pub(super) fn update_parsed_archive<F>(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    mut archive: Archive,
+    update: F,
+) -> Result<()>
+where
+    F: FnOnce(&mut Archive) -> Result<()>,
+{
+    update(&mut archive)?;
+    archive.validate()?;
+    package.replace_archive(archive_name, &archive)?;
+    Ok(())
 }
 
 fn resolve_object_storage(
@@ -294,5 +338,60 @@ mod tests {
             .unwrap();
 
         assert!(locate_text_storages(&package).unwrap().is_empty());
+    }
+
+    #[test]
+    fn located_storage_retains_the_matching_parsed_archive() {
+        let object = ArchiveObject::new(
+            44,
+            vec![RawMessage {
+                type_: 2_001,
+                data: crate::protobuf::tswp::StorageArchive {
+                    text: vec!["Hello".to_owned()],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            }],
+        )
+        .unwrap();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/One.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        let located = locate_text_storage_with_archive(&package, 44).unwrap();
+
+        assert_eq!(located.location.archive_name, "Index/One.iwa");
+        assert_eq!(located.location.object_id, 44);
+        assert!(located.archive.object(44).is_some());
+    }
+
+    #[test]
+    fn located_storage_still_validates_later_archives() {
+        let object = ArchiveObject::new(
+            45,
+            vec![RawMessage {
+                type_: 2_001,
+                data: crate::protobuf::tswp::StorageArchive::default().encode_to_vec(),
+            }],
+        )
+        .unwrap();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/One.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+        package.insert_entry("Index/Z-Broken.iwa", vec![0]).unwrap();
+
+        assert!(locate_text_storage_with_archive(&package, 45).is_err());
     }
 }
