@@ -102,7 +102,7 @@ rayon = "1.11" # Data parallelism library for parallel iterators and work-steali
 roaring = "0" # Compressed bitmap data structure for efficient set operations
 ryu = "1.0" # Fast float-to-string conversion with minimal allocations
 serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
-serde-saphyr = "0" # YAML serialization support
+serde-saphyr = "1" # YAML serialization support
 sha2 = "0.11" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 soapberry-zip = { workspace = true, optional = true } # High-performance ZIP archive handling for modern Office formats (gated by ooxml/iwa/odf features)

@@ -62,7 +62,7 @@ roaring       = "0"
 rowan         = "0.16"
 ryu           = "1.0"
 serde         = { version = "1", features = ["derive"] }
-serde-saphyr  = "0"
+serde-saphyr  = "1"
 sha1          = "0.11"
 sha2          = "0.11"
 smallvec      = "1.15"
