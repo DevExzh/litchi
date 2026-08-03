@@ -50,39 +50,41 @@ pub(super) fn apply_named_paragraph_style(
     storage_id: u64,
     target: ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
-    let storage = storage::locate(package, storage_id)?;
-    let target_style = selectable_style(package, storage.style_id, target)?;
-    let current = resolve_applied_style(package, storage.style_id)?;
+    let storage = storage::locate_with_archive(package, storage_id)?;
+    let style_id = storage.location.style_id;
+    let storage_archive_name = storage.location.wire.archive_name.clone();
+    let target_style = selectable_style(package, style_id, target)?;
+    let current = resolve_applied_style(package, style_id)?;
     if current.style.id() == target && !current.has_overrides {
         return Ok(target_style);
     }
 
-    let current_location = native::locate_style(package, storage.style_id)?;
-    let current_is_named = current.style.id().get() == storage.style_id;
+    let current_location = native::locate_style(package, style_id)?;
+    let current_is_named = current.style.id().get() == style_id;
     let target_location = native::locate_style(package, target.get())?;
     let mut staged = package.clone();
-    storage::patch_style_reference(&mut staged, &storage, storage.style_id, target.get())?;
+    storage::patch_style_reference_with_archive(&mut staged, storage, style_id, target.get())?;
 
-    if !current_is_named && native::is_exclusive(package, storage.style_id)? {
+    if !current_is_named && native::is_exclusive(package, style_id)? {
         remove_exclusive_variation(
             &mut staged,
-            &storage.wire.archive_name,
-            storage.style_id,
+            &storage_archive_name,
+            style_id,
             current.style.id(),
             target,
         )?;
     } else {
         register_style_reference(
             &mut staged,
-            &storage.wire.archive_name,
+            &storage_archive_name,
             &target_location.archive_name,
             target.get(),
         )?;
         unregister_owner_reference_if_unused(
             &mut staged,
-            &storage.wire.archive_name,
+            &storage_archive_name,
             &current_location.archive_name,
-            storage.style_id,
+            style_id,
         )?;
     }
 

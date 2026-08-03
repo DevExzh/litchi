@@ -2,7 +2,7 @@
 
 use prost::Message;
 
-use crate::archive::RawMessage;
+use crate::archive::{Archive, RawMessage};
 use crate::protobuf::tswp;
 use crate::wire::{
     parse_wire_fields, patch_varint_field, repeated_length_delimited_payloads,
@@ -10,7 +10,10 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use crate::text::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
+use crate::text::storage_wire::{
+    LocatedStorage, StorageLocation,
+    locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
+};
 const PARAGRAPH_STYLE_TABLE_FIELD: u32 = 5;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_CHARACTER_INDEX_FIELD: u32 = 1;
@@ -22,11 +25,26 @@ pub(in crate::text) struct ParagraphStorageLocation {
     pub(in crate::text) style_id: u64,
 }
 
+pub(in crate::text) struct LocatedParagraphStorage {
+    pub(in crate::text) location: ParagraphStorageLocation,
+    pub(in crate::text) archive: Archive,
+}
+
 pub(in crate::text) fn locate(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<ParagraphStorageLocation> {
-    let wire = locate_native_storage(
+    locate_with_archive(package, storage_id).map(|located| located.location)
+}
+
+pub(in crate::text) fn locate_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<LocatedParagraphStorage> {
+    let LocatedStorage {
+        location: wire,
+        archive,
+    } = locate_native_storage_with_archive(
         package,
         storage_id,
         PARAGRAPH_STYLE_TABLE_FIELD,
@@ -63,7 +81,10 @@ pub(in crate::text) fn locate(
                 "iWork text storage {storage_id} has no uniform paragraph style"
             ))
         })?;
-    Ok(ParagraphStorageLocation { wire, style_id })
+    Ok(LocatedParagraphStorage {
+        location: ParagraphStorageLocation { wire, style_id },
+        archive,
+    })
 }
 
 pub(in crate::text) fn patch_style_reference(
@@ -72,8 +93,33 @@ pub(in crate::text) fn patch_style_reference(
     old_style_id: u64,
     new_style_id: u64,
 ) -> Result<()> {
+    let archive_name = location.wire.archive_name.clone();
+    package.update_archive(&archive_name, |archive| {
+        patch_style_reference_in_archive(archive, location, old_style_id, new_style_id)
+    })
+}
+
+pub(in crate::text) fn patch_style_reference_with_archive(
+    package: &mut IWorkPackage,
+    located: LocatedParagraphStorage,
+    old_style_id: u64,
+    new_style_id: u64,
+) -> Result<()> {
+    let LocatedParagraphStorage { location, archive } = located;
+    let archive_name = location.wire.archive_name.clone();
+    update_parsed_archive(package, &archive_name, archive, |archive| {
+        patch_style_reference_in_archive(archive, &location, old_style_id, new_style_id)
+    })
+}
+
+fn patch_style_reference_in_archive(
+    archive: &mut Archive,
+    location: &ParagraphStorageLocation,
+    old_style_id: u64,
+    new_style_id: u64,
+) -> Result<()> {
     let storage_id = location.wire.object_id;
-    package.update_archive(&location.wire.archive_name, |archive| {
+    {
         let object = archive.object_mut(location.wire.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
@@ -139,11 +185,8 @@ pub(in crate::text) fn patch_style_reference(
                             "iWork text storage {storage_id} paragraph style must begin at index zero"
                         )));
                     }
-                    let reference = required_payload(
-                        entry,
-                        ENTRY_OBJECT_FIELD,
-                        "paragraph-style reference",
-                    )?;
+                    let reference =
+                        required_payload(entry, ENTRY_OBJECT_FIELD, "paragraph-style reference")?;
                     if required_varint(
                         reference,
                         REFERENCE_IDENTIFIER_FIELD,
@@ -154,23 +197,16 @@ pub(in crate::text) fn patch_style_reference(
                             "iWork text storage {storage_id} paragraph style changed unexpectedly"
                         )));
                     }
-                    let patched = transform_length_delimited_field(
-                        entry,
-                        ENTRY_OBJECT_FIELD,
-                        |reference| {
+                    let patched =
+                        transform_length_delimited_field(entry, ENTRY_OBJECT_FIELD, |reference| {
                             patch_varint_field(
                                 reference,
                                 REFERENCE_IDENTIFIER_FIELD,
                                 true,
                                 Some(new_style_id),
                             )
-                        },
-                    )?;
-                    rewrite_repeated_length_delimited_fields(
-                        table,
-                        TABLE_ENTRIES_FIELD,
-                        &[patched],
-                    )
+                        })?;
+                    rewrite_repeated_length_delimited_fields(table, TABLE_ENTRIES_FIELD, &[patched])
                 },
             )?;
             tswp::StorageArchive::decode(data.as_slice())?;
@@ -213,7 +249,7 @@ pub(in crate::text) fn patch_style_reference(
             )));
         }
         Ok(())
-    })
+    }
 }
 
 fn required_payload<'a>(data: &'a [u8], field: u32, context: &str) -> Result<&'a [u8]> {
