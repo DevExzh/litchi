@@ -2,10 +2,10 @@
 
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::is_spreadsheetml_name;
-use crate::xlsx::outline_properties::{
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_xlsx::outline_properties::{
     WorksheetOutlineProperties, parse_worksheet_outline_properties,
 };
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -14,6 +14,9 @@ use quick_xml::reader::NsReader;
 
 const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;
+const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 128;
+const MAX_EVENTS: usize = 1_000_000;
 
 /// A bounded A1 anchor used to synchronize worksheet window positions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -198,11 +201,23 @@ struct Parser {
 // Text/CData arms keep `?`-bearing whitespace checks out of guards; guards cannot use `?`.
 #[allow(clippy::collapsible_match)]
 pub fn parse_worksheet_sheet_properties(xml: &[u8]) -> Result<Option<WorksheetSheetProperties>> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("worksheet XML is too large"));
+    }
     let outline_properties = parse_worksheet_outline_properties(xml)?;
-    let processed =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    let limits = MceLimits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        ..MceLimits::default()
+    };
+    let processed = process_markup_compatibility(xml, &MceCapabilities::default(), &limits)?;
+    if processed.xml.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML is too large"));
+    }
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut parser = Parser {
         stack: Vec::new(),
         builder: None,
@@ -211,16 +226,46 @@ pub fn parse_worksheet_sheet_properties(xml: &[u8]) -> Result<Option<WorksheetSh
         seen_outline_properties: false,
         seen_page_setup_properties: false,
     };
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
+    let mut events = 0usize;
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("worksheet XML exceeds event limit"));
+        }
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         reject_unsafe_event(&event)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
-            Event::Start(element) => parser.start(&namespace, &element, decoder, &resolver)?,
+            Event::Start(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if parser.stack.is_empty() && root_seen {
+                    return Err(invalid("worksheet XML contains multiple roots"));
+                }
+                if parser.stack.len() >= MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
+                let was_root = parser.stack.is_empty();
+                parser.start(&namespace, &element, decoder, &resolver)?;
+                if was_root {
+                    root_seen = true;
+                }
+            },
             Event::Empty(element) => parser.empty(&namespace, &element, decoder, &resolver)?,
-            Event::End(element) => parser.end(element.local_name().as_ref())?,
+            Event::End(element) => {
+                parser.end(element.local_name().as_ref())?;
+                if parser.stack.is_empty() {
+                    root_closed = true;
+                }
+            },
             Event::Text(text)
                 if matches!(
                     parser.parent(),
@@ -245,11 +290,49 @@ pub fn parse_worksheet_sheet_properties(xml: &[u8]) -> Result<Option<WorksheetSh
             {
                 return Err(invalid("unexpected CDATA in worksheet sheetPr"));
             },
+            Event::Text(text) => {
+                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("worksheet XML text is outside root"));
+                }
+                if parser.parent() == Context::Worksheet
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("worksheet cannot contain direct text"));
+                }
+            },
+            Event::CData(_) if !root_seen || root_closed => {
+                return Err(invalid("worksheet XML CDATA is outside root"));
+            },
+            Event::CData(_) if parser.parent() == Context::Worksheet => {
+                return Err(invalid("worksheet cannot contain direct CDATA"));
+            },
+            Event::GeneralRef(_) => {
+                if !root_seen || root_closed {
+                    return Err(invalid("worksheet XML entity is outside root"));
+                }
+                if matches!(
+                    parser.parent(),
+                    Context::Worksheet
+                        | Context::SheetProperties
+                        | Context::TabColor
+                        | Context::OutlineProperties
+                        | Context::PageSetupProperties
+                ) {
+                    return Err(invalid("worksheet sheetPr cannot contain entity text"));
+                }
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
+            },
             Event::Eof => break,
             _ => {},
         }
     }
-    if !parser.stack.is_empty() {
+    if !root_seen || !root_closed || !parser.stack.is_empty() {
         return Err(invalid("unterminated worksheet sheetPr XML"));
     }
     Ok(parser
@@ -391,8 +474,11 @@ impl Parser {
             return Err(invalid("duplicate worksheet tabColor element"));
         }
         self.seen_tab_color = true;
-        self.builder.as_mut().expect("sheetPr builder").tab_color =
-            Some(parse_tab_color(element, decoder, resolver)?);
+        let builder = self
+            .builder
+            .as_mut()
+            .ok_or_else(|| invalid("sheetPr builder is missing"))?;
+        builder.tab_color = Some(parse_tab_color(element, decoder, resolver)?);
         Ok(())
     }
 
@@ -414,10 +500,12 @@ impl Parser {
             return Err(invalid("duplicate worksheet pageSetUpPr element"));
         }
         self.seen_page_setup_properties = true;
-        self.builder
+        let builder = self
+            .builder
             .as_mut()
-            .expect("sheetPr builder")
-            .page_setup_properties = Some(parse_page_setup_properties(element, decoder, resolver)?);
+            .ok_or_else(|| invalid("sheetPr builder is missing"))?;
+        builder.page_setup_properties =
+            Some(parse_page_setup_properties(element, decoder, resolver)?);
         Ok(())
     }
 }
@@ -853,6 +941,32 @@ mod tests {
         ] {
             assert!(parse(child).is_err(), "expected rejection for {child}");
         }
+    }
+
+    #[test]
+    fn rejects_malformed_document_boundaries_and_excessive_depth() {
+        for xml in [
+            format!(r#"<worksheet xmlns="{NS}"/><worksheet xmlns="{NS}"/>"#),
+            format!(r#"text<worksheet xmlns="{NS}"></worksheet>"#),
+            format!(r#"<worksheet xmlns="{NS}">text</worksheet>"#),
+            format!(r#"<worksheet xmlns="{NS}"></worksheet>tail"#),
+            format!(r#"<worksheet xmlns="{NS}"><![CDATA[data]]></worksheet>"#),
+        ] {
+            assert!(
+                parse_worksheet_sheet_properties(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = format!(r#"<worksheet xmlns="{NS}">"#);
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_worksheet_sheet_properties(xml.as_bytes()).is_err());
     }
 
     fn fixture(bytes: &[u8]) -> WorksheetSheetProperties {

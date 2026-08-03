@@ -187,6 +187,9 @@ pub use litchi_xlsx::ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
+pub use litchi_xlsx::outline_properties::{
+    WorksheetOutlineProperties, parse_worksheet_outline_properties,
+};
 pub use litchi_xlsx::page_margins::{
     PageMargin, WorksheetPageMargins, parse_worksheet_page_margins,
 };
@@ -214,7 +217,6 @@ pub use ole_objects::{
     WorksheetOleObject, WorksheetOleObjects, load_worksheet_ole_objects,
     parse_worksheet_ole_objects, store_worksheet_ole_objects, write_worksheet_ole_objects,
 };
-pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
 pub use page_setup::parse_worksheet_page_setup;
 pub use printer_settings::{
     PrinterSettingsConformance, PrinterSettingsResource, WorksheetPrinterSettings,

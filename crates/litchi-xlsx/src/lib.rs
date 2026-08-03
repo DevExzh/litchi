@@ -17,6 +17,7 @@ pub mod ignored_errors;
 pub mod layout;
 pub mod merge;
 mod outline;
+pub mod outline_properties;
 pub mod page_margins;
 pub mod phonetic_properties;
 pub mod print_options;
@@ -54,6 +55,7 @@ pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 pub use outline::{Outline, OutlineAt};
+pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
 pub use phonetic_properties::{
     WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,

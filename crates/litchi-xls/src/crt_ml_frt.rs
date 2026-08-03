@@ -40,24 +40,100 @@ fn invalid(message: impl Into<String>) -> XlsError {
     }
 }
 
-/// Validate an `FrtHeader` (MS-XLS 2.5.135): the `rt` field and the
-/// `fFrtRef`/`fFrtAlert` bits that MUST be zero.
-fn validate_frt_header(data: &[u8], expected_rt: u16, context: &str) -> XlsResult<()> {
-    if data.len() < FRT_HEADER_LEN {
-        return Err(XlsError::InvalidLength {
-            expected: FRT_HEADER_LEN,
-            found: data.len(),
-        });
+/// Checked cursor for the fixed-width fields and opaque payload sections in
+/// `CrtMlFrt` records.
+struct CrtMlFrtReader<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> CrtMlFrtReader<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
     }
-    if u16::from_le_bytes([data[0], data[1]]) != expected_rt {
+
+    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+        let bytes = self.read_slice(N)?;
+        bytes.try_into().map_err(|_| XlsError::InvalidLength {
+            expected: N,
+            found: bytes.len(),
+        })
+    }
+
+    fn read_u16(&mut self) -> XlsResult<u16> {
+        Ok(u16::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_u32(&mut self) -> XlsResult<u32> {
+        Ok(u32::from_le_bytes(self.read_bytes()?))
+    }
+
+    fn read_slice(&mut self, len: usize) -> XlsResult<&'a [u8]> {
+        let end = self
+            .offset
+            .checked_add(len)
+            .ok_or_else(|| invalid("CrtMlFrt field offset overflows usize"))?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(XlsError::InvalidLength {
+                expected: end,
+                found: self.data.len(),
+            })?;
+        self.offset = end;
+        Ok(bytes)
+    }
+
+    fn read_remaining(&mut self) -> XlsResult<&'a [u8]> {
+        self.read_slice(self.remaining())
+    }
+
+    fn remaining(&self) -> usize {
+        self.data.len().saturating_sub(self.offset)
+    }
+}
+
+/// Validate an `FrtHeader` (MS-XLS 2.5.135): the `rt` field and the
+/// `fFrtRef`/`fFrtAlert` bits that MUST be zero, returning the raw flags and
+/// reserved bytes for lossless round-tripping.
+fn validate_frt_header(
+    reader: &mut CrtMlFrtReader<'_>,
+    expected_rt: u16,
+    context: &str,
+) -> XlsResult<(u16, [u8; 8])> {
+    if reader.read_u16()? != expected_rt {
         return Err(invalid(format!("{context} FrtHeader.rt mismatch")));
     }
-    let flags = u16::from_le_bytes([data[2], data[3]]);
+    let flags = reader.read_u16()?;
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
         return Err(invalid(format!(
             "{context} FrtHeader.grbitFrt {flags:#06X} sets fFrtRef or fFrtAlert"
         )));
     }
+    Ok((flags, reader.read_bytes()?))
+}
+
+fn validate_record_payload_len(data: &[u8], minimum: usize, context: &str) -> XlsResult<()> {
+    if data.len() < minimum {
+        return Err(XlsError::InvalidLength {
+            expected: minimum,
+            found: data.len(),
+        });
+    }
+    if data.len() > MAX_RECORD_PAYLOAD {
+        return Err(invalid(format!(
+            "{context} payload length {} exceeds BIFF8 maximum {MAX_RECORD_PAYLOAD}",
+            data.len()
+        )));
+    }
+    Ok(())
+}
+
+fn append_chain_bytes(chain: &mut Vec<u8>, bytes: &[u8]) -> XlsResult<()> {
+    chain
+        .try_reserve(bytes.len())
+        .map_err(|_| XlsError::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
+    chain.extend_from_slice(bytes);
     Ok(())
 }
 
@@ -85,48 +161,70 @@ impl XlsCrtMlFrt {
     /// `CrtMlFrtContinue` records that follow it.
     pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> XlsResult<Self> {
         const MIN_LEN: usize = FRT_HEADER_LEN + FIELD_LEN + FIELD_LEN;
-        if data.len() < MIN_LEN {
-            return Err(XlsError::InvalidLength {
-                expected: MIN_LEN,
-                found: data.len(),
-            });
-        }
-        validate_frt_header(data, CRT_ML_FRT_RECORD_TYPE, "CrtMlFrt")?;
-        let declared = u64::from(u32::from_le_bytes(
-            data[FRT_HEADER_LEN..FRT_HEADER_LEN + FIELD_LEN]
-                .try_into()
-                .expect("length checked"),
-        ));
+        validate_record_payload_len(data, MIN_LEN, "CrtMlFrt")?;
+        let mut reader = CrtMlFrtReader::new(data);
+        let (flags, reserved) =
+            validate_frt_header(&mut reader, CRT_ML_FRT_RECORD_TYPE, "CrtMlFrt")?;
+        let declared = u64::from(reader.read_u32()?);
         if declared > MAX_CHAIN_LEN {
             return Err(invalid(format!(
                 "CrtMlFrt cb {declared:#X} exceeds {MAX_CHAIN_LEN:#X}"
             )));
         }
 
-        let mut chain = data[FRT_HEADER_LEN + FIELD_LEN..data.len() - FIELD_LEN].to_vec();
+        let first_chain_len =
+            reader
+                .remaining()
+                .checked_sub(FIELD_LEN)
+                .ok_or(XlsError::InvalidLength {
+                    expected: MIN_LEN,
+                    found: data.len(),
+                })?;
+        let first_chain = reader.read_slice(first_chain_len)?;
+        let unused = reader.read_bytes::<FIELD_LEN>()?;
+
+        let declared = usize::try_from(declared)
+            .map_err(|_| XlsError::Allocation("sizing CrtMlFrt XmlTkChain"))?;
+        let mut chain_len = first_chain.len();
         for continuation in continues {
+            validate_record_payload_len(continuation, FRT_HEADER_LEN, "CrtMlFrtContinue")?;
+            let mut reader = CrtMlFrtReader::new(continuation);
             validate_frt_header(
-                continuation,
+                &mut reader,
                 CRT_ML_FRT_CONTINUE_RECORD_TYPE,
                 "CrtMlFrtContinue",
             )?;
-            chain.extend_from_slice(&continuation[FRT_HEADER_LEN..]);
+            chain_len = chain_len
+                .checked_add(reader.remaining())
+                .ok_or_else(|| invalid("CrtMlFrt XmlTkChain length overflows usize"))?;
         }
         // MS-XLS 2.4.70: cb specifies the exact size of the XmlTkChain,
         // including the continuation record data.
-        if chain.len() as u64 != declared {
+        if chain_len != declared {
             return Err(invalid(format!(
-                "CrtMlFrt cb {declared} does not match its XmlTkChain size {}",
-                chain.len()
+                "CrtMlFrt cb {declared} does not match its XmlTkChain size {chain_len}"
             )));
         }
+
+        let mut chain = Vec::new();
+        chain
+            .try_reserve_exact(chain_len)
+            .map_err(|_| XlsError::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
+        append_chain_bytes(&mut chain, first_chain)?;
+        for continuation in continues {
+            let mut reader = CrtMlFrtReader::new(continuation);
+            validate_frt_header(
+                &mut reader,
+                CRT_ML_FRT_CONTINUE_RECORD_TYPE,
+                "CrtMlFrtContinue",
+            )?;
+            append_chain_bytes(&mut chain, reader.read_remaining()?)?;
+        }
         Ok(Self {
-            flags: u16::from_le_bytes([data[2], data[3]]),
-            reserved: data[4..FRT_HEADER_LEN].try_into().expect("length checked"),
+            flags,
+            reserved,
             chain,
-            unused: data[data.len() - FIELD_LEN..]
-                .try_into()
-                .expect("length checked"),
+            unused,
         })
     }
 
@@ -215,10 +313,11 @@ mod tests {
         first.extend_from_slice(&(chain.len() as u32).to_le_bytes());
         first.extend_from_slice(&chain[..first_chunk]);
         first.extend_from_slice(&[0; 4]);
-        let continues = vec![
-            continuation(&chain[first_chunk..first_chunk + 8_000]),
-            continuation(&chain[first_chunk + 8_000..]),
-        ];
+        let continuation_chunk = MAX_RECORD_PAYLOAD - FRT_HEADER_LEN;
+        let continues = chain[first_chunk..]
+            .chunks(continuation_chunk)
+            .map(continuation)
+            .collect::<Vec<_>>();
         let parsed = XlsCrtMlFrt::parse(&first, &continues).unwrap();
         assert_eq!(parsed.chain(), chain.as_slice());
 
@@ -270,6 +369,41 @@ mod tests {
         let mut first = crt_ml_frt_record(b"ab", [0; 4]);
         first[FRT_HEADER_LEN..FRT_HEADER_LEN + 4].copy_from_slice(&3u32.to_le_bytes());
         assert!(XlsCrtMlFrt::parse(&first, &[bad]).is_err());
+    }
+
+    #[test]
+    fn rejects_truncated_and_oversized_payloads() {
+        let record = crt_ml_frt_record(b"chain", [0; 4]);
+        for length in 0..record.len() {
+            assert!(
+                XlsCrtMlFrt::parse(&record[..length], &[]).is_err(),
+                "expected truncated CrtMlFrt payload of {length} bytes to fail"
+            );
+        }
+
+        let continuation_record = continuation(b"continuation");
+        for length in 0..FRT_HEADER_LEN {
+            assert!(
+                XlsCrtMlFrt::parse(&record, &[continuation_record[..length].to_vec()]).is_err(),
+                "expected truncated CrtMlFrtContinue payload of {length} bytes to fail"
+            );
+        }
+
+        let mut oversized = record.clone();
+        oversized.resize(MAX_RECORD_PAYLOAD + 1, 0);
+        assert!(XlsCrtMlFrt::parse(&oversized, &[]).is_err());
+
+        let oversized_continuation =
+            continuation(&vec![0; MAX_RECORD_PAYLOAD - FRT_HEADER_LEN + 1]);
+        assert!(XlsCrtMlFrt::parse(&record, &[oversized_continuation]).is_err());
+    }
+
+    #[test]
+    fn accepts_empty_continuation_payload() {
+        let record = crt_ml_frt_record(b"", [0; 4]);
+        let parsed = XlsCrtMlFrt::parse(&record, &[continuation(&[])]).unwrap();
+        assert!(parsed.chain().is_empty());
+        assert_eq!(parsed.to_record_payloads(), vec![record]);
     }
 
     #[test]
