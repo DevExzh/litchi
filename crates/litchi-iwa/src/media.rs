@@ -6,13 +6,14 @@
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::ops::Range;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use prost::Message;
 use sha1::{Digest, Sha1};
+use tempfile::NamedTempFile;
 
 use crate::archive::RawMessage;
 use crate::package::{IWorkPackage, PackageLimits};
@@ -517,57 +518,124 @@ impl MediaManager {
                 asset.size, self.state.limits.max_asset_bytes
             )));
         }
+
+        let capacity = usize::try_from(asset.size).map_err(|_| {
+            Error::Bundle(format!(
+                "Media asset {} does not fit in memory on this target",
+                asset.path.display()
+            ))
+        })?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(capacity).map_err(|error| {
+            Error::Bundle(format!(
+                "Unable to reserve {} bytes for media asset {}: {error}",
+                capacity,
+                asset.path.display()
+            ))
+        })?;
+        self.extract_to_writer(filename, &mut data)?;
+        Ok(data)
+    }
+
+    /// Stream an asset to a caller-owned sequential sink.
+    ///
+    /// The configured per-asset limit is checked before reading. Directory
+    /// sources are additionally bounded while reading so a file that grows
+    /// after discovery cannot cause an unbounded allocation or copy.
+    pub fn extract_to_writer<W: Write>(&self, filename: &str, mut sink: W) -> Result<()> {
+        let asset = self
+            .get(filename)
+            .ok_or_else(|| Error::Bundle(format!("Media asset not found: {filename}")))?;
+        if asset.size > self.state.limits.max_asset_bytes {
+            return Err(Error::Bundle(format!(
+                "Media asset {filename} is {} bytes, exceeding the configured {}-byte limit",
+                asset.size, self.state.limits.max_asset_bytes
+            )));
+        }
+
         match &self.state.source {
             MediaSource::Directory(root) => {
                 let path = root.join(&asset.path);
-                let file = fs::File::open(&path)?;
-                let size = file.metadata()?.len();
-                if size > self.state.limits.max_asset_bytes {
+                let metadata = fs::symlink_metadata(&path)?;
+                if metadata.file_type().is_symlink() {
+                    return Err(Error::Bundle(format!(
+                        "Media asset is a symbolic link: {}",
+                        path.display()
+                    )));
+                }
+                if !metadata.is_file() {
+                    return Err(Error::Bundle(format!(
+                        "Media asset is not a regular file: {}",
+                        path.display()
+                    )));
+                }
+                if metadata.len() > self.state.limits.max_asset_bytes {
                     return Err(Error::Bundle(format!(
                         "Media asset {} grew to {} bytes, exceeding the configured {}-byte limit",
                         path.display(),
-                        size,
+                        metadata.len(),
                         self.state.limits.max_asset_bytes
                     )));
                 }
-                let capacity = usize::try_from(size).map_err(|_| {
-                    Error::Bundle(format!(
-                        "Media asset {} does not fit in memory on this target",
-                        path.display()
-                    ))
-                })?;
-                let mut data = Vec::new();
-                data.try_reserve_exact(capacity).map_err(|error| {
-                    Error::Bundle(format!(
-                        "Unable to reserve {} bytes for media asset {}: {error}",
-                        capacity,
-                        path.display()
-                    ))
-                })?;
-                file.take(self.state.limits.max_asset_bytes.saturating_add(1))
-                    .read_to_end(&mut data)?;
-                if u64::try_from(data.len()).unwrap_or(u64::MAX) > self.state.limits.max_asset_bytes
-                {
+
+                let file = fs::File::open(&path)?;
+                let mut bounded = file.take(self.state.limits.max_asset_bytes.saturating_add(1));
+                let written = std::io::copy(&mut bounded, &mut sink)?;
+                if written > self.state.limits.max_asset_bytes {
                     return Err(Error::Bundle(format!(
                         "Media asset {} exceeded the configured {}-byte limit while reading",
                         path.display(),
                         self.state.limits.max_asset_bytes
                     )));
                 }
-                Ok(data)
+                Ok(())
             },
             MediaSource::File(path) => {
                 let package = IWorkPackage::open_with_limits(path, self.state.package_limits)?;
-                extract_package_entry(&package, asset, self.state.limits)
+                write_package_entry(&package, asset, self.state.limits, &mut sink)
             },
             MediaSource::Package(package) => {
-                extract_package_entry(package, asset, self.state.limits)
+                write_package_entry(package, asset, self.state.limits, &mut sink)
             },
         }
     }
 
+    /// Atomically stream an asset to a regular file.
     pub fn extract_to_file(&self, filename: &str, output_path: &Path) -> Result<()> {
-        fs::write(output_path, self.extract(filename)?)?;
+        let parent = output_path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let existing = match fs::symlink_metadata(output_path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::Bundle(format!(
+                    "Media output destination must not be a symbolic link: {}",
+                    output_path.display()
+                )));
+            },
+            Ok(metadata) if metadata.is_file() => Some(metadata),
+            Ok(_) => {
+                return Err(Error::Bundle(format!(
+                    "Media output destination is not a regular file: {}",
+                    output_path.display()
+                )));
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.into()),
+        };
+
+        let mut temporary = NamedTempFile::new_in(parent)?;
+        self.extract_to_writer(filename, temporary.as_file_mut())?;
+        if let Some(metadata) = existing {
+            fs::set_permissions(temporary.path(), metadata.permissions())?;
+        }
+        temporary.as_file_mut().sync_all()?;
+        temporary
+            .persist(output_path)
+            .map_err(|error| Error::Io(error.error))?;
+        if let Ok(directory) = fs::File::open(parent) {
+            directory.sync_all()?;
+        }
         Ok(())
     }
 
@@ -631,11 +699,12 @@ fn insert_unique_asset(
     Ok(())
 }
 
-fn extract_package_entry(
+fn write_package_entry<W: Write>(
     package: &IWorkPackage,
     asset: &MediaAsset,
     limits: MediaLimits,
-) -> Result<Vec<u8>> {
+    sink: &mut W,
+) -> Result<()> {
     let name = asset.path.to_str().ok_or_else(|| {
         Error::Bundle(format!(
             "Media path is not valid UTF-8: {}",
@@ -651,15 +720,8 @@ fn extract_package_entry(
             limits.max_asset_bytes
         )));
     }
-    let mut output = Vec::new();
-    output.try_reserve_exact(data.len()).map_err(|error| {
-        Error::Bundle(format!(
-            "Unable to reserve {} bytes for media package entry {name}: {error}",
-            data.len()
-        ))
-    })?;
-    output.extend_from_slice(data);
-    Ok(output)
+    sink.write_all(data)?;
+    Ok(())
 }
 
 /// Metadata-backed view of one `TSP.DataInfo` record.
@@ -1824,6 +1886,93 @@ mod tests {
             disk.extract("image-7.png").unwrap(),
             memory.extract("image-7.png").unwrap()
         );
+
+        let mut streamed = Vec::new();
+        memory
+            .extract_to_writer("image-7.png", &mut streamed)
+            .unwrap();
+        assert_eq!(streamed, b"\x89PNG\r\n\x1a\noriginal");
+    }
+
+    #[test]
+    fn media_file_extraction_rejects_non_file_destinations() -> std::io::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let manager = MediaManager::from_package(synthetic_package()).unwrap();
+
+        let error = manager
+            .extract_to_file("image-7.png", directory.path())
+            .unwrap_err();
+        assert!(error.to_string().contains("not a regular file"));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn media_file_extraction_rejects_symbolic_link_destinations() -> std::io::Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir()?;
+        let target = directory.path().join("target.png");
+        let link = directory.path().join("image.png");
+        fs::write(&target, b"sentinel")?;
+        symlink(&target, &link)?;
+
+        let manager = MediaManager::from_package(synthetic_package()).unwrap();
+        let error = manager.extract_to_file("image-7.png", &link).unwrap_err();
+
+        assert!(error.to_string().contains("symbolic link"));
+        assert_eq!(fs::read(&target)?, b"sentinel");
+        assert!(fs::symlink_metadata(&link)?.file_type().is_symlink());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn media_file_extraction_preserves_existing_permissions() -> std::io::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir()?;
+        let destination = directory.path().join("image.png");
+        fs::write(&destination, b"old")?;
+        let mut permissions = fs::metadata(&destination)?.permissions();
+        permissions.set_mode(0o640);
+        fs::set_permissions(&destination, permissions)?;
+
+        let manager = MediaManager::from_package(synthetic_package()).unwrap();
+        manager
+            .extract_to_file("image-7.png", &destination)
+            .unwrap();
+
+        let mode = fs::metadata(&destination)?.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o640);
+        assert_eq!(fs::read(&destination)?, b"\x89PNG\r\n\x1a\noriginal");
+        Ok(())
+    }
+
+    #[test]
+    fn directory_media_streaming_rechecks_growth() -> std::io::Result<()> {
+        let bundle = tempfile::tempdir()?;
+        let data = bundle.path().join("Data");
+        fs::create_dir(&data)?;
+        let asset_path = data.join("asset.bin");
+        fs::write(&asset_path, b"small")?;
+
+        let limits = MediaLimits::new(1, 5, 5).unwrap();
+        let manager = MediaManager::new_with_limits(bundle.path(), limits).unwrap();
+        fs::write(&asset_path, b"larger")?;
+
+        let mut streamed = Vec::new();
+        let error = manager
+            .extract_to_writer("asset.bin", &mut streamed)
+            .unwrap_err();
+        assert!(error.to_string().contains("grew to"));
+        assert!(streamed.is_empty());
+
+        let destination = bundle.path().join("output.bin");
+        fs::write(&destination, b"sentinel")?;
+        assert!(manager.extract_to_file("asset.bin", &destination).is_err());
+        assert_eq!(fs::read(destination)?, b"sentinel");
+        Ok(())
     }
 
     #[test]

@@ -13,6 +13,7 @@
 //! - `crate::keynote::KeynoteDocument` for Keynote-specific features
 
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -237,6 +238,30 @@ impl Document {
         manager.extract(filename)
     }
 
+    /// Stream a materialized media asset to a caller-owned sequential sink.
+    pub fn extract_media_to_writer<W: Write>(&self, filename: &str, sink: W) -> Result<()> {
+        let manager = self
+            .state
+            .media_manager
+            .as_ref()
+            .ok_or_else(|| Error::Bundle("Media manager not available".to_string()))?;
+        manager.extract_to_writer(filename, sink)
+    }
+
+    /// Atomically extract a materialized media asset to a regular file.
+    pub fn extract_media_to_file<P: AsRef<Path>>(
+        &self,
+        filename: &str,
+        output_path: P,
+    ) -> Result<()> {
+        let manager = self
+            .state
+            .media_manager
+            .as_ref()
+            .ok_or_else(|| Error::Bundle("Media manager not available".to_string()))?;
+        manager.extract_to_file(filename, output_path.as_ref())
+    }
+
     /// Extract structured data from the document
     ///
     /// This returns tables, slides, sections, and other structured content
@@ -453,6 +478,37 @@ mod tests {
 
         let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert_eq!(document.application(), Application::Common);
+    }
+
+    #[test]
+    fn document_exposes_streaming_media_extraction() {
+        let object = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 101,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let mut package = crate::IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/Document.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+        package
+            .insert_entry("Data/image.png", b"media-bytes".to_vec())
+            .unwrap();
+
+        let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let mut streamed = Vec::new();
+        document
+            .extract_media_to_writer("image.png", &mut streamed)
+            .unwrap();
+        assert_eq!(streamed, b"media-bytes");
     }
 
     #[test]
