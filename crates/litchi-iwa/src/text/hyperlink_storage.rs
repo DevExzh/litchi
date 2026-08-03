@@ -12,8 +12,9 @@ use crate::{Error, IWorkPackage, Result};
 
 use super::position::TextRange;
 use super::storage_wire::{
-    StorageLocation, locate_storage as locate_native_storage, text_utf16_len,
-    validate_sorted_boundaries,
+    LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
+    locate_storage_with_archive as locate_native_storage_with_archive, text_utf16_len,
+    update_parsed_archive, validate_sorted_boundaries,
 };
 
 pub(super) const SMART_FIELD_TABLE_FIELD: u32 = 11;
@@ -70,6 +71,22 @@ pub(super) fn locate_storage(
         )));
     }
     Ok(location)
+}
+
+pub(super) fn locate_storage_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+    kind: RangedObjectTable,
+) -> Result<LocatedStorage> {
+    let located =
+        locate_native_storage_with_archive(package, storage_id, kind.field(), kind.label())?;
+    if kind.decoded(&located.location.storage).is_some() != located.location.table_present {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} {} table wire state is inconsistent",
+            kind.label()
+        )));
+    }
+    Ok(located)
 }
 
 pub(super) fn decoded_boundaries(
@@ -344,7 +361,7 @@ type TablePatch = (Option<Vec<u8>>, Option<u64>, Option<u64>);
 
 pub(super) fn patch_ranged_object_table<F>(
     package: &mut IWorkPackage,
-    location: &StorageLocation,
+    located: LocatedStorage,
     storage_id: u64,
     kind: RangedObjectTable,
     transform: F,
@@ -352,13 +369,14 @@ pub(super) fn patch_ranged_object_table<F>(
 where
     F: FnOnce(Option<&[u8]>, &tswp::StorageArchive) -> Result<TablePatch>,
 {
+    let LocatedStorage { location, archive } = located;
     if location.object_id != storage_id {
         return Err(Error::InvalidFormat(format!(
             "iWork text storage anchor {} does not match requested storage {storage_id}",
             location.object_id
         )));
     }
-    package.update_archive(&location.archive_name, |archive| {
+    update_parsed_archive(package, &location.archive_name, archive, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
@@ -391,7 +409,6 @@ where
                     location.message_index, location.message_type, original.type_
                 )));
             }
-            let storage = tswp::StorageArchive::decode(original.data.as_slice())?;
             let tables = repeated_length_delimited_payloads(&original.data, kind.field())?;
             if tables.len() > 1 {
                 return Err(Error::InvalidFormat(format!(
@@ -400,7 +417,8 @@ where
                     kind.label()
                 )));
             }
-            let (replacement, added, removed) = transform(tables.first().copied(), &storage)?;
+            let (replacement, added, removed) =
+                transform(tables.first().copied(), &location.storage)?;
             let data = patch_length_delimited_field(
                 &original.data,
                 kind.field(),

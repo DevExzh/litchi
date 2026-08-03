@@ -15,8 +15,8 @@ use super::bookmark_object::{
 use super::bookmark_types::{TextBookmark, TextBookmarkId, TextBookmarkSettings};
 use super::hyperlink_storage::{
     Boundary, RangedObjectTable, add_range, decoded_boundaries, encode_table,
-    ensure_range_available, locate_storage, patch_ranged_object_table, raw_boundaries,
-    remove_range, validate_range,
+    ensure_range_available, locate_storage, locate_storage_with_archive, patch_ranged_object_table,
+    raw_boundaries, remove_range, validate_range,
 };
 use super::position::{TextPosition, TextRange};
 use super::smart_field_object::{
@@ -38,9 +38,10 @@ pub(crate) fn add_text_bookmark(
     range: TextRange,
     settings: &TextBookmarkSettings,
 ) -> Result<TextBookmark> {
-    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
+    let located = locate_storage_with_archive(package, storage_id, BOOKMARK_TABLE)?;
+    let location = &located.location;
     validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location, BOOKMARK_TABLE)?;
+    let boundaries = decoded_boundaries(storage_id, location, BOOKMARK_TABLE)?;
     ensure_range_available(
         storage_id,
         range,
@@ -53,10 +54,11 @@ pub(crate) fn add_text_bookmark(
     let identifier = next_object_identifier(package)?;
     let id = TextBookmarkId::from_native(identifier);
     let bookmark_object = new_bookmark_object(identifier, settings)?;
+    let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location,
+        located,
         storage_id,
         BOOKMARK_TABLE,
         |table, storage| {
@@ -73,7 +75,7 @@ pub(crate) fn add_text_bookmark(
             encode_table(table, boundaries).map(|table| (Some(table), Some(identifier), None))
         },
     )?;
-    staged.update_archive(&location.archive_name, |archive| {
+    staged.update_archive(&archive_name, |archive| {
         archive.insert_object(bookmark_object)
     })?;
     set_package_last_object_identifier(&mut staged, identifier)?;
@@ -99,9 +101,10 @@ pub(crate) fn update_text_bookmark(
     if current.range == range && current.settings == *settings {
         return Ok(current);
     }
-    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
+    let located = locate_storage_with_archive(package, storage_id, BOOKMARK_TABLE)?;
+    let location = &located.location;
     validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location, BOOKMARK_TABLE)?;
+    let boundaries = decoded_boundaries(storage_id, location, BOOKMARK_TABLE)?;
     ensure_range_available(
         storage_id,
         range,
@@ -112,10 +115,11 @@ pub(crate) fn update_text_bookmark(
     )?;
     require_exclusive_storage_reference(package, storage_id, id.object_id(), "bookmark")?;
 
+    let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location,
+        located,
         storage_id,
         BOOKMARK_TABLE,
         |table, storage| {
@@ -133,12 +137,7 @@ pub(crate) fn update_text_bookmark(
             encode_table(table, boundaries).map(|table| (Some(table), None, None))
         },
     )?;
-    patch_bookmark_settings(
-        &mut staged,
-        &location.archive_name,
-        id.object_id(),
-        settings,
-    )?;
+    patch_bookmark_settings(&mut staged, &archive_name, id.object_id(), settings)?;
     let verified = roundtrip(&staged)?;
     let updated = bookmark_by_id(&verified, storage_id, id)?;
     if updated.range != range || updated.settings != *settings {
@@ -156,15 +155,17 @@ pub(crate) fn remove_text_bookmark(
     id: TextBookmarkId,
 ) -> Result<TextBookmark> {
     let removed = bookmark_by_id(package, storage_id, id)?;
-    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
+    let located = locate_storage_with_archive(package, storage_id, BOOKMARK_TABLE)?;
+    let location = &located.location;
     require_exclusive_storage_reference(package, storage_id, id.object_id(), "bookmark")?;
     let registered_component = component_identifier_for_object_uuid(package, id.object_id())?;
     let owning_component = component_identifier_for_entry(package, &location.archive_name)?;
 
+    let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location,
+        located,
         storage_id,
         BOOKMARK_TABLE,
         |table, storage| {
@@ -182,7 +183,7 @@ pub(crate) fn remove_text_bookmark(
         },
     )?;
     ensure_no_metadata_reference(&staged, id.object_id(), "bookmark")?;
-    staged.update_archive(&location.archive_name, |archive| {
+    staged.update_archive(&archive_name, |archive| {
         let object = archive.remove_object(id.object_id()).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork bookmark object {} disappeared during deletion",

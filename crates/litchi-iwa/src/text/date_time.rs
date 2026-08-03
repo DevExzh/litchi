@@ -18,8 +18,8 @@ use super::date_time_types::{
 use super::editor::replace_storage_text;
 use super::hyperlink_storage::{
     Boundary, RangedObjectTable, add_range, decoded_boundaries, encode_table,
-    ensure_range_available, locate_storage, patch_ranged_object_table, raw_boundaries,
-    remove_range, validate_range,
+    ensure_range_available, locate_storage, locate_storage_with_archive, patch_ranged_object_table,
+    raw_boundaries, remove_range, validate_range,
 };
 use super::position::{TextPosition, TextRange};
 use super::smart_field_object::{
@@ -94,9 +94,10 @@ fn add_date_time_field_in_place(
     range: TextRange,
     settings: &TextDateTimeFieldSettings,
 ) -> Result<TextDateTimeFieldId> {
-    let location = locate_storage(package, storage_id, SMART_FIELD_TABLE)?;
+    let located = locate_storage_with_archive(package, storage_id, SMART_FIELD_TABLE)?;
+    let location = &located.location;
     validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location, SMART_FIELD_TABLE)?;
+    let boundaries = decoded_boundaries(storage_id, location, SMART_FIELD_TABLE)?;
     ensure_range_available(
         storage_id,
         range,
@@ -107,9 +108,10 @@ fn add_date_time_field_in_place(
     )?;
     let identifier = next_object_identifier(package)?;
     let object = new_date_time_object(identifier, settings)?;
+    let archive_name = location.archive_name.clone();
     patch_ranged_object_table(
         package,
-        &location,
+        located,
         storage_id,
         SMART_FIELD_TABLE,
         |table, storage| {
@@ -126,9 +128,7 @@ fn add_date_time_field_in_place(
             encode_table(table, boundaries).map(|table| (Some(table), Some(identifier), None))
         },
     )?;
-    package.update_archive(&location.archive_name, |archive| {
-        archive.insert_object(object)
-    })?;
+    package.update_archive(&archive_name, |archive| archive.insert_object(object))?;
     set_package_last_object_identifier(package, identifier)?;
     Ok(TextDateTimeFieldId::from_native(identifier))
 }
@@ -144,9 +144,10 @@ pub(crate) fn update_text_date_time_field(
     if current.range == range && current.settings == *settings {
         return Ok(current);
     }
-    let location = locate_storage(package, storage_id, SMART_FIELD_TABLE)?;
+    let located = locate_storage_with_archive(package, storage_id, SMART_FIELD_TABLE)?;
+    let location = &located.location;
     validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location, SMART_FIELD_TABLE)?;
+    let boundaries = decoded_boundaries(storage_id, location, SMART_FIELD_TABLE)?;
     ensure_range_available(
         storage_id,
         range,
@@ -157,10 +158,11 @@ pub(crate) fn update_text_date_time_field(
     )?;
     require_exclusive_storage_reference(package, storage_id, id.object_id(), "Date & Time")?;
 
+    let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location,
+        located,
         storage_id,
         SMART_FIELD_TABLE,
         |table, storage| {
@@ -178,12 +180,7 @@ pub(crate) fn update_text_date_time_field(
             encode_table(table, boundaries).map(|table| (Some(table), None, None))
         },
     )?;
-    patch_date_time_settings(
-        &mut staged,
-        &location.archive_name,
-        id.object_id(),
-        settings,
-    )?;
+    patch_date_time_settings(&mut staged, &archive_name, id.object_id(), settings)?;
     let verified = roundtrip(&staged)?;
     let updated = date_time_field_by_id(&verified, storage_id, id)?;
     if updated.range != range || updated.settings != *settings {
@@ -201,15 +198,17 @@ pub(crate) fn remove_text_date_time_field(
     id: TextDateTimeFieldId,
 ) -> Result<TextDateTimeField> {
     let removed = date_time_field_by_id(package, storage_id, id)?;
-    let location = locate_storage(package, storage_id, SMART_FIELD_TABLE)?;
+    let located = locate_storage_with_archive(package, storage_id, SMART_FIELD_TABLE)?;
+    let location = &located.location;
     require_exclusive_storage_reference(package, storage_id, id.object_id(), "Date & Time")?;
     let registered_component = component_identifier_for_object_uuid(package, id.object_id())?;
     let owning_component = component_identifier_for_entry(package, &location.archive_name)?;
 
+    let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
-        &location,
+        located,
         storage_id,
         SMART_FIELD_TABLE,
         |table, storage| {
@@ -227,7 +226,7 @@ pub(crate) fn remove_text_date_time_field(
         },
     )?;
     ensure_no_metadata_reference(&staged, id.object_id(), "Date & Time")?;
-    staged.update_archive(&location.archive_name, |archive| {
+    staged.update_archive(&archive_name, |archive| {
         let object = archive.remove_object(id.object_id()).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork Date & Time object {} disappeared during deletion",
