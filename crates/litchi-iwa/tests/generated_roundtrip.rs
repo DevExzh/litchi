@@ -54,13 +54,13 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
         Format::Keynote => Application::Keynote,
     };
 
-    assert_eq!(detect::bytes(&bytes), Some(expected));
+    assert_eq!(detect::bytes(&bytes)?, Some(expected));
 
     let mut reader = Cursor::new(bytes.as_slice());
     reader.set_position(1);
-    assert_eq!(detect::reader(&mut reader), Some(expected));
+    assert_eq!(detect::reader(&mut reader)?, Some(expected));
     assert_eq!(reader.position(), 1);
-    assert_eq!(detect::path(path), Some(expected));
+    assert_eq!(detect::path(path)?, Some(expected));
 
     let document = Document::open(path)?;
     assert_send_sync::<litchi_iwa::Bundle>();

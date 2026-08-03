@@ -108,7 +108,9 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 
         // Finally try iWork detection
         #[cfg(feature = "iwa")]
-        if let Some(result) = litchi_iwa::detect::bytes(bytes).map(iwork_format) {
+        if let Ok(Some(result)) =
+            litchi_iwa::detect::bytes(bytes).map(|result| result.map(iwork_format))
+        {
             return Some(result);
         }
 
@@ -173,7 +175,9 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             #[cfg(feature = "iwa")]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
-                if let Some(format) = litchi_iwa::detect::reader(reader).map(iwork_format) {
+                if let Ok(Some(format)) =
+                    litchi_iwa::detect::reader(reader).map(|result| result.map(iwork_format))
+                {
                     return Some(format);
                 }
             }
@@ -205,7 +209,10 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
 /// Detect iWork format from file path.
 #[cfg(feature = "iwa")]
 pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
-    litchi_iwa::detect::path(path.as_ref()).map(iwork_format)
+    litchi_iwa::detect::path(path.as_ref())
+        .ok()
+        .flatten()
+        .map(iwork_format)
 }
 
 #[cfg(feature = "iwa")]

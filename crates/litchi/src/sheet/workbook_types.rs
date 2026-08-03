@@ -128,7 +128,9 @@ pub fn refine_workbook_format<R: Read + Seek>(
         }
 
         #[cfg(feature = "iwa")]
-        if litchi_iwa::detect::bytes(&data) == Some(litchi_iwa::detect::Format::Numbers) {
+        if litchi_iwa::detect::bytes(&data).ok().flatten()
+            == Some(litchi_iwa::detect::Format::Numbers)
+        {
             return Ok(WorkbookFormat::Numbers);
         }
 

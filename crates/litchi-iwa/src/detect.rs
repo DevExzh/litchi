@@ -1,4 +1,4 @@
-//! Best-effort Apple iWork format detection.
+//! Typed Apple iWork format detection.
 //!
 //! Detection validates application-root evidence plus legacy bundle markers.
 //! It inspects only the root archive envelope, not document content, and does
@@ -173,26 +173,52 @@ impl Default for Limits {
 /// Detect an iWork application from complete packaged bytes.
 ///
 /// ZIP and Snappy metadata are validated under explicit file-count and size
-/// limits. A package with conflicting application-root evidence is rejected.
-pub fn bytes(value: &[u8]) -> Option<Format> {
+/// limits. A package with conflicting application-root evidence is reported as
+/// a typed format error; an unrelated or unrecognized byte slice returns
+/// `Ok(None)`.
+pub fn bytes(value: &[u8]) -> crate::Result<Option<Format>> {
     bytes_with_limits(value, Limits::default())
 }
 
 /// Detect an iWork application using caller-selected resource ceilings.
-pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Option<Format> {
-    if u64::try_from(value.len()).ok()? > limits.max_input_bytes {
-        return None;
+pub fn bytes_with_limits(value: &[u8], limits: Limits) -> crate::Result<Option<Format>> {
+    let input_size = u64::try_from(value.len())
+        .map_err(|_| crate::Error::InvalidFormat("iWork input length exceeds u64".to_owned()))?;
+    if input_size > limits.max_input_bytes {
+        return Err(crate::Error::InvalidFormat(format!(
+            "iWork detection input is {input_size} bytes, exceeding the {} byte limit",
+            limits.max_input_bytes
+        )));
     }
-    let archive = ArchiveReader::new_with_limits(value, limits.archive_limits()).ok()?;
-    match classify_archive(&archive, true, limits) {
-        Outcome::Found(format) => Some(format),
-        Outcome::None | Outcome::Conflict => None,
+    if !is_zip_signature(value) {
+        return Ok(None);
+    }
+    let archive = ArchiveReader::new_with_limits(value, limits.archive_limits())
+        .map_err(|error| crate::Error::Archive(format!("failed to open iWork package: {error}")))?;
+    match classify_archive(&archive, true, limits)? {
+        Outcome::Found(format) => Ok(Some(format)),
+        Outcome::None => Ok(None),
+        Outcome::Conflict => Err(crate::Error::InvalidFormat(
+            "iWork package contains conflicting application evidence".to_owned(),
+        )),
     }
 }
 
-fn classify_archive(archive: &ArchiveReader<'_>, allow_nested: bool, limits: Limits) -> Outcome {
+fn is_zip_signature(value: &[u8]) -> bool {
+    value.starts_with(b"PK\x03\x04")
+        || value.starts_with(b"PK\x05\x06")
+        || value.starts_with(b"PK\x07\x08")
+}
+
+fn classify_archive(
+    archive: &ArchiveReader<'_>,
+    allow_nested: bool,
+    limits: Limits,
+) -> crate::Result<Outcome> {
     if is_encrypted_iwork_archive(archive) {
-        return Outcome::Conflict;
+        return Err(crate::Error::InvalidFormat(
+            "password-protected iWork documents are not supported".to_owned(),
+        ));
     }
 
     let marks = marks(archive.file_names());
@@ -200,55 +226,64 @@ fn classify_archive(archive: &ArchiveReader<'_>, allow_nested: bool, limits: Lim
         return classify_direct_archive(archive, marks, limits);
     }
     if !allow_nested {
-        return Outcome::None;
+        return Ok(Outcome::None);
     }
 
-    let index_name = match nested_index_zip_name(archive) {
-        Ok(Some(name)) => name,
-        Ok(None) => return Outcome::None,
-        Err(_) => return Outcome::Conflict,
+    let Some(index_name) = nested_index_zip_name(archive)? else {
+        return Ok(Outcome::None);
     };
-    let index_data = match archive.read(&index_name) {
-        Ok(data) => data,
-        Err(_) => return Outcome::Conflict,
-    };
-    let index = match ArchiveReader::new_with_limits(&index_data, limits.archive_limits()) {
-        Ok(index) => index,
-        Err(_) => return Outcome::Conflict,
-    };
+    let index_data = archive.read(&index_name).map_err(|error| {
+        crate::Error::Archive(format!(
+            "failed to read legacy package index {index_name}: {error}"
+        ))
+    })?;
+    let index =
+        ArchiveReader::new_with_limits(&index_data, limits.archive_limits()).map_err(|error| {
+            crate::Error::Archive(format!(
+                "failed to open legacy package index {index_name}: {error}"
+            ))
+        })?;
     classify_archive(&index, false, limits)
 }
 
-fn classify_direct_archive(archive: &ArchiveReader<'_>, marks: Marks, limits: Limits) -> Outcome {
+fn classify_direct_archive(
+    archive: &ArchiveReader<'_>,
+    marks: Marks,
+    limits: Limits,
+) -> crate::Result<Outcome> {
     let mut documents = archive
         .file_names()
         .filter(|name| index_name(name) == Some("Document.iwa"));
     let Some(document_name) = documents.next() else {
-        return Outcome::None;
+        return Ok(Outcome::None);
     };
     if documents.next().is_some() {
-        return Outcome::Conflict;
+        return Err(crate::Error::InvalidFormat(
+            "iWork package contains multiple Document.iwa components".to_owned(),
+        ));
     }
 
-    let data = match archive.read(document_name) {
-        Ok(data) => data,
-        Err(_) => return Outcome::Conflict,
-    };
-    let Some(format) = root_format(&data, limits) else {
-        return Outcome::Conflict;
+    let data = archive.read(document_name).map_err(|error| {
+        crate::Error::Archive(format!("failed to read {document_name}: {error}"))
+    })?;
+    let Some(format) = root_format(&data, limits)? else {
+        return Err(crate::Error::InvalidFormat(
+            "Document.iwa has no recognized iWork application root".to_owned(),
+        ));
     };
     if marks.accepts(format) {
-        Outcome::Found(format)
+        Ok(Outcome::Found(format))
     } else {
-        Outcome::Conflict
+        Err(crate::Error::InvalidFormat(
+            "iWork component markers conflict with the Document.iwa application root".to_owned(),
+        ))
     }
 }
 
-fn root_format(data: &[u8], limits: Limits) -> Option<Format> {
+fn root_format(data: &[u8], limits: Limits) -> crate::Result<Option<Format>> {
     let stream =
-        SnappyStream::decompress_with_limits(&mut Cursor::new(data), limits.snappy_limits().ok()?)
-            .ok()?;
-    let archive = Archive::parse(stream.data()).ok()?;
+        SnappyStream::decompress_with_limits(&mut Cursor::new(data), limits.snappy_limits()?)?;
+    let archive = Archive::parse(stream.data())?;
     let mut detected = None;
 
     for application in archive
@@ -265,12 +300,14 @@ fn root_format(data: &[u8], limits: Limits) -> Option<Format> {
             Application::Common => continue,
         };
         if detected.is_some_and(|previous| previous != format) {
-            return None;
+            return Err(crate::Error::InvalidFormat(
+                "Document.iwa contains conflicting application roots".to_owned(),
+            ));
         }
         detected = Some(format);
     }
 
-    detected
+    Ok(detected)
 }
 
 /// Detect an iWork application from a seekable stream.
@@ -278,73 +315,93 @@ fn root_format(data: &[u8], limits: Limits) -> Option<Format> {
 /// Detection starts at byte zero and restores the caller's original cursor on
 /// every path. Streams larger than the selected input ceiling are rejected
 /// without being read.
-pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
+pub fn reader<R: Read + Seek>(value: &mut R) -> crate::Result<Option<Format>> {
     reader_with_limits(value, Limits::default())
 }
 
 /// Detect an iWork application from a seekable stream under explicit limits.
-pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Option<Format> {
-    let original = value.stream_position().ok()?;
+pub fn reader_with_limits<R: Read + Seek>(
+    value: &mut R,
+    limits: Limits,
+) -> crate::Result<Option<Format>> {
+    let original = value.stream_position()?;
     let detected = (|| {
-        let length = value.seek(SeekFrom::End(0)).ok()?;
+        let length = value.seek(SeekFrom::End(0))?;
         if length > limits.max_input_bytes {
-            return None;
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork detection input is {length} bytes, exceeding the {} byte limit",
+                limits.max_input_bytes
+            )));
         }
 
-        let length = usize::try_from(length).ok()?;
+        let length = usize::try_from(length).map_err(|_| {
+            crate::Error::InvalidFormat("iWork input length does not fit usize".to_owned())
+        })?;
         let mut data = Vec::new();
-        data.try_reserve_exact(length).ok()?;
+        data.try_reserve_exact(length).map_err(|error| {
+            crate::Error::InvalidFormat(format!(
+                "unable to reserve iWork detection input buffer: {error}"
+            ))
+        })?;
         data.resize(length, 0);
 
-        value.seek(SeekFrom::Start(0)).ok()?;
-        value.read_exact(&mut data).ok()?;
+        value.seek(SeekFrom::Start(0))?;
+        value.read_exact(&mut data)?;
         let mut extra = [0];
-        if value.read(&mut extra).ok()? != 0 {
-            return None;
+        if value.read(&mut extra)? != 0 {
+            return Err(crate::Error::InvalidFormat(
+                "iWork detection source changed while it was being read".to_owned(),
+            ));
         }
         bytes_with_limits(&data, limits)
     })();
-    value.seek(SeekFrom::Start(original)).ok()?;
+    value.seek(SeekFrom::Start(original))?;
     detected
 }
 
 /// Detect a packaged iWork file or a legacy directory bundle.
 ///
 /// Symbolic links, conflicting markers, malformed `Index.zip` archives, and
-/// directory traversal errors fail closed.
-pub fn path(value: impl AsRef<Path>) -> Option<Format> {
+/// directory traversal errors are typed errors.
+pub fn path(value: impl AsRef<Path>) -> crate::Result<Option<Format>> {
     path_with_limits(value, Limits::default())
 }
 
 /// Detect a packaged file or legacy directory bundle under explicit limits.
-pub fn path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Option<Format> {
+pub fn path_with_limits(value: impl AsRef<Path>, limits: Limits) -> crate::Result<Option<Format>> {
     let value = value.as_ref();
     match kind(value)? {
-        Kind::File => reader_with_limits(&mut File::open(value).ok()?, limits),
+        Kind::File => reader_with_limits(&mut File::open(value)?, limits),
         Kind::Dir => directory(value, limits),
-        Kind::Missing => None,
+        Kind::Missing => Ok(None),
     }
 }
 
-fn directory(root: &Path, limits: Limits) -> Option<Format> {
+fn directory(root: &Path, limits: Limits) -> crate::Result<Option<Format>> {
     let mut evidence = classify(
         marker(root, "index.xml")?,
         marker(root, "index.apxl")?,
         marker(root, "index.numbers")?,
     );
     if evidence == Outcome::Conflict {
-        return None;
+        return Err(crate::Error::InvalidFormat(
+            "iWork bundle contains conflicting legacy application markers".to_owned(),
+        ));
     }
 
     let index_zip = root.join("Index.zip");
     evidence = evidence.merge(match kind(&index_zip)? {
-        Kind::File => reader_with_limits(&mut File::open(index_zip).ok()?, limits)
-            .map_or(Outcome::Conflict, Outcome::Found),
+        Kind::File => match reader_with_limits(&mut File::open(&index_zip)?, limits)? {
+            Some(format) => Outcome::Found(format),
+            None => Outcome::Conflict,
+        },
         Kind::Dir => Outcome::Conflict,
         Kind::Missing => Outcome::None,
     });
     if evidence == Outcome::Conflict {
-        return None;
+        return Err(crate::Error::InvalidFormat(
+            "iWork bundle contains an invalid or conflicting Index.zip".to_owned(),
+        ));
     }
 
     let index = root.join("Index");
@@ -355,23 +412,34 @@ fn directory(root: &Path, limits: Limits) -> Option<Format> {
     });
 
     match evidence {
-        Outcome::Found(format) => Some(format),
-        Outcome::None | Outcome::Conflict => None,
+        Outcome::Found(format) => Ok(Some(format)),
+        Outcome::None => Ok(None),
+        Outcome::Conflict => Err(crate::Error::InvalidFormat(
+            "iWork bundle contains conflicting application evidence".to_owned(),
+        )),
     }
 }
 
-fn directory_outcome(index: &Path, limits: Limits) -> Option<Outcome> {
+fn directory_outcome(index: &Path, limits: Limits) -> crate::Result<Outcome> {
     let mut marks = Marks::default();
     let mut document = None;
-    for entry in fs::read_dir(index).ok()? {
-        let entry = entry.ok()?;
-        let kind = entry.file_type().ok()?;
+    for entry in fs::read_dir(index)? {
+        let entry = entry?;
+        let kind = entry.file_type()?;
         if kind.is_symlink() {
-            return None;
+            return Err(crate::Error::InvalidFormat(format!(
+                "iWork bundle index contains symbolic link {}",
+                entry.path().display()
+            )));
         }
         if kind.is_file() {
             let name = entry.file_name();
-            let name = name.to_str()?;
+            let name = name.to_str().ok_or_else(|| {
+                crate::Error::InvalidFormat(format!(
+                    "iWork bundle index contains a non-UTF-8 entry: {}",
+                    entry.path().display()
+                ))
+            })?;
             marks.see_index(name);
             if name == "Document.iwa" {
                 document = Some(entry.path());
@@ -379,22 +447,26 @@ fn directory_outcome(index: &Path, limits: Limits) -> Option<Outcome> {
         }
     }
     if !marks.iwa {
-        return Some(Outcome::Conflict);
+        return Ok(Outcome::None);
     }
     let Some(document) = document else {
-        return Some(Outcome::Conflict);
+        return Err(crate::Error::InvalidFormat(
+            "iWork bundle index contains IWA components but no Document.iwa".to_owned(),
+        ));
     };
-    let document_size = fs::metadata(&document).ok()?.len();
+    let document_size = fs::metadata(&document)?.len();
     if document_size > limits.max_input_bytes || document_size > limits.max_entry_size {
-        return Some(Outcome::Conflict);
+        let limit = limits.max_input_bytes.min(limits.max_entry_size);
+        return Err(crate::Error::InvalidFormat(format!(
+            "iWork Document.iwa is {document_size} bytes, exceeding the {limit} byte limit"
+        )));
     }
-    let Some(format) = fs::read(document)
-        .ok()
-        .and_then(|data| root_format(&data, limits))
-    else {
-        return Some(Outcome::Conflict);
+    let Some(format) = root_format(&fs::read(&document)?, limits)? else {
+        return Err(crate::Error::InvalidFormat(
+            "Document.iwa has no recognized iWork application root".to_owned(),
+        ));
     };
-    Some(if marks.accepts(format) {
+    Ok(if marks.accepts(format) {
         Outcome::Found(format)
     } else {
         Outcome::Conflict
@@ -487,11 +559,14 @@ fn classify(pages: bool, keynote: bool, numbers: bool) -> Outcome {
     }
 }
 
-fn marker(root: &Path, name: &str) -> Option<bool> {
+fn marker(root: &Path, name: &str) -> crate::Result<bool> {
     match kind(&root.join(name))? {
-        Kind::File => Some(true),
-        Kind::Missing => Some(false),
-        Kind::Dir => None,
+        Kind::File => Ok(true),
+        Kind::Missing => Ok(false),
+        Kind::Dir => Err(crate::Error::InvalidFormat(format!(
+            "iWork marker {} is a directory",
+            root.join(name).display()
+        ))),
     }
 }
 
@@ -502,22 +577,28 @@ enum Kind {
     Dir,
 }
 
-fn kind(value: &Path) -> Option<Kind> {
+fn kind(value: &Path) -> crate::Result<Kind> {
     match fs::symlink_metadata(value) {
         Ok(metadata) => {
             let kind = metadata.file_type();
             if kind.is_symlink() {
-                None
+                Err(crate::Error::InvalidFormat(format!(
+                    "iWork detection refuses symbolic link {}",
+                    value.display()
+                )))
             } else if kind.is_file() {
-                Some(Kind::File)
+                Ok(Kind::File)
             } else if kind.is_dir() {
-                Some(Kind::Dir)
+                Ok(Kind::Dir)
             } else {
-                None
+                Err(crate::Error::InvalidFormat(format!(
+                    "iWork detection refuses unsupported filesystem node {}",
+                    value.display()
+                )))
             }
         },
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(Kind::Missing),
-        Err(_) => None,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Kind::Missing),
+        Err(error) => Err(crate::Error::Io(error)),
     }
 }
 
@@ -603,7 +684,7 @@ mod tests {
     #[test]
     fn detects_root_application_with_shared_table_components() {
         assert_eq!(
-            bytes(&document_package(Format::Pages, &[])),
+            bytes(&document_package(Format::Pages, &[])).unwrap(),
             Some(Format::Pages)
         );
         assert_eq!(
@@ -615,37 +696,43 @@ mod tests {
                     "Index/TemplateSlide-31.iwa",
                     "Index/CalculationEngine-81.iwa"
                 ]
-            )),
+            ))
+            .unwrap(),
             Some(Format::Keynote)
         );
         assert_eq!(
             bytes(&document_package(
                 Format::Numbers,
                 &["Index/CalculationEngine-174.iwa"]
-            )),
+            ))
+            .unwrap(),
             Some(Format::Numbers)
         );
         assert_eq!(
             bytes(&document_package(
                 Format::Pages,
                 &["Index/CalculationEngine.iwa"]
-            )),
+            ))
+            .unwrap(),
             Some(Format::Pages)
         );
-        assert_eq!(
-            bytes(&document_package(Format::Numbers, &["Index/Slide-1.iwa"])),
-            None
-        );
-        assert_eq!(
+        assert!(bytes(&document_package(Format::Numbers, &["Index/Slide-1.iwa"])).is_err());
+        assert!(
             bytes(&document_package(
                 Format::Pages,
                 &["Index/MasterSlide-12.iwa"]
-            )),
+            ))
+            .is_err()
+        );
+        assert!(bytes(&package(&[("Index/Document.iwa", b"not iwa")])).is_err());
+        assert_eq!(
+            bytes(&package(&[("Index/Unknown.iwa", b"iwa")])).unwrap(),
             None
         );
-        assert_eq!(bytes(&package(&[("Index/Document.iwa", b"not iwa")])), None);
-        assert_eq!(bytes(&package(&[("Index/Unknown.iwa", b"iwa")])), None);
-        assert_eq!(bytes(&package(&[("Data/image.png", b"iwa")])), None);
+        assert_eq!(
+            bytes(&package(&[("Data/image.png", b"iwa")])).unwrap(),
+            None
+        );
     }
 
     #[test]
@@ -653,24 +740,27 @@ mod tests {
         let root = document(Format::Pages);
         let index = package(&[("Document.iwa", &root)]);
         let outer = package(&[("legacy.pages/Index.zip", &index)]);
-        assert_eq!(bytes(&outer), Some(Format::Pages));
+        assert_eq!(bytes(&outer).unwrap(), Some(Format::Pages));
 
         let ambiguous = package(&[("a/Index.zip", &index), ("b/Index.zip", &index)]);
-        assert_eq!(bytes(&ambiguous), None);
+        assert!(bytes(&ambiguous).is_err());
 
         let root = document(Format::Pages);
         let encrypted = package(&[
             ("Index/Document.iwa", &root),
             ("Metadata/.iwpv2", b"encryption metadata"),
         ]);
-        assert_eq!(bytes(&encrypted), None);
+        assert!(bytes(&encrypted).is_err());
     }
 
     #[test]
     fn checked_limits_preserve_defaults_and_bound_each_layer() {
         let valid = document_package(Format::Pages, &[]);
         let defaults = Limits::default();
-        assert_eq!(bytes_with_limits(&valid, defaults), Some(Format::Pages));
+        assert_eq!(
+            bytes_with_limits(&valid, defaults).unwrap(),
+            Some(Format::Pages)
+        );
         assert_eq!(defaults.max_input_bytes(), Limits::HARD_MAX_INPUT_BYTES);
         assert_eq!(defaults.max_files(), Limits::HARD_MAX_FILES);
         assert_eq!(defaults.max_entry_size(), Limits::HARD_MAX_ENTRY_SIZE);
@@ -681,7 +771,7 @@ mod tests {
         );
 
         let input_bound = Limits::new(1, 1, 1, 1, 1).unwrap();
-        assert_eq!(bytes_with_limits(&valid, input_bound), None);
+        assert!(bytes_with_limits(&valid, input_bound).is_err());
 
         let stream_bound = Limits::new(
             Limits::HARD_MAX_INPUT_BYTES,
@@ -691,7 +781,7 @@ mod tests {
             1,
         )
         .unwrap();
-        assert_eq!(bytes_with_limits(&valid, stream_bound), None);
+        assert!(bytes_with_limits(&valid, stream_bound).is_err());
     }
 
     #[test]
@@ -712,12 +802,12 @@ mod tests {
     fn reader_restores_nonzero_cursor_on_success_and_rejection() {
         let mut valid = Cursor::new(document_package(Format::Pages, &[]));
         valid.set_position(9);
-        assert_eq!(reader(&mut valid), Some(Format::Pages));
+        assert_eq!(reader(&mut valid).unwrap(), Some(Format::Pages));
         assert_eq!(valid.position(), 9);
 
         let mut invalid = Cursor::new(b"not an iWork package".to_vec());
         invalid.set_position(4);
-        assert_eq!(reader(&mut invalid), None);
+        assert_eq!(reader(&mut invalid).unwrap(), None);
         assert_eq!(invalid.position(), 4);
     }
 
@@ -727,12 +817,12 @@ mod tests {
 
         let packaged = temp.0.join("document.pages");
         fs::write(&packaged, document_package(Format::Pages, &[]))?;
-        assert_eq!(path(&packaged), Some(Format::Pages));
+        assert_eq!(path(&packaged).unwrap(), Some(Format::Pages));
 
         let legacy = temp.0.join("legacy.key");
         fs::create_dir(&legacy)?;
         fs::write(legacy.join("index.apxl"), [])?;
-        assert_eq!(path(&legacy), Some(Format::Keynote));
+        assert_eq!(path(&legacy).unwrap(), Some(Format::Keynote));
 
         let bundle = temp.0.join("sheet.numbers");
         fs::create_dir(&bundle)?;
@@ -740,7 +830,7 @@ mod tests {
             bundle.join("Index.zip"),
             document_package(Format::Numbers, &["Index/CalculationEngine-174.iwa"]),
         )?;
-        assert_eq!(path(&bundle), Some(Format::Numbers));
+        assert_eq!(path(&bundle).unwrap(), Some(Format::Numbers));
 
         let agreeing = temp.0.join("agreeing.pages");
         fs::create_dir(&agreeing)?;
@@ -749,7 +839,7 @@ mod tests {
             agreeing.join("Index.zip"),
             document_package(Format::Pages, &[]),
         )?;
-        assert_eq!(path(&agreeing), Some(Format::Pages));
+        assert_eq!(path(&agreeing).unwrap(), Some(Format::Pages));
 
         let unpacked = temp.0.join("unpacked.key");
         fs::create_dir_all(unpacked.join("Index"))?;
@@ -758,11 +848,11 @@ mod tests {
             document(Format::Keynote),
         )?;
         fs::write(unpacked.join("Index/Slide-1.iwa"), [])?;
-        assert_eq!(path(&unpacked), Some(Format::Keynote));
+        assert_eq!(path(&unpacked).unwrap(), Some(Format::Keynote));
 
         let tight = Limits::new(1, 1, 1, 1, 1).unwrap();
-        assert_eq!(path_with_limits(&packaged, tight), None);
-        assert_eq!(path_with_limits(&unpacked, tight), None);
+        assert!(path_with_limits(&packaged, tight).is_err());
+        assert!(path_with_limits(&unpacked, tight).is_err());
         Ok(())
     }
 
@@ -773,20 +863,20 @@ mod tests {
         let generic = temp.0.join("generic");
         fs::create_dir_all(generic.join("Index"))?;
         fs::write(generic.join("Index/Unknown.iwa"), [])?;
-        assert_eq!(path(&generic), None);
+        assert!(path(&generic).is_err());
 
         let media = temp.0.join("media-only");
         fs::create_dir_all(media.join("Data"))?;
         fs::create_dir(media.join("Assets"))?;
         fs::write(media.join("theme-preview.jpg"), [])?;
-        assert_eq!(path(&media), None);
+        assert_eq!(path(&media).unwrap(), None);
 
         let conflict = temp.0.join("conflict");
         fs::create_dir_all(conflict.join("Index"))?;
         fs::write(conflict.join("Index/Document.iwa"), document(Format::Pages))?;
         fs::write(conflict.join("Index/Slide.iwa"), [])?;
         fs::write(conflict.join("Index/CalculationEngine.iwa"), [])?;
-        assert_eq!(path(&conflict), None);
+        assert!(path(&conflict).is_err());
 
         let legacy_conflict = temp.0.join("legacy-conflict");
         fs::create_dir(&legacy_conflict)?;
@@ -795,7 +885,7 @@ mod tests {
             legacy_conflict.join("Index.zip"),
             document_package(Format::Numbers, &[]),
         )?;
-        assert_eq!(path(&legacy_conflict), None);
+        assert!(path(&legacy_conflict).is_err());
 
         let representation_conflict = temp.0.join("representation-conflict");
         fs::create_dir_all(representation_conflict.join("Index"))?;
@@ -808,7 +898,7 @@ mod tests {
             document(Format::Keynote),
         )?;
         fs::write(representation_conflict.join("Index/Slide-1.iwa"), [])?;
-        assert_eq!(path(&representation_conflict), None);
+        assert!(path(&representation_conflict).is_err());
         Ok(())
     }
 

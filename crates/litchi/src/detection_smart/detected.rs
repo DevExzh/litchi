@@ -177,7 +177,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         }
 
         #[cfg(feature = "iwa")]
-        if let Some(format) = litchi_iwa::detect::bytes(&bytes) {
+        if let Ok(Some(format)) = litchi_iwa::detect::bytes(&bytes) {
             return Some(match format {
                 litchi_iwa::detect::Format::Pages => DetectedFormat::Pages(bytes),
                 litchi_iwa::detect::Format::Keynote => DetectedFormat::Keynote(bytes),

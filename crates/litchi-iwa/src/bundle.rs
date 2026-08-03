@@ -608,7 +608,7 @@ impl BundleMetadata {
 
 /// Detect the application type from a bundle path
 pub fn detect_application_type<P: AsRef<Path>>(bundle_path: P) -> Result<String> {
-    Ok(match crate::detect::path(bundle_path) {
+    Ok(match crate::detect::path(bundle_path)? {
         Some(crate::detect::Format::Pages) => "Pages",
         Some(crate::detect::Format::Keynote) => "Keynote",
         Some(crate::detect::Format::Numbers) => "Numbers",
