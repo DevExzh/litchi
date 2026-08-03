@@ -15,24 +15,27 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use litchi_iwa::ref_graph::ReferenceGraph;
+//! use litchi_iwa::ref_graph::{ObjectId, ReferenceGraph};
 //!
 //! let mut graph = ReferenceGraph::new();
 //!
 //! // Build the graph
-//! graph.add_reference(1, 2);  // Object 1 references object 2
-//! graph.add_reference(1, 3);  // Object 1 references object 3
-//! graph.add_reference(2, 3);  // Object 2 references object 3
+//! let one = ObjectId::try_from(1).expect("non-null object ID");
+//! let two = ObjectId::try_from(2).expect("non-null object ID");
+//! let three = ObjectId::try_from(3).expect("non-null object ID");
+//! graph.add_object_reference(one, two);
+//! graph.add_object_reference(one, three);
+//! graph.add_object_reference(two, three);
 //!
 //! // Query dependencies
-//! assert_eq!(graph.get_outgoing_refs(1), Some(vec![2, 3]));
-//! assert_eq!(graph.get_incoming_refs(3), Some(vec![1, 2]));
+//! assert_eq!(graph.outgoing(one).map(|ids| ids.collect::<Vec<_>>()), Some(vec![two, three]));
+//! assert_eq!(graph.incoming(three).map(|ids| ids.collect::<Vec<_>>()), Some(vec![one, two]));
 //!
 //! // Check for cycles
-//! assert!(!graph.has_cycle_from(1));
+//! assert!(!graph.has_cycle(one));
 //!
 //! // Get transitive dependencies
-//! let reachable = graph.get_reachable(1);
+//! let reachable = graph.reachable(one);
 //! assert_eq!(reachable.len(), 3);
 //! ```
 
@@ -240,6 +243,7 @@ impl ReferenceGraph {
     /// graph.add_reference(1, 2);  // Duplicate - will be ignored
     /// assert_eq!(graph.get_outgoing_refs(1), Some(vec![2]));
     /// ```
+    #[deprecated(note = "use add_object_reference(ObjectId, ObjectId) for checked identities")]
     pub fn add_reference(&mut self, source_id: u64, target_id: u64) {
         if let (Some(source), Some(target)) = (ObjectId::new(source_id), ObjectId::new(target_id)) {
             self.add_object_reference(source, target);
@@ -322,6 +326,7 @@ impl ReferenceGraph {
     /// let all = graph.all_objects();
     /// assert_eq!(all.len(), 3);
     /// ```
+    #[deprecated(note = "use all_object_ids for the typed identity view")]
     pub fn all_objects(&self) -> std::collections::HashSet<u64> {
         self.all_object_ids()
             .into_iter()
@@ -382,6 +387,7 @@ impl ReferenceGraph {
     /// graph.add_reference(3, 1);  // Creates cycle
     /// assert!(graph.has_cycle_from(1));
     /// ```
+    #[deprecated(note = "use has_cycle(ObjectId) for checked identity semantics")]
     pub fn has_cycle_from(&self, start_id: u64) -> bool {
         let Some(start_id) = ObjectId::new(start_id) else {
             return false;

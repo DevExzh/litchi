@@ -329,8 +329,9 @@ impl ObjectIndex {
     /// # Performance
     ///
     /// O(V + E) where V is vertices and E is edges in the reachable subgraph
+    #[deprecated(note = "use has_cycle_from(ObjectId) for checked identity semantics")]
     pub fn has_circular_reference(&self, object_id: u64) -> bool {
-        self.reference_graph.has_cycle_from(object_id)
+        ObjectId::new(object_id).is_some_and(|object_id| self.has_cycle_from(object_id))
     }
 
     /// Check for a cycle through the validated identity API.
@@ -764,7 +765,6 @@ mod tests {
         assert!(index.reference_graph().is_empty());
         assert_eq!(index.get_dependencies(1), None);
         assert_eq!(index.get_dependents(1), None);
-        assert!(!index.has_circular_reference(1));
         assert_eq!(index.get_transitive_dependencies(1), vec![1]);
 
         let object_id = ObjectId::try_from(1).unwrap();
