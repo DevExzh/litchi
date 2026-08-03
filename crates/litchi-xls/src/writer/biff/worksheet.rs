@@ -941,6 +941,26 @@ pub fn write_hyperlink<W: Write>(
         ));
     }
 
+    // HLink stores its target as Ref8U (MS-XLS 2.5.209): rows are ordered
+    // u16 values, while columns are ordered values in the 0..=0xFF grid.
+    // Validate the complete range before choosing a hyperlink encoding so a
+    // malformed record can never be emitted for an out-of-grid target.
+    if row1 > row2 {
+        return Err(XlsError::InvalidCellReference(
+            "Hyperlink row range must be ordered".to_string(),
+        ));
+    }
+    if col1 > col2 {
+        return Err(XlsError::InvalidCellReference(
+            "Hyperlink column range must be ordered".to_string(),
+        ));
+    }
+    if col2 > u8::MAX as u16 {
+        return Err(XlsError::InvalidCellReference(
+            "Hyperlink column index must be <= 255 for BIFF8".to_string(),
+        ));
+    }
+
     let r1 = row1 as u16;
     let r2 = row2 as u16;
 
@@ -1426,5 +1446,41 @@ mod view_round_trip_tests {
         assert!(write_scl(&mut Vec::new(), 5, 1).is_err());
         assert!(write_pane(&mut Vec::new(), 1, 256).is_err());
         assert!(write_default_selection(&mut Vec::new(), 0, 256).is_err());
+    }
+}
+
+#[cfg(test)]
+mod hyperlink_writer_tests {
+    use super::write_hyperlink;
+
+    #[test]
+    fn rejects_invalid_ref8u_ranges_before_emitting_bytes() {
+        for (row1, row2, col1, col2) in [(2, 1, 0, 0), (0, 0, 2, 1), (0, 0, 0, 256)] {
+            let mut output = Vec::new();
+            assert!(
+                write_hyperlink(&mut output, row1, row2, col1, col2, "https://example.com",)
+                    .is_err()
+            );
+            assert!(output.is_empty());
+        }
+    }
+
+    #[test]
+    fn accepts_maximum_ref8u_bounds() {
+        let mut output = Vec::new();
+        write_hyperlink(
+            &mut output,
+            u32::from(u16::MAX),
+            u32::from(u16::MAX),
+            u16::from(u8::MAX),
+            u16::from(u8::MAX),
+            "https://example.com",
+        )
+        .unwrap();
+
+        assert_eq!(&output[4..6], &u16::MAX.to_le_bytes());
+        assert_eq!(&output[6..8], &u16::MAX.to_le_bytes());
+        assert_eq!(&output[8..10], &u16::from(u8::MAX).to_le_bytes());
+        assert_eq!(&output[10..12], &u16::from(u8::MAX).to_le_bytes());
     }
 }

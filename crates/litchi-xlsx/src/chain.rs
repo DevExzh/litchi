@@ -1,5 +1,7 @@
 //! Typed, inert SpreadsheetML calculation-chain metadata and package ownership.
 
+use std::collections::HashSet;
+
 use crate::error::{Error, Result, allocation, invalid};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_sheet::{At, Cell as Address};
@@ -21,6 +23,7 @@ const MAX_CELLS: usize = 2_000_000;
 const MAX_XML_BYTES: usize = 256 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 const MAX_EXTENSION_BYTES: usize = 16 * 1024 * 1024;
+const MAX_CELL_CONTENT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_EXTENSION_ATTRIBUTES: usize = 256;
 const MAX_ATTRIBUTE_BYTES: usize = 1024 * 1024;
 const MAX_EXTENSION_DEPTH: usize = 128;
@@ -205,6 +208,7 @@ impl Cell {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chain {
     cells: Vec<Cell>,
+    ambiguous_key: Option<(Sheet, Address)>,
     extension_list_xml: Option<String>,
     namespace_declarations: Vec<(String, String)>,
     attrs: Vec<Attr>,
@@ -216,6 +220,7 @@ impl Chain {
         first.explicit_sheet = true;
         Self {
             cells: vec![first],
+            ambiguous_key: None,
             extension_list_xml: None,
             namespace_declarations: Vec::new(),
             attrs: Vec::new(),
@@ -260,7 +265,16 @@ impl Chain {
         if self.cells.len() >= MAX_CELLS {
             return Err(invalid("calculation chain has too many cells"));
         }
-        self.reject_duplicate(&cell, None)?;
+        if self.matching_position(cell.sheet, cell.address)?.is_some() {
+            return Err(invalid(format!(
+                "calculation cell {} on sheet {} already exists",
+                cell.address,
+                cell.sheet.get()
+            )));
+        }
+        self.cells
+            .try_reserve(1)
+            .map_err(|source| allocation("calculation-chain cells", source))?;
         self.cells.push(cell);
         self.ensure_sheet_boundaries();
         Ok(self)
@@ -277,7 +291,16 @@ impl Chain {
         if self.cells.len() >= MAX_CELLS {
             return Err(invalid("calculation chain has too many cells"));
         }
-        self.reject_duplicate(&cell, None)?;
+        if self.matching_position(cell.sheet, cell.address)?.is_some() {
+            return Err(invalid(format!(
+                "calculation cell {} on sheet {} already exists",
+                cell.address,
+                cell.sheet.get()
+            )));
+        }
+        self.cells
+            .try_reserve(1)
+            .map_err(|source| allocation("calculation-chain cells", source))?;
         self.cells.insert(position, cell);
         self.ensure_sheet_boundaries();
         Ok(self)
@@ -287,7 +310,14 @@ impl Chain {
     pub fn put(&mut self, cell: Cell) -> Result<Option<Cell>> {
         match self.matching_position(cell.sheet, cell.address)? {
             None => {
-                self.push(cell)?;
+                if self.cells.len() >= MAX_CELLS {
+                    return Err(invalid("calculation chain has too many cells"));
+                }
+                self.cells
+                    .try_reserve(1)
+                    .map_err(|source| allocation("calculation-chain cells", source))?;
+                self.cells.push(cell);
+                self.ensure_sheet_boundaries();
                 Ok(None)
             },
             Some(position) => {
@@ -302,7 +332,11 @@ impl Chain {
     pub fn replace_at(&mut self, position: usize, cell: Cell) -> Result<Cell> {
         self.at(position)?;
         self.reject_duplicate(&cell, Some(position))?;
+        let mut key_index = self.key_index_if_ambiguous()?;
         let previous = std::mem::replace(&mut self.cells[position], cell);
+        if let Some(key_index) = &mut key_index {
+            self.refresh_ambiguity(key_index);
+        }
         self.ensure_sheet_boundaries();
         Ok(previous)
     }
@@ -322,7 +356,11 @@ impl Chain {
         if self.cells.len() == 1 {
             return Err(invalid("a calculation chain cannot be empty"));
         }
+        let mut key_index = self.key_index_if_ambiguous()?;
         let removed = self.cells.remove(position);
+        if let Some(key_index) = &mut key_index {
+            self.refresh_ambiguity(key_index);
+        }
         self.ensure_sheet_boundaries();
         Ok(removed)
     }
@@ -355,19 +393,39 @@ impl Chain {
     }
 
     fn matching_position(&self, sheet: Sheet, address: Address) -> Result<Option<usize>> {
-        let mut found = None;
-        for (position, cell) in self.cells.iter().enumerate() {
-            if cell.sheet == sheet && cell.address == address {
-                if found.is_some() {
-                    return Err(invalid(format!(
-                        "calculation chain contains ambiguous cell {address} on sheet {}",
-                        sheet.get()
-                    )));
-                }
-                found = Some(position);
+        if let Some((ambiguous_sheet, ambiguous_address)) = self.ambiguous_key {
+            return Err(invalid(format!(
+                "calculation chain contains ambiguous cell {} on sheet {}",
+                ambiguous_address,
+                ambiguous_sheet.get()
+            )));
+        }
+        Ok(self
+            .cells
+            .iter()
+            .position(|cell| cell.sheet == sheet && cell.address == address))
+    }
+
+    fn key_index_if_ambiguous(&self) -> Result<Option<HashSet<(Sheet, Address)>>> {
+        if self.ambiguous_key.is_none() {
+            return Ok(None);
+        }
+        let mut seen = HashSet::new();
+        seen.try_reserve(self.cells.len())
+            .map_err(|source| allocation("calculation-chain key index", source))?;
+        Ok(Some(seen))
+    }
+
+    fn refresh_ambiguity(&mut self, seen: &mut HashSet<(Sheet, Address)>) {
+        seen.clear();
+        self.ambiguous_key = None;
+        for cell in &self.cells {
+            let key = (cell.sheet, cell.address);
+            if !seen.insert(key) {
+                self.ambiguous_key = Some(key);
+                break;
             }
         }
-        Ok(found)
     }
 
     fn reject_duplicate(&self, cell: &Cell, except: Option<usize>) -> Result<()> {
@@ -454,6 +512,8 @@ pub fn write(chain: &Chain, conformance: Conformance) -> Result<Vec<u8>> {
 #[derive(Default)]
 struct Builder {
     cells: Vec<Cell>,
+    seen_keys: HashSet<(Sheet, Address)>,
+    ambiguous_key: Option<(Sheet, Address)>,
     extension_list_xml: Option<String>,
     namespace_declarations: Vec<(String, String)>,
     attrs: Vec<Attr>,
@@ -466,6 +526,7 @@ impl Builder {
         }
         let mut chain = Chain {
             cells: self.cells,
+            ambiguous_key: self.ambiguous_key,
             extension_list_xml: self.extension_list_xml,
             namespace_declarations: self.namespace_declarations,
             attrs: self.attrs,
@@ -535,7 +596,8 @@ pub fn read(xml: &[u8]) -> Result<Chain> {
                     return Err(invalid("calculation cells must precede extLst"));
                 }
                 let cell = parse_cell(&element, decoder, &resolver, current_sheet)?;
-                consume_leaf(&mut reader, b"c")?;
+                let content_start = position(&reader)?;
+                consume_leaf(&mut reader, b"c", content_start)?;
                 current_sheet = Some(cell.sheet);
                 push_cell(&mut builder, cell)?;
             },
@@ -554,7 +616,7 @@ pub fn read(xml: &[u8]) -> Result<Chain> {
                 if std::mem::replace(&mut saw_extensions, true) {
                     return Err(invalid("duplicate calculation-chain extLst"));
                 }
-                let end = consume_extension_list(&mut reader)?;
+                let end = consume_extension_list(&mut reader, start)?;
                 builder.extension_list_xml = Some(raw_range(bytes, start, end)?);
             },
             Event::Start(element) | Event::Empty(element) if saw_root && !closed_root => {
@@ -993,16 +1055,45 @@ fn push_cell(builder: &mut Builder, cell: Cell) -> Result<()> {
     if builder.cells.len() >= MAX_CELLS {
         return Err(invalid("calculation chain has too many cells"));
     }
+    let key = (cell.sheet, cell.address);
+    let duplicate = builder.seen_keys.contains(&key);
+    builder
+        .cells
+        .try_reserve(1)
+        .map_err(|source| allocation("calculation-chain cells", source))?;
+    if !duplicate {
+        builder
+            .seen_keys
+            .try_reserve(1)
+            .map_err(|source| allocation("calculation-chain key index", source))?;
+        builder.seen_keys.insert(key);
+    } else if builder.ambiguous_key.is_none() {
+        builder.ambiguous_key = Some(key);
+    }
     builder.cells.push(cell);
     Ok(())
 }
 
-fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()> {
+fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8], start: usize) -> Result<()> {
     loop {
-        match reader
+        let event_start = position(reader)?;
+        enforce_budget(
+            start,
+            event_start,
+            MAX_CELL_CONTENT_BYTES,
+            "calculation cell content exceeds its byte limit",
+        )?;
+        let event = reader
             .read_event()
-            .map_err(|error| invalid(format!("invalid calculation-cell XML: {error}")))?
-        {
+            .map_err(|error| invalid(format!("invalid calculation-cell XML: {error}")))?;
+        let event_end = position(reader)?;
+        enforce_budget(
+            start,
+            event_end,
+            MAX_CELL_CONTENT_BYTES,
+            "calculation cell content exceeds its byte limit",
+        )?;
+        match event {
             Event::End(element) if element.local_name().as_ref() == local => return Ok(()),
             Event::Text(text)
                 if text
@@ -1020,14 +1111,28 @@ fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()> {
     }
 }
 
-fn consume_extension_list(reader: &mut NsReader<&[u8]>) -> Result<usize> {
+fn consume_extension_list(reader: &mut NsReader<&[u8]>, start: usize) -> Result<usize> {
     let mut depth = 1usize;
     let mut nodes = 0usize;
     while depth != 0 {
-        match reader
+        let event_start = position(reader)?;
+        enforce_budget(
+            start,
+            event_start,
+            MAX_EXTENSION_BYTES,
+            "calculation-chain extension list is too large",
+        )?;
+        let event = reader
             .read_event()
-            .map_err(|error| invalid(format!("invalid extension XML: {error}")))?
-        {
+            .map_err(|error| invalid(format!("invalid extension XML: {error}")))?;
+        let event_end = position(reader)?;
+        enforce_budget(
+            start,
+            event_end,
+            MAX_EXTENSION_BYTES,
+            "calculation-chain extension list is too large",
+        )?;
+        match event {
             Event::Start(_) => {
                 depth = depth
                     .checked_add(1)
@@ -1292,6 +1397,16 @@ fn raw_range(bytes: &[u8], start: usize, end: usize) -> Result<String> {
     .map_err(|error| invalid(format!("calculation-chain extension is not UTF-8: {error}")))
 }
 
+fn enforce_budget(start: usize, current: usize, limit: usize, message: &'static str) -> Result<()> {
+    let consumed = current
+        .checked_sub(start)
+        .ok_or_else(|| invalid("calculation-chain XML offset moved backwards"))?;
+    if consumed > limit {
+        return Err(invalid(message));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1405,6 +1520,54 @@ mod tests {
         let chain = read(xml.as_bytes()).unwrap();
         assert_eq!(chain.len(), 2);
         assert!(chain.get(Sheet::new(1).unwrap(), "A1").is_err());
+    }
+
+    #[test]
+    fn semantic_mutations_reject_ambiguous_imports_without_changing_order() {
+        let xml = format!(
+            r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" i="1"/><c r="A1"/><c r="B2"/></calcChain>"#
+        );
+        let mut chain = read(xml.as_bytes()).unwrap();
+        let before = chain.clone();
+        let sheet = Sheet::new(1).unwrap();
+
+        assert!(chain.get(sheet, "B2").is_err());
+        assert!(chain.put(Cell::new(sheet, "C3").unwrap()).is_err());
+        assert!(chain.push(Cell::new(sheet, "C3").unwrap()).is_err());
+        assert!(chain.insert(1, Cell::new(sheet, "C3").unwrap()).is_err());
+        assert!(chain.remove(sheet, "B2").is_err());
+        assert_eq!(chain, before);
+    }
+
+    #[test]
+    fn positional_repairs_refresh_ambiguous_import_state() {
+        let xml = format!(
+            r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" i="1"/><c r="A1"/><c r="B2"/></calcChain>"#
+        );
+        let mut chain = read(xml.as_bytes()).unwrap();
+        let sheet = Sheet::new(1).unwrap();
+
+        chain.remove_at(1).unwrap();
+        assert_eq!(chain.get(sheet, "B2").unwrap().unwrap().reference(), "B2");
+
+        let mut chain = read(xml.as_bytes()).unwrap();
+        chain
+            .replace_at(1, Cell::new(sheet, "C3").unwrap())
+            .unwrap();
+        assert_eq!(chain.get(sheet, "C3").unwrap().unwrap().reference(), "C3");
+    }
+
+    #[test]
+    fn rejects_oversized_nested_calculation_content_before_decoding() {
+        let mut xml =
+            format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" i="1">"#).into_bytes();
+        xml.extend(std::iter::repeat_n(
+            b' ',
+            MAX_CELL_CONTENT_BYTES.saturating_add(1),
+        ));
+        xml.extend_from_slice(b"</c></calcChain>");
+
+        assert!(read(&xml).is_err());
     }
 
     #[test]

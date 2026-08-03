@@ -60,23 +60,42 @@ pub(super) enum WorkbookFormat {
 pub fn detect_workbook_format_from_signature<R: Read + Seek>(
     reader: &mut R,
 ) -> Result<WorkbookFormat> {
-    let mut header = [0u8; 8];
-    reader.seek(SeekFrom::Start(0))?;
-    reader.read_exact(&mut header)?;
-    reader.seek(SeekFrom::Start(0))?;
+    const OLE2_SIGNATURE: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+    const ZIP_SIGNATURE: [u8; 4] = [b'P', b'K', 0x03, 0x04];
 
-    // Check for OLE2 format (XLS)
-    if &header[0..8] == b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1" {
-        return Ok(WorkbookFormat::Xls);
+    let original = reader.stream_position()?;
+    let detected = (|| {
+        reader.seek(SeekFrom::Start(0))?;
+
+        let mut prefix = [0u8; ZIP_SIGNATURE.len()];
+        reader.read_exact(&mut prefix)?;
+
+        // Check for ZIP-based workbooks (XLSX, XLSB, or Numbers). The
+        // complete four-byte local-file signature is sufficient here; format
+        // refinement performs package validation when it is requested.
+        if prefix == ZIP_SIGNATURE {
+            return Ok(WorkbookFormat::Xlsx);
+        }
+
+        // OLE2 has an eight-byte signature. Do not classify a truncated
+        // prefix as XLS, even when the first four bytes happen to match.
+        if prefix == OLE2_SIGNATURE[..prefix.len()] {
+            let mut suffix = [0u8; OLE2_SIGNATURE.len() - ZIP_SIGNATURE.len()];
+            reader.read_exact(&mut suffix)?;
+            if suffix == OLE2_SIGNATURE[prefix.len()..] {
+                return Ok(WorkbookFormat::Xls);
+            }
+        }
+
+        Err(Error::NotOfficeFile)
+    })();
+
+    let restored = reader.seek(SeekFrom::Start(original));
+    match (detected, restored) {
+        (Ok(format), Ok(_)) => Ok(format),
+        (Err(error), Ok(_)) => Err(error),
+        (Ok(_), Err(error)) | (Err(_), Err(error)) => Err(error.into()),
     }
-
-    // Check for ZIP format (XLSX, XLSB, or Numbers)
-    if &header[0..4] == b"PK\x03\x04" {
-        // Default to XLSX, will be refined later
-        return Ok(WorkbookFormat::Xlsx);
-    }
-
-    Err(Error::NotOfficeFile)
 }
 
 /// Refine ZIP-based workbook format detection (XLSX vs XLSB vs Numbers)
@@ -152,13 +171,24 @@ mod tests {
 
     #[test]
     fn test_detect_workbook_format_from_signature_xlsx() {
-        // ZIP signature for XLSX files (needs at least 8 bytes for the detection function)
-        let data = b"PK\x03\x04extra_data_here";
+        // The complete ZIP local-file signature is enough for the initial
+        // classification; package refinement validates the actual workbook.
+        let data = b"PK\x03\x04";
         let mut cursor = Cursor::new(data);
+        cursor.set_position(2);
         let result = detect_workbook_format_from_signature(&mut cursor);
         assert!(result.is_ok());
         // Returns Xlsx by default for ZIP files
         assert_eq!(result.unwrap(), WorkbookFormat::Xlsx);
+        assert_eq!(cursor.position(), 2);
+    }
+
+    #[test]
+    fn test_detect_workbook_format_rejects_truncated_ole2_signature() {
+        let mut cursor = Cursor::new(b"\xD0\xCF\x11\xE0".to_vec());
+        let result = detect_workbook_format_from_signature(&mut cursor);
+        assert!(matches!(result, Err(Error::Io(_))));
+        assert_eq!(cursor.position(), 0);
     }
 
     #[test]

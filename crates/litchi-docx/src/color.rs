@@ -1,5 +1,9 @@
 //! Shared strict WordprocessingML color vocabulary.
 
+use std::str::FromStr;
+
+use crate::{Error, Result};
+
 /// A theme-color slot used by WordprocessingML formatting and web metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Theme {
@@ -23,7 +27,38 @@ pub enum Theme {
 }
 
 impl Theme {
+    /// Every value in the WordprocessingML `ST_ThemeColor` domain.
+    ///
+    /// The array is ordered according to the checked-in WordprocessingML
+    /// vocabulary and is allocation-free to iterate. It deliberately does
+    /// not include DrawingML-only `ST_SchemeColorVal` tokens such as `dk1` or
+    /// `hlink`.
+    pub const ALL: [Self; 17] = [
+        Self::Dark1,
+        Self::Light1,
+        Self::Dark2,
+        Self::Light2,
+        Self::Accent1,
+        Self::Accent2,
+        Self::Accent3,
+        Self::Accent4,
+        Self::Accent5,
+        Self::Accent6,
+        Self::Hyperlink,
+        Self::FollowedHyperlink,
+        Self::None,
+        Self::Background1,
+        Self::Text1,
+        Self::Background2,
+        Self::Text2,
+    ];
+
     /// Parse the exact `ST_ThemeColor` lexical token.
+    ///
+    /// This compatibility parser retains the original `Option` API. New
+    /// callers should use [`Self::parse_str`] or `str::parse`, which preserve
+    /// the distinction between an invalid token and an absent optional
+    /// attribute.
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "dark1" => Some(Self::Dark1),
@@ -45,6 +80,15 @@ impl Theme {
             "text2" => Some(Self::Text2),
             _ => None,
         }
+    }
+
+    /// Parse an exact `ST_ThemeColor` token with a typed DOCX error.
+    ///
+    /// WordprocessingML theme colors are case-sensitive. The parser rejects
+    /// similarly named DrawingML scheme-color tokens instead of silently
+    /// widening this format-specific domain.
+    pub fn parse_str(value: &str) -> Result<Self> {
+        Self::parse(value).ok_or_else(|| Error::Invalid(format!("invalid theme color '{value}'")))
     }
 
     /// Return the exact `ST_ThemeColor` lexical token.
@@ -71,33 +115,45 @@ impl Theme {
     }
 }
 
+impl FromStr for Theme {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        Self::parse_str(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Theme;
 
     #[test]
     fn every_theme_color_round_trips() {
-        for value in [
-            Theme::Dark1,
-            Theme::Light1,
-            Theme::Dark2,
-            Theme::Light2,
-            Theme::Accent1,
-            Theme::Accent2,
-            Theme::Accent3,
-            Theme::Accent4,
-            Theme::Accent5,
-            Theme::Accent6,
-            Theme::Hyperlink,
-            Theme::FollowedHyperlink,
-            Theme::None,
-            Theme::Background1,
-            Theme::Text1,
-            Theme::Background2,
-            Theme::Text2,
-        ] {
+        for value in Theme::ALL {
             assert_eq!(Theme::parse(value.as_str()), Some(value));
+            assert!(matches!(
+                Theme::parse_str(value.as_str()),
+                Ok(parsed) if parsed == value
+            ));
+            assert!(matches!(
+                value.as_str().parse::<Theme>(),
+                Ok(parsed) if parsed == value
+            ));
         }
         assert_eq!(Theme::parse("Accent1"), None);
+    }
+
+    #[test]
+    fn strict_parser_rejects_invalid_and_other_color_domains() {
+        for value in ["", "Accent1", "accent7", "dk1", "hlink", "phClr"] {
+            assert!(Theme::parse_str(value).is_err(), "{value}");
+            assert!(value.parse::<Theme>().is_err(), "{value}");
+            assert_eq!(Theme::parse(value), None, "{value}");
+        }
+
+        assert!(matches!(
+            Theme::parse_str("accent7"),
+            Err(crate::Error::Invalid(message)) if message == "invalid theme color 'accent7'"
+        ));
     }
 }

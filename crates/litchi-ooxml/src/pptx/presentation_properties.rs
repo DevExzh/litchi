@@ -327,10 +327,16 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                 let node = make_node(&e, d, &stack)?;
                 attach(&mut stack, &mut root, node)?;
             },
-            Ok(Event::End(_)) => {
+            Ok(Event::End(e)) => {
                 let node = stack
                     .pop()
                     .ok_or_else(|| invalid("unexpected closing element"))?;
+                if node.qname.as_bytes() != e.name().as_ref() {
+                    return Err(invalid(format!(
+                        "mismatched closing element for '{}'",
+                        node.qname
+                    )));
+                }
                 attach(&mut stack, &mut root, node)?;
             },
             Ok(Event::Text(t)) => {
@@ -1680,5 +1686,13 @@ mod tests {
             },
         ));
         assert!(v.to_xml(false).is_err());
+    }
+
+    #[test]
+    fn rejects_mismatched_closing_elements() {
+        let xml = format!(
+            r#"<p:presentationPr xmlns:p="{P_NS}"><p:showPr></p:webPr></p:presentationPr>"#
+        );
+        assert!(PresentationProperties::parse(xml.as_bytes()).is_err());
     }
 }

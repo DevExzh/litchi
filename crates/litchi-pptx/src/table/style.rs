@@ -1076,6 +1076,7 @@ enum SemanticToken {
         local: String,
     },
     Text(String),
+    Comment(String),
 }
 
 struct SemanticCursor<'a> {
@@ -1168,7 +1169,12 @@ impl<'a> SemanticCursor<'a> {
                         text.decode().map_err(xml_error)?.into_owned(),
                     )));
                 },
-                Event::Decl(_) | Event::Comment(_) => {},
+                Event::Comment(comment) => {
+                    return Ok(Some(SemanticToken::Comment(
+                        comment.decode().map_err(xml_error)?.into_owned(),
+                    )));
+                },
+                Event::Decl(_) => {},
                 Event::DocType(_) | Event::PI(_) => {
                     return Err(invalid("forbidden markup in table-style XML"));
                 },
@@ -1383,6 +1389,33 @@ mod tests {
         assert_eq!(
             load(&package).unwrap().unwrap().source_xml(),
             Some(changed_opaque.as_bytes())
+        );
+    }
+
+    #[test]
+    fn semantic_comparison_publishes_changed_opaque_comments() {
+        let original = format!(
+            r#"<a:tblStyleLst xmlns:a="{A}" def="{DEFAULT}"><a:tblStyle styleId="{FIRST}" styleName="x"><a:extLst><!-- producer note --><a:ext uri="x"/></a:extLst></a:tblStyle></a:tblStyleLst>"#,
+        );
+        let changed = format!(
+            r#"<a:tblStyleLst xmlns:a="{A}" def="{DEFAULT}"><a:tblStyle styleId="{FIRST}" styleName="x"><a:extLst><!-- updated producer note --><a:ext uri="x"/></a:extLst></a:tblStyle></a:tblStyleLst>"#,
+        );
+        let mut package = synthetic(
+            ct::PML_PRESENTATION_MAIN,
+            Conformance::Transitional,
+            Some(original.as_bytes()),
+        );
+
+        assert!(
+            put(
+                &mut package,
+                List::parse(changed.as_bytes().to_vec()).unwrap()
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            load(&package).unwrap().unwrap().source_xml(),
+            Some(changed.as_bytes())
         );
     }
 
