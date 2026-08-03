@@ -20,7 +20,7 @@ use crate::bundle::Bundle;
 use crate::media::{MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject};
 use crate::ref_graph::ObjectId;
-use crate::registry::{Application, detect_application, detect_application_from_document};
+use crate::registry::{Application, detect_application_from_document};
 use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
@@ -50,18 +50,10 @@ impl Document {
         let bundle = Bundle::open(path_ref)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        // Detect application type from message types
-        let all_message_types: Vec<u32> = bundle
-            .archives()
-            .values()
-            .flat_map(|archive| &archive.objects)
-            .flat_map(|obj| &obj.messages)
-            .map(|msg| msg.type_)
-            .collect();
-
-        let application = detect_bundle_application(&bundle)
-            .or_else(|| detect_application(&all_message_types))
-            .unwrap_or(Application::Common);
+        // Application ownership is established only by the validated root
+        // DocumentArchive envelope. Numeric message IDs overlap across iWork
+        // applications and are not safe evidence for a fallback guess.
+        let application = detect_bundle_application(&bundle).unwrap_or(Application::Common);
 
         // Try to create media manager (may fail for single-file bundles)
         let media_manager = MediaManager::new(path_ref).ok();
@@ -97,18 +89,10 @@ impl Document {
         let media_manager = MediaManager::from_bytes(bytes).ok();
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        // Detect application type from message types
-        let all_message_types: Vec<u32> = bundle
-            .archives()
-            .values()
-            .flat_map(|archive| &archive.objects)
-            .flat_map(|obj| &obj.messages)
-            .map(|msg| msg.type_)
-            .collect();
-
-        let application = detect_bundle_application(&bundle)
-            .or_else(|| detect_application(&all_message_types))
-            .unwrap_or(Application::Common);
+        // Application ownership is established only by the validated root
+        // DocumentArchive envelope. Numeric message IDs overlap across iWork
+        // applications and are not safe evidence for a fallback guess.
+        let application = detect_bundle_application(&bundle).unwrap_or(Application::Common);
 
         Ok(Self::from_parts(
             bundle,
@@ -328,6 +312,8 @@ impl DocumentStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::registry::detect_application;
 
     fn assert_send_sync<T: Send + Sync>() {}
 
@@ -374,6 +360,30 @@ mod tests {
 
         // Test empty input
         assert_eq!(detect_application(&[]), None);
+    }
+
+    #[test]
+    fn document_application_detection_fails_closed_on_overlapping_message_ids() {
+        let object = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 101,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let mut package = crate::IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/Document.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        assert_eq!(document.application(), Application::Common);
     }
 
     #[test]
