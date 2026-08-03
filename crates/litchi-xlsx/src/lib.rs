@@ -19,6 +19,7 @@ pub mod row;
 pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod style;
+pub mod volatile_dependencies;
 pub mod web;
 mod workbook;
 pub mod xml_maps;

@@ -166,13 +166,13 @@ impl MiniFatBuilder {
     ///
     /// * `Vec<Vec<u8>>` - Vector of MiniFAT sectors
     pub fn generate_minifat_sectors(&self, sector_size: usize) -> Result<Vec<Vec<u8>>, OleError> {
-        if self.minifat.is_empty() {
-            return Ok(Vec::new());
-        }
         if !matches!(sector_size, 512 | 4096) {
             return Err(OleError::InvalidData(format!(
                 "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
             )));
+        }
+        if self.minifat.is_empty() {
+            return Ok(Vec::new());
         }
 
         let entries_per_sector = sector_size / 4;
@@ -323,6 +323,15 @@ mod tests {
     fn serialized_minifat_rejects_invalid_sector_geometry() {
         let mut minifat = MiniFatBuilder::new(64);
         minifat.allocate_mini_chain(&[1]).unwrap();
+        assert!(matches!(
+            minifat.generate_minifat_sectors(0),
+            Err(OleError::InvalidData(_))
+        ));
+    }
+
+    #[test]
+    fn empty_minifat_rejects_invalid_sector_geometry() {
+        let minifat = MiniFatBuilder::new(64);
         assert!(matches!(
             minifat.generate_minifat_sectors(0),
             Err(OleError::InvalidData(_))

@@ -139,7 +139,9 @@ impl FunctionGroupCollector {
                 self.extended
                     .push(parse_unicode_string(record_type, &data[12..])?);
             },
-            _ => unreachable!(),
+            _ => {
+                return invalid(record_type, "unsupported function-group record");
+            },
         }
         self.validate_resource_bounds(record_type)
     }

@@ -1490,7 +1490,7 @@ fn set_simple_payload(
                 filter_value: optional_f64(e, b"filterVal", d)?,
             })
         },
-        _ => unreachable!(),
+        _ => return Err(invalid("unsupported filterColumn payload")),
     });
     Ok(())
 }

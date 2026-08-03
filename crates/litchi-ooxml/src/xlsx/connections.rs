@@ -808,7 +808,7 @@ fn parse_connection(n: &Node) -> Result<Connection> {
             3 => set(&mut c.text, parse_text(child)?)?,
             4 => set(&mut c.parameters, parse_parameters(child)?)?,
             5 => set(&mut c.extension_xml, node_xml(child, false)?)?,
-            _ => unreachable!(),
+            _ => return Err(invalid("unexpected connection child index")),
         }
     }
     Ok(c)
