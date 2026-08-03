@@ -7,7 +7,7 @@ use quick_xml::{
     encoding::Decoder,
     events::{BytesStart, Event},
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 const X: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const XS: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -280,17 +280,17 @@ impl Connections {
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         validate(self)?;
         let ns = if strict { XS } else { X };
-        let mut x = format!(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><connections xmlns="{ns}">"#
-        );
+        let mut x = BoundedXml::new();
+        x.push_str(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><connections xmlns=\"",
+        )?;
+        x.push_str(ns)?;
+        x.push_str("\">")?;
         for c in &self.connections {
             write_connection(&mut x, c, strict)?;
         }
-        x.push_str("</connections>");
-        if x.len() > MAX {
-            return Err(invalid("serialized connections part exceeds 16 MiB"));
-        }
-        Ok(x.into_bytes())
+        x.push_str("</connections>")?;
+        Ok(x.finish())
     }
 }
 
@@ -308,8 +308,12 @@ impl Connections {
                 connection.id
             )));
         }
+        validate_connections(self.connections.iter().chain(std::iter::once(&connection)))?;
+        self.connections
+            .try_reserve(1)
+            .map_err(|_| invalid("connection collection allocation failed"))?;
         self.connections.push(connection);
-        validate(self)
+        Ok(())
     }
 
     pub fn update(&mut self, id: u32, connection: Connection) -> Result<()> {
@@ -325,10 +329,19 @@ impl Connections {
             .iter()
             .position(|candidate| candidate.id == id)
             .ok_or_else(|| invalid(format!("connection ID {id} was not found")))?;
-        let mut staged = self.clone();
-        staged.connections[offset] = connection;
-        validate(&staged)?;
-        *self = staged;
+        validate_connections(
+            self.connections
+                .iter()
+                .enumerate()
+                .map(|(index, candidate)| {
+                    if index == offset {
+                        &connection
+                    } else {
+                        candidate
+                    }
+                }),
+        )?;
+        self.connections[offset] = connection;
         Ok(())
     }
 
@@ -340,6 +353,12 @@ impl Connections {
         else {
             return Ok(false);
         };
+        validate_connections(
+            self.connections
+                .iter()
+                .enumerate()
+                .filter_map(|(index, connection)| (index != offset).then_some(connection)),
+        )?;
         self.connections.remove(offset);
         Ok(true)
     }
@@ -348,19 +367,40 @@ impl Connections {
         if ordered_ids.len() != self.connections.len() {
             return Err(invalid("connection reorder must contain every ID"));
         }
-        let expected = self
-            .connections
-            .iter()
-            .map(|item| item.id)
-            .collect::<HashSet<_>>();
-        let actual = ordered_ids.iter().copied().collect::<HashSet<_>>();
-        if expected != actual || actual.len() != ordered_ids.len() {
-            return Err(invalid("connection reorder is not a permutation"));
+        let mut index_by_id = HashMap::new();
+        index_by_id
+            .try_reserve(self.connections.len())
+            .map_err(|_| invalid("connection reorder allocation failed"))?;
+        for (index, connection) in self.connections.iter().enumerate() {
+            if index_by_id.insert(connection.id, index).is_some() {
+                return Err(invalid("connection reorder is not a permutation"));
+            }
         }
-        self.connections = ordered_ids
-            .iter()
-            .map(|id| self.find(*id).expect("permutation was validated").clone())
-            .collect();
+
+        let mut seen = HashSet::new();
+        seen.try_reserve(ordered_ids.len())
+            .map_err(|_| invalid("connection reorder allocation failed"))?;
+        let mut ranks = Vec::new();
+        ranks
+            .try_reserve_exact(ordered_ids.len())
+            .map_err(|_| invalid("connection reorder allocation failed"))?;
+        ranks.resize(ordered_ids.len(), usize::MAX);
+        for (rank, id) in ordered_ids.iter().enumerate() {
+            let Some(&index) = index_by_id.get(id) else {
+                return Err(invalid("connection reorder is not a permutation"));
+            };
+            if !seen.insert(*id) {
+                return Err(invalid("connection reorder is not a permutation"));
+            }
+            ranks[index] = rank;
+        }
+        self.connections.sort_unstable_by_key(|connection| {
+            index_by_id
+                .get(&connection.id)
+                .and_then(|index| ranks.get(*index))
+                .copied()
+                .unwrap_or(usize::MAX)
+        });
         Ok(())
     }
 }
@@ -1133,30 +1173,70 @@ fn parse_parameters(n: &Node) -> Result<Vec<ConnectionParameter>> {
     Ok(out)
 }
 
-fn write_connection(x: &mut String, c: &Connection, s: bool) -> Result<()> {
-    x.push_str("<connection");
-    num(x, "id", c.id);
-    str_opt(x, "sourceFile", c.source_file.as_deref());
-    str_opt(x, "odcFile", c.odc_file.as_deref());
-    bool_opt(x, "keepAlive", c.keep_alive);
-    num_opt(x, "interval", c.interval);
-    str_opt(x, "name", c.name.as_deref());
-    str_opt(x, "description", c.description.as_deref());
-    num_opt(x, "type", c.connection_type);
-    num_opt(x, "reconnectionMethod", c.reconnection_method);
-    num(x, "refreshedVersion", c.refreshed_version);
-    num_opt(x, "minRefreshableVersion", c.min_refreshable_version);
-    bool_opt(x, "savePassword", c.save_password);
-    bool_opt(x, "new", c.new_connection);
-    bool_opt(x, "deleted", c.deleted);
-    bool_opt(x, "onlyUseConnectionFile", c.only_use_connection_file);
-    bool_opt(x, "background", c.background);
-    bool_opt(x, "refreshOnLoad", c.refresh_on_load);
-    bool_opt(x, "saveData", c.save_data);
-    if let Some(v) = c.credentials {
-        attr(x, "credentials", credentials_str(v));
+struct BoundedXml {
+    bytes: Vec<u8>,
+}
+
+impl BoundedXml {
+    fn new() -> Self {
+        Self { bytes: Vec::new() }
     }
-    str_opt(x, "singleSignOnId", c.single_sign_on_id.as_deref());
+
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.push_bytes(value.as_bytes())
+    }
+
+    fn push_char(&mut self, value: char) -> Result<()> {
+        let mut encoded = [0; 4];
+        let length = value.encode_utf8(&mut encoded).len();
+        self.push_bytes(&encoded[..length])
+    }
+
+    fn push_bytes(&mut self, value: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(value.len())
+            .ok_or_else(|| invalid("serialized connections length overflows"))?;
+        if length > MAX {
+            return Err(invalid("serialized connections part exceeds 16 MiB"));
+        }
+        self.bytes
+            .try_reserve_exact(value.len())
+            .map_err(|_| invalid("serialized connections output allocation failed"))?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+fn write_connection(x: &mut BoundedXml, c: &Connection, s: bool) -> Result<()> {
+    x.push_str("<connection")?;
+    num(x, "id", c.id)?;
+    str_opt(x, "sourceFile", c.source_file.as_deref())?;
+    str_opt(x, "odcFile", c.odc_file.as_deref())?;
+    bool_opt(x, "keepAlive", c.keep_alive)?;
+    num_opt(x, "interval", c.interval)?;
+    str_opt(x, "name", c.name.as_deref())?;
+    str_opt(x, "description", c.description.as_deref())?;
+    num_opt(x, "type", c.connection_type)?;
+    num_opt(x, "reconnectionMethod", c.reconnection_method)?;
+    num(x, "refreshedVersion", c.refreshed_version)?;
+    num_opt(x, "minRefreshableVersion", c.min_refreshable_version)?;
+    bool_opt(x, "savePassword", c.save_password)?;
+    bool_opt(x, "new", c.new_connection)?;
+    bool_opt(x, "deleted", c.deleted)?;
+    bool_opt(x, "onlyUseConnectionFile", c.only_use_connection_file)?;
+    bool_opt(x, "background", c.background)?;
+    bool_opt(x, "refreshOnLoad", c.refresh_on_load)?;
+    bool_opt(x, "saveData", c.save_data)?;
+    if let Some(v) = c.credentials {
+        attr(x, "credentials", credentials_str(v))?;
+    }
+    str_opt(x, "singleSignOnId", c.single_sign_on_id.as_deref())?;
     if c.database.is_none()
         && c.olap.is_none()
         && c.web.is_none()
@@ -1164,38 +1244,38 @@ fn write_connection(x: &mut String, c: &Connection, s: bool) -> Result<()> {
         && c.parameters.is_none()
         && c.extension_xml.is_none()
     {
-        x.push_str("/>");
+        x.push_str("/>")?;
         return Ok(());
     }
-    x.push('>');
+    x.push_char('>')?;
     if let Some(v) = &c.database {
-        x.push_str("<dbPr");
-        attr(x, "connection", &v.connection);
-        str_opt(x, "command", v.command.as_deref());
-        str_opt(x, "serverCommand", v.server_command.as_deref());
-        num_opt(x, "commandType", v.command_type);
-        x.push_str("/>");
+        x.push_str("<dbPr")?;
+        attr(x, "connection", &v.connection)?;
+        str_opt(x, "command", v.command.as_deref())?;
+        str_opt(x, "serverCommand", v.server_command.as_deref())?;
+        num_opt(x, "commandType", v.command_type)?;
+        x.push_str("/>")?;
     }
     if let Some(v) = &c.olap {
-        write_olap(x, v);
+        write_olap(x, v)?;
     }
     if let Some(v) = &c.web {
-        write_web(x, v);
+        write_web(x, v)?;
     }
     if let Some(v) = &c.text {
-        write_text(x, v);
+        write_text(x, v)?;
     }
     if let Some(v) = &c.parameters {
-        write_parameters(x, v);
+        write_parameters(x, v)?;
     }
     if let Some(v) = &c.extension_xml {
         opaque(x, v, s)?;
     }
-    x.push_str("</connection>");
+    x.push_str("</connection>")?;
     Ok(())
 }
-fn write_olap(x: &mut String, v: &OlapProperties) {
-    x.push_str("<olapPr");
+fn write_olap(x: &mut BoundedXml, v: &OlapProperties) -> Result<()> {
+    x.push_str("<olapPr")?;
     for (n, b) in [
         ("local", v.local),
         ("localRefresh", v.local_refresh),
@@ -1205,14 +1285,15 @@ fn write_olap(x: &mut String, v: &OlapProperties) {
         ("serverFont", v.server_font),
         ("serverFontColor", v.server_font_color),
     ] {
-        bool_opt(x, n, b)
+        bool_opt(x, n, b)?;
     }
-    str_opt(x, "localConnection", v.local_connection.as_deref());
-    num_opt(x, "rowDrillCount", v.row_drill_count);
-    x.push_str("/>")
+    str_opt(x, "localConnection", v.local_connection.as_deref())?;
+    num_opt(x, "rowDrillCount", v.row_drill_count)?;
+    x.push_str("/>")?;
+    Ok(())
 }
-fn write_web(x: &mut String, v: &WebQueryProperties) {
-    x.push_str("<webPr");
+fn write_web(x: &mut BoundedXml, v: &WebQueryProperties) -> Result<()> {
+    x.push_str("<webPr")?;
     for (n, b) in [
         ("xml", v.xml_source),
         ("sourceData", v.source_data),
@@ -1224,48 +1305,49 @@ fn write_web(x: &mut String, v: &WebQueryProperties) {
         ("xl2000", v.excel2000),
         ("htmlTables", v.html_tables),
     ] {
-        bool_opt(x, n, b)
+        bool_opt(x, n, b)?;
     }
-    str_opt(x, "url", v.url.as_deref());
-    str_opt(x, "post", v.post.as_deref());
+    str_opt(x, "url", v.url.as_deref())?;
+    str_opt(x, "post", v.post.as_deref())?;
     if let Some(h) = v.html_format {
-        attr(x, "htmlFormat", html_str(h));
+        attr(x, "htmlFormat", html_str(h))?;
     }
-    str_opt(x, "editPage", v.edit_page.as_deref());
+    str_opt(x, "editPage", v.edit_page.as_deref())?;
     if let Some(t) = &v.tables {
-        x.push_str("><tables");
-        num(x, "count", t.len());
-        x.push('>');
+        x.push_str("><tables")?;
+        num(x, "count", t.len())?;
+        x.push_char('>')?;
         for z in t {
             match z {
-                WebTableSelector::Missing => x.push_str("<m/>"),
+                WebTableSelector::Missing => x.push_str("<m/>")?,
                 WebTableSelector::String(v) => {
-                    x.push_str("<s");
-                    attr(x, "v", v);
-                    x.push_str("/>");
+                    x.push_str("<s")?;
+                    attr(x, "v", v)?;
+                    x.push_str("/>")?;
                 },
                 WebTableSelector::Index(v) => {
-                    x.push_str("<x");
-                    num(x, "v", *v);
-                    x.push_str("/>");
+                    x.push_str("<x")?;
+                    num(x, "v", *v)?;
+                    x.push_str("/>")?;
                 },
             }
         }
-        x.push_str("</tables></webPr>");
+        x.push_str("</tables></webPr>")?;
     } else {
-        x.push_str("/>");
+        x.push_str("/>")?;
     }
+    Ok(())
 }
-fn write_text(x: &mut String, v: &TextImportProperties) {
-    x.push_str("<textPr");
-    bool_opt(x, "prompt", v.prompt);
+fn write_text(x: &mut BoundedXml, v: &TextImportProperties) -> Result<()> {
+    x.push_str("<textPr")?;
+    bool_opt(x, "prompt", v.prompt)?;
     if let Some(z) = v.file_type {
-        attr(x, "fileType", file_str(z));
+        attr(x, "fileType", file_str(z))?;
     }
-    num_opt(x, "codePage", v.code_page);
-    str_opt(x, "characterSet", v.character_set.as_deref());
-    num_opt(x, "firstRow", v.first_row);
-    str_opt(x, "sourceFile", v.source_file.as_deref());
+    num_opt(x, "codePage", v.code_page)?;
+    str_opt(x, "characterSet", v.character_set.as_deref())?;
+    num_opt(x, "firstRow", v.first_row)?;
+    str_opt(x, "sourceFile", v.source_file.as_deref())?;
     for (n, b) in [
         ("delimited", v.delimited),
         ("tab", v.tab),
@@ -1274,69 +1356,96 @@ fn write_text(x: &mut String, v: &TextImportProperties) {
         ("semicolon", v.semicolon),
         ("consecutive", v.consecutive),
     ] {
-        bool_opt(x, n, b)
+        bool_opt(x, n, b)?;
     }
-    str_opt(x, "decimal", v.decimal.as_deref());
-    str_opt(x, "thousands", v.thousands.as_deref());
+    str_opt(x, "decimal", v.decimal.as_deref())?;
+    str_opt(x, "thousands", v.thousands.as_deref())?;
     if let Some(z) = v.qualifier {
-        attr(x, "qualifier", qualifier_str(z));
+        attr(x, "qualifier", qualifier_str(z))?;
     }
-    str_opt(x, "delimiter", v.delimiter.as_deref());
+    str_opt(x, "delimiter", v.delimiter.as_deref())?;
     if let Some(f) = &v.fields {
-        x.push_str("><textFields");
-        num(x, "count", f.len());
-        x.push('>');
+        x.push_str("><textFields")?;
+        num(x, "count", f.len())?;
+        x.push_char('>')?;
         for z in f {
-            x.push_str("<textField");
+            x.push_str("<textField")?;
             if let Some(t) = z.field_type {
-                attr(x, "type", field_str(t));
+                attr(x, "type", field_str(t))?;
             }
-            num_opt(x, "position", z.position);
-            x.push_str("/>");
+            num_opt(x, "position", z.position)?;
+            x.push_str("/>")?;
         }
-        x.push_str("</textFields></textPr>");
+        x.push_str("</textFields></textPr>")?;
     } else {
-        x.push_str("/>");
+        x.push_str("/>")?;
     }
+    Ok(())
 }
-fn write_parameters(x: &mut String, v: &[ConnectionParameter]) {
-    x.push_str("<parameters");
-    num(x, "count", v.len());
-    x.push('>');
+fn write_parameters(x: &mut BoundedXml, v: &[ConnectionParameter]) -> Result<()> {
+    x.push_str("<parameters")?;
+    num(x, "count", v.len())?;
+    x.push_char('>')?;
     for p in v {
-        x.push_str("<parameter");
-        str_opt(x, "name", p.name.as_deref());
-        num_opt(x, "sqlType", p.sql_type);
+        x.push_str("<parameter")?;
+        str_opt(x, "name", p.name.as_deref())?;
+        num_opt(x, "sqlType", p.sql_type)?;
         if let Some(z) = p.parameter_type {
-            attr(x, "parameterType", parameter_str(z));
+            attr(x, "parameterType", parameter_str(z))?;
         }
-        bool_opt(x, "refreshOnChange", p.refresh_on_change);
-        str_opt(x, "prompt", p.prompt.as_deref());
-        bool_opt(x, "boolean", p.boolean);
+        bool_opt(x, "refreshOnChange", p.refresh_on_change)?;
+        str_opt(x, "prompt", p.prompt.as_deref())?;
+        bool_opt(x, "boolean", p.boolean)?;
         if let Some(z) = p.double {
-            attr(x, "double", &z.to_string());
+            let value = z.to_string();
+            attr(x, "double", &value)?;
         }
-        num_opt(x, "integer", p.integer);
-        str_opt(x, "string", p.string.as_deref());
-        str_opt(x, "cell", p.cell.as_deref());
-        x.push_str("/>");
+        num_opt(x, "integer", p.integer)?;
+        str_opt(x, "string", p.string.as_deref())?;
+        str_opt(x, "cell", p.cell.as_deref())?;
+        x.push_str("/>")?;
     }
-    x.push_str("</parameters>");
+    x.push_str("</parameters>")?;
+    Ok(())
 }
 
 fn validate(v: &Connections) -> Result<()> {
-    if v.connections.is_empty() || v.connections.len() > MAX_CONNECTIONS {
-        return Err(invalid("invalid connection count"));
-    }
+    validate_connections(v.connections.iter())
+}
+
+fn validate_connections<'a, I>(connections: I) -> Result<()>
+where
+    I: IntoIterator<Item = &'a Connection>,
+{
+    let connections = connections.into_iter();
+    let (lower, upper) = connections.size_hint();
+    let reserve = upper.unwrap_or(lower).min(MAX_CONNECTIONS);
     let mut ids = HashSet::new();
     let mut names = HashSet::new();
+    ids.try_reserve(reserve)
+        .map_err(|_| invalid("connection validation allocation failed"))?;
+    names
+        .try_reserve(reserve)
+        .map_err(|_| invalid("connection validation allocation failed"))?;
+    let mut count = 0usize;
     let mut ext = 0usize;
-    for c in &v.connections {
+    for c in connections {
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("connection count overflow"))?;
+        if count > MAX_CONNECTIONS {
+            return Err(invalid("invalid connection count"));
+        }
+        ids.try_reserve(1)
+            .map_err(|_| invalid("connection validation allocation failed"))?;
         if !ids.insert(c.id) {
             return Err(invalid("duplicate connection id"));
         }
         if let Some(n) = &c.name {
             bounded(n)?;
+            names
+                .try_reserve(1)
+                .map_err(|_| invalid("connection validation allocation failed"))?;
             if !names.insert(n) {
                 return Err(invalid("duplicate connection name"));
             }
@@ -1389,12 +1498,15 @@ fn validate(v: &Connections) -> Result<()> {
                 .ok_or_else(|| invalid("extension size overflow"))?;
         }
     }
+    if count == 0 {
+        return Err(invalid("invalid connection count"));
+    }
     if ext > MAX_EXT {
         return Err(invalid("connection extensions exceed 8 MiB"));
     }
     Ok(())
 }
-fn opaque(x: &mut String, b: &[u8], strict: bool) -> Result<()> {
+fn opaque(x: &mut BoundedXml, b: &[u8], strict: bool) -> Result<()> {
     parse_dom(b)?;
     let mut s = std::str::from_utf8(b).map_err(xml_error)?.to_string();
     if strict {
@@ -1402,7 +1514,7 @@ fn opaque(x: &mut String, b: &[u8], strict: bool) -> Result<()> {
     } else {
         s = s.replace(XS, X)
     }
-    x.push_str(&s);
+    x.push_str(&s)?;
     Ok(())
 }
 fn node_xml(n: &Node, s: bool) -> Result<Vec<u8>> {
@@ -1606,30 +1718,47 @@ fn bounded(v: &str) -> Result<()> {
         Ok(())
     }
 }
-fn attr(x: &mut String, n: &str, v: &str) {
-    x.push(' ');
-    x.push_str(n);
-    x.push_str("=\"");
-    esc(x, v);
-    x.push('"')
+fn attr(x: &mut BoundedXml, n: &str, v: &str) -> Result<()> {
+    x.push_char(' ')?;
+    x.push_str(n)?;
+    x.push_str("=\"")?;
+    esc_bounded(x, v)?;
+    x.push_char('"')
 }
-fn str_opt(x: &mut String, n: &str, v: Option<&str>) {
+fn str_opt(x: &mut BoundedXml, n: &str, v: Option<&str>) -> Result<()> {
     if let Some(v) = v {
-        attr(x, n, v)
+        attr(x, n, v)?;
     }
+    Ok(())
 }
-fn bool_opt(x: &mut String, n: &str, v: Option<bool>) {
+fn bool_opt(x: &mut BoundedXml, n: &str, v: Option<bool>) -> Result<()> {
     if let Some(v) = v {
-        attr(x, n, if v { "1" } else { "0" })
+        attr(x, n, if v { "1" } else { "0" })?;
     }
+    Ok(())
 }
-fn num<T: std::fmt::Display>(x: &mut String, n: &str, v: T) {
+fn num<T: std::fmt::Display>(x: &mut BoundedXml, n: &str, v: T) -> Result<()> {
     attr(x, n, &v.to_string())
 }
-fn num_opt<T: std::fmt::Display>(x: &mut String, n: &str, v: Option<T>) {
+fn num_opt<T: std::fmt::Display>(x: &mut BoundedXml, n: &str, v: Option<T>) -> Result<()> {
     if let Some(v) = v {
-        num(x, n, v)
+        num(x, n, v)?;
     }
+    Ok(())
+}
+fn esc_bounded(x: &mut BoundedXml, v: &str) -> Result<()> {
+    for c in v.chars() {
+        match c {
+            '&' => x.push_str("&amp;")?,
+            '<' => x.push_str("&lt;")?,
+            '"' => x.push_str("&quot;")?,
+            '\r' => x.push_str("&#xD;")?,
+            '\n' => x.push_str("&#xA;")?,
+            '\t' => x.push_str("&#x9;")?,
+            _ => x.push_char(c)?,
+        }
+    }
+    Ok(())
 }
 fn esc(x: &mut String, v: &str) {
     for c in v.chars() {
@@ -1805,6 +1934,59 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn failed_add_preserves_the_existing_connection_set() {
+        let xml = format!(
+            r#"<connections xmlns="{X}"><connection id="1" refreshedVersion="0"/></connections>"#
+        );
+        let mut value = Connections::parse(xml.as_bytes()).unwrap();
+        let before = value.clone();
+
+        let mut invalid = value.connections[0].clone();
+        invalid.id = 2;
+        invalid.description = Some("x".repeat(MAX_STRING + 1));
+        assert!(value.add(invalid).is_err());
+        assert_eq!(value, before);
+
+        let duplicate = value.connections[0].clone();
+        assert!(value.add(duplicate).is_err());
+        assert_eq!(value, before);
+    }
+
+    #[test]
+    fn failed_reorder_preserves_the_existing_connection_order() {
+        let xml = format!(
+            r#"<connections xmlns="{X}"><connection id="1" refreshedVersion="0"/><connection id="2" refreshedVersion="0"/></connections>"#
+        );
+        let mut value = Connections::parse(xml.as_bytes()).unwrap();
+        let before = value.clone();
+
+        assert!(value.reorder(&[1, 1]).is_err());
+        assert_eq!(value, before);
+
+        value.reorder(&[2, 1]).unwrap();
+        assert_eq!(
+            value
+                .connections
+                .iter()
+                .map(|connection| connection.id)
+                .collect::<Vec<_>>(),
+            vec![2, 1]
+        );
+    }
+
+    #[test]
+    fn bounded_serializer_rejects_oversized_output_before_appending() {
+        let mut output = BoundedXml::new();
+        let error = output.push_bytes(&vec![b'x'; MAX + 1]).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "serialized connections part exceeds 16 MiB"
+        );
+        assert!(output.bytes.is_empty());
+    }
+
     fn package(content_type: &str, external: bool, outbound: bool) -> OpcPackage {
         let mut p = OpcPackage::new();
         let wb = PackURI::new("/xl/workbook.xml").unwrap();

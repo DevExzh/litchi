@@ -12,6 +12,8 @@ use quick_xml::{Reader, Writer, XmlVersion};
 
 const NS: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_NS: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const NS_TEXT: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_NS_TEXT: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps";
 const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/xmlMaps";
 const CONTENT_TYPE: &str = "application/xml";
@@ -101,86 +103,80 @@ impl XmlMapInfo {
 
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         validate(self)?;
-        let namespace = if strict {
-            std::str::from_utf8(STRICT_NS).map_err(xml_error)?
-        } else {
-            std::str::from_utf8(NS).map_err(xml_error)?
-        };
-        let mut xml = String::from(
+        let namespace = if strict { STRICT_NS_TEXT } else { NS_TEXT };
+        let mut xml = BoundedXml::new();
+        xml.push_str(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><MapInfo xmlns=\"",
-        );
-        escape_attr(&mut xml, namespace);
-        xml.push_str("\" SelectionNamespaces=\"");
-        escape_attr(&mut xml, &self.selection_namespaces);
-        xml.push_str("\">");
+        )?;
+        escape_attr(&mut xml, namespace)?;
+        xml.push_str("\" SelectionNamespaces=\"")?;
+        escape_attr(&mut xml, &self.selection_namespaces)?;
+        xml.push_str("\">")?;
         for schema in &self.schemas {
-            xml.push_str("<Schema ID=\"");
-            escape_attr(&mut xml, &schema.id);
-            xml.push('"');
-            optional_string_attr(&mut xml, "SchemaRef", schema.schema_reference.as_deref());
-            optional_string_attr(&mut xml, "Namespace", schema.namespace.as_deref());
+            xml.push_str("<Schema ID=\"")?;
+            escape_attr(&mut xml, &schema.id)?;
+            xml.push_char('"')?;
+            optional_string_attr(&mut xml, "SchemaRef", schema.schema_reference.as_deref())?;
+            optional_string_attr(&mut xml, "Namespace", schema.namespace.as_deref())?;
             if let Some(payload) = &schema.payload_xml {
-                xml.push('>');
-                xml.push_str(std::str::from_utf8(payload).map_err(xml_error)?);
-                xml.push_str("</Schema>");
+                xml.push_char('>')?;
+                xml.push_str(std::str::from_utf8(payload).map_err(xml_error)?)?;
+                xml.push_str("</Schema>")?;
             } else {
-                xml.push_str("/>");
+                xml.push_str("/>")?;
             }
         }
         for map in &self.maps {
-            xml.push_str("<Map ID=\"");
-            xml.push_str(&map.id.to_string());
-            xml.push_str("\" Name=\"");
-            escape_attr(&mut xml, &map.name);
-            xml.push_str("\" RootElement=\"");
-            escape_attr(&mut xml, &map.root_element);
-            xml.push_str("\" SchemaID=\"");
-            escape_attr(&mut xml, &map.schema_id);
-            xml.push('"');
+            xml.push_str("<Map ID=\"")?;
+            xml.push_str(&map.id.to_string())?;
+            xml.push_str("\" Name=\"")?;
+            escape_attr(&mut xml, &map.name)?;
+            xml.push_str("\" RootElement=\"")?;
+            escape_attr(&mut xml, &map.root_element)?;
+            xml.push_str("\" SchemaID=\"")?;
+            escape_attr(&mut xml, &map.schema_id)?;
+            xml.push_char('"')?;
             bool_attr(
                 &mut xml,
                 "ShowImportExportValidationErrors",
                 map.show_import_export_validation_errors,
-            );
-            bool_attr(&mut xml, "AutoFit", map.auto_fit);
-            bool_attr(&mut xml, "Append", map.append);
+            )?;
+            bool_attr(&mut xml, "AutoFit", map.auto_fit)?;
+            bool_attr(&mut xml, "Append", map.append)?;
             bool_attr(
                 &mut xml,
                 "PreserveSortAFLayout",
                 map.preserve_sort_auto_filter_layout,
-            );
-            bool_attr(&mut xml, "PreserveFormat", map.preserve_format);
+            )?;
+            bool_attr(&mut xml, "PreserveFormat", map.preserve_format)?;
             if let Some(binding) = &map.data_binding {
-                xml.push_str("><DataBinding");
+                xml.push_str("><DataBinding")?;
                 optional_string_attr(
                     &mut xml,
                     "DataBindingName",
                     binding.data_binding_name.as_deref(),
-                );
-                optional_bool_attr(&mut xml, "FileBinding", binding.file_binding);
-                optional_u32_attr(&mut xml, "ConnectionID", binding.connection_id);
+                )?;
+                optional_bool_attr(&mut xml, "FileBinding", binding.file_binding)?;
+                optional_u32_attr(&mut xml, "ConnectionID", binding.connection_id)?;
                 optional_string_attr(
                     &mut xml,
                     "FileBindingName",
                     binding.file_binding_name.as_deref(),
-                );
-                optional_u32_attr(&mut xml, "DataBindingLoadMode", Some(binding.load_mode));
+                )?;
+                optional_u32_attr(&mut xml, "DataBindingLoadMode", Some(binding.load_mode))?;
                 if let Some(payload) = &binding.payload_xml {
-                    xml.push('>');
-                    xml.push_str(std::str::from_utf8(payload).map_err(xml_error)?);
-                    xml.push_str("</DataBinding></Map>");
+                    xml.push_char('>')?;
+                    xml.push_str(std::str::from_utf8(payload).map_err(xml_error)?)?;
+                    xml.push_str("</DataBinding></Map>")?;
                 } else {
-                    xml.push_str("/></Map>");
+                    xml.push_str("/></Map>")?;
                 }
             } else {
-                xml.push_str("/>");
+                xml.push_str("/>")?;
             }
         }
-        xml.push_str("</MapInfo>");
-        if xml.len() > MAX_PART_BYTES {
-            return Err(invalid("serialized custom XML maps part exceeds 32 MiB"));
-        }
-        Ok(xml.into_bytes())
+        xml.push_str("</MapInfo>")?;
+        Ok(xml.finish())
     }
 }
 
@@ -1157,46 +1153,91 @@ fn optional_bounded(value: Option<&str>) -> Result<()> {
         Ok(())
     }
 }
-fn optional_string_attr(xml: &mut String, name: &str, value: Option<&str>) {
-    if let Some(value) = value {
-        xml.push(' ');
-        xml.push_str(name);
-        xml.push_str("=\"");
-        escape_attr(xml, value);
-        xml.push('"');
+struct BoundedXml {
+    bytes: Vec<u8>,
+}
+
+impl BoundedXml {
+    fn new() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.push_bytes(value.as_bytes())
+    }
+
+    fn push_char(&mut self, value: char) -> Result<()> {
+        let mut encoded = [0; 4];
+        let length = value.encode_utf8(&mut encoded).len();
+        self.push_bytes(&encoded[..length])
+    }
+
+    fn push_bytes(&mut self, value: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(value.len())
+            .ok_or_else(|| invalid("serialized custom XML maps length overflows"))?;
+        if length > MAX_PART_BYTES {
+            return Err(invalid("serialized custom XML maps part exceeds 32 MiB"));
+        }
+        self.bytes
+            .try_reserve_exact(value.len())
+            .map_err(|_| invalid("serialized custom XML maps output allocation failed"))?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
     }
 }
-fn optional_bool_attr(xml: &mut String, name: &str, value: Option<bool>) {
+
+fn optional_string_attr(xml: &mut BoundedXml, name: &str, value: Option<&str>) -> Result<()> {
     if let Some(value) = value {
-        bool_attr(xml, name, value);
+        xml.push_char(' ')?;
+        xml.push_str(name)?;
+        xml.push_str("=\"")?;
+        escape_attr(xml, value)?;
+        xml.push_char('"')?;
     }
+    Ok(())
 }
-fn optional_u32_attr(xml: &mut String, name: &str, value: Option<u32>) {
+fn optional_bool_attr(xml: &mut BoundedXml, name: &str, value: Option<bool>) -> Result<()> {
     if let Some(value) = value {
-        xml.push(' ');
-        xml.push_str(name);
-        xml.push_str("=\"");
-        xml.push_str(&value.to_string());
-        xml.push('"');
+        bool_attr(xml, name, value)?;
     }
+    Ok(())
 }
-fn bool_attr(xml: &mut String, name: &str, value: bool) {
-    xml.push(' ');
-    xml.push_str(name);
-    xml.push_str(if value { "=\"1\"" } else { "=\"0\"" });
+fn optional_u32_attr(xml: &mut BoundedXml, name: &str, value: Option<u32>) -> Result<()> {
+    if let Some(value) = value {
+        xml.push_char(' ')?;
+        xml.push_str(name)?;
+        xml.push_str("=\"")?;
+        xml.push_str(&value.to_string())?;
+        xml.push_char('"')?;
+    }
+    Ok(())
 }
-fn escape_attr(out: &mut String, value: &str) {
+fn bool_attr(xml: &mut BoundedXml, name: &str, value: bool) -> Result<()> {
+    xml.push_char(' ')?;
+    xml.push_str(name)?;
+    xml.push_str(if value { "=\"1\"" } else { "=\"0\"" })?;
+    Ok(())
+}
+fn escape_attr(out: &mut BoundedXml, value: &str) -> Result<()> {
     for c in value.chars() {
         match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '"' => out.push_str("&quot;"),
-            '\r' => out.push_str("&#xD;"),
-            '\n' => out.push_str("&#xA;"),
-            '\t' => out.push_str("&#x9;"),
-            _ => out.push(c),
+            '&' => out.push_str("&amp;")?,
+            '<' => out.push_str("&lt;")?,
+            '"' => out.push_str("&quot;")?,
+            '\r' => out.push_str("&#xD;")?,
+            '\n' => out.push_str("&#xA;")?,
+            '\t' => out.push_str("&#x9;")?,
+            _ => out.push_char(c)?,
         }
     }
+    Ok(())
 }
 fn invalid(message: impl Into<String>) -> Box<dyn std::error::Error + Send + Sync> {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()).into()
@@ -1367,6 +1408,31 @@ mod tests {
         ));
         valid.schemas[0].payload_xml = Some(b"<?unsafe?><x/>".to_vec());
         assert!(valid.to_xml(false).is_err());
+    }
+
+    #[test]
+    fn serializer_rejects_oversized_output_before_final_append() {
+        fn large_payload() -> Vec<u8> {
+            let mut payload = Vec::with_capacity(MAX_OPAQUE_BYTES);
+            payload.extend_from_slice(b"<x>");
+            payload.resize(MAX_OPAQUE_BYTES - 4, b'x');
+            payload.extend_from_slice(b"</x>");
+            payload
+        }
+
+        let mut value = fixture_info();
+        value.schemas[0].payload_xml = Some(large_payload());
+        value.maps[0]
+            .data_binding
+            .as_mut()
+            .expect("fixture has a data binding")
+            .payload_xml = Some(large_payload());
+
+        let error = value.to_xml(false).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "serialized custom XML maps part exceeds 32 MiB"
+        );
     }
 
     #[test]
