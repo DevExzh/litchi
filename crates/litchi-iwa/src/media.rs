@@ -465,8 +465,23 @@ impl MediaManager {
         Ok(assets)
     }
 
+    /// Get the compatibility lookup map keyed by basename.
+    ///
+    /// Callers that need reproducible traversal should use
+    /// [`Self::assets_in_order`] instead of depending on `HashMap` iteration
+    /// order.
     pub fn assets(&self) -> &HashMap<String, MediaAsset> {
         &self.state.assets
+    }
+
+    /// Return all materialized assets in deterministic relative-path order.
+    ///
+    /// The vector owns only the ordering allocation; each asset remains
+    /// borrowed from this immutable manager snapshot.
+    pub fn assets_in_order(&self) -> Vec<&MediaAsset> {
+        let mut assets: Vec<_> = self.state.assets.values().collect();
+        assets.sort_unstable_by_key(|asset| asset.path.as_os_str());
+        assets
     }
 
     /// Return the checked resource profile used by this manager.
@@ -1989,6 +2004,21 @@ mod tests {
             .unwrap();
 
         let manager = MediaManager::from_package(package).unwrap();
+        let all_paths: Vec<_> = manager
+            .assets_in_order()
+            .into_iter()
+            .map(|asset| asset.path.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            all_paths,
+            vec![
+                "Data/a-image.png",
+                "Data/clip.m4a",
+                "Data/image-7.png",
+                "Data/z-image.png"
+            ]
+        );
+
         let image_paths: Vec<_> = manager
             .images()
             .into_iter()
