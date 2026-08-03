@@ -1,7 +1,7 @@
 //! Mutable iWork ZIP package with entry-order preservation.
 
 use std::collections::HashSet;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Component, Path};
 use std::sync::Arc;
@@ -567,26 +567,62 @@ impl IWorkPackage {
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.validate_state()?;
         let mut writer = StreamingArchiveWriter::new();
-        for (name, data) in &self.state.entries {
-            writer.write_stored(name, data).map_err(|error| {
-                Error::Bundle(format!("Failed to write package entry {name}: {error}"))
-            })?;
-        }
+        self.write_entries(&mut writer)?;
         writer
             .finish_to_bytes()
             .map_err(|error| Error::Bundle(format!("Failed to finish iWork ZIP: {error}")))
     }
 
-    /// Atomically save the package to a file in the destination directory.
+    /// Stream the package as a ZIP to a caller-owned sequential sink.
+    ///
+    /// The package is validated before the first byte is written. ZIP central
+    /// directory records are finalized by the sink writer, so this method does
+    /// not allocate a second buffer containing the complete package.
+    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> {
+        self.validate_state()?;
+        let mut writer = StreamingArchiveWriter::with_writer(sink);
+        self.write_entries(&mut writer)?;
+        writer
+            .finish()
+            .map(|_| ())
+            .map_err(|error| Error::Bundle(format!("Failed to finish iWork ZIP: {error}")))
+    }
+
+    /// Atomically save the package to a regular file in the destination
+    /// directory without buffering the complete ZIP in memory.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let path = path.as_ref();
         let parent = path
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
             .unwrap_or_else(|| Path::new("."));
-        let bytes = self.to_bytes()?;
+
+        let existing = match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::Bundle(format!(
+                    "iWork package destination must not be a symbolic link: {}",
+                    path.display()
+                )));
+            },
+            Ok(metadata) if metadata.is_file() => Some(metadata),
+            Ok(_) => {
+                return Err(Error::Bundle(format!(
+                    "iWork package destination is not a regular file: {}",
+                    path.display()
+                )));
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.into()),
+        };
+
         let mut temporary = NamedTempFile::new_in(parent)?;
-        temporary.write_all(&bytes)?;
+        self.write_to(temporary.as_file_mut())?;
+
+        // Apply the existing mode after writing: a read-only destination must
+        // not make the temporary file unwritable while the ZIP is finalized.
+        if let Some(metadata) = existing {
+            fs::set_permissions(temporary.path(), metadata.permissions())?;
+        }
         temporary.as_file_mut().sync_all()?;
         temporary
             .persist(path)
@@ -595,6 +631,15 @@ impl IWorkPackage {
         // Make the rename durable on filesystems that support directory sync.
         if let Ok(directory) = File::open(parent) {
             directory.sync_all()?;
+        }
+        Ok(())
+    }
+
+    fn write_entries<W: Write>(&self, writer: &mut StreamingArchiveWriter<W>) -> Result<()> {
+        for (name, data) in &self.state.entries {
+            writer.write_stored(name, data).map_err(|error| {
+                Error::Bundle(format!("Failed to write package entry {name}: {error}"))
+            })?;
         }
         Ok(())
     }
@@ -727,6 +772,16 @@ impl Snapshot {
     /// Encode the unchanged snapshot as an iWork ZIP package.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.edit().to_bytes()
+    }
+
+    /// Stream the unchanged snapshot as a ZIP to a caller-owned sink.
+    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> {
+        self.edit().write_to(sink)
+    }
+
+    /// Atomically save the unchanged snapshot to a regular file.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        self.edit().save(path)
     }
 
     /// Report whether a normalized package member exists without creating an
@@ -1204,6 +1259,79 @@ mod tests {
             reparsed.entry_names().collect::<Vec<_>>(),
             ["Index/Document.iwa", "Data/a", "Data/b"]
         );
+    }
+
+    #[test]
+    fn write_to_matches_memory_encoding() {
+        let mut package = IWorkPackage::new();
+        package.insert_entry("Data/a", vec![1, 2, 3]).unwrap();
+        package
+            .insert_entry("Metadata/Properties.plist", b"plist".to_vec())
+            .unwrap();
+
+        let expected = package.to_bytes().unwrap();
+        let mut streamed = Vec::new();
+        package.write_to(&mut streamed).unwrap();
+        let mut snapshot_streamed = Vec::new();
+        package.snapshot().write_to(&mut snapshot_streamed).unwrap();
+
+        assert_eq!(streamed, expected);
+        assert_eq!(snapshot_streamed, expected);
+    }
+
+    #[test]
+    fn save_rejects_non_file_destinations() -> std::io::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let package = IWorkPackage::new();
+
+        let error = package.save(directory.path()).unwrap_err();
+        assert!(error.to_string().contains("not a regular file"));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_rejects_symbolic_link_destinations_without_replacing_target() -> std::io::Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir()?;
+        let target = directory.path().join("target.pages");
+        let link = directory.path().join("document.pages");
+        std::fs::write(&target, b"sentinel")?;
+        symlink(&target, &link)?;
+
+        let package = IWorkPackage::new();
+        let error = package.save(&link).unwrap_err();
+
+        assert!(error.to_string().contains("symbolic link"));
+        assert_eq!(std::fs::read(&target)?, b"sentinel");
+        assert!(std::fs::symlink_metadata(&link)?.file_type().is_symlink());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_preserves_existing_regular_file_permissions() -> std::io::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir()?;
+        let destination = directory.path().join("document.pages");
+        std::fs::write(&destination, b"old")?;
+        let mut permissions = std::fs::metadata(&destination)?.permissions();
+        permissions.set_mode(0o640);
+        std::fs::set_permissions(&destination, permissions)?;
+
+        let mut package = IWorkPackage::new();
+        package.insert_entry("Data/a", b"new".to_vec()).unwrap();
+        package.save(&destination).unwrap();
+
+        let mode = std::fs::metadata(&destination)?.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o640);
+        assert_eq!(
+            IWorkPackage::open(&destination).unwrap().entry("Data/a"),
+            Some(&b"new"[..])
+        );
+        Ok(())
     }
 
     #[test]
