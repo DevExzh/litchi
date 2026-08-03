@@ -295,22 +295,19 @@ impl NumbersDocument {
         &self.state.object_index
     }
 
-    /// Get document statistics
-    pub fn stats(&self) -> NumbersDocumentStats {
+    /// Get document statistics after resolving the document sheets.
+    pub fn stats(&self) -> Result<NumbersDocumentStats> {
         let total_objects = self.state.object_index.all_object_ids().len();
-        let sheets_result = self.sheets();
-        let sheet_count = sheets_result.as_ref().map(|s| s.len()).unwrap_or(0);
-        let table_count = sheets_result
-            .as_ref()
-            .map(|sheets| sheets.iter().map(|s| s.table_count()).sum())
-            .unwrap_or(0);
+        let sheets = self.sheets()?;
+        let sheet_count = sheets.len();
+        let table_count = sheets.iter().map(|sheet| sheet.table_count()).sum();
 
-        NumbersDocumentStats {
+        Ok(NumbersDocumentStats {
             total_objects,
             sheet_count,
             table_count,
             application: Application::Numbers,
-        }
+        })
     }
 }
 

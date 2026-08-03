@@ -18,7 +18,7 @@ use litchi_iwa::Document;
 
 let doc = Document::open("document.pages")?;
 let text = doc.text()?;
-let stats = doc.stats();
+let stats = doc.stats()?;
 println!("objects: {}", stats.total_objects);
 
 let structured = doc.extract_structured_data()?;

@@ -684,17 +684,16 @@ impl KeynoteDocument {
         &self.state.object_index
     }
 
-    /// Get document statistics
-    pub fn stats(&self) -> KeynoteDocumentStats {
+    /// Get document statistics after resolving the presentation slides.
+    pub fn stats(&self) -> Result<KeynoteDocumentStats> {
         let total_objects = self.state.object_index.all_object_ids().len();
-        let slides_result = self.slides();
-        let slide_count = slides_result.as_ref().map(|s| s.len()).unwrap_or(0);
+        let slide_count = self.slides()?.len();
 
-        KeynoteDocumentStats {
+        Ok(KeynoteDocumentStats {
             total_objects,
             slide_count,
             application: Application::Keynote,
-        }
+        })
     }
 }
 

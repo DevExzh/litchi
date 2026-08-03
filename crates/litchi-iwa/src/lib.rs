@@ -16,7 +16,7 @@
 //! println!("{}", text);
 //!
 //! // Get document statistics
-//! let stats = doc.stats();
+//! let stats = doc.stats()?;
 //! println!("Objects: {}", stats.total_objects);
 //! println!("Application: {:?}", stats.application);
 //!

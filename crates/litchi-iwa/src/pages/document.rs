@@ -222,17 +222,16 @@ impl PagesDocument {
         &self.state.object_index
     }
 
-    /// Get document statistics
-    pub fn stats(&self) -> PagesDocumentStats {
+    /// Get document statistics after resolving the document sections.
+    pub fn stats(&self) -> Result<PagesDocumentStats> {
         let total_objects = self.state.object_index.all_object_ids().len();
-        let sections_result = self.sections();
-        let section_count = sections_result.as_ref().map(|s| s.len()).unwrap_or(0);
+        let section_count = self.sections()?.len();
 
-        PagesDocumentStats {
+        Ok(PagesDocumentStats {
             total_objects,
             section_count,
             application: Application::Pages,
-        }
+        })
     }
 }
 

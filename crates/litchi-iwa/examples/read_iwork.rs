@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let doc = Document::open(path)?;
 
     // High-level statistics.
-    let stats = doc.stats();
+    let stats = doc.stats()?;
     println!("--- document stats ---");
     println!("application:   {:?}", stats.application);
     println!("total objects: {}", stats.total_objects);

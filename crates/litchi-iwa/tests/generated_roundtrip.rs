@@ -69,13 +69,15 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     assert_send_sync::<NumbersDocument>();
     assert_send_sync::<KeynoteDocument>();
     assert_eq!(document.application(), application);
-    assert_eq!(document.stats().application, application);
-    assert!(document.stats().total_objects > 0);
+    let document_stats = document.stats()?;
+    assert_eq!(document_stats.application, application);
+    assert!(document_stats.total_objects > 0);
     let document_snapshot = document.snapshot();
     assert_eq!(document_snapshot.application(), document.application());
+    let document_snapshot_stats = document_snapshot.stats()?;
     assert_eq!(
-        document_snapshot.stats().total_objects,
-        document.stats().total_objects
+        document_snapshot_stats.total_objects,
+        document_stats.total_objects
     );
     let bundle_snapshot = document.bundle().snapshot();
     assert_eq!(
@@ -87,34 +89,40 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
 
     let document_from_bytes = Document::from_bytes(&bytes)?;
     assert_eq!(document_from_bytes.application(), application);
-    assert!(document_from_bytes.stats().total_objects > 0);
+    assert!(document_from_bytes.stats()?.total_objects > 0);
 
     match expected {
         Format::Pages => {
             PagesEditor::open(path)?;
             let specialized = PagesDocument::open(path)?;
             let snapshot = specialized.snapshot();
+            let specialized_stats = specialized.stats()?;
+            let snapshot_stats = snapshot.stats()?;
             assert_eq!(
-                snapshot.stats().total_objects,
-                specialized.stats().total_objects
+                snapshot_stats.total_objects,
+                specialized_stats.total_objects
             );
         },
         Format::Numbers => {
             NumbersEditor::open(path)?;
             let specialized = NumbersDocument::open(path)?;
             let snapshot = specialized.snapshot();
+            let specialized_stats = specialized.stats()?;
+            let snapshot_stats = snapshot.stats()?;
             assert_eq!(
-                snapshot.stats().total_objects,
-                specialized.stats().total_objects
+                snapshot_stats.total_objects,
+                specialized_stats.total_objects
             );
         },
         Format::Keynote => {
             KeynoteEditor::open(path)?;
             let specialized = KeynoteDocument::open(path)?;
             let snapshot = specialized.snapshot();
+            let specialized_stats = specialized.stats()?;
+            let snapshot_stats = snapshot.stats()?;
             assert_eq!(
-                snapshot.stats().total_objects,
-                specialized.stats().total_objects
+                snapshot_stats.total_objects,
+                specialized_stats.total_objects
             );
         },
     }

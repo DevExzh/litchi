@@ -19,8 +19,8 @@ use std::sync::Arc;
 use crate::bundle::Bundle;
 use crate::media::{MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject};
-use crate::registry::{Application, detect_application, detect_application_from_document};
 use crate::ref_graph::ObjectId;
+use crate::registry::{Application, detect_application, detect_application_from_document};
 use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
@@ -149,17 +149,16 @@ impl Document {
         Ok(extractor.get_text())
     }
 
-    /// Get all objects in the document
-    pub fn objects(&self) -> Vec<ResolvedObject> {
-        self.try_objects().unwrap_or_default()
+    /// Resolve all objects in the document in deterministic object-ID order.
+    pub fn objects(&self) -> Result<Vec<ResolvedObject>> {
+        self.try_objects()
     }
 
     /// Resolve all indexed objects in deterministic object-ID order.
     ///
-    /// This is the fallible counterpart to [`Self::objects`]. It uses the
-    /// typed object index and batches archive lookups, so callers that need to
-    /// distinguish malformed state from an empty document can retain the
-    /// original error instead of silently receiving an empty vector.
+    /// This named compatibility entry point remains available for callers
+    /// that prefer an explicitly fallible method name. It uses the typed
+    /// object index and batches archive lookups.
     pub fn try_objects(&self) -> Result<Vec<ResolvedObject>> {
         let object_ids = self.state.object_index.object_ids()?;
         self.state
@@ -235,13 +234,13 @@ impl Document {
         structured::extract_all(&self.state.bundle, &self.state.object_index)
     }
 
-    /// Get document statistics
-    pub fn stats(&self) -> DocumentStats {
+    /// Get document statistics after resolving the indexed object set.
+    pub fn stats(&self) -> Result<DocumentStats> {
         let total_objects = self.state.object_index.all_object_ids().len();
         let archives_count = self.state.bundle.archives().len();
 
         let mut message_type_counts = HashMap::new();
-        for object in self.objects() {
+        for object in self.objects()? {
             for &msg_type in &object.message_types() {
                 *message_type_counts.entry(msg_type).or_insert(0) += 1;
             }
@@ -249,13 +248,13 @@ impl Document {
 
         let media_stats = self.media_stats();
 
-        DocumentStats {
+        Ok(DocumentStats {
             total_objects,
             archives_count,
             message_type_counts,
             application: self.state.application,
             media_stats,
-        }
+        })
     }
 }
 
@@ -395,11 +394,13 @@ mod tests {
         let doc = doc_result.unwrap();
 
         // Verify we can get objects
-        let objects = doc.objects();
+        let objects = doc.objects().expect("test document should resolve objects");
         assert!(!objects.is_empty(), "Document should contain objects");
 
         // Verify we can get stats
-        let stats = doc.stats();
+        let stats = doc
+            .stats()
+            .expect("test document should produce statistics");
         assert!(stats.total_objects > 0, "Document should have objects");
 
         // Test text extraction
