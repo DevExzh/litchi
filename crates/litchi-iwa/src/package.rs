@@ -41,6 +41,35 @@ pub struct Snapshot {
     limits: PackageLimits,
 }
 
+/// The published result of an atomic package-level snapshot edit.
+///
+/// A commit owns the callback's result together with the immutable snapshot
+/// produced after the candidate edit passed package-state validation. The
+/// source snapshot used to start the edit is never mutated.
+#[must_use = "a commit contains the published snapshot"]
+#[derive(Debug)]
+pub struct Commit<T> {
+    value: T,
+    snapshot: Snapshot,
+}
+
+impl<T> Commit<T> {
+    /// Borrow the callback's result.
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    /// Borrow the immutable snapshot published by the commit.
+    pub fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Consume the commit and return its result and published snapshot.
+    pub fn into_parts(self) -> (T, Snapshot) {
+        (self.value, self.snapshot)
+    }
+}
+
 /// Resource ceilings applied while ingesting one iWork package.
 ///
 /// The limits cover every ZIP archive opened during ingress, including a
@@ -769,6 +798,25 @@ impl Snapshot {
         }
     }
 
+    /// Stage, validate, and publish one atomic copy-on-write edit.
+    ///
+    /// The callback receives a private mutable package view. If it returns an
+    /// error, or if the resulting package violates its configured limits or
+    /// member-name invariants, no new snapshot is published and the source
+    /// snapshot remains unchanged.
+    pub fn edit_with<T, F>(&self, edit: F) -> Result<Commit<T>>
+    where
+        F: FnOnce(&mut IWorkPackage) -> Result<T>,
+    {
+        let mut candidate = self.edit();
+        let value = edit(&mut candidate)?;
+        candidate.validate_state()?;
+        Ok(Commit {
+            value,
+            snapshot: candidate.snapshot(),
+        })
+    }
+
     /// Encode the unchanged snapshot as an iWork ZIP package.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.edit().to_bytes()
@@ -1162,6 +1210,63 @@ mod tests {
         assert_eq!(snapshot.entry("Data/changed"), None);
         assert_eq!(edit.len(), 2);
         assert_eq!(edit.entry("Data/changed"), Some(b"changed".as_slice()));
+    }
+
+    #[test]
+    fn snapshot_edit_with_publishes_a_validated_commit() -> crate::Result<()> {
+        let mut package = IWorkPackage::new();
+        package.insert_entry("Data/original", b"original".to_vec())?;
+        let source = package.snapshot();
+
+        let commit = source.edit_with(|edit| {
+            edit.insert_entry("Data/changed", b"changed".to_vec())?;
+            Ok(edit.len())
+        })?;
+
+        assert_eq!(commit.value(), &2);
+        assert_eq!(source.len(), 1);
+        assert_eq!(source.entry("Data/changed"), None);
+        assert_eq!(commit.snapshot().len(), 2);
+        assert_eq!(
+            commit.snapshot().entry("Data/changed"),
+            Some(b"changed".as_slice())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn snapshot_edit_with_discards_callback_failures() -> crate::Result<()> {
+        let mut package = IWorkPackage::new();
+        package.insert_entry("Data/original", b"original".to_vec())?;
+        let source = package.snapshot();
+
+        let error = source.edit_with(|edit| -> crate::Result<()> {
+            edit.insert_entry("Data/changed", b"changed".to_vec())?;
+            Err(Error::InvalidFormat("reject staged edit".to_owned()))
+        });
+
+        assert!(error.is_err());
+        assert_eq!(source.len(), 1);
+        assert_eq!(source.entry("Data/changed"), None);
+        Ok(())
+    }
+
+    #[test]
+    fn snapshot_edit_with_discards_candidates_that_fail_final_validation() {
+        let limits = PackageLimits::new(1, 4, 4).unwrap();
+        let mut package = empty_package_with_limits(limits);
+        package
+            .insert_entry("Data/asset", vec![1, 2, 3, 4])
+            .unwrap();
+        let source = package.snapshot();
+
+        let error = source.edit_with(|edit| {
+            edit.entry_mut("Data/asset").unwrap().push(5);
+            Ok(())
+        });
+
+        assert!(error.unwrap_err().to_string().contains("member"));
+        assert_eq!(source.entry("Data/asset"), Some([1, 2, 3, 4].as_slice()));
     }
 
     #[test]
