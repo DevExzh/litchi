@@ -104,39 +104,38 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     }
 }
 
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes([data[offset], data[offset + 1]])
+fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> XlsResult<[u8; N]> {
+    let end = offset
+        .checked_add(N)
+        .ok_or_else(|| XlsError::InvalidData("custom-view field offset overflow".to_string()))?;
+    let bytes = data.get(offset..end).ok_or(XlsError::InvalidLength {
+        expected: end,
+        found: data.len(),
+    })?;
+    let mut value = [0; N];
+    value.copy_from_slice(bytes);
+    Ok(value)
 }
 
-fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ])
+fn read_u8(data: &[u8], offset: usize) -> XlsResult<u8> {
+    let [value] = read_bytes(data, offset)?;
+    Ok(value)
 }
 
-fn read_i32(data: &[u8], offset: usize) -> i32 {
-    i32::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ])
+fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
+    Ok(u16::from_le_bytes(read_bytes(data, offset)?))
 }
 
-fn read_f64(data: &[u8], offset: usize) -> f64 {
-    f64::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-        data[offset + 4],
-        data[offset + 5],
-        data[offset + 6],
-        data[offset + 7],
-    ])
+fn read_u32(data: &[u8], offset: usize) -> XlsResult<u32> {
+    Ok(u32::from_le_bytes(read_bytes(data, offset)?))
+}
+
+fn read_i32(data: &[u8], offset: usize) -> XlsResult<i32> {
+    Ok(i32::from_le_bytes(read_bytes(data, offset)?))
+}
+
+fn read_f64(data: &[u8], offset: usize) -> XlsResult<f64> {
+    Ok(f64::from_le_bytes(read_bytes(data, offset)?))
 }
 
 /// How cell comments appear in a custom view (`UserBView.mdNoteDisp`).
@@ -198,6 +197,7 @@ pub struct XlsWorkbookCustomView {
     tab_ratio: u16,
     /// Display-flag word (fields A–N); typed accessors decode the bits.
     display_flags: u16,
+    note_display: XlsCustomViewNoteDisplay,
     /// Window-flag word (fields O–P plus the undefined high bits).
     window_flags: u16,
     merge_interval: u16,
@@ -213,16 +213,18 @@ impl XlsWorkbookCustomView {
                 found: data.len(),
             });
         }
-        let tab_ratio = read_u16(data, 40);
+        let tab_ratio = read_u16(data, 40)?;
         if tab_ratio > MAX_TAB_RATIO {
             return Err(invalid(
                 USER_B_VIEW_RECORD_TYPE,
                 "UserBView.wTabRatio must not exceed 1000",
             ));
         }
-        let display_flags = read_u16(data, 42);
+        let display_flags = read_u16(data, 42)?;
         // Reject out-of-range enumerations up front so accessors stay total.
-        XlsCustomViewNoteDisplay::from_bits((display_flags >> NOTE_DISP_SHIFT) & NOTE_DISP_MASK)?;
+        let note_display = XlsCustomViewNoteDisplay::from_bits(
+            (display_flags >> NOTE_DISP_SHIFT) & NOTE_DISP_MASK,
+        )?;
         let object_display = (display_flags >> HIDE_OBJ_SHIFT) & HIDE_OBJ_MASK;
         if object_display == HIDE_OBJ_MASK {
             return Err(invalid(
@@ -233,22 +235,28 @@ impl XlsWorkbookCustomView {
         let active_tab = if display_flags & INVALID_TAB_ID != 0 {
             None
         } else {
-            Some(read_u16(data, 4))
+            Some(read_u16(data, 4)?)
         };
-        let mut guid = [0u8; 16];
-        guid.copy_from_slice(&data[8..24]);
-        let name = parse_string_record(&data[USER_B_VIEW_HEADER_LEN..], &XlsEncoding::Utf16Le)?;
+        let guid = read_bytes(data, 8)?;
+        let name_data = data
+            .get(USER_B_VIEW_HEADER_LEN..)
+            .ok_or(XlsError::InvalidLength {
+                expected: USER_B_VIEW_HEADER_LEN,
+                found: data.len(),
+            })?;
+        let name = parse_string_record(name_data, &XlsEncoding::Utf16Le)?;
         Ok(Self {
             guid,
             active_tab,
-            window_x: read_i32(data, 24),
-            window_y: read_i32(data, 28),
-            window_width: read_i32(data, 32),
-            window_height: read_i32(data, 36),
+            window_x: read_i32(data, 24)?,
+            window_y: read_i32(data, 28)?,
+            window_width: read_i32(data, 32)?,
+            window_height: read_i32(data, 36)?,
             tab_ratio,
             display_flags,
-            window_flags: read_u16(data, 46),
-            merge_interval: read_u16(data, 48),
+            note_display,
+            window_flags: read_u16(data, 46)?,
+            merge_interval: read_u16(data, 48)?,
             name,
         })
     }
@@ -282,11 +290,8 @@ impl XlsWorkbookCustomView {
         self.display_flags & DSP_STATUS != 0
     }
     /// How cell comments appear in this view.
-    pub fn note_display(&self) -> XlsCustomViewNoteDisplay {
-        XlsCustomViewNoteDisplay::from_bits(
-            (self.display_flags >> NOTE_DISP_SHIFT) & NOTE_DISP_MASK,
-        )
-        .expect("validated at parse")
+    pub const fn note_display(&self) -> XlsCustomViewNoteDisplay {
+        self.note_display
     }
     /// Whether a horizontal scroll bar is displayed.
     pub const fn shows_horizontal_scroll_bar(&self) -> bool {
@@ -384,6 +389,7 @@ pub struct XlsSheetCustomViewBegin {
     active_pane: XlsPaneType,
     /// Flag double-word (fields A–b); typed accessors decode the bits.
     flags: u32,
+    hidden_rows: XlsCustomViewHiddenRows,
     top_left: XlsCustomViewTopLeft,
     split_x: f64,
     split_y: f64,
@@ -401,21 +407,21 @@ impl XlsSheetCustomViewBegin {
                 found: data.len(),
             });
         }
-        let scale = read_u32(data, 20);
+        let scale = read_u32(data, 20)?;
         if !(MIN_SCALE..=MAX_SCALE).contains(&scale) {
             return Err(invalid(
                 USER_S_VIEW_BEGIN_RECORD_TYPE,
                 "UserSViewBegin.wScale must be between 10 and 400",
             ));
         }
-        let gridline_color = read_u16(data, 24);
+        let gridline_color = read_u16(data, 24)?;
         if gridline_color > MAX_GRIDLINE_COLOR {
             return Err(invalid(
                 USER_S_VIEW_BEGIN_RECORD_TYPE,
                 "UserSViewBegin.icvHdr must not exceed 64",
             ));
         }
-        let active_pane = match data[28] {
+        let active_pane = match read_u8(data, 28)? {
             0 => XlsPaneType::LowerRight,
             1 => XlsPaneType::UpperRight,
             2 => XlsPaneType::LowerLeft,
@@ -427,27 +433,28 @@ impl XlsSheetCustomViewBegin {
                 ));
             },
         };
-        let flags = read_u32(data, 32);
-        XlsCustomViewHiddenRows::from_bits((flags >> HIDDEN_RW_SHIFT) & HIDDEN_RW_MASK)?;
-        let mut guid = [0u8; 16];
-        guid.copy_from_slice(&data[0..16]);
+        let flags = read_u32(data, 32)?;
+        let hidden_rows =
+            XlsCustomViewHiddenRows::from_bits((flags >> HIDDEN_RW_SHIFT) & HIDDEN_RW_MASK)?;
+        let guid = read_bytes(data, 0)?;
         Ok(Self {
             guid,
-            tab_id: read_u16(data, 16),
+            tab_id: read_u16(data, 16)?,
             scale,
             gridline_color,
             active_pane,
             flags,
+            hidden_rows,
             top_left: XlsCustomViewTopLeft {
-                first_row: read_u16(data, 36),
-                last_row: read_u16(data, 38),
-                first_col: read_u16(data, 40),
-                last_col: read_u16(data, 42),
+                first_row: read_u16(data, 36)?,
+                last_row: read_u16(data, 38)?,
+                first_col: read_u16(data, 40)?,
+                last_col: read_u16(data, 42)?,
             },
-            split_x: read_f64(data, 44),
-            split_y: read_f64(data, 52),
-            right_pane_col: read_u16(data, 60),
-            bottom_pane_row: read_u16(data, 62),
+            split_x: read_f64(data, 44)?,
+            split_y: read_f64(data, 52)?,
+            right_pane_col: read_u16(data, 60)?,
+            bottom_pane_row: read_u16(data, 62)?,
         })
     }
 
@@ -548,9 +555,8 @@ impl XlsSheetCustomViewBegin {
         self.flags & SPLIT_H != 0
     }
     /// Whether hidden rows (filtered rows excluded) are present.
-    pub fn hidden_rows(&self) -> XlsCustomViewHiddenRows {
-        XlsCustomViewHiddenRows::from_bits((self.flags >> HIDDEN_RW_SHIFT) & HIDDEN_RW_MASK)
-            .expect("validated at parse")
+    pub const fn hidden_rows(&self) -> XlsCustomViewHiddenRows {
+        self.hidden_rows
     }
     /// Whether at least one hidden column is present.
     pub const fn has_hidden_columns(&self) -> bool {
@@ -619,14 +625,14 @@ impl XlsChartSheetCustomViewBegin {
                 found: data.len(),
             });
         }
-        let scale = read_u32(data, 20);
+        let scale = read_u32(data, 20)?;
         if !(MIN_SCALE..=MAX_SCALE).contains(&scale) {
             return Err(invalid(
                 USER_S_VIEW_BEGIN_RECORD_TYPE,
                 "UserSViewBegin_Chart.wScale must be between 10 and 400",
             ));
         }
-        let flags = read_u32(data, 32);
+        let flags = read_u32(data, 32)?;
         let visibility = match (flags >> HS_STATE_SHIFT) & HS_STATE_MASK {
             0 => XlsSheetVisibility::Visible,
             1 => XlsSheetVisibility::Hidden,
@@ -638,11 +644,10 @@ impl XlsChartSheetCustomViewBegin {
                 ));
             },
         };
-        let mut guid = [0u8; 16];
-        guid.copy_from_slice(&data[0..16]);
+        let guid = read_bytes(data, 0)?;
         Ok(Self {
             guid,
-            tab_id: read_u32(data, 16),
+            tab_id: read_u32(data, 16)?,
             scale,
             visibility,
             zoom_to_fit: flags & ZOOM_TO_FIT != 0,
@@ -688,7 +693,7 @@ impl XlsSheetCustomViewEnd {
             });
         }
         Ok(Self {
-            reserved: read_u16(data, 0),
+            reserved: read_u16(data, 0)?,
         })
     }
 
@@ -781,6 +786,40 @@ mod tests {
         assert!(!view.is_minimized());
         assert_eq!(view.merge_interval(), 30);
         assert_eq!(view.name(), "Quarterly");
+    }
+
+    #[test]
+    fn enum_accessors_cover_every_legal_encoding() {
+        for (bits, expected) in [
+            (0, XlsCustomViewNoteDisplay::Off),
+            (1, XlsCustomViewNoteDisplay::VisualCue),
+            (2, XlsCustomViewNoteDisplay::On),
+        ] {
+            let mut payload = user_b_view_payload();
+            payload[42..44]
+                .copy_from_slice(&(DSP_STATUS | (bits << NOTE_DISP_SHIFT)).to_le_bytes());
+            let view = XlsWorkbookCustomView::parse(&payload).unwrap();
+            assert_eq!(view.note_display(), expected);
+        }
+
+        for (bits, expected) in [
+            (0, XlsCustomViewHiddenRows::Present),
+            (1, XlsCustomViewHiddenRows::NotPresent),
+        ] {
+            let mut payload = user_s_view_begin_payload();
+            let flags = (read_u32(&payload, 32).unwrap() & !(HIDDEN_RW_MASK << HIDDEN_RW_SHIFT))
+                | (bits << HIDDEN_RW_SHIFT);
+            payload[32..36].copy_from_slice(&flags.to_le_bytes());
+            let begin = XlsSheetCustomViewBegin::parse(&payload).unwrap();
+            assert_eq!(begin.hidden_rows(), expected);
+        }
+    }
+
+    #[test]
+    fn checked_field_reads_reject_truncation_and_offset_overflow() {
+        assert!(read_bytes::<2>(&[0], 0).is_err());
+        assert!(read_u32(&[0; 4], usize::MAX).is_err());
+        assert!(read_f64(&[0; 8], usize::MAX).is_err());
     }
 
     #[test]
@@ -894,7 +933,7 @@ mod tests {
         assert!(XlsSheetCustomViewBegin::parse(&payload).is_err());
         // Out-of-range hidden-row state.
         let mut payload = user_s_view_begin_payload();
-        let flags = read_u32(&payload, 32) | (2 << HIDDEN_RW_SHIFT);
+        let flags = read_u32(&payload, 32).unwrap() | (2 << HIDDEN_RW_SHIFT);
         payload[32..36].copy_from_slice(&flags.to_le_bytes());
         assert!(XlsSheetCustomViewBegin::parse(&payload).is_err());
     }

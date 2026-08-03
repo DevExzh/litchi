@@ -221,6 +221,9 @@ pub fn parse_workbook_calculation_properties(
             Event::CData(_) if leaf_depth.is_some_and(|value| depth >= value) => {
                 return Err(invalid("calcPr cannot contain CDATA"));
             },
+            Event::GeneralRef(_) if leaf_depth.is_some_and(|value| depth >= value) => {
+                return Err(invalid("calcPr cannot contain entity references"));
+            },
             Event::Eof => break,
             _ => {},
         }
@@ -497,6 +500,14 @@ mod tests {
         }
         assert!(parse("<calcPr/><calcPr/>").is_err());
         assert!(parse(r#"<calcPr calcId="1" calcId="2"/>"#).is_err());
+    }
+
+    #[test]
+    fn rejects_entity_references_inside_calc_pr() {
+        for reference in ["&amp;", "&#x20;"] {
+            let child = format!("<calcPr>{reference}</calcPr>");
+            assert!(parse(&child).is_err(), "expected rejection for {child}");
+        }
     }
 
     fn fixture(bytes: &[u8]) -> WorkbookCalculationProperties {

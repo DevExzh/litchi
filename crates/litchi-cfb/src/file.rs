@@ -445,12 +445,19 @@ impl<R: Read + Seek> OleFile<R> {
                 "Declared FAT sector count exceeds the physical file".to_string(),
             ));
         }
+        if u64::from(num_difat_sectors) > physical_sector_count {
+            return Err(OleError::CorruptedFile(
+                "Declared DIFAT sector count exceeds the physical file".to_string(),
+            ));
+        }
         let expected_fat_sectors = usize::try_from(num_fat_sectors)
             .map_err(|_| OleError::CorruptedFile("FAT sector count is too large".to_string()))?;
+        let expected_difat_sectors = usize::try_from(num_difat_sectors)
+            .map_err(|_| OleError::CorruptedFile("DIFAT sector count is too large".to_string()))?;
 
         // First 109 FAT sector indexes are in header at offset 0x4C
         let mut fat_sectors = Vec::with_capacity(expected_fat_sectors);
-        let mut difat_sectors = Vec::with_capacity(num_difat_sectors as usize);
+        let mut difat_sectors = Vec::with_capacity(expected_difat_sectors);
         let header_fat_count = HEADER_DIFAT_ENTRIES.min(expected_fat_sectors);
         for i in 0..header_fat_count {
             let offset = HEADER_DIFAT_OFFSET + i * 4;
@@ -474,7 +481,7 @@ impl<R: Read + Seek> OleFile<R> {
 
         let mut difat_sector = first_difat_sector;
         let entries_per_sector = (self.sector_size / 4) - 1;
-        for difat_index in 0..num_difat_sectors as usize {
+        for difat_index in 0..expected_difat_sectors {
             self.claim_sector(difat_sector, PhysicalSectorRole::Difat)?;
             difat_sectors.push(difat_sector);
             let sector_data = self.read_sector(difat_sector)?;
@@ -503,7 +510,7 @@ impl<R: Read + Seek> OleFile<R> {
             let next = U32::<LE>::read_from_bytes(&sector_data[next_offset..next_offset + 4])
                 .map(|v| v.get())
                 .unwrap_or(0);
-            if difat_index + 1 == num_difat_sectors as usize {
+            if difat_index + 1 == expected_difat_sectors {
                 if next != ENDOFCHAIN {
                     return Err(OleError::CorruptedFile(
                         "DIFAT chain exceeds its declared length".to_string(),
@@ -1223,12 +1230,84 @@ impl<R: Read + Seek> OleFile<R> {
 
     /// List all streams in the OLE file
     ///
-    /// Returns a list of stream paths (as vectors of storage/stream names)
+    /// Returns a list of stream paths (as vectors of storage/stream names).
+    ///
+    /// The directory graph is supplied by untrusted input, so traversal uses
+    /// an explicit work stack rather than consuming the call stack.
     pub fn list_streams(&self) -> Vec<Vec<String>> {
-        let mut streams = Vec::new();
-        if let Some(ref root) = self.root {
-            self.collect_streams(root, &mut Vec::new(), &mut streams);
+        enum Work {
+            Tree { sid: u32, path_len: usize },
+            Entry { sid: u32, path_len: usize },
+            Restore { path_len: usize },
         }
+
+        let mut streams = Vec::new();
+        let Some(root) = self.root.as_ref() else {
+            return streams;
+        };
+
+        let mut pending = Vec::new();
+        if root.sid_child != NOSTREAM {
+            pending.push(Work::Tree {
+                sid: root.sid_child,
+                path_len: 0,
+            });
+        }
+        let mut path = Vec::new();
+
+        while let Some(work) = pending.pop() {
+            match work {
+                Work::Tree { sid, path_len } => {
+                    if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
+                        continue;
+                    }
+                    let Some(entry) = self.dir_entries.get(sid as usize).and_then(Option::as_ref)
+                    else {
+                        continue;
+                    };
+
+                    // Push in reverse in-order so the left subtree is visited
+                    // first without recursion.
+                    pending.push(Work::Tree {
+                        sid: entry.sid_right,
+                        path_len,
+                    });
+                    pending.push(Work::Entry { sid, path_len });
+                    pending.push(Work::Tree {
+                        sid: entry.sid_left,
+                        path_len,
+                    });
+                },
+                Work::Entry { sid, path_len } => {
+                    let Some(entry) = self.dir_entries.get(sid as usize).and_then(Option::as_ref)
+                    else {
+                        continue;
+                    };
+                    path.truncate(path_len);
+                    if !entry.name.is_empty() && entry.entry_type != STGTY_ROOT {
+                        path.push(entry.name.clone());
+                    }
+
+                    match entry.entry_type {
+                        STGTY_STREAM => {
+                            streams.push(path.clone());
+                            path.truncate(path_len);
+                        },
+                        STGTY_STORAGE | STGTY_ROOT if entry.sid_child != NOSTREAM => {
+                            let child_path_len = path.len();
+                            pending.push(Work::Restore { path_len });
+                            pending.push(Work::Tree {
+                                sid: entry.sid_child,
+                                path_len: child_path_len,
+                            });
+                        },
+                        _ => path.truncate(path_len),
+                    }
+                },
+                Work::Restore { path_len } => path.truncate(path_len),
+            }
+        }
+
         streams
     }
 
@@ -1262,25 +1341,44 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(entries)
     }
 
-    /// Recursively collect all children from a directory (as references - zero-copy)
+    /// Collect all children from a directory (as references - zero-copy).
+    ///
+    /// The sibling tree is untrusted input, so this uses an explicit stack
+    /// instead of recursive calls.
     fn collect_directory_children<'a>(&'a self, sid: u32, entries: &mut Vec<&'a DirectoryEntry>) {
-        if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
-            return;
-        }
+        let mut pending = Vec::new();
+        let mut current = sid;
 
-        if let Some(entry) = self.dir_entries[sid as usize].as_ref() {
-            // Traverse left
-            if entry.sid_left != NOSTREAM {
-                self.collect_directory_children(entry.sid_left, entries);
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                if current as usize >= self.dir_entries.len() {
+                    break;
+                }
+                let Some(entry) = self
+                    .dir_entries
+                    .get(current as usize)
+                    .and_then(Option::as_ref)
+                else {
+                    break;
+                };
+                pending.push(current);
+                current = entry.sid_left;
             }
+
+            let Some(current_sid) = pending.pop() else {
+                break;
+            };
+            let Some(entry) = self
+                .dir_entries
+                .get(current_sid as usize)
+                .and_then(Option::as_ref)
+            else {
+                continue;
+            };
 
             // Add reference instead of clone - zero-copy!
             entries.push(entry);
-
-            // Traverse right
-            if entry.sid_right != NOSTREAM {
-                self.collect_directory_children(entry.sid_right, entries);
-            }
+            current = entry.sid_right;
         }
     }
 
@@ -1295,60 +1393,6 @@ impl<R: Read + Seek> OleFile<R> {
         match self.find_entry(path) {
             Ok(entry) => entry.entry_type == STGTY_STORAGE || entry.entry_type == STGTY_ROOT,
             Err(_) => false,
-        }
-    }
-
-    /// Recursively collect streams from directory tree
-    fn collect_streams(
-        &self,
-        entry: &DirectoryEntry,
-        path: &mut Vec<String>,
-        streams: &mut Vec<Vec<String>>,
-    ) {
-        // Add current entry to path
-        let path_len_before = path.len();
-        if !entry.name.is_empty() && entry.entry_type != STGTY_ROOT {
-            path.push(entry.name.clone()); // Clone needed as we're building the path
-        }
-
-        // If this is a stream, add it to the list
-        if entry.entry_type == STGTY_STREAM {
-            streams.push(path.clone()); // Clone needed to save the path
-            path.truncate(path_len_before); // Restore path
-            return;
-        }
-
-        // If this is a storage, recurse into children
-        if entry.entry_type == STGTY_STORAGE || entry.entry_type == STGTY_ROOT {
-            // Process children by traversing the red-black tree
-            if entry.sid_child != NOSTREAM {
-                self.traverse_children(entry.sid_child, path, streams);
-            }
-        }
-
-        // Restore path to original state
-        path.truncate(path_len_before);
-    }
-
-    /// Traverse children in red-black tree
-    fn traverse_children(&self, sid: u32, path: &mut Vec<String>, streams: &mut Vec<Vec<String>>) {
-        if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
-            return;
-        }
-
-        if let Some(ref entry) = self.dir_entries[sid as usize] {
-            // Traverse left
-            if entry.sid_left != NOSTREAM {
-                self.traverse_children(entry.sid_left, path, streams);
-            }
-
-            // Process current (path is modified in-place and restored)
-            self.collect_streams(entry, path, streams);
-
-            // Traverse right
-            if entry.sid_right != NOSTREAM {
-                self.traverse_children(entry.sid_right, path, streams);
-            }
         }
     }
 
@@ -1778,6 +1822,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_difat_counts_beyond_the_physical_file_before_reserving() {
+        let mut data = sample_file();
+        data[0x44..0x48].copy_from_slice(&0u32.to_le_bytes());
+        data[0x48..0x4C].copy_from_slice(&u32::MAX.to_le_bytes());
+
+        assert!(matches!(
+            OleFile::open(Cursor::new(data)),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("DIFAT sector count exceeds the physical file")
+        ));
+    }
+
+    #[test]
     fn rejects_cyclic_directory_trees() {
         let mut data = sample_file();
         let directory_sector = u32::from_le_bytes(data[0x30..0x34].try_into().unwrap());
@@ -1810,5 +1867,74 @@ mod tests {
             file.read_sector(0),
             Err(OleError::CorruptedFile(message)) if message.contains("outside the file")
         ));
+    }
+
+    #[test]
+    fn lists_deep_directory_trees_without_call_stack_growth() {
+        const DEPTH: usize = 16_384;
+
+        let mut dir_entries = vec![None; DEPTH + 1];
+        for index in (0..DEPTH).rev() {
+            let sid = u32::try_from(index + 1).unwrap();
+            let right = if index + 1 < DEPTH {
+                u32::try_from(index + 2).unwrap()
+            } else {
+                NOSTREAM
+            };
+            dir_entries[sid as usize] = Some(DirectoryEntry {
+                sid,
+                name: format!("Stream {index:05}"),
+                entry_type: STGTY_STREAM,
+                sid_left: NOSTREAM,
+                sid_right: right,
+                sid_child: NOSTREAM,
+                clsid: String::new(),
+                start_sector: ENDOFCHAIN,
+                size: 0,
+                is_minifat: false,
+                children: Vec::new(),
+            });
+        }
+
+        let file = OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: Some(DirectoryEntry {
+                sid: 0,
+                name: "Root Entry".to_string(),
+                entry_type: STGTY_ROOT,
+                sid_left: NOSTREAM,
+                sid_right: NOSTREAM,
+                sid_child: 1,
+                clsid: String::new(),
+                start_sector: ENDOFCHAIN,
+                size: 0,
+                is_minifat: false,
+                children: Vec::new(),
+            }),
+            dir_entries,
+            ministream: None,
+            sector_roles: Vec::new(),
+        };
+
+        let streams = file.list_streams();
+        assert_eq!(streams.len(), DEPTH);
+        assert_eq!(streams[0], vec!["Stream 00000"]);
+        let last_name = format!("Stream {:05}", DEPTH - 1);
+        assert_eq!(streams[DEPTH - 1], vec![last_name]);
+
+        let entries = file.list_directory_entries(&[]).unwrap();
+        assert_eq!(entries.len(), DEPTH);
+        assert_eq!(entries.first().map(|entry| entry.sid), Some(1));
+        assert_eq!(
+            entries.last().map(|entry| entry.sid),
+            Some(u32::try_from(DEPTH).unwrap())
+        );
     }
 }

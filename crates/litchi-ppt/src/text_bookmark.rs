@@ -29,9 +29,9 @@ impl PowerPointTextBookmark {
             return corrupted("TextBookmarkAtom has an invalid header or size");
         }
         let bookmark = Self {
-            begin: u32::from_le_bytes(record.data[0..4].try_into().expect("fixed slice")),
-            end: u32::from_le_bytes(record.data[4..8].try_into().expect("fixed slice")),
-            id: u32::from_le_bytes(record.data[8..12].try_into().expect("fixed slice")),
+            begin: read_u32(record, 0)?,
+            end: read_u32(record, 4)?,
+            id: read_u32(record, 8)?,
         };
         bookmark.validate()?;
         Ok(bookmark)
@@ -76,6 +76,11 @@ impl PowerPointTextBookmark {
         }
         Ok(())
     }
+}
+
+fn read_u32(record: &PptRecord, offset: usize) -> Result<u32> {
+    litchi_core::binary::read_u32_le_at(&record.data, offset)
+        .map_err(|_| PptError::Corrupted("TextBookmarkAtom payload is truncated".into()))
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
