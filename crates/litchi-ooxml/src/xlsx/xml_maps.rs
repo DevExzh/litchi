@@ -102,9 +102,9 @@ impl XmlMapInfo {
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         validate(self)?;
         let namespace = if strict {
-            std::str::from_utf8(STRICT_NS).unwrap()
+            std::str::from_utf8(STRICT_NS).map_err(xml_error)?
         } else {
-            std::str::from_utf8(NS).unwrap()
+            std::str::from_utf8(NS).map_err(xml_error)?
         };
         let mut xml = String::from(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><MapInfo xmlns=\"",
@@ -524,7 +524,12 @@ fn parse_processed(xml: &[u8]) -> Result<XmlMapInfo> {
                         return Err(invalid("opaque XML depth limit exceeded"));
                     }
                 },
-                Event::End(_) => active.depth -= 1,
+                Event::End(_) => {
+                    active.depth = active
+                        .depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("invalid opaque XML nesting"))?;
+                },
                 Event::DocType(_) | Event::PI(_) => {
                     return Err(invalid("DTD and processing instructions are rejected"));
                 },
@@ -539,7 +544,9 @@ fn parse_processed(xml: &[u8]) -> Result<XmlMapInfo> {
                 return Err(invalid("opaque XML payload exceeds 16 MiB"));
             }
             if active.depth == 0 {
-                let completed = capture.take().unwrap();
+                let completed = capture
+                    .take()
+                    .ok_or_else(|| invalid("opaque XML capture state was lost"))?;
                 assign_payload(
                     &mut schemas,
                     &mut maps,
@@ -598,8 +605,15 @@ fn parse_processed(xml: &[u8]) -> Result<XmlMapInfo> {
                     .pop()
                     .ok_or_else(|| invalid("closing element outside MapInfo"))?;
                 if let Context::Binding(index) = ended {
-                    maps[index].value.data_binding =
-                        Some(maps[index].binding.as_ref().unwrap().value.clone());
+                    let value = maps
+                        .get(index)
+                        .and_then(|map| map.binding.as_ref())
+                        .map(|binding| binding.value.clone())
+                        .ok_or_else(|| invalid("DataBinding context has no binding"))?;
+                    maps.get_mut(index)
+                        .ok_or_else(|| invalid("DataBinding context has no map"))?
+                        .value
+                        .data_binding = Some(value);
                 }
                 if matches!(ended, Context::Root) {
                     root_closed = true;
@@ -679,7 +693,10 @@ fn handle_start(
             )?);
         },
         Context::Binding(index) => {
-            let binding = maps[index].binding.as_ref().unwrap();
+            let binding = maps
+                .get(index)
+                .and_then(|map| map.binding.as_ref())
+                .ok_or_else(|| invalid("DataBinding context has no binding"))?;
             if binding.value.payload_xml.is_some() {
                 return Err(invalid("DataBinding permits at most one opaque child"));
             }
@@ -732,7 +749,10 @@ fn handle_empty(
             schemas[index].value.payload_xml = Some(capture_empty(e, &schemas[index].bindings)?);
         },
         Some(Context::Binding(index)) => {
-            let binding = maps[index].binding.as_mut().unwrap();
+            let binding = maps
+                .get_mut(index)
+                .and_then(|map| map.binding.as_mut())
+                .ok_or_else(|| invalid("DataBinding context has no binding"))?;
             if binding.value.payload_xml.is_some() {
                 return Err(invalid("DataBinding permits at most one opaque child"));
             }
@@ -756,17 +776,16 @@ fn parse_schema(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMapSchema> {
     })
 }
 fn parse_map(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMap> {
-    let id = parse_u32_attr(e, d, b"ID", true)?.unwrap();
+    let id = required_u32_attr(e, d, b"ID")?;
     let name = required_attr(e, d, b"Name")?;
     let root_element = required_attr(e, d, b"RootElement")?;
     let schema_id = required_attr(e, d, b"SchemaID")?;
     let show_import_export_validation_errors =
-        parse_bool_attr(e, d, b"ShowImportExportValidationErrors", true)?.unwrap();
-    let auto_fit = parse_bool_attr(e, d, b"AutoFit", true)?.unwrap();
-    let append = parse_bool_attr(e, d, b"Append", true)?.unwrap();
-    let preserve_sort_auto_filter_layout =
-        parse_bool_attr(e, d, b"PreserveSortAFLayout", true)?.unwrap();
-    let preserve_format = parse_bool_attr(e, d, b"PreserveFormat", true)?.unwrap();
+        required_bool_attr(e, d, b"ShowImportExportValidationErrors")?;
+    let auto_fit = required_bool_attr(e, d, b"AutoFit")?;
+    let append = required_bool_attr(e, d, b"Append")?;
+    let preserve_sort_auto_filter_layout = required_bool_attr(e, d, b"PreserveSortAFLayout")?;
+    let preserve_format = required_bool_attr(e, d, b"PreserveFormat")?;
     only_attrs(
         e,
         &[
@@ -799,7 +818,7 @@ fn parse_binding(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMapDataBinding> {
     let file_binding = parse_bool_attr(e, d, b"FileBinding", false)?;
     let connection_id = parse_u32_attr(e, d, b"ConnectionID", false)?;
     let file_binding_name = optional_attr(e, d, b"FileBindingName")?;
-    let load_mode = parse_u32_attr(e, d, b"DataBindingLoadMode", true)?.unwrap();
+    let load_mode = required_u32_attr(e, d, b"DataBindingLoadMode")?;
     only_attrs(
         e,
         &[
@@ -854,9 +873,15 @@ fn assign_payload(
     match owner {
         Owner::Schema(i) => schemas[i].value.payload_xml = Some(payload),
         Owner::Binding(i) => {
-            let value = &mut maps[i].binding.as_mut().unwrap().value;
-            value.payload_xml = Some(payload.clone());
-            maps[i].value.data_binding = Some(value.clone());
+            let map = maps
+                .get_mut(i)
+                .ok_or_else(|| invalid("DataBinding payload has no map"))?;
+            let binding = map
+                .binding
+                .as_mut()
+                .ok_or_else(|| invalid("DataBinding payload has no binding"))?;
+            binding.value.payload_xml = Some(payload);
+            map.value.data_binding = Some(binding.value.clone());
         },
     }
     Ok(())
@@ -1037,6 +1062,22 @@ fn parse_u32_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8], required: bool) -> R
         ))),
         None => Ok(None),
     }
+}
+fn required_bool_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<bool> {
+    parse_bool_attr(e, d, n, true)?.ok_or_else(|| {
+        invalid(format!(
+            "missing required attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))
+    })
+}
+fn required_u32_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<u32> {
+    parse_u32_attr(e, d, n, true)?.ok_or_else(|| {
+        invalid(format!(
+            "missing required attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))
+    })
 }
 fn only_attrs(e: &BytesStart<'_>, allowed: &[&[u8]]) -> Result<()> {
     for a in e.attributes().with_checks(true) {
