@@ -97,6 +97,20 @@ fn object_count(state: &GraphState) -> usize {
             .count()
 }
 
+fn object_ids_in_order(state: &GraphState) -> Vec<ObjectId> {
+    let mut object_ids = Vec::with_capacity(
+        state
+            .incoming_refs
+            .len()
+            .saturating_add(state.outgoing_refs.len()),
+    );
+    object_ids.extend(state.incoming_refs.keys().copied());
+    object_ids.extend(state.outgoing_refs.keys().copied());
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    object_ids
+}
+
 /// Object reference graph for tracking dependencies
 ///
 /// Maintains a bidirectional graph of object references with efficient
@@ -323,6 +337,15 @@ impl ReferenceGraph {
             .chain(self.state.outgoing_refs.keys())
             .copied()
             .collect()
+    }
+
+    /// Get all object IDs in deterministic numeric order.
+    ///
+    /// This is the stable, typed collection view for callers that need
+    /// reproducible traversal or diagnostics. It allocates one compact vector
+    /// and does not expose the graph's hash-map storage.
+    pub fn object_ids(&self) -> Vec<ObjectId> {
+        object_ids_in_order(&self.state)
     }
 
     /// Check for a cycle through the typed identity API.
@@ -574,6 +597,14 @@ impl ReferenceGraphSnapshot {
             .collect()
     }
 
+    /// Get all object IDs in deterministic numeric order.
+    ///
+    /// The snapshot shares its graph storage, while this explicit collection
+    /// allocates only the sorted result vector.
+    pub fn object_ids(&self) -> Vec<ObjectId> {
+        object_ids_in_order(&self.state)
+    }
+
     /// Check whether a cycle is reachable from `object_id`.
     pub fn has_cycle_from(&self, object_id: ObjectId) -> bool {
         ReferenceGraph {
@@ -787,8 +818,27 @@ mod tests {
         assert_eq!(snapshot.reachable(one), vec![one, two]);
         assert!(!snapshot.has_cycle_from(one));
         assert_eq!(snapshot.all_object_ids(), HashSet::from([one, two]));
+        assert_eq!(snapshot.object_ids(), vec![one, two]);
         assert_eq!(snapshot.len(), 2);
         assert_eq!(snapshot.edge_count(), 1);
+    }
+
+    #[test]
+    fn object_ids_are_sorted_and_deduplicated() {
+        let mut graph = ReferenceGraph::new();
+        let two = ObjectId::try_from(2).unwrap();
+        let four = ObjectId::try_from(4).unwrap();
+        let seven = ObjectId::try_from(7).unwrap();
+        let nine = ObjectId::try_from(9).unwrap();
+
+        graph.add_object_reference(nine, two);
+        graph.add_object_reference(two, seven);
+        graph.add_object_reference(nine, seven);
+        graph.add_object_reference(four, nine);
+
+        let expected = vec![two, four, seven, nine];
+        assert_eq!(graph.object_ids(), expected);
+        assert_eq!(graph.snapshot().object_ids(), expected);
     }
 
     #[test]

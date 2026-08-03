@@ -563,7 +563,13 @@ impl Bundle {
         }
     }
 
-    fn archives_in_order(&self) -> Vec<(&str, &Archive)> {
+    /// Enumerate archives in deterministic lexicographic name order.
+    ///
+    /// The returned vector owns only the ordering allocation; archive names
+    /// and archive values remain borrowed from this bundle. This is the
+    /// preferred collection view for selectors, diagnostics, and other
+    /// consumers that must not depend on `HashMap` iteration order.
+    pub fn archives_in_order(&self) -> Vec<(&str, &Archive)> {
         let mut archives: Vec<_> = self
             .state
             .archives
@@ -747,7 +753,10 @@ impl Bundle {
         versions
     }
 
-    /// Get all archives in the bundle
+    /// Get all archives in the bundle.
+    ///
+    /// This compatibility view exposes the internal lookup map. Callers that
+    /// need stable traversal order should use [`Self::archives_in_order`].
     pub fn archives(&self) -> &HashMap<String, Archive> {
         &self.state.archives
     }
@@ -1390,6 +1399,13 @@ mod tests {
                 ("Index/Z.iwa", Some(4)),
             ]
         );
+
+        let archive_order: Vec<_> = bundle
+            .archives_in_order()
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(archive_order, vec!["Index/A.iwa", "Index/Z.iwa"]);
 
         let matching_order: Vec<_> = bundle
             .find_objects_by_type(7)
