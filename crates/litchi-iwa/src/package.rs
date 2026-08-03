@@ -32,6 +32,7 @@ use package_state::PackageState;
 pub struct IWorkPackage {
     state: Arc<PackageState>,
     limits: PackageLimits,
+    mutation_revision: u64,
 }
 
 /// An immutable, cheaply shareable package snapshot.
@@ -529,6 +530,7 @@ impl IWorkPackage {
         Ok(Self {
             state: Arc::new(PackageState::from_entries(entries)),
             limits,
+            mutation_revision: 0,
         })
     }
 
@@ -599,6 +601,7 @@ impl IWorkPackage {
         Ok(Self {
             state: Arc::new(PackageState::from_entries(entries)),
             limits,
+            mutation_revision: 0,
         })
     }
 
@@ -613,6 +616,16 @@ impl IWorkPackage {
     /// Return the resource profile retained for lazy archive reads and edits.
     pub const fn limits(&self) -> PackageLimits {
         self.limits
+    }
+
+    /// Return the monotonic revision of this mutable package view.
+    ///
+    /// Format-specific editors use this compact token to reject an archive
+    /// parsed before a caller performed another mutation. Cloning a package
+    /// preserves the revision, while the first subsequent mutation advances
+    /// only the mutated clone's revision.
+    pub(crate) const fn mutation_revision(&self) -> u64 {
+        self.mutation_revision
     }
 
     /// Capture an immutable package snapshot without copying package entries.
@@ -680,6 +693,7 @@ impl IWorkPackage {
     /// published accidentally.
     pub fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let position = self.entry_position(normalize_entry_name(name))?;
+        self.mark_mutated();
         Some(&mut Arc::make_mut(&mut self.state).entries[position].1)
     }
 
@@ -695,12 +709,15 @@ impl IWorkPackage {
         let position = self.entry_position(&name);
         self.validate_entry_update(position, &data)?;
         if let Some(position) = position {
-            return Ok(Some(std::mem::replace(
+            let previous = std::mem::replace(
                 &mut Arc::make_mut(&mut self.state).entries[position].1,
                 data,
-            )));
+            );
+            self.mark_mutated();
+            return Ok(Some(previous));
         }
         self.insert_new_entry(name, data);
+        self.mark_mutated();
         Ok(None)
     }
 
@@ -710,6 +727,7 @@ impl IWorkPackage {
         let state = Arc::make_mut(&mut self.state);
         let removed = state.entries.remove(position).1;
         state.rebuild_positions();
+        self.mark_mutated();
         Some(removed)
     }
 
@@ -781,6 +799,7 @@ impl IWorkPackage {
         let state = Arc::make_mut(&mut self.state);
         state.entries.insert(position, (normalized, compressed));
         state.rebuild_positions();
+        self.mark_mutated();
         Ok(())
     }
 
@@ -978,6 +997,10 @@ impl IWorkPackage {
         }
         state.rebuild_positions();
     }
+
+    fn mark_mutated(&mut self) {
+        self.mutation_revision = self.mutation_revision.wrapping_add(1);
+    }
 }
 
 impl Snapshot {
@@ -1026,6 +1049,7 @@ impl Snapshot {
         IWorkPackage {
             state: Arc::clone(&self.state),
             limits: self.limits,
+            mutation_revision: 0,
         }
     }
 

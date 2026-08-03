@@ -8,7 +8,7 @@ use prost::Message;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::protobuf::tswp::list_style_archive::{LabelGeometry, LabelType, NumberType};
 use crate::protobuf::{tsp, tss, tswp};
-use crate::text::storage_wire::locate_text_storages;
+use crate::text::storage_wire::{locate_text_storages, update_parsed_archive};
 use crate::wire::{
     patch_length_delimited_field, patch_varint_field, rewrite_repeated_fixed32_fields,
     rewrite_repeated_length_delimited_fields, rewrite_repeated_varint_fields,
@@ -53,7 +53,20 @@ pub(super) struct ListStyleLocation {
     pub(super) style: tswp::ListStyleArchive,
 }
 
+pub(super) struct LocatedListStyle {
+    pub(super) location: ListStyleLocation,
+    pub(super) archive: Archive,
+    package_revision: u64,
+}
+
 pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<ListStyleLocation> {
+    locate_style_with_archive(package, style_id).map(|located| located.location)
+}
+
+pub(super) fn locate_style_with_archive(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<LocatedListStyle> {
     let mut found = None;
     for archive_name in package.iwa_entry_names() {
         let archive = package.archive(archive_name)?;
@@ -73,12 +86,16 @@ pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<List
         };
         let style = tswp::ListStyleArchive::decode(message.data.as_slice())?;
         if found
-            .replace(ListStyleLocation {
-                object_id: style_id,
-                archive_name: archive_name.to_owned(),
-                message_index: *message_index,
-                message_type: message.type_,
-                style,
+            .replace(LocatedListStyle {
+                location: ListStyleLocation {
+                    object_id: style_id,
+                    archive_name: archive_name.to_owned(),
+                    message_index: *message_index,
+                    message_type: message.type_,
+                    style,
+                },
+                archive,
+                package_revision: package.mutation_revision(),
             })
             .is_some()
         {
@@ -592,70 +609,106 @@ fn patch_style_message<F>(
 where
     F: FnOnce(&[u8], u64) -> Result<Option<Vec<u8>>>,
 {
-    let style_id = location.object_id;
-    package.update_archive(&location.archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        if object.archive_info.identifier != Some(style_id) {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} object identity changed unexpectedly"
-            )));
-        }
-        if object.messages.get(location.message_index).is_none() {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} writable payload index {} is missing",
-                location.message_index
-            )));
-        }
-        if object.messages[location.message_index].type_ != location.message_type {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} writable payload changed unexpectedly"
-            )));
-        }
-        if object
-            .archive_info
-            .message_infos
-            .get(location.message_index)
-            .is_none()
-        {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} writable payload metadata index {} is missing",
-                location.message_index
-            )));
-        }
-        if object.archive_info.message_infos[location.message_index].type_ != location.message_type
-        {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} writable payload metadata changed unexpectedly"
-            )));
-        }
-        let replacement = {
-            let original = &object.messages[location.message_index];
-            patch(&original.data, style_id)?.map(|data| (original.type_, data))
-        };
-        let Some((message_type, data)) = replacement else {
-            return Ok(());
-        };
-        object.replace_message(
-            location.message_index,
-            RawMessage {
-                type_: message_type,
-                data,
-            },
-        )?;
-        Ok(())
+    let archive_name = location.archive_name.clone();
+    package.update_archive(&archive_name, |archive| {
+        patch_style_message_in_archive(archive, location, patch)
     })
 }
 
-pub(super) fn replace_direct_number_types(
+fn patch_style_message_with_archive<F>(
     package: &mut IWorkPackage,
+    located: LocatedListStyle,
+    patch: F,
+) -> Result<()>
+where
+    F: FnOnce(&[u8], u64) -> Result<Option<Vec<u8>>>,
+{
+    let LocatedListStyle {
+        location,
+        archive,
+        package_revision,
+    } = located;
+    if package.mutation_revision() != package_revision {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {} package changed unexpectedly",
+            location.object_id
+        )));
+    }
+    let archive_name = location.archive_name.clone();
+    update_parsed_archive(package, &archive_name, archive, |archive| {
+        patch_style_message_in_archive(archive, &location, patch)
+    })
+}
+
+fn patch_style_message_in_archive<F>(
+    archive: &mut Archive,
     location: &ListStyleLocation,
+    patch: F,
+) -> Result<()>
+where
+    F: FnOnce(&[u8], u64) -> Result<Option<Vec<u8>>>,
+{
+    let style_id = location.object_id;
+    let object = archive
+        .object_mut(style_id)
+        .ok_or_else(|| Error::InvalidFormat(format!("iWork list style {style_id} is missing")))?;
+    if object.archive_info.identifier != Some(style_id) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} object identity changed unexpectedly"
+        )));
+    }
+    if object.messages.get(location.message_index).is_none() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} writable payload index {} is missing",
+            location.message_index
+        )));
+    }
+    if object.messages[location.message_index].type_ != location.message_type {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} writable payload changed unexpectedly"
+        )));
+    }
+    if object
+        .archive_info
+        .message_infos
+        .get(location.message_index)
+        .is_none()
+    {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} writable payload metadata index {} is missing",
+            location.message_index
+        )));
+    }
+    if object.archive_info.message_infos[location.message_index].type_ != location.message_type {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} writable payload metadata changed unexpectedly"
+        )));
+    }
+    let replacement = {
+        let original = &object.messages[location.message_index];
+        patch(&original.data, style_id)?.map(|data| (original.type_, data))
+    };
+    let Some((message_type, data)) = replacement else {
+        return Ok(());
+    };
+    object.replace_message(
+        location.message_index,
+        RawMessage {
+            type_: message_type,
+            data,
+        },
+    )?;
+    Ok(())
+}
+
+pub(super) fn replace_direct_number_types_with_archive(
+    package: &mut IWorkPackage,
+    located: LocatedListStyle,
     number_types: &[i32],
 ) -> Result<()> {
-    let style_id = location.object_id;
+    let style_id = located.location.object_id;
     validate_number_types(style_id, number_types)?;
-    patch_style_message(package, location, |data, style_id| {
+    patch_style_message_with_archive(package, located, |data, style_id| {
         Ok(Some(patch_direct_number_types(
             data,
             style_id,
@@ -744,14 +797,14 @@ fn patch_direct_number_types(data: &[u8], style_id: u64, number_types: &[i32]) -
     Ok(patched)
 }
 
-pub(super) fn replace_direct_tiered_numbers(
+pub(super) fn replace_direct_tiered_numbers_with_archive(
     package: &mut IWorkPackage,
-    location: &ListStyleLocation,
+    located: LocatedListStyle,
     tiered_numbers: &[bool],
 ) -> Result<()> {
-    let style_id = location.object_id;
+    let style_id = located.location.object_id;
     validate_tiered_numbers(style_id, tiered_numbers)?;
-    patch_style_message(package, location, |data, style_id| {
+    patch_style_message_with_archive(package, located, |data, style_id| {
         Ok(Some(patch_direct_tiered_numbers(
             data,
             style_id,
@@ -839,12 +892,12 @@ fn patch_direct_tiered_numbers(
     Ok(patched)
 }
 
-pub(super) fn replace_direct_label_color(
+pub(super) fn replace_direct_label_color_with_archive(
     package: &mut IWorkPackage,
-    location: &ListStyleLocation,
+    located: LocatedListStyle,
     color: ParagraphListLabelColor,
 ) -> Result<()> {
-    patch_style_message(package, location, |data, style_id| {
+    patch_style_message_with_archive(package, located, |data, style_id| {
         Ok(Some(patch_direct_label_color(data, style_id, color)?))
     })
 }
@@ -955,26 +1008,26 @@ fn native_label_color(color: ParagraphListLabelColor) -> (Option<bool>, Option<t
     }
 }
 
-pub(super) fn replace_direct_bullet_strings(
+pub(super) fn replace_direct_bullet_strings_with_archive(
     package: &mut IWorkPackage,
-    location: &ListStyleLocation,
+    located: LocatedListStyle,
     strings: &[String],
 ) -> Result<()> {
-    let style_id = location.object_id;
+    let style_id = located.location.object_id;
     validate_bullet_strings(style_id, strings)?;
-    patch_style_message(package, location, |data, style_id| {
+    patch_style_message_with_archive(package, located, |data, style_id| {
         Ok(Some(patch_direct_bullet_strings(data, style_id, strings)?))
     })
 }
 
-pub(super) fn replace_direct_bullet_geometries(
+pub(super) fn replace_direct_bullet_geometries_with_archive(
     package: &mut IWorkPackage,
-    location: &ListStyleLocation,
+    located: LocatedListStyle,
     geometries: &[LabelGeometry],
 ) -> Result<()> {
-    let style_id = location.object_id;
+    let style_id = located.location.object_id;
     validate_bullet_geometries(style_id, geometries)?;
-    patch_style_message(package, location, |data, style_id| {
+    patch_style_message_with_archive(package, located, |data, style_id| {
         Ok(Some(patch_direct_bullet_geometries(
             data, style_id, geometries,
         )?))
@@ -1058,16 +1111,16 @@ fn patch_direct_bullet_geometries(
     Ok(patched)
 }
 
-pub(super) fn replace_direct_list_indentation(
+pub(super) fn replace_direct_list_indentation_with_archive(
     package: &mut IWorkPackage,
-    location: &ListStyleLocation,
+    located: LocatedListStyle,
     indents: &[f32],
     text_indents: &[f32],
 ) -> Result<()> {
-    let style_id = location.object_id;
+    let style_id = located.location.object_id;
     validate_list_float_array(style_id, indents, ListFloatArray::LabelIndents)?;
     validate_list_float_array(style_id, text_indents, ListFloatArray::TextGaps)?;
-    patch_style_message(package, location, |data, style_id| {
+    patch_style_message_with_archive(package, located, |data, style_id| {
         Ok(Some(patch_direct_list_indentation(
             data,
             style_id,
@@ -1964,13 +2017,16 @@ mod tests {
         let location = locate_style(&package, style_id).unwrap();
         assert_eq!(location.message_index, 1);
         assert_eq!(location.message_type, LIST_STYLE_MESSAGE_TYPE);
+        let located = locate_style_with_archive(&package, style_id).unwrap();
+        assert!(located.archive.object(style_id).is_some());
 
         let mut strings = style.strings.clone();
         strings[2] = "◆".to_owned();
-        replace_direct_bullet_strings(&mut package, &location, &strings).unwrap();
-        replace_direct_list_indentation(
+        replace_direct_bullet_strings_with_archive(&mut package, located, &strings).unwrap();
+        let located_indentation = locate_style_with_archive(&package, style_id).unwrap();
+        replace_direct_list_indentation_with_archive(
             &mut package,
-            &location,
+            located_indentation,
             &level_indents(BULLET_INDENT_STEP_POINTS),
             &[BULLET_INDENT_STEP_POINTS / FONT_EM_POINTS; LIST_LEVEL_COUNT],
         )
@@ -1990,6 +2046,7 @@ mod tests {
         );
 
         let mut stale = package.clone();
+        let stale_located = locate_style_with_archive(&stale, style_id).unwrap();
         stale
             .update_archive("Index/One.iwa", |archive| {
                 let object = archive.object_mut(style_id).unwrap();
@@ -1999,7 +2056,10 @@ mod tests {
             })
             .unwrap();
         let before = stale.entry("Index/One.iwa").unwrap().to_vec();
-        assert!(replace_direct_bullet_strings(&mut stale, &location, &strings).is_err());
+        assert!(
+            replace_direct_bullet_strings_with_archive(&mut stale, stale_located, &strings)
+                .is_err()
+        );
         assert_eq!(stale.entry("Index/One.iwa").unwrap(), before.as_slice());
     }
 }

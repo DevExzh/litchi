@@ -60,7 +60,8 @@ pub(in crate::text) fn set_paragraph_list_bullet_geometry(
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
     let style_id = effective_style_id(&boundaries, paragraph)?;
-    let style = native::locate_style(package, style_id)?;
+    let located_style = native::locate_style_with_archive(package, style_id)?;
+    let style = &located_style.location;
     let stylesheet_id = native::stylesheet_id(package, &style.style, style_id)?;
     if object_archive_name(package, stylesheet_id)? != style.archive_name {
         return Err(Error::InvalidFormat(format!(
@@ -78,7 +79,11 @@ pub(in crate::text) fn set_paragraph_list_bullet_geometry(
         && native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     if can_update_in_place {
-        native::replace_direct_bullet_geometries(&mut staged, &style, &geometries)?;
+        native::replace_direct_bullet_geometries_with_archive(
+            &mut staged,
+            located_style,
+            &geometries,
+        )?;
     } else {
         let new_style_id = next_object_identifier(&staged)?;
         let variation =
