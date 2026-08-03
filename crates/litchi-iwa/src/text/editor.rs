@@ -111,6 +111,7 @@ use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
 use super::position::{TextPosition, TextRange};
+use super::storage_wire::{locate_text_storage, locate_text_storages};
 use super::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
     ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
@@ -125,8 +126,6 @@ use super::text_comment_types::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
 };
-
-const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
 /// A discoverable text storage within an iWork package.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,60 +160,27 @@ impl IWorkTextEditor {
     }
 
     pub fn storages(&self) -> Result<Vec<TextStorageInfo>> {
-        let mut storages = Vec::new();
-        for name in self.package.iwa_entry_names() {
-            let archive = self.package.archive(name)?;
-            for object in archive.objects {
-                let Some(object_id) = object.archive_info.identifier else {
-                    continue;
-                };
-                for message in object.messages {
-                    if !STORAGE_MESSAGE_TYPES.contains(&message.type_) {
-                        continue;
-                    }
-                    let Ok(storage) = StorageArchive::decode(message.data.as_slice()) else {
-                        continue;
-                    };
-                    storages.push(TextStorageInfo {
-                        object_id,
-                        message_type: message.type_,
-                        kind: storage.kind,
-                        text: storage.text.concat(),
-                    });
-                }
-            }
-        }
+        let mut storages = locate_text_storages(&self.package)?
+            .into_iter()
+            .map(|location| TextStorageInfo {
+                object_id: location.object_id,
+                message_type: location.message_type,
+                kind: location.storage.kind,
+                text: location.storage.text.concat(),
+            })
+            .collect::<Vec<_>>();
         storages.sort_by_key(|storage| storage.object_id);
         Ok(storages)
     }
 
     pub fn storage(&self, object_id: u64) -> Result<TextStorageInfo> {
-        let archive_name = find_storage_archive(&self.package, object_id)?;
-        let archive = self.package.archive(&archive_name)?;
-        let object = archive.object(object_id).ok_or_else(|| {
-            Error::ParseError(format!("Text storage object {object_id} not found"))
-        })?;
-        object
-            .messages
-            .iter()
-            .find_map(|message| {
-                if !STORAGE_MESSAGE_TYPES.contains(&message.type_) {
-                    return None;
-                }
-                StorageArchive::decode(message.data.as_slice())
-                    .ok()
-                    .map(|storage| TextStorageInfo {
-                        object_id,
-                        message_type: message.type_,
-                        kind: storage.kind,
-                        text: storage.text.concat(),
-                    })
-            })
-            .ok_or_else(|| {
-                Error::ParseError(format!(
-                    "Object {object_id} has no writable TSWP storage payload"
-                ))
-            })
+        let location = locate_text_storage(&self.package, object_id)?;
+        Ok(TextStorageInfo {
+            object_id,
+            message_type: location.message_type,
+            kind: location.storage.kind,
+            text: location.storage.text.concat(),
+        })
     }
 
     /// Replace a UTF-16 range, matching the indexing used by iWork attributes.
@@ -2246,27 +2212,17 @@ pub(super) fn replace_storage_text(
     range: Range<usize>,
     replacement: &str,
 ) -> Result<()> {
-    let archive_name = find_storage_archive(package, object_id)?;
+    let location = locate_text_storage(package, object_id)?;
+    let archive_name = location.archive_name;
+    let message_index = location.message_index;
+    let message_type = location.message_type;
+    let mut storage = location.storage;
     let mut removed_references = std::collections::HashSet::new();
     package.update_archive(&archive_name, |archive| {
         let object = archive.object_mut(object_id).ok_or_else(|| {
             Error::ParseError(format!("Text storage object {object_id} not found"))
         })?;
-        let message_index = object
-            .messages
-            .iter()
-            .position(|message| {
-                STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                    && StorageArchive::decode(message.data.as_slice()).is_ok()
-            })
-            .ok_or_else(|| {
-                Error::ParseError(format!(
-                    "Object {object_id} has no writable TSWP storage payload"
-                ))
-            })?;
-        let message_type = object.messages[message_index].type_;
         let original = object.messages[message_index].data.as_slice();
-        let mut storage = StorageArchive::decode(original)?;
         let previous_references = storage_object_references(&storage);
         let current = storage.text.concat();
         let start = utf16_to_byte_index(&current, range.start)?;
@@ -2325,28 +2281,6 @@ pub(super) fn replace_storage_text(
     remove_unreferenced_number_attachment_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_bookmark_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_highlight_objects(package, &archive_name, &removed_references)
-}
-
-fn find_storage_archive(package: &IWorkPackage, object_id: u64) -> Result<String> {
-    let mut found = None;
-    for name in package.iwa_entry_names() {
-        let archive = package.archive(name)?;
-        let Some(object) = archive.object(object_id) else {
-            continue;
-        };
-        if !object.messages.iter().any(|message| {
-            STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                && StorageArchive::decode(message.data.as_slice()).is_ok()
-        }) {
-            continue;
-        }
-        if found.replace(name.to_owned()).is_some() {
-            return Err(Error::Archive(format!(
-                "Text storage object {object_id} occurs in multiple IWA components"
-            )));
-        }
-    }
-    found.ok_or_else(|| Error::ParseError(format!("Text storage object {object_id} not found")))
 }
 
 fn utf16_to_byte_index(text: &str, target: usize) -> Result<usize> {
@@ -2906,6 +2840,129 @@ mod tests {
     use crate::protobuf::tswp::overlapping_field_attribute_table::OverlappingFieldAttribute;
 
     #[test]
+    fn storage_discovery_rejects_malformed_recognized_payload() {
+        let editor = IWorkTextEditor::from_package(test_package_with_messages(vec![RawMessage {
+            type_: 2001,
+            data: vec![0x80],
+        }]));
+
+        assert!(editor.storages().is_err());
+    }
+
+    #[test]
+    fn storage_lookup_does_not_skip_malformed_first_payload() {
+        let valid = StorageArchive {
+            text: vec!["valid sibling".to_owned()],
+            ..Default::default()
+        };
+        let editor = IWorkTextEditor::from_package(test_package_with_messages(vec![
+            RawMessage {
+                type_: 2001,
+                data: vec![0x80],
+            },
+            RawMessage {
+                type_: 2022,
+                data: valid.encode_to_vec(),
+            },
+        ]));
+
+        assert!(editor.storage(42).is_err());
+    }
+
+    #[test]
+    fn storage_lookup_rejects_duplicate_recognized_payloads() {
+        let first = StorageArchive {
+            text: vec!["first".to_owned()],
+            ..Default::default()
+        };
+        let second = StorageArchive {
+            text: vec!["second".to_owned()],
+            ..Default::default()
+        };
+        let editor = IWorkTextEditor::from_package(test_package_with_messages(vec![
+            RawMessage {
+                type_: 2001,
+                data: first.encode_to_vec(),
+            },
+            RawMessage {
+                type_: 2022,
+                data: second.encode_to_vec(),
+            },
+        ]));
+
+        assert!(editor.storage(42).is_err());
+        assert!(editor.storages().is_err());
+    }
+
+    #[test]
+    fn storage_lookup_rejects_duplicate_archives() {
+        let object = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 2001,
+                data: StorageArchive {
+                    text: vec!["duplicated".to_owned()],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            }],
+        )
+        .unwrap();
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive("Index/Document.iwa", &archive)
+            .unwrap();
+        package
+            .replace_archive("Index/Other.iwa", &archive)
+            .unwrap();
+
+        let editor = IWorkTextEditor::from_package(package);
+        assert!(editor.storage(42).is_err());
+    }
+
+    #[test]
+    fn storage_replacement_is_atomic_when_resolution_fails() {
+        let mut editor =
+            IWorkTextEditor::from_package(test_package_with_messages(vec![RawMessage {
+                type_: 2001,
+                data: vec![0x80],
+            }]));
+        let before = editor.to_bytes().unwrap();
+
+        assert!(editor.replace_text(42, 0..0, "replacement").is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn unknown_message_types_are_ignored_and_preserved() {
+        let unknown = RawMessage {
+            type_: 9_999,
+            data: vec![0xde, 0xad, 0xbe, 0xef],
+        };
+        let storage = StorageArchive {
+            text: vec!["Source".to_owned()],
+            ..Default::default()
+        };
+        let mut editor = IWorkTextEditor::from_package(test_package_with_messages(vec![
+            unknown.clone(),
+            RawMessage {
+                type_: 2001,
+                data: storage.encode_to_vec(),
+            },
+        ]));
+
+        assert_eq!(editor.storage(42).unwrap().text, "Source");
+        editor.set_text(42, "Updated").unwrap();
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let object = archive.object(42).unwrap();
+        assert_eq!(object.messages[0], unknown);
+        assert_eq!(object.messages[1].type_, 2001);
+    }
+
+    #[test]
     fn whole_text_replacement_preserves_drop_cap_sentinel_exactly() {
         let storage = StorageArchive {
             text: vec!["Source".to_owned()],
@@ -3164,14 +3221,14 @@ mod tests {
     }
 
     fn test_package(storage: StorageArchive) -> IWorkPackage {
-        let object = ArchiveObject::new(
-            42,
-            vec![RawMessage {
-                type_: 2001,
-                data: storage.encode_to_vec(),
-            }],
-        )
-        .unwrap();
+        test_package_with_messages(vec![RawMessage {
+            type_: 2001,
+            data: storage.encode_to_vec(),
+        }])
+    }
+
+    fn test_package_with_messages(messages: Vec<RawMessage>) -> IWorkPackage {
+        let object = ArchiveObject::new(42, messages).unwrap();
         let mut package = IWorkPackage::new();
         package
             .replace_archive(

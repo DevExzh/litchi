@@ -1,7 +1,10 @@
 //! Shared bounded access to native TSWP storage payloads and UTF-16 boundaries.
 
+use std::collections::HashSet;
+
 use prost::Message;
 
+use crate::archive::RawMessage;
 use crate::protobuf::tswp::StorageArchive;
 use crate::wire::repeated_length_delimited_payloads;
 use crate::{Error, IWorkPackage, Result};
@@ -9,7 +12,10 @@ use crate::{Error, IWorkPackage, Result};
 pub(super) const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 
 pub(super) struct StorageLocation {
+    pub object_id: u64,
     pub archive_name: String,
+    pub message_index: usize,
+    pub message_type: u32,
     pub storage: StorageArchive,
     pub table_present: bool,
 }
@@ -21,42 +27,112 @@ pub(super) fn locate_storage(
     table_field: u32,
     table_label: &str,
 ) -> Result<StorageLocation> {
+    locate_storage_in_package(package, storage_id, Some((table_field, table_label)))
+}
+
+/// Locate one writable text storage without applying a table-specific policy.
+pub(super) fn locate_text_storage(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<StorageLocation> {
+    locate_storage_in_package(package, storage_id, None)
+}
+
+/// Discover every writable text storage while validating each recognized payload.
+pub(super) fn locate_text_storages(package: &IWorkPackage) -> Result<Vec<StorageLocation>> {
+    let mut locations = Vec::new();
+    let mut seen = HashSet::new();
+    for archive_name in package.iwa_entry_names() {
+        let archive = package.archive(archive_name)?;
+        for object in archive.objects {
+            let Some(object_id) = object.archive_info.identifier else {
+                continue;
+            };
+            let Some(location) =
+                resolve_object_storage(archive_name, object_id, &object.messages, None)?
+            else {
+                continue;
+            };
+            if !seen.insert(object_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Text storage object {object_id} occurs in multiple IWA components"
+                )));
+            }
+            locations.push(location);
+        }
+    }
+    Ok(locations)
+}
+
+fn locate_storage_in_package(
+    package: &IWorkPackage,
+    storage_id: u64,
+    table: Option<(u32, &str)>,
+) -> Result<StorageLocation> {
     let mut found = None;
     for archive_name in package.iwa_entry_names() {
         let archive = package.archive(archive_name)?;
         let Some(object) = archive.object(storage_id) else {
             continue;
         };
-        let payloads = object
-            .messages
-            .iter()
-            .filter(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
-            .collect::<Vec<_>>();
-        let [message] = payloads.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
-            )));
+        let Some(location) =
+            resolve_object_storage(archive_name, storage_id, &object.messages, table)?
+        else {
+            continue;
         };
-        let storage = StorageArchive::decode(message.data.as_slice())?;
-        let table_count =
-            repeated_length_delimited_payloads(message.data.as_slice(), table_field)?.len();
-        if table_count > 1 {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} contains {table_count} {table_label} tables"
-            )));
-        }
-        let location = StorageLocation {
-            archive_name: archive_name.to_owned(),
-            storage,
-            table_present: table_count == 1,
-        };
-        if found.replace(location).is_some() {
+        if found.is_some() {
             return Err(Error::InvalidFormat(format!(
                 "iWork text storage {storage_id} occurs in multiple archives"
             )));
         }
+        found = Some(location);
     }
     found.ok_or_else(|| Error::InvalidFormat(format!("iWork text storage {storage_id} is missing")))
+}
+
+fn resolve_object_storage(
+    archive_name: &str,
+    object_id: u64,
+    messages: &[RawMessage],
+    table: Option<(u32, &str)>,
+) -> Result<Option<StorageLocation>> {
+    let mut found = None;
+    for (message_index, message) in messages.iter().enumerate() {
+        if !STORAGE_MESSAGE_TYPES.contains(&message.type_) {
+            continue;
+        }
+        let storage = StorageArchive::decode(message.data.as_slice()).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "iWork text storage {object_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
+            ))
+        })?;
+        if found.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {object_id} must have exactly one writable payload"
+            )));
+        }
+        let table_present = if let Some((table_field, table_label)) = table {
+            let table_count =
+                repeated_length_delimited_payloads(message.data.as_slice(), table_field)?.len();
+            if table_count > 1 {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork text storage {object_id} contains {table_count} {table_label} tables"
+                )));
+            }
+            table_count == 1
+        } else {
+            false
+        };
+        found = Some(StorageLocation {
+            object_id,
+            archive_name: archive_name.to_owned(),
+            message_index,
+            message_type: message.type_,
+            storage,
+            table_present,
+        });
+    }
+    Ok(found)
 }
 
 pub(super) fn require_text_boundary(storage_id: u64, position: u32, text: &[String]) -> Result<()> {
