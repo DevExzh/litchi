@@ -273,14 +273,22 @@ impl DocumentStats {
     pub fn most_common_message_type(&self) -> Option<(u32, usize)> {
         self.message_type_counts
             .iter()
-            .max_by_key(|&(_, count)| count)
+            .max_by(|(left_type, left_count), (right_type, right_count)| {
+                left_count
+                    .cmp(right_count)
+                    .then_with(|| right_type.cmp(left_type))
+            })
             .map(|(&type_, &count)| (type_, count))
     }
 
-    /// Get message type distribution as a string
+    /// Get message type distribution as a deterministic summary string.
     pub fn message_type_summary(&self) -> String {
         let mut types: Vec<_> = self.message_type_counts.iter().collect();
-        types.sort_by_key(|&(_, count)| std::cmp::Reverse(*count));
+        types.sort_by(|(left_type, left_count), (right_type, right_count)| {
+            right_count
+                .cmp(left_count)
+                .then_with(|| left_type.cmp(right_type))
+        });
 
         let top_types: Vec<String> = types
             .into_iter()
@@ -344,6 +352,25 @@ mod tests {
         let summary = stats.message_type_summary();
         assert!(summary.contains("3: 15"));
         assert!(summary.contains("1: 10"));
+    }
+
+    #[test]
+    fn document_statistics_break_ties_by_message_type() {
+        let message_type_counts =
+            HashMap::from([(7, 10), (3, 10), (5, 10), (1, 10), (9, 10), (2, 10)]);
+        let stats = DocumentStats {
+            total_objects: 0,
+            archives_count: 0,
+            message_type_counts,
+            application: Application::Common,
+            media_stats: None,
+        };
+
+        assert_eq!(stats.most_common_message_type(), Some((1, 10)));
+        assert_eq!(
+            stats.message_type_summary(),
+            "1: 10, 2: 10, 3: 10, 5: 10, 7: 10 (and 1 more)"
+        );
     }
 
     #[test]
