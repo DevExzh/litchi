@@ -607,7 +607,9 @@ fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                 _ => {},
             }
             if *capture_depth == 0 {
-                let (_, source, prefix, writer) = capture.take().expect("capture checked");
+                let Some((_, source, prefix, writer)) = capture.take() else {
+                    return Err(invalid("dataValidations capture state disappeared"));
+                };
                 let bytes = writer.into_inner();
                 if bytes.len() > MAX_FRAGMENT_BYTES {
                     return Err(invalid("dataValidations fragment is too large"));
@@ -716,7 +718,9 @@ fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
                 _ => {},
             }
             if *capture_depth == 0 {
-                let (_, writer) = capture.take().expect("capture checked");
+                let Some((_, writer)) = capture.take() else {
+                    return Err(invalid("dataValidation capture state disappeared"));
+                };
                 validations.push(parse_rule(&writer.into_inner(), fragment.source)?);
                 if validations.len() > MAX_VALIDATIONS {
                     return Err(invalid("too many data validations"));
@@ -951,13 +955,16 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     && exact(&namespace, X12AC)
                     && local.as_ref() == b"list"
                 {
-                    if wrapper.expect("wrapper").0 != 1 {
+                    let Some(wrapper_state) = wrapper.as_mut() else {
+                        return Err(invalid("quoted validation list is outside its wrapper"));
+                    };
+                    if wrapper_state.0 != 1 {
                         return Err(invalid("quoted validation list is only valid in formula1"));
                     }
-                    if wrapper.as_ref().is_some_and(|v| v.2) {
+                    if wrapper_state.2 {
                         return Err(invalid("formula wrapper must contain exactly one value"));
                     }
-                    wrapper.as_mut().expect("wrapper").2 = true;
+                    wrapper_state.2 = true;
                     depth += 1;
                     text = Some((depth, TextTarget::List, String::new()));
                 } else if source == DataValidationSource::Office2010
@@ -1035,11 +1042,14 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     && exact(&namespace, XM)
                     && local.as_ref() == b"f"
                 {
-                    if wrapper.as_ref().is_some_and(|v| v.2) {
+                    let Some(wrapper_state) = wrapper.as_mut() else {
+                        return Err(invalid("formula value is outside its wrapper"));
+                    };
+                    if wrapper_state.2 {
                         return Err(invalid("formula wrapper must contain exactly one value"));
                     }
-                    let number = wrapper.expect("wrapper").0;
-                    wrapper.as_mut().expect("wrapper").2 = true;
+                    let number = wrapper_state.0;
+                    wrapper_state.2 = true;
                     if number == 1 {
                         if formula1
                             .replace(ValidationListSource::Formula(DataValidationFormula(
@@ -1084,7 +1094,9 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
             },
             Event::End(element) => {
                 if text.as_ref().is_some_and(|(target, _, _)| *target == depth) {
-                    let (_, target, value) = text.take().expect("text checked");
+                    let Some((_, target, value)) = text.take() else {
+                        return Err(invalid("data-validation text state disappeared"));
+                    };
                     match target {
                         TextTarget::Formula1 => {
                             if formula1.is_some() {
@@ -1116,7 +1128,9 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     .is_some_and(|(_, target, _)| *target == depth)
                     && matches!(element.local_name().as_ref(), b"formula1" | b"formula2")
                 {
-                    let (_, _, seen) = wrapper.take().expect("wrapper checked");
+                    let Some((_, _, seen)) = wrapper.take() else {
+                        return Err(invalid("data-validation wrapper state disappeared"));
+                    };
                     if source == DataValidationSource::Office2010 && !seen {
                         return Err(invalid(
                             "x14 formula wrapper must contain exactly one value",

@@ -9,6 +9,7 @@ pub mod calculation_properties;
 pub mod cell;
 pub mod chain;
 pub mod column;
+pub mod connections;
 mod error;
 pub mod formula;
 pub mod layout;

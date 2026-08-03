@@ -580,20 +580,31 @@ impl<R: Read + Seek> OleFile<R> {
             "MiniFAT",
         )?;
         self.claim_chain(&sectors, PhysicalSectorRole::MiniFat)?;
-        let mut minifat_data = Vec::with_capacity(sectors.len() * self.sector_size);
+        let data_len = sectors
+            .len()
+            .checked_mul(self.sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("MiniFAT data size overflow".to_string()))?;
+        let mut minifat_data = Vec::new();
+        minifat_data
+            .try_reserve_exact(data_len)
+            .map_err(|source| OleError::allocation("MiniFAT data", source))?;
         for sector in sectors {
             minifat_data.extend_from_slice(&self.read_sector(sector)?);
         }
 
         // Parse as array of u32 (little-endian) - use chunks for efficiency
         let entries_count = minifat_data.len() / 4;
-        self.minifat = Vec::with_capacity(entries_count);
+        let mut minifat = Vec::new();
+        minifat
+            .try_reserve_exact(entries_count)
+            .map_err(|source| OleError::allocation("MiniFAT entries", source))?;
 
         for chunk in minifat_data.chunks_exact(4) {
             let entry = U32::<LE>::read_from_bytes(chunk)
                 .map_err(|_| OleError::InvalidFormat("Failed to read u32".to_string()))?;
-            self.minifat.push(entry.get());
+            minifat.push(entry.get());
         }
+        self.minifat = minifat;
 
         Ok(())
     }
@@ -1860,6 +1871,56 @@ mod tests {
             OleFile::open(Cursor::new(data)),
             Err(OleError::CorruptedFile(message))
                 if message.contains("DIFAT sector count exceeds the physical file")
+        ));
+    }
+
+    #[test]
+    fn rejects_minifat_buffer_size_overflow_before_reading_a_sector() {
+        let mut file = OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: usize::MAX,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: vec![1, ENDOFCHAIN],
+            minifat: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
+        };
+
+        assert!(matches!(
+            file.load_minifat(0, 2),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("MiniFAT data size overflow")
+        ));
+    }
+
+    #[test]
+    fn reports_minifat_allocation_failure_without_panicking() {
+        let mut file = OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: usize::MAX,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: vec![ENDOFCHAIN],
+            minifat: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed],
+        };
+
+        assert!(matches!(
+            file.load_minifat(0, 1),
+            Err(OleError::Allocation {
+                resource: "MiniFAT data",
+                ..
+            })
         ));
     }
 
