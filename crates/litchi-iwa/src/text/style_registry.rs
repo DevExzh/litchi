@@ -1,5 +1,6 @@
 //! Shared registration for private text-style variations.
 
+use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     remove_component_external_reference, remove_component_external_references_to_object,
@@ -8,22 +9,34 @@ use crate::package_metadata::{
 use crate::protobuf::tsp;
 use crate::wire::append_repeated_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
-use crate::{archive::ArchiveObject, archive::RawMessage};
 use prost::Message;
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const STYLESHEET_STYLES_FIELD: u32 = 1;
 
 pub(super) fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
+    object_archive(package, identifier).map(|(name, _)| name)
+}
+
+/// Locate an object while retaining the parsed archive that contains it.
+///
+/// Every candidate archive is still parsed before a successful result is
+/// returned. This keeps malformed later archives observable and preserves the
+/// duplicate-identifier check while allowing callers that need the object to
+/// avoid parsing the matching archive a second time.
+pub(super) fn object_archive(package: &IWorkPackage, identifier: u64) -> Result<(String, Archive)> {
     let mut found = None;
     for name in package.iwa_entry_names() {
-        if package.archive(name)?.object(identifier).is_some()
-            && found.replace(name.to_owned()).is_some()
-        {
+        let archive = package.archive(name)?;
+        if archive.object(identifier).is_none() {
+            continue;
+        }
+        if found.is_some() {
             return Err(Error::InvalidFormat(format!(
                 "iWork object {identifier} occurs in multiple archives"
             )));
         }
+        found = Some((name.to_owned(), archive));
     }
     found.ok_or_else(|| Error::InvalidFormat(format!("iWork object {identifier} is missing")))
 }
@@ -170,4 +183,60 @@ pub(crate) fn unregister_private_style(
         add_component_external_reference(package, owner_component, style_component, replacement)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn package_with_object(name: &str, identifier: u64) -> IWorkPackage {
+        let mut package = IWorkPackage::new();
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    identifier,
+                    vec![RawMessage {
+                        type_: 99,
+                        data: vec![0],
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        package.replace_archive(name, &archive).unwrap();
+        package
+    }
+
+    #[test]
+    fn object_archive_returns_the_parsed_matching_archive() {
+        let package = package_with_object("Index/Styles.iwa", 7);
+
+        let (name, archive) = object_archive(&package, 7).unwrap();
+
+        assert_eq!(name, "Index/Styles.iwa");
+        assert!(archive.object(7).is_some());
+        assert_eq!(object_archive_name(&package, 7).unwrap(), name);
+    }
+
+    #[test]
+    fn object_archive_rejects_missing_and_duplicate_identifiers() {
+        assert!(object_archive(&IWorkPackage::new(), 7).is_err());
+
+        let mut package = package_with_object("Index/One.iwa", 7);
+        let second = package_with_object("Index/Two.iwa", 7)
+            .entry("Index/Two.iwa")
+            .unwrap()
+            .to_vec();
+        package.insert_entry("Index/Two.iwa", second).unwrap();
+
+        assert!(object_archive(&package, 7).is_err());
+    }
+
+    #[test]
+    fn object_archive_still_parses_later_archives_after_a_match() {
+        let mut package = package_with_object("Index/One.iwa", 7);
+        package.insert_entry("Index/Z-Broken.iwa", vec![0]).unwrap();
+
+        assert!(object_archive(&package, 7).is_err());
+    }
 }

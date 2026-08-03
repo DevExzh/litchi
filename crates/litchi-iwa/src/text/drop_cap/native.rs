@@ -11,7 +11,7 @@ use super::types::{
     DropCapCharacterCount, DropCapCharacterScale, DropCapCornerRadius, DropCapLineCount,
     DropCapOutdent, DropCapPadding, DropCapRaisedLines, DropCapWrap, ParagraphDropCap,
 };
-use crate::text::style_registry::object_archive_name;
+use crate::text::style_registry::{object_archive, object_archive_name};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const DROP_CAP_STYLE_MESSAGE_TYPE: u32 = 10_024;
@@ -54,8 +54,7 @@ pub(super) struct DropCapBaseStyle {
 }
 
 pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<DropCapStyleLocation> {
-    let archive_name = object_archive_name(package, style_id)?;
-    let archive = package.archive(&archive_name)?;
+    let (archive_name, archive) = object_archive(package, style_id)?;
     let object = archive.object(style_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork Drop Cap style {style_id} is missing"))
     })?;

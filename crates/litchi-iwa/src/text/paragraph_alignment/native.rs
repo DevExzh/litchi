@@ -34,7 +34,7 @@ use super::super::style::{
     TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript,
     TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
-use super::super::style_registry::object_archive_name;
+use super::super::style_registry::object_archive;
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const THEME_MESSAGE_TYPES: &[u32] = &[10, 10_001, 12_009];
@@ -274,8 +274,7 @@ pub(crate) fn locate_style(
     package: &IWorkPackage,
     style_id: u64,
 ) -> Result<ParagraphStyleLocation> {
-    let archive_name = object_archive_name(package, style_id)?;
-    let archive = package.archive(&archive_name)?;
+    let (archive_name, archive) = object_archive(package, style_id)?;
     let object = archive.object(style_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork paragraph style {style_id} is missing"))
     })?;
@@ -485,8 +484,7 @@ pub(crate) fn named_paragraph_styles(
 ) -> Result<Vec<NamedParagraphStyle>> {
     let first = locate_style(package, first_style_id)?;
     let stylesheet_id = stylesheet_id(&first.style, first_style_id)?;
-    let archive_name = object_archive_name(package, stylesheet_id)?;
-    let archive = package.archive(&archive_name)?;
+    let (_, archive) = object_archive(package, stylesheet_id)?;
     let stylesheet_object = archive.object(stylesheet_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork stylesheet {stylesheet_id} is missing"))
     })?;
