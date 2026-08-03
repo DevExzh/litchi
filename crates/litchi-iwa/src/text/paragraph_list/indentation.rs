@@ -70,13 +70,7 @@ pub(in crate::text) fn set_paragraph_list_indentation(
         && native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     if can_update_in_place {
-        native::replace_direct_list_indentation(
-            &mut staged,
-            &style.archive_name,
-            style_id,
-            &indents,
-            &text_indents,
-        )?;
+        native::replace_direct_list_indentation(&mut staged, &style, &indents, &text_indents)?;
     } else {
         let new_style_id = next_object_identifier(&staged)?;
         let variation = native::indentation_variation_object(
@@ -208,7 +202,7 @@ fn collapse_or_clear_redundant_indentation(
         )?;
         release_package_identifier_suffix(&mut staged, &[style_id])?;
     } else {
-        native::remove_direct_list_indentation(&mut staged, &style.archive_name, style_id)?;
+        native::remove_direct_list_indentation(&mut staged, &style)?;
     }
     if paragraph_list_indentation(&staged, storage_id, paragraph)? != standard {
         return Err(Error::InvalidFormat(

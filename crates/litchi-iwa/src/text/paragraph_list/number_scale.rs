@@ -61,12 +61,7 @@ pub(in crate::text) fn set_paragraph_list_number_scale(
         && native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     if can_update_in_place {
-        native::replace_direct_bullet_geometries(
-            &mut staged,
-            &style.archive_name,
-            style_id,
-            &geometries,
-        )?;
+        native::replace_direct_bullet_geometries(&mut staged, &style, &geometries)?;
     } else {
         let new_style_id = next_object_identifier(&staged)?;
         let variation =
@@ -191,7 +186,7 @@ fn collapse_or_clear_redundant_scale(
         )?;
         release_package_identifier_suffix(&mut staged, &[style_id])?;
     } else {
-        native::remove_direct_bullet_geometries(&mut staged, &style.archive_name, style_id)?;
+        native::remove_direct_bullet_geometries(&mut staged, &style)?;
     }
     if paragraph_list_number_scale(&staged, storage_id, paragraph)? != ParagraphListNumberScale::ONE
     {

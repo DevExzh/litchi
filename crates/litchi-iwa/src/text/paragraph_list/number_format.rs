@@ -61,12 +61,7 @@ pub(in crate::text) fn set_paragraph_list_number_format(
         && native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     if can_update_in_place {
-        native::replace_direct_number_types(
-            &mut staged,
-            &style.archive_name,
-            style_id,
-            &number_types,
-        )?;
+        native::replace_direct_number_types(&mut staged, &style, &number_types)?;
     } else {
         let new_style_id = next_object_identifier(&staged)?;
         let variation = native::number_format_variation_object(
@@ -193,7 +188,7 @@ fn collapse_or_clear_redundant_format(
         )?;
         release_package_identifier_suffix(&mut staged, &[style_id])?;
     } else {
-        native::remove_direct_number_types(&mut staged, &style.archive_name, style_id)?;
+        native::remove_direct_number_types(&mut staged, &style)?;
     }
     if paragraph_list_number_format(&staged, storage_id, paragraph)?
         != ParagraphListNumberFormat::DECIMAL

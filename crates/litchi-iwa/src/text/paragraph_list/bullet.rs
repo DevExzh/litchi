@@ -61,12 +61,7 @@ pub(in crate::text) fn set_paragraph_list_bullet(
         && native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     if can_update_in_place {
-        native::replace_direct_bullet_strings(
-            &mut staged,
-            &style.archive_name,
-            style_id,
-            &strings,
-        )?;
+        native::replace_direct_bullet_strings(&mut staged, &style, &strings)?;
     } else {
         let new_style_id = next_object_identifier(&staged)?;
         let variation = native::variation_object(new_style_id, style_id, stylesheet_id, strings)?;

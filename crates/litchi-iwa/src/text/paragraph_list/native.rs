@@ -46,7 +46,10 @@ const BULLET_OVERRIDE_COUNT: u32 = 5;
 const NUMBER_OVERRIDE_COUNT: u32 = 6;
 
 pub(super) struct ListStyleLocation {
+    pub(super) object_id: u64,
     pub(super) archive_name: String,
+    pub(super) message_index: usize,
+    pub(super) message_type: u32,
     pub(super) style: tswp::ListStyleArchive,
 }
 
@@ -57,23 +60,24 @@ pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<List
         let Some(object) = archive.object(style_id) else {
             continue;
         };
-        let mut styles = object
+        let payloads = object
             .messages
             .iter()
-            .filter(|message| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|message| tswp::ListStyleArchive::decode(message.data.as_slice()))
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        if styles.len() != 1 {
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        let [(message_index, message)] = payloads.as_slice() else {
             return Err(Error::InvalidFormat(format!(
                 "iWork list style {style_id} must have exactly one writable payload"
             )));
-        }
-        let style = styles.pop().ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} payload disappeared"))
-        })?;
+        };
+        let style = tswp::ListStyleArchive::decode(message.data.as_slice())?;
         if found
             .replace(ListStyleLocation {
+                object_id: style_id,
                 archive_name: archive_name.to_owned(),
+                message_index: *message_index,
+                message_type: message.type_,
                 style,
             })
             .is_some()
@@ -580,35 +584,63 @@ pub(super) fn number_tiering_variation_object(
     Ok(object)
 }
 
-pub(super) fn replace_direct_number_types(
+fn patch_style_message<F>(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
-    number_types: &[i32],
-) -> Result<()> {
-    validate_number_types(style_id, number_types)?;
-    package.update_archive(archive_name, |archive| {
+    location: &ListStyleLocation,
+    patch: F,
+) -> Result<()>
+where
+    F: FnOnce(&[u8], u64) -> Result<Option<Vec<u8>>>,
+{
+    let style_id = location.object_id;
+    package.update_archive(&location.archive_name, |archive| {
         let object = archive.object_mut(style_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+        if object.archive_info.identifier != Some(style_id) {
             return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
+                "iWork list style {style_id} object identity changed unexpectedly"
             )));
+        }
+        if object.messages.get(location.message_index).is_none() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} writable payload index {} is missing",
+                location.message_index
+            )));
+        }
+        if object.messages[location.message_index].type_ != location.message_type {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} writable payload changed unexpectedly"
+            )));
+        }
+        if object
+            .archive_info
+            .message_infos
+            .get(location.message_index)
+            .is_none()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} writable payload metadata index {} is missing",
+                location.message_index
+            )));
+        }
+        if object.archive_info.message_infos[location.message_index].type_ != location.message_type
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} writable payload metadata changed unexpectedly"
+            )));
+        }
+        let replacement = {
+            let original = &object.messages[location.message_index];
+            patch(&original.data, style_id)?.map(|data| (original.type_, data))
         };
-        let original = &object.messages[*index];
-        let data = patch_direct_number_types(&original.data, style_id, number_types)?;
+        let Some((message_type, data)) = replacement else {
+            return Ok(());
+        };
         object.replace_message(
-            *index,
+            location.message_index,
             RawMessage {
-                type_: original.type_,
+                type_: message_type,
                 data,
             },
         )?;
@@ -616,34 +648,34 @@ pub(super) fn replace_direct_number_types(
     })
 }
 
+pub(super) fn replace_direct_number_types(
+    package: &mut IWorkPackage,
+    location: &ListStyleLocation,
+    number_types: &[i32],
+) -> Result<()> {
+    let style_id = location.object_id;
+    validate_number_types(style_id, number_types)?;
+    patch_style_message(package, location, |data, style_id| {
+        Ok(Some(patch_direct_number_types(
+            data,
+            style_id,
+            number_types,
+        )?))
+    })
+}
+
 pub(super) fn remove_direct_number_types(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
-        if style.number_types.is_empty() {
-            return Ok(());
+    patch_style_message(package, location, |data, style_id| {
+        let original = tswp::ListStyleArchive::decode(data)?;
+
+        if original.number_types.is_empty() {
+            return Ok(None);
         }
-        validate_number_types(style_id, &style.number_types)?;
-        let override_count = style
+        validate_number_types(style_id, &original.number_types)?;
+        let override_count = original
             .override_count
             .unwrap_or(0)
             .checked_sub(1)
@@ -652,11 +684,11 @@ pub(super) fn remove_direct_number_types(
                     "iWork list style {style_id} has number formats without an override count"
                 ))
             })?;
-        let data = rewrite_repeated_varint_fields(&original.data, NUMBER_TYPES_FIELD, &[])?;
+        let data = rewrite_repeated_varint_fields(data, NUMBER_TYPES_FIELD, &[])?;
         let data = patch_varint_field(
             &data,
             OVERRIDE_COUNT_FIELD,
-            style.override_count.is_some(),
+            original.override_count.is_some(),
             Some(u64::from(override_count)),
         )?;
         let decoded = tswp::ListStyleArchive::decode(data.as_slice())?;
@@ -665,14 +697,7 @@ pub(super) fn remove_direct_number_types(
                 "iWork list style {style_id} number-format removal failed validation"
             )));
         }
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+        Ok(Some(data))
     })
 }
 
@@ -721,65 +746,28 @@ fn patch_direct_number_types(data: &[u8], style_id: u64, number_types: &[i32]) -
 
 pub(super) fn replace_direct_tiered_numbers(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
     tiered_numbers: &[bool],
 ) -> Result<()> {
+    let style_id = location.object_id;
     validate_tiered_numbers(style_id, tiered_numbers)?;
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let data = patch_direct_tiered_numbers(&original.data, style_id, tiered_numbers)?;
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+    patch_style_message(package, location, |data, style_id| {
+        Ok(Some(patch_direct_tiered_numbers(
+            data,
+            style_id,
+            tiered_numbers,
+        )?))
     })
 }
 
 pub(super) fn remove_direct_tiered_numbers(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+    patch_style_message(package, location, |data, style_id| {
+        let style = tswp::ListStyleArchive::decode(data)?;
         if style.tiered_numbers.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
         validate_tiered_numbers(style_id, &style.tiered_numbers)?;
         let override_count = style
@@ -791,7 +779,7 @@ pub(super) fn remove_direct_tiered_numbers(
                     "iWork list style {style_id} has number tiering without an override count"
                 ))
             })?;
-        let data = rewrite_repeated_varint_fields(&original.data, TIERED_NUMBERS_FIELD, &[])?;
+        let data = rewrite_repeated_varint_fields(data, TIERED_NUMBERS_FIELD, &[])?;
         let data = patch_varint_field(
             &data,
             OVERRIDE_COUNT_FIELD,
@@ -804,14 +792,7 @@ pub(super) fn remove_direct_tiered_numbers(
                 "iWork list style {style_id} number-tiering removal failed validation"
             )));
         }
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+        Ok(Some(data))
     })
 }
 
@@ -860,65 +841,23 @@ fn patch_direct_tiered_numbers(
 
 pub(super) fn replace_direct_label_color(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
     color: ParagraphListLabelColor,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let data = patch_direct_label_color(&original.data, style_id, color)?;
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+    patch_style_message(package, location, |data, style_id| {
+        Ok(Some(patch_direct_label_color(data, style_id, color)?))
     })
 }
 
 pub(super) fn remove_direct_label_color(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+    patch_style_message(package, location, |data, style_id| {
+        let style = tswp::ListStyleArchive::decode(data)?;
         let had_override = style.font_color_null.is_some() || style.font_color.is_some();
         if !had_override {
-            return Ok(());
+            return Ok(None);
         }
         let override_count = style
             .override_count
@@ -930,7 +869,7 @@ pub(super) fn remove_direct_label_color(
                 ))
             })?;
         let data = patch_varint_field(
-            &original.data,
+            data,
             FONT_COLOR_NULL_FIELD,
             style.font_color_null.is_some(),
             None,
@@ -956,14 +895,7 @@ pub(super) fn remove_direct_label_color(
                 "iWork list style {style_id} label-color removal failed validation"
             )));
         }
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+        Ok(Some(data))
     })
 }
 
@@ -1025,101 +957,38 @@ fn native_label_color(color: ParagraphListLabelColor) -> (Option<bool>, Option<t
 
 pub(super) fn replace_direct_bullet_strings(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
     strings: &[String],
 ) -> Result<()> {
+    let style_id = location.object_id;
     validate_bullet_strings(style_id, strings)?;
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let data = patch_direct_bullet_strings(&original.data, style_id, strings)?;
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+    patch_style_message(package, location, |data, style_id| {
+        Ok(Some(patch_direct_bullet_strings(data, style_id, strings)?))
     })
 }
 
 pub(super) fn replace_direct_bullet_geometries(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
     geometries: &[LabelGeometry],
 ) -> Result<()> {
+    let style_id = location.object_id;
     validate_bullet_geometries(style_id, geometries)?;
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let data = patch_direct_bullet_geometries(&original.data, style_id, geometries)?;
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+    patch_style_message(package, location, |data, style_id| {
+        Ok(Some(patch_direct_bullet_geometries(
+            data, style_id, geometries,
+        )?))
     })
 }
 
 pub(super) fn remove_direct_bullet_geometries(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+    patch_style_message(package, location, |data, style_id| {
+        let style = tswp::ListStyleArchive::decode(data)?;
         if style.geometries.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
         let override_count = style
             .override_count
@@ -1130,7 +999,7 @@ pub(super) fn remove_direct_bullet_geometries(
                     "iWork list style {style_id} has geometry without an override count"
                 ))
             })?;
-        let data = rewrite_repeated_length_delimited_fields(&original.data, GEOMETRIES_FIELD, &[])?;
+        let data = rewrite_repeated_length_delimited_fields(data, GEOMETRIES_FIELD, &[])?;
         let data = patch_varint_field(
             &data,
             OVERRIDE_COUNT_FIELD,
@@ -1143,14 +1012,7 @@ pub(super) fn remove_direct_bullet_geometries(
                 "iWork list style {style_id} bullet geometry removal failed validation"
             )));
         }
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+        Ok(Some(data))
     })
 }
 
@@ -1198,39 +1060,20 @@ fn patch_direct_bullet_geometries(
 
 pub(super) fn replace_direct_list_indentation(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
     indents: &[f32],
     text_indents: &[f32],
 ) -> Result<()> {
+    let style_id = location.object_id;
     validate_list_float_array(style_id, indents, ListFloatArray::LabelIndents)?;
     validate_list_float_array(style_id, text_indents, ListFloatArray::TextGaps)?;
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let data = patch_direct_list_indentation(&original.data, style_id, indents, text_indents)?;
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+    patch_style_message(package, location, |data, style_id| {
+        Ok(Some(patch_direct_list_indentation(
+            data,
+            style_id,
+            indents,
+            text_indents,
+        )?))
     })
 }
 
@@ -1289,31 +1132,14 @@ fn patch_direct_list_indentation(
 
 pub(super) fn remove_direct_list_indentation(
     package: &mut IWorkPackage,
-    archive_name: &str,
-    style_id: u64,
+    location: &ListStyleLocation,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "iWork list style {style_id} must have exactly one writable payload"
-            )));
-        };
-        let original = &object.messages[*index];
-        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+    patch_style_message(package, location, |data, style_id| {
+        let style = tswp::ListStyleArchive::decode(data)?;
         let removed_overrides =
             u32::from(!style.indents.is_empty()) + u32::from(!style.text_indents.is_empty());
         if removed_overrides == 0 {
-            return Ok(());
+            return Ok(None);
         }
         let override_count = style
             .override_count
@@ -1324,7 +1150,7 @@ pub(super) fn remove_direct_list_indentation(
                     "iWork list style {style_id} has indentation without enough overrides"
                 ))
             })?;
-        let data = rewrite_repeated_fixed32_fields(&original.data, INDENTS_FIELD, &[])?;
+        let data = rewrite_repeated_fixed32_fields(data, INDENTS_FIELD, &[])?;
         let data = rewrite_repeated_fixed32_fields(&data, TEXT_INDENTS_FIELD, &[])?;
         let data = patch_varint_field(
             &data,
@@ -1341,14 +1167,7 @@ pub(super) fn remove_direct_list_indentation(
                 "iWork list style {style_id} indentation removal failed validation"
             )));
         }
-        object.replace_message(
-            *index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        Ok(())
+        Ok(Some(data))
     })
 }
 
@@ -2089,5 +1908,74 @@ mod tests {
         assert_eq!(decoded.number_types, formats);
         assert_eq!(decoded.font_color, style.font_color);
         assert!(validate_tiered_numbers(10, &[false; LIST_LEVEL_COUNT - 1]).is_err());
+    }
+
+    #[test]
+    fn native_style_mutations_use_exact_message_anchor_with_sibling_payload() {
+        let style_id = 42;
+        let mut style = canonical_archive(ParagraphList::Bullet);
+        style.super_.parent = Some(reference(8));
+        style.super_.is_variation = Some(true);
+        let sibling = vec![0x98, 0x06, 0x07];
+        let object = ArchiveObject::new(
+            style_id,
+            vec![
+                RawMessage {
+                    type_: 2_022,
+                    data: sibling.clone(),
+                },
+                RawMessage {
+                    type_: LIST_STYLE_MESSAGE_TYPE,
+                    data: style.encode_to_vec(),
+                },
+            ],
+        )
+        .unwrap();
+        let archive = crate::archive::Archive {
+            objects: vec![object],
+        };
+        let mut package = IWorkPackage::new();
+        package.replace_archive("Index/One.iwa", &archive).unwrap();
+
+        let location = locate_style(&package, style_id).unwrap();
+        assert_eq!(location.message_index, 1);
+        assert_eq!(location.message_type, LIST_STYLE_MESSAGE_TYPE);
+
+        let mut strings = style.strings.clone();
+        strings[2] = "◆".to_owned();
+        replace_direct_bullet_strings(&mut package, &location, &strings).unwrap();
+        replace_direct_list_indentation(
+            &mut package,
+            &location,
+            &level_indents(BULLET_INDENT_STEP_POINTS),
+            &[BULLET_INDENT_STEP_POINTS / FONT_EM_POINTS; LIST_LEVEL_COUNT],
+        )
+        .unwrap();
+        remove_direct_list_indentation(&mut package, &location).unwrap();
+
+        let updated = package.archive("Index/One.iwa").unwrap();
+        let updated_object = updated.object(style_id).unwrap();
+        assert_eq!(updated_object.messages[0].data, sibling);
+        assert_eq!(updated_object.messages[0].type_, 2_022);
+        assert_eq!(updated_object.archive_info.message_infos[0].type_, 2_022);
+        assert_eq!(
+            tswp::ListStyleArchive::decode(updated_object.messages[1].data.as_slice())
+                .unwrap()
+                .strings,
+            strings
+        );
+
+        let mut stale = package.clone();
+        stale
+            .update_archive("Index/One.iwa", |archive| {
+                let object = archive.object_mut(style_id).unwrap();
+                object.messages[1].type_ = LIST_STYLE_MESSAGE_TYPE + 1;
+                object.archive_info.message_infos[1].type_ = LIST_STYLE_MESSAGE_TYPE + 1;
+                Ok(())
+            })
+            .unwrap();
+        let before = stale.entry("Index/One.iwa").unwrap().to_vec();
+        assert!(replace_direct_bullet_strings(&mut stale, &location, &strings).is_err());
+        assert_eq!(stale.entry("Index/One.iwa").unwrap(), before.as_slice());
     }
 }

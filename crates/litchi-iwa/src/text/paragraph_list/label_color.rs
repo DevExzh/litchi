@@ -55,7 +55,7 @@ pub(in crate::text) fn set_paragraph_list_label_color(
         && native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     if can_update_in_place {
-        native::replace_direct_label_color(&mut staged, &style.archive_name, style_id, color)?;
+        native::replace_direct_label_color(&mut staged, &style, color)?;
     } else {
         let new_style_id = next_object_identifier(&staged)?;
         let variation =
@@ -176,7 +176,7 @@ fn collapse_or_clear_redundant_color(
         )?;
         release_package_identifier_suffix(&mut staged, &[style_id])?;
     } else {
-        native::remove_direct_label_color(&mut staged, &style.archive_name, style_id)?;
+        native::remove_direct_label_color(&mut staged, &style)?;
     }
     if paragraph_list_label_color(&staged, storage_id, paragraph)?
         != ParagraphListLabelColor::Automatic

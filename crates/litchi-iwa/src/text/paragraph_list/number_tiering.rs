@@ -63,12 +63,7 @@ pub(in crate::text) fn set_paragraph_list_number_tiering(
         && native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     if can_update_in_place {
-        native::replace_direct_tiered_numbers(
-            &mut staged,
-            &style.archive_name,
-            style_id,
-            &native_tiering,
-        )?;
+        native::replace_direct_tiered_numbers(&mut staged, &style, &native_tiering)?;
     } else {
         let new_style_id = next_object_identifier(&staged)?;
         let variation = native::number_tiering_variation_object(
@@ -195,7 +190,7 @@ fn collapse_or_clear_redundant_tiering(
         )?;
         release_package_identifier_suffix(&mut staged, &[style_id])?;
     } else {
-        native::remove_direct_tiered_numbers(&mut staged, &style.archive_name, style_id)?;
+        native::remove_direct_tiered_numbers(&mut staged, &style)?;
     }
     if paragraph_list_number_tiering(&staged, storage_id, paragraph)?
         != ParagraphListNumberTiering::Flat
