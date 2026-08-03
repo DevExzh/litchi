@@ -3,7 +3,7 @@
 use prost::Message;
 
 use crate::archive::RawMessage;
-use crate::protobuf::tswp::{self, StorageArchive};
+use crate::protobuf::tswp;
 use crate::wire::{
     patch_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
@@ -11,9 +11,9 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::super::drop_cap::ParagraphStart;
+use super::super::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
 use super::types::{ParagraphListLevel, ParagraphListLevelPlacement};
 
-const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const PARAGRAPH_DATA_TABLE_FIELD: u32 = 6;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_LIST_LEVEL_FIELD: u32 = 2;
@@ -22,7 +22,8 @@ pub(crate) fn paragraph_list_levels(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<Vec<ParagraphListLevelPlacement>> {
-    let (_, storage) = locate_storage(package, storage_id)?;
+    let location = locate_storage(package, storage_id)?;
+    let storage = &location.storage;
     let starts = paragraph_starts(&storage.text)?;
     let entries = storage
         .table_para_data
@@ -46,7 +47,8 @@ pub(crate) fn paragraph_list_level(
     storage_id: u64,
     paragraph: ParagraphStart,
 ) -> Result<ParagraphListLevel> {
-    let (_, storage) = locate_storage(package, storage_id)?;
+    let location = locate_storage(package, storage_id)?;
+    let storage = &location.storage;
     let starts = paragraph_starts(&storage.text)?;
     require_paragraph_start(storage_id, paragraph, &starts)?;
     let entries = storage
@@ -76,9 +78,9 @@ pub(in crate::text) fn set_paragraph_list_level(
     if paragraph_list_level(package, storage_id, paragraph)? == level {
         return Ok(());
     }
-    let (archive_name, _) = locate_storage(package, storage_id)?;
+    let location = locate_storage(package, storage_id)?;
     let mut staged = package.clone();
-    patch_level(&mut staged, &archive_name, storage_id, paragraph, level)?;
+    patch_level(&mut staged, location, storage_id, paragraph, level)?;
     if paragraph_list_level(&staged, storage_id, paragraph)? != level {
         return Err(Error::InvalidFormat(
             "iWork paragraph list-level update failed validation".to_owned(),
@@ -102,32 +104,32 @@ pub(in crate::text) fn reset_paragraph_list_level(
 
 fn patch_level(
     package: &mut IWorkPackage,
-    archive_name: &str,
+    location: StorageLocation,
     storage_id: u64,
     paragraph: ParagraphStart,
     level: ParagraphListLevel,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
+    let StorageLocation {
+        archive_name,
+        message_index,
+        message_type,
+        storage,
+        ..
+    } = location;
+    package.update_archive(&archive_name, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| {
-                STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                    && StorageArchive::decode(message.data.as_slice()).is_ok()
-            })
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+        let original = object.messages.get(message_index).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} writable payload index {message_index} is missing"
+            ))
+        })?;
+        if original.type_ != message_type {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
+                "iWork text storage {storage_id} writable payload changed unexpectedly"
             )));
-        };
-        let original = &object.messages[*index];
-        let storage = StorageArchive::decode(original.data.as_slice())?;
+        }
         let starts = paragraph_starts(&storage.text)?;
         require_paragraph_start(storage_id, paragraph, &starts)?;
         let decoded = storage
@@ -142,9 +144,9 @@ fn patch_level(
             |table| patch_table(table, storage_id, paragraph, level, &starts),
         )?;
         object.replace_message(
-            *index,
+            message_index,
             RawMessage {
-                type_: original.type_,
+                type_: message_type,
                 data,
             },
         )?;
@@ -238,61 +240,19 @@ fn patch_table(
     rewrite_repeated_length_delimited_fields(table, TABLE_ENTRIES_FIELD, &encoded)
 }
 
-fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<(String, StorageArchive)> {
-    let mut found = None;
-    for archive_name in package.iwa_entry_names() {
-        let archive = package.archive(archive_name)?;
-        let Some(object) = archive.object(storage_id) else {
-            continue;
-        };
-        let mut payloads = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter_map(|(index, message)| {
-                STORAGE_MESSAGE_TYPES
-                    .contains(&message.type_)
-                    .then(|| {
-                        StorageArchive::decode(message.data.as_slice())
-                            .ok()
-                            .map(|storage| (index, storage))
-                    })
-                    .flatten()
-            })
-            .collect::<Vec<_>>();
-        if payloads.len() != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
-            )));
-        }
-        let (message_index, storage) = payloads.pop().ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} payload disappeared"
-            ))
-        })?;
-        let table_count = object
-            .messages
-            .get(message_index)
-            .map(|message| {
-                repeated_length_delimited_payloads(
-                    message.data.as_slice(),
-                    PARAGRAPH_DATA_TABLE_FIELD,
-                )
-            })
-            .transpose()?
-            .map_or(0, |tables| tables.len());
-        if table_count != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must contain one paragraph-data table, found {table_count}"
-            )));
-        }
-        if found.replace((archive_name.to_owned(), storage)).is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} occurs in multiple archives"
-            )));
-        }
+fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
+    let location = locate_native_storage(
+        package,
+        storage_id,
+        PARAGRAPH_DATA_TABLE_FIELD,
+        "paragraph-data",
+    )?;
+    if !location.table_present {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} must contain one paragraph-data table, found 0"
+        )));
     }
-    found.ok_or_else(|| Error::InvalidFormat(format!("iWork text storage {storage_id} is missing")))
+    Ok(location)
 }
 
 fn validate_entries(
@@ -374,6 +334,17 @@ pub(super) fn paragraph_starts(text: &[String]) -> Result<Vec<u32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{Archive, ArchiveObject, RawMessage};
+
+    #[test]
+    fn level_lookup_rejects_malformed_recognized_storage() {
+        let package = test_package(vec![RawMessage {
+            type_: 2022,
+            data: vec![0x80],
+        }]);
+
+        assert!(paragraph_list_levels(&package, 42).is_err());
+    }
 
     #[test]
     fn level_updates_preserve_unknown_parallel_paragraph_data() {
@@ -426,5 +397,19 @@ mod tests {
                 .collect::<Vec<_>>(),
             [(0, 0), (4, 1), (9, 0)]
         );
+    }
+
+    fn test_package(messages: Vec<RawMessage>) -> IWorkPackage {
+        let object = ArchiveObject::new(42, messages).unwrap();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/Document.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+        package
     }
 }

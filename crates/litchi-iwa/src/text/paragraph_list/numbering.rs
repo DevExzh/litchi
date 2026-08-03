@@ -3,7 +3,7 @@
 use prost::Message;
 
 use crate::archive::RawMessage;
-use crate::protobuf::tswp::{self, StorageArchive};
+use crate::protobuf::tswp;
 use crate::wire::{
     parse_wire_fields, patch_length_delimited_field, patch_varint_field,
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
@@ -11,12 +11,12 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
+use super::super::storage_wire::{StorageLocation, locate_storage as locate_native_storage};
 use super::levels::{paragraph_starts, require_paragraph_start};
 use super::paragraph_lists;
 use super::types::{ParagraphList, ParagraphListNumbering};
 use crate::text::ParagraphStart;
 
-const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const PARAGRAPH_START_TABLE_FIELD: u32 = 14;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_START_NUMBER_FIELD: u32 = 2;
@@ -26,7 +26,8 @@ pub(crate) fn paragraph_list_numbering(
     storage_id: u64,
     paragraph: ParagraphStart,
 ) -> Result<ParagraphListNumbering> {
-    let (_, storage) = locate_storage(package, storage_id)?;
+    let location = locate_storage(package, storage_id)?;
+    let storage = &location.storage;
     let starts = paragraph_starts(&storage.text)?;
     require_paragraph_start(storage_id, paragraph, &starts)?;
     let Some(table) = storage.table_para_starts.as_ref() else {
@@ -54,9 +55,9 @@ pub(in crate::text) fn set_paragraph_list_numbering(
     if matches!(numbering, ParagraphListNumbering::StartAt(_)) {
         require_numbered_paragraph(package, storage_id, paragraph)?;
     }
-    let (archive_name, _) = locate_storage(package, storage_id)?;
+    let location = locate_storage(package, storage_id)?;
     let mut staged = package.clone();
-    patch_numbering(&mut staged, &archive_name, storage_id, paragraph, numbering)?;
+    patch_numbering(&mut staged, location, storage_id, paragraph, numbering)?;
     if paragraph_list_numbering(&staged, storage_id, paragraph)? != numbering {
         return Err(Error::InvalidFormat(
             "iWork paragraph list-numbering update failed validation".to_owned(),
@@ -93,32 +94,32 @@ fn require_numbered_paragraph(
 
 fn patch_numbering(
     package: &mut IWorkPackage,
-    archive_name: &str,
+    location: StorageLocation,
     storage_id: u64,
     paragraph: ParagraphStart,
     numbering: ParagraphListNumbering,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
+    let StorageLocation {
+        archive_name,
+        message_index,
+        message_type,
+        storage,
+        ..
+    } = location;
+    package.update_archive(&archive_name, |archive| {
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork text storage {storage_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| {
-                STORAGE_MESSAGE_TYPES.contains(&message.type_)
-                    && StorageArchive::decode(message.data.as_slice()).is_ok()
-            })
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+        let original = object.messages.get(message_index).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork text storage {storage_id} writable payload index {message_index} is missing"
+            ))
+        })?;
+        if original.type_ != message_type {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
+                "iWork text storage {storage_id} writable payload changed unexpectedly"
             )));
-        };
-        let original = &object.messages[*index];
-        let storage = StorageArchive::decode(original.data.as_slice())?;
+        }
         let starts = paragraph_starts(&storage.text)?;
         require_paragraph_start(storage_id, paragraph, &starts)?;
         let table_count =
@@ -147,9 +148,9 @@ fn patch_numbering(
             )?
         };
         object.replace_message(
-            *index,
+            message_index,
             RawMessage {
-                type_: original.type_,
+                type_: message_type,
                 data,
             },
         )?;
@@ -264,36 +265,13 @@ fn new_table(
     tswp::ParaDataAttributeTable { entries }
 }
 
-fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<(String, StorageArchive)> {
-    let mut found = None;
-    for archive_name in package.iwa_entry_names() {
-        let archive = package.archive(archive_name)?;
-        let Some(object) = archive.object(storage_id) else {
-            continue;
-        };
-        let mut payloads = object
-            .messages
-            .iter()
-            .filter(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
-            .filter_map(|message| StorageArchive::decode(message.data.as_slice()).ok())
-            .collect::<Vec<_>>();
-        if payloads.len() != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} must have exactly one writable payload"
-            )));
-        }
-        let storage = payloads.pop().ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} payload disappeared"
-            ))
-        })?;
-        if found.replace((archive_name.to_owned(), storage)).is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} occurs in multiple archives"
-            )));
-        }
-    }
-    found.ok_or_else(|| Error::InvalidFormat(format!("iWork text storage {storage_id} is missing")))
+fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
+    locate_native_storage(
+        package,
+        storage_id,
+        PARAGRAPH_START_TABLE_FIELD,
+        "paragraph-start",
+    )
 }
 
 fn validate_entries(
@@ -336,7 +314,18 @@ fn validate_entries(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{Archive, ArchiveObject};
     use crate::text::ParagraphListStart;
+
+    #[test]
+    fn numbering_lookup_rejects_malformed_recognized_storage() {
+        let package = test_package(vec![RawMessage {
+            type_: 2001,
+            data: vec![0x80],
+        }]);
+
+        assert!(paragraph_list_numbering(&package, 42, ParagraphStart::ZERO).is_err());
+    }
 
     #[test]
     fn numbering_table_restart_and_continue_preserve_parallel_data() {
@@ -370,5 +359,19 @@ mod tests {
         assert_eq!(decoded.entries[0].second, 9);
         assert_eq!(decoded.entries[1].first, 0);
         assert_eq!(decoded.entries[1].second, 8);
+    }
+
+    fn test_package(messages: Vec<RawMessage>) -> IWorkPackage {
+        let object = ArchiveObject::new(42, messages).unwrap();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/Document.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+        package
     }
 }
