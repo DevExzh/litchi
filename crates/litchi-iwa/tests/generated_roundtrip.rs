@@ -17,6 +17,8 @@ use litchi_iwa::pages::{PagesDocument, PagesEditor};
 use litchi_iwa::registry::Application;
 use tempfile::tempdir;
 
+fn assert_send_sync<T: Send + Sync>() {}
+
 #[test]
 fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<dyn Error>> {
     let directory = tempdir()?;
@@ -61,9 +63,15 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     assert_eq!(detect::path(path), Some(expected));
 
     let document = Document::open(path)?;
+    assert_send_sync::<litchi_iwa::Bundle>();
     assert_eq!(document.application(), application);
     assert_eq!(document.stats().application, application);
     assert!(document.stats().total_objects > 0);
+    let bundle_snapshot = document.bundle().snapshot();
+    assert_eq!(
+        bundle_snapshot.archives().len(),
+        document.bundle().archives().len()
+    );
     document.text()?;
     document.extract_structured_data()?;
 

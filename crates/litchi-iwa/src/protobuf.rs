@@ -220,8 +220,12 @@ pub fn decode(message_type: u32, data: &[u8]) -> Result<Box<dyn DecodedMessage>>
     }
 }
 
-/// Trait for decoded iWork messages
-pub trait DecodedMessage: std::fmt::Debug {
+/// Trait for decoded iWork messages retained by immutable bundle snapshots.
+///
+/// Decoded messages are read-only after construction, so requiring both
+/// marker traits makes the containing archive and bundle safe to share across
+/// concurrent readers without a runtime lock.
+pub trait DecodedMessage: std::fmt::Debug + Send + Sync {
     /// Get the message type identifier
     fn message_type(&self) -> u32;
 

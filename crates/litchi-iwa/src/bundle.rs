@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use plist::Value;
 use soapberry_zip::office::ArchiveReader;
@@ -18,8 +19,13 @@ use crate::zip_utils::parse_iwa_files_from_archive;
 use crate::{Error, Result};
 
 /// Represents an iWork document bundle
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Bundle {
+    state: Arc<BundleState>,
+}
+
+#[derive(Debug)]
+struct BundleState {
     /// Path to the bundle directory
     bundle_path: PathBuf,
     /// Parsed IWA archives from Index.zip
@@ -99,11 +105,11 @@ impl Bundle {
             document_id: None,
         };
 
-        Ok(Bundle {
-            bundle_path: std::path::PathBuf::from("<bytes>"), // Placeholder path
+        Ok(Self::from_parts(
+            std::path::PathBuf::from("<bytes>"), // Placeholder path
             archives,
             metadata,
-        })
+        ))
     }
 
     /// Create a Bundle from raw bytes (ZIP archive).
@@ -127,11 +133,11 @@ impl Bundle {
             document_id: None,
         };
 
-        Ok(Bundle {
-            bundle_path: std::path::PathBuf::from("<zip_archive>"), // Placeholder path
+        Ok(Self::from_parts(
+            std::path::PathBuf::from("<zip_archive>"), // Placeholder path
             archives,
             metadata,
-        })
+        ))
     }
 
     /// Open a traditional directory-based bundle
@@ -145,11 +151,11 @@ impl Bundle {
         // Parse metadata
         let metadata = Self::parse_metadata(bundle_path)?;
 
-        Ok(Bundle {
-            bundle_path: bundle_path.to_path_buf(),
+        Ok(Self::from_parts(
+            bundle_path.to_path_buf(),
             archives,
             metadata,
-        })
+        ))
     }
 
     /// Open a single-file bundle (zip archive)
@@ -168,11 +174,30 @@ impl Bundle {
             document_id: None,
         };
 
-        Ok(Bundle {
-            bundle_path: bundle_path.to_path_buf(),
+        Ok(Self::from_parts(
+            bundle_path.to_path_buf(),
             archives,
             metadata,
-        })
+        ))
+    }
+
+    fn from_parts(
+        bundle_path: PathBuf,
+        archives: HashMap<String, Archive>,
+        metadata: BundleMetadata,
+    ) -> Self {
+        Self {
+            state: Arc::new(BundleState {
+                bundle_path,
+                archives,
+                metadata,
+            }),
+        }
+    }
+
+    /// Capture a cheap immutable snapshot that shares all parsed bundle state.
+    pub fn snapshot(&self) -> Self {
+        self.clone()
     }
 
     /// Validate that the path contains a valid iWork bundle structure
@@ -339,22 +364,22 @@ impl Bundle {
 
     /// Get all archives in the bundle
     pub fn archives(&self) -> &HashMap<String, Archive> {
-        &self.archives
+        &self.state.archives
     }
 
     /// Get a specific archive by name
     pub fn get_archive(&self, name: &str) -> Option<&Archive> {
-        self.archives.get(name)
+        self.state.archives.get(name)
     }
 
     /// Get bundle metadata
     pub fn metadata(&self) -> &BundleMetadata {
-        &self.metadata
+        &self.state.metadata
     }
 
     /// Get the bundle path
     pub fn path(&self) -> &Path {
-        &self.bundle_path
+        &self.state.bundle_path
     }
 
     /// Validate the bundle structure and integrity
@@ -370,7 +395,7 @@ impl Bundle {
     /// * `Err(Error)` with detailed error message if validation fails
     pub fn validate(&self) -> Result<()> {
         // Check that we have at least one archive
-        if self.archives.is_empty() {
+        if self.state.archives.is_empty() {
             return Err(Error::Bundle(
                 "Bundle contains no archives - may be corrupted or empty".to_string(),
             ));
@@ -378,7 +403,7 @@ impl Bundle {
 
         // Verify each archive has at least one object
         let mut total_objects = 0;
-        for (archive_name, archive) in &self.archives {
+        for (archive_name, archive) in &self.state.archives {
             if archive.objects.is_empty() {
                 eprintln!("Warning: Archive '{}' contains no objects", archive_name);
             }
@@ -398,11 +423,12 @@ impl Bundle {
     ///
     /// Performs basic sanity checks to detect obviously corrupted bundles.
     pub fn is_corrupted(&self) -> bool {
-        if self.archives.is_empty() {
+        if self.state.archives.is_empty() {
             return true;
         }
 
         let has_any_objects = self
+            .state
             .archives
             .values()
             .any(|archive| !archive.objects.is_empty());
@@ -412,14 +438,16 @@ impl Bundle {
 
     /// Get bundle statistics
     pub fn stats(&self) -> BundleStats {
-        let archive_count = self.archives.len();
+        let archive_count = self.state.archives.len();
         let total_objects: usize = self
+            .state
             .archives
             .values()
             .map(|archive| archive.objects.len())
             .sum();
 
         let largest_archive = self
+            .state
             .archives
             .iter()
             .max_by_key(|(_, archive)| archive.objects.len())
@@ -436,7 +464,7 @@ impl Bundle {
     pub fn extract_text(&self) -> Result<String> {
         let mut text_parts = Vec::new();
 
-        for archive in self.archives.values() {
+        for archive in self.state.archives.values() {
             for object in &archive.objects {
                 text_parts.extend(object.extract_text());
             }
@@ -449,7 +477,7 @@ impl Bundle {
     /// Get all objects across all archives
     pub fn all_objects(&self) -> Vec<(&str, &ArchiveObject)> {
         let mut objects = Vec::new();
-        for (archive_name, archive) in &self.archives {
+        for (archive_name, archive) in &self.state.archives {
             for object in &archive.objects {
                 objects.push((archive_name.as_str(), object));
             }
@@ -461,7 +489,7 @@ impl Bundle {
     pub fn find_objects_by_type(&self, message_type: u32) -> Vec<(&str, &ArchiveObject)> {
         let mut matching_objects = Vec::new();
 
-        for (archive_name, archive) in &self.archives {
+        for (archive_name, archive) in &self.state.archives {
             for object in &archive.objects {
                 if object.messages.iter().any(|msg| msg.type_ == message_type) {
                     matching_objects.push((archive_name.as_str(), object));
@@ -778,5 +806,24 @@ mod tests {
         let error = Bundle::open(&bundle_link).unwrap_err();
         assert!(error.to_string().contains("symbolic link"));
         Ok(())
+    }
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn snapshots_share_immutable_bundle_state() {
+        let bundle = Bundle::from_parts(
+            PathBuf::from("<test>"),
+            HashMap::new(),
+            BundleMetadata::default(),
+        );
+        let snapshot = bundle.snapshot();
+
+        assert!(Arc::ptr_eq(&bundle.state, &snapshot.state));
+    }
+
+    #[test]
+    fn bundles_are_send_and_sync() {
+        assert_send_sync::<Bundle>();
     }
 }
