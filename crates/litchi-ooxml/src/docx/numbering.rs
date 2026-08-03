@@ -531,7 +531,9 @@ impl Numbering {
                                     .as_ref()
                                     .is_some_and(|value| value.depth == depth) =>
                             {
-                                let pending = picture_bullet.take().expect("bullet checked");
+                                let pending = picture_bullet.take().ok_or_else(|| {
+                                    invalid("picture bullet state missing at end")
+                                })?;
                                 push_picture_bullet(
                                     &mut result.picture_bullets,
                                     PictureBullet {
@@ -541,11 +543,10 @@ impl Numbering {
                                 )?;
                             },
                             b"lvl" if level.as_ref().is_some_and(|value| value.depth == depth) => {
-                                finish_level(
-                                    &mut abstract_num,
-                                    &mut level_override,
-                                    level.take().expect("level checked"),
-                                )?;
+                                let pending = level
+                                    .take()
+                                    .ok_or_else(|| invalid("level state missing at end"))?;
+                                finish_level(&mut abstract_num, &mut level_override, pending)?;
                             },
                             b"lvlOverride"
                                 if level_override
@@ -555,10 +556,10 @@ impl Numbering {
                                 if level.is_some() {
                                     return Err(invalid("unterminated level in lvlOverride"));
                                 }
-                                finish_override(
-                                    &mut num,
-                                    level_override.take().expect("override checked"),
-                                )?;
+                                let pending = level_override
+                                    .take()
+                                    .ok_or_else(|| invalid("override state missing at end"))?;
+                                finish_override(&mut num, pending)?;
                             },
                             b"abstractNum"
                                 if abstract_num
@@ -568,16 +569,18 @@ impl Numbering {
                                 if level.is_some() {
                                     return Err(invalid("unterminated abstract numbering level"));
                                 }
-                                push_abstract(
-                                    &mut result.abstract_nums,
-                                    abstract_num.take().expect("abstract checked").value,
-                                )?;
+                                let pending = abstract_num.take().ok_or_else(|| {
+                                    invalid("abstract numbering state missing at end")
+                                })?;
+                                push_abstract(&mut result.abstract_nums, pending.value)?;
                             },
                             b"num" if num.as_ref().is_some_and(|value| value.depth == depth) => {
                                 if level.is_some() || level_override.is_some() {
                                     return Err(invalid("unterminated numbering override"));
                                 }
-                                let pending = num.take().expect("num checked");
+                                let pending = num
+                                    .take()
+                                    .ok_or_else(|| invalid("num state missing at end"))?;
                                 let abstract_num_id = pending.abstract_num_id.ok_or_else(|| {
                                     invalid(&format!(
                                         "numbering instance {} is missing abstractNumId",
@@ -1226,6 +1229,18 @@ mod tests {
         ))
     }
 
+    fn assert_rejected_without_panicking(xml: &[u8]) {
+        let parsed = std::panic::catch_unwind(|| parse(xml));
+        match parsed {
+            Ok(Err(error)) => assert!(
+                matches!(error, OoxmlError::InvalidFormat(_) | OoxmlError::Xml(_)),
+                "unexpected numbering error: {error}"
+            ),
+            Ok(Ok(_)) => panic!("malformed numbering XML was accepted"),
+            Err(_) => panic!("numbering parser panicked on malformed XML"),
+        }
+    }
+
     #[test]
     fn parses_complete_level_and_override() {
         let value = parse(br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="multilevel"/><w:styleLink w:val="List"/><w:lvl w:ilvl="0"><w:start w:val="3"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:suff w:val="space"/><w:lvlRestart w:val="0"/><w:isLgl/><w:pStyle w:val="ListParagraph"/><w:lvlPicBulletId w:val="7"/></w:lvl></w:abstractNum><w:num w:numId="9"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="5"/></w:lvlOverride></w:num></w:numbering>"#).unwrap();
@@ -1280,6 +1295,30 @@ mod tests {
     fn rejects_duplicate_picture_bullet_ids() {
         let duplicate = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numPicBullet w:numPicBulletId="1"/><w:numPicBullet w:numPicBulletId="1"/></w:numbering>"#;
         assert!(parse(duplicate).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_numbering_order_without_panicking() {
+        for xml in [
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:num w:numId="2"/></w:abstractNum></w:numbering>"#[..],
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:num w:numId="2"/></w:lvl></w:abstractNum></w:numbering>"#[..],
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:num w:numId="2"><w:lvlOverride w:ilvl="0"><w:lvl w:ilvl="1"/></w:lvlOverride><w:abstractNumId w:val="1"/></w:num></w:numbering>"#[..],
+        ] {
+            assert_rejected_without_panicking(xml);
+        }
+    }
+
+    #[test]
+    fn rejects_truncated_numbering_states_without_panicking() {
+        for xml in [
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numPicBullet w:numPicBulletId="1">"#[..],
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0">"#[..],
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:num w:numId="2"><w:lvlOverride w:ilvl="0">"#[..],
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1">"#[..],
+            &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:num w:numId="2">"#[..],
+        ] {
+            assert_rejected_without_panicking(xml);
+        }
     }
 
     #[test]

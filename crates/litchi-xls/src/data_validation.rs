@@ -200,24 +200,27 @@ pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<XlsDataValidationSettings> {
             data.len()
         ));
     }
-    let options = u16::from_le_bytes([data[0], data[1]]);
+    let mut cursor = Cursor::new(data);
+    let options = cursor.u16()?;
     if options & !0x0005 != 0 {
         return invalid(format!(
             "DVAL contains reserved option bits: {options:#06x}"
         ));
     }
-    let x_left = read_u32(data, 2)?;
-    let y_top = read_u32(data, 6)?;
+    let x_left = cursor.u32()?;
+    let y_top = cursor.u32()?;
     if x_left > 65_535 || y_top > 65_535 {
         return invalid("DVAL window coordinates exceed 65535".to_string());
     }
-    let object_id = i32::from_le_bytes(data[10..14].try_into().unwrap());
+    let object_id = cursor.i32()?;
     let dropdown_object_id = match object_id {
         -1 => None,
-        1..=32_767 => Some(object_id as u16),
+        1..=32_767 => Some(u16::try_from(object_id).map_err(|_| {
+            XlsError::InvalidData(format!("invalid DVAL dropdown object id: {object_id}"))
+        })?),
         _ => return invalid(format!("invalid DVAL dropdown object id: {object_id}")),
     };
-    let rule_count = read_u32(data, 14)?;
+    let rule_count = cursor.u32()?;
     if rule_count > 65_534 {
         return invalid(format!("DVAL rule count exceeds 65534: {rule_count}"));
     }
@@ -226,7 +229,9 @@ pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<XlsDataValidationSettings> {
         x_left,
         y_top,
         dropdown_object_id,
-        declared_rule_count: rule_count as u16,
+        declared_rule_count: u16::try_from(rule_count).map_err(|_| {
+            XlsError::InvalidData(format!("DVAL rule count exceeds 65534: {rule_count}"))
+        })?,
     })
 }
 
@@ -320,7 +325,7 @@ pub(crate) fn parse_dv(
         _ => {},
     }
 
-    let range_count = cursor.u16()? as usize;
+    let range_count = usize::from(cursor.u16()?);
     if !(1..=MAX_VALIDATION_RANGES).contains(&range_count) {
         return invalid(format!(
             "DV range count must be 1..={MAX_VALIDATION_RANGES}, got {range_count}"
@@ -344,11 +349,17 @@ pub(crate) fn parse_dv(
         if first_row > last_row || first_column > last_column || last_column > 255 {
             return invalid("DV contains an invalid or out-of-range cell range".to_string());
         }
+        let first_column = u8::try_from(first_column).map_err(|_| {
+            XlsError::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
+        })?;
+        let last_column = u8::try_from(last_column).map_err(|_| {
+            XlsError::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
+        })?;
         ranges.push(XlsDataValidationRange {
             first_row,
             last_row,
-            first_column: first_column as u8,
-            last_column: last_column as u8,
+            first_column,
+            last_column,
         });
     }
     Ok(XlsDataValidationRule {
@@ -375,13 +386,6 @@ fn invalid<T>(message: String) -> XlsResult<T> {
     Err(XlsError::InvalidData(message))
 }
 
-fn read_u32(data: &[u8], offset: usize) -> XlsResult<u32> {
-    let bytes = data.get(offset..offset + 4).ok_or_else(|| {
-        XlsError::InvalidData("truncated BIFF data-validation record".to_string())
-    })?;
-    Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
-}
-
 struct Cursor<'a> {
     data: &'a [u8],
     position: usize,
@@ -406,28 +410,39 @@ impl<'a> Cursor<'a> {
         self.position = end;
         Ok(bytes)
     }
+    fn take_array<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+        let bytes: [u8; N] = self
+            .take(N)?
+            .try_into()
+            .map_err(|_| XlsError::InvalidData("truncated DV record".to_string()))?;
+        Ok(bytes)
+    }
     fn u16(&mut self) -> XlsResult<u16> {
-        Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
+        Ok(u16::from_le_bytes(self.take_array()?))
     }
     fn u32(&mut self) -> XlsResult<u32> {
-        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+        Ok(u32::from_le_bytes(self.take_array()?))
+    }
+    fn i32(&mut self) -> XlsResult<i32> {
+        Ok(i32::from_le_bytes(self.take_array()?))
     }
     fn unicode_string(&mut self, max_units: usize) -> XlsResult<Option<String>> {
-        let units = self.u16()? as usize;
+        let units = usize::from(self.u16()?);
         if units > max_units {
             return invalid(format!("DV string exceeds its {max_units}-character limit"));
         }
-        let flags = self.take(1)?[0];
+        let [flags] = self.take_array()?;
         if flags & !0x0D != 0 {
             return invalid(format!("DV string contains reserved flags: {flags:#04x}"));
         }
         let rich_runs = if flags & 0x08 != 0 {
-            self.u16()? as usize
+            usize::from(self.u16()?)
         } else {
             0
         };
         let extension_size = if flags & 0x04 != 0 {
-            self.u32()? as usize
+            usize::try_from(self.u32()?)
+                .map_err(|_| XlsError::InvalidData("DV string size overflow".to_string()))?
         } else {
             0
         };
@@ -437,10 +452,17 @@ impl<'a> Cursor<'a> {
             .ok_or_else(|| XlsError::InvalidData("DV string size overflow".to_string()))?;
         let characters = self.take(character_bytes)?;
         let value = if wide {
-            let utf16: Vec<u16> = characters
-                .chunks_exact(2)
-                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-                .collect();
+            let mut chunks = characters.chunks_exact(2);
+            let mut utf16 = Vec::with_capacity(units);
+            for bytes in &mut chunks {
+                let bytes: [u8; 2] = bytes.try_into().map_err(|_| {
+                    XlsError::InvalidData("DV string contains invalid UTF-16".to_string())
+                })?;
+                utf16.push(u16::from_le_bytes(bytes));
+            }
+            if !chunks.remainder().is_empty() {
+                return invalid("DV string contains invalid UTF-16".to_string());
+            }
             String::from_utf16(&utf16).map_err(|_| {
                 XlsError::InvalidData("DV string contains invalid UTF-16".to_string())
             })?
@@ -495,6 +517,13 @@ mod tests {
         data
     }
 
+    fn assert_rejected_without_panicking<T>(parse: impl FnOnce() -> XlsResult<T>) {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(parse)) {
+            Ok(result) => assert!(result.is_err()),
+            Err(_) => panic!("malformed data-validation input must not panic"),
+        }
+    }
+
     #[test]
     fn parses_dval_and_dv_with_raw_formulas() {
         let mut dval = Vec::new();
@@ -530,6 +559,23 @@ mod tests {
         dv[end - 8..end - 6].copy_from_slice(&5u16.to_le_bytes());
         dv[end - 6..end - 4].copy_from_slice(&4u16.to_le_bytes());
         assert!(parse_dv(&dv, None).is_err());
+    }
+
+    #[test]
+    fn rejects_truncated_dval_payloads_without_panicking() {
+        for length in 0..18 {
+            let data = vec![0u8; length];
+            assert_rejected_without_panicking(|| parse_dval(&data));
+        }
+    }
+
+    #[test]
+    fn rejects_truncated_dv_fields_without_panicking() {
+        let data = valid_dv();
+        for length in 0..data.len() {
+            let truncated = &data[..length];
+            assert_rejected_without_panicking(|| parse_dv(truncated, None));
+        }
     }
 
     #[test]

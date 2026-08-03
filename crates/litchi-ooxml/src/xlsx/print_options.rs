@@ -89,6 +89,9 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
@@ -116,6 +119,9 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
                 }
             },
             Event::Empty(element) => {
+                if !root_seen || root_closed {
+                    return Err(invalid("worksheet XML element is outside root"));
+                }
                 if depth == 1
                     && spreadsheet(&namespace)
                     && element.local_name().as_ref() == b"printOptions"
@@ -129,6 +135,10 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
                 }
             },
             Event::Text(text) => {
+                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("worksheet XML text is outside root"));
+                }
                 if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("printOptions must not contain text"));
                 }
@@ -136,12 +146,24 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
             Event::CData(_) if open.is_some() => {
                 return Err(invalid("printOptions must not contain CDATA"));
             },
+            Event::CData(_) if !root_seen || root_closed => {
+                return Err(invalid("worksheet XML CDATA is outside root"));
+            },
             Event::End(element) => {
-                if open
-                    .as_ref()
-                    .is_some_and(|(element_depth, _)| *element_depth == depth)
-                {
-                    let (_, options) = open.take().expect("checked above");
+                if depth == 0 {
+                    return Err(invalid("unexpected XML end element"));
+                }
+                if let Some((element_depth, _)) = open.as_ref() {
+                    if *element_depth != depth {
+                        return Err(invalid("invalid printOptions closing state"));
+                    }
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"printOptions"
+                    {
+                        return Err(invalid("invalid printOptions closing element"));
+                    }
+                    let (_, options) = open
+                        .take()
+                        .ok_or_else(|| invalid("invalid printOptions closing state"))?;
                     result = Some(options);
                 }
                 if depth == 1 {
@@ -155,6 +177,9 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
                     .ok_or_else(|| invalid("unexpected XML end element"))?;
             },
             Event::GeneralRef(reference) => {
+                if !root_seen || root_closed {
+                    return Err(invalid("worksheet XML entity is outside root"));
+                }
                 if reference.resolve_char_ref().map_err(xml_error)?.is_none()
                     && !matches!(
                         reference.decode().map_err(xml_error)?.as_ref(),
@@ -287,6 +312,16 @@ mod tests {
         assert!(parse(r#"<printOptions headings="1" headings="0"/>"#).is_err());
         assert!(parse(r#"<printOptions mystery="1"/>"#).is_err());
         assert!(parse(r#"<printOptions><x/></printOptions>"#).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_closing_state_without_panicking() {
+        let xml = format!(r#"{START}<printOptions/></worksheet><printOptions/>"#);
+        let parsed = std::panic::catch_unwind(|| parse_worksheet_print_options(xml.as_bytes()));
+        assert!(matches!(parsed, Ok(Err(_))));
+
+        let incomplete = format!(r#"{START}<printOptions>"#);
+        assert!(parse_worksheet_print_options(incomplete.as_bytes()).is_err());
     }
 
     #[test]

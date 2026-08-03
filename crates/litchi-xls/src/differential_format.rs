@@ -19,18 +19,30 @@ fn invalid(message: impl Into<String>) -> XlsError {
     }
 }
 
-fn read_u16(data: &[u8], offset: usize, field: &str) -> XlsResult<u16> {
-    let bytes = data
-        .get(offset..offset + 2)
+fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> XlsResult<[u8; N]> {
+    let end = offset
+        .checked_add(N)
         .ok_or_else(|| invalid(format!("truncated {field}")))?;
-    Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
+    let bytes = data
+        .get(offset..end)
+        .ok_or_else(|| invalid(format!("truncated {field}")))?;
+    bytes
+        .try_into()
+        .map_err(|_| invalid(format!("truncated {field}")))
+}
+
+fn read_u8(data: &[u8], offset: usize, field: &str) -> XlsResult<u8> {
+    data.get(offset)
+        .copied()
+        .ok_or_else(|| invalid(format!("truncated {field}")))
+}
+
+fn read_u16(data: &[u8], offset: usize, field: &str) -> XlsResult<u16> {
+    Ok(u16::from_le_bytes(read_bytes::<2>(data, offset, field)?))
 }
 
 fn read_u32(data: &[u8], offset: usize, field: &str) -> XlsResult<u32> {
-    let bytes = data
-        .get(offset..offset + 4)
-        .ok_or_else(|| invalid(format!("truncated {field}")))?;
-    Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
+    Ok(u32::from_le_bytes(read_bytes::<4>(data, offset, field)?))
 }
 
 fn read_i16(data: &[u8], offset: usize, field: &str) -> XlsResult<i16> {
@@ -38,10 +50,7 @@ fn read_i16(data: &[u8], offset: usize, field: &str) -> XlsResult<i16> {
 }
 
 fn read_f64(data: &[u8], offset: usize, field: &str) -> XlsResult<f64> {
-    let bytes = data
-        .get(offset..offset + 8)
-        .ok_or_else(|| invalid(format!("truncated {field}")))?;
-    Ok(f64::from_le_bytes(bytes.try_into().unwrap()))
+    Ok(f64::from_le_bytes(read_bytes::<8>(data, offset, field)?))
 }
 
 /// A theme color slot used by an extended formatting property.
@@ -157,31 +166,33 @@ impl XlsXfColor {
                 data.len()
             )));
         }
-        if data[0] & 0x01 == 0 {
+        let [flags, index, tint_low, tint_high, red, green, blue, alpha] =
+            read_bytes::<8>(data, 0, "XFPropColor")?;
+        if flags & 0x01 == 0 {
             return Err(invalid("XFPropColor fValidRGBA must be set"));
         }
-        let source = match data[0] >> 1 {
+        let source = match flags >> 1 {
             0 => XlsXfColorSource::Automatic,
             1 => {
-                if !matches!(data[1], 0..=65 | 72) {
-                    return Err(invalid(format!("invalid indexed XF color {}", data[1])));
+                if !matches!(index, 0..=65 | 72) {
+                    return Err(invalid(format!("invalid indexed XF color {index}")));
                 }
-                XlsXfColorSource::Indexed(data[1])
+                XlsXfColorSource::Indexed(index)
             },
             2 => XlsXfColorSource::Rgb,
-            3 => XlsXfColorSource::Theme(XlsThemeColor::from_byte(data[1])?),
+            3 => XlsXfColorSource::Theme(XlsThemeColor::from_byte(index)?),
             4 => XlsXfColorSource::NotSet,
             value => return Err(invalid(format!("reserved XF color source {value}"))),
         };
-        let tint = i16::from_le_bytes([data[2], data[3]]);
+        let tint = i16::from_le_bytes([tint_low, tint_high]);
         if tint == i16::MIN {
             return Err(invalid("XFPropColor tint cannot equal -32768"));
         }
         Ok(Self {
             source,
             tint,
-            rgba: data[4..8].try_into().unwrap(),
-            ignored_index: data[1],
+            rgba: [red, green, blue, alpha],
+            ignored_index: index,
         })
     }
 
@@ -365,7 +376,7 @@ impl XlsXfGradientStop {
         }
         let stop = Self {
             position: read_f64(data, 2, "XFPropGradientStop.numPosition")?,
-            color: XlsXfColor::parse(&data[10..18])?,
+            color: XlsXfColor::parse(&read_bytes::<8>(data, 10, "XFPropGradientStop.color")?)?,
             unused: read_u16(data, 0, "XFPropGradientStop.unused")?,
         };
         validate_unit_interval(stop.position, "stop")?;
@@ -507,7 +518,11 @@ impl XlsXfProperty {
         match property_type {
             0x0000 => {
                 exact(1)?;
-                Ok(Self::FillPattern(parse_fill_pattern(data[0])?))
+                Ok(Self::FillPattern(parse_fill_pattern(read_u8(
+                    data,
+                    0,
+                    "XFPropFillPattern.pattern",
+                )?)?))
             },
             0x0001 => Ok(Self::ForegroundColor(XlsXfColor::parse(data)?)),
             0x0002 => Ok(Self::BackgroundColor(XlsXfColor::parse(data)?)),
@@ -517,7 +532,7 @@ impl XlsXfProperty {
             0x0006..=0x000C => {
                 exact(10)?;
                 let border = XlsXfBorder {
-                    color: XlsXfColor::parse(&data[..8])?,
+                    color: XlsXfColor::parse(&read_bytes::<8>(data, 0, "XFPropBorder.color")?)?,
                     style: parse_border_style(read_u16(data, 8, "XFPropBorder.dgBorder")?)?,
                 };
                 Ok(match property_type {
@@ -532,7 +547,7 @@ impl XlsXfProperty {
             },
             0x000D | 0x000E | 0x0014..=0x0017 | 0x001C..=0x0021 | 0x002B | 0x002C => {
                 exact(1)?;
-                let value = parse_bool(data[0], property_type)?;
+                let value = parse_bool(read_u8(data, 0, "XFProp.Boolean")?, property_type)?;
                 Ok(match property_type {
                     0x000D => Self::DiagonalUp(value),
                     0x000E => Self::DiagonalDown(value),
@@ -553,16 +568,24 @@ impl XlsXfProperty {
             0x000F => {
                 exact(1)?;
                 Ok(Self::HorizontalAlignment(parse_horizontal_alignment(
-                    data[0],
+                    read_u8(data, 0, "XFProp.horizontal alignment")?,
                 )?))
             },
             0x0010 => {
                 exact(1)?;
-                Ok(Self::VerticalAlignment(parse_vertical_alignment(data[0])?))
+                Ok(Self::VerticalAlignment(parse_vertical_alignment(read_u8(
+                    data,
+                    0,
+                    "XFProp.vertical alignment",
+                )?)?))
             },
             0x0011 => {
                 exact(1)?;
-                Ok(Self::TextRotation(parse_rotation(data[0])?))
+                Ok(Self::TextRotation(parse_rotation(read_u8(
+                    data,
+                    0,
+                    "XFProp.text rotation",
+                )?)?))
             },
             0x0012 => {
                 exact(2)?;
@@ -574,7 +597,11 @@ impl XlsXfProperty {
             },
             0x0013 => {
                 exact(1)?;
-                Ok(Self::ReadingOrder(parse_reading_order(data[0])?))
+                Ok(Self::ReadingOrder(parse_reading_order(read_u8(
+                    data,
+                    0,
+                    "XFProp.reading order",
+                )?)?))
             },
             0x0018 => Ok(Self::FontName(parse_lp_wide_string(data)?)),
             0x0019 => {
@@ -601,11 +628,19 @@ impl XlsXfProperty {
             },
             0x0022 => {
                 exact(1)?;
-                Ok(Self::FontCharset(parse_charset(data[0])?))
+                Ok(Self::FontCharset(parse_charset(read_u8(
+                    data,
+                    0,
+                    "XFProp.font charset",
+                )?)?))
             },
             0x0023 => {
                 exact(1)?;
-                Ok(Self::FontFamily(parse_font_family(data[0])?))
+                Ok(Self::FontFamily(parse_font_family(read_u8(
+                    data,
+                    0,
+                    "XFProp.font family",
+                )?)?))
             },
             0x0024 => {
                 exact(4)?;
@@ -619,13 +654,15 @@ impl XlsXfProperty {
             },
             0x0025 => {
                 exact(1)?;
-                Ok(Self::FontScheme(match data[0] {
-                    0 => XlsXfFontScheme::None,
-                    1 => XlsXfFontScheme::Major,
-                    2 => XlsXfFontScheme::Minor,
-                    0xFF => XlsXfFontScheme::NotSpecified,
-                    value => return Err(invalid(format!("reserved font scheme {value}"))),
-                }))
+                Ok(Self::FontScheme(
+                    match read_u8(data, 0, "XFProp.font scheme")? {
+                        0 => XlsXfFontScheme::None,
+                        1 => XlsXfFontScheme::Major,
+                        2 => XlsXfFontScheme::Minor,
+                        0xFF => XlsXfFontScheme::NotSpecified,
+                        value => return Err(invalid(format!("reserved font scheme {value}"))),
+                    },
+                ))
             },
             0x0026 => Ok(Self::NumberFormatCode(parse_number_format_code(data)?)),
             0x0029 => {
@@ -777,17 +814,23 @@ impl XlsXfProperties {
         let mut properties = Vec::with_capacity(count);
         for _ in 0..count {
             let property_type = read_u16(data, offset, "XFProp.xfPropType")?;
-            let size = usize::from(read_u16(data, offset + 2, "XFProp.cb")?);
+            let size_offset = offset
+                .checked_add(2)
+                .ok_or_else(|| invalid("XFProp header range overflows"))?;
+            let size = usize::from(read_u16(data, size_offset, "XFProp.cb")?);
             if size < 4 {
                 return Err(invalid(format!(
                     "XFProp size {size} is smaller than its header"
                 )));
             }
+            let data_offset = offset
+                .checked_add(4)
+                .ok_or_else(|| invalid("XFProp data range overflows"))?;
             let end = offset
                 .checked_add(size)
                 .ok_or_else(|| invalid("XFProp range overflows"))?;
             let blob = data
-                .get(offset + 4..end)
+                .get(data_offset..end)
                 .ok_or_else(|| invalid("truncated XFProp data"))?;
             properties.push(XlsXfProperty::parse(property_type, blob)?);
             offset = end;
@@ -850,10 +893,15 @@ impl XlsXfProperties {
         self.validate()?;
         let mut data = Vec::new();
         data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&(self.properties.len() as u16).to_le_bytes());
+        let property_count = u16::try_from(self.properties.len())
+            .map_err(|_| invalid("XFProps count exceeds BIFF u16"))?;
+        data.extend_from_slice(&property_count.to_le_bytes());
         for property in &self.properties {
             let blob = property.data_bytes()?;
-            let size = u16::try_from(4usize + blob.len())
+            let property_size = 4usize
+                .checked_add(blob.len())
+                .ok_or_else(|| invalid("XFProp size overflows"))?;
+            let size = u16::try_from(property_size)
                 .map_err(|_| invalid("XFProp size exceeds BIFF u16"))?;
             data.extend_from_slice(&property.property_type().to_le_bytes());
             data.extend_from_slice(&size.to_le_bytes());
@@ -904,7 +952,10 @@ impl XlsDifferentialFormat {
         let value = Self {
             new_border: flags & 0x0002 != 0,
             unused_flags: flags & 0x0005,
-            properties: XlsXfProperties::parse(&data[FRT_HEADER_LEN + 2..])?,
+            properties: XlsXfProperties::parse(
+                data.get(FRT_HEADER_LEN + 2..)
+                    .ok_or_else(|| invalid("truncated DXF properties"))?,
+            )?,
         };
         value.validate()?;
         Ok(value)
@@ -913,7 +964,10 @@ impl XlsDifferentialFormat {
     pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
         self.validate()?;
         let properties = self.properties.to_bytes()?;
-        let size = FRT_HEADER_LEN + 2 + properties.len();
+        let size = FRT_HEADER_LEN
+            .checked_add(2)
+            .and_then(|size| size.checked_add(properties.len()))
+            .ok_or_else(|| invalid("DXF payload size overflows"))?;
         if size > MAX_BIFF8_PAYLOAD_LEN {
             return Err(invalid("DXF exceeds the BIFF8 record payload cap"));
         }
@@ -928,9 +982,14 @@ impl XlsDifferentialFormat {
 
     pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
         let payload = self.to_payload()?;
-        let mut data = Vec::with_capacity(4 + payload.len());
+        let record_len = 4usize
+            .checked_add(payload.len())
+            .ok_or_else(|| invalid("DXF record size overflows"))?;
+        let payload_len =
+            u16::try_from(payload.len()).map_err(|_| invalid("DXF payload exceeds BIFF u16"))?;
+        let mut data = Vec::with_capacity(record_len);
         data.extend_from_slice(&DXF_RECORD_TYPE.to_le_bytes());
-        data.extend_from_slice(&(payload.len() as u16).to_le_bytes());
+        data.extend_from_slice(&payload_len.to_le_bytes());
         data.extend_from_slice(&payload);
         Ok(data)
     }
@@ -952,19 +1011,28 @@ impl XlsDifferentialFormat {
 }
 
 pub(crate) fn validate_frt_header(data: &[u8], record_type: u16) -> XlsResult<()> {
-    if data.len() < FRT_HEADER_LEN {
-        return Err(XlsError::InvalidRecord {
+    let header = data.get(..FRT_HEADER_LEN).ok_or(XlsError::InvalidRecord {
+        record_type,
+        message: "truncated FrtHeader".to_string(),
+    })?;
+    let actual_record_type = header
+        .get(..2)
+        .and_then(|bytes| <[u8; 2]>::try_from(bytes).ok())
+        .map(u16::from_le_bytes)
+        .ok_or(XlsError::InvalidRecord {
             record_type,
             message: "truncated FrtHeader".to_string(),
-        });
-    }
-    if u16::from_le_bytes([data[0], data[1]]) != record_type {
+        })?;
+    if actual_record_type != record_type {
         return Err(XlsError::InvalidRecord {
             record_type,
             message: "future-record type does not match record header".to_string(),
         });
     }
-    if data[2..12].iter().any(|byte| *byte != 0) {
+    if header
+        .get(2..FRT_HEADER_LEN)
+        .is_none_or(|reserved| reserved.iter().any(|byte| *byte != 0))
+    {
         return Err(XlsError::InvalidRecord {
             record_type,
             message: "future-record reserved fields must be zero".to_string(),
@@ -1277,12 +1345,27 @@ fn font_family_byte(value: XlsFontFamily) -> u8 {
 
 fn parse_lp_wide_string(data: &[u8]) -> XlsResult<String> {
     let count = usize::from(read_u16(data, 0, "LPWideString.cchCharacters")?);
-    if count > 32 || data.len() != 2 + count * 2 {
+    if count > 32 {
         return Err(invalid(
             "font name LPWideString is malformed or exceeds 32 characters",
         ));
     }
-    decode_utf16(&data[2..], "font name")
+    let byte_len = count
+        .checked_mul(2)
+        .ok_or_else(|| invalid("font name LPWideString size overflows"))?;
+    let end = 2usize
+        .checked_add(byte_len)
+        .ok_or_else(|| invalid("font name LPWideString range overflows"))?;
+    if data.len() != end {
+        return Err(invalid(
+            "font name LPWideString is malformed or exceeds 32 characters",
+        ));
+    }
+    decode_utf16(
+        data.get(2..end)
+            .ok_or_else(|| invalid("truncated font name LPWideString"))?,
+        "font name",
+    )
 }
 
 fn write_lp_wide_string(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
@@ -1290,7 +1373,9 @@ fn write_lp_wide_string(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
     if units.len() > 32 {
         return Err(invalid("font name exceeds 32 UTF-16 code units"));
     }
-    data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    let count =
+        u16::try_from(units.len()).map_err(|_| invalid("font name length exceeds BIFF u16"))?;
+    data.extend_from_slice(&count.to_le_bytes());
     data.extend(units.into_iter().flat_map(u16::to_le_bytes));
     Ok(())
 }
@@ -1314,7 +1399,11 @@ fn parse_number_format_code(data: &[u8]) -> XlsResult<String> {
             "number-format string has trailing or truncated UTF-16 data",
         ));
     }
-    decode_utf16(&data[2..], "number-format string")
+    decode_utf16(
+        data.get(2..end)
+            .ok_or_else(|| invalid("truncated number-format string"))?,
+        "number-format string",
+    )
 }
 
 fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
@@ -1322,7 +1411,9 @@ fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
     if !(1..=255).contains(&units.len()) {
         return Err(invalid("number-format string length must be 1..=255"));
     }
-    data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    let count = u16::try_from(units.len())
+        .map_err(|_| invalid("number-format string length exceeds BIFF u16"))?;
+    data.extend_from_slice(&count.to_le_bytes());
     data.extend(units.into_iter().flat_map(u16::to_le_bytes));
     Ok(())
 }
@@ -1331,9 +1422,12 @@ fn decode_utf16(data: &[u8], field: &str) -> XlsResult<String> {
     if !data.len().is_multiple_of(2) {
         return Err(invalid(format!("{field} has an odd byte length")));
     }
-    let units = data
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]));
+    let mut units = Vec::with_capacity(data.len() / 2);
+    for chunk in data.chunks_exact(2) {
+        let bytes = <[u8; 2]>::try_from(chunk)
+            .map_err(|_| invalid(format!("{field} has an invalid UTF-16 unit")))?;
+        units.push(u16::from_le_bytes(bytes));
+    }
     char::decode_utf16(units)
         .collect::<Result<String, _>>()
         .map_err(|_| invalid(format!("{field} contains invalid UTF-16")))
@@ -1467,6 +1561,56 @@ mod tests {
             XlsDifferentialFormat::try_new(false, vec![XlsXfProperty::JustifyDistributed(true)],)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn fixed_width_reads_reject_offset_overflow_without_panicking() {
+        assert!(matches!(
+            std::panic::catch_unwind(|| read_u16(&[], usize::MAX, "u16")),
+            Ok(Err(_))
+        ));
+        assert!(matches!(
+            std::panic::catch_unwind(|| read_u32(&[], usize::MAX, "u32")),
+            Ok(Err(_))
+        ));
+        assert!(matches!(
+            std::panic::catch_unwind(|| read_f64(&[], usize::MAX, "f64")),
+            Ok(Err(_))
+        ));
+    }
+
+    #[test]
+    fn malformed_fixed_width_properties_return_errors_without_panicking() {
+        let empty = XlsDifferentialFormat::try_new(false, vec![])
+            .unwrap()
+            .to_payload()
+            .unwrap();
+        for property_type in [
+            0x0000u16, 0x0001, 0x0003, 0x0004, 0x0006, 0x000D, 0x000F, 0x0010, 0x0011, 0x0012,
+            0x0013, 0x0018, 0x0019, 0x001A, 0x001B, 0x0022, 0x0023, 0x0024, 0x0025, 0x0029, 0x002A,
+        ] {
+            let mut payload = empty.clone();
+            payload[16..18].copy_from_slice(&1u16.to_le_bytes());
+            payload.extend_from_slice(&property_type.to_le_bytes());
+            payload.extend_from_slice(&4u16.to_le_bytes());
+            let parsed =
+                std::panic::catch_unwind(|| XlsDifferentialFormat::parse_payload(&payload));
+            assert!(
+                matches!(parsed, Ok(Err(_))),
+                "property type 0x{property_type:04X} did not reject empty data"
+            );
+        }
+    }
+
+    #[test]
+    fn oversized_dxf_writes_are_rejected_without_truncating_record_length() {
+        let dxf = XlsDifferentialFormat::try_new(
+            false,
+            vec![XlsXfProperty::WrapText(false); MAX_XF_PROPERTIES],
+        )
+        .unwrap();
+        assert!(dxf.to_payload().is_err());
+        assert!(dxf.to_record_bytes().is_err());
     }
 
     #[test]
