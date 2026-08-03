@@ -17,6 +17,7 @@ pub mod ignored_errors;
 pub mod layout;
 pub mod merge;
 mod outline;
+pub mod print_options;
 pub mod raw;
 pub mod row;
 pub mod scenarios;
@@ -51,6 +52,7 @@ pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 pub use outline::{Outline, OutlineAt};
+pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{
     ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,

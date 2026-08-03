@@ -38,7 +38,6 @@ use super::parsers::worksheet_parser;
 use super::phonetic_properties::{
     WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
 };
-use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use super::query_table::{
     QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
     parse_query_table,
@@ -71,6 +70,7 @@ use super::{
 };
 use litchi_xlsx::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
 use litchi_xlsx::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
+use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};
 use litchi_xlsx::web::Bindings;

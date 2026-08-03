@@ -51,7 +51,6 @@ pub mod parsers;
 pub mod phonetic_properties;
 pub mod pivot;
 pub mod pivot_chart;
-pub mod print_options;
 pub mod printer_settings;
 pub mod query_table;
 pub mod revisions;
@@ -100,6 +99,7 @@ pub use chartsheet::{
 pub use litchi_xlsx::calculation_properties;
 pub use litchi_xlsx::cell_watches;
 pub use litchi_xlsx::ignored_errors;
+pub use litchi_xlsx::print_options;
 pub use litchi_xlsx::scenarios;
 pub use litchi_xlsx::sheet_calculation_properties;
 pub mod writer;
@@ -187,6 +187,7 @@ pub use litchi_xlsx::ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
+pub use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use litchi_xlsx::sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
     parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
@@ -213,7 +214,6 @@ pub use phonetic_properties::{
     WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
     parse_worksheet_phonetic_properties,
 };
-pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use printer_settings::{
     PrinterSettingsConformance, PrinterSettingsResource, WorksheetPrinterSettings,
     WorksheetPrinterSettingsReference, load_worksheet_printer_settings,

@@ -13,6 +13,7 @@ const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DEPTH: usize = 128;
+const MAX_EVENTS: usize = 1_000_000;
 const MAX_OFFICE_MARGIN_INCHES: f64 = 49.0;
 
 /// A validated physical page margin stored by SpreadsheetML in inches.
@@ -75,6 +76,9 @@ pub fn parse_worksheet_page_margins(xml: &[u8]) -> Result<Option<WorksheetPageMa
     }
     let validated =
         process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    if validated.xml.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML is too large"));
+    }
     let selected = if validated.report.alternate_content_count == 0 {
         xml
     } else {
@@ -91,14 +95,29 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
     let mut root_closed = false;
     let mut result = None;
     let mut open: Option<(usize, WorksheetPageMargins)> = None;
+    let mut declaration_seen = false;
+    let mut events = 0usize;
+    reader.config_mut().check_end_names = true;
 
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("worksheet XML exceeds event limit"));
+        }
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if depth == 0 && root_seen {
+                    return Err(invalid("worksheet XML contains multiple roots"));
+                }
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
@@ -126,6 +145,16 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
                 }
             },
             Event::Empty(element) => {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if depth == 0 {
+                    return Err(if root_seen {
+                        invalid("worksheet XML contains multiple roots")
+                    } else {
+                        invalid("worksheet root cannot be empty")
+                    });
+                }
                 if depth == 1
                     && spreadsheet(&namespace)
                     && element.local_name().as_ref() == b"pageMargins"
@@ -139,19 +168,37 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
                 }
             },
             Event::Text(text) => {
+                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("worksheet XML text is outside root"));
+                }
                 if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("pageMargins must not contain text"));
+                }
+                if depth == 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet cannot contain direct text"));
                 }
             },
             Event::CData(_) if open.is_some() => {
                 return Err(invalid("pageMargins must not contain CDATA"));
+            },
+            Event::CData(_) if depth == 1 => {
+                return Err(invalid("worksheet cannot contain direct CDATA"));
+            },
+            Event::CData(_) if !root_seen || root_closed => {
+                return Err(invalid("worksheet XML CDATA is outside root"));
             },
             Event::End(element) => {
                 if open
                     .as_ref()
                     .is_some_and(|(element_depth, _)| *element_depth == depth)
                 {
-                    let (_, margins) = open.take().expect("checked above");
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"pageMargins" {
+                        return Err(invalid("invalid pageMargins closing element"));
+                    }
+                    let (_, margins) = open
+                        .take()
+                        .ok_or_else(|| invalid("invalid pageMargins closing state"))?;
                     result = Some(margins);
                 }
                 if depth == 1 {
@@ -165,6 +212,9 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
                     .ok_or_else(|| invalid("unexpected XML end element"))?;
             },
             Event::GeneralRef(reference) => {
+                if !root_seen || root_closed {
+                    return Err(invalid("worksheet XML entity is outside root"));
+                }
                 if reference.resolve_char_ref().map_err(xml_error)?.is_none()
                     && !matches!(
                         reference.decode().map_err(xml_error)?.as_ref(),
@@ -173,14 +223,20 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
                 {
                     return Err(invalid("custom XML entities are rejected"));
                 }
-                if open.is_some() {
+                if open.is_some() || depth == 1 {
                     return Err(invalid("pageMargins must not contain entity text"));
                 }
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
-            Event::Decl(_) | Event::Comment(_) | Event::CData(_) => {},
+            Event::Comment(_) | Event::CData(_) => {},
             Event::Eof => break,
         }
     }
@@ -271,6 +327,7 @@ mod tests {
 
     const START: &str =
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+    const CORE_NAMESPACE: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
     fn parse(body: &str) -> Result<Option<WorksheetPageMargins>> {
         parse_worksheet_page_margins(format!("{START}{body}</worksheet>").as_bytes())
@@ -327,6 +384,34 @@ mod tests {
                 .is_err()
         );
         assert!(parse(r#"<pageMargins left="1" right="2" top="3" bottom="4" header="5" footer="6"><x/></pageMargins>"#).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_document_boundaries_and_excessive_depth() {
+        for xml in [
+            format!(
+                r#"<worksheet xmlns="{CORE_NAMESPACE}"/><worksheet xmlns="{CORE_NAMESPACE}"/>"#
+            ),
+            format!(r#"text{}"#, START),
+            format!(r#"{}text</worksheet>"#, START),
+            format!(r#"{}</worksheet>tail"#, START),
+            format!(r#"{}<![CDATA[data]]></worksheet>"#, START),
+        ] {
+            assert!(
+                parse_worksheet_page_margins(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = START.to_owned();
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_worksheet_page_margins(xml.as_bytes()).is_err());
     }
 
     #[test]

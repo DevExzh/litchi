@@ -6,13 +6,14 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{OoxmlError, Result};
+use crate::error::{Error, Result};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DEPTH: usize = 128;
+const MAX_EVENTS: usize = 1_000_000;
 
 /// The effective flags from one worksheet `printOptions` element.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -65,6 +66,9 @@ pub fn parse_worksheet_print_options(xml: &[u8]) -> Result<Option<WorksheetPrint
     }
     let validated =
         process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    if validated.xml.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML is too large"));
+    }
     let selected = if validated.report.alternate_content_count == 0 {
         xml
     } else {
@@ -81,8 +85,17 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
     let mut root_closed = false;
     let mut result = None;
     let mut open: Option<(usize, WorksheetPrintOptions)> = None;
+    let mut declaration_seen = false;
+    let mut events = 0usize;
+    reader.config_mut().check_end_names = true;
 
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("worksheet XML exceeds event limit"));
+        }
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
@@ -119,7 +132,13 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
                 }
             },
             Event::Empty(element) => {
-                if !root_seen || root_closed {
+                if root_closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if !root_seen {
+                    return Err(invalid("worksheet root cannot be empty"));
+                }
+                if depth == 0 {
                     return Err(invalid("worksheet XML element is outside root"));
                 }
                 if depth == 1
@@ -142,9 +161,15 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
                 if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("printOptions must not contain text"));
                 }
+                if depth == 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet cannot contain direct text"));
+                }
             },
             Event::CData(_) if open.is_some() => {
                 return Err(invalid("printOptions must not contain CDATA"));
+            },
+            Event::CData(_) if depth == 1 => {
+                return Err(invalid("worksheet cannot contain direct CDATA"));
             },
             Event::CData(_) if !root_seen || root_closed => {
                 return Err(invalid("worksheet XML CDATA is outside root"));
@@ -188,14 +213,20 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
                 {
                     return Err(invalid("custom XML entities are rejected"));
                 }
-                if open.is_some() {
+                if open.is_some() || depth == 1 {
                     return Err(invalid("printOptions must not contain entity text"));
                 }
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                declaration_seen = true;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
-            Event::Decl(_) | Event::Comment(_) | Event::CData(_) => {},
+            Event::Comment(_) | Event::CData(_) => {},
             Event::Eof => break,
         }
     }
@@ -252,11 +283,13 @@ fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
 fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected)
 }
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(format!(
+        "invalid worksheet print-options XML: {error}"
+    )))
 }
 
 #[cfg(test)]
@@ -266,6 +299,7 @@ mod tests {
 
     const START: &str =
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+    const CORE_STR: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
     fn parse(body: &str) -> Result<Option<WorksheetPrintOptions>> {
         parse_worksheet_print_options(format!("{START}{body}</worksheet>").as_bytes())
@@ -322,6 +356,35 @@ mod tests {
 
         let incomplete = format!(r#"{START}<printOptions>"#);
         assert!(parse_worksheet_print_options(incomplete.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_document_boundaries_and_excessive_depth() {
+        for xml in [
+            format!(
+                r#"<worksheet xmlns="{}"/><worksheet xmlns="{}"/>"#,
+                CORE_STR, CORE_STR
+            ),
+            format!(r#"text{}"#, START),
+            format!(r#"{}text</worksheet>"#, START),
+            format!(r#"{}</worksheet>tail"#, START),
+            format!(r#"{}<![CDATA[data]]></worksheet>"#, START),
+        ] {
+            assert!(
+                parse_worksheet_print_options(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = START.to_owned();
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_worksheet_print_options(xml.as_bytes()).is_err());
     }
 
     #[test]
