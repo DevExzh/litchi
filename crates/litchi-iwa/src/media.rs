@@ -441,12 +441,16 @@ impl MediaManager {
         self.state.assets.get(filename)
     }
 
+    /// Return matching assets in deterministic relative-path order.
     pub fn assets_by_type(&self, media_type: MediaType) -> Vec<&MediaAsset> {
-        self.state
+        let mut assets: Vec<_> = self
+            .state
             .assets
             .values()
             .filter(|asset| asset.media_type == media_type)
-            .collect()
+            .collect();
+        assets.sort_unstable_by_key(|asset| asset.path.as_os_str());
+        assets
     }
 
     pub fn images(&self) -> Vec<&MediaAsset> {
@@ -1779,6 +1783,38 @@ mod tests {
             disk.extract("image-7.png").unwrap(),
             memory.extract("image-7.png").unwrap()
         );
+    }
+
+    #[test]
+    fn filtered_media_queries_are_deterministic_by_relative_path() {
+        let mut package = synthetic_package();
+        package
+            .insert_entry("Data/z-image.png", b"z".to_vec())
+            .unwrap();
+        package
+            .insert_entry("Data/a-image.png", b"a".to_vec())
+            .unwrap();
+        package
+            .insert_entry("Data/clip.m4a", b"m4a".to_vec())
+            .unwrap();
+
+        let manager = MediaManager::from_package(package).unwrap();
+        let image_paths: Vec<_> = manager
+            .images()
+            .into_iter()
+            .map(|asset| asset.path.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            image_paths,
+            vec!["Data/a-image.png", "Data/image-7.png", "Data/z-image.png"]
+        );
+
+        let audio_paths: Vec<_> = manager
+            .assets_by_type(MediaType::Audio)
+            .into_iter()
+            .map(|asset| asset.path.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(audio_paths, vec!["Data/clip.m4a"]);
     }
 
     fn assert_send_sync<T: Send + Sync>() {}
