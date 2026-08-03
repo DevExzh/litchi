@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::archive::{Archive, RawMessage};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
 use crate::ref_graph::{ObjectId, ObjectIdIter, ReferenceGraph};
 use crate::{Error, Result};
@@ -25,6 +25,12 @@ pub struct ObjectIndexEntry {
     pub data_offset: u64,
     /// Length of the object data
     pub data_length: u64,
+    /// Position of the object within its parsed archive.
+    ///
+    /// This is an internal source-position hint. Resolution validates the
+    /// identifier at the position and falls back to an identity scan when a
+    /// caller supplies a bundle with a different object order.
+    object_position: usize,
     /// Type of the object
     pub object_type: u32,
 }
@@ -101,7 +107,7 @@ impl ObjectIndex {
     ///   - Enables efficient random access to objects
     ///   - Follows libetonyek's ObjectRecord approach
     fn parse_archive(&mut self, archive_name: &str, archive: &Archive) -> Result<()> {
-        for object in &archive.objects {
+        for (object_position, object) in archive.objects.iter().enumerate() {
             let identifier = object.archive_info.identifier.ok_or_else(|| {
                 Error::Archive(format!(
                     "archive {archive_name} contains an object without an identifier"
@@ -130,6 +136,7 @@ impl ObjectIndex {
                 // These match the approach used in libetonyek's ObjectRecord
                 data_offset: object.data_offset,
                 data_length: object.data_length,
+                object_position,
                 object_type,
             };
 
@@ -471,15 +478,13 @@ impl ObjectIndex {
             )));
         };
 
-        Ok(archive
-            .objects
-            .iter()
-            .find(|object| object.archive_info.identifier == Some(object_id.get()))
-            .map(|object| ResolvedObjectRef {
-                id: object_id,
-                archive_info: &object.archive_info,
-                messages: &object.messages,
-            }))
+        let object = indexed_object(archive, entry, object_id);
+
+        Ok(object.map(|object| ResolvedObjectRef {
+            id: object_id,
+            archive_info: &object.archive_info,
+            messages: &object.messages,
+        }))
     }
 
     /// Resolve an object through the validated identity API.
@@ -588,24 +593,28 @@ impl ObjectIndex {
 
         let mut resolved_by_id = HashMap::with_capacity(object_ids.len());
 
-        // Resolve objects archive by archive
+        // Resolve objects archive by archive. The indexed source position
+        // avoids rescanning each archive for sparse batches; the helper keeps
+        // the compatibility fallback for a bundle with a different order.
         for (archive_name, ids) in objects_by_archive {
             if let Some(archive) = bundle.get_archive(archive_name) {
-                for object in &archive.objects {
-                    if let Some(obj_id) = object.archive_info.identifier
-                        && let Ok(object_id) = ObjectId::try_from(obj_id)
-                        && ids.contains(&object_id)
-                    {
-                        let resolved = ResolvedObjectRef {
-                            id: object_id,
-                            archive_info: &object.archive_info,
-                            messages: &object.messages,
-                        };
-                        if resolved_by_id.insert(object_id, resolved).is_some() {
-                            return Err(Error::Archive(format!(
-                                "object {obj_id} occurs in more than one archive"
-                            )));
-                        }
+                for object_id in ids {
+                    let Some(entry) = self.entry(object_id) else {
+                        continue;
+                    };
+                    let Some(object) = indexed_object(archive, entry, object_id) else {
+                        continue;
+                    };
+                    let resolved = ResolvedObjectRef {
+                        id: object_id,
+                        archive_info: &object.archive_info,
+                        messages: &object.messages,
+                    };
+                    if resolved_by_id.insert(object_id, resolved).is_some() {
+                        return Err(Error::Archive(format!(
+                            "object {} occurs in more than one archive",
+                            object_id.get()
+                        )));
                     }
                 }
             }
@@ -715,6 +724,27 @@ impl ObjectIndex {
             avg_refs_per_object,
         }
     }
+}
+
+/// Resolve an indexed object by its source position, validating the identity
+/// before returning it. A linear identity fallback keeps the public resolver
+/// correct when an index is intentionally used with a separately ordered
+/// snapshot of the same archive.
+fn indexed_object<'a>(
+    archive: &'a Archive,
+    entry: &ObjectIndexEntry,
+    object_id: ObjectId,
+) -> Option<&'a ArchiveObject> {
+    archive
+        .objects
+        .get(entry.object_position)
+        .filter(|object| object.archive_info.identifier == Some(object_id.get()))
+        .or_else(|| {
+            archive
+                .objects
+                .iter()
+                .find(|object| object.archive_info.identifier == Some(object_id.get()))
+        })
 }
 
 /// Statistics about the object index
@@ -899,6 +929,7 @@ mod tests {
             fragment_name: "Document.iwa".to_string(),
             data_offset: 100,
             data_length: 200,
+            object_position: 0,
             object_type: 42,
         };
 
@@ -906,6 +937,46 @@ mod tests {
         assert_eq!(entry.fragment_name, "Document.iwa");
         assert_eq!(entry.object_type, 42);
         assert_eq!(entry.object_id(), ObjectId::new(123));
+    }
+
+    #[test]
+    fn indexed_object_positions_validate_and_fallback_for_reordered_archives() {
+        let object = |identifier| {
+            ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: 42,
+                    data: Vec::new(),
+                }],
+            )
+            .unwrap()
+        };
+        let original = Archive {
+            objects: vec![object(10), object(20)],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Test.iwa", &original).unwrap();
+
+        let object_id = ObjectId::try_from(10).unwrap();
+        let entry = index.entry(object_id).unwrap();
+        assert_eq!(
+            indexed_object(&original, entry, object_id)
+                .unwrap()
+                .archive_info
+                .identifier,
+            Some(10)
+        );
+
+        let reordered = Archive {
+            objects: vec![object(20), object(10)],
+        };
+        assert_eq!(
+            indexed_object(&reordered, entry, object_id)
+                .unwrap()
+                .archive_info
+                .identifier,
+            Some(10)
+        );
     }
 
     #[test]
