@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
-use crate::ref_graph::ReferenceGraph;
+use crate::ref_graph::{ObjectId, ObjectIdIter, ReferenceGraph};
 use crate::{Error, Result};
 
 /// Represents an entry in the object index
@@ -24,6 +24,14 @@ pub struct ObjectIndexEntry {
     pub data_length: u64,
     /// Type of the object
     pub object_type: u32,
+}
+
+impl ObjectIndexEntry {
+    /// Return the validated object identity, if this compatibility entry is
+    /// non-null.
+    pub fn object_id(&self) -> Option<ObjectId> {
+        ObjectId::new(self.id)
+    }
 }
 
 /// Object index that maps object IDs to their locations
@@ -79,42 +87,54 @@ impl ObjectIndex {
     ///   - Follows libetonyek's ObjectRecord approach
     fn parse_archive(&mut self, archive_name: &str, archive: &Archive) -> Result<()> {
         for object in &archive.objects {
-            if let Some(identifier) = object.archive_info.identifier {
-                // Determine object type from first message
-                let object_type = object.messages.first().map(|msg| msg.type_).unwrap_or(0);
+            let identifier = object.archive_info.identifier.ok_or_else(|| {
+                Error::Archive(format!(
+                    "archive {archive_name} contains an object without an identifier"
+                ))
+            })?;
+            let object_id = ObjectId::try_from(identifier).map_err(|_| {
+                Error::Archive(format!(
+                    "archive {archive_name} contains the null object identifier"
+                ))
+            })?;
 
-                let entry = ObjectIndexEntry {
-                    id: identifier,
-                    fragment_name: archive_name.to_string(),
-                    // Use actual byte offsets from the parsed archive
-                    // These match the approach used in libetonyek's ObjectRecord
-                    data_offset: object.data_offset,
-                    data_length: object.data_length,
-                    object_type,
-                };
+            // Determine object type from first message
+            let object_type = object.messages.first().map(|msg| msg.type_).unwrap_or(0);
 
-                self.entries.insert(identifier, entry);
-                self.fragment_objects
-                    .entry(archive_name.to_string())
-                    .or_default()
-                    .push(identifier);
+            let entry = ObjectIndexEntry {
+                id: identifier,
+                fragment_name: archive_name.to_string(),
+                // Use actual byte offsets from the parsed archive
+                // These match the approach used in libetonyek's ObjectRecord
+                data_offset: object.data_offset,
+                data_length: object.data_length,
+                object_type,
+            };
 
-                // MessageInfo is the authoritative, application-independent
-                // reference index emitted by iWork for every payload.
-                let mut has_indexed_references = false;
-                for message_info in &object.archive_info.message_infos {
-                    for &reference in &message_info.object_references {
-                        has_indexed_references = true;
-                        self.reference_graph.add_reference(identifier, reference);
+            self.entries.insert(identifier, entry);
+            self.fragment_objects
+                .entry(archive_name.to_string())
+                .or_default()
+                .push(identifier);
+
+            // MessageInfo is the authoritative, application-independent
+            // reference index emitted by iWork for every payload.
+            let mut has_indexed_references = false;
+            for message_info in &object.archive_info.message_infos {
+                has_indexed_references |= !message_info.object_references.is_empty();
+                for &reference in &message_info.object_references {
+                    if let Some(target_id) = ObjectId::new(reference) {
+                        self.reference_graph
+                            .add_object_reference(object_id, target_id);
                     }
                 }
+            }
 
-                // Some old archives omit MessageInfo references. Decode only
-                // unambiguous high-numbered payloads as a compatibility fallback;
-                // low message types overlap between Numbers and Keynote.
-                if !has_indexed_references && object_type >= 2000 {
-                    self.parse_object_references(identifier, object)?;
-                }
+            // Some old archives omit MessageInfo references. Decode only
+            // unambiguous high-numbered payloads as a compatibility fallback;
+            // low message types overlap between Numbers and Keynote.
+            if !has_indexed_references && object_type >= 2000 {
+                self.parse_object_references(identifier, object)?;
             }
         }
         Ok(())
@@ -647,21 +667,26 @@ impl ObjectIndex {
     /// O(1) average case for HashMap insertion. Uses efficient deduplication
     /// to avoid storing duplicate references.
     fn extract_reference(&mut self, source_id: u64, reference: &crate::protobuf::tsp::Reference) {
-        let target_id = reference.identifier;
-
-        // Ignore null/zero references (0 typically means "no reference")
-        if target_id == 0 {
+        let (Some(source_id), Some(target_id)) = (
+            ObjectId::new(source_id),
+            ObjectId::new(reference.identifier),
+        ) else {
             return;
-        }
+        };
 
-        // Build the reference graph: track both outgoing and incoming references
-        // This enables bidirectional graph traversal
-        self.reference_graph.add_reference(source_id, target_id);
+        // Build the reference graph through the checked identity boundary.
+        self.reference_graph
+            .add_object_reference(source_id, target_id);
     }
 
     /// Get an object entry by ID
     pub fn get_entry(&self, id: u64) -> Option<&ObjectIndexEntry> {
         self.entries.get(&id)
+    }
+
+    /// Get an object entry through the validated identity API.
+    pub fn entry(&self, object_id: ObjectId) -> Option<&ObjectIndexEntry> {
+        self.entries.get(&object_id.get())
     }
 
     /// Get all objects in a specific fragment
@@ -672,6 +697,36 @@ impl ObjectIndex {
     /// Get all object IDs
     pub fn all_object_ids(&self) -> Vec<u64> {
         self.entries.keys().cloned().collect()
+    }
+
+    /// Get all indexed object identities in deterministic numeric order.
+    pub fn object_ids(&self) -> Result<Vec<ObjectId>> {
+        let mut object_ids: Vec<_> = self
+            .entries
+            .keys()
+            .copied()
+            .map(ObjectId::try_from)
+            .collect::<std::result::Result<_, _>>()
+            .map_err(|_| Error::Archive("object index contains a null object identifier".into()))?;
+        object_ids.sort_unstable();
+        Ok(object_ids)
+    }
+
+    /// Get typed object identities for one fragment in source order.
+    pub fn fragment_object_ids(&self, fragment_name: &str) -> Result<Option<Vec<ObjectId>>> {
+        self.get_fragment_objects(fragment_name)
+            .map(|ids| {
+                ids.iter()
+                    .copied()
+                    .map(ObjectId::try_from)
+                    .collect::<std::result::Result<Vec<_>, _>>()
+                    .map_err(|_| {
+                        Error::Archive(format!(
+                            "fragment {fragment_name} contains a null object identifier"
+                        ))
+                    })
+            })
+            .transpose()
     }
 
     /// Get all entries
@@ -733,6 +788,11 @@ impl ObjectIndex {
             .map(|v| v.as_slice())
     }
 
+    /// Get typed dependencies without exposing raw sentinel IDs.
+    pub fn dependencies(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.reference_graph.outgoing(object_id)
+    }
+
     /// Get objects that reference the given object
     ///
     /// Returns the "dependents" of an object - all objects that point to it.
@@ -750,9 +810,14 @@ impl ObjectIndex {
             .map(|v| v.as_slice())
     }
 
+    /// Get typed dependents without exposing raw sentinel IDs.
+    pub fn dependents(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.reference_graph.incoming(object_id)
+    }
+
     /// Check if there are any circular references starting from the given object
     ///
-    /// Performs depth-first search to detect cycles in the reference graph.
+    /// Performs iterative depth-first search to detect cycles in the reference graph.
     /// This is useful for validating document integrity.
     ///
     /// # Arguments
@@ -768,6 +833,11 @@ impl ObjectIndex {
     /// O(V + E) where V is vertices and E is edges in the reachable subgraph
     pub fn has_circular_reference(&self, object_id: u64) -> bool {
         self.reference_graph.has_cycle_from(object_id)
+    }
+
+    /// Check for a cycle through the validated identity API.
+    pub fn has_cycle_from(&self, object_id: ObjectId) -> bool {
+        self.reference_graph.snapshot().has_cycle_from(object_id)
     }
 
     /// Get all objects reachable from the given object
@@ -789,6 +859,11 @@ impl ObjectIndex {
     /// O(V + E) where V is vertices and E is edges in the reachable subgraph
     pub fn get_transitive_dependencies(&self, object_id: u64) -> Vec<u64> {
         self.reference_graph.get_reachable(object_id)
+    }
+
+    /// Get typed transitive dependencies, including the starting object.
+    pub fn reachable_from(&self, object_id: ObjectId) -> Vec<ObjectId> {
+        self.reference_graph.snapshot().reachable(object_id)
     }
 
     /// Resolve an object reference to get the actual object data
@@ -849,6 +924,11 @@ impl ObjectIndex {
         Ok(None)
     }
 
+    /// Resolve an object through the validated identity API.
+    pub fn resolve(&self, bundle: &Bundle, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
+        self.resolve_object(bundle, object_id.get())
+    }
+
     /// Batch resolve multiple object references
     ///
     /// More efficient than calling `resolve_object` multiple times
@@ -902,6 +982,34 @@ impl ObjectIndex {
         Ok(resolved)
     }
 
+    /// Batch-resolve objects through the validated identity API.
+    pub fn resolve_many(
+        &self,
+        bundle: &Bundle,
+        object_ids: &[ObjectId],
+    ) -> Result<Vec<ResolvedObject>> {
+        let raw_ids: Vec<_> = object_ids.iter().map(|object_id| object_id.get()).collect();
+        let mut resolved = self.resolve_objects(bundle, &raw_ids)?;
+        let order: HashMap<_, _> = object_ids
+            .iter()
+            .enumerate()
+            .map(|(position, object_id)| (object_id.get(), position))
+            .collect();
+        resolved
+            .sort_unstable_by_key(|object| order.get(&object.id).copied().unwrap_or(usize::MAX));
+        Ok(resolved)
+    }
+
+    /// Resolve an object and its typed dependency closure.
+    pub fn resolve_reachable(
+        &self,
+        bundle: &Bundle,
+        object_id: ObjectId,
+    ) -> Result<Vec<ResolvedObject>> {
+        let object_ids = self.reachable_from(object_id);
+        self.resolve_many(bundle, &object_ids)
+    }
+
     /// Resolve an object and all its dependencies transitively
     ///
     /// This performs a breadth-first traversal of the object graph,
@@ -932,6 +1040,11 @@ impl ObjectIndex {
     /// Check if an object exists in the index
     pub fn contains_object(&self, object_id: u64) -> bool {
         self.entries.contains_key(&object_id)
+    }
+
+    /// Check for an indexed object through the validated identity API.
+    pub fn contains(&self, object_id: ObjectId) -> bool {
+        self.entries.contains_key(&object_id.get())
     }
 
     /// Get the total number of indexed objects
@@ -1020,6 +1133,12 @@ pub struct ResolvedObject {
 }
 
 impl ResolvedObject {
+    /// Return the validated object identity, if the compatibility payload is
+    /// non-null.
+    pub fn object_id(&self) -> Option<ObjectId> {
+        ObjectId::new(self.id)
+    }
+
     /// Get the primary message type
     pub fn primary_message_type(&self) -> Option<u32> {
         self.messages.first().map(|msg| msg.type_)
@@ -1060,6 +1179,7 @@ mod tests {
         assert_eq!(entry.id, 123);
         assert_eq!(entry.fragment_name, "Document.iwa");
         assert_eq!(entry.object_type, 42);
+        assert_eq!(entry.object_id(), ObjectId::new(123));
     }
 
     #[test]
@@ -1071,10 +1191,69 @@ mod tests {
         assert_eq!(index.get_dependents(1), None);
         assert!(!index.has_circular_reference(1));
         assert_eq!(index.get_transitive_dependencies(1), vec![1]);
+
+        let object_id = ObjectId::try_from(1).unwrap();
+        assert!(index.dependencies(object_id).is_none());
+        assert!(index.dependents(object_id).is_none());
+        assert!(!index.has_cycle_from(object_id));
+        assert_eq!(index.reachable_from(object_id), vec![object_id]);
     }
 
     #[test]
     fn indexes_authoritative_message_info_references() {
+        let mut object = ArchiveObject::new(
+            10,
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        object.archive_info.message_infos[0].object_references = vec![0, 20, 30, 20, 0];
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Test.iwa", &archive).unwrap();
+
+        assert_eq!(index.get_dependencies(10), Some([20, 30].as_slice()));
+        assert_eq!(index.get_dependents(20), Some([10].as_slice()));
+        assert_eq!(index.stats().total_references, 2);
+    }
+
+    #[test]
+    fn authoritative_null_only_references_suppress_legacy_fallback() {
+        let table_data = TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            entries: Vec::new(),
+            segments: vec![Reference {
+                identifier: 20,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let mut object = ArchiveObject::new(
+            10,
+            vec![RawMessage {
+                type_: 6005,
+                data: table_data.encode_to_vec(),
+            }],
+        )
+        .unwrap();
+        object.archive_info.message_infos[0].object_references = vec![0];
+
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Test.iwa", &archive).unwrap();
+
+        assert_eq!(index.get_dependencies(10), None);
+        assert_eq!(index.stats().total_references, 0);
+    }
+
+    #[test]
+    fn typed_object_index_queries_preserve_order_and_identity() {
         let mut object = ArchiveObject::new(
             10,
             vec![RawMessage {
@@ -1090,9 +1269,78 @@ mod tests {
         let mut index = ObjectIndex::new();
         index.parse_archive("Index/Test.iwa", &archive).unwrap();
 
-        assert_eq!(index.get_dependencies(10), Some([20, 30].as_slice()));
-        assert_eq!(index.get_dependents(20), Some([10].as_slice()));
-        assert_eq!(index.stats().total_references, 2);
+        let source = ObjectId::try_from(10).unwrap();
+        let target = ObjectId::try_from(20).unwrap();
+
+        assert_eq!(
+            index.entry(source).and_then(ObjectIndexEntry::object_id),
+            Some(source)
+        );
+        assert_eq!(index.object_ids().unwrap(), vec![source]);
+        assert_eq!(
+            index.fragment_object_ids("Index/Test.iwa").unwrap(),
+            Some(vec![source])
+        );
+        assert_eq!(index.fragment_object_ids("missing.iwa").unwrap(), None);
+        assert_eq!(
+            index.dependencies(source).unwrap().collect::<Vec<_>>(),
+            vec![target, ObjectId::try_from(30).unwrap()]
+        );
+        assert_eq!(
+            index.dependents(target).unwrap().collect::<Vec<_>>(),
+            vec![source]
+        );
+        assert_eq!(
+            index.reachable_from(source),
+            vec![source, target, ObjectId::try_from(30).unwrap()]
+        );
+        assert!(!index.has_cycle_from(source));
+        assert!(index.contains(source));
+    }
+
+    #[test]
+    fn rejects_null_archive_object_ids() {
+        let object = ArchiveObject::new(
+            0,
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let archive = Archive {
+            objects: vec![object],
+        };
+
+        let error = ObjectIndex::new()
+            .parse_archive("Index/Test.iwa", &archive)
+            .unwrap_err();
+        assert!(
+            matches!(error, Error::Archive(message) if message.contains("null object identifier"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_archive_object_ids() {
+        let mut object = ArchiveObject::new(
+            10,
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        object.archive_info.identifier = None;
+        let archive = Archive {
+            objects: vec![object],
+        };
+
+        let error = ObjectIndex::new()
+            .parse_archive("Index/Test.iwa", &archive)
+            .unwrap_err();
+        assert!(
+            matches!(error, Error::Archive(message) if message.contains("without an identifier"))
+        );
     }
 
     #[test]

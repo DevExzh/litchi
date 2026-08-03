@@ -157,6 +157,26 @@ impl ReferenceGraph {
         }
     }
 
+    /// Get the validated objects that reference `object_id`.
+    ///
+    /// The iterator borrows the graph and performs no allocation.
+    pub fn incoming(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.state
+            .incoming_refs
+            .get(&object_id.get())
+            .map(|ids| ObjectIdIter { inner: ids.iter() })
+    }
+
+    /// Get the validated objects referenced by `object_id`.
+    ///
+    /// The iterator borrows the graph and performs no allocation.
+    pub fn outgoing(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.state
+            .outgoing_refs
+            .get(&object_id.get())
+            .map(|ids| ObjectIdIter { inner: ids.iter() })
+    }
+
     /// Add a reference through the checked typed identity path.
     pub fn add_object_reference(&mut self, source: ObjectId, target: ObjectId) {
         self.add_reference(source.get(), target.get());
@@ -683,6 +703,7 @@ mod tests {
         let object_id = ObjectId::try_from(42).expect("non-zero IDs are valid");
         assert_eq!(object_id.get(), 42);
         assert!(ObjectId::try_from(0).is_err());
+        assert_eq!(ObjectId::try_from(u64::MAX).unwrap().get(), u64::MAX);
         assert_eq!(std::mem::size_of::<ObjectId>(), std::mem::size_of::<u64>());
     }
 
@@ -705,6 +726,7 @@ mod tests {
         // Keep the legacy wire-facing path covered: null protobuf references
         // are tolerated at the boundary but never exposed by the typed view.
         graph.add_reference(one.get(), 0);
+        assert_eq!(graph.outgoing(one).unwrap().collect::<Vec<_>>(), vec![two]);
         let snapshot = graph.snapshot();
 
         graph.add_object_reference(one, three);
