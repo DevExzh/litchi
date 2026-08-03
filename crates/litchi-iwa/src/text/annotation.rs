@@ -18,7 +18,8 @@ use super::highlight_object::{
 };
 use super::highlight_storage::{
     Boundary, add_range, decoded_boundaries, encode_table, ensure_range_available, locate_storage,
-    patch_highlight_table, raw_boundaries, remove_range, validate_range,
+    locate_storage_with_archive, patch_highlight_table, raw_boundaries, remove_range,
+    validate_range,
 };
 use super::position::{TextPosition, TextRange};
 use super::storage_wire::{StorageLocation, text_utf16_len};
@@ -92,37 +93,38 @@ pub(super) fn add_annotation(
     body: String,
 ) -> Result<AnnotationRecord> {
     validate_kind_body(kind, &body)?;
-    let location = locate_storage(package, storage_id)?;
-    ensure_no_overlapping_highlight_table(storage_id, &location)?;
-    validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location)?;
-    ensure_range_available(storage_id, range, &boundaries, None, &location.storage.text)?;
-
     let mut staged = package.clone();
     let (author_id, author_entry, _) = ensure_annotation_author(&mut staged)?;
     let annotation_id = next_object_identifier(&staged)?;
     let comment_storage_id = annotation_id
         .checked_add(OBJECT_IDENTIFIER_INCREMENT)
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
-    patch_highlight_table(&mut staged, &location, |table, storage| {
+    let located = locate_storage_with_archive(&staged, storage_id)?;
+    let location = &located.location;
+    ensure_no_overlapping_highlight_table(storage_id, location)?;
+    validate_range(storage_id, range, &location.storage.text)?;
+    let boundaries = decoded_boundaries(storage_id, location)?;
+    ensure_range_available(storage_id, range, &boundaries, None, &location.storage.text)?;
+    let archive_name = location.archive_name.clone();
+    patch_highlight_table(&mut staged, located, |table, storage| {
         let mut boundaries = raw_boundaries(storage_id, table, storage)?;
         ensure_range_available(storage_id, range, &boundaries, None, &storage.text)?;
         add_range(&mut boundaries, range, annotation_id)?;
         encode_table(table, boundaries).map(|table| (Some(table), Some(annotation_id), None))
     })?;
-    staged.update_archive(&location.archive_name, |archive| {
+    staged.update_archive(&archive_name, |archive| {
         archive.insert_object(new_highlight_object(annotation_id, comment_storage_id)?)
     })?;
     insert_annotation_comment_storage(
         &mut staged,
-        &location.archive_name,
+        &archive_name,
         comment_storage_id,
         body,
         author_id,
     )?;
     add_author_external_reference(
         &mut staged,
-        &location.archive_name,
+        &archive_name,
         author_entry.as_deref(),
         author_id,
     )?;
@@ -152,10 +154,11 @@ pub(super) fn update_annotation(
     if current.range == range && current.graph.body == body {
         return Ok(current);
     }
-    let location = locate_storage(package, storage_id)?;
-    ensure_no_overlapping_highlight_table(storage_id, &location)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
+    let location = &located.location;
+    ensure_no_overlapping_highlight_table(storage_id, location)?;
     validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location)?;
+    let boundaries = decoded_boundaries(storage_id, location)?;
     ensure_range_available(
         storage_id,
         range,
@@ -171,9 +174,10 @@ pub(super) fn update_annotation(
         "annotation comment-storage",
     )?;
 
+    let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
     if current.range != range {
-        patch_highlight_table(&mut staged, &location, |table, storage| {
+        patch_highlight_table(&mut staged, located, |table, storage| {
             let mut boundaries = raw_boundaries(storage_id, table, storage)?;
             remove_range(&mut boundaries, object_id)?;
             ensure_range_available(storage_id, range, &boundaries, None, &storage.text)?;
@@ -184,7 +188,7 @@ pub(super) fn update_annotation(
     if current.graph.body != body {
         update_annotation_comment_text(
             &mut staged,
-            &location.archive_name,
+            &archive_name,
             object_id,
             current.graph.comment_storage_id,
             body,
@@ -209,11 +213,13 @@ pub(super) fn remove_annotation(
     kind: AnnotationKind,
 ) -> Result<AnnotationRecord> {
     let removed = annotation_by_id(package, storage_id, object_id, kind)?;
-    let location = locate_storage(package, storage_id)?;
+    let located = locate_storage_with_archive(package, storage_id)?;
+    let location = &located.location;
     require_exclusive_reference(package, storage_id, object_id, kind.label())?;
 
+    let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
-    patch_highlight_table(&mut staged, &location, |table, storage| {
+    patch_highlight_table(&mut staged, located, |table, storage| {
         let mut boundaries = raw_boundaries(storage_id, table, storage)?;
         remove_range(&mut boundaries, object_id)?;
         if boundaries
@@ -225,12 +231,7 @@ pub(super) fn remove_annotation(
             Ok((None, None, Some(object_id)))
         }
     })?;
-    remove_detached_annotations(
-        &mut staged,
-        &location.archive_name,
-        &[object_id],
-        Some(kind),
-    )?;
+    remove_detached_annotations(&mut staged, &archive_name, &[object_id], Some(kind))?;
     let verified = roundtrip(&staged)?;
     if annotations(&verified, storage_id)?
         .iter()

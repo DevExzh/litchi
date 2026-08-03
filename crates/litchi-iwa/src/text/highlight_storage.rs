@@ -12,8 +12,9 @@ use crate::{Error, IWorkPackage, Result};
 
 use super::position::TextRange;
 use super::storage_wire::{
-    StorageLocation, locate_storage as locate_native_storage, text_utf16_len,
-    validate_sorted_boundaries,
+    LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
+    locate_storage_with_archive as locate_native_storage_with_archive, text_utf16_len,
+    update_parsed_archive, validate_sorted_boundaries,
 };
 
 pub(super) const HIGHLIGHT_TABLE_FIELD: u32 = 23;
@@ -35,6 +36,24 @@ pub(super) fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<
         )));
     }
     Ok(location)
+}
+
+pub(super) fn locate_storage_with_archive(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<LocatedStorage> {
+    let located = locate_native_storage_with_archive(
+        package,
+        storage_id,
+        HIGHLIGHT_TABLE_FIELD,
+        "highlight",
+    )?;
+    if located.location.storage.table_highlight.is_some() != located.location.table_present {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} highlight-table wire state is inconsistent"
+        )));
+    }
+    Ok(located)
 }
 
 pub(super) fn decoded_boundaries(
@@ -288,13 +307,14 @@ type TablePatch = (Option<Vec<u8>>, Option<u64>, Option<u64>);
 
 pub(super) fn patch_highlight_table<F>(
     package: &mut IWorkPackage,
-    location: &StorageLocation,
+    located: LocatedStorage,
     transform: F,
 ) -> Result<()>
 where
     F: FnOnce(Option<&[u8]>, &tswp::StorageArchive) -> Result<TablePatch>,
 {
-    package.update_archive(&location.archive_name, |archive| {
+    let LocatedStorage { location, archive } = located;
+    update_parsed_archive(package, &location.archive_name, archive, |archive| {
         let object = archive.object_mut(location.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork text storage {} is missing",
@@ -334,7 +354,6 @@ where
                     original.type_
                 )));
             }
-            let storage = tswp::StorageArchive::decode(original.data.as_slice())?;
             let tables = repeated_length_delimited_payloads(&original.data, HIGHLIGHT_TABLE_FIELD)?;
             if tables.len() > 1 {
                 return Err(Error::InvalidFormat(format!(
@@ -343,7 +362,8 @@ where
                     tables.len()
                 )));
             }
-            let (replacement, added, removed) = transform(tables.first().copied(), &storage)?;
+            let (replacement, added, removed) =
+                transform(tables.first().copied(), &location.storage)?;
             let data = patch_length_delimited_field(
                 &original.data,
                 HIGHLIGHT_TABLE_FIELD,
