@@ -33,6 +33,32 @@ struct PivotCacheIdentity {
     stream_id: u16,
 }
 
+fn lookup_shared_string_index(
+    shared_strings: &[String],
+    string_map: &HashMap<String, u32>,
+    value: &str,
+) -> XlsResult<u32> {
+    let index = string_map.get(value).copied().ok_or_else(|| {
+        XlsError::InvalidData(format!(
+            "string cell value {value:?} is missing from the shared string table"
+        ))
+    })?;
+    let table_index = usize::try_from(index).map_err(|_| {
+        XlsError::InvalidData(format!(
+            "shared string index {index} for value {value:?} cannot be represented"
+        ))
+    })?;
+    match shared_strings.get(table_index) {
+        Some(entry) if entry == value => Ok(index),
+        Some(_) => Err(XlsError::InvalidData(format!(
+            "shared string index {index} for value {value:?} does not match the shared string table"
+        ))),
+        None => Err(XlsError::InvalidData(format!(
+            "shared string index {index} for value {value:?} is outside the shared string table"
+        ))),
+    }
+}
+
 fn stage_pivot_cache_identities(
     worksheets: &[WritableWorksheet],
 ) -> XlsResult<Vec<Vec<PivotCacheIdentity>>> {
@@ -119,7 +145,12 @@ pub(crate) fn generate_workbook_stream(
     )?;
     workbook_window.validate_for_sheet_count(worksheets.len())?;
     let active_sheet = usize::from(workbook_window.active_sheet_index);
-    if !worksheets[active_sheet].view.is_selected() {
+    let active_worksheet = worksheets.get(active_sheet).ok_or_else(|| {
+        XlsError::InvalidData(format!(
+            "active worksheet index {active_sheet} is outside the sheet collection"
+        ))
+    })?;
+    if !active_worksheet.view.is_selected() {
         return Err(XlsError::InvalidData(format!(
             "active worksheet {active_sheet} must be selected in Window2"
         )));
@@ -140,7 +171,9 @@ pub(crate) fn generate_workbook_stream(
     let pivot_cache_identities = stage_pivot_cache_identities(worksheets)?;
     let mut stream = Vec::new();
     let has_pivot_tables = worksheets.iter().any(|ws| !ws.pivot_tables.is_empty());
-    let sheet_count = u16::try_from(worksheets.len()).unwrap_or(u16::MAX);
+    let sheet_count = u16::try_from(worksheets.len()).map_err(|_| {
+        XlsError::InvalidData("worksheet count exceeds the BIFF8 limit".to_string())
+    })?;
     let (protect_structure, protect_windows, password_hash, protect_revisions, revision_hash) =
         workbook_protection
             .map(|protection| {
@@ -425,15 +458,19 @@ pub(crate) fn generate_workbook_stream(
                 .count();
             let mut row_item_indices: Vec<Vec<u16>> = Vec::with_capacity(pt.source_data.len());
             let mut row_numeric_values: Vec<Vec<f64>> = Vec::with_capacity(pt.source_data.len());
-            for row in &pt.source_data {
+            for (row_index, row) in pt.source_data.iter().enumerate() {
                 let mut si = Vec::with_capacity(num_string_fields);
                 let mut nv = Vec::with_capacity(num_numeric_fields);
                 let mut values = row.iter();
-                for field in &pt.fields {
+                for (field_index, field) in pt.fields.iter().enumerate() {
                     if matches!(field.grouping, Some(crate::PivotCacheGrouping::Discrete(_))) {
                         continue;
                     }
-                    let val = values.next().unwrap();
+                    let val = values.next().ok_or_else(|| {
+                        XlsError::InvalidData(format!(
+                            "PivotCache source row {row_index} is missing a value for field {field_index}"
+                        ))
+                    })?;
                     let is_num = field.is_numeric
                         && field.cache_items.is_empty()
                         && field.grouping.is_none();
@@ -461,6 +498,11 @@ pub(crate) fn generate_workbook_stream(
                         },
                         _ => {}, // type mismatch — skip
                     }
+                }
+                if values.next().is_some() {
+                    return Err(XlsError::InvalidData(format!(
+                        "PivotCache source row {row_index} has more values than source fields"
+                    )));
                 }
                 row_item_indices.push(si);
                 row_numeric_values.push(nv);
@@ -598,7 +640,9 @@ pub(crate) fn generate_workbook_stream(
 
     for (worksheet_index, worksheet) in worksheets.iter().enumerate() {
         // Record the position of this worksheet's BOF
-        let worksheet_pos = stream.len() as u32;
+        let worksheet_pos = u32::try_from(stream.len()).map_err(|_| {
+            XlsError::InvalidData("workbook stream position exceeds the BIFF8 limit".to_string())
+        })?;
         actual_positions.push(worksheet_pos);
 
         use std::collections::HashMap as StdHashMap;
@@ -854,7 +898,11 @@ pub(crate) fn generate_workbook_stream(
 
         let mut cell_index = 0usize;
         while cell_index < sorted_cells.len() {
-            let ((row, col), cell) = sorted_cells[cell_index];
+            let ((row, col), cell) = sorted_cells.get(cell_index).copied().ok_or_else(|| {
+                XlsError::InvalidData(format!(
+                    "worksheet cell index {cell_index} is outside the sorted cell list"
+                ))
+            })?;
             let xf_index = match cell.pivot_xf_role {
                 Some(super::worksheet::PivotCellXfRole::HeaderAccent) => {
                     pivot_xf_indices.header_accent
@@ -879,7 +927,12 @@ pub(crate) fn generate_workbook_stream(
                 let mut expected_col = *col;
 
                 while next_index < sorted_cells.len() {
-                    let ((next_row, next_col), next_cell) = sorted_cells[next_index];
+                    let ((next_row, next_col), next_cell) =
+                        sorted_cells.get(next_index).copied().ok_or_else(|| {
+                            XlsError::InvalidData(format!(
+                                "worksheet cell index {next_index} is outside the sorted cell list"
+                            ))
+                        })?;
                     if next_row != row || *next_col != expected_col {
                         break;
                     }
@@ -924,7 +977,7 @@ pub(crate) fn generate_workbook_stream(
                     biff::write_number(&mut stream, *row, *col, xf_index, *value)?;
                 },
                 XlsCellValue::String(s) => {
-                    let sst_index = *string_map.get(s).unwrap();
+                    let sst_index = lookup_shared_string_index(shared_strings, string_map, s)?;
                     biff::write_labelsst(&mut stream, *row, *col, xf_index, sst_index)?;
                 },
                 XlsCellValue::Boolean(value) => {
@@ -974,7 +1027,15 @@ pub(crate) fn generate_workbook_stream(
         stream.splice(index_record_pos..index_record_pos, index_record);
         stream.extend_from_slice(&row_table);
 
-        if let Some(drawing_id) = worksheet_drawing_ids[worksheet_index] {
+        let drawing_id = worksheet_drawing_ids
+            .get(worksheet_index)
+            .copied()
+            .ok_or_else(|| {
+                XlsError::InvalidData(format!(
+                    "worksheet drawing ID plan is missing worksheet {worksheet_index}"
+                ))
+            })?;
+        if let Some(drawing_id) = drawing_id {
             let pivot_object_ids = worksheet
                 .pivot_tables
                 .iter()
@@ -1257,10 +1318,16 @@ pub(crate) fn generate_workbook_stream(
         //   [SXPI]
         //   *SXDI
         //   SxEx
+        let worksheet_pivot_cache_identities =
+            pivot_cache_identities.get(worksheet_index).ok_or_else(|| {
+                XlsError::InvalidData(format!(
+                    "pivot cache identity plan is missing worksheet {worksheet_index}"
+                ))
+            })?;
         for (pt, identity) in worksheet
             .pivot_tables
             .iter()
-            .zip(&pivot_cache_identities[worksheet_index])
+            .zip(worksheet_pivot_cache_identities)
         {
             let field_count = pt.fields.len() as u16;
             let data_field_count = pt.data_items.len() as u16;
@@ -1471,14 +1538,58 @@ pub(crate) fn generate_workbook_stream(
 
     // Go back and update BoundSheet positions
     for (i, &pos) in actual_positions.iter().enumerate() {
-        let boundsheet_pos = boundsheet_positions[i];
+        let boundsheet_pos = boundsheet_positions.get(i).copied().ok_or_else(|| {
+            XlsError::InvalidData(format!("BoundSheet position is missing for worksheet {i}"))
+        })?;
         // Position field starts at offset 4 in the record (after header)
-        let pos_offset = boundsheet_pos + 4;
-        stream[pos_offset..pos_offset + 4].copy_from_slice(&pos.to_le_bytes());
+        let pos_offset = boundsheet_pos.checked_add(4).ok_or_else(|| {
+            XlsError::InvalidData("BoundSheet position overflows the workbook stream".to_string())
+        })?;
+        let pos_end = pos_offset.checked_add(4).ok_or_else(|| {
+            XlsError::InvalidData("BoundSheet position overflows the workbook stream".to_string())
+        })?;
+        let position_field = stream.get_mut(pos_offset..pos_end).ok_or_else(|| {
+            XlsError::InvalidData(
+                "BoundSheet position does not point to a complete record".to_string(),
+            )
+        })?;
+        position_field.copy_from_slice(&pos.to_le_bytes());
     }
 
     Ok(WorkbookStreams {
         workbook: stream,
         pivot_caches,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_shared_string_mapping_returns_invalid_data() {
+        let shared_strings = vec!["present".to_string()];
+        let string_map = HashMap::new();
+
+        let result = lookup_shared_string_index(&shared_strings, &string_map, "present");
+
+        assert!(matches!(
+            result,
+            Err(XlsError::InvalidData(message)) if message.contains("missing from the shared string table")
+        ));
+    }
+
+    #[test]
+    fn shared_string_mapping_must_match_table_entry() {
+        let shared_strings = vec!["first".to_string(), "second".to_string()];
+        let mut string_map = HashMap::new();
+        string_map.insert("second".to_string(), 0);
+
+        let result = lookup_shared_string_index(&shared_strings, &string_map, "second");
+
+        assert!(matches!(
+            result,
+            Err(XlsError::InvalidData(message)) if message.contains("does not match the shared string table")
+        ));
+    }
 }

@@ -117,6 +117,19 @@ impl std::error::Error for PptError {
 /// Result type for PPT operations.
 pub type Result<T> = std::result::Result<T, PptError>;
 
+const POWERPOINT_DOCUMENT_STREAM: &[&str] = &["PowerPoint Document"];
+
+fn validate_powerpoint_document_stream<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {
+    if ole.exists(POWERPOINT_DOCUMENT_STREAM) && !ole.directory_exists(POWERPOINT_DOCUMENT_STREAM) {
+        return Ok(());
+    }
+
+    Err(PptError::InvalidFormat(
+        "Not a valid PowerPoint document: PowerPoint Document stream not found or is not a stream"
+            .to_string(),
+    ))
+}
+
 /// A PowerPoint (.ppt) package.
 ///
 /// This is the main entry point for working with legacy PowerPoint presentations.
@@ -184,12 +197,7 @@ impl<R: Read + Seek> Package<R> {
     pub fn from_reader(reader: R) -> Result<Self> {
         let ole = OleFile::open(reader)?;
 
-        // Verify it's a PowerPoint document by checking for the PowerPoint Document stream
-        if !ole.exists(&["PowerPoint Document"]) {
-            return Err(PptError::InvalidFormat(
-                "Not a valid PowerPoint document: PowerPoint Document stream not found".to_string(),
-            ));
-        }
+        validate_powerpoint_document_stream(&ole)?;
 
         Ok(Self { ole })
     }
@@ -216,12 +224,7 @@ impl<R: Read + Seek> Package<R> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
-        // Verify it's a PowerPoint document by checking for the PowerPoint Document stream
-        if !ole.exists(&["PowerPoint Document"]) {
-            return Err(PptError::InvalidFormat(
-                "Not a valid PowerPoint document: PowerPoint Document stream not found".to_string(),
-            ));
-        }
+        validate_powerpoint_document_stream(&ole)?;
 
         Ok(Self { ole })
     }
@@ -350,7 +353,15 @@ impl From<PptError> for litchi_core::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_cfb::OleWriter;
+    use std::io::Cursor;
     use std::path::Path;
+
+    fn serialize_ole(writer: &mut OleWriter) -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
 
     #[test]
     fn test_open_package() {
@@ -366,6 +377,26 @@ mod tests {
                 .join("empty.ppt"),
         );
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn rejects_powerpoint_document_storage_before_package_publication() {
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["PowerPoint Document"]).unwrap();
+        let bytes = serialize_ole(&mut writer);
+
+        let from_reader = Package::from_reader(Cursor::new(bytes.clone()));
+        assert!(matches!(
+            from_reader,
+            Err(PptError::InvalidFormat(message)) if message.contains("is not a stream")
+        ));
+
+        let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let from_ole_file = Package::from_ole_file(ole);
+        assert!(matches!(
+            from_ole_file,
+            Err(PptError::InvalidFormat(message)) if message.contains("is not a stream")
+        ));
     }
 
     #[test]

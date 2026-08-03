@@ -2502,9 +2502,18 @@ impl Package {
         use crate::docx::writer::relmap::RelationshipMapper;
         use litchi_opc::constants::relationship_type as rt;
 
-        // If we have a mutable document, update the document.xml part
-        if let Some(mut mutable_doc) = self.mutable_doc.take() {
-            if mutable_doc.is_modified() {
+        // Keep both the source graph and the mutable semantic document
+        // available until the complete publication succeeds. Materializing a
+        // document rebuilds many related parts; an error half-way through must
+        // leave the caller with the same retryable edit rather than a dropped
+        // writer and a partially rewritten package.
+        let package_before = self.opc.clone();
+        let mut mutable_doc = self.mutable_doc.take();
+        let result = (|| -> Result<()> {
+            // If we have a mutable document, update the document.xml part
+            if let Some(mutable_doc) = mutable_doc.as_mut()
+                && mutable_doc.is_modified()
+            {
                 // Generate TOC if configured (must happen before serialization)
                 mutable_doc.generate_toc_if_needed()?;
 
@@ -2969,28 +2978,37 @@ impl Package {
                     self.update_theme_part(theme_xml)?;
                 }
             }
-            // Put the document back
-            self.mutable_doc = Some(mutable_doc);
+
+            // Stage only an explicitly edited core-properties slot. The guard
+            // keeps edit intent dirty until the output sink accepts the complete
+            // package, so a failed stream remains retryable.
+            let staged_properties = self.properties.stage(&mut self.opc)?;
+
+            // Update or remove the custom-properties package graph atomically.
+            self.custom_props.write(&mut self.opc)?;
+
+            // Embed fonts if feature enabled and requested in options
+            #[cfg(feature = "fonts")]
+            {
+                self.embed_fonts()?;
+            }
+
+            self.opc.to_stream(writer).map_err(|e| {
+                OoxmlError::Io(std::io::Error::other(format!(
+                    "Failed to save package: {}",
+                    e
+                )))
+            })?;
+            staged_properties.commit();
+            Ok(())
+        })();
+
+        self.mutable_doc = mutable_doc;
+        if let Err(error) = result {
+            self.opc = package_before;
+            return Err(error);
         }
-
-        // Flush only an explicitly edited core-properties slot.
-        self.properties.flush(&mut self.opc)?;
-
-        // Update or remove the custom-properties package graph atomically.
-        self.custom_props.write(&mut self.opc)?;
-
-        // Embed fonts if feature enabled and requested in options
-        #[cfg(feature = "fonts")]
-        {
-            self.embed_fonts()?;
-        }
-
-        self.opc.to_stream(writer).map_err(|e| {
-            OoxmlError::Io(std::io::Error::other(format!(
-                "Failed to save package: {}",
-                e
-            )))
-        })
+        Ok(())
     }
 
     /// Borrows the document core properties, retaining package absence.
@@ -3513,8 +3531,26 @@ fn mail_merge_target_as_source(target: MailMergeTarget) -> MailMergeSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{Cursor, Seek, Write};
     use tempfile::NamedTempFile;
+
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buffer: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("injected DOCX sink failure"))
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Seek for FailingWriter {
+        fn seek(&mut self, _position: std::io::SeekFrom) -> std::io::Result<u64> {
+            Err(std::io::Error::other("injected DOCX seek failure"))
+        }
+    }
 
     #[test]
     fn saves_and_reopens_package() {
@@ -3545,6 +3581,50 @@ mod tests {
         let text = reopened_again.document().unwrap().text().unwrap();
         assert!(text.contains("round-trip text"));
         assert!(text.contains("appended after reopen"));
+    }
+
+    #[test]
+    fn failed_stream_keeps_document_and_properties_retryable() {
+        let mut package = Package::new().unwrap();
+        package
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("retryable document");
+        package.put_props(Props::new().title("retryable properties"));
+        let document_before = package.opc.main_document_part().unwrap().blob().to_vec();
+        let core_properties_uri = PackURI::new("/docProps/core.xml").unwrap();
+        let core_properties_before = package
+            .opc
+            .get_part(&core_properties_uri)
+            .unwrap()
+            .blob()
+            .to_vec();
+
+        assert!(package.to_plain_stream(FailingWriter).is_err());
+        assert_eq!(
+            package.opc.main_document_part().unwrap().blob(),
+            document_before.as_slice()
+        );
+        assert_eq!(
+            package.opc.get_part(&core_properties_uri).unwrap().blob(),
+            core_properties_before.as_slice()
+        );
+        assert!(
+            package
+                .mutable_doc
+                .as_ref()
+                .is_some_and(MutableDocument::is_modified)
+        );
+        assert!(package.properties.is_dirty());
+
+        package
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("second attempt");
+        let mut output = Cursor::new(Vec::new());
+        package.to_plain_stream(&mut output).unwrap();
+        assert!(!output.into_inner().is_empty());
+        assert!(!package.properties.is_dirty());
     }
 
     #[cfg(feature = "fonts")]
