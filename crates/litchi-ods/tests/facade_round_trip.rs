@@ -12,7 +12,12 @@ fn builder_and_package_facade_round_trip() {
 
 #[test]
 fn spreadsheet_facade_owns_rdf_crud() {
-    let mut spreadsheet = Spreadsheet::from_bytes(SpreadsheetBuilder::new().build().unwrap()).unwrap();
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:spreadsheet><table:table xml:id="sheet" table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
+    let bytes = SpreadsheetBuilder::new()
+        .content_xml(content)
+        .build()
+        .unwrap();
+    let mut spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
     let triple = Triple {
         subject: Subject::Iri("#sheet".to_string()),
         predicate: "https://example.invalid/schema#label".to_string(),
