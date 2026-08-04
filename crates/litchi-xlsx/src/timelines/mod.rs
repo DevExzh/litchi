@@ -78,18 +78,3 @@ pub use model::{
 pub use package::{
     load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
 };
-
-// Compatibility aliases preserve the pre-layering public surface. Canonical
-// names above are contextual to this owner and do not repeat its prefix.
-pub type Timeline = View;
-pub type TimelineCacheDefinition = CacheDefinition;
-pub type TimelineCachePivotTable = CachePivotTable;
-pub type TimelineLevel = Level;
-pub type TimelineOpaqueXml = OpaqueXml;
-pub type TimelinePivotFilter = PivotFilter;
-pub type TimelineRange = Range;
-pub type TimelineState = State;
-pub type Timelines = Views;
-pub type WorkbookTimelineCache = Cache;
-pub type WorksheetTimelines = WorksheetView;
-pub type PivotFilterType = FilterType;
