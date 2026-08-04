@@ -148,16 +148,10 @@ pub use phonetic_properties::{
     parse_worksheet_phonetic_properties,
 };
 pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
-// Keep the historical root names as aliases; semantic query-table names live
-// under `query_table` and remain available there without the repeated prefix.
+// Query-table semantic types remain under the contextual `query_table` owner;
+// package operations are also available at this convenience facade.
 pub use query_table::{
-    Conformance as QueryTableConformance, ExtensionAttribute as QueryTableExtensionAttribute,
-    ExtensionList as QueryTableExtensionList, Field as QueryTableField,
-    GrowShrinkType as QueryTableGrowShrinkType, IconSet as QueryTableIconSet,
-    QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, Refresh as QueryTableRefresh,
-    STRICT_QUERY_TABLE_RELATIONSHIP_TYPE, SortBy as QueryTableSortBy,
-    SortCondition as QueryTableSortCondition, SortMethod as QueryTableSortMethod,
-    SortState as QueryTableSortState, Table as QueryTable, WorksheetTable as WorksheetQueryTable,
+    QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,
     add_worksheet_query_table, find_worksheet_query_table, is_query_table_relationship_type,
     load_worksheet_query_tables, parse_query_table, remove_worksheet_query_table,
     reorder_worksheet_query_tables, replace_worksheet_query_table, update_worksheet_query_table,

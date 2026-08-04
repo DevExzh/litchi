@@ -1,8 +1,7 @@
-//! Compatibility exports for the canonical XLSX-owned query-table codec.
+//! Canonical OOXML host facade for the XLSX-owned query-table codec.
 //!
 //! The semantic model, bounded XML codec, and package graph operations live in
-//! the canonical `litchi_xlsx::query_table` module. This module retains the
-//! historical host path.
+//! the canonical `litchi_xlsx::query_table` module.
 
 pub use litchi_xlsx::query_table::*;
 

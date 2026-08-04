@@ -1,8 +1,8 @@
 use litchi_ooxml::xlsx::connections::{
     Connection, Connections, CredentialsMethod, load_from_package, store_in_package,
 };
+use litchi_ooxml::xlsx::query_table::{Conformance, Field, Refresh, Table};
 use litchi_ooxml::xlsx::{
-    QueryTable, QueryTableConformance, QueryTableField, QueryTableRefresh,
     add_worksheet_query_table, find_worksheet_query_table, load_worksheet_query_tables,
     remove_worksheet_query_table, reorder_worksheet_query_tables, update_worksheet_query_table,
 };
@@ -62,15 +62,15 @@ fn package() -> (OpcPackage, PackURI) {
     (package, worksheet_name)
 }
 
-fn table(name: &str, connection_id: u32) -> QueryTable {
-    let mut refresh = QueryTableRefresh::new();
-    let mut field = QueryTableField::new(1);
+fn table(name: &str, connection_id: u32) -> Table {
+    let mut refresh = Refresh::new();
+    let mut field = Field::new(1);
     field.set_name(Some("Value".into()));
     field.set_row_numbers(Some(false));
     field.set_fill_formulas(Some(true));
     refresh.add_field(field);
     refresh.add_deleted_field("Removed".into());
-    let mut table = QueryTable::new(name, connection_id);
+    let mut table = Table::new(name, connection_id);
     table.set_headers(Some(true));
     table.set_row_numbers(Some(false));
     table.set_fill_formulas(Some(true));
@@ -97,14 +97,14 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
         &mut package,
         &worksheet,
         table("Query A", 1),
-        QueryTableConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
     let second = add_worksheet_query_table(
         &mut package,
         &worksheet,
         table("Query B", 2),
-        QueryTableConformance::Strict,
+        Conformance::Strict,
     )
     .unwrap();
     assert_eq!(
@@ -124,7 +124,7 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
         &worksheet,
         first.relationship_id(),
         table("Updated", 1),
-        QueryTableConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
     let reordered = reorder_worksheet_query_tables(
@@ -159,7 +159,7 @@ fn missing_connection_and_bad_reorder_are_atomic() {
             &mut package,
             &worksheet,
             table("Missing", 99),
-            QueryTableConformance::Transitional,
+            Conformance::Transitional,
         )
         .is_err()
     );
@@ -173,7 +173,7 @@ fn missing_connection_and_bad_reorder_are_atomic() {
         &mut package,
         &worksheet,
         table("Valid", 1),
-        QueryTableConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
     assert!(reorder_worksheet_query_tables(&mut package, &worksheet, &["missing".into()]).is_err());
@@ -199,7 +199,7 @@ fn removal_preserves_a_query_table_target_shared_by_another_part() {
         &mut package,
         &worksheet,
         table("Shared", 1),
-        QueryTableConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
     let owner_name = PackURI::new("/xl/customXml/shared.xml").unwrap();

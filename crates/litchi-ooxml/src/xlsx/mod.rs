@@ -157,13 +157,10 @@ pub use litchi_xlsx::scenarios::{
     write_worksheet_scenarios,
 };
 pub use query_table::{
-    QueryTable, QueryTableConformance, QueryTableExtensionAttribute, QueryTableExtensionList,
-    QueryTableField, QueryTableGrowShrinkType, QueryTableIconSet, QueryTableRefresh,
-    QueryTableSortBy, QueryTableSortCondition, QueryTableSortMethod, QueryTableSortState,
-    WorksheetQueryTable, add_worksheet_query_table, find_worksheet_query_table,
-    load_worksheet_query_tables, parse_query_table, remove_worksheet_query_table,
-    reorder_worksheet_query_tables, replace_worksheet_query_table, update_worksheet_query_table,
-    write_query_table,
+    QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,
+    add_worksheet_query_table, find_worksheet_query_table, load_worksheet_query_tables,
+    parse_query_table, remove_worksheet_query_table, reorder_worksheet_query_tables,
+    replace_worksheet_query_table, update_worksheet_query_table, write_query_table,
 };
 pub use revisions::{
     RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,

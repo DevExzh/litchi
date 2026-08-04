@@ -31,8 +31,7 @@ use super::named_sheet_view::{Views, discover_named_sheet_views};
 use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
 use super::query_table::{
-    QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
-    parse_query_table,
+    QUERY_TABLE_CONTENT_TYPE, WorksheetTable, is_query_table_relationship_type, parse_query_table,
 };
 use super::sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, parse_worksheet_sheet_calculation_properties,
@@ -253,7 +252,7 @@ pub struct Worksheet<'a> {
     sparkline_groups: Vec<SparklineGroup>,
     web_bindings: Bindings,
     tables: Vec<Table>,
-    query_tables: Vec<WorksheetQueryTable>,
+    query_tables: Vec<WorksheetTable>,
     images: Vec<Image>,
     charts: Vec<WorksheetChart>,
 }
@@ -380,7 +379,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Static query-table refresh metadata associated with this worksheet.
-    pub fn query_tables(&self) -> &[WorksheetQueryTable] {
+    pub fn query_tables(&self) -> &[WorksheetTable] {
         &self.query_tables
     }
 
@@ -890,7 +889,7 @@ impl<'a> Worksheet<'a> {
                 );
             }
             let query_table = parse_query_table(part.blob())?;
-            query_tables.push(WorksheetQueryTable::new(
+            query_tables.push(WorksheetTable::new(
                 relationship_id,
                 part_uri.to_string(),
                 query_table,
