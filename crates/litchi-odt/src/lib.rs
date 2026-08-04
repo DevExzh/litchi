@@ -563,24 +563,24 @@ pub use index_mark::{
 pub use mutable::MutableDocument;
 pub use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
-pub use page_sequence::OdtPageSequence;
+pub use page_sequence::Sequence;
 pub use reference_mark::{
     ReferenceMark, ReferenceMarkFragments, insert_reference_mark_xml, remove_reference_mark_xml,
     replace_reference_mark_xml,
 };
 pub use ruby::Ruby;
 pub use section::{
-    OdtSectionBlock, add_section_xml, clear_sections_xml, remove_section_xml, unwrap_section_xml,
+    Block, add_section_xml, clear_sections_xml, remove_section_xml, unwrap_section_xml,
     update_section_xml, wrap_section_xml,
 };
 pub use tracked_changes::{
-    OdtTrackedPosition, OdtTrackedStory, mark_tracked_change_range_xml, mark_tracked_deletion_xml,
+    Position, Story, mark_tracked_change_range_xml, mark_tracked_deletion_xml,
     set_tracked_changes_xml, unmark_tracked_change_xml,
 };
 
 // Re-export ODT-specific types for external use
 #[allow(unused_imports)] // Library public API
 pub use parser::{
-    ChangeType, Comment, Section, SectionDdeSource, SectionDisplay, SectionSource, TrackChange,
-    TrackedChanges,
+    ChangeType, Comment, Parser, Section, SectionDdeSource, SectionDisplay, SectionSource,
+    TrackChange, TrackedChanges,
 };

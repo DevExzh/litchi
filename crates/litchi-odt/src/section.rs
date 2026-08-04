@@ -1,4 +1,4 @@
-use super::parser::{OdtParser, Section, SectionDisplay};
+use super::parser::{Parser, Section, SectionDisplay};
 use base64::Engine as _;
 use litchi_core::{Error, Result};
 use quick_xml::events::Event;
@@ -13,7 +13,7 @@ const MAX_VALUE: usize = 65_536;
 
 /// Stable whole-block location used to wrap existing content in a section.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OdtSectionBlock {
+pub enum Block {
     BodyParagraph(usize),
     BodyTable(usize),
     TableCellParagraph {
@@ -186,8 +186,8 @@ pub fn clear_sections_xml(xml: &str) -> Result<String> {
 pub fn wrap_section_xml(
     xml: &str,
     section: &Section,
-    start: &OdtSectionBlock,
-    end: &OdtSectionBlock,
+    start: &Block,
+    end: &Block,
 ) -> Result<String> {
     section.validate()?;
     let scan = scan(xml)?;
@@ -235,20 +235,20 @@ pub fn wrap_section_xml(
     validate_candidate(output)
 }
 
-fn compatible_blocks(start: &OdtSectionBlock, end: &OdtSectionBlock) -> Result<()> {
+fn compatible_blocks(start: &Block, end: &Block) -> Result<()> {
     match (start, end) {
         (
-            OdtSectionBlock::BodyParagraph(_) | OdtSectionBlock::BodyTable(_),
-            OdtSectionBlock::BodyParagraph(_) | OdtSectionBlock::BodyTable(_),
+            Block::BodyParagraph(_) | Block::BodyTable(_),
+            Block::BodyParagraph(_) | Block::BodyTable(_),
         ) => Ok(()),
         (
-            OdtSectionBlock::TableCellParagraph {
+            Block::TableCellParagraph {
                 table: a,
                 row: b,
                 cell: c,
                 ..
             },
-            OdtSectionBlock::TableCellParagraph {
+            Block::TableCellParagraph {
                 table: x,
                 row: y,
                 cell: z,
@@ -338,7 +338,7 @@ struct SectionSite {
     content_start: usize,
 }
 struct BlockSite {
-    block: OdtSectionBlock,
+    block: Block,
     span: Range<usize>,
 }
 struct Scan {
@@ -356,7 +356,7 @@ struct OpenSection {
     content_start: usize,
 }
 struct OpenBlock {
-    block: OdtSectionBlock,
+    block: Block,
     depth: usize,
     start: usize,
 }
@@ -583,10 +583,10 @@ fn block_start(
     local: &[u8],
     table: &mut Option<TableState>,
     body: &mut usize,
-) -> Option<OdtSectionBlock> {
+) -> Option<Block> {
     if text && matches!(local, b"p" | b"h") {
         if let Some(t) = table {
-            let block = OdtSectionBlock::TableCellParagraph {
+            let block = Block::TableCellParagraph {
                 table: t.table,
                 row: t.row?,
                 cell: t.cell?,
@@ -597,10 +597,10 @@ fn block_start(
         } else {
             let i = *body;
             *body += 1;
-            Some(OdtSectionBlock::BodyParagraph(i))
+            Some(Block::BodyParagraph(i))
         }
     } else if table_ns && local == b"table" && table.as_ref().is_some_and(|t| t.depth > 0) {
-        Some(OdtSectionBlock::BodyTable(table.as_ref()?.table))
+        Some(Block::BodyTable(table.as_ref()?.table))
     } else {
         None
     }
@@ -700,7 +700,7 @@ fn ensure_unique(
 }
 fn validate_candidate(xml: String) -> Result<String> {
     let _ = scan(&xml)?;
-    let sections = OdtParser::parse_sections(&xml)?;
+    let sections = Parser::parse_sections(&xml)?;
     let mut names = HashSet::new();
     for section in sections {
         section.validate()?;

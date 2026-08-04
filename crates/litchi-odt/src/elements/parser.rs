@@ -45,7 +45,7 @@ pub enum DocumentOrderElement {
 /// structure elements like paragraphs, tables, headings, and lists.
 ///
 /// For format-specific features, use the specialized parsers:
-/// - `OdtParser` for ODT-specific features (track changes, comments, sections)
+/// - `crate::parser::Parser` for ODT-specific features (track changes, comments, sections)
 /// - `OdsParser` for ODS-specific features (cell formulas, named ranges)
 /// - `OdpParser` for ODP-specific features (slide transitions, animations)
 pub struct DocumentParser;

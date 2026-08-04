@@ -18,7 +18,7 @@ const MAX_TOTAL_MASTER_PAGE_NAME_BYTES: usize = 16 * 1_048_576;
 /// This model preserves only the ordered assignments stored in `content.xml`. It
 /// does not calculate page breaks, resolve master-page definitions, or paginate text.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdtPageSequence {
+pub struct Sequence {
     /// The `text:master-page-name` value for each explicit `text:page`, in order.
     pub master_page_names: Vec<String>,
 }
@@ -32,7 +32,7 @@ enum Frame {
     Page,
 }
 
-pub(crate) fn parse_page_sequence(xml: &str) -> Result<Option<OdtPageSequence>> {
+pub(crate) fn parse_page_sequence(xml: &str) -> Result<Option<Sequence>> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return Err(invalid(format!(
             "content XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte page-sequence limit"
@@ -71,7 +71,7 @@ pub(crate) fn parse_page_sequence(xml: &str) -> Result<Option<OdtPageSequence>> 
                         ));
                     }
                     ensure_no_attributes(element, "text:page-sequence")?;
-                    sequence = Some(OdtPageSequence {
+                    sequence = Some(Sequence {
                         master_page_names: Vec::new(),
                     });
                     push_frame(&mut stack, Frame::PageSequence)?;
@@ -234,7 +234,7 @@ fn ensure_no_attributes(element: &BytesStart<'_>, context: &str) -> Result<()> {
 }
 
 fn append_page(
-    sequence: &mut OdtPageSequence,
+    sequence: &mut Sequence,
     total_name_bytes: &mut usize,
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -296,7 +296,7 @@ fn is_namespace_declaration(name: &[u8]) -> bool {
     name == b"xmlns" || name.starts_with(b"xmlns:")
 }
 
-impl OdtPageSequence {
+impl Sequence {
     /// Create a validated explicit page sequence (ODF 1.3 §5.3
     /// `text:page-sequence` with §5.4 `text:page` children).
     ///
@@ -335,7 +335,7 @@ impl OdtPageSequence {
     }
 }
 
-fn validate_sequence(sequence: &OdtPageSequence) -> Result<()> {
+fn validate_sequence(sequence: &Sequence) -> Result<()> {
     if sequence.master_page_names.is_empty() {
         return Err(invalid(
             "text:page-sequence requires at least one text:page",
@@ -497,13 +497,10 @@ fn locate_site(xml: &str) -> Result<PageSequenceSite> {
 /// `None` removes an existing sequence and is a no-op when none exists. A new
 /// sequence is inserted as the first child of `office:text`, matching the
 /// element order of ODF 1.3 §5.1 (`office:text`) and §5.3.
-pub(crate) fn set_page_sequence_xml(
-    xml: &str,
-    sequence: Option<&OdtPageSequence>,
-) -> Result<String> {
+pub(crate) fn set_page_sequence_xml(xml: &str, sequence: Option<&Sequence>) -> Result<String> {
     parse_page_sequence(xml)?;
     let site = locate_site(xml)?;
-    let fragment = sequence.map(OdtPageSequence::to_xml_fragment).transpose()?;
+    let fragment = sequence.map(Sequence::to_xml_fragment).transpose()?;
     let updated = match (site, fragment) {
         (PageSequenceSite::Existing(range), replacement) => super::header_footer::replace_range(
             xml,
@@ -550,7 +547,7 @@ fn invalid(message: impl std::fmt::Display) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{OdtPageSequence, parse_page_sequence};
+    use super::{Sequence, parse_page_sequence};
 
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -573,7 +570,7 @@ mod tests {
 
         assert_eq!(
             parse_page_sequence(&xml).unwrap(),
-            Some(OdtPageSequence {
+            Some(Sequence {
                 master_page_names: vec![
                     "First".to_string(),
                     "Right".to_string(),
@@ -621,16 +618,16 @@ mod tests {
         use super::set_page_sequence_xml;
 
         let sequence =
-            OdtPageSequence::new(vec!["First".to_string(), "Left & Right".to_string()]).unwrap();
+            Sequence::new(vec!["First".to_string(), "Left & Right".to_string()]).unwrap();
         let fragment = sequence.to_xml_fragment().unwrap();
         assert_eq!(
             fragment,
             r#"<text:page-sequence xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><text:page text:master-page-name="First"/><text:page text:master-page-name="Left &amp; Right"/></text:page-sequence>"#
         );
 
-        assert!(OdtPageSequence::new(Vec::new()).is_err());
-        assert!(OdtPageSequence::new(vec![String::new()]).is_err());
-        assert!(OdtPageSequence::new(vec!["Bad\nName".to_string()]).is_err());
+        assert!(Sequence::new(Vec::new()).is_err());
+        assert!(Sequence::new(vec![String::new()]).is_err());
+        assert!(Sequence::new(vec!["Bad\nName".to_string()]).is_err());
 
         // Insert as the first child of office:text, ahead of other content.
         let xml = content("<t:p>text</t:p>");
@@ -644,7 +641,7 @@ mod tests {
         );
 
         // Replace an existing sequence, then remove it.
-        let replacement = OdtPageSequence::new(vec!["Only".to_string()]).unwrap();
+        let replacement = Sequence::new(vec!["Only".to_string()]).unwrap();
         let updated = set_page_sequence_xml(&updated, Some(&replacement)).unwrap();
         assert_eq!(parse_page_sequence(&updated).unwrap(), Some(replacement));
         let updated = set_page_sequence_xml(&updated, None).unwrap();

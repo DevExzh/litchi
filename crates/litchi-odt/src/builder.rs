@@ -96,7 +96,7 @@ pub struct DocumentBuilder {
     )>,
     notes_configurations: crate::NotesConfigurations,
     line_numbering_configuration: Option<crate::LineNumberingConfiguration>,
-    page_sequence: Option<crate::OdtPageSequence>,
+    page_sequence: Option<crate::Sequence>,
 }
 
 impl Default for DocumentBuilder {
@@ -1219,10 +1219,7 @@ impl DocumentBuilder {
     /// The sequence is written as the first child of `office:text`, matching
     /// the element order of ODF 1.3 §5.1 and §5.3. Master-page names are
     /// stored lexically and never resolved against `styles.xml`.
-    pub fn set_page_sequence(
-        &mut self,
-        sequence: Option<crate::OdtPageSequence>,
-    ) -> Result<&mut Self> {
+    pub fn set_page_sequence(&mut self, sequence: Option<crate::Sequence>) -> Result<&mut Self> {
         if let Some(sequence) = &sequence {
             sequence.to_xml_fragment()?;
         }

@@ -17,7 +17,7 @@ use std::path::Path;
 
 use super::header_footer::{MasterPage, parse_master_pages};
 use super::page_layout::{PageLayout, parse_page_layouts};
-use super::page_sequence::{OdtPageSequence, parse_page_sequence};
+use super::page_sequence::{Sequence, parse_page_sequence};
 
 const MAX_REFERENCE_DEPTH: usize = 4_096;
 const MAX_REFERENCES: usize = 1_000_000;
@@ -589,7 +589,7 @@ impl Document {
     ///
     /// This exposes stored page metadata only. It does not resolve master-page
     /// styles, calculate page breaks, or paginate the document.
-    pub fn page_sequence(&self) -> Result<Option<OdtPageSequence>> {
+    pub fn page_sequence(&self) -> Result<Option<Sequence>> {
         parse_page_sequence(self.content.xml_content())
     }
 
@@ -662,7 +662,7 @@ impl Document {
     /// # }
     /// ```
     pub fn track_changes(&self) -> Result<Vec<super::parser::TrackChange>> {
-        super::parser::OdtParser::parse_track_changes(self.content.xml_content())
+        super::parser::Parser::parse_track_changes(self.content.xml_content())
     }
 
     /// Get tracked changes together with their inert container policy metadata.
@@ -670,7 +670,7 @@ impl Document {
     /// Protection-key material and digest identifiers are retained for round-trip and
     /// inspection only; this method never unlocks, accepts, rejects, or evaluates changes.
     pub fn tracked_changes(&self) -> Result<super::parser::TrackedChanges> {
-        super::parser::OdtParser::parse_tracked_changes(self.content.xml_content())
+        super::parser::Parser::parse_tracked_changes(self.content.xml_content())
     }
 
     /// Get all comments/annotations in the document.
@@ -691,7 +691,7 @@ impl Document {
     /// # }
     /// ```
     pub fn comments(&self) -> Result<Vec<super::parser::Comment>> {
-        super::parser::OdtParser::parse_comments(self.content.xml_content())
+        super::parser::Parser::parse_comments(self.content.xml_content())
     }
 
     /// Get all sections in the document.
@@ -715,7 +715,7 @@ impl Document {
     /// # }
     /// ```
     pub fn sections(&self) -> Result<Vec<super::parser::Section>> {
-        super::parser::OdtParser::parse_sections(self.content.xml_content())
+        super::parser::Parser::parse_sections(self.content.xml_content())
     }
 
     /// Get all generated text indexes, including their inert source definitions and cached bodies.

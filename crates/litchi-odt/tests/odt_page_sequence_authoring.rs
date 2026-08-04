@@ -4,10 +4,10 @@
 //! The model preserves only the ordered `text:master-page-name` assignments;
 //! litchi never paginates or resolves the referenced master pages.
 
-use litchi_odt::{Document, DocumentBuilder, MutableDocument, OdtPageSequence};
+use litchi_odt::{Document, DocumentBuilder, MutableDocument, Sequence};
 
-fn sequence() -> OdtPageSequence {
-    OdtPageSequence::new(vec![
+fn sequence() -> Sequence {
+    Sequence::new(vec![
         "First".to_string(),
         "Left".to_string(),
         "Right".to_string(),
@@ -55,11 +55,11 @@ fn builder_authored_page_sequence_round_trips_the_package() {
 #[test]
 fn builder_rejects_invalid_page_sequences() {
     let mut builder = DocumentBuilder::new();
-    assert!(OdtPageSequence::new(Vec::new()).is_err());
-    assert!(OdtPageSequence::new(vec![String::new()]).is_err());
+    assert!(Sequence::new(Vec::new()).is_err());
+    assert!(Sequence::new(vec![String::new()]).is_err());
     assert!(
         builder
-            .set_page_sequence(Some(OdtPageSequence {
+            .set_page_sequence(Some(Sequence {
                 master_page_names: vec!["Bad\nName".to_string()],
             }))
             .is_err()
@@ -83,7 +83,7 @@ fn mutable_sets_replaces_and_removes_page_sequence() {
     assert_eq!(reopened.page_sequence().unwrap(), Some(sequence()));
 
     // Replace the assignments in place.
-    let replacement = OdtPageSequence::new(vec!["Standard".to_string()]).unwrap();
+    let replacement = Sequence::new(vec!["Standard".to_string()]).unwrap();
     let mut mutable = MutableDocument::from_document(reopened).unwrap();
     mutable.set_page_sequence(Some(&replacement)).unwrap();
     let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();

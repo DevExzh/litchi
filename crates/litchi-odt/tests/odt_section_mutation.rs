@@ -1,7 +1,7 @@
 use litchi_odt::{
-    ChangeType, Document, DocumentBuilder, MutableDocument, OdtSectionBlock, OdtTrackedPosition,
-    OdtTrackedStory, Section, SectionDdeSource, SectionDisplay, SectionSource, TrackChange,
-    TrackedChanges, wrap_section_xml,
+    Block, ChangeType, Document, DocumentBuilder, MutableDocument, Position, Section,
+    SectionDdeSource, SectionDisplay, SectionSource, Story, TrackChange, TrackedChanges,
+    wrap_section_xml,
 };
 
 fn section(name: &str) -> Section {
@@ -89,12 +89,12 @@ fn mutable_wraps_nested_sections_and_preserves_tracked_changes() {
     document
         .mark_tracked_change_range(
             "insert_1",
-            OdtTrackedPosition {
-                story: OdtTrackedStory::Paragraph(0),
+            Position {
+                story: Story::Paragraph(0),
                 character: 1,
             },
-            OdtTrackedPosition {
-                story: OdtTrackedStory::Paragraph(0),
+            Position {
+                story: Story::Paragraph(0),
                 character: 2,
             },
         )
@@ -103,21 +103,13 @@ fn mutable_wraps_nested_sections_and_preserves_tracked_changes() {
     let mut outer = section("Outer");
     outer.content.clear();
     document
-        .wrap_section(
-            &outer,
-            OdtSectionBlock::BodyParagraph(0),
-            OdtSectionBlock::BodyParagraph(1),
-        )
+        .wrap_section(&outer, Block::BodyParagraph(0), Block::BodyParagraph(1))
         .unwrap();
     let mut inner = section("Inner");
     inner.xml_id = Some("inner_id".to_string());
     inner.content.clear();
     document
-        .wrap_section(
-            &inner,
-            OdtSectionBlock::BodyParagraph(1),
-            OdtSectionBlock::BodyParagraph(1),
-        )
+        .wrap_section(&inner, Block::BodyParagraph(1), Block::BodyParagraph(1))
         .unwrap();
     assert_eq!(document.sections().unwrap().len(), 2);
     assert_eq!(document.tracked_changes().unwrap().changes[0].content, "😀");
@@ -142,13 +134,8 @@ fn mixed_body_and_table_cell_ranges_are_lossless_and_errors_roll_back() {
     let xml = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:text><text:p>A<text:span text:style-name="S">😀</text:span></text:p><table:table table:name="T"><table:table-row><table:table-cell><text:p>Cell 1</text:p><text:p>Cell 2</text:p></table:table-cell></table:table-row></table:table><text:p>Tail</text:p></office:text></office:body></office:document-content>"#;
     let mut body = section("BodyMixed");
     body.content.clear();
-    let wrapped = wrap_section_xml(
-        xml,
-        &body,
-        &OdtSectionBlock::BodyParagraph(0),
-        &OdtSectionBlock::BodyTable(0),
-    )
-    .unwrap();
+    let wrapped =
+        wrap_section_xml(xml, &body, &Block::BodyParagraph(0), &Block::BodyTable(0)).unwrap();
     assert!(wrapped.contains(r#"<text:span text:style-name="S">😀</text:span>"#));
     assert!(wrapped.contains("<table:table table:name=\"T\">"));
 
@@ -158,13 +145,13 @@ fn mixed_body_and_table_cell_ranges_are_lossless_and_errors_roll_back() {
     let wrapped = wrap_section_xml(
         &wrapped,
         &cell,
-        &OdtSectionBlock::TableCellParagraph {
+        &Block::TableCellParagraph {
             table: 0,
             row: 0,
             cell: 0,
             paragraph: 0,
         },
-        &OdtSectionBlock::TableCellParagraph {
+        &Block::TableCellParagraph {
             table: 0,
             row: 0,
             cell: 0,
@@ -180,8 +167,8 @@ fn mixed_body_and_table_cell_ranges_are_lossless_and_errors_roll_back() {
     let crossing = wrap_section_xml(
         &wrapped,
         &section("Crossing"),
-        &OdtSectionBlock::BodyTable(0),
-        &OdtSectionBlock::BodyParagraph(1),
+        &Block::BodyTable(0),
+        &Block::BodyParagraph(1),
     );
     assert!(crossing.is_err());
 }
@@ -193,11 +180,7 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
     let mut wrapper = section("Wrapper");
     wrapper.content.clear();
     unwrap
-        .wrap_section(
-            &wrapper,
-            OdtSectionBlock::BodyParagraph(0),
-            OdtSectionBlock::BodyParagraph(0),
-        )
+        .wrap_section(&wrapper, Block::BodyParagraph(0), Block::BodyParagraph(0))
         .unwrap();
     unwrap.unwrap_section("Wrapper").unwrap();
     assert_eq!(
@@ -211,11 +194,7 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
     let mut remove = MutableDocument::new();
     remove.add_paragraph("delete me").unwrap();
     remove
-        .wrap_section(
-            &wrapper,
-            OdtSectionBlock::BodyParagraph(0),
-            OdtSectionBlock::BodyParagraph(0),
-        )
+        .wrap_section(&wrapper, Block::BodyParagraph(0), Block::BodyParagraph(0))
         .unwrap();
     remove.remove_section("Wrapper").unwrap();
     assert!(

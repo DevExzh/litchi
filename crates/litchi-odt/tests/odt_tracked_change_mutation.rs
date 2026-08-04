@@ -1,6 +1,6 @@
 use litchi_odt::{
-    ChangeType, Document, MutableDocument, OdtTrackedPosition, OdtTrackedStory, TrackChange,
-    TrackedChanges, mark_tracked_change_range_xml, set_tracked_changes_xml,
+    ChangeType, Document, MutableDocument, Position, Story, TrackChange, TrackedChanges,
+    mark_tracked_change_range_xml, set_tracked_changes_xml,
 };
 
 fn change(id: &str, kind: ChangeType) -> TrackChange {
@@ -29,8 +29,8 @@ fn marks_a_styled_span_inside_a_table_cell_without_rewriting_markup() {
         ..TrackedChanges::default()
     };
     let with_declaration = set_tracked_changes_xml(xml, Some(&tracked)).unwrap();
-    let start = OdtTrackedPosition {
-        story: OdtTrackedStory::TableCell {
+    let start = Position {
+        story: Story::TableCell {
             table: 0,
             row: 0,
             cell: 0,
@@ -50,9 +50,9 @@ fn marks_a_styled_span_inside_a_table_cell_without_rewriting_markup() {
     assert!(set_tracked_changes_xml(&duplicate_xml_id, Some(&tracked)).is_err());
 }
 
-fn position(paragraph: usize, character: usize) -> OdtTrackedPosition {
-    OdtTrackedPosition {
-        story: OdtTrackedStory::Paragraph(paragraph),
+fn position(paragraph: usize, character: usize) -> Position {
+    Position {
+        story: Story::Paragraph(paragraph),
         character,
     }
 }

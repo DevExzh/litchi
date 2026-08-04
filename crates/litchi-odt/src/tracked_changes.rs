@@ -330,7 +330,7 @@ fn make_error(message: impl Into<String>) -> Error {
 
 /// Stable text story used when placing tracked-change markers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OdtTrackedStory {
+pub enum Story {
     /// Body paragraph or heading outside tables, in document order.
     Paragraph(usize),
     /// Paragraph inside a table cell, addressed by lexical table/row/cell/paragraph order.
@@ -344,14 +344,14 @@ pub enum OdtTrackedStory {
 
 /// Unicode-scalar position inside one stable text story.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdtTrackedPosition {
-    pub story: OdtTrackedStory,
+pub struct Position {
+    pub story: Story,
     pub character: usize,
 }
 
 #[derive(Clone)]
 struct StorySite {
-    story: OdtTrackedStory,
+    story: Story,
     boundaries: Vec<Option<usize>>,
     empty: Option<(Range<usize>, String)>,
 }
@@ -377,7 +377,7 @@ struct XmlSites {
 }
 
 struct ActiveStory {
-    story: OdtTrackedStory,
+    story: Story,
     depth: usize,
     boundaries: Vec<Option<usize>>,
 }
@@ -415,10 +415,10 @@ pub fn set_tracked_changes_xml(xml: &str, tracked: Option<&TrackedChanges>) -> R
 pub fn mark_tracked_change_range_xml(
     xml: &str,
     change_id: &str,
-    start: &OdtTrackedPosition,
-    end: &OdtTrackedPosition,
+    start: &Position,
+    end: &Position,
 ) -> Result<String> {
-    let tracked = super::parser::OdtParser::parse_tracked_changes(xml)?;
+    let tracked = super::parser::Parser::parse_tracked_changes(xml)?;
     let change = tracked
         .changes
         .iter()
@@ -455,9 +455,9 @@ pub fn mark_tracked_change_range_xml(
 pub fn mark_tracked_deletion_xml(
     xml: &str,
     change_id: &str,
-    position: &OdtTrackedPosition,
+    position: &Position,
 ) -> Result<String> {
-    let tracked = super::parser::OdtParser::parse_tracked_changes(xml)?;
+    let tracked = super::parser::Parser::parse_tracked_changes(xml)?;
     let change = tracked
         .changes
         .iter()
@@ -513,7 +513,7 @@ pub fn unmark_tracked_change_xml(xml: &str, change_id: &str) -> Result<String> {
 }
 
 fn validate_authored_tracked_xml(xml: &str) -> Result<TrackedChanges> {
-    let tracked = super::parser::OdtParser::parse_tracked_changes(xml)?;
+    let tracked = super::parser::Parser::parse_tracked_changes(xml)?;
     tracked.validate()?;
     let types = tracked
         .changes
@@ -557,7 +557,7 @@ fn validate_authored_tracked_xml(xml: &str) -> Result<TrackedChanges> {
     Ok(tracked)
 }
 
-fn resolve_story_position(stories: &[StorySite], position: &OdtTrackedPosition) -> Result<usize> {
+fn resolve_story_position(stories: &[StorySite], position: &Position) -> Result<usize> {
     let site = stories
         .iter()
         .find(|site| site.story == position.story)
@@ -765,7 +765,7 @@ fn validate_mutable_xml_id(
     Ok(())
 }
 
-fn next_story(table: &mut Option<TableContext>, body: &mut usize) -> Result<OdtTrackedStory> {
+fn next_story(table: &mut Option<TableContext>, body: &mut usize) -> Result<Story> {
     if let Some(table) = table {
         let row = table
             .row
@@ -775,7 +775,7 @@ fn next_story(table: &mut Option<TableContext>, body: &mut usize) -> Result<OdtT
             .ok_or_else(|| make_error("table paragraph is outside a cell"))?;
         let paragraph = table.next_paragraph;
         table.next_paragraph = table.next_paragraph.saturating_add(1);
-        Ok(OdtTrackedStory::TableCell {
+        Ok(Story::TableCell {
             table: table.table,
             row,
             cell,
@@ -784,7 +784,7 @@ fn next_story(table: &mut Option<TableContext>, body: &mut usize) -> Result<OdtT
     } else {
         let index = *body;
         *body = body.saturating_add(1);
-        Ok(OdtTrackedStory::Paragraph(index))
+        Ok(Story::Paragraph(index))
     }
 }
 
@@ -954,7 +954,7 @@ fn apply_tracked_edits(xml: &str, mut edits: Vec<(Range<usize>, String)>) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::OdtParser;
+    use crate::parser::Parser;
 
     fn change(id: &str, change_type: ChangeType, content: &str) -> TrackChange {
         TrackChange {
@@ -989,7 +989,7 @@ mod tests {
         assert!(xml.contains("&lt;&amp;"));
         assert!(!xml.contains("live text"));
 
-        let parsed = OdtParser::parse_tracked_changes(&xml).unwrap();
+        let parsed = Parser::parse_tracked_changes(&xml).unwrap();
         assert_eq!(parsed.track_changes, Some(true));
         assert_eq!(parsed.protection_key.as_deref(), Some("YWJj"));
         assert_eq!(parsed.changes.len(), 3);
@@ -1029,10 +1029,10 @@ mod tests {
         let Ok(xml) = std::fs::read_to_string(path) else {
             return;
         };
-        let parsed = OdtParser::parse_tracked_changes(&xml).unwrap();
+        let parsed = Parser::parse_tracked_changes(&xml).unwrap();
         assert!(!parsed.changes.is_empty());
         let serialized = parsed.to_xml_fragment().unwrap();
-        let reparsed = OdtParser::parse_tracked_changes(&serialized).unwrap();
+        let reparsed = Parser::parse_tracked_changes(&serialized).unwrap();
         assert_eq!(reparsed.changes.len(), parsed.changes.len());
     }
 }

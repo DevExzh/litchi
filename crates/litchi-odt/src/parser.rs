@@ -27,7 +27,7 @@ const MAX_SEMANTIC_ITEMS: usize = 1_000_000;
 ///
 /// For generic element parsing (paragraphs, tables, etc.), use `DocumentParser`
 /// from `crate::elements::parser` instead.
-pub struct OdtParser;
+pub struct Parser;
 
 /// Complete inert tracked-change declarations and their container policy.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -151,7 +151,7 @@ pub struct SectionDdeSource {
     pub automatic_update: Option<bool>,
 }
 
-impl OdtParser {
+impl Parser {
     /// Parse track changes from content
     ///
     /// Extracts tracked changes (insertions, deletions, format changes) from the document.
@@ -1933,7 +1933,7 @@ mod tests {
 
     #[test]
     fn test_parse_track_changes() {
-        let changes = OdtParser::parse_track_changes(TEST_TRACK_CHANGES_XML).unwrap();
+        let changes = Parser::parse_track_changes(TEST_TRACK_CHANGES_XML).unwrap();
         assert_eq!(changes.len(), 3);
 
         assert_eq!(changes[0].id, "change1");
@@ -1957,20 +1957,20 @@ mod tests {
 
     #[test]
     fn test_parse_track_changes_empty() {
-        let changes = OdtParser::parse_track_changes(TEST_EMPTY_TRACK_CHANGES).unwrap();
+        let changes = Parser::parse_track_changes(TEST_EMPTY_TRACK_CHANGES).unwrap();
         assert!(changes.is_empty());
     }
 
     #[test]
     fn test_parse_track_changes_no_tracked_changes() {
-        let changes = OdtParser::parse_track_changes(TEST_EMPTY_CONTENT).unwrap();
+        let changes = Parser::parse_track_changes(TEST_EMPTY_CONTENT).unwrap();
         assert!(changes.is_empty());
     }
 
     #[test]
     fn parses_tracked_change_metadata_deletions_and_referenced_ranges() {
         let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text><t:tracked-changes><t:changed-region t:id="i1"><t:insertion><o:change-info><d:creator>A &amp; B</d:creator><d:date>2026-07-16T10:00:00</d:date><t:p>review note</t:p></o:change-info></t:insertion></t:changed-region><t:changed-region xml:id="d1"><t:deletion><o:change-info><d:creator>Deleter</d:creator><d:date>2026-07-16</d:date><t:p>not deleted text</t:p></o:change-info><t:p>Gone &amp;<t:s t:c="2"/><t:span><![CDATA[X]]></t:span></t:p><t:p>Second<t:tab/></t:p></t:deletion></t:changed-region><t:changed-region t:id="f1"><t:format-change><o:change-info><d:creator>Stylist</d:creator><d:date>2026-07-15</d:date></o:change-info></t:format-change></t:changed-region></t:tracked-changes><t:p>pre<t:change-start t:change-id="i1"/>In&amp;<o:annotation o:name="note"><t:p>hidden comment</t:p></o:annotation><t:span>sert</t:span><t:s t:c="2"/><![CDATA[!]]><t:change-end t:change-id="i1"/>post<t:change t:change-id="d1"/></t:p><t:p><t:change-start t:change-id="i1"/>Again<t:change-end t:change-id="i1"/> and <t:change-start t:change-id="f1"/>Bold<t:change-end t:change-id="f1"/></t:p></o:text></o:body></o:document-content>"#;
-        let changes = OdtParser::parse_track_changes(xml).unwrap();
+        let changes = Parser::parse_track_changes(xml).unwrap();
         assert_eq!(changes.len(), 3);
         assert_eq!(changes[0].id, "i1");
         assert_eq!(changes[0].author.as_deref(), Some("A & B"));
@@ -1987,7 +1987,7 @@ mod tests {
     #[test]
     fn retains_tracked_change_policy_and_schema_attributes() {
         let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text><t:tracked-changes t:track-changes="0" t:protection-key="YWJj" t:protection-key-digest-algorithm="urn:example:sha256"><t:changed-region t:id="d1" xml:id="d1"><t:deletion t:merge-last-paragraph="false"><o:change-info><d:creator>A</d:creator><d:date>2026-07-16</d:date></o:change-info><t:p>gone</t:p></t:deletion></t:changed-region><t:changed-region t:id="f1"><t:format-change t:style-name="Emphasis"><o:change-info><d:creator>B</d:creator><d:date>2026-07-16</d:date></o:change-info></t:format-change></t:changed-region></t:tracked-changes></o:text></o:body></o:document-content>"#;
-        let tracked = OdtParser::parse_tracked_changes(xml).unwrap();
+        let tracked = Parser::parse_tracked_changes(xml).unwrap();
         assert_eq!(tracked.track_changes, Some(false));
         assert_eq!(tracked.protection_key.as_deref(), Some("YWJj"));
         assert_eq!(
@@ -2012,7 +2012,7 @@ mod tests {
         ] {
             let xml = format!("{prefix}{body}{suffix}");
             assert!(
-                OdtParser::parse_tracked_changes(&xml).is_err(),
+                Parser::parse_tracked_changes(&xml).is_err(),
                 "accepted {body}"
             );
         }
@@ -2027,43 +2027,43 @@ mod tests {
         let missing_id = format!(
             "{prelude}<t:tracked-changes><t:changed-region><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&missing_id).is_err());
+        assert!(Parser::parse_track_changes(&missing_id).is_err());
 
         let duplicate_id = format!(
             "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region><t:changed-region t:id=\"x\"><t:deletion>{info}</t:deletion></t:changed-region></t:tracked-changes>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&duplicate_id).is_err());
+        assert!(Parser::parse_track_changes(&duplicate_id).is_err());
 
         let multiple_kinds = format!(
             "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion><t:deletion>{info}</t:deletion></t:changed-region></t:tracked-changes>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&multiple_kinds).is_err());
+        assert!(Parser::parse_track_changes(&multiple_kinds).is_err());
 
         let missing_kind = format!(
             "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"/></t:tracked-changes>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&missing_kind).is_err());
+        assert!(Parser::parse_track_changes(&missing_kind).is_err());
 
         let unknown_marker = format!(
             "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change t:change-id=\"unknown\"/></t:p>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&unknown_marker).is_err());
+        assert!(Parser::parse_track_changes(&unknown_marker).is_err());
 
         let unmatched_end = format!(
             "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change-end t:change-id=\"x\"/></t:p>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&unmatched_end).is_err());
+        assert!(Parser::parse_track_changes(&unmatched_end).is_err());
 
         let unmatched_start = format!(
             "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change-start t:change-id=\"x\"/>open</t:p>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&unmatched_start).is_err());
+        assert!(Parser::parse_track_changes(&unmatched_start).is_err());
 
         let duplicate_attribute = format!(
             "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change t:change-id=\"x\" u:change-id=\"x\"/></t:p>{suffix}"
         );
-        assert!(OdtParser::parse_track_changes(&duplicate_attribute).is_err());
-        assert!(OdtParser::parse_track_changes("<t:tracked-changes>").is_err());
+        assert!(Parser::parse_track_changes(&duplicate_attribute).is_err());
+        assert!(Parser::parse_track_changes("<t:tracked-changes>").is_err());
     }
 
     #[test]
@@ -2080,12 +2080,12 @@ mod tests {
         xml.push_str(
             "</t:p></t:deletion></t:changed-region></t:tracked-changes></o:text></o:body></o:document-content>",
         );
-        assert!(OdtParser::parse_track_changes(&xml).is_err());
+        assert!(Parser::parse_track_changes(&xml).is_err());
     }
 
     #[test]
     fn test_parse_comments() {
-        let comments = OdtParser::parse_comments(TEST_COMMENTS_XML).unwrap();
+        let comments = Parser::parse_comments(TEST_COMMENTS_XML).unwrap();
         assert_eq!(comments.len(), 2);
 
         // First comment
@@ -2104,13 +2104,13 @@ mod tests {
 
     #[test]
     fn test_parse_comments_empty() {
-        let comments = OdtParser::parse_comments(TEST_EMPTY_CONTENT).unwrap();
+        let comments = Parser::parse_comments(TEST_EMPTY_CONTENT).unwrap();
         assert!(comments.is_empty());
     }
 
     #[test]
     fn test_parse_sections() {
-        let sections = OdtParser::parse_sections(TEST_SECTIONS_XML).unwrap();
+        let sections = Parser::parse_sections(TEST_SECTIONS_XML).unwrap();
         assert_eq!(sections.len(), 3);
 
         // First section
@@ -2131,14 +2131,14 @@ mod tests {
 
     #[test]
     fn test_parse_sections_empty() {
-        let sections = OdtParser::parse_sections(TEST_EMPTY_CONTENT).unwrap();
+        let sections = Parser::parse_sections(TEST_EMPTY_CONTENT).unwrap();
         assert!(sections.is_empty());
     }
 
     #[test]
     fn parses_annotation_metadata_body_and_referenced_range_with_namespace_aliases() {
         let xml = r#"<x:document-content xmlns:x="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><x:body><x:text><t:p>before<x:annotation x:name="c&amp;1"><d:creator>A &amp; B</d:creator><m:date-string>2026-07-16</m:date-string><t:p>First<t:s t:c="2"/>X</t:p><t:list><t:list-item><t:p>Second<![CDATA[!]]></t:p></t:list-item></t:list></x:annotation>R&amp;<t:span>ange</t:span><x:annotation-end x:name="c&amp;1"/>after</t:p></x:text></x:body></x:document-content>"#;
-        let comments = OdtParser::parse_comments(xml).unwrap();
+        let comments = Parser::parse_comments(xml).unwrap();
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].id, "c&1");
         assert_eq!(comments[0].author.as_deref(), Some("A & B"));
@@ -2150,7 +2150,7 @@ mod tests {
     #[test]
     fn parses_nested_sections_in_document_order_with_visible_text() {
         let xml = r#"<x:document-content xmlns:x="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:l="http://www.w3.org/1999/xlink"><x:body><x:text><t:section t:name="Outer &amp; Main" t:style-name="S1" t:protected="1" xml:id="outer" t:protection-key="YWJj" t:protection-key-digest-algorithm="urn:sha256" t:display="condition" t:condition="ooow:visible()"><t:section-source l:type="simple" l:href="https://example.invalid/doc.odt" l:show="embed" t:section-name="Remote" t:filter-name="writer8"/><t:p>One &amp;<t:s t:c="2"/></t:p><t:section t:name="Inner"><t:p>Inner <![CDATA[X]]></t:p></t:section><t:p>Last</t:p></t:section><t:section t:name="Empty"><x:dde-source x:name="Feed" x:conversion-mode="keep-text" x:automatic-update="false"/></t:section></x:text></x:body></x:document-content>"#;
-        let sections = OdtParser::parse_sections(xml).unwrap();
+        let sections = Parser::parse_sections(xml).unwrap();
         assert_eq!(sections.len(), 3);
         assert_eq!(sections[0].name, "Outer & Main");
         assert_eq!(sections[0].style.as_deref(), Some("S1"));
@@ -2184,36 +2184,36 @@ mod tests {
     #[test]
     fn annotations_and_sections_reject_malformed_or_ambiguous_xml() {
         let namespace = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-        assert!(OdtParser::parse_comments("<x:annotation>").is_err());
+        assert!(Parser::parse_comments("<x:annotation>").is_err());
         let nested = r#"<x:annotation xmlns:x="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><x:annotation/></x:annotation>"#;
-        assert!(OdtParser::parse_comments(nested).is_err());
+        assert!(Parser::parse_comments(nested).is_err());
         let missing_name = format!(r#"<t:section xmlns:t="{namespace}"/>"#);
-        assert!(OdtParser::parse_sections(&missing_name).is_err());
+        assert!(Parser::parse_sections(&missing_name).is_err());
         let invalid_boolean =
             format!(r#"<t:section xmlns:t="{namespace}" t:name="A" t:protected="yes"/>"#);
-        assert!(OdtParser::parse_sections(&invalid_boolean).is_err());
+        assert!(Parser::parse_sections(&invalid_boolean).is_err());
         let duplicate = format!(
             r#"<t:section xmlns:t="{namespace}" xmlns:u="{namespace}" t:name="A" u:name="B"/>"#
         );
-        assert!(OdtParser::parse_sections(&duplicate).is_err());
+        assert!(Parser::parse_sections(&duplicate).is_err());
         let missing_condition =
             format!(r#"<t:section xmlns:t="{namespace}" t:name="A" t:display="condition"/>"#);
-        assert!(OdtParser::parse_sections(&missing_condition).is_err());
+        assert!(Parser::parse_sections(&missing_condition).is_err());
         let stray_condition =
             format!(r#"<t:section xmlns:t="{namespace}" t:name="A" t:condition="x"/>"#);
-        assert!(OdtParser::parse_sections(&stray_condition).is_err());
+        assert!(Parser::parse_sections(&stray_condition).is_err());
         let duplicate_source = format!(
             r#"<t:section xmlns:t="{namespace}" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" t:name="A"><t:section-source/><o:dde-source/></t:section>"#
         );
-        assert!(OdtParser::parse_sections(&duplicate_source).is_err());
+        assert!(Parser::parse_sections(&duplicate_source).is_err());
         let nonempty_source = format!(
             r#"<t:section xmlns:t="{namespace}" t:name="A"><t:section-source>bad</t:section-source></t:section>"#
         );
-        assert!(OdtParser::parse_sections(&nonempty_source).is_err());
+        assert!(Parser::parse_sections(&nonempty_source).is_err());
         let incomplete_link = format!(
             r#"<t:section xmlns:t="{namespace}" xmlns:l="http://www.w3.org/1999/xlink" t:name="A"><t:section-source l:href="x"/></t:section>"#
         );
-        assert!(OdtParser::parse_sections(&incomplete_link).is_err());
+        assert!(Parser::parse_sections(&incomplete_link).is_err());
     }
 
     #[test]
