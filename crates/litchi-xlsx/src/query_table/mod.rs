@@ -2,7 +2,7 @@
 //!
 //! The owner is layered by responsibility: semantic declarations in
 //! `model`, bounded XML/MCE conversion in `codec`, and OPC relationship
-//! operations in `package`. Legacy prefixed names below are aliases only.
+//! operations in `package`.
 
 mod codec;
 mod model;
@@ -19,17 +19,3 @@ pub use package::{
     load_worksheet_query_tables, remove_worksheet_query_table, reorder_worksheet_query_tables,
     replace_worksheet_query_table, update_worksheet_query_table,
 };
-
-pub type QueryTable = Table;
-pub type QueryTableConformance = Conformance;
-pub type QueryTableExtensionAttribute = ExtensionAttribute;
-pub type QueryTableExtensionList = ExtensionList;
-pub type QueryTableField = Field;
-pub type QueryTableGrowShrinkType = GrowShrinkType;
-pub type QueryTableIconSet = IconSet;
-pub type QueryTableRefresh = Refresh;
-pub type QueryTableSortBy = SortBy;
-pub type QueryTableSortCondition = SortCondition;
-pub type QueryTableSortMethod = SortMethod;
-pub type QueryTableSortState = SortState;
-pub type WorksheetQueryTable = WorksheetTable;

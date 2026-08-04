@@ -1,7 +1,6 @@
 //! Semantic SpreadsheetML query-table model.
 //!
-//! The surrounding module supplies the contextual owner name. Historical
-//! `QueryTable*` names remain aliases in `mod.rs` for source compatibility.
+//! The surrounding module supplies the contextual owner name.
 
 use super::codec::write_query_table;
 use crate::error::{Error, Result};
