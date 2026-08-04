@@ -1,10 +1,6 @@
 //! Native page-number/page-count attachment CRUD for Pages text storage.
 //!
-//! Text-box selectors use [`DrawableObjectId`] as their canonical type. The
-//! checked `TryInto` boundary preserves the existing raw-object-id call path
-//! during migration without allowing zero or otherwise invalid identifiers.
-
-use std::fmt;
+//! Text-box selectors use [`DrawableObjectId`] as their canonical type.
 
 use super::PagesEditor;
 use crate::Result;
@@ -92,31 +88,21 @@ impl PagesEditor {
     }
 
     /// Read every number attachment in one ordinary Pages text box.
-    pub fn text_box_number_attachments<D>(
+    pub fn text_box_number_attachments(
         &self,
-        drawable_object_id: D,
-    ) -> Result<Vec<TextNumberAttachment>>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_text_box_drawable_id(drawable_object_id)?;
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<Vec<TextNumberAttachment>> {
         let graph = self.text_box_graph(drawable_object_id.object_id())?;
         self.text.text_number_attachments(graph.storage_id)
     }
 
     /// Atomically insert a number attachment in an ordinary Pages text box.
-    pub fn insert_text_box_number_attachment<D>(
+    pub fn insert_text_box_number_attachment(
         &mut self,
-        drawable_object_id: D,
+        drawable_object_id: DrawableObjectId,
         position: TextPosition,
         settings: TextNumberAttachmentSettings,
-    ) -> Result<TextNumberAttachment>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_text_box_drawable_id(drawable_object_id)?;
+    ) -> Result<TextNumberAttachment> {
         let graph = self.text_box_graph(drawable_object_id.object_id())?;
         let mut staged = self.text.clone();
         let attachment =
@@ -126,17 +112,12 @@ impl PagesEditor {
     }
 
     /// Atomically update a Pages text-box number attachment.
-    pub fn update_text_box_number_attachment<D>(
+    pub fn update_text_box_number_attachment(
         &mut self,
-        drawable_object_id: D,
+        drawable_object_id: DrawableObjectId,
         id: TextNumberAttachmentId,
         settings: TextNumberAttachmentSettings,
-    ) -> Result<TextNumberAttachment>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_text_box_drawable_id(drawable_object_id)?;
+    ) -> Result<TextNumberAttachment> {
         let graph = self.text_box_graph(drawable_object_id.object_id())?;
         let mut staged = self.text.clone();
         let attachment = staged.update_text_number_attachment(graph.storage_id, id, settings)?;
@@ -145,34 +126,17 @@ impl PagesEditor {
     }
 
     /// Delete a Pages text-box number attachment and its placeholder.
-    pub fn remove_text_box_number_attachment<D>(
+    pub fn remove_text_box_number_attachment(
         &mut self,
-        drawable_object_id: D,
+        drawable_object_id: DrawableObjectId,
         id: TextNumberAttachmentId,
-    ) -> Result<TextNumberAttachment>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_text_box_drawable_id(drawable_object_id)?;
+    ) -> Result<TextNumberAttachment> {
         let graph = self.text_box_graph(drawable_object_id.object_id())?;
         let mut staged = self.text.clone();
         let attachment = staged.remove_text_number_attachment(graph.storage_id, id)?;
         *self = Self::from_package(staged.into_package())?;
         Ok(attachment)
     }
-}
-
-fn normalize_text_box_drawable_id<D>(value: D) -> Result<DrawableObjectId>
-where
-    D: TryInto<DrawableObjectId>,
-    D::Error: fmt::Debug,
-{
-    value.try_into().map_err(|error| {
-        crate::Error::ParseError(format!(
-            "invalid Pages text-box drawable selector: {error:?}"
-        ))
-    })
 }
 
 #[cfg(test)]
@@ -248,23 +212,10 @@ mod tests {
         let (mut pages, selector) = pages_with_text_box();
         let baseline = pages.to_bytes().unwrap();
 
-        assert!(pages.text_box_number_attachments(0_u64).is_err());
+        assert!(DrawableObjectId::from_object_id(0).is_err());
         assert_eq!(pages.to_bytes().unwrap(), baseline);
-        assert!(
-            pages
-                .text_box_number_attachments(DrawableObjectId::try_from(999_999_u64).unwrap())
-                .is_err()
-        );
-        assert_eq!(pages.to_bytes().unwrap(), baseline);
-        assert!(
-            pages
-                .insert_text_box_number_attachment(
-                    0_u64,
-                    TextPosition::from_utf16_index(0).unwrap(),
-                    settings(),
-                )
-                .is_err()
-        );
+        let missing_selector = DrawableObjectId::try_from(999_999_u64).unwrap();
+        assert!(pages.text_box_number_attachments(missing_selector).is_err());
         assert_eq!(pages.to_bytes().unwrap(), baseline);
 
         let attachment = pages

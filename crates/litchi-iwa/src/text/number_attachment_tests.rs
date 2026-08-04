@@ -1,6 +1,7 @@
 use super::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText, TextPosition,
 };
+use crate::comments::DrawableObjectId;
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -129,9 +130,10 @@ fn scratch_pages_text_box_number_attachments_round_trip() {
         )
         .unwrap();
     let pages_box = pages.add_text_box(5, PREFIX, POSITION, SIZE).unwrap();
+    let pages_box_id = DrawableObjectId::from_object_id(pages_box.drawable_object_id).unwrap();
     let pages_attachment = pages
         .insert_text_box_number_attachment(
-            pages_box.drawable_object_id,
+            pages_box_id,
             position,
             settings(TextNumberAttachmentKind::PageNumber),
         )
@@ -143,12 +145,12 @@ fn scratch_pages_text_box_number_attachments_round_trip() {
     );
     assert_eq!(
         pages
-            .text_box_number_attachments(pages_box.drawable_object_id)
+            .text_box_number_attachments(pages_box_id)
             .unwrap()
             .as_slice(),
         std::slice::from_ref(&pages_attachment)
     );
     pages
-        .remove_text_box_number_attachment(pages_box.drawable_object_id, pages_attachment.id)
+        .remove_text_box_number_attachment(pages_box_id, pages_attachment.id)
         .unwrap();
 }

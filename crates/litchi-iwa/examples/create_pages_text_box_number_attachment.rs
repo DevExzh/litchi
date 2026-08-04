@@ -1,3 +1,4 @@
+use litchi_iwa::comments::DrawableObjectId;
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::text::{TextNumberAttachmentKind, TextNumberAttachmentSettings, TextPosition};
@@ -22,8 +23,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         TEXT_BOX_POSITION,
         TEXT_BOX_SIZE,
     )?;
+    let drawable_object_id = DrawableObjectId::from_object_id(text_box.drawable_object_id)?;
     editor.insert_text_box_number_attachment(
-        text_box.drawable_object_id,
+        drawable_object_id,
         TextPosition::from_utf16_index(TEXT_BOX_PREFIX.encode_utf16().count())?,
         TextNumberAttachmentSettings::new(TextNumberAttachmentKind::PageNumber),
     )?;
