@@ -27,14 +27,14 @@ pub mod vml_shape;
 pub mod watermark;
 
 // Re-export main document type
-pub use doc::{DocumentProtection, MutableDocument};
+pub use doc::{MutableDocument, Protection};
 
 // Re-export note types
 pub use note::Note;
 
 // Re-export section types
 pub use section::{
-    BorderColor, ChapterSep, DocumentGridType, EndnotePos, Endnotes, FootnotePos, Footnotes,
+    BorderColor, ChapterSep, EndnotePos, Endnotes, FootnotePos, Footnotes, GridType,
     LineNumberRestart, NoteNumberRestart, PageBorderArt, PageBorderDisplay, PageBorderOffsetFrom,
     PageBorderStyle, PageBorderZOrder, PageNumberFormat, PageOrientation, SectionColumn,
     SectionColumns, SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference,

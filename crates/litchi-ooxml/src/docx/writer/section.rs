@@ -358,14 +358,14 @@ impl SectionTextDirection {
 
 /// Document-grid mode for East Asian layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocumentGridType {
+pub enum GridType {
     Default,
     Lines,
     LinesAndChars,
     SnapToChars,
 }
 
-impl DocumentGridType {
+impl GridType {
     fn as_str(self) -> &'static str {
         match self {
             Self::Default => "default",
@@ -391,7 +391,7 @@ impl DocumentGridType {
 /// Section document-grid settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionDocumentGrid {
-    pub grid_type: DocumentGridType,
+    pub grid_type: GridType,
     pub line_pitch: Option<u32>,
     pub char_space: Option<i32>,
 }
@@ -1814,9 +1814,9 @@ fn parse_grid(xml: &str) -> Result<SectionDocumentGrid> {
     let attrs = attributes(xml)?;
     Ok(SectionDocumentGrid {
         grid_type: attr(&attrs, "type")
-            .map(DocumentGridType::parse)
+            .map(GridType::parse)
             .transpose()?
-            .unwrap_or(DocumentGridType::Default),
+            .unwrap_or(GridType::Default),
         line_pitch: attr(&attrs, "linePitch")
             .map(|value| parse_u32(value, "grid line pitch"))
             .transpose()?,

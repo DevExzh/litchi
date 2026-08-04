@@ -20,7 +20,7 @@ use crate::docx::numbering::parse_part;
 use crate::docx::paragraph::Paragraph;
 use crate::docx::parts::DocumentPart;
 use crate::docx::section::{Section, Sections};
-use crate::docx::settings::DocumentSettings;
+use crate::docx::settings::Settings;
 use crate::docx::settings::extract_document_variables;
 use crate::docx::smart_tag::SmartTag;
 use crate::docx::statistics::{
@@ -2354,7 +2354,7 @@ impl<'a> Document<'a> {
 
     /// Get the document settings including protection status.
     ///
-    /// Returns a `DocumentSettings` object providing access to document settings
+    /// Returns a `Settings` object providing access to document settings
     /// such as protection status, track revisions, and zoom level.
     ///
     /// # Examples
@@ -2376,7 +2376,7 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn settings(&self) -> Result<Option<DocumentSettings>> {
+    pub fn settings(&self) -> Result<Option<Settings>> {
         let main_part = self.opc.main_document_part()?;
         let mut matches = main_part
             .rels()
@@ -2397,7 +2397,7 @@ impl<'a> Document<'a> {
         }
         let target = rel.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
-        Ok(Some(DocumentSettings::extract_from_part(settings_part)?))
+        Ok(Some(Settings::extract_from_part(settings_part)?))
     }
 
     /// Load the ISO mail-merge recipient-data part referenced by `settings.xml`.

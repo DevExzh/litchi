@@ -139,10 +139,9 @@ pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use settings::{
     AttachedTemplate, ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatFlag,
-    CompatibilityOption, CompatibilitySetting, DocumentSettings, MAX_LANGUAGE_TAG_LENGTH,
-    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ParseCompatFlagError,
-    ParseNotePositionError, ProofState, ProofingState, ProtectionType, SmartTagType,
-    ThemeFontLanguages, View,
+    CompatibilityOption, CompatibilitySetting, MAX_LANGUAGE_TAG_LENGTH, NoteNumberingProperties,
+    NoteNumberingRestart, NotePosition, ParseCompatFlagError, ParseNotePositionError, ProofState,
+    ProofingState, ProtectionType, SmartTagType, ThemeFontLanguages, View,
 };
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use smartart::{Diagram, DiagramConformance, load_smart_arts};
@@ -165,22 +164,21 @@ pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle,
 // Re-export writer types
 pub use writer::{
     BibliographyFieldSpec, BibliographyFilter, BorderColor, CellProperties, CellRevisionKind,
-    ChapterSep, CitationFieldSpec, CitationSource, ColorScheme, ContentControlType,
-    DocumentGridType, DocumentProtection, EndnotePos, Endnotes, FootnotePos, Footnotes,
-    ImageWatermark, ImageWatermarkAnchor, LineNumberRestart, ListType, MAX_OLE_PAYLOAD_BYTES,
-    MAX_SMART_ARTS, MAX_WATERMARK_IMAGE_BYTES, MutableBookmark, MutableComment,
-    MutableContentControl, MutableDocument, MutableField, MutableHyperlink, MutableInlineImage,
-    MutableOleObject, MutableParagraph, MutableRevision, MutableRun, MutableSmartArt,
-    MutableSmartTag, MutableSmartTagAttribute, MutableStyle, MutableTable, MutableTextBox,
-    MutableTheme, MutableVmlShape, NoteNumberRestart, PageBorderArt, PageBorderDisplay,
-    PageBorderOffsetFrom, PageBorderStyle, PageBorderZOrder, PageNumberFormat, PageOrientation,
-    RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind, RunContent,
-    SectionColumn, SectionColumns, SectionDocumentGrid, SectionHeaderFooterPart,
-    SectionHeaderFooterReference, SectionLineNumbering, SectionPageBorder, SectionPageBorders,
-    SectionPageNumbering, SectionPaperSource, SectionProperties, SectionTextDirection,
-    SectionVerticalAlignment, TableBorder, TableBorders, TableCellMergeRevisionState,
-    TableOfContents, TableRevisionKind, VmlShapeKind, VmlShapePosition, Watermark, WatermarkLayout,
-    generate_styles_xml,
+    ChapterSep, CitationFieldSpec, CitationSource, ColorScheme, ContentControlType, EndnotePos,
+    Endnotes, FootnotePos, Footnotes, GridType, ImageWatermark, ImageWatermarkAnchor,
+    LineNumberRestart, ListType, MAX_OLE_PAYLOAD_BYTES, MAX_SMART_ARTS, MAX_WATERMARK_IMAGE_BYTES,
+    MutableBookmark, MutableComment, MutableContentControl, MutableDocument, MutableField,
+    MutableHyperlink, MutableInlineImage, MutableOleObject, MutableParagraph, MutableRevision,
+    MutableRun, MutableSmartArt, MutableSmartTag, MutableSmartTagAttribute, MutableStyle,
+    MutableTable, MutableTextBox, MutableTheme, MutableVmlShape, NoteNumberRestart, PageBorderArt,
+    PageBorderDisplay, PageBorderOffsetFrom, PageBorderStyle, PageBorderZOrder, PageNumberFormat,
+    PageOrientation, Protection, RevisionContentControl, RevisionKind, RevisionMetadata,
+    RowRevisionKind, RunContent, SectionColumn, SectionColumns, SectionDocumentGrid,
+    SectionHeaderFooterPart, SectionHeaderFooterReference, SectionLineNumbering, SectionPageBorder,
+    SectionPageBorders, SectionPageNumbering, SectionPaperSource, SectionProperties,
+    SectionTextDirection, SectionVerticalAlignment, TableBorder, TableBorders,
+    TableCellMergeRevisionState, TableOfContents, TableRevisionKind, VmlShapeKind,
+    VmlShapePosition, Watermark, WatermarkLayout, generate_styles_xml,
 };
 // Note: writer::Note is not re-exported to avoid naming conflict with footnote::Note
 // Use writer::Note explicitly if needed

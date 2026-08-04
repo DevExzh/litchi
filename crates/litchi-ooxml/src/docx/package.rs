@@ -5,11 +5,12 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::{Binding, NewStore};
 use crate::docx::document::Document;
 use crate::docx::mail_merge::{
-    self, Recipients, Settings, Source, Target, is_mail_merge_relationship_type, map_docx_error,
+    self, Recipients, Settings as MailMergeSettings, Source, Target,
+    is_mail_merge_relationship_type, map_docx_error,
 };
 use crate::docx::parts::DocumentPart;
 use crate::docx::settings::{
-    ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings, extract_document_variables,
+    ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, Settings, extract_document_variables,
     patch_attached_template, patch_document_variables, patch_mail_merge,
     validate_attached_template_target,
 };
@@ -476,7 +477,7 @@ fn ensure_word_font_settings(
                     ct::WML_SETTINGS
                 )));
             }
-            DocumentSettings::extract_from_part(part)?;
+            Settings::extract_from_part(part)?;
             part.blob().to_vec()
         },
         Ok(_) => {
@@ -508,11 +509,11 @@ fn ensure_word_font_settings(
         let part = package.get_part(&target)?;
         let mut checked = part.clone_part();
         checked.set_blob(updated.clone());
-        DocumentSettings::extract_from_part(&*checked)?;
+        Settings::extract_from_part(&*checked)?;
         package.get_part_mut(&target)?.set_blob(updated);
     } else {
         let part = BlobPart::new(target.clone(), ct::WML_SETTINGS.to_owned(), updated);
-        DocumentSettings::extract_from_part(&part)?;
+        Settings::extract_from_part(&part)?;
         package.try_add_part(Box::new(part))?;
         let relationship_type = match conformance {
             font::Conformance::Transitional => litchi_opc::constants::relationship_type::SETTINGS,
@@ -2004,12 +2005,10 @@ impl Package {
     }
 
     /// Return the validated inert mail-merge settings, if configured.
-    pub fn mail_merge_settings(&self) -> Result<Option<Settings>> {
+    pub fn mail_merge_settings(&self) -> Result<Option<MailMergeSettings>> {
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(DocumentSettings::extract_from_part(&part)?
-            .mail_merge()
-            .cloned())
+        Ok(Settings::extract_from_part(&part)?.mail_merge().cloned())
     }
 
     /// Resolve a mail-merge relationship without opening or fetching its target.
@@ -2041,7 +2040,7 @@ impl Package {
     /// Set or replace the complete mail-merge graph atomically.
     pub fn set_mail_merge(
         &mut self,
-        mut settings: Settings,
+        mut settings: MailMergeSettings,
         data_source: Option<Source>,
         header_source: Option<Source>,
         recipients: Option<Recipients>,
@@ -2049,7 +2048,7 @@ impl Package {
     ) -> Result<()> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
+        Settings::extract_from_part(&original)?;
         let old_targets = self.mail_merge_internal_targets(&snapshot)?;
         let mut used_ids = snapshot
             .relationships
@@ -2137,7 +2136,7 @@ impl Package {
                 relationship.external,
             );
         }
-        DocumentSettings::extract_from_part(&replacement)?;
+        Settings::extract_from_part(&replacement)?;
 
         let mut installed = Vec::new();
         for part in staged_parts {
@@ -2168,7 +2167,7 @@ impl Package {
     /// Update settings and sources using the same atomic replacement semantics.
     pub fn update_mail_merge(
         &mut self,
-        settings: Settings,
+        settings: MailMergeSettings,
         data_source: Option<Source>,
         header_source: Option<Source>,
         recipients: Option<Recipients>,
@@ -2213,7 +2212,7 @@ impl Package {
     pub fn clear_mail_merge(&mut self) -> Result<bool> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        if DocumentSettings::extract_from_part(&original)?
+        if Settings::extract_from_part(&original)?
             .mail_merge()
             .is_none()
         {
@@ -2231,7 +2230,7 @@ impl Package {
         for id in ids {
             replacement.rels_mut().remove(&id);
         }
-        DocumentSettings::extract_from_part(&replacement)?;
+        Settings::extract_from_part(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         for old_target in old_targets {
             if !self.part_is_referenced(&old_target) {
@@ -2343,7 +2342,7 @@ impl Package {
             return Ok(None);
         }
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(DocumentSettings::extract_from_part(&part)?
+        Ok(Settings::extract_from_part(&part)?
             .attached_template()
             .cloned())
     }
@@ -2361,7 +2360,7 @@ impl Package {
         validate_attached_template_target(&target_uri)?;
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        let settings = DocumentSettings::extract_from_part(&original)?;
+        let settings = Settings::extract_from_part(&original)?;
         let old_id = settings
             .attached_template()
             .map(|template| template.relationship_id().to_owned());
@@ -2383,7 +2382,7 @@ impl Package {
             &snapshot.xml,
             Some(&relationship_id),
         )?);
-        DocumentSettings::extract_from_part(&replacement)?;
+        Settings::extract_from_part(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(self)
     }
@@ -2395,7 +2394,7 @@ impl Package {
             return Ok(None);
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        let settings = DocumentSettings::extract_from_part(&original)?;
+        let settings = Settings::extract_from_part(&original)?;
         let Some(attached_template) = settings.attached_template().cloned() else {
             return Ok(None);
         };
@@ -2404,7 +2403,7 @@ impl Package {
             patch_attached_template(&snapshot.xml, None)?,
             Some(attached_template.relationship_id()),
         );
-        DocumentSettings::extract_from_part(&replacement)?;
+        Settings::extract_from_part(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(Some(attached_template))
     }
@@ -2427,12 +2426,12 @@ impl Package {
     ) -> Result<Option<String>> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
+        Settings::extract_from_part(&original)?;
         let mut variables = extract_document_variables(&original)?;
         let previous = variables.insert(name, value)?;
         let xml = patch_document_variables(&snapshot.xml, &variables)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&replacement)?;
+        Settings::extract_from_part(&replacement)?;
         extract_document_variables(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(previous)
@@ -2445,14 +2444,14 @@ impl Package {
             return Ok(None);
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
+        Settings::extract_from_part(&original)?;
         let mut variables = extract_document_variables(&original)?;
         let Some(previous) = variables.remove(name) else {
             return Ok(None);
         };
         let xml = patch_document_variables(&snapshot.xml, &variables)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&replacement)?;
+        Settings::extract_from_part(&replacement)?;
         extract_document_variables(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(Some(previous))
@@ -2465,7 +2464,7 @@ impl Package {
             return Ok(0);
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
+        Settings::extract_from_part(&original)?;
         let mut variables = extract_document_variables(&original)?;
         let count = variables.count();
         if count == 0 {
@@ -2474,7 +2473,7 @@ impl Package {
         variables.clear();
         let xml = patch_document_variables(&snapshot.xml, &variables)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&replacement)?;
+        Settings::extract_from_part(&replacement)?;
         extract_document_variables(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(count)
@@ -3387,7 +3386,7 @@ impl Package {
     fn update_settings_part(&mut self, xml: Vec<u8>) -> Result<()> {
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&part)?;
+        Settings::extract_from_part(&part)?;
         self.commit_settings_part(&snapshot, part)
     }
 

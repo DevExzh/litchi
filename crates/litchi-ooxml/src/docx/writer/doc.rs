@@ -41,7 +41,7 @@ pub struct MutableDocument {
     /// Comments (ID -> Comment)
     comments: Vec<MutableComment>,
     /// Document protection settings
-    protection: Option<DocumentProtection>,
+    protection: Option<Protection>,
     /// Whether document protection was explicitly changed.
     protection_dirty: bool,
     /// Section properties (page setup, margins, orientation)
@@ -82,7 +82,7 @@ const FIRST_VML_SHAPE_NUMBER: u32 = 1025;
 
 /// Document protection settings.
 #[derive(Debug, Clone)]
-pub struct DocumentProtection {
+pub struct Protection {
     /// Type of protection
     pub protection_type: ProtectionType,
     /// Password hash (optional, for actual enforcement)
@@ -842,7 +842,7 @@ impl MutableDocument {
     /// doc.set_protection(ProtectionType::Comments);
     /// ```
     pub fn set_protection(&mut self, protection_type: ProtectionType) {
-        self.protection = Some(DocumentProtection {
+        self.protection = Some(Protection {
             protection_type,
             password_hash: None,
             salt: None,
@@ -867,7 +867,7 @@ impl MutableDocument {
         password_hash: String,
         salt: String,
     ) {
-        self.protection = Some(DocumentProtection {
+        self.protection = Some(Protection {
             protection_type,
             password_hash: Some(password_hash),
             salt: Some(salt),
@@ -1555,7 +1555,7 @@ impl Default for MutableDocument {
 
 fn write_document_protection(
     xml: &mut String,
-    protection: &DocumentProtection,
+    protection: &Protection,
     prefix: &str,
     local_namespace: Option<&str>,
 ) -> Result<()> {
@@ -1595,10 +1595,7 @@ fn write_document_protection(
     Ok(())
 }
 
-fn patch_document_protection(
-    existing: &[u8],
-    protection: Option<&DocumentProtection>,
-) -> Result<Vec<u8>> {
+fn patch_document_protection(existing: &[u8], protection: Option<&Protection>) -> Result<Vec<u8>> {
     use crate::docx::namespace::scan_word_element_ranges;
 
     let existing = std::str::from_utf8(existing).map_err(|_| {

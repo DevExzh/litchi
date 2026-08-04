@@ -4,7 +4,7 @@
 //! and protection status.
 
 use crate::docx::mail_merge::{
-    Settings, parse_settings_mail_merge, validate_mail_merge_relationships,
+    Settings as MailMergeSettings, parse_settings_mail_merge, validate_mail_merge_relationships,
 };
 use crate::docx::namespace::{
     STRICT_WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace, word_attribute_value,
@@ -91,7 +91,7 @@ impl AttachedTemplate {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone)]
-pub struct DocumentSettings {
+pub struct Settings {
     /// Format-owned scalar settings parsed from `settings.xml`.
     values: OwnedSettings,
     /// Smart-tag type declarations.
@@ -99,7 +99,7 @@ pub struct DocumentSettings {
     /// Whether applications should omit embedded smart-tag data when saving.
     do_not_embed_smart_tags: bool,
     /// Inert mail-merge connection and display metadata.
-    mail_merge: Option<Settings>,
+    mail_merge: Option<MailMergeSettings>,
     /// Inert external attached-template reference.
     attached_template: Option<AttachedTemplate>,
 }
@@ -116,8 +116,8 @@ pub use litchi_docx::settings::{
 };
 
 type OwnedSettings = litchi_docx::settings::Settings<Format>;
-impl DocumentSettings {
-    /// Create a new DocumentSettings with default values.
+impl Settings {
+    /// Create a new Settings value with default values.
     pub fn new() -> Self {
         Self {
             values: OwnedSettings::new(),
@@ -166,7 +166,7 @@ impl DocumentSettings {
 
     /// Return the document's inert mail-merge metadata, if present.
     #[inline]
-    pub fn mail_merge(&self) -> Option<&Settings> {
+    pub fn mail_merge(&self) -> Option<&MailMergeSettings> {
         self.mail_merge.as_ref()
     }
 
@@ -266,7 +266,7 @@ impl DocumentSettings {
     ///
     /// # Returns
     ///
-    /// A DocumentSettings object
+    /// A Settings object
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
         let xml = litchi_ooxml_common::mce::process_part(part)?;
         let mut settings = Self::extract_from_xml(xml.as_ref())?;
@@ -441,7 +441,7 @@ enum NoteKind {
 
 fn begin_settings_group(
     element: &BytesStart<'_>,
-    settings: &DocumentSettings,
+    settings: &Settings,
     saw_compat: &mut bool,
 ) -> Result<Option<PendingGroup>> {
     match element.local_name().as_ref() {
@@ -480,7 +480,7 @@ fn begin_settings_group(
     }
 }
 
-fn finish_settings_group(settings: &mut DocumentSettings, group: PendingGroup) -> Result<()> {
+fn finish_settings_group(settings: &mut Settings, group: PendingGroup) -> Result<()> {
     match group {
         PendingGroup::Compatibility {
             options,
@@ -640,7 +640,7 @@ fn parse_setting(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-    settings: &mut DocumentSettings,
+    settings: &mut Settings,
     seen: &mut SeenSettings,
 ) -> Result<()> {
     match element.local_name().as_ref() {
@@ -877,10 +877,7 @@ pub(crate) fn validate_attached_template_target(target: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_attached_template_relationship(
-    part: &dyn Part,
-    settings: &mut DocumentSettings,
-) -> Result<()> {
+fn validate_attached_template_relationship(part: &dyn Part, settings: &mut Settings) -> Result<()> {
     let matching = part
         .rels()
         .iter()
@@ -977,7 +974,7 @@ pub(crate) fn patch_font_embedding(xml: &[u8], subsetted: bool) -> Result<Vec<u8
 
 #[cfg(any(feature = "fonts", test))]
 fn patch_font_flag(xml: &[u8], flag: FontFlag, enabled: bool) -> Result<Vec<u8>> {
-    DocumentSettings::extract_from_xml(xml)?;
+    Settings::extract_from_xml(xml)?;
     let layout = scan_settings_xml_layout(xml)?;
     let (range, current, insert_at) = match flag {
         FontFlag::EmbedTrueType => (
@@ -1071,10 +1068,10 @@ fn settings_patch_buffer(capacity: usize) -> Result<Vec<u8>> {
 
 pub(crate) fn patch_mail_merge(
     xml: &[u8],
-    mail_merge: Option<&Settings>,
+    mail_merge: Option<&MailMergeSettings>,
     conformance: crate::docx::mail_merge::Conformance,
 ) -> Result<Vec<u8>> {
-    DocumentSettings::extract_from_xml(xml)?;
+    Settings::extract_from_xml(xml)?;
     let layout = scan_settings_xml_layout(xml)?;
     let replacement = mail_merge
         .map(|value| {
@@ -1179,7 +1176,7 @@ pub(crate) fn patch_attached_template(
     relationship_id: Option<&str>,
 ) -> Result<Vec<u8>> {
     // Validate the original tree and its direct-child cardinality before using offsets.
-    DocumentSettings::extract_from_xml(xml)?;
+    Settings::extract_from_xml(xml)?;
     let layout = scan_settings_xml_layout(xml)?;
     if relationship_id.is_none() && layout.attached_template_range.is_none() {
         return Ok(xml.to_vec());
@@ -1753,7 +1750,7 @@ fn map_docx_error(error: litchi_docx::Error) -> OoxmlError {
     }
 }
 
-impl Default for DocumentSettings {
+impl Default for Settings {
     fn default() -> Self {
         Self::new()
     }
@@ -1767,7 +1764,7 @@ mod tests {
 
     #[test]
     fn test_settings_creation() {
-        let settings = DocumentSettings::new();
+        let settings = Settings::new();
         assert!(!settings.is_protected());
         assert!(settings.protection_type().is_none());
         assert!(!settings.track_revisions());
@@ -1805,7 +1802,7 @@ mod tests {
             <s:doNotEmbedSmartTags s:val="off"/>
         </s:settings>"#;
 
-        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+        let settings = Settings::extract_from_xml(xml).unwrap();
         assert!(settings.track_revisions());
         assert!(!settings.do_not_embed_smart_tags());
         assert_eq!(settings.smart_tag_types().len(), 1);
@@ -1824,34 +1821,34 @@ mod tests {
     fn validates_smart_tag_settings() {
         let enabled = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags/></w:settings>"#;
         assert!(
-            DocumentSettings::extract_from_xml(enabled)
+            Settings::extract_from_xml(enabled)
                 .unwrap()
                 .do_not_embed_smart_tags()
         );
 
         let missing_url = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTagType w:namespaceuri="urn:test" w:name="test"/></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(missing_url).is_err());
+        assert!(Settings::extract_from_xml(missing_url).is_err());
 
         let oversized_name = "n".repeat(litchi_docx::settings::MAX_SMART_TAG_NAME_CHARS + 1);
         let oversized = format!(
             r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTagType w:namespaceuri="urn:test" w:name="{oversized_name}" w:url="https://example.test"/></w:settings>"#
         );
         assert!(matches!(
-            DocumentSettings::extract_from_xml(oversized.as_bytes()),
+            Settings::extract_from_xml(oversized.as_bytes()),
             Err(OoxmlError::InvalidFormat(message)) if message.contains("smart-tag name")
         ));
 
         let invalid_on_off = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags w:val="maybe"/></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(invalid_on_off).is_err());
+        assert!(Settings::extract_from_xml(invalid_on_off).is_err());
 
         let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags/><w:doNotEmbedSmartTags/></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+        assert!(Settings::extract_from_xml(duplicate).is_err());
     }
 
     #[test]
     fn parses_compat_options_and_settings() {
         let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:zoom w:percent="100"/><w:compat><w:useFELayout/><w:doNotExpandShiftReturn w:val="off"/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="14"/><w:compatSetting w:name="enableOpenTypeFeatures" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/></w:compat><w:rsids/></w:settings>"#;
-        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+        let settings = Settings::extract_from_xml(xml).unwrap();
         assert_eq!(settings.zoom_percent(), Some(100));
         assert_eq!(settings.compatibility_options().len(), 2);
         assert_eq!(
@@ -1968,13 +1965,13 @@ mod tests {
             let transitional = format!(
                 r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:{raw}/></w:compat></w:settings>"#
             );
-            let parsed = DocumentSettings::extract_from_xml(transitional.as_bytes()).unwrap();
+            let parsed = Settings::extract_from_xml(transitional.as_bytes()).unwrap();
             assert_eq!(parsed.compatibility_options()[0].flag(), flag);
 
             let strict = format!(
                 r#"<w:settings xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:compat><w:{raw}/></w:compat></w:settings>"#
             );
-            let parsed = DocumentSettings::extract_from_xml(strict.as_bytes());
+            let parsed = Settings::extract_from_xml(strict.as_bytes());
             if flag.is_strict() {
                 assert_eq!(parsed.unwrap().compatibility_options()[0].flag(), flag);
             } else {
@@ -1994,44 +1991,44 @@ mod tests {
             let unknown = format!(
                 r#"<w:settings xmlns:w="{namespace}"><w:compat><w:vendorCompat/></w:compat></w:settings>"#
             );
-            assert!(DocumentSettings::extract_from_xml(unknown.as_bytes()).is_err());
+            assert!(Settings::extract_from_xml(unknown.as_bytes()).is_err());
 
             let duplicate = format!(
                 r#"<w:settings xmlns:w="{namespace}"><w:compat><w:spaceForUL/><w:spaceForUL/></w:compat></w:settings>"#
             );
-            assert!(DocumentSettings::extract_from_xml(duplicate.as_bytes()).is_err());
+            assert!(Settings::extract_from_xml(duplicate.as_bytes()).is_err());
         }
     }
 
     #[test]
     fn parses_empty_and_strict_compat_groups() {
         let empty = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat/></w:settings>"#;
-        let settings = DocumentSettings::extract_from_xml(empty).unwrap();
+        let settings = Settings::extract_from_xml(empty).unwrap();
         assert!(settings.compatibility_options().is_empty());
         assert!(settings.compatibility_settings().is_empty());
         assert_eq!(settings.compatibility_mode(), None);
 
         let strict = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:compat><s:compatSetting s:name="compatibilityMode" s:uri="http://schemas.microsoft.com/office/word" s:val="15"/></s:compat></s:settings>"#;
-        let settings = DocumentSettings::extract_from_xml(strict).unwrap();
+        let settings = Settings::extract_from_xml(strict).unwrap();
         assert_eq!(settings.compatibility_mode(), Some(15));
     }
 
     #[test]
     fn rejects_invalid_compat_groups() {
         let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat/><w:compat/></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+        assert!(Settings::extract_from_xml(duplicate).is_err());
 
         let missing_value = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word"/></w:compat></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(missing_value).is_err());
+        assert!(Settings::extract_from_xml(missing_value).is_err());
 
         let unterminated = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat>"#;
-        assert!(DocumentSettings::extract_from_xml(unterminated).is_err());
+        assert!(Settings::extract_from_xml(unterminated).is_err());
     }
 
     #[test]
     fn parses_document_level_note_properties() {
         let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:footnote w:type="separator" w:id="-1"/><w:pos w:val="pageBottom"/><w:numFmt w:val="lowerRoman"/><w:numStart w:val="2"/><w:numRestart w:val="eachPage"/></w:footnotePr><w:endnotePr><w:pos w:val="docEnd"/><w:numFmt w:val="upperLetter"/></w:endnotePr></w:settings>"#;
-        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+        let settings = Settings::extract_from_xml(xml).unwrap();
 
         let footnotes = settings.footnote_properties().unwrap();
         assert_eq!(footnotes.position(), Some(NotePosition::PageBottom));
@@ -2066,7 +2063,7 @@ mod tests {
                     r#"<w:settings xmlns:w="{namespace}"><w:footnotePr><w:pos w:val="{raw}"/></w:footnotePr></w:settings>"#
                 );
                 assert_eq!(
-                    DocumentSettings::extract_from_xml(xml.as_bytes())
+                    Settings::extract_from_xml(xml.as_bytes())
                         .unwrap()
                         .footnote_properties()
                         .unwrap()
@@ -2091,7 +2088,7 @@ mod tests {
                     r#"<w:settings xmlns:w="{namespace}"><w:endnotePr><w:pos w:val="{raw}"/></w:endnotePr></w:settings>"#
                 );
                 assert_eq!(
-                    DocumentSettings::extract_from_xml(xml.as_bytes())
+                    Settings::extract_from_xml(xml.as_bytes())
                         .unwrap()
                         .endnote_properties()
                         .unwrap()
@@ -2109,7 +2106,7 @@ mod tests {
                 let xml = format!(
                     r#"<w:settings xmlns:w="{namespace}"><w:endnotePr><w:pos w:val="{raw}"/></w:endnotePr></w:settings>"#
                 );
-                assert!(DocumentSettings::extract_from_xml(xml.as_bytes()).is_err());
+                assert!(Settings::extract_from_xml(xml.as_bytes()).is_err());
             }
         }
 
@@ -2127,31 +2124,31 @@ mod tests {
     #[test]
     fn rejects_invalid_note_property_groups() {
         let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr/><w:footnotePr/></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+        assert!(Settings::extract_from_xml(duplicate).is_err());
 
         let bad_start = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnotePr><w:numStart w:val="soon"/></w:endnotePr></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(bad_start).is_err());
+        assert!(Settings::extract_from_xml(bad_start).is_err());
 
         let bad_restart = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numRestart w:val="sometimes"/></w:footnotePr></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(bad_restart).is_err());
+        assert!(Settings::extract_from_xml(bad_restart).is_err());
 
         let bad_position = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:pos w:val="vendorPosition"/></w:footnotePr></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(bad_position).is_err());
+        assert!(Settings::extract_from_xml(bad_position).is_err());
 
         let footnote_only_position = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnotePr><w:pos w:val="pageBottom"/></w:endnotePr></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(footnote_only_position).is_err());
+        assert!(Settings::extract_from_xml(footnote_only_position).is_err());
 
         let bad_format = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numFmt w:val="vendorNumbering"/></w:footnotePr></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(bad_format).is_err());
+        assert!(Settings::extract_from_xml(bad_format).is_err());
 
         let duplicate_child = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numFmt w:val="decimal"/><w:numFmt w:val="bullet"/></w:footnotePr></w:settings>"#;
-        assert!(DocumentSettings::extract_from_xml(duplicate_child).is_err());
+        assert!(Settings::extract_from_xml(duplicate_child).is_err());
     }
 
     #[test]
     fn parses_view_proofing_and_theme_defaults() {
         let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:writeProtection/><w:view w:val="print"/><w:proofState w:spelling="clean" w:grammar="dirty"/><w:defaultTabStop w:val="720"/><w:themeFontLang w:val="en-US" w:eastAsia="ja-JP" w:bidi="ar-SA"/><w:clrSchemeMapping w:bg1="light1" w:t1="dark1" w:hyperlink="hyperlink"/></w:settings>"#;
-        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+        let settings = Settings::extract_from_xml(xml).unwrap();
         assert!(settings.is_write_protected());
         assert_eq!(settings.view(), Some(View::Print));
         let proofing = settings.proofing_state().unwrap();
@@ -2179,7 +2176,7 @@ mod tests {
         assert_eq!(mapping.get(ColorSchemeSlot::Accent1), None);
 
         let strict = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:writeProtection s:val="off"/><s:view s:val="web"/><s:proofState/></s:settings>"#;
-        let settings = DocumentSettings::extract_from_xml(strict).unwrap();
+        let settings = Settings::extract_from_xml(strict).unwrap();
         assert!(!settings.is_write_protected());
         assert_eq!(settings.view(), Some(View::Web));
         let proofing = settings.proofing_state().unwrap();
@@ -2224,7 +2221,7 @@ mod tests {
     #[test]
     fn editing_settings_serialize_and_reparse() {
         let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:writeProtection/><w:view w:val="outline"/><w:proofState w:spelling="dirty"/><w:defaultTabStop w:val="1440"/><w:themeFontLang w:val="en-US" w:bidi="he-IL"/><w:clrSchemeMapping w:bg1="dark2" w:accent3="accent1" w:followedHyperlink="hyperlink"/></w:settings>"#;
-        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+        let settings = Settings::extract_from_xml(xml).unwrap();
 
         let fragment = settings.to_editing_settings_xml("w");
         assert_eq!(
@@ -2235,7 +2232,7 @@ mod tests {
         let reparsed_xml = format!(
             r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{fragment}</w:settings>"#
         );
-        let reparsed = DocumentSettings::extract_from_xml(reparsed_xml.as_bytes()).unwrap();
+        let reparsed = Settings::extract_from_xml(reparsed_xml.as_bytes()).unwrap();
         assert_eq!(reparsed.is_write_protected(), settings.is_write_protected());
         assert_eq!(reparsed.view(), settings.view());
         assert_eq!(reparsed.proofing_state(), settings.proofing_state());
@@ -2299,7 +2296,7 @@ mod tests {
             let mut xml = prefix.to_vec();
             xml.extend_from_slice(body);
             xml.extend_from_slice(suffix);
-            DocumentSettings::extract_from_xml(&xml)
+            Settings::extract_from_xml(&xml)
         };
 
         assert!(reject(br#"<w:view/>"#).is_err());
@@ -2407,7 +2404,7 @@ mod tests {
     #[test]
     fn parses_bundled_settings_resource() {
         let settings =
-            DocumentSettings::extract_from_xml(include_bytes!("resources/settings.xml")).unwrap();
+            Settings::extract_from_xml(include_bytes!("resources/settings.xml")).unwrap();
         assert_eq!(settings.compatibility_mode(), Some(14));
         assert_eq!(settings.compatibility_settings().len(), 4);
         assert!(settings.compatibility_options().iter().any(|option| {
@@ -2476,7 +2473,7 @@ mod tests {
                 "file:///templates/Corporate.dotx",
                 true,
             );
-            let settings = DocumentSettings::extract_from_part(&part).unwrap();
+            let settings = Settings::extract_from_part(&part).unwrap();
             let attached = settings.attached_template().unwrap();
             assert_eq!(attached.relationship_id(), "customRel");
             assert_eq!(attached.target_uri(), "file:///templates/Corporate.dotx");
@@ -2491,20 +2488,20 @@ mod tests {
             litchi_opc::constants::content_type::WML_SETTINGS.to_owned(),
             xml.to_vec(),
         );
-        assert!(DocumentSettings::extract_from_part(&missing).is_err());
+        assert!(Settings::extract_from_part(&missing).is_err());
 
         let wrong_type = attached_template_part(xml, "urn:wrong", "file:///a.dotx", true);
-        assert!(DocumentSettings::extract_from_part(&wrong_type).is_err());
+        assert!(Settings::extract_from_part(&wrong_type).is_err());
         let internal =
             attached_template_part(xml, ATTACHED_TEMPLATE_RELATIONSHIP, "template.dotx", false);
-        assert!(DocumentSettings::extract_from_part(&internal).is_err());
+        assert!(Settings::extract_from_part(&internal).is_err());
         let whitespace = attached_template_part(
             xml,
             ATTACHED_TEMPLATE_RELATIONSHIP,
             "file:///bad path.dotx",
             true,
         );
-        assert!(DocumentSettings::extract_from_part(&whitespace).is_err());
+        assert!(Settings::extract_from_part(&whitespace).is_err());
 
         let mut duplicate =
             attached_template_part(xml, ATTACHED_TEMPLATE_RELATIONSHIP, "file:///a.dotx", true);
@@ -2514,7 +2511,7 @@ mod tests {
             "duplicate".to_owned(),
             true,
         );
-        assert!(DocumentSettings::extract_from_part(&duplicate).is_err());
+        assert!(Settings::extract_from_part(&duplicate).is_err());
     }
 
     #[test]
