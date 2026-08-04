@@ -26,6 +26,7 @@ pub mod row;
 pub mod scenarios;
 pub mod sheet;
 pub mod sheet_calculation_properties;
+pub mod sheet_view;
 pub mod style;
 pub mod views;
 pub mod volatile_dependencies;
@@ -72,6 +73,12 @@ pub use scenarios::{
 pub use sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
     parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
+};
+pub use sheet_view::{
+    PivotAreaType, PivotSelectionAxis, WorksheetCellReference, WorksheetPanePosition,
+    WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,
+    WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
+    WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
 };
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use views::{
