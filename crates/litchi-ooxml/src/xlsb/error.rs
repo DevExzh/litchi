@@ -17,6 +17,8 @@ pub enum XlsbError {
     Wire(litchi_xlsb::Error),
     /// Typed workbook calculation-property error.
     Calc(litchi_xlsb::calc::Error),
+    /// Typed merged-cell record error.
+    MergedCell(litchi_xlsb::merged_cells::Error),
     /// Invalid record type
     InvalidRecordType(u16),
     /// Unexpected record
@@ -88,6 +90,7 @@ impl fmt::Display for XlsbError {
             XlsbError::Xml(e) => write!(f, "XML error: {}", e),
             XlsbError::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
             XlsbError::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
+            XlsbError::MergedCell(e) => write!(f, "XLSB merged-cell error: {e}"),
             XlsbError::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
             XlsbError::UnexpectedRecord { expected, found } => {
                 write!(
@@ -152,6 +155,7 @@ impl std::error::Error for XlsbError {
             XlsbError::Xml(e) => Some(e),
             XlsbError::Wire(e) => Some(e),
             XlsbError::Calc(e) => Some(e),
+            XlsbError::MergedCell(e) => Some(e),
             XlsbError::Allocation { source, .. } => Some(source),
             XlsbError::Drawing(e) => Some(e),
             XlsbError::Common(e) => Some(e),
@@ -184,6 +188,12 @@ impl From<litchi_xlsb::Error> for XlsbError {
 impl From<litchi_xlsb::calc::Error> for XlsbError {
     fn from(error: litchi_xlsb::calc::Error) -> Self {
         Self::Calc(error)
+    }
+}
+
+impl From<litchi_xlsb::merged_cells::Error> for XlsbError {
+    fn from(error: litchi_xlsb::merged_cells::Error) -> Self {
+        Self::MergedCell(error)
     }
 }
 
