@@ -1,7 +1,7 @@
-use litchi_odt::{DocumentBuilder, FlatOpenDocument, OpenDocumentPackage};
 use litchi_odt::style::paragraph::alignment::{
     Horizontal, Properties, Style, Vertical, parse, set_xml,
 };
+use litchi_odt::{DocumentBuilder, FlatOpenDocument, OpenDocumentPackage};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -72,12 +72,7 @@ fn parses_every_token() {
         ));
         let set = parse(&xml).unwrap();
         assert_eq!(
-            set.get("P")
-                .unwrap()
-                .properties
-                .as_ref()
-                .unwrap()
-                .vertical,
+            set.get("P").unwrap().properties.as_ref().unwrap().vertical,
             Some(expect)
         );
     }
@@ -136,10 +131,7 @@ fn rejects_malformed_values_and_duplicates() {
         ),
     ];
     for xml in bad {
-        assert!(
-            parse(&xml).is_err(),
-            "accepted {xml}"
-        );
+        assert!(parse(&xml).is_err(), "accepted {xml}");
     }
 }
 
@@ -207,11 +199,7 @@ fn mutation_replaces_inserts_and_strips_owned_attributes() {
     let reparsed = parse(&updated).unwrap();
     assert!(reparsed.get("C").unwrap().properties.is_some());
     // Nothing to strip and no properties element: unchanged.
-    let unchanged = set_xml(
-        &bare,
-        &Style::named("B", None).unwrap(),
-    )
-    .unwrap();
+    let unchanged = set_xml(&bare, &Style::named("B", None).unwrap()).unwrap();
     assert_eq!(unchanged, bare);
 }
 

@@ -9,8 +9,11 @@ fn document(body: &str) -> Document {
     let content = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}" o:version="1.3"><o:body><o:text>{body}</o:text></o:body></o:document-content>"#
     );
-    Document::from_bytes(support::package(MIMETYPE, &[("content.xml", content.as_bytes())]))
-        .unwrap()
+    Document::from_bytes(support::package(
+        MIMETYPE,
+        &[("content.xml", content.as_bytes())],
+    ))
+    .unwrap()
 }
 
 #[test]

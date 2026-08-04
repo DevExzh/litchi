@@ -169,7 +169,10 @@ fn mutable_update_preserves_inherited_aliases() {
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" o:version="1.3"><o:body><o:text><t:p>body</t:p></o:text></o:body></o:document-content>"#;
     let document = Document::from_bytes(support::package(
         "application/vnd.oasis.opendocument.text",
-        &[("content.xml", content.as_bytes()), ("styles.xml", styles.as_bytes())],
+        &[
+            ("content.xml", content.as_bytes()),
+            ("styles.xml", styles.as_bytes()),
+        ],
     ))
     .unwrap();
     assert_eq!(

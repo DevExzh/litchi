@@ -14,10 +14,10 @@ fn package(content: &str) -> Vec<u8> {
     support::package(
         MIMETYPE,
         &[
-        ("content.xml", content.as_bytes()),
-        ("meta.xml", b"<meta-preserved/>"),
-        ("settings.xml", b"<settings-preserved/>"),
-        ("Objects/asset.bin", b"\x00preserved\xff"),
+            ("content.xml", content.as_bytes()),
+            ("meta.xml", b"<meta-preserved/>"),
+            ("settings.xml", b"<settings-preserved/>"),
+            ("Objects/asset.bin", b"\x00preserved\xff"),
         ],
     )
 }

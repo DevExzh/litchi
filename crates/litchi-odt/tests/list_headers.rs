@@ -5,8 +5,8 @@
 //! must be reachable from the structured list model and not only through the
 //! flattened text.
 
-use litchi_odt::elements::text::TextElements;
 use litchi_odt::elements::parser::{DocumentOrderElement, DocumentParser};
+use litchi_odt::elements::text::TextElements;
 use litchi_odt::elements::text::{ListHeader, Paragraph};
 
 /// A list whose first block is an unnumbered header followed by two items.

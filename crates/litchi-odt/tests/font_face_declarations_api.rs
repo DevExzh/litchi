@@ -19,7 +19,10 @@ fn declarations(name: &str) -> Faces {
 fn document() -> Document {
     Document::from_bytes(support::package(
         MIMETYPE,
-        &[("content.xml", CONTENT.as_bytes()), ("styles.xml", STYLES.as_bytes())],
+        &[
+            ("content.xml", CONTENT.as_bytes()),
+            ("styles.xml", STYLES.as_bytes()),
+        ],
     ))
     .unwrap()
 }

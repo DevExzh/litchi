@@ -3,7 +3,9 @@ use litchi_odp::{Presentation, PresentationBuilder};
 #[test]
 fn builder_and_presentation_facade_round_trip() {
     let mut builder = PresentationBuilder::new();
-    builder.add_slide_with_title("Welcome", "Hello from ODP").unwrap();
+    builder
+        .add_slide_with_title("Welcome", "Hello from ODP")
+        .unwrap();
     let bytes = builder.build().unwrap();
     let presentation = Presentation::from_bytes(bytes.clone()).unwrap();
     assert_eq!(presentation.slide_count().unwrap(), 1);

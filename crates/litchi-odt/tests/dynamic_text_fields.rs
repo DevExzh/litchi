@@ -16,8 +16,11 @@ fn document(inner: &str) -> Document {
     let content = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}" o:version="1.2"><o:body><o:text><t:p>{inner}</t:p></o:text></o:body></o:document-content>"#
     );
-    Document::from_bytes(support::package(MIMETYPE, &[("content.xml", content.as_bytes())]))
-        .unwrap()
+    Document::from_bytes(support::package(
+        MIMETYPE,
+        &[("content.xml", content.as_bytes())],
+    ))
+    .unwrap()
 }
 
 #[test]

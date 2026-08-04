@@ -1,6 +1,6 @@
-use litchi_ods::{Spreadsheet, SpreadsheetBuilder};
 use litchi_odf_common::constants;
 use litchi_ods::rdf::{Object, Subject, Triple};
+use litchi_ods::{Spreadsheet, SpreadsheetBuilder};
 
 #[test]
 fn builder_and_package_facade_round_trip() {
@@ -32,5 +32,8 @@ fn spreadsheet_facade_owns_rdf_crud() {
     assert_eq!(spreadsheet.rdf_graphs().unwrap()[0].triples, [triple]);
     spreadsheet.remove_rdf_graph(&path).unwrap();
     assert!(spreadsheet.rdf_graphs().unwrap().is_empty());
-    assert_eq!(constants::ODF_SPREADSHEET, "application/vnd.oasis.opendocument.spreadsheet");
+    assert_eq!(
+        constants::ODF_SPREADSHEET,
+        "application/vnd.oasis.opendocument.spreadsheet"
+    );
 }

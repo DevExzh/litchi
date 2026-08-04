@@ -1,7 +1,7 @@
 //! Tests for `draw:image-map` through the package and flat-document APIs.
 
-use litchi_odt::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_odt::image_map::ImageMapAreaShape;
+use litchi_odt::{FlatOpenDocument, OpenDocumentPackage};
 mod support;
 
 const CONTENT: &str = concat!(
@@ -23,8 +23,11 @@ const CONTENT: &str = concat!(
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
 fn package() -> OpenDocumentPackage {
-    OpenDocumentPackage::from_bytes(support::package(MIMETYPE, &[("content.xml", CONTENT.as_bytes())]))
-        .unwrap()
+    OpenDocumentPackage::from_bytes(support::package(
+        MIMETYPE,
+        &[("content.xml", CONTENT.as_bytes())],
+    ))
+    .unwrap()
 }
 
 #[test]
