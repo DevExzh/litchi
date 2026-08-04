@@ -21,12 +21,12 @@ const MAX_RELATIONSHIP_ID_CHARS: usize = 1_024;
 
 /// Namespace form used when serializing a consolidation fragment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetDataConsolidationConformance {
+pub enum Conformance {
     Transitional,
     Strict,
 }
 
-impl WorksheetDataConsolidationConformance {
+impl Conformance {
     fn main_namespace(self) -> &'static str {
         match self {
             Self::Transitional => TRANSITIONAL_MAIN,
@@ -44,7 +44,7 @@ impl WorksheetDataConsolidationConformance {
 
 /// Mathematical aggregator selected by `ST_DataConsolidateFunction`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum WorksheetDataConsolidationFunction {
+pub enum Function {
     Average,
     Count,
     CountNumbers,
@@ -59,7 +59,7 @@ pub enum WorksheetDataConsolidationFunction {
     PopulationVariance,
 }
 
-impl WorksheetDataConsolidationFunction {
+impl Function {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "average" => Ok(Self::Average),
@@ -98,9 +98,9 @@ impl WorksheetDataConsolidationFunction {
 
 /// A validated A1 cell or rectangular range reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetDataConsolidationRangeReference(String);
+pub struct RangeReference(String);
 
-impl WorksheetDataConsolidationRangeReference {
+impl RangeReference {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if !valid_range_reference(&value) {
@@ -116,37 +116,34 @@ impl WorksheetDataConsolidationRangeReference {
 
 /// The mutually exclusive source forms of `CT_DataRef`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WorksheetDataReferenceSource {
+pub enum ReferenceSource {
     DefinedName(String),
     Range {
         sheet: String,
-        reference: WorksheetDataConsolidationRangeReference,
+        reference: RangeReference,
     },
 }
 
 /// A single consolidation source, optionally in an external workbook.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetDataReference {
-    source: WorksheetDataReferenceSource,
+pub struct Reference {
+    source: ReferenceSource,
     relationship_id: Option<String>,
 }
 
-impl WorksheetDataReference {
+impl Reference {
     pub fn named(name: impl Into<String>) -> Result<Self> {
         let name = checked_xstring(name.into(), "dataRef name")?;
         Ok(Self {
-            source: WorksheetDataReferenceSource::DefinedName(name),
+            source: ReferenceSource::DefinedName(name),
             relationship_id: None,
         })
     }
 
-    pub fn range(
-        sheet: impl Into<String>,
-        reference: WorksheetDataConsolidationRangeReference,
-    ) -> Result<Self> {
+    pub fn range(sheet: impl Into<String>, reference: RangeReference) -> Result<Self> {
         let sheet = checked_xstring(sheet.into(), "dataRef sheet")?;
         Ok(Self {
-            source: WorksheetDataReferenceSource::Range { sheet, reference },
+            source: ReferenceSource::Range { sheet, reference },
             relationship_id: None,
         })
     }
@@ -156,7 +153,7 @@ impl WorksheetDataReference {
         Ok(self)
     }
 
-    pub fn source(&self) -> &WorksheetDataReferenceSource {
+    pub fn source(&self) -> &ReferenceSource {
         &self.source
     }
     pub fn relationship_id(&self) -> Option<&str> {
@@ -166,13 +163,13 @@ impl WorksheetDataReference {
 
 /// Bounded `dataRefs` collection and its optional source count.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetDataReferences {
-    references: Vec<WorksheetDataReference>,
+pub struct References {
+    references: Vec<Reference>,
     declared_count: Option<u32>,
 }
 
-impl WorksheetDataReferences {
-    pub fn new(references: Vec<WorksheetDataReference>) -> Result<Self> {
+impl References {
+    pub fn new(references: Vec<Reference>) -> Result<Self> {
         validate_reference_count(references.len())?;
         Ok(Self {
             declared_count: Some(references.len() as u32),
@@ -180,7 +177,7 @@ impl WorksheetDataReferences {
         })
     }
 
-    pub fn references(&self) -> &[WorksheetDataReference] {
+    pub fn references(&self) -> &[Reference] {
         &self.references
     }
     pub fn declared_count(&self) -> Option<u32> {
@@ -190,20 +187,17 @@ impl WorksheetDataReferences {
 
 /// Complete immutable worksheet `dataConsolidate` settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetDataConsolidation {
-    function: WorksheetDataConsolidationFunction,
+pub struct DataConsolidation {
+    function: Function,
     left_labels: bool,
     start_labels: bool,
     top_labels: bool,
     link: bool,
-    data_references: Option<WorksheetDataReferences>,
+    data_references: Option<References>,
 }
 
-impl WorksheetDataConsolidation {
-    pub fn new(
-        function: WorksheetDataConsolidationFunction,
-        data_references: Option<WorksheetDataReferences>,
-    ) -> Self {
+impl DataConsolidation {
+    pub fn new(function: Function, data_references: Option<References>) -> Self {
         Self {
             function,
             left_labels: false,
@@ -230,7 +224,7 @@ impl WorksheetDataConsolidation {
         self.link = value;
         self
     }
-    pub fn function(&self) -> WorksheetDataConsolidationFunction {
+    pub fn function(&self) -> Function {
         self.function
     }
     pub fn left_labels(&self) -> bool {
@@ -245,7 +239,7 @@ impl WorksheetDataConsolidation {
     pub fn link(&self) -> bool {
         self.link
     }
-    pub fn data_references(&self) -> Option<&WorksheetDataReferences> {
+    pub fn data_references(&self) -> Option<&References> {
         self.data_references.as_ref()
     }
 }
@@ -269,18 +263,16 @@ enum NamespaceKind {
 
 #[derive(Default)]
 struct ConsolidationBuilder {
-    function: Option<WorksheetDataConsolidationFunction>,
+    function: Option<Function>,
     left_labels: Option<bool>,
     start_labels: Option<bool>,
     top_labels: Option<bool>,
     link: Option<bool>,
-    data_references: Option<WorksheetDataReferences>,
+    data_references: Option<References>,
 }
 
 /// Parses the direct worksheet `dataConsolidate` child after applying shared MCE processing.
-pub fn parse_worksheet_data_consolidation(
-    xml: &[u8],
-) -> Result<Option<WorksheetDataConsolidation>> {
+pub fn parse_worksheet_data_consolidation(xml: &[u8]) -> Result<Option<DataConsolidation>> {
     let source = std::str::from_utf8(xml)
         .map_err(|error| invalid(format!("worksheet XML is not UTF-8: {error}")))?;
     let processed = process_str(source)?;
@@ -372,7 +364,7 @@ fn begin_element(
     parent: Option<Scope>,
     builder: &mut Option<ConsolidationBuilder>,
     declared_count: &mut Option<u32>,
-    references: &mut Vec<WorksheetDataReference>,
+    references: &mut Vec<Reference>,
     seen_consolidation: &mut bool,
     passed_consolidation_position: &mut bool,
 ) -> Result<Scope> {
@@ -460,7 +452,7 @@ fn end_scope(
     scope: Scope,
     builder: &mut Option<ConsolidationBuilder>,
     declared_count: &mut Option<u32>,
-    references: &mut Vec<WorksheetDataReference>,
+    references: &mut Vec<Reference>,
 ) -> Result<()> {
     if scope == Scope::DataRefs {
         validate_reference_count(references.len())?;
@@ -472,7 +464,7 @@ fn end_scope(
                 references.len()
             )));
         }
-        let collection = WorksheetDataReferences {
+        let collection = References {
             references: std::mem::take(references),
             declared_count: declared_count.take(),
         };
@@ -486,8 +478,8 @@ fn end_scope(
     Ok(())
 }
 
-fn finish_builder(builder: ConsolidationBuilder) -> Result<WorksheetDataConsolidation> {
-    Ok(WorksheetDataConsolidation {
+fn finish_builder(builder: ConsolidationBuilder) -> Result<DataConsolidation> {
+    Ok(DataConsolidation {
         function: builder.function.unwrap_or_default(),
         left_labels: builder.left_labels.unwrap_or(false),
         start_labels: builder.start_labels.unwrap_or(false),
@@ -519,11 +511,7 @@ fn parse_consolidation_attributes(
                 invalid(format!("invalid dataConsolidate attribute value: {error}"))
             })?;
         match local.as_ref() {
-            b"function" => set_once(
-                &mut value.function,
-                WorksheetDataConsolidationFunction::parse(&text)?,
-                "function",
-            )?,
+            b"function" => set_once(&mut value.function, Function::parse(&text)?, "function")?,
             b"leftLabels" => set_once(
                 &mut value.left_labels,
                 parse_bool(&text, "leftLabels")?,
@@ -580,7 +568,7 @@ fn parse_data_refs_attributes(
 fn parse_data_ref_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<WorksheetDataReference> {
+) -> Result<Reference> {
     let mut name = None;
     let mut sheet = None;
     let mut reference = None;
@@ -604,11 +592,9 @@ fn parse_data_ref_attributes(
             (NamespaceKind::Unbound, b"sheet") => {
                 set_once(&mut sheet, checked_xstring(text, "dataRef sheet")?, "sheet")?
             },
-            (NamespaceKind::Unbound, b"ref") => set_once(
-                &mut reference,
-                WorksheetDataConsolidationRangeReference::new(text)?,
-                "ref",
-            )?,
+            (NamespaceKind::Unbound, b"ref") => {
+                set_once(&mut reference, RangeReference::new(text)?, "ref")?
+            },
             (NamespaceKind::Relationship, b"id") => {
                 set_once(&mut relationship_id, checked_relationship_id(text)?, "r:id")?
             },
@@ -616,17 +602,15 @@ fn parse_data_ref_attributes(
         }
     }
     let source = match (name, sheet, reference) {
-        (Some(name), None, None) => WorksheetDataReferenceSource::DefinedName(name),
-        (None, Some(sheet), Some(reference)) => {
-            WorksheetDataReferenceSource::Range { sheet, reference }
-        },
+        (Some(name), None, None) => ReferenceSource::DefinedName(name),
+        (None, Some(sheet), Some(reference)) => ReferenceSource::Range { sheet, reference },
         _ => {
             return Err(invalid(
                 "dataRef requires exactly name or the sheet and ref pair",
             ));
         },
     };
-    Ok(WorksheetDataReference {
+    Ok(Reference {
         source,
         relationship_id,
     })
@@ -634,8 +618,8 @@ fn parse_data_ref_attributes(
 
 /// Serializes one canonical, namespace-complete `dataConsolidate` fragment.
 pub fn write_worksheet_data_consolidation(
-    value: &WorksheetDataConsolidation,
-    conformance: WorksheetDataConsolidationConformance,
+    value: &DataConsolidation,
+    conformance: Conformance,
 ) -> Result<String> {
     if let Some(data_refs) = &value.data_references {
         validate_reference_count(data_refs.references.len())?;
@@ -655,7 +639,7 @@ pub fn write_worksheet_data_consolidation(
     if has_relationships {
         write!(xml, " xmlns:r=\"{}\"", conformance.relationship_namespace()).unwrap();
     }
-    if value.function != WorksheetDataConsolidationFunction::Sum {
+    if value.function != Function::Sum {
         write!(xml, " function=\"{}\"", value.function.as_str()).unwrap();
     }
     write_true_attribute(&mut xml, "leftLabels", value.left_labels);
@@ -671,10 +655,8 @@ pub fn write_worksheet_data_consolidation(
     for reference in &data_refs.references {
         xml.push_str("<dataRef");
         match &reference.source {
-            WorksheetDataReferenceSource::DefinedName(name) => {
-                write_attribute(&mut xml, "name", name)
-            },
-            WorksheetDataReferenceSource::Range { sheet, reference } => {
+            ReferenceSource::DefinedName(name) => write_attribute(&mut xml, "name", name),
+            ReferenceSource::Range { sheet, reference } => {
                 write_attribute(&mut xml, "ref", reference.as_str());
                 write_attribute(&mut xml, "sheet", sheet);
             },
@@ -911,7 +893,7 @@ mod tests {
         let value = parse_worksheet_data_consolidation(&worksheet(T, "<dataConsolidate/>"))
             .unwrap()
             .unwrap();
-        assert_eq!(value.function(), WorksheetDataConsolidationFunction::Sum);
+        assert_eq!(value.function(), Function::Sum);
         assert!(
             !value.left_labels() && !value.start_labels() && !value.top_labels() && !value.link()
         );
@@ -920,31 +902,25 @@ mod tests {
 
     #[test]
     fn canonical_writer_round_trips_range_name_relationships_and_flags() {
-        let references = WorksheetDataReferences::new(vec![
-            WorksheetDataReference::range(
+        let references = References::new(vec![
+            Reference::range(
                 "Sales & West",
-                WorksheetDataConsolidationRangeReference::new("$A$1:XFD1048576").unwrap(),
+                RangeReference::new("$A$1:XFD1048576").unwrap(),
             )
             .unwrap(),
-            WorksheetDataReference::named("Workbook_Name")
+            Reference::named("Workbook_Name")
                 .unwrap()
                 .with_relationship_id("rId7")
                 .unwrap(),
         ])
         .unwrap();
-        let value = WorksheetDataConsolidation::new(
-            WorksheetDataConsolidationFunction::CountNumbers,
-            Some(references),
-        )
-        .with_left_labels(true)
-        .with_start_labels(true)
-        .with_top_labels(true)
-        .with_link(true);
-        let fragment = write_worksheet_data_consolidation(
-            &value,
-            WorksheetDataConsolidationConformance::Transitional,
-        )
-        .unwrap();
+        let value = DataConsolidation::new(Function::CountNumbers, Some(references))
+            .with_left_labels(true)
+            .with_start_labels(true)
+            .with_top_labels(true)
+            .with_link(true);
+        let fragment =
+            write_worksheet_data_consolidation(&value, Conformance::Transitional).unwrap();
         assert_eq!(
             fragment,
             format!(
@@ -956,11 +932,7 @@ mod tests {
             .unwrap();
         assert_eq!(parsed, value);
         assert_eq!(
-            write_worksheet_data_consolidation(
-                &parsed,
-                WorksheetDataConsolidationConformance::Transitional
-            )
-            .unwrap(),
+            write_worksheet_data_consolidation(&parsed, Conformance::Transitional).unwrap(),
             fragment
         );
     }

@@ -20,7 +20,7 @@ use super::comments::parse_comments_xml;
 use super::conditional_formatting::{
     Association, Differential, DifferentialRef, Formatting, Rule, parse_conditional_formattings,
 };
-use super::data_consolidation::{WorksheetDataConsolidation, parse_worksheet_data_consolidation};
+use super::data_consolidation::{DataConsolidation, parse_worksheet_data_consolidation};
 use super::data_validation::{Collection, Validation, parse_data_validation_collections};
 use super::drawing::parse_drawing_xml;
 use super::format::{CellFill, CellFont, CellFormat};
@@ -57,7 +57,7 @@ use super::{
     },
 };
 use litchi_xlsx::cell_watches::{CellWatches, parse_cell_watches};
-use litchi_xlsx::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
+use litchi_xlsx::ignored_errors::{IgnoredErrors, parse_worksheet_ignored_errors};
 use litchi_xlsx::outline_properties::OutlineProperties;
 use litchi_xlsx::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
 use litchi_xlsx::phonetic_properties::{
@@ -226,7 +226,7 @@ pub struct Worksheet<'a> {
     /// Effective static worksheet row/column defaults and outline metadata.
     sheet_format_properties: Option<WorksheetSheetFormatProperties>,
     /// User-reviewed worksheet error-checking exceptions.
-    ignored_errors: Option<WorksheetIgnoredErrors>,
+    ignored_errors: Option<IgnoredErrors>,
     /// Watch-window cell references tracked by the worksheet.
     cell_watches: Option<CellWatches>,
     /// Worksheet-level calculation properties from `sheetCalcPr`.
@@ -240,7 +240,7 @@ pub struct Worksheet<'a> {
     /// Default East Asian phonetic text formatting.
     phonetic_properties: Option<WorksheetPhoneticProperties>,
     /// Data consolidation function, labels, linking, and source references.
-    data_consolidation: Option<WorksheetDataConsolidation>,
+    data_consolidation: Option<DataConsolidation>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -1985,7 +1985,7 @@ impl<'a> Worksheet<'a> {
     // ===== Ignored Errors =====
 
     /// User-reviewed worksheet error-checking exceptions, when present.
-    pub fn ignored_errors(&self) -> Option<&WorksheetIgnoredErrors> {
+    pub fn ignored_errors(&self) -> Option<&IgnoredErrors> {
         self.ignored_errors.as_ref()
     }
 
@@ -2028,7 +2028,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Immutable worksheet data-consolidation settings, when explicitly present.
-    pub fn data_consolidation(&self) -> Option<&WorksheetDataConsolidation> {
+    pub fn data_consolidation(&self) -> Option<&DataConsolidation> {
         self.data_consolidation.as_ref()
     }
 

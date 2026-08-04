@@ -1,5 +1,5 @@
 use litchi_ooxml::xlsx::ignored_errors::{
-    WorksheetIgnoredErrorType, WorksheetIgnoredErrors, parse_worksheet_ignored_errors,
+    IgnoredErrorType, IgnoredErrors, parse_worksheet_ignored_errors,
 };
 
 #[test]
@@ -12,9 +12,9 @@ fn host_reexports_the_canonical_ignored_errors_owner() {
         .unwrap()
         .unwrap();
 
-    fn accepts_canonical_owner(_: &litchi_xlsx::ignored_errors::WorksheetIgnoredErrors) {}
+    fn accepts_canonical_owner(_: &litchi_xlsx::ignored_errors::IgnoredErrors) {}
     accepts_canonical_owner(&value);
 
-    let _: &WorksheetIgnoredErrors = &value;
-    assert!(value.entries()[0].ignores(WorksheetIgnoredErrorType::Formula));
+    let _: &IgnoredErrors = &value;
+    assert!(value.entries()[0].ignores(IgnoredErrorType::Formula));
 }

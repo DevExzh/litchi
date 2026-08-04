@@ -88,9 +88,7 @@ pub use custom_data::{
     ExtensionList, Properties, parse_properties, validate_workbook_root, write_properties,
 };
 pub use data_consolidation::{
-    WorksheetDataConsolidation, WorksheetDataConsolidationConformance,
-    WorksheetDataConsolidationFunction, WorksheetDataConsolidationRangeReference,
-    WorksheetDataReference, WorksheetDataReferenceSource, WorksheetDataReferences,
+    DataConsolidation, Function, RangeReference, Reference, ReferenceSource, References,
     parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
 };
 pub use data_validation::{
@@ -115,8 +113,8 @@ pub use external_links::{
 pub use formula::Formula;
 pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
 pub use ignored_errors::{
-    IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
-    WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
+    IgnoredError, IgnoredErrorRangeReference, IgnoredErrorType, IgnoredErrors,
+    IgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
 pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,

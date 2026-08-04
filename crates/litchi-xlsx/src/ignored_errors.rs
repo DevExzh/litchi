@@ -26,7 +26,7 @@ const MAX_EVENTS: usize = 1_000_000;
 /// One of the nine independent error conditions that a user may suppress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(usize)]
-pub enum WorksheetIgnoredErrorType {
+pub enum IgnoredErrorType {
     CalculatedColumn,
     EmptyCellReference,
     EvaluationError,
@@ -50,12 +50,12 @@ impl IgnoredErrorRangeReference {
 
 /// Inert, bounded markup retained from an `ignoredErrors/extLst/ext` entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetIgnoredErrorsExtension {
+pub struct IgnoredErrorsExtension {
     uri: String,
     markup: Vec<u8>,
 }
 
-impl WorksheetIgnoredErrorsExtension {
+impl IgnoredErrorsExtension {
     pub fn uri(&self) -> &str {
         &self.uri
     }
@@ -67,32 +67,32 @@ impl WorksheetIgnoredErrorsExtension {
 
 /// Error conditions suppressed for one or more worksheet ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetIgnoredError {
+pub struct IgnoredError {
     ranges: Vec<IgnoredErrorRangeReference>,
     flags: [bool; 9],
 }
 
-impl WorksheetIgnoredError {
+impl IgnoredError {
     pub fn ranges(&self) -> &[IgnoredErrorRangeReference] {
         &self.ranges
     }
-    pub fn ignores(&self, error_type: WorksheetIgnoredErrorType) -> bool {
+    pub fn ignores(&self, error_type: IgnoredErrorType) -> bool {
         self.flags[error_type as usize]
     }
 }
 
 /// Worksheet ignored-error collection in document order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetIgnoredErrors {
-    entries: Vec<WorksheetIgnoredError>,
-    extensions: Vec<WorksheetIgnoredErrorsExtension>,
+pub struct IgnoredErrors {
+    entries: Vec<IgnoredError>,
+    extensions: Vec<IgnoredErrorsExtension>,
 }
 
-impl WorksheetIgnoredErrors {
-    pub fn entries(&self) -> &[WorksheetIgnoredError] {
+impl IgnoredErrors {
+    pub fn entries(&self) -> &[IgnoredError] {
         &self.entries
     }
-    pub fn extensions(&self) -> &[WorksheetIgnoredErrorsExtension] {
+    pub fn extensions(&self) -> &[IgnoredErrorsExtension] {
         &self.extensions
     }
 }
@@ -110,12 +110,12 @@ enum Context {
 struct Capture {
     depth: usize,
     writer: Writer<Vec<u8>>,
-    extension: WorksheetIgnoredErrorsExtension,
+    extension: IgnoredErrorsExtension,
 }
 
 struct Parser {
     stack: Vec<Context>,
-    collection: Option<WorksheetIgnoredErrors>,
+    collection: Option<IgnoredErrors>,
     capture: Option<Capture>,
     seen_collection: bool,
     seen_extension_list: bool,
@@ -127,7 +127,7 @@ struct Parser {
 }
 
 /// Parse the worksheet's direct `ignoredErrors` collection.
-pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<WorksheetIgnoredErrors>> {
+pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<IgnoredErrors>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("ignoredErrors worksheet XML exceeds size limit"));
     }
@@ -372,7 +372,7 @@ impl Parser {
         reject_attributes(element, "ignoredErrors")?;
         self.seen_collection = true;
         self.collection_phase = 0;
-        self.collection = Some(WorksheetIgnoredErrors {
+        self.collection = Some(IgnoredErrors {
             entries: Vec::new(),
             extensions: Vec::new(),
         });
@@ -490,7 +490,7 @@ impl Parser {
         Ok(())
     }
 
-    fn add_extension(&mut self, extension: WorksheetIgnoredErrorsExtension) -> Result<()> {
+    fn add_extension(&mut self, extension: IgnoredErrorsExtension) -> Result<()> {
         let collection = self
             .collection
             .as_mut()
@@ -516,7 +516,7 @@ fn parse_ignored_error(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<WorksheetIgnoredError> {
+) -> Result<IgnoredError> {
     let mut sqref = None;
     let mut flags = [false; 9];
     let mut seen_flags = [false; 9];
@@ -543,15 +543,15 @@ fn parse_ignored_error(
             continue;
         }
         let error_type = match local.as_ref() {
-            b"calculatedColumn" => WorksheetIgnoredErrorType::CalculatedColumn,
-            b"emptyCellReference" => WorksheetIgnoredErrorType::EmptyCellReference,
-            b"evalError" => WorksheetIgnoredErrorType::EvaluationError,
-            b"formula" => WorksheetIgnoredErrorType::Formula,
-            b"formulaRange" => WorksheetIgnoredErrorType::FormulaRange,
-            b"listDataValidation" => WorksheetIgnoredErrorType::ListDataValidation,
-            b"numberStoredAsText" => WorksheetIgnoredErrorType::NumberStoredAsText,
-            b"twoDigitTextYear" => WorksheetIgnoredErrorType::TwoDigitTextYear,
-            b"unlockedFormula" => WorksheetIgnoredErrorType::UnlockedFormula,
+            b"calculatedColumn" => IgnoredErrorType::CalculatedColumn,
+            b"emptyCellReference" => IgnoredErrorType::EmptyCellReference,
+            b"evalError" => IgnoredErrorType::EvaluationError,
+            b"formula" => IgnoredErrorType::Formula,
+            b"formulaRange" => IgnoredErrorType::FormulaRange,
+            b"listDataValidation" => IgnoredErrorType::ListDataValidation,
+            b"numberStoredAsText" => IgnoredErrorType::NumberStoredAsText,
+            b"twoDigitTextYear" => IgnoredErrorType::TwoDigitTextYear,
+            b"unlockedFormula" => IgnoredErrorType::UnlockedFormula,
             name => {
                 return Err(invalid(format!(
                     "unknown ignoredError attribute '{}'",
@@ -567,7 +567,7 @@ fn parse_ignored_error(
         flags[index] = parse_bool(&value, String::from_utf8_lossy(local.as_ref()).as_ref())?;
     }
     let ranges = sqref.ok_or_else(|| invalid("ignoredError requires sqref"))?;
-    Ok(WorksheetIgnoredError { ranges, flags })
+    Ok(IgnoredError { ranges, flags })
 }
 
 fn parse_sqref(value: &str) -> Result<Vec<IgnoredErrorRangeReference>> {
@@ -650,7 +650,7 @@ fn parse_extension(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<WorksheetIgnoredErrorsExtension> {
+) -> Result<IgnoredErrorsExtension> {
     let mut uri = None;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
@@ -676,7 +676,7 @@ fn parse_extension(
         }
         uri = Some(value);
     }
-    Ok(WorksheetIgnoredErrorsExtension {
+    Ok(IgnoredErrorsExtension {
         uri: uri.ok_or_else(|| invalid("ignoredErrors ext requires uri"))?,
         markup: Vec::new(),
     })
@@ -740,7 +740,7 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetIgnoredErrors>> {
+    fn parse(child: &str) -> Result<Option<IgnoredErrors>> {
         parse_worksheet_ignored_errors(
             format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
         )
@@ -757,15 +757,15 @@ mod tests {
         assert_eq!(value.entries().len(), 2);
         assert_eq!(value.entries()[0].ranges()[1].as_str(), "$B$2:C3");
         for kind in [
-            WorksheetIgnoredErrorType::CalculatedColumn,
-            WorksheetIgnoredErrorType::EmptyCellReference,
-            WorksheetIgnoredErrorType::EvaluationError,
-            WorksheetIgnoredErrorType::Formula,
-            WorksheetIgnoredErrorType::FormulaRange,
-            WorksheetIgnoredErrorType::ListDataValidation,
-            WorksheetIgnoredErrorType::NumberStoredAsText,
-            WorksheetIgnoredErrorType::TwoDigitTextYear,
-            WorksheetIgnoredErrorType::UnlockedFormula,
+            IgnoredErrorType::CalculatedColumn,
+            IgnoredErrorType::EmptyCellReference,
+            IgnoredErrorType::EvaluationError,
+            IgnoredErrorType::Formula,
+            IgnoredErrorType::FormulaRange,
+            IgnoredErrorType::ListDataValidation,
+            IgnoredErrorType::NumberStoredAsText,
+            IgnoredErrorType::TwoDigitTextYear,
+            IgnoredErrorType::UnlockedFormula,
         ] {
             assert!(value.entries()[0].ignores(kind));
             assert!(!value.entries()[1].ignores(kind));
@@ -780,7 +780,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .entries()[0]
-                .ignores(WorksheetIgnoredErrorType::Formula)
+                .ignores(IgnoredErrorType::Formula)
         );
         let xml = format!(
             concat!(
@@ -851,7 +851,7 @@ mod tests {
         assert!(parse_worksheet_ignored_errors(xml.as_bytes()).is_err());
     }
 
-    fn fixture(bytes: &[u8]) -> WorksheetIgnoredErrors {
+    fn fixture(bytes: &[u8]) -> IgnoredErrors {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
@@ -875,13 +875,13 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["C2:C5", "E2:E4", "E5"]
         );
-        assert!(format.entries()[0].ignores(WorksheetIgnoredErrorType::NumberStoredAsText));
+        assert!(format.entries()[0].ignores(IgnoredErrorType::NumberStoredAsText));
 
         let large = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx"
         )));
         assert_eq!(large.entries()[0].ranges()[0].as_str(), "A1:J7577");
-        assert!(large.entries()[0].ignores(WorksheetIgnoredErrorType::NumberStoredAsText));
+        assert!(large.entries()[0].ignores(IgnoredErrorType::NumberStoredAsText));
     }
 }

@@ -107,9 +107,7 @@ pub use conditional_formatting::{
     Payload, Period, Rule, TokenError, Value, ValueKind,
 };
 pub use data_consolidation::{
-    WorksheetDataConsolidation, WorksheetDataConsolidationConformance,
-    WorksheetDataConsolidationFunction, WorksheetDataConsolidationRangeReference,
-    WorksheetDataReference, WorksheetDataReferenceSource, WorksheetDataReferences,
+    DataConsolidation, Function, RangeReference, ReferenceSource, References,
     parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
 };
 pub use data_validation::{
@@ -158,8 +156,8 @@ pub use format::{
 pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
 pub use litchi_drawingml::geom::Preset;
 pub use litchi_xlsx::ignored_errors::{
-    IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
-    WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
+    IgnoredError, IgnoredErrorRangeReference, IgnoredErrorType, IgnoredErrors,
+    IgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
 pub use litchi_xlsx::outline_properties::{OutlineProperties, parse_outline_properties};
 pub use litchi_xlsx::page_margins::{

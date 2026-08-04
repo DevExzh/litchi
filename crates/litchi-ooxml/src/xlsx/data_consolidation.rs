@@ -66,10 +66,7 @@ mod tests {
         );
         worksheet.load_data().unwrap();
         let consolidation = worksheet.data_consolidation().unwrap();
-        assert_eq!(
-            consolidation.function(),
-            WorksheetDataConsolidationFunction::Average
-        );
+        assert_eq!(consolidation.function(), Function::Average);
         assert!(consolidation.top_labels());
         assert_eq!(
             consolidation.data_references().unwrap().references().len(),
