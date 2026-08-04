@@ -778,6 +778,7 @@ impl<'a> Presentation<'a> {
         &self,
     ) -> Result<crate::pptx::modern_comment_authors::ModernCommentGraph> {
         crate::pptx::modern_comment_authors::load_modern_comment_graph(self.package)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
     /// Get all comments from the presentation.

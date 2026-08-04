@@ -24,6 +24,7 @@ pub mod page_margins;
 pub mod page_setup;
 pub mod phonetic_properties;
 pub mod print_options;
+pub mod query_table;
 pub mod raw;
 pub mod row;
 pub mod scenarios;
@@ -88,6 +89,16 @@ pub use phonetic_properties::{
     parse_worksheet_phonetic_properties,
 };
 pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+pub use query_table::{
+    QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, QueryTable, QueryTableConformance,
+    QueryTableExtensionAttribute, QueryTableExtensionList, QueryTableField,
+    QueryTableGrowShrinkType, QueryTableIconSet, QueryTableRefresh, QueryTableSortBy,
+    QueryTableSortCondition, QueryTableSortMethod, QueryTableSortState,
+    STRICT_QUERY_TABLE_RELATIONSHIP_TYPE, WorksheetQueryTable, add_worksheet_query_table,
+    find_worksheet_query_table, is_query_table_relationship_type, load_worksheet_query_tables,
+    parse_query_table, remove_worksheet_query_table, reorder_worksheet_query_tables,
+    replace_worksheet_query_table, update_worksheet_query_table, write_query_table,
+};
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{
     ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,

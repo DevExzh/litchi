@@ -3745,6 +3745,43 @@ compilation because `pkg-config`/fontconfig is unavailable. This is functional
 and boundary evidence; native Office and performance evidence remain governed
 by the evidence levels below.
 
+## PPTX comments/media and XLSX query-table owner follow-up
+
+The next owner batch moves three larger format-specific seams out of the
+migration host while retaining package traversal and historical error/API
+surfaces in explicit adapters:
+
+- PresentationML modern comments and their author list, relationship graph,
+  bounded MCE-aware codecs, and CRUD operations now live in
+  `litchi-pptx::modern_comments` and `litchi-pptx::modern_comment_authors`.
+  The host retains presentation/package traversal and maps the typed owner
+  errors back to its historical boundary.
+- PresentationML audio/video picture values, extension metadata, inert media
+  resources, and the slide media OPC graph now live in
+  `litchi-pptx::media_parts`. The host adapter preserves the existing
+  `Slide::media` entry point and its historical invalid-format behavior while
+  payload bytes remain shared and never decoded, fetched, or executed.
+- SpreadsheetML query-table values, refresh/sort/field metadata, bounded XML,
+  relationship validation, and worksheet query-table graph operations now live
+  in `litchi-xlsx::query_table`. Workbook and worksheet facade traversal stays
+  in `litchi-ooxml`, including the real LibreOffice query-table regression.
+
+The checked-in specification evidence covers `[MS-PPTX]` §§2.1.1 (Media
+Part), 2.1.5 (Comment Part), 2.1.6 (Author Part), 2.2.4 (Media Extensions),
+and 2.16.1.1--2.16.3.7 for the Office 2018 modern-comment structures. Query
+tables are pinned to `[MS-XLSX]` §§2.4.41, 2.6.88, and 2.2.4.7, with the
+corresponding checked-in `[MS-OE376]` table-of-contents entries 2.1.854--
+2.1.856 and `[MS-OI29500]` entries 2.1.826--2.1.828.
+
+The owner suites pass 196 PPTX and 314 XLSX tests with all features enabled;
+the complete host package suite passes 1,645 unit tests plus its integration
+and doctest targets. Owner all-target strict Clippy, host default all-target
+strict Clippy, formatting, diff, and crate-boundary checks pass. Host
+all-features Clippy remains environment-blocked before compilation because
+`pkg-config`/fontconfig is unavailable. This is functional and boundary
+evidence; native Office and performance evidence remain governed by the
+evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

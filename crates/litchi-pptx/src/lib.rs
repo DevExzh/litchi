@@ -21,6 +21,9 @@ pub mod font;
 pub mod format;
 pub mod hyperlinks;
 pub mod laser;
+pub mod media_parts;
+pub mod modern_comment_authors;
+pub mod modern_comments;
 pub mod notes;
 pub mod presentation_properties;
 pub mod shape;
@@ -46,6 +49,30 @@ pub use comments::{
 pub use error::{Error, Result};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
+pub use media_parts::{
+    MediaBookmark, MediaData, MediaExtensionList, MediaFade, MediaResource, MediaTrim,
+    OfficeMediaExtension, SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
+    SlideMediaPoster, SlideMediaTransform, load_slide_media, parse_slide_media, store_slide_media,
+    write_slide_media_pictures,
+};
+pub use modern_comment_authors::{
+    MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE,
+    ModernCommentAuthor, ModernCommentAuthorList, ModernCommentAuthorPart, ModernCommentGraph,
+    add_modern_comment_author, find_modern_comment_author, load_modern_comment_authors,
+    load_modern_comment_graph, remove_modern_comment_author, reorder_modern_comment_authors,
+    replace_modern_comment_author, store_modern_comment_authors, update_modern_comment_author,
+    validate_modern_comment_author_references,
+};
+pub use modern_comments::{
+    MODERN_COMMENT_CONTENT_TYPE, MODERN_COMMENT_RELATIONSHIP_TYPE, ModernComment,
+    ModernCommentAnchor, ModernCommentAnchorKind, ModernCommentList,
+    ModernCommentNamespaceDeclaration, ModernCommentPart, ModernCommentPosition,
+    ModernCommentReply, ModernCommentStatus, Progress, add_modern_comment,
+    add_modern_comment_reply, find_modern_comment, find_modern_comment_reply, load_modern_comments,
+    remove_modern_comment, remove_modern_comment_reply, reorder_modern_comments,
+    replace_modern_comment, replace_modern_comment_reply, store_modern_comment,
+    update_modern_comment, update_modern_comment_reply,
+};
 pub use presentation_properties::{
     BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget, OpaquePresentationExtension,
     PresentationColor, PresentationProperties, PresentationPropertyExtension, PrintColorMode,
