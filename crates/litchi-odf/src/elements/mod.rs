@@ -15,8 +15,6 @@ pub mod element;
 pub mod field;
 /// Metadata elements
 pub mod meta;
-/// Namespace handling utilities
-pub mod namespace;
 /// Office document elements
 pub mod office;
 /// Generic ODF document parser (shared across ODT/ODS/ODP)

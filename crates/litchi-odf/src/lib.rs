@@ -32,7 +32,8 @@
 //!   - ✅ Draw elements (shapes, frames, images)
 //!   - ✅ Field elements (date, time, page number)
 //!   - ✅ Bookmark and reference support
-//!   - ✅ Namespace handling for ODF XML
+//! - **Common XML Vocabulary** (`litchi-odf-common`)
+//!   - ✅ Namespace handling and qualified-name resolution
 //!
 //! - **Constants & Utilities** (`constants.rs`, `datatype.rs`)
 //!   - ✅ MIME type constants and mappings
@@ -304,6 +305,8 @@ pub use litchi_odf_common::coordinates;
 mod core;
 /// ODF data type conversions (Boolean, Date, DateTime, Duration)
 pub use litchi_odf_common::datatype;
+/// ODF namespace and qualified-name vocabulary.
+pub use litchi_odf_common::namespace;
 /// Best-effort detection for packaged and flat OpenDocument files.
 pub mod detect;
 pub mod drawing_fill_image;

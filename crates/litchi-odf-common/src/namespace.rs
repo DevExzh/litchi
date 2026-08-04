@@ -1,7 +1,8 @@
-//! Namespace handling utilities for ODF XML elements.
+//! ODF namespace vocabulary and qualified-name resolution.
 //!
 //! This module provides support for XML namespaces, including qualified names,
-//! namespace context, and namespace-aware operations.
+//! namespace context, and namespace-aware comparisons shared by every ODF
+//! document family.
 //!
 //! # Implementation Status
 //!

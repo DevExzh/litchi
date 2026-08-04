@@ -3,8 +3,8 @@
 //! This module provides the fundamental Element class that all ODF elements
 //! inherit from, providing common functionality for XML manipulation.
 
-use crate::elements::namespace::{NamespaceContext, QualifiedName};
 use litchi_core::{Error, Result};
+use litchi_odf_common::namespace::{NamespaceContext, QualifiedName};
 use quick_xml::events::Event;
 use std::collections::HashMap;
 

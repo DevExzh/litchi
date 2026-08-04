@@ -4486,6 +4486,21 @@ may still map owner errors or resolve OPC relationships, but they no longer
 invent a second semantic type or a prefix-expanded alias. Callers that need a
 format-neutral model use the owning common crate directly.
 
+## ODF namespace vocabulary extraction
+
+This bounded ODF common-vocabulary slice moves the generic XML namespace
+model from `litchi-odf::elements::namespace` to the canonical
+`litchi-odf-common::namespace` owner. `QualifiedName` resolves expanded names
+and `NamespaceContext` carries prefix/default-namespace bindings; neither type
+depends on package, manifest, encryption, or a document-family model.
+
+`litchi-odf::elements::element` consumes those common types directly, while
+the old nested host module is removed rather than retained as a compatibility
+alias. The ODF facade exposes the common module at its short `namespace` path,
+and the canonical names remain prefix-free. Namespace constants, mappings, and
+focused model tests now live with the common owner. This extraction makes no
+new ODF conformance claim and does not change package or manifest ownership.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
