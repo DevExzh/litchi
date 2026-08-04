@@ -57,7 +57,7 @@ pub struct XlsbWorkbookWriter {
     calc: Props,
     is_1904: bool,
     connections: Option<crate::xlsb::connections::XlsbConnections>,
-    external_links: Vec<crate::xlsb::formula::XlsbExternalLink>,
+    external_links: Vec<crate::xlsb::external_link::Link>,
     pivot_caches: Vec<AuthoredPivotCache>,
     vba: Option<Arc<Vec<u8>>>,
 }
@@ -242,7 +242,7 @@ impl XlsbWorkbookWriter {
     /// instantiated, evaluated, or executed.
     pub fn add_external_link(
         &mut self,
-        link: crate::xlsb::formula::XlsbExternalLink,
+        link: crate::xlsb::external_link::Link,
     ) -> XlsbResult<&mut Self> {
         link.validate()?;
         if self.external_links.len() >= MAX_AUTHORED_EXTERNAL_LINKS {
@@ -255,7 +255,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// External links scheduled for authoring, in workbook support-link order.
-    pub fn external_links(&self) -> &[crate::xlsb::formula::XlsbExternalLink] {
+    pub fn external_links(&self) -> &[crate::xlsb::external_link::Link] {
         &self.external_links
     }
 
@@ -1526,27 +1526,23 @@ mod tests {
     #[test]
     fn external_links_round_trip_with_inert_package_topology() {
         use crate::xlsb::external_link::{
-            XlsbDdeItem, XlsbExternalCachedValue, XlsbExternalCellLocation,
-            XlsbExternalCellReference, XlsbExternalDefinedName, XlsbExternalErrorValue,
-            XlsbExternalLink, XlsbExternalLinkKind, XlsbExternalNameFormula,
-            XlsbExternalNameFormulaKind, XlsbExternalSheetRange, XlsbExternalValueMatrix,
-            XlsbOleItem,
+            CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue, Kind, Link,
+            NameFormula, NameFormulaKind, OleItem, SheetRange, ValueMatrix,
         };
 
         let mut workbook = XlsbWorkbookWriter::new();
         workbook.add_worksheet(MutableXlsbWorksheet::new("Host"));
-        let external_formula =
-            XlsbExternalNameFormula::cell_reference(XlsbExternalCellReference::new(
-                XlsbExternalSheetRange::sheets(0, 0).unwrap(),
-                XlsbExternalCellLocation::new(3, 2),
-            ));
+        let external_formula = NameFormula::cell_reference(CellReference::new(
+            SheetRange::sheets(0, 0).unwrap(),
+            CellLocation::new(3, 2),
+        ));
         workbook
             .add_external_link(
-                XlsbExternalLink::workbook_with_defined_names(
+                Link::workbook_with_defined_names(
                     "file:///data/Budget.xlsx",
                     vec!["Data".to_string(), "Rates".to_string()],
                     vec![
-                        XlsbExternalDefinedName::new("ExchangeRate")
+                        DefinedName::new("ExchangeRate")
                             .unwrap()
                             .with_formula(external_formula)
                             .with_built_in(true)
@@ -1556,25 +1552,25 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        let dde_cache = XlsbExternalValueMatrix::new(
+        let dde_cache = ValueMatrix::new(
             1,
             5,
             vec![
-                XlsbExternalCachedValue::Empty,
-                XlsbExternalCachedValue::Number(42.5),
-                XlsbExternalCachedValue::Boolean(true),
-                XlsbExternalCachedValue::Error(XlsbExternalErrorValue::NotAvailable),
-                XlsbExternalCachedValue::String("Ready".to_string()),
+                CachedValue::Empty,
+                CachedValue::Number(42.5),
+                CachedValue::Boolean(true),
+                CachedValue::Error(ErrorValue::NotAvailable),
+                CachedValue::String("Ready".to_string()),
             ],
         )
         .unwrap();
         workbook
             .add_external_link(
-                XlsbExternalLink::dde_with_items(
+                Link::dde_with_items(
                     "Excel",
                     "System",
                     vec![
-                        XlsbDdeItem::new("StatusItem")
+                        DdeItem::new("StatusItem")
                             .unwrap()
                             .with_advise(true)
                             .with_picture(true)
@@ -1586,21 +1582,16 @@ mod tests {
             .unwrap();
         workbook
             .add_external_link(
-                XlsbExternalLink::ole_with_items(
+                Link::ole_with_items(
                     "file:///data/Model.xlsx",
                     "Excel.Sheet.12",
                     vec![
-                        XlsbOleItem::new("ModelItem")
+                        OleItem::new("ModelItem")
                             .unwrap()
                             .with_advise(true)
                             .with_icon(true)
                             .with_cached_values(
-                                XlsbExternalValueMatrix::new(
-                                    1,
-                                    1,
-                                    vec![XlsbExternalCachedValue::Number(7.0)],
-                                )
-                                .unwrap(),
+                                ValueMatrix::new(1, 1, vec![CachedValue::Number(7.0)]).unwrap(),
                             ),
                     ],
                 )
@@ -1689,7 +1680,7 @@ mod tests {
         assert_eq!(reader.external_link(1).unwrap().dde_topic(), Some("System"));
         let links = reader.external_links();
         assert_eq!(links.len(), 3);
-        assert_eq!(links[0].kind(), XlsbExternalLinkKind::Workbook);
+        assert_eq!(links[0].kind(), Kind::Workbook);
         assert_eq!(links[0].source(), "file:///data/Budget.xlsx");
         assert_eq!(links[0].sheet_names(), ["Data", "Rates"]);
         let defined_name = &links[0].defined_names()[0];
@@ -1698,13 +1689,13 @@ mod tests {
         assert_eq!(defined_name.scope_sheet_index(), Some(1));
         assert_eq!(
             defined_name.formula().unwrap().kind(),
-            XlsbExternalNameFormulaKind::CellReference
+            NameFormulaKind::CellReference
         );
         assert_eq!(
             defined_name.formula().unwrap().tokens(),
             [0x3A, 0, 0, 0, 0, 3, 0, 2, 0]
         );
-        assert_eq!(links[1].kind(), XlsbExternalLinkKind::Dde);
+        assert_eq!(links[1].kind(), Kind::Dde);
         assert_eq!(links[1].source(), "Excel");
         assert_eq!(links[1].dde_topic(), Some("System"));
         let dde_item = &links[1].dde_items()[0];
@@ -1716,14 +1707,14 @@ mod tests {
         assert_eq!(
             dde_item.cached_values().unwrap().values(),
             [
-                XlsbExternalCachedValue::Empty,
-                XlsbExternalCachedValue::Number(42.5),
-                XlsbExternalCachedValue::Boolean(true),
-                XlsbExternalCachedValue::Error(XlsbExternalErrorValue::NotAvailable),
-                XlsbExternalCachedValue::String("Ready".to_string()),
+                CachedValue::Empty,
+                CachedValue::Number(42.5),
+                CachedValue::Boolean(true),
+                CachedValue::Error(ErrorValue::NotAvailable),
+                CachedValue::String("Ready".to_string()),
             ]
         );
-        assert_eq!(links[2].kind(), XlsbExternalLinkKind::Ole);
+        assert_eq!(links[2].kind(), Kind::Ole);
         assert_eq!(links[2].source(), "file:///data/Model.xlsx");
         assert_eq!(links[2].ole_program_id(), Some("Excel.Sheet.12"));
         let ole_item = &links[2].ole_items()[0];
@@ -1732,62 +1723,39 @@ mod tests {
         assert!(ole_item.displays_as_icon());
         assert_eq!(
             ole_item.cached_values().unwrap().values(),
-            [XlsbExternalCachedValue::Number(7.0)]
+            [CachedValue::Number(7.0)]
         );
     }
 
     #[test]
     fn external_link_constructors_refuse_malformed_metadata() {
         use crate::xlsb::external_link::{
-            XlsbDdeItem, XlsbExternalCachedValue, XlsbExternalDefinedName, XlsbExternalLink,
-            XlsbExternalNameFormula, XlsbExternalValueMatrix,
+            CachedValue, DdeItem, DefinedName, Link, NameFormula, ValueMatrix,
         };
 
-        assert!(XlsbExternalLink::workbook("", Vec::new(), Vec::new()).is_err());
+        assert!(Link::workbook("", Vec::new(), Vec::new()).is_err());
         assert!(
-            XlsbExternalLink::workbook(
+            Link::workbook(
                 "Book.xlsx",
                 vec!["Data".to_string(), "data".to_string()],
                 Vec::new(),
             )
             .is_err()
         );
-        assert!(XlsbExternalLink::dde("Excel", "", vec!["Item".to_string()]).is_err());
+        assert!(Link::dde("Excel", "", vec!["Item".to_string()]).is_err());
+        assert!(Link::ole("Model.xlsx", "Excel.Sheet", vec!["A1".to_string()],).is_err());
+        assert!(NameFormula::from_tokens(vec![0x3A, 0]).is_err());
+        assert!(ValueMatrix::new(2, 2, vec![CachedValue::Number(1.0)]).is_err());
+        assert!(ValueMatrix::new(1, 1, vec![CachedValue::Number(-0.0)]).is_err());
+        assert!(ValueMatrix::new(1, 1, vec![CachedValue::Number(f64::from_bits(1))]).is_err());
+        assert!(ValueMatrix::new(1, 1, vec![CachedValue::String(String::new())]).is_ok());
+        let invalid_formula = NameFormula::from_tokens(vec![0x3A, 2, 0, 2, 0, 0, 0, 0, 0]).unwrap();
         assert!(
-            XlsbExternalLink::ole("Model.xlsx", "Excel.Sheet", vec!["A1".to_string()],).is_err()
-        );
-        assert!(XlsbExternalNameFormula::from_tokens(vec![0x3A, 0]).is_err());
-        assert!(
-            XlsbExternalValueMatrix::new(2, 2, vec![XlsbExternalCachedValue::Number(1.0)]).is_err()
-        );
-        assert!(
-            XlsbExternalValueMatrix::new(1, 1, vec![XlsbExternalCachedValue::Number(-0.0)])
-                .is_err()
-        );
-        assert!(
-            XlsbExternalValueMatrix::new(
-                1,
-                1,
-                vec![XlsbExternalCachedValue::Number(f64::from_bits(1))]
-            )
-            .is_err()
-        );
-        assert!(
-            XlsbExternalValueMatrix::new(
-                1,
-                1,
-                vec![XlsbExternalCachedValue::String(String::new())]
-            )
-            .is_ok()
-        );
-        let invalid_formula =
-            XlsbExternalNameFormula::from_tokens(vec![0x3A, 2, 0, 2, 0, 0, 0, 0, 0]).unwrap();
-        assert!(
-            XlsbExternalLink::workbook_with_defined_names(
+            Link::workbook_with_defined_names(
                 "Book.xlsx",
                 vec!["OnlySheet".to_string()],
                 vec![
-                    XlsbExternalDefinedName::new("BadScope")
+                    DefinedName::new("BadScope")
                         .unwrap()
                         .with_formula(invalid_formula)
                 ],
@@ -1795,20 +1763,15 @@ mod tests {
             .is_err()
         );
         assert!(
-            XlsbExternalLink::dde_with_items(
+            Link::dde_with_items(
                 "Excel",
                 "System",
                 vec![
-                    XlsbDdeItem::new("NotStdDocumentName")
+                    DdeItem::new("NotStdDocumentName")
                         .unwrap()
                         .with_ole_support(true)
                         .with_cached_values(
-                            XlsbExternalValueMatrix::new(
-                                1,
-                                1,
-                                vec![XlsbExternalCachedValue::Empty]
-                            )
-                            .unwrap()
+                            ValueMatrix::new(1, 1, vec![CachedValue::Empty]).unwrap()
                         )
                 ],
             )

@@ -200,11 +200,10 @@ pub use drawing::{
 pub use drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
 pub use error::{XlsbError, XlsbResult};
 pub use external_link::{
-    MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS, MAX_XLSB_EXTERNAL_CACHED_VALUES,
-    XlsbDdeItem, XlsbExternalAreaReference, XlsbExternalCachedValue, XlsbExternalCellLocation,
-    XlsbExternalCellReference, XlsbExternalDefinedName, XlsbExternalErrorValue, XlsbExternalLink,
-    XlsbExternalLinkKind, XlsbExternalNameFormula, XlsbExternalNameFormulaKind,
-    XlsbExternalSheetRange, XlsbExternalValueMatrix, XlsbOleItem,
+    AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,
+    Kind, Link, MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
+    MAX_XLSB_EXTERNAL_CACHED_VALUES, NameFormula, NameFormulaKind, OleItem, SheetRange,
+    ValueMatrix,
 };
 pub use pivot::{
     CalculatedItem, CalculatedMember, CalculatedMemberExt14, PivotCacheConsolidationPage,

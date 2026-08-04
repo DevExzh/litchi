@@ -3,13 +3,12 @@
 use crate::xlsb::XlsbCell;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::external_link::{
-    DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
-    DDE_ITEM_RESERVED_MASK, DDE_ITEM_SUPPORTS_OLE, EXTERNAL_NAME_BUILT_IN,
+    CachedValue, DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
+    DDE_ITEM_RESERVED_MASK, DDE_ITEM_SUPPORTS_OLE, DdeItem, DefinedName, EXTERNAL_NAME_BUILT_IN,
     EXTERNAL_NAME_RESERVED_MASK, EXTERNAL_REFERENCE_DDE, EXTERNAL_REFERENCE_OLE,
-    EXTERNAL_REFERENCE_WORKBOOK, MAX_XLSB_EXTERNAL_CACHED_VALUES, OLE_ITEM_DISPLAY_AS_ICON,
-    OLE_ITEM_REQUIRED_CLASS_FLAG, OLE_ITEM_RESERVED_MASK, XlsbDdeItem, XlsbExternalCachedValue,
-    XlsbExternalDefinedName, XlsbExternalEntries, XlsbExternalErrorValue, XlsbExternalLink,
-    XlsbExternalLinkKind, XlsbExternalNameFormula, XlsbExternalValueMatrix, XlsbOleItem,
+    EXTERNAL_REFERENCE_WORKBOOK, Entries, ErrorValue, Kind, Link, MAX_XLSB_EXTERNAL_CACHED_VALUES,
+    NameFormula, OLE_ITEM_DISPLAY_AS_ICON, OLE_ITEM_REQUIRED_CLASS_FLAG, OLE_ITEM_RESERVED_MASK,
+    OleItem, ValueMatrix,
 };
 use crate::xlsb::formula::{
     FormulaExternalBook, FormulaExternalSheet, FormulaPivotViewDefinition,
@@ -354,7 +353,7 @@ impl XlsbWorkbook {
     }
 
     /// Borrow one stored external link without cloning its cached values.
-    pub fn external_link(&self, index: usize) -> Option<&XlsbExternalLink> {
+    pub fn external_link(&self, index: usize) -> Option<&Link> {
         self.formula_context
             .external_books
             .get(index)
@@ -362,9 +361,7 @@ impl XlsbWorkbook {
     }
 
     /// Iterate stored external links without cloning their cached values.
-    pub fn external_link_iter(
-        &self,
-    ) -> impl ExactSizeIterator<Item = &XlsbExternalLink> + DoubleEndedIterator {
+    pub fn external_link_iter(&self) -> impl ExactSizeIterator<Item = &Link> + DoubleEndedIterator {
         self.formula_context
             .external_books
             .iter()
@@ -378,7 +375,7 @@ impl XlsbWorkbook {
     /// cached matrices.
     /// Litchi never follows, opens, contacts, refreshes, evaluates, or
     /// executes any external-link target.
-    pub fn external_links(&self) -> Vec<XlsbExternalLink> {
+    pub fn external_links(&self) -> Vec<Link> {
         self.formula_context
             .external_books
             .iter()
@@ -1925,9 +1922,7 @@ impl XlsbWorkbook {
                     current_formula = if formula_len == 0 {
                         None
                     } else {
-                        Some(XlsbExternalNameFormula::from_tokens(
-                            record.payload()[4..].to_vec(),
-                        )?)
+                        Some(NameFormula::from_tokens(record.payload()[4..].to_vec())?)
                     };
                     sup_name_state = 2;
                 },
@@ -2017,7 +2012,7 @@ impl XlsbWorkbook {
                             "invalid cached external value matrix".to_string(),
                         ));
                     }
-                    current_cache = Some(XlsbExternalValueMatrix::new(
+                    current_cache = Some(ValueMatrix::new(
                         rows,
                         columns,
                         std::mem::take(&mut cache_values),
@@ -2044,7 +2039,7 @@ impl XlsbWorkbook {
                     match kind {
                         EXTERNAL_REFERENCE_WORKBOOK => {
                             let scope = binary::read_u32_le_at(&bits, 2)?;
-                            let mut entry = XlsbExternalDefinedName::new(name)?
+                            let mut entry = DefinedName::new(name)?
                                 .with_built_in(bits[0] & EXTERNAL_NAME_BUILT_IN != 0);
                             if scope != 0 {
                                 entry = entry.with_sheet_scope(u16::try_from(scope - 1).map_err(
@@ -2061,7 +2056,7 @@ impl XlsbWorkbook {
                             workbook_entries.push(entry);
                         },
                         EXTERNAL_REFERENCE_DDE => {
-                            let mut item = XlsbDdeItem::new(name)?
+                            let mut item = DdeItem::new(name)?
                                 .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
                                 .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
                                 .with_ole_support(bits[0] & DDE_ITEM_SUPPORTS_OLE != 0);
@@ -2071,7 +2066,7 @@ impl XlsbWorkbook {
                             dde_entries.push(item);
                         },
                         EXTERNAL_REFERENCE_OLE => {
-                            let mut item = XlsbOleItem::new(name)?
+                            let mut item = OleItem::new(name)?
                                 .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
                                 .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
                                 .with_icon(bits[0] & OLE_ITEM_DISPLAY_AS_ICON != 0);
@@ -2131,7 +2126,7 @@ impl XlsbWorkbook {
                         "DDE external link must not contain relationships".to_string(),
                     ));
                 }
-                (XlsbExternalLinkKind::Dde, target_key, Some(target_detail))
+                (Kind::Dde, target_key, Some(target_detail))
             },
             EXTERNAL_REFERENCE_WORKBOOK | EXTERNAL_REFERENCE_OLE => {
                 if part.rels().len() != 1 {
@@ -2168,9 +2163,9 @@ impl XlsbWorkbook {
                 }
                 let target = relationship.target_ref().to_string();
                 let link_kind = if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                    XlsbExternalLinkKind::Workbook
+                    Kind::Workbook
                 } else {
-                    XlsbExternalLinkKind::Ole
+                    Kind::Ole
                 };
                 let detail = if kind == EXTERNAL_REFERENCE_OLE {
                     Some(target_detail)
@@ -2182,12 +2177,12 @@ impl XlsbWorkbook {
             _ => unreachable!("external link kind was validated above"),
         };
         let entries = match kind {
-            EXTERNAL_REFERENCE_WORKBOOK => XlsbExternalEntries::Workbook(workbook_entries),
-            EXTERNAL_REFERENCE_DDE => XlsbExternalEntries::Dde(dde_entries),
-            EXTERNAL_REFERENCE_OLE => XlsbExternalEntries::Ole(ole_entries),
+            EXTERNAL_REFERENCE_WORKBOOK => Entries::Workbook(workbook_entries),
+            EXTERNAL_REFERENCE_DDE => Entries::Dde(dde_entries),
+            EXTERNAL_REFERENCE_OLE => Entries::Ole(ole_entries),
             _ => unreachable!("external link kind was validated above"),
         };
-        let metadata = XlsbExternalLink {
+        let metadata = Link {
             kind: link_kind,
             source,
             detail,
@@ -2229,20 +2224,20 @@ impl XlsbWorkbook {
     fn parse_external_cached_value(
         record_type: litchi_xlsb::raw::Kind,
         data: &[u8],
-    ) -> XlsbResult<XlsbExternalCachedValue> {
+    ) -> XlsbResult<CachedValue> {
         match record_type {
-            kind::SUP_NAME_NIL if data.is_empty() => Ok(XlsbExternalCachedValue::Empty),
+            kind::SUP_NAME_NIL if data.is_empty() => Ok(CachedValue::Empty),
             kind::SUP_NAME_NUM if data.len() == 8 => {
                 let number = f64::from_le_bytes(data.try_into().expect("length was checked"));
-                crate::xlsb::external_link::validate_external_number(number)?;
-                Ok(XlsbExternalCachedValue::Number(number))
+                crate::xlsb::external_link::validate_number(number)?;
+                Ok(CachedValue::Number(number))
             },
             kind::SUP_NAME_BOOL if data.len() == 1 && data[0] <= 1 => {
-                Ok(XlsbExternalCachedValue::Boolean(data[0] != 0))
+                Ok(CachedValue::Boolean(data[0] != 0))
             },
-            kind::SUP_NAME_ERROR if data.len() == 1 => Ok(XlsbExternalCachedValue::Error(
-                XlsbExternalErrorValue::from_code(data[0])?,
-            )),
+            kind::SUP_NAME_ERROR if data.len() == 1 => {
+                Ok(CachedValue::Error(ErrorValue::from_code(data[0])?))
+            },
             kind::SUP_NAME_STRING => {
                 let (value, consumed) = crate::xlsb::records::decode_string(data)?;
                 if consumed != data.len() {
@@ -2250,7 +2245,7 @@ impl XlsbWorkbook {
                         "BrtSupNameSt has trailing bytes".to_string(),
                     ));
                 }
-                Ok(XlsbExternalCachedValue::String(value))
+                Ok(CachedValue::String(value))
             },
             _ => Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
                 "invalid cached external value record {record_type}"
@@ -3269,7 +3264,7 @@ mod tests {
         assert_eq!(book.metadata().defined_names()[0].name(), "Rate");
 
         let link = book.metadata();
-        assert_eq!(link.kind(), XlsbExternalLinkKind::Workbook);
+        assert_eq!(link.kind(), Kind::Workbook);
         assert!(link.is_workbook());
         assert_eq!(link.source(), "Book.xlsx");
         assert_eq!(link.dde_topic(), None);
@@ -3284,7 +3279,7 @@ mod tests {
         let dde = parse_external_link_with_relationship_type(&dde_records, None)
             .unwrap()
             .metadata();
-        assert_eq!(dde.kind(), XlsbExternalLinkKind::Dde);
+        assert_eq!(dde.kind(), Kind::Dde);
         assert!(!dde.is_workbook());
         assert_eq!(dde.source(), "Excel");
         assert_eq!(dde.dde_topic(), Some("System"));
@@ -3299,7 +3294,7 @@ mod tests {
         )
         .unwrap()
         .metadata();
-        assert_eq!(ole.kind(), XlsbExternalLinkKind::Ole);
+        assert_eq!(ole.kind(), Kind::Ole);
         assert!(!ole.is_workbook());
         assert_eq!(ole.source(), "Book.xlsx");
         assert_eq!(ole.dde_topic(), None);
@@ -3423,7 +3418,7 @@ mod tests {
         let links = workbook.external_links();
         assert_eq!(links.len(), 1);
         let link = &links[0];
-        assert_eq!(link.kind(), XlsbExternalLinkKind::Workbook);
+        assert_eq!(link.kind(), Kind::Workbook);
         assert_eq!(link.source(), "Book.xlsx");
         assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
         assert_eq!(link.defined_names()[0].name(), "Rate");

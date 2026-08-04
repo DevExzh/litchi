@@ -60,11 +60,10 @@ pub(crate) mod data_validation;
 // Re-export main types for public API
 pub use crate::xlsb::drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
 pub use crate::xlsb::external_link::{
-    MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS, MAX_XLSB_EXTERNAL_CACHED_VALUES,
-    XlsbDdeItem, XlsbExternalAreaReference, XlsbExternalCachedValue, XlsbExternalCellLocation,
-    XlsbExternalCellReference, XlsbExternalDefinedName, XlsbExternalErrorValue, XlsbExternalLink,
-    XlsbExternalLinkKind, XlsbExternalNameFormula, XlsbExternalNameFormulaKind,
-    XlsbExternalSheetRange, XlsbExternalValueMatrix, XlsbOleItem,
+    AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,
+    Kind, Link, MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
+    MAX_XLSB_EXTERNAL_CACHED_VALUES, NameFormula, NameFormulaKind, OleItem, SheetRange,
+    ValueMatrix,
 };
 pub use crate::xlsx::writer::{
     Geometry, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,

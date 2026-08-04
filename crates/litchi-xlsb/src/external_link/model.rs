@@ -1,8 +1,6 @@
 //! Semantic XLSB external-link values and invariants.
 //!
-//! The names in this module are contextual to the `external_link` owner;
-//! historical `XlsbExternal*` spellings are compatibility aliases in
-//! `mod.rs`.
+//! The names in this module are contextual to the `external_link` owner.
 
 use super::{
     Error, MAX_COLLECTION_ITEMS, MAX_WIDE_STRING_UNITS, MAX_XLSB_EXTERNAL_CACHE_COLUMNS,

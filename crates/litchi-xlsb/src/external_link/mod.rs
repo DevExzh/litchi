@@ -1,7 +1,7 @@
 //! Typed, inert XLSB External Link data (MS-XLSB 2.1.7.25).
 //!
-//! Semantic values, bounded BIFF12 codecs, and compatibility exports are
-//! layered under this owner. These APIs never open an external workbook,
+//! Semantic values and bounded BIFF12 codecs are layered under this owner.
+//! These APIs never open an external workbook,
 //! contact DDE, instantiate OLE, refresh data, evaluate formulas, or execute
 //! code.
 
@@ -63,9 +63,6 @@ pub const DATA_ITEM_REQUIRED_TRAILING_FLAG: u8 = 1;
 
 /// Maximum bytes accepted or emitted for one external-link part stream.
 pub const MAX_LINK_PART_BYTES: usize = 32 * 1024 * 1024;
-/// Historical constant spelling retained for source compatibility.
-pub const MAX_XLSB_EXTERNAL_LINK_PART_BYTES: usize = MAX_LINK_PART_BYTES;
-
 pub use codec::{
     parse_external_link, parse_external_link_model, parse_external_link_with_relationship,
 };
@@ -75,22 +72,3 @@ pub use model::{
     validate_number,
 };
 pub use package::write_external_link_stream;
-
-// Compatibility aliases for the former prefixed public owner vocabulary.
-pub use model::AreaReference as XlsbExternalAreaReference;
-pub use model::CachedValue as XlsbExternalCachedValue;
-pub use model::CellLocation as XlsbExternalCellLocation;
-pub use model::CellReference as XlsbExternalCellReference;
-pub use model::DdeItem as XlsbDdeItem;
-pub use model::DefinedName as XlsbExternalDefinedName;
-pub use model::Entries as XlsbExternalEntries;
-pub use model::ErrorValue as XlsbExternalErrorValue;
-pub use model::Kind as XlsbExternalLinkKind;
-pub use model::Link as XlsbExternalLink;
-pub use model::NameFormula as XlsbExternalNameFormula;
-pub use model::NameFormulaKind as XlsbExternalNameFormulaKind;
-pub use model::OleItem as XlsbOleItem;
-pub use model::Parsed as ParsedExternalLink;
-pub use model::SheetRange as XlsbExternalSheetRange;
-pub use model::ValueMatrix as XlsbExternalValueMatrix;
-pub use model::validate_number as validate_external_number;

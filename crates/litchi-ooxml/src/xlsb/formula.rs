@@ -25,7 +25,7 @@
 mod function_table;
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-pub use crate::xlsb::external_link::{XlsbExternalLink, XlsbExternalLinkKind};
+use crate::xlsb::external_link::Link;
 use function_table::BUILTIN_FUNCTIONS;
 
 pub use litchi_xlsb::formula::ptg_types;
@@ -535,15 +535,15 @@ impl FormulaTableDefinition {
 /// Formula-resolution metadata from one XLSB External Link part.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FormulaExternalBook {
-    pub(crate) metadata: XlsbExternalLink,
+    pub(crate) metadata: Link,
 }
 
 impl FormulaExternalBook {
-    pub(crate) fn metadata(&self) -> XlsbExternalLink {
+    pub(crate) fn metadata(&self) -> Link {
         self.metadata.clone()
     }
 
-    pub(crate) fn metadata_ref(&self) -> &XlsbExternalLink {
+    pub(crate) fn metadata_ref(&self) -> &Link {
         &self.metadata
     }
 }
@@ -3875,7 +3875,7 @@ mod tests {
             }]
             .into(),
             external_books: vec![FormulaExternalBook {
-                metadata: XlsbExternalLink::workbook(
+                metadata: Link::workbook(
                     "Book.xlsx",
                     vec!["Data Sheet".to_string()],
                     vec!["Rate".to_string()],
@@ -4345,12 +4345,8 @@ mod tests {
             }]
             .into(),
             external_books: vec![FormulaExternalBook {
-                metadata: XlsbExternalLink::workbook(
-                    "Book.xlsx",
-                    vec!["Data Sheet".to_string()],
-                    Vec::new(),
-                )
-                .unwrap(),
+                metadata: Link::workbook("Book.xlsx", vec!["Data Sheet".to_string()], Vec::new())
+                    .unwrap(),
             }]
             .into(),
             defined_names: Vec::new().into(),
@@ -4496,12 +4492,8 @@ mod structured_reference_compiler_tests {
             },
         ];
         let external_books = vec![FormulaExternalBook {
-            metadata: XlsbExternalLink::workbook(
-                "Book.xlsx",
-                vec!["Data Sheet".to_string()],
-                Vec::new(),
-            )
-            .unwrap(),
+            metadata: Link::workbook("Book.xlsx", vec!["Data Sheet".to_string()], Vec::new())
+                .unwrap(),
         }];
         let sheet_ranges = std::cell::RefCell::new(Vec::new());
         let compile_context = FormulaCompilationContext {

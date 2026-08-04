@@ -4,7 +4,7 @@
 //! wrapper retains the historical OPC part and relationship API.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::external_link::XlsbExternalLink;
+use crate::xlsb::external_link::Link;
 use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type;
 use litchi_opc::part::{BlobPart, Part};
@@ -13,7 +13,7 @@ const EXTERNAL_LINK_CONTENT_TYPE: &str = "application/vnd.ms-excel.externalLink"
 const MAX_EXTERNAL_LINK_PART_BYTES: usize = 32 * 1024 * 1024;
 
 pub(crate) fn author_external_link_part(
-    link: &XlsbExternalLink,
+    link: &Link,
     one_based_index: usize,
 ) -> XlsbResult<BlobPart> {
     link.validate()?;
@@ -30,11 +30,11 @@ pub(crate) fn author_external_link_part(
         Vec::new(),
     );
     let relationship_id = match link.kind() {
-        crate::xlsb::external_link::XlsbExternalLinkKind::Workbook => {
+        crate::xlsb::external_link::Kind::Workbook => {
             Some(part.relate_to_ext(link.source(), relationship_type::EXTERNAL_LINK_PATH))
         },
-        crate::xlsb::external_link::XlsbExternalLinkKind::Dde => None,
-        crate::xlsb::external_link::XlsbExternalLinkKind::Ole => {
+        crate::xlsb::external_link::Kind::Dde => None,
+        crate::xlsb::external_link::Kind::Ole => {
             Some(part.relate_to_ext(link.source(), relationship_type::OLE_OBJECT))
         },
     };
