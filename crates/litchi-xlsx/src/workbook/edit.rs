@@ -12,6 +12,7 @@ use litchi_sheet::{
 
 use super::{Sheet, SheetKind, SheetSelector, Visibility, Workbook};
 use crate::cell::{Cell, Content, Stored};
+use crate::chain;
 use crate::column::{
     Flags as ColumnFlags, Outline, OutlineAt, Props as ColumnProps, State as ColumnState, WidthAt,
 };
@@ -6074,6 +6075,7 @@ fn create_sheets(
 }
 
 fn calculation_chain_removal(workbook: &Workbook) -> Result<Vec<GraphChange>> {
+    chain::validate_package(&workbook.inner.package)?;
     let main = workbook
         .inner
         .package
@@ -10265,6 +10267,31 @@ mod tests {
             calculation_chain_removal(&shared_target),
             Err(Error::Invalid(message)) if message.contains("another incoming relationship")
         ));
+
+        let mut outbound = source.inner.package.clone();
+        outbound
+            .get_part_mut(&chain_uri)
+            .expect("chain part")
+            .rels_mut()
+            .try_add_relationship(
+                litchi_opc::constants::relationship_type::WORKSHEET.to_owned(),
+                "worksheets/sheet1.xml".to_owned(),
+                "rId1".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("chain outbound relationship");
+        let outbound = Workbook::from_package(outbound).expect("outbound chain workbook");
+        let mut edit = outbound.edit().expect("outbound chain edit");
+        edit.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .set("A1", 7_i32)
+            .expect("set");
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::Invalid(message)) if message.contains("calculation-chain part cannot have relationships")
+        ));
+        assert!(outbound.inner.package.get_part(&chain_uri).is_ok());
     }
 
     #[test]

@@ -659,6 +659,18 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Chain, Conformance)>> {
     load_for_workbook(package, &workbook_uri)
 }
 
+/// Validate the package topology for the optional calculation chain without
+/// decoding its inert XML payload.
+pub(crate) fn validate_package(package: &OpcPackage) -> Result<()> {
+    let workbook_uri = main_workbook_uri(package)?;
+    let Some(relationship) = relationship(package, &workbook_uri)? else {
+        validate_part_set(package, None)?;
+        return Ok(());
+    };
+    validate_part_set(package, Some(&relationship.part_name))?;
+    validate_part(package, &relationship.part_name)
+}
+
 /// Store a caller-authored inert calculation chain in a SpreadsheetML package.
 ///
 /// The supplied order is serialized without recalculating formulas or inferring
