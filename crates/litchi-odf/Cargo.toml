@@ -8,17 +8,30 @@ license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
 
+[features]
+default = ["odt", "ods", "odp"]
+all = ["odb", "odc", "odg", "odi", "odm", "odp", "ods", "odt", "oth"]
+odb = ["dep:litchi-odb"]
+odc = ["dep:litchi-odc"]
+odg = ["dep:litchi-odg"]
+odi = ["dep:litchi-odi"]
+odm = ["dep:litchi-odm"]
+odp = ["dep:litchi-odp"]
+ods = ["dep:litchi-ods"]
+odt = ["dep:litchi-odt"]
+oth = ["dep:litchi-oth"]
+
 [dependencies]
-litchi-odb = { workspace = true }
-litchi-odc = { workspace = true }
+litchi-odb = { workspace = true, optional = true }
+litchi-odc = { workspace = true, optional = true }
 litchi-odf-common = { workspace = true }
-litchi-odg = { workspace = true }
-litchi-odi = { workspace = true }
-litchi-odm = { workspace = true }
-litchi-odp = { workspace = true }
-litchi-ods = { workspace = true }
-litchi-odt = { workspace = true }
-litchi-oth = { workspace = true }
+litchi-odg = { workspace = true, optional = true }
+litchi-odi = { workspace = true, optional = true }
+litchi-odm = { workspace = true, optional = true }
+litchi-odp = { workspace = true, optional = true }
+litchi-ods = { workspace = true, optional = true }
+litchi-odt = { workspace = true, optional = true }
+litchi-oth = { workspace = true, optional = true }
 
 [dev-dependencies]
 litchi-eval = { workspace = true }
