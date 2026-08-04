@@ -1,6 +1,6 @@
 //! Namespace-aware read-only access to standalone OpenDocument charts.
 
-use crate::{OdfMetadata, OpenDocumentFamily, OpenDocumentPackage};
+use crate::{OpenDocumentFamily, OpenDocumentPackage};
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
@@ -218,7 +218,7 @@ impl ChartDocument {
         self.package.metadata()
     }
 
-    pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.package.odf_metadata()
     }
 

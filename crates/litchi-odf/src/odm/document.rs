@@ -1,6 +1,5 @@
 //! Typed access to OpenDocument text master documents.
 
-use crate::OdfMetadata;
 use crate::constants;
 use crate::core::OwnedPackage;
 use crate::odt::Document;
@@ -343,7 +342,7 @@ impl MasterDocument {
     }
 
     /// Extract complete OpenDocument metadata.
-    pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.document.odf_metadata()
     }
 

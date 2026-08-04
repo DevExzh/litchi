@@ -1,6 +1,6 @@
 //! Inert, namespace-aware MathML access for OpenDocument Formula packages.
 
-use crate::{OdfMetadata, OpenDocumentFamily, OpenDocumentPackage, PackageWriter, constants};
+use crate::{OpenDocumentFamily, OpenDocumentPackage, PackageWriter, constants};
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
@@ -378,7 +378,7 @@ impl FormulaDocument {
     }
 
     /// Extract complete OpenDocument metadata.
-    pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.package.odf_metadata()
     }
 

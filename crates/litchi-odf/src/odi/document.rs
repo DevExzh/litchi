@@ -1,6 +1,6 @@
 //! Namespace-aware, inert access to standalone OpenDocument images.
 
-use crate::{OdfMetadata, OpenDocumentFamily, OpenDocumentPackage};
+use crate::{OpenDocumentFamily, OpenDocumentPackage};
 use base64::Engine as _;
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::XmlVersion;
@@ -291,7 +291,7 @@ impl ImageDocument {
     }
 
     /// Extract complete OpenDocument metadata.
-    pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.package.odf_metadata()
     }
 

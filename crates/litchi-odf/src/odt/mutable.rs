@@ -4,9 +4,7 @@
 //! for in-place modification of content, styles, and metadata.
 
 use crate::BookmarkTarget;
-use crate::core::{
-    MetaXmlPatch, OdfMetadata, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml,
-};
+use crate::core::{MetaXmlPatch, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml};
 use crate::elements::field::{FieldParser, OdfDynamicTextField};
 use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
@@ -2837,7 +2835,7 @@ impl MutableDocument {
         let Ok(source) = String::from_utf8(bytes) else {
             return Ok(None);
         };
-        let source_metadata = OdfMetadata::from_xml(&source)?;
+        let source_metadata = crate::Metadata::from_xml(&source)?;
         let patch = MetaXmlPatch::preserve_all()
             .with_generator_and_modification_date("Litchi/0.0.1", chrono::Utc::now().to_rfc3339())
             .diff_simple_fields(&source_metadata, &self.metadata);

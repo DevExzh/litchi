@@ -1,7 +1,7 @@
 //! Semantic access to OpenDocument drawings.
 
 use crate::odp::OdpParser;
-use crate::{MediaReference, OdfMetadata, OpenDocumentFamily, OpenDocumentPackage, Shape, Slide};
+use crate::{MediaReference, OpenDocumentFamily, OpenDocumentPackage, Shape, Slide};
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -465,7 +465,7 @@ impl DrawingDocument {
     }
 
     /// Extract the complete format-specific OpenDocument metadata model.
-    pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.package.odf_metadata()
     }
 

@@ -3,9 +3,7 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::core::{
-    MetaXmlPatch, OdfMetadata, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml,
-};
+use crate::core::{MetaXmlPatch, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml};
 use crate::odp::animation::validate_animation_roots;
 use crate::odp::content_source::PresentationContentSource;
 use crate::odp::legacy_animation::validate_legacy_animation_root;
@@ -1032,7 +1030,7 @@ impl MutablePresentation {
         let Ok(source) = String::from_utf8(bytes) else {
             return Ok(None);
         };
-        let source_metadata = OdfMetadata::from_xml(&source)?;
+        let source_metadata = crate::Metadata::from_xml(&source)?;
         let patch = MetaXmlPatch::preserve_all()
             .with_generator_and_modification_date("Litchi/0.0.1", chrono::Utc::now().to_rfc3339())
             .diff_simple_fields(&source_metadata, &self.metadata);

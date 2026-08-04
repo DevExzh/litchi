@@ -143,7 +143,7 @@ impl FlatOpenDocument {
     }
 
     /// Extract the complete format-specific metadata model.
-    pub fn odf_metadata(&self) -> Result<crate::OdfMetadata> {
+    pub fn odf_metadata(&self) -> Result<crate::Metadata> {
         Meta::from_bytes(self.xml.as_bytes())?.odf_metadata()
     }
 
@@ -514,7 +514,7 @@ impl OpenDocumentPackage {
     }
 
     /// Extract the complete format-specific metadata model, if `meta.xml` exists.
-    pub fn odf_metadata(&self) -> Result<Option<crate::OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         let Some(xml) = self.optional_xml_part(constants::ODF_META)? else {
             return Ok(None);
         };

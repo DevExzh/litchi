@@ -425,8 +425,8 @@ pub use chart_properties::{
 pub use core::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Manifest, ManifestChecksum,
     ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm, ManifestEntry,
-    ManifestKeyDerivation, ManifestStartKeyGeneration, OdfEncryptionCipher, OdfEncryptionKdf,
-    OdfEncryptionProfile, OdfEncryptionStartKey, OdfMetadata, OdfStructure, OwnedPackage,
+    ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OdfEncryptionCipher,
+    OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey, OdfStructure, OwnedPackage,
     PackageWriter, TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
 };
 pub use digital_signature::{OdfDigitalSignature, OdfDigitalSignatures, OdfSignatureReference};

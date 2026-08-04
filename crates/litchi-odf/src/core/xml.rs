@@ -162,8 +162,8 @@ impl Meta {
     }
 
     /// Parse the complete format-specific OpenDocument metadata model.
-    pub fn odf_metadata(&self) -> Result<crate::core::OdfMetadata> {
-        crate::core::OdfMetadata::from_xml(self.xml.content())
+    pub fn odf_metadata(&self) -> Result<crate::core::Metadata> {
+        crate::core::Metadata::from_xml(self.xml.content())
     }
 
     /// Extract common metadata while preserving parse failures.

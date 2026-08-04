@@ -40,7 +40,7 @@
 //! - ✅ Default template generation (content.xml, styles.xml, meta.xml, settings.xml)
 //! - ✅ Manifest.xml auto-generation
 //!
-//! ## ✅ Metadata (`metadata.rs`) - COMPLETE
+//! ## ✅ Metadata (`metadata/`) - COMPLETE
 //! - ✅ Unified metadata structure
 //! - ✅ Dublin Core fields (title, creator, description, etc.)
 //! - ✅ ODF-specific fields (editing cycles, generator, etc.)
@@ -75,8 +75,8 @@ pub use manifest::{
     ManifestEncryptionAlgorithm, ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration,
 };
 pub use metadata::{
-    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,
-    TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
+    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Metadata, TemplateMetadata,
+    UserDefinedMetadata, UserDefinedValueType,
 };
 pub(crate) use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::OwnedPackage;

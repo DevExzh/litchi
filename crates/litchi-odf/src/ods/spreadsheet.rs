@@ -1233,7 +1233,7 @@ impl Spreadsheet {
     }
 
     /// Get the complete format-specific OpenDocument metadata model.
-    pub fn odf_metadata(&self) -> Result<Option<crate::OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.meta.as_ref().map(Meta::odf_metadata).transpose()
     }
 

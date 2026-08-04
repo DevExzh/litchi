@@ -1,6 +1,5 @@
 //! Read-only access to legacy OpenDocument web templates.
 
-use crate::OdfMetadata;
 use crate::constants;
 use crate::core::OwnedPackage;
 use crate::odt::Document;
@@ -82,7 +81,7 @@ impl WebDocument {
     }
 
     /// Extract complete OpenDocument metadata.
-    pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.document.odf_metadata()
     }
 
