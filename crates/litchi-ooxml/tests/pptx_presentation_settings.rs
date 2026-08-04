@@ -1,5 +1,5 @@
 use litchi_ooxml::pptx::{
-    Package, PrintColorMode, PrintOutput, ShowMode, SlideSelection, SlideShowExtension, ViewKind,
+    Package, PrintColorMode, PrintOutput, ShowExtension, ShowMode, SlideSelection, ViewKind,
 };
 use litchi_ooxml::{OoxmlError, PackURI};
 
@@ -40,7 +40,7 @@ fn package_and_presentation_load_local_settings() {
     assert_eq!(show.mode, Some(ShowMode::Kiosk { restart: Some(5) }));
     assert_eq!(
         show.extensions,
-        vec![SlideShowExtension::BrowseMode {
+        vec![ShowExtension::BrowseMode {
             show_status: Some(false)
         }]
     );

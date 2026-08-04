@@ -202,10 +202,9 @@ pub use parts::{
 };
 pub use presentation::{PptxChart, Presentation};
 pub use presentation_properties::{
-    BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget, OpaquePresentationExtension,
-    PresentationColor, PresentationProperties, PresentationPropertyExtension, PrintColorMode,
-    PrintOutput, PrintProperties, ShowMode, ShowProperties, SlideSelection, SlideShowExtension,
-    WebColor, WebProperties, WebScreenSize, load_from_package as load_presentation_properties,
+    BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
+    PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
+    WebColor, WebScreenSize, load_from_package as load_presentation_properties,
 };
 pub use presentation_structure::{
     PresentationSlideReference, PresentationStructure, add_custom_show, add_custom_show_slide,

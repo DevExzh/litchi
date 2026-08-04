@@ -1110,7 +1110,7 @@ impl<'a> Presentation<'a> {
     /// opened, fetched, or otherwise activated.
     pub fn presentation_properties(
         &self,
-    ) -> Result<Option<crate::pptx::presentation_properties::PresentationProperties>> {
+    ) -> Result<Option<crate::pptx::presentation_properties::Properties>> {
         crate::pptx::presentation_properties::load_from_package(self.package)
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }

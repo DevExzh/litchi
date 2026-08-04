@@ -170,15 +170,3 @@ pub struct Properties {
     pub recent_colors: Vec<Color>,
     pub extensions: Vec<Extension>,
 }
-
-// Historical names remain source-compatible at the public facade.
-pub type InertHtmlTarget = HtmlTarget;
-pub type PresentationColor = Color;
-pub type OpaquePresentationExtension = OpaqueExtension;
-pub type PresentationPropertyExtension = Extension;
-pub type SlideShowExtension = ShowExtension;
-pub type HtmlPublishProperties = HtmlPublish;
-pub type WebProperties = Web;
-pub type PrintProperties = Print;
-pub type ShowProperties = Show;
-pub type PresentationProperties = Properties;
