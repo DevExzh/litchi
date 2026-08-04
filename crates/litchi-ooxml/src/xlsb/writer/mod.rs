@@ -74,7 +74,7 @@ pub use crate::xlsx::{
     WorksheetChart, XlsxTextAutofit, XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor,
     XlsxTextWrap,
 };
-pub use chartsheet::MutableXlsbChartSheet;
+pub use chartsheet::MutableChartSheet;
 pub use litchi_xlsb::pivot_view::Part;
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};

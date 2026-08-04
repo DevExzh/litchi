@@ -18,7 +18,7 @@ use crate::xlsb::worksheet::StrongProtection;
 /// Visibility state of a chart sheet, from `BrtBundleSh hsState`
 /// (MS-XLSB 2.4.718).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsbChartSheetState {
+pub enum State {
     /// The sheet is visible.
     Visible,
     /// The sheet is hidden through the user interface.
@@ -30,11 +30,11 @@ pub enum XlsbChartSheetState {
 /// `BrtColor` payload as carried by `BrtCsProp brtcolorTab` (MS-XLSB
 /// 2.4.337): the background color of the sheet tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbChartSheetColor {
+pub struct Color {
     /// Whether the palette color matches the RGB values (`fValidRGB`).
     pub valid_rgb: bool,
     /// Kind of color information carried by the record (`xColorType`).
-    pub color_type: XlsbChartSheetColorType,
+    pub color_type: ColorType,
     /// Palette or theme index (`index`); meaningless for RGB colors.
     pub index: u8,
     /// Tint and shade value (`nTintAndShade`).
@@ -43,12 +43,12 @@ pub struct XlsbChartSheetColor {
     pub rgba: [u8; 4],
 }
 
-impl XlsbChartSheetColor {
+impl Color {
     /// The default tab color when `BrtCsProp` is absent: automatic.
     pub fn automatic() -> Self {
-        XlsbChartSheetColor {
+        Color {
             valid_rgb: false,
-            color_type: XlsbChartSheetColorType::Automatic,
+            color_type: ColorType::Automatic,
             index: 0,
             tint: 0,
             rgba: [0; 4],
@@ -56,7 +56,7 @@ impl XlsbChartSheetColor {
     }
 }
 
-impl Default for XlsbChartSheetColor {
+impl Default for Color {
     fn default() -> Self {
         Self::automatic()
     }
@@ -64,7 +64,7 @@ impl Default for XlsbChartSheetColor {
 
 /// `xColorType` values of a `BrtColor` (MS-XLSB 2.4.337).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsbChartSheetColorType {
+pub enum ColorType {
     /// Color information is automatically determined by the application.
     Automatic,
     /// A color from the color palette, addressed by `index` (an `Icv`).
@@ -77,7 +77,7 @@ pub enum XlsbChartSheetColorType {
 
 /// One chart sheet view from `BrtBeginCsView` (MS-XLSB 2.4.38).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbChartSheetView {
+pub struct View {
     /// Whether the chart sheet is currently selected (`fSelected`).
     pub selected: bool,
     /// Window zoom level as a percentage; 0 means no zoom level is set
@@ -90,7 +90,7 @@ pub struct XlsbChartSheetView {
 
 /// Chart sheet protection from `BrtCsProtection` (MS-XLSB 2.4.345).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbChartSheetProtection {
+pub struct Protection {
     /// Password verifier value; 0 means no password is required (`protpwd`).
     /// Stored verbatim and never verified.
     pub password_verifier: u16,
@@ -102,7 +102,7 @@ pub struct XlsbChartSheetProtection {
 
 /// Page layout and printing settings from `BrtCsPageSetup` (MS-XLSB 2.4.343).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsbChartSheetPageSetup {
+pub struct PageSetup {
     /// Printer paper size (`iPaperSize`; 1..=118 are standard sizes).
     pub paper_size: u32,
     /// Horizontal printer resolution in dots per inch (`iRes`).
@@ -131,26 +131,26 @@ pub struct XlsbChartSheetPageSetup {
 
 /// Typed inert model of one Chart Sheet part (MS-XLSB 2.1.7.7).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsbChartSheet {
+pub struct ChartSheet {
     /// Sheet name from `BrtBundleSh` in the workbook part.
     pub name: String,
     /// Sheet visibility state from `BrtBundleSh`.
-    pub state: XlsbChartSheetState,
+    pub state: State,
     /// Code name from `BrtCsProp strName` (MS-XLSB 2.4.344); empty when the
     /// record is absent.
     pub code_name: String,
     /// Whether the chart sheet is published (`BrtCsProp fPublish`).
     pub published: bool,
     /// Sheet tab background color (`BrtCsProp brtcolorTab`).
-    pub tab_color: XlsbChartSheetColor,
+    pub tab_color: Color,
     /// Chart sheet views from the `BrtBeginCsViews` collection.
-    pub views: Vec<XlsbChartSheetView>,
+    pub views: Vec<View>,
     /// Classic chart sheet protection, when present.
-    pub protection: Option<XlsbChartSheetProtection>,
+    pub protection: Option<Protection>,
     /// ISO strong password data from `BrtCsProtectionIso`, when present.
     pub strong_protection: Option<StrongProtection>,
     /// Page layout and printing settings, when present.
-    pub page_setup: Option<XlsbChartSheetPageSetup>,
+    pub page_setup: Option<PageSetup>,
     /// Relationship identifier of the Drawings part from `BrtDrawing`
     /// (MS-XLSB 2.4.354); stored verbatim and never dereferenced.
     pub drawing_rel_id: Option<String>,

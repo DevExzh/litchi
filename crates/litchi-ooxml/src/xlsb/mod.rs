@@ -187,8 +187,7 @@ pub mod web_extension_bindings;
 
 pub use cell::Cell;
 pub use chartsheet::{
-    XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
-    XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView, parse_chart_sheet_part,
+    ChartSheet, Color, ColorType, PageSetup, Protection, State, View, parse_chart_sheet_part,
 };
 pub use data_validation::{DataValidationRecordKind, DataValidationSettings, Validation};
 pub use drawing::{
@@ -239,6 +238,6 @@ pub use worksheet::{
 };
 // Re-export writer types for convenience
 pub use writer::{
-    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, StylesWriter,
+    MutableChartSheet, MutableSharedStringsWriter, MutableXlsbWorksheet, StylesWriter,
     XlsbWorkbookWriter,
 };

@@ -59,7 +59,7 @@ pub struct XlsbWorkbook {
     is_1904: bool,
     pivot_cache_definitions: Vec<(u32, crate::xlsb::pivot::PivotCacheDefinition)>,
     structured_tables: Vec<(usize, crate::xlsb::table::Table)>,
-    chart_sheets: Vec<(usize, crate::xlsb::chartsheet::XlsbChartSheet)>,
+    chart_sheets: Vec<(usize, crate::xlsb::chartsheet::ChartSheet)>,
     sheet_drawings: Vec<crate::xlsb::drawing::SheetDrawing>,
     connections: Option<crate::xlsb::connections::Connections>,
 }
@@ -487,16 +487,13 @@ impl XlsbWorkbook {
     /// verifiers, and hash data are stored verbatim and are never
     /// dereferenced, verified, or executed. The chart hosted by a chart
     /// sheet is surfaced through [`XlsbWorkbook::sheet_drawing`].
-    pub fn chart_sheets(&self) -> &[(usize, crate::xlsb::chartsheet::XlsbChartSheet)] {
+    pub fn chart_sheets(&self) -> &[(usize, crate::xlsb::chartsheet::ChartSheet)] {
         &self.chart_sheets
     }
 
     /// Look up the typed chart sheet anchored to one sheet, selected by
     /// zero-based sheet index; `None` for worksheets and macro sheets.
-    pub fn chart_sheet(
-        &self,
-        sheet_index: usize,
-    ) -> Option<&crate::xlsb::chartsheet::XlsbChartSheet> {
+    pub fn chart_sheet(&self, sheet_index: usize) -> Option<&crate::xlsb::chartsheet::ChartSheet> {
         self.chart_sheets
             .iter()
             .find(|(index, _)| *index == sheet_index)

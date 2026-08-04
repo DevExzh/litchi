@@ -105,14 +105,14 @@ fn parses_full_chart_sheet_stream() {
     ]);
     let sheet = parse_chart_sheet_part(&data, "Chart1".to_string(), 0).unwrap();
     assert_eq!(sheet.name, "Chart1");
-    assert_eq!(sheet.state, XlsbChartSheetState::Visible);
+    assert_eq!(sheet.state, State::Visible);
     assert_eq!(sheet.code_name, "ChartCode");
     assert!(sheet.published);
     assert_eq!(
         sheet.tab_color,
-        XlsbChartSheetColor {
+        Color {
             valid_rgb: true,
-            color_type: XlsbChartSheetColorType::Rgb,
+            color_type: ColorType::Rgb,
             index: 0,
             tint: 0,
             rgba: [0x10, 0x20, 0x30, 0xFF],
@@ -121,7 +121,7 @@ fn parses_full_chart_sheet_stream() {
     assert_eq!(sheet.views.len(), 1);
     assert_eq!(
         sheet.views[0],
-        XlsbChartSheetView {
+        View {
             selected: true,
             scale: 100,
             workbook_view_index: 0,
@@ -138,7 +138,7 @@ fn parses_full_chart_sheet_stream() {
     assert_eq!(page_setup.printer_settings_rel_id, "rIdPrinter");
     assert_eq!(
         sheet.protection,
-        Some(XlsbChartSheetProtection {
+        Some(Protection {
             password_verifier: 0,
             locked: true,
             objects: false,
@@ -161,9 +161,9 @@ fn parses_full_chart_sheet_stream() {
 fn maps_sheet_states() {
     let minimal = chart_sheet_stream(&[]);
     let hidden = parse_chart_sheet_part(&minimal, "C".to_string(), 1).unwrap();
-    assert_eq!(hidden.state, XlsbChartSheetState::Hidden);
+    assert_eq!(hidden.state, State::Hidden);
     let very_hidden = parse_chart_sheet_part(&minimal, "C".to_string(), 2).unwrap();
-    assert_eq!(very_hidden.state, XlsbChartSheetState::VeryHidden);
+    assert_eq!(very_hidden.state, State::VeryHidden);
     assert!(matches!(
         parse_chart_sheet_part(&minimal, "C".to_string(), 3),
         Err(XlsbError::Unrecognized { .. })
@@ -176,10 +176,7 @@ fn parses_minimal_chart_sheet_stream() {
     let sheet = parse_chart_sheet_part(&data, "Chart1".to_string(), 0).unwrap();
     assert!(sheet.code_name.is_empty());
     assert!(!sheet.published);
-    assert_eq!(
-        sheet.tab_color.color_type,
-        XlsbChartSheetColorType::Automatic
-    );
+    assert_eq!(sheet.tab_color.color_type, ColorType::Automatic);
     assert!(sheet.views.is_empty());
     assert!(sheet.protection.is_none());
     assert!(sheet.page_setup.is_none());
@@ -196,7 +193,7 @@ fn tab_color_variants() {
         (rt::END_SHEET, Vec::new()),
     ]);
     let sheet = parse_chart_sheet_part(&data, "C".to_string(), 0).unwrap();
-    assert_eq!(sheet.tab_color.color_type, XlsbChartSheetColorType::Indexed);
+    assert_eq!(sheet.tab_color.color_type, ColorType::Indexed);
     assert_eq!(sheet.tab_color.index, 0x40);
 
     // Theme color (xColorType = 3).
@@ -207,7 +204,7 @@ fn tab_color_variants() {
         (rt::END_SHEET, Vec::new()),
     ]);
     let sheet = parse_chart_sheet_part(&data, "C".to_string(), 0).unwrap();
-    assert_eq!(sheet.tab_color.color_type, XlsbChartSheetColorType::Theme);
+    assert_eq!(sheet.tab_color.color_type, ColorType::Theme);
     assert_eq!(sheet.tab_color.index, 0x0B);
 
     // RGB color without the valid bit is rejected.

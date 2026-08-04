@@ -7,7 +7,7 @@ use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
 };
 use crate::xlsb::writer::{
-    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, StylesWriter,
+    MutableChartSheet, MutableSharedStringsWriter, MutableXlsbWorksheet, StylesWriter,
 };
 use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
@@ -49,7 +49,7 @@ const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
 /// ```
 pub struct XlsbWorkbookWriter {
     worksheets: Vec<MutableXlsbWorksheet>,
-    chart_sheets: Vec<MutableXlsbChartSheet>,
+    chart_sheets: Vec<MutableChartSheet>,
     sheet_order: Vec<XlsbSheetSlot>,
     named_ranges: Vec<Definition>,
     shared_strings: MutableSharedStringsWriter,
@@ -184,8 +184,8 @@ impl XlsbWorkbookWriter {
     /// relationships are allocated at save time and never followed or fetched.
     pub fn add_chart_sheet(
         &mut self,
-        chart_sheet: MutableXlsbChartSheet,
-    ) -> XlsbResult<&mut MutableXlsbChartSheet> {
+        chart_sheet: MutableChartSheet,
+    ) -> XlsbResult<&mut MutableChartSheet> {
         chart_sheet.validate()?;
         if self.chart_sheets.len() >= super::chartsheet::max_chart_sheets() {
             return Err(XlsbError::InvalidFormula(
@@ -303,7 +303,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Mutable chart-sheet access by chart-sheet insertion index.
-    pub fn get_chart_sheet_mut(&mut self, index: usize) -> Option<&mut MutableXlsbChartSheet> {
+    pub fn get_chart_sheet_mut(&mut self, index: usize) -> Option<&mut MutableChartSheet> {
         self.chart_sheets.get_mut(index)
     }
 
@@ -936,9 +936,9 @@ impl XlsbWorkbookWriter {
                 XlsbSheetSlot::Worksheet(_) => 0,
                 XlsbSheetSlot::ChartSheet(index) => match self.chart_sheets[index].metadata().state
                 {
-                    crate::xlsb::chartsheet::XlsbChartSheetState::Visible => 0,
-                    crate::xlsb::chartsheet::XlsbChartSheetState::Hidden => 1,
-                    crate::xlsb::chartsheet::XlsbChartSheetState::VeryHidden => 2,
+                    crate::xlsb::chartsheet::State::Visible => 0,
+                    crate::xlsb::chartsheet::State::Hidden => 1,
+                    crate::xlsb::chartsheet::State::VeryHidden => 2,
                 },
             };
             temp_writer.write_u32(state)?;
@@ -1783,10 +1783,7 @@ mod tests {
 
     #[test]
     fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
-        use crate::xlsb::chartsheet::{
-            XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
-            XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView,
-        };
+        use crate::xlsb::chartsheet::{Color, ColorType, PageSetup, Protection, State, View};
         use crate::xlsb::worksheet::StrongProtection;
         use crate::xlsx::{ChartAnchor, WorksheetChart};
 
@@ -1799,25 +1796,25 @@ mod tests {
             ChartAnchor::new(0, 0, 10, 20),
         )
         .unwrap();
-        let mut chart_sheet = MutableXlsbChartSheet::new("Sales Chart", chart);
+        let mut chart_sheet = MutableChartSheet::new("Sales Chart", chart);
         {
             let metadata = chart_sheet.metadata_mut();
-            metadata.state = XlsbChartSheetState::Hidden;
+            metadata.state = State::Hidden;
             metadata.code_name = "ChartCode".to_string();
             metadata.published = true;
-            metadata.tab_color = XlsbChartSheetColor {
+            metadata.tab_color = Color {
                 valid_rgb: true,
-                color_type: XlsbChartSheetColorType::Rgb,
+                color_type: ColorType::Rgb,
                 index: 0,
                 tint: -100,
                 rgba: [0x44, 0x72, 0xc4, 0xff],
             };
-            metadata.views = vec![XlsbChartSheetView {
+            metadata.views = vec![View {
                 selected: true,
                 scale: 125,
                 workbook_view_index: 0,
             }];
-            metadata.protection = Some(XlsbChartSheetProtection {
+            metadata.protection = Some(Protection {
                 password_verifier: 0x1234,
                 locked: true,
                 objects: false,
@@ -1831,7 +1828,7 @@ mod tests {
         }
         chart_sheet
             .set_page_setup(
-                XlsbChartSheetPageSetup {
+                PageSetup {
                     paper_size: 9,
                     horizontal_resolution: 600,
                     vertical_resolution: 600,
@@ -1868,7 +1865,7 @@ mod tests {
             ]
         );
         let parsed = reader.chart_sheet(1).expect("chart sheet missing");
-        assert_eq!(parsed.state, XlsbChartSheetState::Hidden);
+        assert_eq!(parsed.state, State::Hidden);
         assert_eq!(parsed.code_name, "ChartCode");
         assert!(parsed.published);
         assert_eq!(parsed.tab_color.rgba, [0x44, 0x72, 0xc4, 0xff]);
@@ -1893,7 +1890,7 @@ mod tests {
 
     #[test]
     fn chart_sheet_validation_is_lossless_or_refuse() {
-        use crate::xlsb::chartsheet::{XlsbChartSheetColor, XlsbChartSheetColorType};
+        use crate::xlsb::chartsheet::{Color, ColorType};
         use crate::xlsx::{ChartAnchor, WorksheetChart};
 
         let chart = WorksheetChart::bar_chart(
@@ -1906,22 +1903,22 @@ mod tests {
         let mut workbook = XlsbWorkbookWriter::new();
         workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
         workbook
-            .add_chart_sheet(MutableXlsbChartSheet::new("Chart", chart.clone()))
+            .add_chart_sheet(MutableChartSheet::new("Chart", chart.clone()))
             .unwrap();
         assert!(
             workbook
-                .add_chart_sheet(MutableXlsbChartSheet::new("chart", chart.clone()))
+                .add_chart_sheet(MutableChartSheet::new("chart", chart.clone()))
                 .is_err()
         );
 
-        let mut invalid = MutableXlsbChartSheet::new("Invalid", chart.clone());
+        let mut invalid = MutableChartSheet::new("Invalid", chart.clone());
         invalid.metadata_mut().views[0].scale = 401;
         assert!(workbook.add_chart_sheet(invalid).is_err());
 
-        let mut invalid_color = MutableXlsbChartSheet::new("Invalid Color", chart);
-        invalid_color.metadata_mut().tab_color = XlsbChartSheetColor {
+        let mut invalid_color = MutableChartSheet::new("Invalid Color", chart);
+        invalid_color.metadata_mut().tab_color = Color {
             valid_rgb: false,
-            color_type: XlsbChartSheetColorType::Indexed,
+            color_type: ColorType::Indexed,
             index: 0x52,
             tint: 0,
             rgba: [0; 4],
@@ -3363,10 +3360,7 @@ mod tests {
         data.add_chart(worksheet_chart).unwrap();
         workbook.add_worksheet(data);
         workbook
-            .add_chart_sheet(MutableXlsbChartSheet::new(
-                "Linked Chart",
-                chart_sheet_chart,
-            ))
+            .add_chart_sheet(MutableChartSheet::new("Linked Chart", chart_sheet_chart))
             .unwrap();
 
         let mut output = Cursor::new(Vec::new());

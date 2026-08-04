@@ -51,17 +51,17 @@ const MAX_THEME_COLOR_INDEX: u8 = 0x0B;
 const MAX_SPIN_COUNT: u32 = 10_000_000;
 
 /// Parse a Chart Sheet part (`xl/chartsheets/sheet*.bin`) into a typed
-/// [`XlsbChartSheet`].
+/// [`ChartSheet`].
 ///
 /// `name` and `state` come from the sheet's `BrtBundleSh` record in the
 /// workbook part. The stream must start with `BrtBeginSheet` and end with
 /// `BrtEndSheet`. Records after `BrtEndSheet` are ignored. Unknown record
 /// types anywhere in the stream are skipped without failing.
-pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResult<XlsbChartSheet> {
+pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResult<ChartSheet> {
     let state = match state {
-        0 => XlsbChartSheetState::Visible,
-        1 => XlsbChartSheetState::Hidden,
-        2 => XlsbChartSheetState::VeryHidden,
+        0 => State::Visible,
+        1 => State::Hidden,
+        2 => State::VeryHidden,
         other => {
             return Err(XlsbError::Unrecognized {
                 typ: "BrtBundleSh hsState".to_string(),
@@ -69,12 +69,12 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResu
             });
         },
     };
-    let mut sheet = XlsbChartSheet {
+    let mut sheet = ChartSheet {
         name,
         state,
         code_name: String::new(),
         published: false,
-        tab_color: XlsbChartSheetColor::automatic(),
+        tab_color: Color::automatic(),
         views: Vec::new(),
         protection: None,
         strong_protection: None,
@@ -169,7 +169,7 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResu
 }
 
 /// `BrtCsProp` payload (MS-XLSB 2.4.344).
-fn parse_cs_prop(data: &[u8], sheet: &mut XlsbChartSheet) -> XlsbResult<()> {
+fn parse_cs_prop(data: &[u8], sheet: &mut ChartSheet) -> XlsbResult<()> {
     let mut cursor = Cursor::new(data, "BrtCsProp");
     let flags = cursor.read_u16()?;
     sheet.published = flags & CS_PROP_PUBLISHED != 0;
@@ -180,28 +180,28 @@ fn parse_cs_prop(data: &[u8], sheet: &mut XlsbChartSheet) -> XlsbResult<()> {
 }
 
 /// `BrtColor` structure (MS-XLSB 2.4.337).
-fn parse_brt_color(data: &[u8]) -> XlsbResult<XlsbChartSheetColor> {
+fn parse_brt_color(data: &[u8]) -> XlsbResult<Color> {
     debug_assert_eq!(data.len(), BRT_COLOR_LEN);
     let valid_rgb = data[0] & COLOR_VALID_RGB != 0;
     let color_type = match data[0] >> COLOR_TYPE_SHIFT {
-        COLOR_TYPE_AUTOMATIC => XlsbChartSheetColorType::Automatic,
-        COLOR_TYPE_INDEXED => XlsbChartSheetColorType::Indexed,
-        COLOR_TYPE_RGB => XlsbChartSheetColorType::Rgb,
-        COLOR_TYPE_THEME => XlsbChartSheetColorType::Theme,
+        COLOR_TYPE_AUTOMATIC => ColorType::Automatic,
+        COLOR_TYPE_INDEXED => ColorType::Indexed,
+        COLOR_TYPE_RGB => ColorType::Rgb,
+        COLOR_TYPE_THEME => ColorType::Theme,
         other => {
             return Err(malformed("BrtColor", format!("color type {other}")));
         },
     };
-    if color_type == XlsbChartSheetColorType::Rgb && !valid_rgb {
+    if color_type == ColorType::Rgb && !valid_rgb {
         return Err(malformed("BrtColor", "direct color is not marked valid"));
     }
-    if color_type == XlsbChartSheetColorType::Theme && data[1] > MAX_THEME_COLOR_INDEX {
+    if color_type == ColorType::Theme && data[1] > MAX_THEME_COLOR_INDEX {
         return Err(malformed(
             "BrtColor",
             format!("theme color index {}", data[1]),
         ));
     }
-    Ok(XlsbChartSheetColor {
+    Ok(Color {
         valid_rgb,
         color_type,
         index: data[1],
@@ -211,7 +211,7 @@ fn parse_brt_color(data: &[u8]) -> XlsbResult<XlsbChartSheetColor> {
 }
 
 /// `BrtCsPageSetup` payload (MS-XLSB 2.4.343).
-fn parse_cs_page_setup(data: &[u8]) -> XlsbResult<XlsbChartSheetPageSetup> {
+fn parse_cs_page_setup(data: &[u8]) -> XlsbResult<PageSetup> {
     let mut cursor = Cursor::new(data, "BrtCsPageSetup");
     let paper_size = cursor.read_u32()?;
     let horizontal_resolution = cursor.read_u32()?;
@@ -227,7 +227,7 @@ fn parse_cs_page_setup(data: &[u8]) -> XlsbResult<XlsbChartSheetPageSetup> {
         return Err(malformed("BrtCsPageSetup", "empty szRelID"));
     }
     cursor.finish()?;
-    Ok(XlsbChartSheetPageSetup {
+    Ok(PageSetup {
         paper_size,
         horizontal_resolution,
         vertical_resolution,
@@ -243,9 +243,9 @@ fn parse_cs_page_setup(data: &[u8]) -> XlsbResult<XlsbChartSheetPageSetup> {
 }
 
 /// `BrtCsProtection` payload (MS-XLSB 2.4.345).
-fn parse_cs_protection(data: &[u8]) -> XlsbResult<XlsbChartSheetProtection> {
+fn parse_cs_protection(data: &[u8]) -> XlsbResult<Protection> {
     let mut cursor = Cursor::new(data, "BrtCsProtection");
-    let protection = XlsbChartSheetProtection {
+    let protection = Protection {
         password_verifier: cursor.read_u16()?,
         locked: cursor.read_bool32()?,
         objects: cursor.read_bool32()?,
@@ -297,7 +297,7 @@ fn parse_cs_protection_iso(data: &[u8]) -> XlsbResult<(StrongProtection, bool, b
 fn parse_cs_views(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
-    views: &mut Vec<XlsbChartSheetView>,
+    views: &mut Vec<View>,
 ) -> XlsbResult<()> {
     if !views.is_empty() {
         return Err(malformed("BrtBeginCsViews", "duplicate collection"));
@@ -330,7 +330,7 @@ fn parse_cs_views(
 }
 
 /// `BrtBeginCsView` payload (MS-XLSB 2.4.38).
-fn parse_cs_view(data: &[u8]) -> XlsbResult<XlsbChartSheetView> {
+fn parse_cs_view(data: &[u8]) -> XlsbResult<View> {
     let mut cursor = Cursor::new(data, "BrtBeginCsView");
     let flags = cursor.read_u16()?;
     let scale = cursor.read_u32()?;
@@ -339,7 +339,7 @@ fn parse_cs_view(data: &[u8]) -> XlsbResult<XlsbChartSheetView> {
     }
     let workbook_view_index = cursor.read_u32()?;
     cursor.finish()?;
-    Ok(XlsbChartSheetView {
+    Ok(View {
         selected: flags & CS_VIEW_SELECTED != 0,
         scale,
         workbook_view_index,

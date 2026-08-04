@@ -14,8 +14,5 @@ mod parse;
 #[cfg(test)]
 mod tests;
 
-pub use model::{
-    XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
-    XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView,
-};
+pub use model::{ChartSheet, Color, ColorType, PageSetup, Protection, State, View};
 pub use parse::parse_chart_sheet_part;

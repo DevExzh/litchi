@@ -1,9 +1,6 @@
 //! Typed XLSB chart-sheet authoring (MS-XLSB 2.1.7.7).
 
-use crate::xlsb::chartsheet::{
-    XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
-    XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView,
-};
+use crate::xlsb::chartsheet::{ChartSheet, Color, ColorType, PageSetup, Protection, State, View};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::worksheet::StrongProtection;
 use crate::xlsx::WorksheetChart;
@@ -24,24 +21,24 @@ const MAX_PAPER_SIZE: u32 = i32::MAX as u32 - 1;
 
 /// A chart sheet being authored in a new XLSB workbook.
 #[derive(Debug, Clone)]
-pub struct MutableXlsbChartSheet {
-    metadata: XlsbChartSheet,
+pub struct MutableChartSheet {
+    metadata: ChartSheet,
     chart: WorksheetChart,
     printer_settings: Option<Vec<u8>>,
 }
 
-impl MutableXlsbChartSheet {
+impl MutableChartSheet {
     /// Create a visible chart sheet with one default workbook view.
     pub fn new(name: impl Into<String>, chart: WorksheetChart) -> Self {
         let name = name.into();
         Self {
-            metadata: XlsbChartSheet {
+            metadata: ChartSheet {
                 name,
-                state: XlsbChartSheetState::Visible,
+                state: State::Visible,
                 code_name: String::new(),
                 published: false,
-                tab_color: XlsbChartSheetColor::automatic(),
-                views: vec![XlsbChartSheetView {
+                tab_color: Color::automatic(),
+                views: vec![View {
                     selected: false,
                     scale: 100,
                     workbook_view_index: 0,
@@ -64,7 +61,7 @@ impl MutableXlsbChartSheet {
     }
 
     /// Sheet-level metadata written to the binary chart-sheet stream.
-    pub fn metadata(&self) -> &XlsbChartSheet {
+    pub fn metadata(&self) -> &ChartSheet {
         &self.metadata
     }
 
@@ -72,7 +69,7 @@ impl MutableXlsbChartSheet {
     ///
     /// Relationship identifiers are allocated by the writer. Setting a
     /// drawing or legacy-drawing identifier causes validation to fail.
-    pub fn metadata_mut(&mut self) -> &mut XlsbChartSheet {
+    pub fn metadata_mut(&mut self) -> &mut ChartSheet {
         &mut self.metadata
     }
 
@@ -92,7 +89,7 @@ impl MutableXlsbChartSheet {
     /// with an identifier allocated by the package writer.
     pub fn set_page_setup(
         &mut self,
-        mut page_setup: XlsbChartSheetPageSetup,
+        mut page_setup: PageSetup,
         printer_settings: Vec<u8>,
     ) -> XlsbResult<&mut Self> {
         if printer_settings.is_empty() || printer_settings.len() > MAX_PRINTER_SETTINGS_BYTES {
@@ -178,7 +175,7 @@ pub(crate) fn max_chart_sheets() -> usize {
 }
 
 pub(crate) fn write_chart_sheet(
-    sheet: &MutableXlsbChartSheet,
+    sheet: &MutableChartSheet,
     drawing_rel_id: &str,
     printer_rel_id: Option<&str>,
 ) -> XlsbResult<Vec<u8>> {
@@ -233,19 +230,19 @@ fn validate_string(value: &str, context: &str) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_color(color: XlsbChartSheetColor) -> XlsbResult<()> {
-    if color.color_type == XlsbChartSheetColorType::Rgb && !color.valid_rgb {
+fn validate_color(color: Color) -> XlsbResult<()> {
+    if color.color_type == ColorType::Rgb && !color.valid_rgb {
         return Err(XlsbError::InvalidFormula(
             "direct chart-sheet tab color is not marked valid".to_string(),
         ));
     }
-    if color.color_type == XlsbChartSheetColorType::Theme && color.index > MAX_THEME_COLOR_INDEX {
+    if color.color_type == ColorType::Theme && color.index > MAX_THEME_COLOR_INDEX {
         return Err(XlsbError::InvalidFormula(format!(
             "chart-sheet theme color index {} exceeds {MAX_THEME_COLOR_INDEX}",
             color.index
         )));
     }
-    if color.color_type == XlsbChartSheetColorType::Indexed && color.index > MAX_INDEXED_COLOR {
+    if color.color_type == ColorType::Indexed && color.index > MAX_INDEXED_COLOR {
         return Err(XlsbError::InvalidFormula(format!(
             "chart-sheet indexed color {} exceeds {MAX_INDEXED_COLOR}",
             color.index
@@ -268,7 +265,7 @@ fn validate_strong_protection(value: &StrongProtection) -> XlsbResult<()> {
     validate_string(&value.algorithm, "strong-protection algorithm")
 }
 
-fn validate_page_setup(value: &XlsbChartSheetPageSetup) -> XlsbResult<()> {
+fn validate_page_setup(value: &PageSetup) -> XlsbResult<()> {
     if value.paper_size > MAX_PAPER_SIZE || (119..256).contains(&value.paper_size) {
         return Err(XlsbError::InvalidFormula(format!(
             "chart-sheet paper size {} is invalid or reserved",
@@ -284,14 +281,14 @@ fn validate_page_setup(value: &XlsbChartSheetPageSetup) -> XlsbResult<()> {
     Ok(())
 }
 
-fn write_properties<W: Write>(writer: &mut Writer<W>, value: &XlsbChartSheet) -> XlsbResult<()> {
+fn write_properties<W: Write>(writer: &mut Writer<W>, value: &ChartSheet) -> XlsbResult<()> {
     let mut data = Vec::new();
     data.extend_from_slice(&(u16::from(value.published)).to_le_bytes());
     let color_type = match value.tab_color.color_type {
-        XlsbChartSheetColorType::Automatic => 0,
-        XlsbChartSheetColorType::Indexed => 1,
-        XlsbChartSheetColorType::Rgb => 2,
-        XlsbChartSheetColorType::Theme => 3,
+        ColorType::Automatic => 0,
+        ColorType::Indexed => 1,
+        ColorType::Rgb => 2,
+        ColorType::Theme => 3,
     };
     data.push(u8::from(value.tab_color.valid_rgb) | (color_type << 1));
     data.push(value.tab_color.index);
@@ -301,7 +298,7 @@ fn write_properties<W: Write>(writer: &mut Writer<W>, value: &XlsbChartSheet) ->
     Ok(writer.write_record(rt::CS_PROP, &data)?)
 }
 
-fn write_views<W: Write>(writer: &mut Writer<W>, views: &[XlsbChartSheetView]) -> XlsbResult<()> {
+fn write_views<W: Write>(writer: &mut Writer<W>, views: &[View]) -> XlsbResult<()> {
     writer.write_record(rt::BEGIN_CS_VIEWS, &[])?;
     for view in views {
         let mut data = Vec::with_capacity(10);
@@ -316,7 +313,7 @@ fn write_views<W: Write>(writer: &mut Writer<W>, views: &[XlsbChartSheetView]) -
 
 fn write_protection<W: Write>(
     writer: &mut Writer<W>,
-    classic: Option<XlsbChartSheetProtection>,
+    classic: Option<Protection>,
     strong: Option<&StrongProtection>,
 ) -> XlsbResult<()> {
     let Some(classic) = classic else {
@@ -348,7 +345,7 @@ fn write_protection<W: Write>(
 
 fn write_page_setup<W: Write>(
     writer: &mut Writer<W>,
-    setup: &XlsbChartSheetPageSetup,
+    setup: &PageSetup,
     printer_rel_id: &str,
 ) -> XlsbResult<()> {
     let mut data = Vec::new();
