@@ -6,7 +6,6 @@ use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
 };
-use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::writer::{
     MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, StylesWriter,
 };
@@ -15,6 +14,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_xlsb::calc::{self, Props};
+use litchi_xlsb::named_ranges::{Definition, validate_name};
 use litchi_xlsb::raw::{Writer, kind};
 use std::io::{Seek, Write};
 use std::sync::Arc;
@@ -51,7 +51,7 @@ pub struct XlsbWorkbookWriter {
     worksheets: Vec<MutableXlsbWorksheet>,
     chart_sheets: Vec<MutableXlsbChartSheet>,
     sheet_order: Vec<XlsbSheetSlot>,
-    named_ranges: Vec<NamedRange>,
+    named_ranges: Vec<Definition>,
     shared_strings: MutableSharedStringsWriter,
     styles: StylesWriter,
     calc: Props,
@@ -212,7 +212,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add a named range (defined name) to the workbook.
-    pub fn add_named_range(&mut self, named_range: NamedRange) {
+    pub fn add_named_range(&mut self, named_range: Definition) {
         self.named_ranges.push(named_range);
     }
 
@@ -454,7 +454,7 @@ impl XlsbWorkbookWriter {
                     named_range.name
                 )));
             }
-            validate_defined_name(&named_range.name)?;
+            validate_name(&named_range.name)?;
             if named_range.formula.is_none() {
                 return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
                     "defined name {} has no formula",
@@ -529,7 +529,7 @@ impl XlsbWorkbookWriter {
                     named_range.name
                 )));
             }
-            validate_defined_name(&named_range.name)?;
+            validate_name(&named_range.name)?;
             if let Some(sheet_id) = named_range.sheet_id
                 && usize::try_from(sheet_id)
                     .ok()
@@ -1506,6 +1506,7 @@ mod tests {
         Bar, Bar14, Color, Formatting, IconSet, RecordKind, Rule, RuleMetadata, RuleType, Scale,
         Value,
     };
+    use litchi_xlsb::named_ranges::area3d_formula;
     use std::io::Cursor;
 
     #[test]
@@ -2627,10 +2628,8 @@ mod tests {
 
     #[test]
     fn test_add_named_range() {
-        use crate::xlsb::named_ranges::NamedRange;
-
         let mut workbook = XlsbWorkbookWriter::new();
-        let named_range = NamedRange::new("TestRange".to_string(), None).with_formula(vec![
+        let named_range = Definition::new("TestRange".to_string(), None).with_formula(vec![
             crate::xlsb::formula::ptg_types::PTG_INT,
             1,
             0,
@@ -2642,13 +2641,11 @@ mod tests {
 
     #[test]
     fn defined_name_survives_package_roundtrip() {
-        use crate::xlsb::named_ranges::{NamedRange, create_area3d_formula};
-
         let mut workbook = XlsbWorkbookWriter::new();
         workbook.add_worksheet(MutableXlsbWorksheet::new("Data Sheet"));
         workbook.add_named_range(
-            NamedRange::new("SalesData".to_string(), None)
-                .with_formula(create_area3d_formula(0, 1, 3, 1, 1).unwrap()),
+            Definition::new("SalesData".to_string(), None)
+                .with_formula(area3d_formula(0, 1, 3, 1, 1).unwrap()),
         );
         let mut summary = MutableXlsbWorksheet::new("Summary");
         summary.set_cell(
@@ -2723,14 +2720,12 @@ mod tests {
 
     #[test]
     fn contextual_grouped_formulas_survive_package_roundtrip() {
-        use crate::xlsb::named_ranges::{NamedRange, create_area3d_formula};
-
         let mut workbook = XlsbWorkbookWriter::new();
         workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
         workbook.add_worksheet(MutableXlsbWorksheet::new("Middle"));
         workbook.add_named_range(
-            NamedRange::new("Rate".to_string(), None)
-                .with_formula(create_area3d_formula(0, 0, 0, 0, 0).unwrap()),
+            Definition::new("Rate".to_string(), None)
+                .with_formula(area3d_formula(0, 0, 0, 0, 0).unwrap()),
         );
         let mut summary = MutableXlsbWorksheet::new("Summary");
         summary
@@ -2801,8 +2796,6 @@ mod tests {
 
     #[test]
     fn rejects_ambiguous_formula_metadata_before_writing() {
-        use crate::xlsb::named_ranges::{NamedRange, create_area3d_formula};
-
         let mut duplicate_sheets = XlsbWorkbookWriter::new();
         duplicate_sheets.add_worksheet(MutableXlsbWorksheet::new("Data"));
         duplicate_sheets.add_worksheet(MutableXlsbWorksheet::new("data"));
@@ -2815,12 +2808,12 @@ mod tests {
         let mut duplicate_names = XlsbWorkbookWriter::new();
         duplicate_names.add_worksheet(MutableXlsbWorksheet::new("Data"));
         duplicate_names.add_named_range(
-            NamedRange::new("Rate".to_string(), None)
-                .with_formula(create_area3d_formula(0, 0, 0, 0, 0).unwrap()),
+            Definition::new("Rate".to_string(), None)
+                .with_formula(area3d_formula(0, 0, 0, 0, 0).unwrap()),
         );
         duplicate_names.add_named_range(
-            NamedRange::new("rate".to_string(), None)
-                .with_formula(create_area3d_formula(0, 1, 1, 0, 0).unwrap()),
+            Definition::new("rate".to_string(), None)
+                .with_formula(area3d_formula(0, 1, 1, 0, 0).unwrap()),
         );
         assert!(duplicate_names.save(Cursor::new(Vec::new())).is_err());
     }

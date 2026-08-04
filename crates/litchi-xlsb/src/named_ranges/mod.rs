@@ -35,9 +35,3 @@ pub enum Error {
 
 pub use codec::{MAX_RECORD_BYTES, area3d_formula, parse};
 pub use model::{Definition, validate_name};
-
-// Historical host vocabulary retained as compatibility aliases. New code
-// should use the contextual owner names above.
-pub use codec::area3d_formula as create_area3d_formula;
-pub use model::Definition as NamedRange;
-pub use model::validate_name as validate_defined_name;

@@ -98,16 +98,3 @@ fn parses_complete_brt_name_and_rejects_malformed_records() {
     truncated_comment[comment_offset..].copy_from_slice(&1_u32.to_le_bytes());
     assert!(Definition::parse(&truncated_comment).is_err());
 }
-
-#[test]
-fn historical_aliases_remain_available() {
-    use super::{NamedRange, create_area3d_formula, validate_defined_name};
-
-    validate_defined_name("SalesData").unwrap();
-    let formula = create_area3d_formula(0, 0, 0, 0, 0).unwrap();
-    assert_eq!(formula[0], ptg_types::PTG_AREA_3D);
-    assert_eq!(
-        NamedRange::create_area3d_formula(0, 0, 0, 0, 0).unwrap(),
-        formula
-    );
-}

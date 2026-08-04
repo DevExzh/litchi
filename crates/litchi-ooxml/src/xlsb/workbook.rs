@@ -15,7 +15,6 @@ use crate::xlsb::formula::{
     FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, excel_name_eq,
 };
 use crate::xlsb::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
-use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::styles_table::{CellFormat, StylesTable};
 use crate::xlsb::vba_project::{
@@ -33,6 +32,7 @@ use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_xlsb::calc::{self, Props};
+use litchi_xlsb::named_ranges::{Definition, validate_name};
 use litchi_xlsb::raw::{Records, kind};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
@@ -1662,7 +1662,7 @@ impl XlsbWorkbook {
                     Self::parse_extern_sheet(record.payload(), external_sheets)?;
                 },
                 kind::NAME => {
-                    let named_range = NamedRange::parse(record.payload())?;
+                    let named_range = Definition::parse(record.payload())?;
                     if named_range
                         .sheet_id
                         .is_some_and(|index| index as usize >= worksheet_names.len())
@@ -1885,10 +1885,10 @@ impl XlsbWorkbook {
                         ));
                     }
                     if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                        validate_defined_name(&name)?;
+                        validate_name(&name)?;
                         sup_name_state = 1;
                     } else {
-                        validate_defined_name(&name)?;
+                        validate_name(&name)?;
                         sup_name_state = 2;
                     }
                     current_name = Some(name);

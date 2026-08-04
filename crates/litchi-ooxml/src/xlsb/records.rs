@@ -2,6 +2,7 @@
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use litchi_core::binary;
+use litchi_xlsb::named_ranges::Definition;
 use litchi_xlsb::raw::{Cursor, Header, Kind, Limits, kind};
 use std::io::Read;
 
@@ -568,7 +569,7 @@ pub struct NameRecord {
 impl NameRecord {
     #[allow(dead_code)]
     pub fn parse(data: &[u8]) -> XlsbResult<Self> {
-        let named_range = crate::xlsb::named_ranges::NamedRange::parse(data)?;
+        let named_range = Definition::parse(data)?;
 
         Ok(NameRecord {
             name: named_range.name,

@@ -153,17 +153,6 @@ impl Definition {
     ) -> Result<Vec<u8>> {
         area3d_formula(sheet_id, first_row, last_row, first_col, last_col)
     }
-
-    /// Historical method spelling retained for host compatibility.
-    pub fn create_area3d_formula(
-        sheet_id: u32,
-        first_row: u32,
-        last_row: u32,
-        first_col: u16,
-        last_col: u16,
-    ) -> Result<Vec<u8>> {
-        Self::area3d_formula(sheet_id, first_row, last_row, first_col, last_col)
-    }
 }
 
 /// Create a 3D area formula token stream for a workbook-local sheet range.

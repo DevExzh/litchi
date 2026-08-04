@@ -27,6 +27,7 @@ mod function_table;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::external_link::Link;
 use function_table::BUILTIN_FUNCTIONS;
+use litchi_xlsb::named_ranges::validate_name;
 
 pub use litchi_xlsb::formula::ptg_types;
 pub use litchi_xlsb::formula::{
@@ -1173,7 +1174,7 @@ fn format_pivot_identifier(name: &str) -> String {
 }
 
 fn validate_table_name(name: &str) -> XlsbResult<()> {
-    crate::xlsb::named_ranges::validate_defined_name(name)?;
+    validate_name(name)?;
     if name
         .get(..3)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("_xl"))
