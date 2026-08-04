@@ -4434,8 +4434,10 @@ relationship helpers from `litchi-ooxml-common`, `litchi-opc`, and
 `litchi-core`. Web-settings, PresentationML tags, SpreadsheetML timelines,
 and ODF graphic-property vocabularies are not one grammar, so no speculative
 document-model implementation was moved into a common crate. The workspace
-now also contains `litchi-iwa-common`, which owns only dependency-neutral,
-bounded IWA varint and wire primitives; concrete Pages, Numbers, and Keynote
+now also contains `litchi-iwa-common`, which owns dependency-neutral bounded
+IWA varint and wire primitives plus format-independent table-cell vocabulary;
+it owns no strokes, appearance, archive/protobuf codecs, package identifiers,
+or concrete object-model state. Concrete Pages, Numbers, and Keynote
 object-model logic remains in the format crates while the migration proceeds.
 The migration exit for this family is deletion of the duplicate facade-local
 `wire.rs` and `varint.rs` kernels, with no public compatibility shim. Until
@@ -5753,10 +5755,14 @@ private adapter for the remaining reader/editor migration. The BNC wire slice
 now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
 CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
 the monolith retains only a private module alias plus its archive/protobuf
-callers. Its 19 leaf tests, 1,508 IWA tests, boundary check, and native Numbers
-open/edit/save/reopen smoke cover the extraction. The next slice should extract
-Numbers table/sheet/formula values and then migrate the Pages/Keynote reader
-boundaries.
+callers. Its 19 leaf tests, 1,509 IWA tests, boundary check, and native Numbers
+open/edit/save/reopen smoke cover the extraction. The BorderSide ownership slice
+is complete: the dependency-neutral table-cell edge selector now lives at
+`litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain
+concrete IWA types, and the former Numbers-owned enum and compatibility path
+were removed. This ownership change has no intentional wire-format change.
+Next, extract Numbers table/sheet/formula values and then migrate the
+Pages/Keynote reader boundaries.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains

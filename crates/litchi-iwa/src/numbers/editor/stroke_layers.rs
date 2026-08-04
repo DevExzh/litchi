@@ -5,7 +5,9 @@
 //! edited axis. This module keeps existing borders attached to their original
 //! cells when the editor inserts or removes a blank row or column.
 
-use super::table::cell::{BorderSide, Borders};
+use litchi_iwa_common::table::cell::BorderSide;
+
+use super::table::cell::Borders;
 use super::*;
 use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
 use crate::shapes::{empty_stroke_archive, stroke_from_native, stroke_to_native};
@@ -146,6 +148,18 @@ impl LayerSide {
         match self.fixed_axis() {
             StrokeAxis::Row => (row, column),
             StrokeAxis::Column => (column, row),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BorderSide, LayerSide};
+
+    #[test]
+    fn public_border_sides_round_trip_through_native_layer_sides() {
+        for side in BorderSide::ALL {
+            assert_eq!(LayerSide::from_public(side).public(), side);
         }
     }
 }

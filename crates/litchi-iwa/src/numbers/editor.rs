@@ -97,15 +97,7 @@ pub mod table {
     /// Cell-level table editing vocabulary.
     pub mod cell {
         use crate::shapes::ShapeStroke;
-
-        /// One edge of a zero-based native Numbers table cell.
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-        pub enum BorderSide {
-            Left,
-            Right,
-            Top,
-            Bottom,
-        }
+        use litchi_iwa_common::table::cell::BorderSide;
 
         /// Effective explicit borders stored for one native Numbers table cell.
         ///

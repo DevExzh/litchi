@@ -1,4 +1,7 @@
 Warning: truncated output (original token count: 30027)
+Total output lines: 3526
+
+Warning: truncated output (original token count: 30027)
 Total output lines: 3524
 
 Warning: truncated output (original token count: 30030)
@@ -10,7 +13,8 @@ Total output lines: 3697
 //! Semantic table models and transactional Pages table editing.
 
 use super::*;
-use crate::numbers::editor::table::cell::{BorderSide, Borders};
+use crate::numbers::editor::table::cell::Borders;
+use litchi_iwa_common::table::cell::BorderSide;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1784,11 +1788,7 @@ impl PagesEditor {
                 &mut staged,
                 model_object_id,
                 row,
-                column,
-                paragraph,
-            )?;
-        if changed {
-          …27 tokens truncated… numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
+                …27 tokens truncated… numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
         &mut self,
         model_object_id: u64,
         row: usize,

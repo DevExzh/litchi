@@ -5,6 +5,7 @@ use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_T
 use crate::protobuf::tn;
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
 use crate::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::table::cell::BorderSide;
 
 #[test]
 fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
@@ -3403,7 +3404,7 @@ fn grows_and_truncates_blank_table_edges_with_uid_maps() {
 #[test]
 fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    let side = crate::numbers::editor::table::cell::BorderSide::Bottom;
+    let side = BorderSide::Bottom;
     assert_eq!(editor.table_cell_borders(10, 1, 2).unwrap().get(side), None);
 
     let stroke = crate::shapes::ShapeStroke::new(
@@ -3577,13 +3578,7 @@ fn table_cell_border_rejects_invalid_coordinates_transactionally() {
     );
     assert!(
         editor
-            .set_table_cell_border(
-                10,
-                usize::MAX,
-                0,
-                crate::numbers::editor::table::cell::BorderSide::Top,
-                stroke,
-            )
+            .set_table_cell_border(10, usize::MAX, 0, BorderSide::Top, stroke,)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3637,7 +3632,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
             10,
             1,
             1,
-            crate::numbers::editor::table::cell::BorderSide::Top,
+            BorderSide::Top,
             crate::shapes::ShapeStroke::new(
                 crate::shapes::RgbaColor::black(),
                 crate::shapes::StrokeWidth::ONE,

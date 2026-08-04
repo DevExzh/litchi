@@ -4,12 +4,13 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 use crate::bundle::Bundle;
-use crate::numbers::editor::table::cell::{BorderSide, Borders};
+use crate::numbers::editor::table::cell::Borders;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 use crate::table_appearance::TableAppearance;
 use crate::table_lock::TableLockState;
+use litchi_iwa_common::table::cell::BorderSide;
 
 mod appearance;
 mod comments;

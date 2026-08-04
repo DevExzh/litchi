@@ -1,7 +1,6 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::CellValue;
-use crate::numbers::editor::table::cell::BorderSide;
 use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
     TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
@@ -12,6 +11,7 @@ use crate::table_cell_data_format::{
     TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
 };
+use litchi_iwa_common::table::cell::BorderSide;
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (

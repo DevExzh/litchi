@@ -63,10 +63,21 @@ family crate.
 
 The IWA subtree follows the same downward-only rule. `litchi-iwa-common` is
 the foundational, dependency-neutral layer for bounded varint and protobuf
-wire primitives; `litchi-iwa` and future `litchi-pages`, `litchi-numbers`, and
-`litchi-keynote` owners may depend on it. The common crate must not depend on
-an archive, graph, facade, or concrete iWork format crate, and concrete format
-owners retain their own object-model and package-topology semantics.
+wire primitives plus neutral table vocabulary; `litchi-iwa` and future
+`litchi-pages`, `litchi-numbers`, and `litchi-keynote` owners may depend on it.
+The common crate must not depend on an archive, graph, facade, or concrete
+iWork format crate, and concrete format owners retain their own object-model
+and package-topology semantics.
+
+The shared table vocabulary begins at
+`litchi-iwa-common::table::cell::BorderSide`. It is a compact, four-variant
+cell-edge selector with no stroke, appearance, archive, or protobuf knowledge.
+`litchi-iwa` retains `numbers::editor::table::cell::Borders` because that
+aggregate contains the facade-owned `ShapeStroke`; native stroke sidecars
+convert the neutral selector at the concrete boundary. The old Numbers-owned
+selector is removed rather than retained as a compatibility alias, and the
+Numbers, Pages, and Keynote border APIs now take this canonical selector
+directly.
 
 The first extracted semantic value layer is `litchi-iwa-text`, which owns only
 the allocation-bearing rich-text values shared by the format leaves. It has no
