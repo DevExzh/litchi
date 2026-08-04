@@ -257,9 +257,7 @@ impl ShapeExt for Shape<'_> {
     }
 
     fn powerpoint12_shape_metadata(&self) -> Result<Option<super::ShapeMetadata>> {
-        use super::{
-            HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata,
-        };
+        use super::{HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata};
         use crate::consts::PptRecordType;
 
         let Some(client_data) = host_record(self, RecordKind::ClientData)? else {

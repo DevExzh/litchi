@@ -311,10 +311,7 @@ impl TableShape {
         self.height
     }
 
-    pub(crate) fn set_powerpoint12_shape_metadata(
-        &mut self,
-        metadata: Option<ShapeMetadata>,
-    ) {
+    pub(crate) fn set_powerpoint12_shape_metadata(&mut self, metadata: Option<ShapeMetadata>) {
         self.powerpoint12_shape_metadata = metadata;
     }
 }
@@ -396,10 +393,7 @@ impl<'a> GroupShape<'a> {
         self.height
     }
 
-    pub(crate) fn set_powerpoint12_shape_metadata(
-        &mut self,
-        metadata: Option<ShapeMetadata>,
-    ) {
+    pub(crate) fn set_powerpoint12_shape_metadata(&mut self, metadata: Option<ShapeMetadata>) {
         self.powerpoint12_shape_metadata = metadata;
     }
 }
@@ -487,10 +481,7 @@ impl LineShape {
         (dx * dx + dy * dy).sqrt()
     }
 
-    pub(crate) fn set_powerpoint12_shape_metadata(
-        &mut self,
-        metadata: Option<ShapeMetadata>,
-    ) {
+    pub(crate) fn set_powerpoint12_shape_metadata(&mut self, metadata: Option<ShapeMetadata>) {
         self.powerpoint12_shape_metadata = metadata;
     }
 }

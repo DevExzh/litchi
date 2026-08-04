@@ -1867,9 +1867,7 @@ mod tests {
     #[test]
     fn powerpoint12_header_footer_placeholder_is_exposed_with_new_identity() {
         use crate::shapes::{PlaceholderSize, PlaceholderType};
-        use crate::{
-            HeaderFooterPlaceholder, NewPlaceholder, ShapeMetadata,
-        };
+        use crate::{HeaderFooterPlaceholder, NewPlaceholder, ShapeMetadata};
 
         let records = [
             record_bytes(0, 0, 0x0420, &[10]),
