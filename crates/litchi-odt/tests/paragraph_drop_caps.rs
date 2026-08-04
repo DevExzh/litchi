@@ -1,5 +1,5 @@
 use litchi_odt::{
-    Document, DocumentBuilder, DropCapDistance, DropCapLength, FlatOpenDocument, MutableDocument,
+    Builder, Document, DropCapDistance, DropCapLength, FlatOpenDocument, MutableDocument,
     OpenDocumentPackage, ParagraphDropCap, ParagraphStyleDropCap, ParagraphStyleTabStops,
     ParagraphTabStop, ParagraphTabStops, TabStopPosition, parse_paragraph_style_drop_caps,
 };
@@ -105,7 +105,7 @@ fn builder_package_composition_and_mutation_round_trip() {
     .unwrap();
     let mut tab_style = ParagraphStyleTabStops::named("Opening", Some(stops)).unwrap();
     tab_style.parent_style_name = Some("Standard".into());
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph_tab_style(tab_style).unwrap();
     builder
         .add_paragraph_drop_cap_style(drop_style.clone())

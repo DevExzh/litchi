@@ -1,5 +1,5 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, NonNegativeLength, OpenDocumentPackage,
+    Builder, FlatOpenDocument, NonNegativeLength, OpenDocumentPackage,
     ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
     ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, TableRowBackgroundColor,
     TableRowBackgroundImage, TableRowBackgroundRepeat, TableRowBackgroundSource, TableShadow,
@@ -279,7 +279,7 @@ fn builder_package_round_trip() {
         }),
     )
     .unwrap();
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph_border_style(style.clone()).unwrap();
     assert!(
         builder

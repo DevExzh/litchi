@@ -921,12 +921,12 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip_without_image_io() {
-        use crate::{Document, DocumentBuilder, MutableDocument};
+        use crate::{Builder, Document, MutableDocument};
         let mut initial = ImageFrameControl::new("Image", "image");
         initial.image_data = Some("Pictures/intentionally-missing.png".into());
         let mut form = ImageFrameForm::new("Main");
         form.add_control(initial.clone()).unwrap();
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_image_frame_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();

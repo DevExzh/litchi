@@ -659,7 +659,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip_targets_without_evaluation() {
-        let mut builder = crate::DocumentBuilder::new();
+        let mut builder = crate::Builder::new();
         builder.add_paragraph("payload").unwrap();
         builder
             .add_bookmark_target(0, &BookmarkTarget::range("built"))

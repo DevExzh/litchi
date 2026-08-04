@@ -1431,11 +1431,11 @@ mod tests {
     }
     #[test]
     fn builder_mutable_package_round_trip() {
-        use crate::{Document, DocumentBuilder, MutableDocument};
+        use crate::{Builder, Document, MutableDocument};
         let mut form = SelectionForm::new("Main");
         form.add_control(ComboboxControl::new("Combo", "combo"))
             .unwrap();
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_selection_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
         let doc = Document::from_bytes(builder.build().unwrap()).unwrap();

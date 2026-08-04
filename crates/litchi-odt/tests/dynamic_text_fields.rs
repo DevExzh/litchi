@@ -4,7 +4,7 @@ use litchi_odt::elements::field::{
     SequenceNumberFormat, SequenceReferenceFormat, StatisticKind, UserFieldDisplay,
     VariableSetDisplay,
 };
-use litchi_odt::{Document, DocumentBuilder, MutableDocument};
+use litchi_odt::{Builder, Document, MutableDocument};
 mod support;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -213,7 +213,7 @@ fn insertion_supports_empty_prefixed_paragraphs_and_builder_round_trips() {
         vec![field.clone()]
     );
 
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_dynamic_text_field(&field).unwrap();
     let built = Document::from_bytes(builder.build().unwrap()).unwrap();
     assert_eq!(built.dynamic_text_fields().unwrap(), vec![field]);

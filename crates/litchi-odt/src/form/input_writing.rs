@@ -1184,12 +1184,12 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip() {
-        use crate::{Document, DocumentBuilder, MutableDocument};
+        use crate::{Builder, Document, MutableDocument};
         let mut initial = FileControl::new("File", "file");
         initial.current_value = Some("/host/path/is/not/read".into());
         let mut form = PasswordFileForm::new("Main");
         form.add_control(initial).unwrap();
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_password_file_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();

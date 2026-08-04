@@ -2986,12 +2986,12 @@ mod tests {
     use crate::elements::parser::OrderElement;
     use crate::elements::table::{TableCell, TableRow};
     use crate::elements::text::{ListItem, Paragraph};
-    use crate::{DocumentBuilder, PageUsage};
+    use crate::{Builder, PageUsage};
 
     const MINIMAL_CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>Original</text:p></office:text></office:body></office:document-content>"#;
 
     fn source_document() -> Document {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Before table").unwrap();
 
         let mut table = Table::new();

@@ -1,7 +1,6 @@
 use litchi_odt::{
-    Block, ChangeType, Document, DocumentBuilder, MutableDocument, Position, Section,
-    SectionDdeSource, SectionDisplay, SectionSource, Story, TrackChange, TrackedChanges,
-    wrap_section_xml,
+    Block, Builder, ChangeType, Document, MutableDocument, Position, Section, SectionDdeSource,
+    SectionDisplay, SectionSource, Story, TrackChange, TrackedChanges, wrap_section_xml,
 };
 
 fn section(name: &str) -> Section {
@@ -56,7 +55,7 @@ fn builder_authors_linked_conditional_protected_and_dde_sections() {
         automatic_update: Some(false),
     });
 
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph("before").unwrap();
     builder.add_section(linked).unwrap();
     builder.add_section(dde).unwrap();

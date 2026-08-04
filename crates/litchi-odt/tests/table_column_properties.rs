@@ -1,6 +1,6 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, OpenDocumentPackage, TableColumnLength,
-    TableColumnProperties, TableColumnRelWidth, TableColumnStyleProperties, TableRowBreak,
+    Builder, FlatOpenDocument, OpenDocumentPackage, TableColumnLength, TableColumnProperties,
+    TableColumnRelWidth, TableColumnStyleProperties, TableRowBreak,
     parse_table_column_style_properties, set_table_column_style_properties_xml,
 };
 use std::io::Cursor;
@@ -116,7 +116,7 @@ fn builder_package_round_trip() {
         ..Default::default()
     };
     let style = TableColumnStyleProperties::named("Col", Some(properties)).unwrap();
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_table_column_property_style(style.clone())
         .unwrap();

@@ -3,13 +3,13 @@
 //! The reader parses form containers and the common control kinds into
 //! strictly typed inert data — control ids, names, labels, current values,
 //! checked/selected state, options, and event-listener metadata that is
-//! retained but never executed — while `DocumentBuilder` and
+//! retained but never executed — while `Builder` and
 //! `MutableDocument` author, edit, and remove controls with packaged
 //! round trips.
 
 use litchi_odt::{
-    ButtonControl, CheckboxControl, CheckboxState, ComboItem, ComboboxControl, ControlForm,
-    Document, DocumentBuilder, FixedTextControl, FlatOpenDocument, FormControlKind, FormNode,
+    Builder, ButtonControl, CheckboxControl, CheckboxState, ComboItem, ComboboxControl,
+    ControlForm, Document, FixedTextControl, FlatOpenDocument, FormControlKind, FormNode,
     GenericForm, HiddenControl, InteractiveForm, ListOption, ListboxControl, MutableDocument,
     RadioControl, SelectionForm, TextControl, TypedValueControl, TypedValueControlKind,
     TypedValueForm, VisualForm,
@@ -203,7 +203,7 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
 
 #[test]
 fn builder_authored_forms_round_trip_the_package() {
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph("Registration form").unwrap();
     builder.add_control_form(&text_form()).unwrap();
     builder.add_interactive_form(&interactive_form()).unwrap();
@@ -254,7 +254,7 @@ fn builder_authored_forms_round_trip_the_package() {
 fn mutable_inserts_replaces_and_removes_controls() {
     // The typed mutation APIs only operate on macro-free documents, so the
     // round trip starts from a builder-authored package.
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph("Registration form").unwrap();
     builder.add_control_form(&text_form()).unwrap();
     builder.add_interactive_form(&interactive_form()).unwrap();

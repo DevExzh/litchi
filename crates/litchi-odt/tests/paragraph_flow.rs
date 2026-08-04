@@ -1,5 +1,5 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, HyphenationKeep, HyphenationLadder, Keep, LineBreak,
+    Builder, FlatOpenDocument, HyphenationKeep, HyphenationLadder, Keep, LineBreak,
     OpenDocumentPackage, ParagraphFlowProperties, ParagraphStyleFlow, PunctuationWrap,
     parse_paragraph_style_flows,
 };
@@ -58,7 +58,7 @@ fn builder_package_round_trip() {
         punctuation_wrap: Some(PunctuationWrap::Simple),
     };
     let style = ParagraphStyleFlow::named("Flow", Some(p)).unwrap();
-    let mut b = DocumentBuilder::new();
+    let mut b = Builder::new();
     b.add_paragraph_flow_style(style.clone()).unwrap();
     b.add_paragraph("x").unwrap();
     let package = OpenDocumentPackage::from_bytes(b.build().unwrap()).unwrap();

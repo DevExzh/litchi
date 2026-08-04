@@ -1,6 +1,6 @@
 use litchi_odt::{
-    CellBorder, CellBorderWidths, CellDirection, CellLength, CellProtect, CellRotationAlign,
-    CellRotationAngle, CellTextAlignSource, CellVerticalAlign, CellWrapOption, DocumentBuilder,
+    Builder, CellBorder, CellBorderWidths, CellDirection, CellLength, CellProtect,
+    CellRotationAlign, CellRotationAngle, CellTextAlignSource, CellVerticalAlign, CellWrapOption,
     FlatOpenDocument, OpenDocumentPackage, TableCellProperties, TableCellStyleProperties,
     TableRowBackgroundColor, TableRowBackgroundImage, TableRowBackgroundRepeat,
     TableRowBackgroundSource, TableShadow, TableWritingMode, parse_table_cell_style_properties,
@@ -211,7 +211,7 @@ fn builder_package_round_trip() {
         ..Default::default()
     };
     let style = TableCellStyleProperties::named("Cell", Some(properties)).unwrap();
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_table_cell_property_style(style.clone())
         .unwrap();

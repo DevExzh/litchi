@@ -921,7 +921,7 @@ impl Document {
     /// # Note
     ///
     /// Full document modification support is planned for future releases. For now,
-    /// to modify a document, use `DocumentBuilder` to create a new document with
+    /// to modify a document, use `Builder` to create a new document with
     /// the desired content.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let bytes = self.to_bytes()?;

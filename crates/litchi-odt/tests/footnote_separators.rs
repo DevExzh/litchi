@@ -1,7 +1,7 @@
 use litchi_odt::{
-    Document, DocumentBuilder, FlatOpenDocument, FootnoteSeparatorAdjustment,
-    FootnoteSeparatorLength, FootnoteSeparatorLineStyle, FootnoteSeparatorPercent, MutableDocument,
-    OpenDocumentPackage, StyleFootnoteSeparator, parse_style_footnote_separators,
+    Builder, Document, FlatOpenDocument, FootnoteSeparatorAdjustment, FootnoteSeparatorLength,
+    FootnoteSeparatorLineStyle, FootnoteSeparatorPercent, MutableDocument, OpenDocumentPackage,
+    StyleFootnoteSeparator, parse_style_footnote_separators,
 };
 use std::io::Cursor;
 
@@ -42,7 +42,7 @@ fn parses_bundled_libreoffice_flat_fixture() {
 
 #[test]
 fn builder_and_package_accessors_round_trip_typed_state() {
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_page_layout_footnote_separator("pm1", sample())
         .unwrap();
@@ -53,7 +53,7 @@ fn builder_and_package_accessors_round_trip_typed_state() {
 
 #[test]
 fn page_layout_parser_exposes_the_typed_separator() {
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_page_layout_footnote_separator("pm1", sample())
         .unwrap();

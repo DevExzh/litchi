@@ -1,5 +1,5 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, HorizontalBackgroundPosition, OpenDocumentPackage,
+    Builder, FlatOpenDocument, HorizontalBackgroundPosition, OpenDocumentPackage,
     TableRowBackgroundColor, TableRowBackgroundImage, TableRowBackgroundPosition,
     TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak, TableRowKeepTogether,
     TableRowLength, TableRowOpacity, TableRowProperties, TableRowStyleProperties,
@@ -106,7 +106,7 @@ fn builder_package_round_trip() {
         ..Default::default()
     };
     let style = TableRowStyleProperties::named("Row", Some(properties)).unwrap();
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_table_row_property_style(style.clone()).unwrap();
     builder.add_paragraph("x").unwrap();
     let package = OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();

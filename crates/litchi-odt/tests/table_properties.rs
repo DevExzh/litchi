@@ -1,5 +1,5 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, OpenDocumentPackage, TableAlignment, TableBorderModel,
+    Builder, FlatOpenDocument, OpenDocumentPackage, TableAlignment, TableBorderModel,
     TablePageNumber, TableProperties, TableRowBackgroundColor, TableRowBackgroundImage,
     TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak,
     TableRowKeepTogether, TableShadow, TableStyleMeasure, TableStylePercent, TableStyleProperties,
@@ -116,7 +116,7 @@ fn builder_package_round_trip() {
         ..Default::default()
     };
     let style = TableStyleProperties::named("Table", Some(p)).unwrap();
-    let mut b = DocumentBuilder::new();
+    let mut b = Builder::new();
     b.add_table_property_style(style.clone()).unwrap();
     b.add_paragraph("x").unwrap();
     let package = OpenDocumentPackage::from_bytes(b.build().unwrap()).unwrap();

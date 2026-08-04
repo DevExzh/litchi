@@ -990,12 +990,12 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip_controls() {
-        use crate::{Document, DocumentBuilder, MutableDocument};
+        use crate::{Builder, Document, MutableDocument};
 
         let mut form = ControlForm::new("Main");
         form.add_control(TextControl::text("Query", "query_1"))
             .unwrap();
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_control_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();

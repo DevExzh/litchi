@@ -1278,7 +1278,7 @@ mod tests {
 
         let mut form = GridForm::new("Grids");
         form.add_control(inserted.clone()).unwrap();
-        let mut builder = crate::DocumentBuilder::new();
+        let mut builder = crate::Builder::new();
         builder.add_grid_form(&form).unwrap();
         let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = crate::MutableDocument::from_document(document).unwrap();

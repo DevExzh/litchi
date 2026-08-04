@@ -1,5 +1,5 @@
 use litchi_odt::{
-    Document, DocumentBuilder, FlatOpenDocument, MutableDocument, OpenDocumentPackage, StyleColumn,
+    Builder, Document, FlatOpenDocument, MutableDocument, OpenDocumentPackage, StyleColumn,
     StyleColumnLength, StyleColumnSeparator, StyleColumnSeparatorAlignment,
     StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
 };
@@ -128,7 +128,7 @@ fn builder_package_page_layout_and_mutable_update_round_trip() {
     separator.style = Some(StyleColumnSeparatorStyle::Solid);
     columns.separator = Some(separator);
 
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_page_layout_columns("Columns&Layout", columns.clone())
         .unwrap();

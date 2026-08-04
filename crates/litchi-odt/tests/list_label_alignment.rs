@@ -1,7 +1,7 @@
 use litchi_odt::{
-    Document, DocumentBuilder, FlatOpenDocument, LabelFollowedBy, ListLabelLength,
-    ListLevelLabelAlignment, ListStyleKind, ListStyleLevelLabelAlignment, MutableDocument,
-    OpenDocumentPackage, parse_list_level_label_alignments,
+    Builder, Document, FlatOpenDocument, LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment,
+    ListStyleKind, ListStyleLevelLabelAlignment, MutableDocument, OpenDocumentPackage,
+    parse_list_level_label_alignments,
 };
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -52,7 +52,7 @@ fn builder_package_and_mutable_round_trip() {
     let mut a = ListLevelLabelAlignment::new(LabelFollowedBy::Space);
     a.text_indent = Some(ListLabelLength::new("-1cm").unwrap());
     a.margin_left = Some(ListLabelLength::new("1cm").unwrap());
-    let mut b = DocumentBuilder::new();
+    let mut b = Builder::new();
     b.set_numbered_list_level_label_alignment(1, a.clone())
         .unwrap();
     b.add_paragraph("x").unwrap();

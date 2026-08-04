@@ -1,7 +1,7 @@
 use litchi_odt::style::paragraph::alignment::{
     Horizontal, Properties, Style, Vertical, parse, set_xml,
 };
-use litchi_odt::{DocumentBuilder, FlatOpenDocument, OpenDocumentPackage};
+use litchi_odt::{Builder, FlatOpenDocument, OpenDocumentPackage};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -213,7 +213,7 @@ fn builder_package_round_trip() {
         }),
     )
     .unwrap();
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_paragraph_alignment_style(style.clone())
         .unwrap();

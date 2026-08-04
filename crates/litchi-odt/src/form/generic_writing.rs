@@ -1175,11 +1175,11 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip() {
-        use crate::{Document, DocumentBuilder, MutableDocument};
+        use crate::{Builder, Document, MutableDocument};
         let mut form = GenericForm::new("Main");
         form.add_control(HiddenControl::new("Hidden", "hidden"))
             .unwrap();
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_generic_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();

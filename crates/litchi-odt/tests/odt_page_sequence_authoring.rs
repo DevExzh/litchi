@@ -1,10 +1,10 @@
 //! Authoring of explicit ODT page sequences (`text:page-sequence`, ODF 1.3
-//! §5.3) through `DocumentBuilder` and `MutableDocument`.
+//! §5.3) through `Builder` and `MutableDocument`.
 //!
 //! The model preserves only the ordered `text:master-page-name` assignments;
 //! litchi never paginates or resolves the referenced master pages.
 
-use litchi_odt::{Document, DocumentBuilder, MutableDocument, Sequence};
+use litchi_odt::{Builder, Document, MutableDocument, Sequence};
 
 fn sequence() -> Sequence {
     Sequence::new(vec![
@@ -27,7 +27,7 @@ fn content_xml(bytes: &[u8]) -> String {
 
 #[test]
 fn builder_authored_page_sequence_round_trips_the_package() {
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.set_page_sequence(Some(sequence())).unwrap();
     builder.add_paragraph("Body text").unwrap();
     let bytes = builder.build().unwrap();
@@ -44,7 +44,7 @@ fn builder_authored_page_sequence_round_trips_the_package() {
     let document = Document::from_bytes(bytes).unwrap();
     assert_eq!(document.page_sequence().unwrap(), Some(sequence()));
     // Clearing works through the builder as well.
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.set_page_sequence(Some(sequence())).unwrap();
     builder.set_page_sequence(None).unwrap();
     builder.add_paragraph("Body text").unwrap();
@@ -54,7 +54,7 @@ fn builder_authored_page_sequence_round_trips_the_package() {
 
 #[test]
 fn builder_rejects_invalid_page_sequences() {
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     assert!(Sequence::new(Vec::new()).is_err());
     assert!(Sequence::new(vec![String::new()]).is_err());
     assert!(
@@ -71,7 +71,7 @@ fn builder_rejects_invalid_page_sequences() {
 
 #[test]
 fn mutable_sets_replaces_and_removes_page_sequence() {
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph("Existing body").unwrap();
     let document = Document::from_bytes(builder.build().unwrap()).unwrap();
     let mut mutable = MutableDocument::from_document(document).unwrap();

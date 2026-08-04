@@ -1178,7 +1178,7 @@ mod tests {
 
     #[test]
     fn lossless_mutation_and_builder_package_access() {
-        use crate::DocumentBuilder;
+        use crate::Builder;
 
         let original = styles(
             r#"<!--keep--><style:list-style xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="L"/>"#,
@@ -1196,7 +1196,7 @@ mod tests {
             original
         );
 
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.set_notes_configuration(value.clone()).unwrap();
         let package = OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
         assert_eq!(

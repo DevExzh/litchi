@@ -34,7 +34,7 @@
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
-//! - ✅ `DocumentBuilder::new()` - Create new documents
+//! - ✅ `Builder::new()` - Create new documents
 //! - ✅ `add_paragraph()` - Add paragraphs with text
 //! - ✅ `add_hyperlink()` / `add_hyperlink_element()` - Add inert simple hyperlinks
 //! - ✅ `add_note()` - Author plain-text or validated structured footnotes and endnotes
@@ -523,7 +523,7 @@ pub mod ruby;
 pub mod section;
 pub mod tracked_changes;
 
-pub use builder::DocumentBuilder;
+pub use builder::Builder;
 pub use document::Document;
 #[allow(unused_imports)]
 pub use dynamic_text::{

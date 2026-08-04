@@ -1,6 +1,6 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, OpenDocumentPackage, ParagraphHorizontalMargin,
-    ParagraphMargins, ParagraphStyleMargins, ParagraphTextIndent, ParagraphVerticalMargin,
+    Builder, FlatOpenDocument, OpenDocumentPackage, ParagraphHorizontalMargin, ParagraphMargins,
+    ParagraphStyleMargins, ParagraphTextIndent, ParagraphVerticalMargin,
     parse_paragraph_style_margins, set_paragraph_style_margins_xml,
 };
 use std::io::Cursor;
@@ -217,7 +217,7 @@ fn builder_package_round_trip() {
         }),
     )
     .unwrap();
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph_margin_style(style.clone()).unwrap();
     assert!(
         builder

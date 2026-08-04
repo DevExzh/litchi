@@ -16,10 +16,10 @@ use std::{ops::Range, path::Path};
 /// # Examples
 ///
 /// ```no_run
-/// use litchi_odt::DocumentBuilder;
+/// use litchi_odt::Builder;
 ///
 /// # fn main() -> litchi_core::Result<()> {
-/// let mut builder = DocumentBuilder::new();
+/// let mut builder = Builder::new();
 /// builder.add_paragraph("Hello, World!")?;
 /// builder.add_paragraph("This is a new document.")?;
 /// builder.save("document.odt")?;
@@ -49,7 +49,7 @@ enum RubyAnnotationInsertion {
     },
 }
 
-pub struct DocumentBuilder {
+pub struct Builder {
     elements: Vec<DocumentElement>,
     text_indexes: Vec<String>,
     text_index_marks: Vec<(usize, crate::TextIndexMark)>,
@@ -99,21 +99,21 @@ pub struct DocumentBuilder {
     page_sequence: Option<crate::Sequence>,
 }
 
-impl Default for DocumentBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl DocumentBuilder {
+impl Builder {
     /// Create a new document builder
     ///
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
-    /// let builder = DocumentBuilder::new();
+    /// let builder = Builder::new();
     /// ```
     pub fn new() -> Self {
         Self {
@@ -702,10 +702,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     /// use litchi_core::Metadata;
     ///
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// let mut metadata = Metadata::default();
     /// metadata.title = Some("My Document".to_string());
     /// metadata.author = Some("John Doe".to_string());
@@ -724,10 +724,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_paragraph("Hello, World!")?;
     /// # Ok(())
     /// # }
@@ -770,10 +770,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_heading("Chapter 1", 1)?;
     /// builder.add_heading("Section 1.1", 2)?;
     /// # Ok(())
@@ -800,10 +800,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_rich_paragraph(vec![
     ///     ("This is ", None),
     ///     ("bold", Some("Bold")),
@@ -839,10 +839,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_bulleted_list(vec!["Item 1", "Item 2", "Item 3"])?;
     /// # Ok(())
     /// # }
@@ -871,10 +871,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_numbered_list(vec!["First", "Second", "Third"])?;
     /// # Ok(())
     /// # }
@@ -905,11 +905,11 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     /// use litchi_odt::elements::text::Paragraph;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// let mut para = Paragraph::new();
     /// para.set_text("Styled paragraph");
     /// para.set_style_name("Heading1");
@@ -931,11 +931,11 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     /// use litchi_odt::elements::text::Heading;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// let mut heading = Heading::new(1);
     /// heading.set_text("Chapter Title");
     /// builder.add_heading_element(heading)?;
@@ -956,11 +956,11 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     /// use litchi_odt::elements::text::{List, ListItem};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// let mut list = List::new();
     /// let mut item = ListItem::new();
     /// item.set_text("First item");
@@ -983,11 +983,11 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     /// use litchi_odt::elements::table::Table;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// let mut table = Table::new();
     /// table.set_name("Table1");
     /// builder.add_table(table)?;
@@ -2071,10 +2071,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_paragraph("Hello, World!")?;
     /// let bytes = builder.build()?;
     /// # Ok(())
@@ -2119,10 +2119,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = DocumentBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_paragraph("Hello, World!")?;
     /// builder.save("output.odt")?;
     /// # Ok(())
@@ -2135,7 +2135,7 @@ impl DocumentBuilder {
     }
 }
 
-impl DocumentBuilder {
+impl Builder {
     /// Add a validated value-range form to the document.
     pub fn add_value_range_form(&mut self, form: &crate::ValueRangeForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
@@ -2186,7 +2186,7 @@ impl DocumentBuilder {
     }
 }
 
-impl DocumentBuilder {
+impl Builder {
     /// Add a validated form containing formatted-text, number, date, or time controls.
     pub fn add_typed_value_form(&mut self, form: &crate::TypedValueForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
@@ -2241,7 +2241,7 @@ impl DocumentBuilder {
     }
 }
 
-impl DocumentBuilder {
+impl Builder {
     /// Adds a form whose final child is an inert `form:connection-resource`.
     pub fn add_connection_resource_form(
         &mut self,
@@ -2369,27 +2369,27 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_document_builder_new() {
-        let builder = DocumentBuilder::new();
+    fn test_builder_new() {
+        let builder = Builder::new();
         assert!(builder.elements.is_empty());
     }
 
     #[test]
-    fn test_document_builder_default() {
-        let builder: DocumentBuilder = Default::default();
+    fn test_builder_default() {
+        let builder: Builder = Default::default();
         assert!(builder.elements.is_empty());
     }
 
     #[test]
     fn test_add_paragraph() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Hello, World!").unwrap();
         assert_eq!(builder.elements.len(), 1);
     }
 
     #[test]
     fn hyperlink_authoring_round_trips_through_an_odt_package() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_hyperlink("https://example.test/a?x=1&y=2", "Example & link")
             .unwrap();
@@ -2418,7 +2418,7 @@ mod tests {
         assert!(content.contains("xlink:actuate=\"onRequest\""));
         assert!(content.contains("xlink:href=\"https://example.test/a?x=1&amp;y=2\""));
 
-        let mut invalid = DocumentBuilder::new();
+        let mut invalid = Builder::new();
         assert!(invalid.add_hyperlink("", "missing target").is_err());
         assert!(invalid.elements.is_empty());
     }
@@ -2441,7 +2441,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Read ").unwrap();
         builder.add_ruby_style(style.clone()).unwrap();
         assert!(builder.add_ruby_style(style.clone()).is_err());
@@ -2458,7 +2458,7 @@ mod tests {
         assert_eq!(ruby.base(), "漢");
         assert_eq!(ruby.text(), "かん");
 
-        let mut invalid = DocumentBuilder::new();
+        let mut invalid = Builder::new();
         assert!(invalid.add_ruby_annotation(0, &annotation).is_err());
         assert!(invalid.elements.is_empty());
     }
@@ -2468,7 +2468,7 @@ mod tests {
         let annotation =
             crate::RubyAnnotation::new(None, crate::RubyBase::from_text("字").unwrap(), "じ", None)
                 .unwrap();
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Read 漢字").unwrap();
         let start = "Read 漢".len();
         builder
@@ -2486,7 +2486,7 @@ mod tests {
         )
         .unwrap();
         let structured = crate::RubyAnnotation::new(None, structured_base, "かんじ", None).unwrap();
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_rich_paragraph(vec![
                 ("A", None),
@@ -2512,7 +2512,7 @@ mod tests {
         note.set_id(Some("note-1".to_string())).unwrap();
         note.set_label(Some("*".to_string())).unwrap();
 
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Body text").unwrap();
         builder.add_note(0, &note).unwrap();
 
@@ -2521,7 +2521,7 @@ mod tests {
         assert_eq!(document.footnotes().unwrap(), vec![note]);
         assert!(document.endnotes().unwrap().is_empty());
 
-        let mut invalid = DocumentBuilder::new();
+        let mut invalid = Builder::new();
         invalid.add_paragraph("Only paragraph").unwrap();
         assert!(
             invalid
@@ -2536,7 +2536,7 @@ mod tests {
 
     #[test]
     fn test_add_heading() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_heading("Chapter 1", 1).unwrap();
         builder.add_heading("Section 1.1", 2).unwrap();
         assert_eq!(builder.elements.len(), 2);
@@ -2544,7 +2544,7 @@ mod tests {
 
     #[test]
     fn test_add_heading_invalid_level() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         let result = builder.add_heading("Invalid", 0);
         assert!(result.is_err());
 
@@ -2554,7 +2554,7 @@ mod tests {
 
     #[test]
     fn test_add_rich_paragraph() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_rich_paragraph(vec![
                 ("This is ", None),
@@ -2567,7 +2567,7 @@ mod tests {
 
     #[test]
     fn test_add_bulleted_list() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_bulleted_list(vec!["Item 1", "Item 2", "Item 3"])
             .unwrap();
@@ -2576,7 +2576,7 @@ mod tests {
 
     #[test]
     fn test_add_numbered_list() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_numbered_list(vec!["First", "Second", "Third"])
             .unwrap();
@@ -2585,7 +2585,7 @@ mod tests {
 
     #[test]
     fn test_add_paragraph_element() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         let mut para = Paragraph::new();
         para.set_text("Custom paragraph");
         builder.add_paragraph_element(para).unwrap();
@@ -2594,7 +2594,7 @@ mod tests {
 
     #[test]
     fn test_add_heading_element() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         let mut heading = Heading::new(1);
         heading.set_text("Custom heading");
         builder.add_heading_element(heading).unwrap();
@@ -2603,7 +2603,7 @@ mod tests {
 
     #[test]
     fn test_add_list_element() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         let mut list = List::new();
         let mut item = ListItem::new();
         item.set_text("Item");
@@ -2614,7 +2614,7 @@ mod tests {
 
     #[test]
     fn test_add_table() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         let mut table = Table::new();
         table.set_name("Table1");
         builder.add_table(table).unwrap();
@@ -2623,7 +2623,7 @@ mod tests {
 
     #[test]
     fn test_set_metadata() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         let metadata = Metadata {
             title: Some("Test Title".to_string()),
             author: Some("Test Author".to_string()),
@@ -2640,7 +2640,7 @@ mod tests {
 
     #[test]
     fn test_generate_content_body() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Paragraph 1").unwrap();
         builder.add_heading("Heading", 1).unwrap();
 
@@ -2651,7 +2651,7 @@ mod tests {
 
     #[test]
     fn test_generate_content_xml() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Test").unwrap();
 
         let xml = builder.generate_content_xml();
@@ -2663,7 +2663,7 @@ mod tests {
 
     #[test]
     fn test_generate_meta_xml() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.metadata.title = Some("My Title".to_string());
         builder.metadata.author = Some("My Author".to_string());
         builder.metadata.subject = Some("My Subject".to_string());
@@ -2682,7 +2682,7 @@ mod tests {
 
     #[test]
     fn test_generate_styles_xml() {
-        let builder = DocumentBuilder::new();
+        let builder = Builder::new();
         let styles_xml = builder.generate_styles_xml();
         assert!(styles_xml.contains("office:document-styles"));
         assert!(styles_xml.contains("L1")); // Numbered list style
@@ -2707,7 +2707,7 @@ mod tests {
             }),
         };
 
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         assert!(builder.line_numbering_configuration().is_none());
         builder
             .set_line_numbering_configuration(configuration.clone())
@@ -2734,7 +2734,7 @@ mod tests {
 
     #[test]
     fn test_build() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Test content").unwrap();
 
         let result = builder.build();
@@ -2750,7 +2750,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.odt");
 
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Test content").unwrap();
 
         let result = builder.save(&path);
@@ -2764,7 +2764,7 @@ mod tests {
 
     #[test]
     fn test_chained_builder_api() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_heading("Title", 1)
             .unwrap()
@@ -2780,7 +2780,7 @@ mod tests {
 
     #[test]
     fn test_document_element_clone() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Test").unwrap();
 
         let cloned = builder.elements[0].clone();
@@ -2792,7 +2792,7 @@ mod tests {
 
     #[test]
     fn test_document_element_debug() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_paragraph("Test").unwrap();
 
         let debug_str = format!("{:?}", builder.elements[0]);
@@ -2801,7 +2801,7 @@ mod tests {
 
     #[test]
     fn test_complete_document() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
 
         // Set metadata
         let metadata = Metadata {
@@ -2835,14 +2835,14 @@ mod tests {
 
     #[test]
     fn test_empty_document_build() {
-        let builder = DocumentBuilder::new();
+        let builder = Builder::new();
         let result = builder.build();
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_heading_levels() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         for level in 1..=6 {
             builder
                 .add_heading(&format!("Level {}", level), level)
@@ -2853,7 +2853,7 @@ mod tests {
 
     #[test]
     fn test_list_with_empty_items() {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = Builder::new();
         builder.add_bulleted_list(vec![]).unwrap();
         assert_eq!(builder.elements.len(), 1);
     }

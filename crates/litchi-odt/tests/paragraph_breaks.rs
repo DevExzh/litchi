@@ -1,5 +1,5 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, OpenDocumentPackage, ParagraphBreak, ParagraphBreaks,
+    Builder, FlatOpenDocument, OpenDocumentPackage, ParagraphBreak, ParagraphBreaks,
     ParagraphPageNumber, ParagraphStyleBreaks, parse_paragraph_style_breaks,
     set_paragraph_style_breaks_xml,
 };
@@ -215,7 +215,7 @@ fn builder_package_round_trip() {
         }),
     )
     .unwrap();
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph_break_style(style.clone()).unwrap();
     assert!(
         builder

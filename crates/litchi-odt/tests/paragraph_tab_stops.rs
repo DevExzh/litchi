@@ -1,5 +1,5 @@
 use litchi_odt::{
-    Document, DocumentBuilder, MutableDocument, OpenDocumentPackage, ParagraphStyleTabStops,
+    Builder, Document, MutableDocument, OpenDocumentPackage, ParagraphStyleTabStops,
     ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
     ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
     TabStopPosition, parse_paragraph_style_tab_stops,
@@ -137,7 +137,7 @@ fn builder_package_and_mutable_document_preserve_typed_styles() {
     let mut style = ParagraphStyleTabStops::named("ReportTabs", Some(stops)).unwrap();
     style.parent_style_name = Some("Standard".to_owned());
 
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_paragraph_tab_style(style.clone()).unwrap();
     builder.add_paragraph("tabbed").unwrap();
     let bytes = builder.build().unwrap();
