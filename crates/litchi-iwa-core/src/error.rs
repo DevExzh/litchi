@@ -60,6 +60,9 @@ pub enum Error {
     #[error("invalid IWA protobuf header: {0}")]
     Protobuf(#[from] prost::DecodeError),
 
+    #[error("IWA archive reader error: {0}")]
+    Io(#[from] std::io::Error),
+
     #[error("could not encode IWA protobuf header: {0}")]
     ProtobufEncode(#[from] prost::EncodeError),
 

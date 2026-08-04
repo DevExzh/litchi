@@ -26,6 +26,9 @@
     reason = "Validated limit profiles deliberately retain the public parameter name."
 )]
 
+use std::collections::HashSet;
+use std::io::Read;
+
 use litchi_iwa_protos::tsp;
 use prost::Message;
 
@@ -45,6 +48,22 @@ pub struct ArchiveInfo {
 }
 
 impl ArchiveInfo {
+    /// Decode one bounded `TSP.ArchiveInfo` protobuf from a reader.
+    ///
+    /// Because protobuf messages are not self-delimiting, callers must pass a
+    /// reader bounded to exactly one header when additional bytes follow it.
+    pub fn parse<R: Read>(reader: &mut R) -> Result<Self> {
+        Self::parse_with_limits(reader, Limits::default())
+    }
+
+    /// Decode one `TSP.ArchiveInfo` protobuf from a reader under explicit
+    /// resource limits.
+    pub fn parse_with_limits<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        let data = read_bounded(reader, limits.max_header_bytes(), "ArchiveInfo")?;
+        Self::decode_with_limits(&data, limits)
+    }
+
     /// Decode one bounded `TSP.ArchiveInfo` header.
     pub fn decode(data: &[u8]) -> Result<Self> {
         Self::decode_with_limits(data, Limits::default())
@@ -154,6 +173,27 @@ impl MessageInfo {
         }
     }
 
+    fn try_new(type_: u32, length: u32) -> Result<Self> {
+        let mut versions = Vec::new();
+        versions
+            .try_reserve_exact(3)
+            .map_err(|_| Error::allocation("IWA message versions", 3))?;
+        versions.extend([1, 0, 5]);
+        Ok(Self {
+            type_,
+            versions,
+            length,
+            field_infos: Vec::new(),
+            object_references: Vec::new(),
+            data_references: Vec::new(),
+            base_message_index: None,
+            diff_merge_version: Vec::new(),
+            diff_field_path: None,
+            fields_to_remove: Vec::new(),
+            diff_read_version: Vec::new(),
+        })
+    }
+
     /// Decode one bounded `TSP.MessageInfo` protobuf.
     pub fn decode(data: &[u8]) -> Result<Self> {
         Self::decode_with_limits(data, Limits::default())
@@ -166,6 +206,23 @@ impl MessageInfo {
         let message_info = Self::from(tsp::MessageInfo::decode(data)?);
         message_info.validate_with_limits(limits)?;
         Ok(message_info)
+    }
+
+    /// Decode one bounded `TSP.MessageInfo` protobuf from a reader.
+    ///
+    /// Because protobuf messages are not self-delimiting, callers must pass a
+    /// reader bounded to exactly one metadata message when additional bytes
+    /// follow it.
+    pub fn parse<R: Read>(reader: &mut R) -> Result<Self> {
+        Self::parse_with_limits(reader, Limits::default())
+    }
+
+    /// Decode one `TSP.MessageInfo` protobuf from a reader under explicit
+    /// resource limits.
+    pub fn parse_with_limits<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        let data = read_bounded(reader, limits.max_header_bytes(), "MessageInfo")?;
+        Self::decode_with_limits(&data, limits)
     }
 
     fn validate_with_limits(&self, limits: Limits) -> Result<()> {
@@ -276,6 +333,11 @@ pub struct ArchiveObject {
     pub data_offset: u64,
     /// Total bytes occupied by the object's payloads.
     pub data_length: u64,
+    /// Original encoded header, retained so untouched unknown protobuf fields
+    /// survive a parse/serialize round trip.
+    original_header: Option<Box<[u8]>>,
+    /// Canonical encoding of the known header fields at parse time.
+    original_canonical_header: Option<Box<[u8]>>,
 }
 
 impl ArchiveObject {
@@ -306,7 +368,7 @@ impl ArchiveObject {
             let length = u32::try_from(message.data.len())
                 .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
             check_message_length(message.data.len(), limits)?;
-            message_infos.push(MessageInfo::new(message.type_, length));
+            message_infos.push(MessageInfo::try_new(message.type_, length)?);
         }
         let object = Self {
             archive_info: ArchiveInfo::new(identifier, message_infos),
@@ -315,6 +377,8 @@ impl ArchiveObject {
             header_length: 0,
             data_offset: 0,
             data_length: 0,
+            original_header: None,
+            original_canonical_header: None,
         };
         object.validate_with_limits(limits)?;
         Ok(object)
@@ -373,6 +437,100 @@ impl ArchiveObject {
     pub fn primary_message_type(&self) -> Option<u32> {
         self.messages.first().map(|message| message.type_)
     }
+
+    /// Replace one payload and synchronize its physical metadata atomically.
+    pub fn replace_message(&mut self, index: usize, message: RawMessage) -> Result<RawMessage> {
+        self.replace_message_with_limits(index, message, Limits::default())
+    }
+
+    /// Replace one payload under explicit resource limits.
+    pub fn replace_message_with_limits(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        limits: Limits,
+    ) -> Result<RawMessage> {
+        let limits = limits.validate()?;
+        self.validate_with_limits(limits)?;
+        let message_info = self
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
+        let length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
+        check_message_length(message.data.len(), limits)?;
+        let old_type = message_info.type_;
+        let old_length = message_info.length;
+        let old = std::mem::replace(
+            self.messages
+                .get_mut(index)
+                .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?,
+            message,
+        );
+        let info = &mut self.archive_info.message_infos[index];
+        info.type_ = self.messages[index].type_;
+        info.length = length;
+        if let Err(error) = self.validate_with_limits(limits) {
+            drop(std::mem::replace(&mut self.messages[index], old));
+            let restored_info = &mut self.archive_info.message_infos[index];
+            restored_info.type_ = old_type;
+            restored_info.length = old_length;
+            return Err(error);
+        }
+        Ok(old)
+    }
+
+    /// Append one payload and synchronize its physical metadata atomically.
+    pub fn push_message(&mut self, message: RawMessage) -> Result<()> {
+        self.push_message_with_limits(message, Limits::default())
+    }
+
+    /// Append one payload under explicit resource limits.
+    pub fn push_message_with_limits(&mut self, message: RawMessage, limits: Limits) -> Result<()> {
+        let limits = limits.validate()?;
+        self.validate_with_limits(limits)?;
+        let next_count = self
+            .messages
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "message count overflow"))?;
+        if next_count > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                next_count,
+                limits.max_messages_per_object(),
+            ));
+        }
+        check_message_length(message.data.len(), limits)?;
+        let length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
+        let message_info = MessageInfo::try_new(message.type_, length)?;
+        self.archive_info
+            .message_infos
+            .try_reserve(1)
+            .map_err(|_| Error::allocation("IWA message metadata", 1))?;
+        self.messages
+            .try_reserve(1)
+            .map_err(|_| Error::allocation("IWA object messages", 1))?;
+        self.archive_info.message_infos.push(message_info);
+        self.messages.push(message);
+        if let Err(error) = self.validate_with_limits(limits) {
+            self.archive_info.message_infos.pop();
+            self.messages.pop();
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Remove one payload and its metadata, returning the payload if present.
+    pub fn remove_message(&mut self, index: usize) -> Option<RawMessage> {
+        if index >= self.messages.len() || index >= self.archive_info.message_infos.len() {
+            return None;
+        }
+        self.archive_info.message_infos.remove(index);
+        Some(self.messages.remove(index))
+    }
 }
 
 /// A parsed, mutable decompressed IWA component archive.
@@ -407,9 +565,10 @@ impl Archive {
         }
 
         let mut objects = Vec::new();
+        let initial_capacity = data.len().min(limits.max_objects());
         objects
-            .try_reserve(data.len().min(limits.max_objects()))
-            .map_err(|_| Error::allocation("IWA archive objects", data.len()))?;
+            .try_reserve(initial_capacity)
+            .map_err(|_| Error::allocation("IWA archive objects", initial_capacity))?;
         let mut cursor = 0usize;
         let mut total_messages = 0usize;
         while cursor < data.len() {
@@ -435,6 +594,7 @@ impl Archive {
                 Error::invalid_archive(object_start, "truncated ArchiveInfo header")
             })?;
             let archive_info = ArchiveInfo::decode_with_limits(header, limits)?;
+            let canonical_header = encode_archive_info(&archive_info, limits)?;
             cursor = header_end;
             add_limited(
                 &mut total_messages,
@@ -509,9 +669,13 @@ impl Archive {
                     .map_err(|_| Error::invalid_archive(payload_start, "offset exceeds u64"))?,
                 data_length: u64::try_from(payload_length)
                     .map_err(|_| Error::invalid_archive(payload_start, "payload exceeds u64"))?,
+                original_header: Some(header.into()),
+                original_canonical_header: Some(canonical_header.into()),
             });
         }
-        Ok(Self { objects })
+        let archive = Self { objects };
+        archive.validate_with_limits(limits)?;
+        Ok(archive)
     }
 
     /// Serialize this archive as a decompressed IWA stream.
@@ -522,30 +686,26 @@ impl Archive {
     /// Serialize this archive under explicit resource limits.
     pub fn to_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
         let limits = limits.validate()?;
-        if self.objects.len() > limits.max_objects() {
-            return Err(limit(
-                LimitKind::Objects,
-                self.objects.len(),
-                limits.max_objects(),
-            ));
-        }
+        validate_object_set(self.objects.iter(), limits)?;
         let mut output = Vec::new();
         for object in &self.objects {
-            object.validate_with_limits(limits)?;
             let mut info = object.archive_info.clone();
             for (message_info, message) in info.message_infos.iter_mut().zip(&object.messages) {
                 message_info.type_ = message.type_;
                 message_info.length = u32::try_from(message.data.len())
                     .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
             }
-            let encoded_info = tsp::ArchiveInfo::from(&info);
-            let header_length = encoded_info.encoded_len();
-            check_header_length(header_length, limits)?;
-            let mut header = Vec::new();
-            header
-                .try_reserve_exact(header_length)
-                .map_err(|_| Error::allocation("IWA ArchiveInfo header", header_length))?;
-            encoded_info.encode(&mut header)?;
+            let canonical_header = encode_archive_info(&info, limits)?;
+            let header = match (
+                object.original_header.as_deref(),
+                object.original_canonical_header.as_deref(),
+            ) {
+                (Some(original), Some(canonical)) if canonical == canonical_header.as_slice() => {
+                    original
+                },
+                _ => canonical_header.as_slice(),
+            };
+            let header_length = header.len();
             let prefix_length = varint_len(header_length)?;
             let payload_length = object.messages.iter().try_fold(0usize, |total, message| {
                 total
@@ -584,7 +744,7 @@ impl Archive {
                 &mut prefix,
             );
             output.extend_from_slice(prefix);
-            output.extend_from_slice(&header);
+            output.extend_from_slice(header);
             for message in &object.messages {
                 output.extend_from_slice(&message.data);
             }
@@ -600,33 +760,7 @@ impl Archive {
     /// Validate all objects under explicit resource limits.
     pub fn validate_with_limits(&self, limits: Limits) -> Result<()> {
         let limits = limits.validate()?;
-        if self.objects.len() > limits.max_objects() {
-            return Err(limit(
-                LimitKind::Objects,
-                self.objects.len(),
-                limits.max_objects(),
-            ));
-        }
-        let mut total_messages = 0usize;
-        let mut total_payload = 0usize;
-        for object in &self.objects {
-            object.validate_with_limits(limits)?;
-            add_limited(
-                &mut total_messages,
-                object.messages.len(),
-                LimitKind::Messages,
-                limits.max_messages(),
-            )?;
-            for message in &object.messages {
-                add_limited(
-                    &mut total_payload,
-                    message.data.len(),
-                    LimitKind::ArchiveBytes,
-                    limits.max_archive_bytes(),
-                )?;
-            }
-        }
-        Ok(())
+        validate_object_set(self.objects.iter(), limits)
     }
 
     /// Insert an object, rejecting missing or duplicate identifiers.
@@ -645,22 +779,80 @@ impl Archive {
             .archive_info
             .identifier
             .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
-        if self
-            .objects
-            .iter()
-            .any(|current| current.archive_info.identifier == Some(identifier))
-        {
+        if self.object(identifier).is_some() {
             return Err(Error::invalid_archive(0, "duplicate object identifier"));
         }
+        validate_object_set(std::iter::once(&object).chain(self.objects.iter()), limits)?;
         self.objects
             .try_reserve(1)
             .map_err(|_| Error::allocation("IWA archive objects", 1))?;
         self.objects.push(object);
-        if let Err(error) = self.validate_with_limits(limits) {
-            self.objects.pop();
-            return Err(error);
-        }
         Ok(())
+    }
+
+    /// Find an object by its archive identifier.
+    #[must_use]
+    pub fn object(&self, identifier: u64) -> Option<&ArchiveObject> {
+        self.objects
+            .iter()
+            .find(|object| object.archive_info.identifier == Some(identifier))
+    }
+
+    /// Find an object mutably by its archive identifier.
+    #[must_use]
+    pub fn object_mut(&mut self, identifier: u64) -> Option<&mut ArchiveObject> {
+        self.objects
+            .iter_mut()
+            .find(|object| object.archive_info.identifier == Some(identifier))
+    }
+
+    /// Insert or replace an object, returning the previous object if present.
+    pub fn upsert_object(&mut self, object: ArchiveObject) -> Result<Option<ArchiveObject>> {
+        self.upsert_object_with_limits(object, Limits::default())
+    }
+
+    /// Insert or replace an object under explicit resource limits.
+    pub fn upsert_object_with_limits(
+        &mut self,
+        object: ArchiveObject,
+        limits: Limits,
+    ) -> Result<Option<ArchiveObject>> {
+        let limits = limits.validate()?;
+        let identifier = object
+            .archive_info
+            .identifier
+            .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
+        if let Some(index) = self
+            .objects
+            .iter()
+            .position(|current| current.archive_info.identifier == Some(identifier))
+        {
+            validate_object_set(
+                self.objects.iter().enumerate().map(
+                    |(current, item)| {
+                        if current == index { &object } else { item }
+                    },
+                ),
+                limits,
+            )?;
+            return Ok(Some(std::mem::replace(&mut self.objects[index], object)));
+        }
+
+        validate_object_set(std::iter::once(&object).chain(self.objects.iter()), limits)?;
+        self.objects
+            .try_reserve(1)
+            .map_err(|_| Error::allocation("IWA archive objects", 1))?;
+        self.objects.push(object);
+        Ok(None)
+    }
+
+    /// Remove an object by its archive identifier.
+    pub fn remove_object(&mut self, identifier: u64) -> Option<ArchiveObject> {
+        let index = self
+            .objects
+            .iter()
+            .position(|object| object.archive_info.identifier == Some(identifier))?;
+        Some(self.objects.remove(index))
     }
 }
 
@@ -677,6 +869,96 @@ fn check_header_length(length: usize, limits: Limits) -> Result<()> {
             length,
             limits.max_header_bytes(),
         ));
+    }
+    Ok(())
+}
+
+fn encode_archive_info(info: &ArchiveInfo, limits: Limits) -> Result<Vec<u8>> {
+    let encoded_info = tsp::ArchiveInfo::from(info);
+    let header_length = encoded_info.encoded_len();
+    check_header_length(header_length, limits)?;
+    let mut header = Vec::new();
+    header
+        .try_reserve_exact(header_length)
+        .map_err(|_| Error::allocation("IWA ArchiveInfo header", header_length))?;
+    encoded_info.encode(&mut header)?;
+    Ok(header)
+}
+
+fn read_bounded<R: Read>(
+    reader: &mut R,
+    maximum: usize,
+    resource: &'static str,
+) -> Result<Vec<u8>> {
+    let mut data = Vec::new();
+    let mut buffer = [0u8; 8192];
+    loop {
+        let remaining = maximum.saturating_sub(data.len());
+        let read_size = remaining.min(buffer.len()).max(1);
+        let read = reader.read(&mut buffer[..read_size])?;
+        if read == 0 {
+            return Ok(data);
+        }
+        if data.len() == maximum {
+            return Err(limit(
+                LimitKind::HeaderBytes,
+                maximum.saturating_add(read),
+                maximum,
+            ));
+        }
+        data.try_reserve(read)
+            .map_err(|_| Error::allocation(resource, read))?;
+        data.extend_from_slice(&buffer[..read]);
+    }
+}
+
+fn validate_object_set<'a, I>(objects: I, limits: Limits) -> Result<()>
+where
+    I: IntoIterator<Item = &'a ArchiveObject>,
+{
+    let limits = limits.validate()?;
+    let objects = objects.into_iter();
+    let mut identifiers = HashSet::new();
+    let initial_capacity = objects.size_hint().0.min(limits.max_objects());
+    identifiers
+        .try_reserve(initial_capacity)
+        .map_err(|_| Error::allocation("IWA archive identifiers", initial_capacity))?;
+    let mut object_count = 0usize;
+    let mut total_messages = 0usize;
+    let mut total_payload = 0usize;
+    for object in objects {
+        object_count = object_count
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "object count overflow"))?;
+        if object_count > limits.max_objects() {
+            return Err(limit(
+                LimitKind::Objects,
+                object_count,
+                limits.max_objects(),
+            ));
+        }
+        let identifier = object
+            .archive_info
+            .identifier
+            .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
+        if !identifiers.insert(identifier) {
+            return Err(Error::invalid_archive(0, "duplicate object identifier"));
+        }
+        object.validate_with_limits(limits)?;
+        add_limited(
+            &mut total_messages,
+            object.messages.len(),
+            LimitKind::Messages,
+            limits.max_messages(),
+        )?;
+        for message in &object.messages {
+            add_limited(
+                &mut total_payload,
+                message.data.len(),
+                LimitKind::ArchiveBytes,
+                limits.max_archive_bytes(),
+            )?;
+        }
     }
     Ok(())
 }

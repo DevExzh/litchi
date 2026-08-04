@@ -11,6 +11,19 @@
 use litchi_iwa_core::{
     Archive, ArchiveLimits, ArchiveObject, Error, LimitKind, RawMessage, SnappyLimits, SnappyStream,
 };
+use prost::Message;
+use std::io::{self, Cursor, Read};
+
+struct FailingReader;
+
+impl Read for FailingReader {
+    fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+        Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "test reader failure",
+        ))
+    }
+}
 
 #[test]
 fn round_trip_spans_multiple_frames() -> Result<(), Error> {
@@ -244,4 +257,305 @@ fn archive_limits_bound_objects_messages_payloads_and_metadata() -> Result<(), E
         })
     ));
     Ok(())
+}
+
+#[test]
+fn archive_crud_rejects_duplicates_and_preserves_order() -> Result<(), Error> {
+    let first = ArchiveObject::new(
+        11,
+        vec![RawMessage {
+            type_: 1,
+            data: b"first".to_vec(),
+        }],
+    )?;
+    let second = ArchiveObject::new(
+        22,
+        vec![RawMessage {
+            type_: 2,
+            data: b"second".to_vec(),
+        }],
+    )?;
+    let duplicate = ArchiveObject::new(
+        11,
+        vec![RawMessage {
+            type_: 3,
+            data: b"duplicate".to_vec(),
+        }],
+    )?;
+    let mut archive = Archive::new();
+    archive.insert_object(first)?;
+    archive.insert_object(second)?;
+    assert_eq!(
+        archive
+            .object(11)
+            .and_then(ArchiveObject::primary_message_type),
+        Some(1)
+    );
+    assert_eq!(archive.objects.len(), 2);
+
+    let error = archive.insert_object(duplicate.clone()).err();
+    assert!(matches!(
+        error,
+        Some(Error::InvalidArchive {
+            reason: "duplicate object identifier",
+            ..
+        })
+    ));
+    assert_eq!(archive.objects.len(), 2);
+
+    let previous = archive.upsert_object(duplicate)?;
+    assert_eq!(
+        previous.and_then(|object| object.primary_message_type()),
+        Some(1)
+    );
+    assert_eq!(
+        archive
+            .object(11)
+            .and_then(ArchiveObject::primary_message_type),
+        Some(3)
+    );
+
+    let removed = archive.remove_object(22);
+    assert_eq!(
+        removed.and_then(|object| object.primary_message_type()),
+        Some(2)
+    );
+    assert!(archive.object(22).is_none());
+    assert_eq!(archive.objects.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn archive_validation_rejects_duplicate_structural_ids() -> Result<(), Error> {
+    let object = ArchiveObject::new(
+        7,
+        vec![RawMessage {
+            type_: 1,
+            data: vec![1],
+        }],
+    )?;
+    let archive = Archive {
+        objects: vec![object.clone(), object],
+    };
+    assert!(matches!(
+        archive.validate(),
+        Err(Error::InvalidArchive {
+            reason: "duplicate object identifier",
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn message_mutations_are_atomic_and_update_metadata() -> Result<(), Error> {
+    let mut object = ArchiveObject::new(
+        9,
+        vec![RawMessage {
+            type_: 10,
+            data: b"old".to_vec(),
+        }],
+    )?;
+    let before_info = object.archive_info.clone();
+    let limits = ArchiveLimits::default().with_message_bytes(3)?;
+    let error = object
+        .replace_message_with_limits(
+            0,
+            RawMessage {
+                type_: 20,
+                data: b"newer".to_vec(),
+            },
+            limits,
+        )
+        .err();
+    assert!(matches!(
+        error,
+        Some(Error::Limit {
+            kind: LimitKind::MessageBytes,
+            ..
+        })
+    ));
+    assert_eq!(object.messages[0].type_, 10);
+    assert_eq!(object.messages[0].data, b"old");
+    assert_eq!(object.archive_info, before_info);
+
+    let old = object.replace_message(
+        0,
+        RawMessage {
+            type_: 20,
+            data: b"new".to_vec(),
+        },
+    )?;
+    assert_eq!(old.data, b"old");
+    assert_eq!(object.archive_info.message_infos[0].type_, 20);
+    assert_eq!(object.archive_info.message_infos[0].length, 3);
+
+    let count_limited = ArchiveLimits::default().with_messages_per_object(1)?;
+    let before_push = object.clone();
+    let error = object
+        .push_message_with_limits(
+            RawMessage {
+                type_: 30,
+                data: vec![4],
+            },
+            count_limited,
+        )
+        .err();
+    assert!(matches!(
+        error,
+        Some(Error::Limit {
+            kind: LimitKind::MessagesPerObject,
+            ..
+        })
+    ));
+    assert_eq!(object.messages, before_push.messages);
+    assert_eq!(object.archive_info, before_push.archive_info);
+
+    object.push_message(RawMessage {
+        type_: 30,
+        data: vec![4],
+    })?;
+    assert_eq!(object.messages.len(), 2);
+    assert_eq!(
+        object.remove_message(0).map(|message| message.type_),
+        Some(20)
+    );
+    assert_eq!(object.messages.len(), 1);
+    assert!(object.remove_message(9).is_none());
+    Ok(())
+}
+
+#[test]
+fn upsert_failure_rolls_back_without_replacing_existing_object() -> Result<(), Error> {
+    let mut archive = Archive::new();
+    archive.insert_object(ArchiveObject::new(
+        1,
+        vec![RawMessage {
+            type_: 1,
+            data: vec![1],
+        }],
+    )?)?;
+    let replacement = ArchiveObject::new(
+        1,
+        vec![RawMessage {
+            type_: 2,
+            data: vec![2, 3, 4],
+        }],
+    )?;
+    let limits = ArchiveLimits::default().with_message_bytes(1)?;
+    let error = archive.upsert_object_with_limits(replacement, limits).err();
+    assert!(matches!(
+        error,
+        Some(Error::Limit {
+            kind: LimitKind::MessageBytes,
+            ..
+        })
+    ));
+    assert_eq!(
+        archive
+            .object(1)
+            .and_then(ArchiveObject::primary_message_type),
+        Some(1)
+    );
+    assert_eq!(archive.objects.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn reader_headers_are_bounded_and_truncation_is_structured() -> Result<(), Error> {
+    let archive = Archive {
+        objects: vec![ArchiveObject::new(
+            31,
+            vec![RawMessage {
+                type_: 41,
+                data: b"payload".to_vec(),
+            }],
+        )?],
+    };
+    let encoded = archive.to_bytes()?;
+    let (header_length, prefix_length) = decode_test_varint(&encoded);
+    let mut reader = Cursor::new(&encoded[prefix_length..prefix_length + header_length]);
+    let info = litchi_iwa_core::ArchiveInfo::parse(&mut reader)?;
+    assert_eq!(info.identifier, Some(31));
+
+    let mut truncated = Cursor::new(vec![0x80]);
+    assert!(matches!(
+        litchi_iwa_core::ArchiveInfo::parse(&mut truncated),
+        Err(Error::Protobuf(_))
+    ));
+
+    let mut oversized = Cursor::new(vec![0, 0]);
+    let limits = ArchiveLimits::default().with_header_bytes(1)?;
+    assert!(matches!(
+        litchi_iwa_core::ArchiveInfo::parse_with_limits(&mut oversized, limits),
+        Err(Error::Limit {
+            kind: LimitKind::HeaderBytes,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn message_info_reader_and_io_errors_are_reported() -> Result<(), Error> {
+    let source = ArchiveObject::new(
+        51,
+        vec![RawMessage {
+            type_: 61,
+            data: vec![1, 2],
+        }],
+    )?;
+    let proto = litchi_iwa_protos::tsp::MessageInfo::from(&source.archive_info.message_infos[0]);
+    let encoded = proto.encode_to_vec();
+    let mut reader = Cursor::new(encoded);
+    let info = litchi_iwa_core::MessageInfo::parse(&mut reader)?;
+    assert_eq!(info.type_, 61);
+    assert_eq!(info.length, 2);
+
+    let mut failing = FailingReader;
+    assert!(matches!(
+        litchi_iwa_core::MessageInfo::parse(&mut failing),
+        Err(Error::Io(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn unknown_header_fields_and_untouched_payloads_round_trip_byte_for_byte() -> Result<(), Error> {
+    let archive = Archive {
+        objects: vec![ArchiveObject::new(
+            71,
+            vec![RawMessage {
+                type_: 81,
+                data: vec![0, 1, 2, 255],
+            }],
+        )?],
+    };
+    let encoded = archive.to_bytes()?;
+    let (header_length, prefix_length) = decode_test_varint(&encoded);
+    let unknown_field = [0xa2, 0x06, 0x01, 0xff];
+    let new_header_length = header_length + unknown_field.len();
+    let mut modified = Vec::new();
+    modified.push(new_header_length as u8);
+    modified.extend_from_slice(&encoded[prefix_length..prefix_length + header_length]);
+    modified.extend_from_slice(&unknown_field);
+    modified.extend_from_slice(&encoded[prefix_length + header_length..]);
+
+    let parsed = Archive::parse(&modified)?;
+    assert_eq!(parsed.objects[0].messages[0].data, vec![0, 1, 2, 255]);
+    assert_eq!(parsed.to_bytes()?, modified);
+    Ok(())
+}
+
+fn decode_test_varint(data: &[u8]) -> (usize, usize) {
+    let mut value = 0usize;
+    let mut shift = 0usize;
+    for (index, byte) in data.iter().copied().enumerate() {
+        value |= usize::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return (value, index + 1);
+        }
+        shift += 7;
+    }
+    (0, 0)
 }
