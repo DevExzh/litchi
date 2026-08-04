@@ -6,9 +6,7 @@
 use crate::xlsb::Image;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsx::WorksheetChart;
-use crate::xlsx::writer::shape::{
-    ShapeEmitter, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
-};
+use crate::xlsx::writer::shape::{ConnectionShapeSpec, GroupSpec, ShapeEmitter, ShapeSpec};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as _;
 
@@ -46,9 +44,9 @@ pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> XlsbResult<Vec<u8>> 
 pub(crate) fn serialize_drawing(
     images: &[Image],
     charts: &[WorksheetChart],
-    shapes: &[XlsxShapeSpec],
-    groups: &[XlsxGroupSpec],
-    connections: &[XlsxConnectionShapeSpec],
+    shapes: &[ShapeSpec],
+    groups: &[GroupSpec],
+    connections: &[ConnectionShapeSpec],
 ) -> XlsbResult<Vec<u8>> {
     if images.is_empty()
         && charts.is_empty()

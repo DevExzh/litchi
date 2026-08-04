@@ -65,16 +65,16 @@ const MAX_TEXT_BYTES: usize = 1024 * 1024;
 
 /// An offset or extent in English Metric Units (EMU), the DrawingML length unit.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct XlsxEmu(pub i64);
+pub struct Emu(pub i64);
 
-impl XlsxEmu {
+impl Emu {
     /// The raw EMU value.
     pub fn emu(self) -> i64 {
         self.0
     }
 }
 
-impl From<i64> for XlsxEmu {
+impl From<i64> for Emu {
     fn from(value: i64) -> Self {
         Self(value)
     }
@@ -82,7 +82,7 @@ impl From<i64> for XlsxEmu {
 
 /// How a two-cell anchored object reacts to cell edits (`xdr:twoCellAnchor@editAs`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum XlsxEditAs {
+pub enum EditAs {
     /// Move and resize with both cells (`twoCell`, the ECMA-376 default).
     #[default]
     TwoCell,
@@ -92,7 +92,7 @@ pub enum XlsxEditAs {
     Absolute,
 }
 
-impl XlsxEditAs {
+impl EditAs {
     /// Return the exact SpreadsheetDrawingML token.
     pub const fn token(self) -> &'static str {
         match self {
@@ -105,30 +105,30 @@ impl XlsxEditAs {
 
 /// An invalid `xdr:twoCellAnchor@editAs` token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsxEditAsError;
+pub struct EditAsError;
 
-impl fmt::Display for XlsxEditAsError {
+impl fmt::Display for EditAsError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("invalid SpreadsheetDrawingML editAs token")
     }
 }
 
-impl std::error::Error for XlsxEditAsError {}
+impl std::error::Error for EditAsError {}
 
-impl FromStr for XlsxEditAs {
-    type Err = XlsxEditAsError;
+impl FromStr for EditAs {
+    type Err = EditAsError;
 
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         match value {
             "twoCell" => Ok(Self::TwoCell),
             "oneCell" => Ok(Self::OneCell),
             "absolute" => Ok(Self::Absolute),
-            _ => Err(XlsxEditAsError),
+            _ => Err(EditAsError),
         }
     }
 }
 
-impl fmt::Display for XlsxEditAs {
+impl fmt::Display for EditAs {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.token())
     }
@@ -136,60 +136,60 @@ impl fmt::Display for XlsxEditAs {
 
 /// One cell anchor point: a zero-based column/row plus an EMU offset into the cell.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsxCellMarker {
+pub struct CellMarker {
     /// Zero-based column index.
     pub column: u32,
     /// Offset from the column edge, in EMUs.
-    pub column_offset: XlsxEmu,
+    pub column_offset: Emu,
     /// Zero-based row index.
     pub row: u32,
     /// Offset from the row edge, in EMUs.
-    pub row_offset: XlsxEmu,
+    pub row_offset: Emu,
 }
 
 /// An absolute position (`xdr:pos`), in EMUs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsxEmuOffset {
+pub struct EmuOffset {
     /// Horizontal offset, in EMUs.
-    pub x: XlsxEmu,
+    pub x: Emu,
     /// Vertical offset, in EMUs.
-    pub y: XlsxEmu,
+    pub y: Emu,
 }
 
 /// An object extent (`xdr:ext` or `a:ext`), in EMUs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsxEmuExtent {
+pub struct EmuExtent {
     /// Width, in EMUs.
-    pub width: XlsxEmu,
+    pub width: Emu,
     /// Height, in EMUs.
-    pub height: XlsxEmu,
+    pub height: Emu,
 }
 
 /// How an object is anchored on the worksheet grid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsxShapeAnchor {
+pub enum ShapeAnchor {
     /// `xdr:twoCellAnchor` — bounded by a from and a to cell marker.
     TwoCell {
         /// Top-left anchor point.
-        from: XlsxCellMarker,
+        from: CellMarker,
         /// Bottom-right anchor point.
-        to: XlsxCellMarker,
+        to: CellMarker,
         /// Edit behavior recorded by `editAs`.
-        edit_as: XlsxEditAs,
+        edit_as: EditAs,
     },
     /// `xdr:oneCellAnchor` — anchored at one cell with an explicit extent.
     OneCell {
         /// Top-left anchor point.
-        from: XlsxCellMarker,
+        from: CellMarker,
         /// Object size.
-        extent: XlsxEmuExtent,
+        extent: EmuExtent,
     },
     /// `xdr:absoluteAnchor` — fixed position and size, independent of cells.
     Absolute {
         /// Top-left position.
-        position: XlsxEmuOffset,
+        position: EmuOffset,
         /// Object size.
-        extent: XlsxEmuExtent,
+        extent: EmuExtent,
     },
 }
 
@@ -245,7 +245,7 @@ impl From<CustomGeometry> for Geometry {
 /// Missing attributes fall back to the ECMA-376 defaults (0.1 inch horizontal,
 /// 0.05 inch vertical).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsxTextInsets {
+pub struct TextInsets {
     /// Left inset.
     pub left: Coordinate32,
     /// Top inset.
@@ -256,7 +256,7 @@ pub struct XlsxTextInsets {
     pub bottom: Coordinate32,
 }
 
-impl Default for XlsxTextInsets {
+impl Default for TextInsets {
     fn default() -> Self {
         Self {
             left: Coordinate32::from(DEFAULT_HORIZONTAL_INSET_EMU),
@@ -269,9 +269,9 @@ impl Default for XlsxTextInsets {
 
 /// Text-body properties of a shape (`a:bodyPr`), with ECMA-376 defaults applied.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsxShapeBodyProperties {
+pub struct BodyProperties {
     /// Text insets.
-    pub insets: XlsxTextInsets,
+    pub insets: TextInsets,
     /// Vertical anchoring of the text.
     pub vertical_anchor: XlsxTextVerticalAnchor,
     /// Whether the anchor point is horizontally centered (`anchorCtr`).
@@ -289,10 +289,10 @@ pub struct XlsxShapeBodyProperties {
     pub space_first_last_paragraph: bool,
 }
 
-impl Default for XlsxShapeBodyProperties {
+impl Default for BodyProperties {
     fn default() -> Self {
         Self {
-            insets: XlsxTextInsets::default(),
+            insets: TextInsets::default(),
             vertical_anchor: XlsxTextVerticalAnchor::default(),
             anchor_center: false,
             direction: XlsxTextDirection::default(),
@@ -307,7 +307,7 @@ impl Default for XlsxShapeBodyProperties {
 
 /// A text run inside a shape-text paragraph (`a:r`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxShapeRun {
+pub struct Run {
     /// Run text.
     pub text: String,
     /// Explicit bold toggle (`a:rPr@b`), when declared.
@@ -322,12 +322,12 @@ pub struct XlsxShapeRun {
 
 /// A paragraph inside a shape text body (`a:p`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxShapeParagraph {
+pub struct Paragraph {
     /// The paragraph's runs in document order.
-    pub runs: Vec<XlsxShapeRun>,
+    pub runs: Vec<Run>,
 }
 
-impl XlsxShapeParagraph {
+impl Paragraph {
     /// Concatenated paragraph text.
     pub fn text(&self) -> String {
         self.runs.iter().map(|run| run.text.as_str()).collect()
@@ -336,19 +336,19 @@ impl XlsxShapeParagraph {
 
 /// The text story of a shape (`xdr:txBody`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxShapeTextBody {
+pub struct TextBody {
     /// Text-body properties (ECMA-376 defaults when `a:bodyPr` is absent).
-    pub body_properties: XlsxShapeBodyProperties,
+    pub body_properties: BodyProperties,
     /// The story's paragraphs in document order.
-    pub paragraphs: Vec<XlsxShapeParagraph>,
+    pub paragraphs: Vec<Paragraph>,
 }
 
-impl XlsxShapeTextBody {
+impl TextBody {
     /// All text of the story, one line per paragraph.
     pub fn text(&self) -> String {
         self.paragraphs
             .iter()
-            .map(XlsxShapeParagraph::text)
+            .map(Paragraph::text)
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -356,7 +356,7 @@ impl XlsxShapeTextBody {
 
 /// Non-visual identity shared by all drawing objects (`xdr:cNvPr` and lock flags).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxShapeNonVisual {
+pub struct NonVisual {
     /// Drawing object ID (`xdr:cNvPr@id`), when declared and well-formed.
     pub id: Option<u32>,
     /// Object name (`xdr:cNvPr@name`).
@@ -371,18 +371,18 @@ pub struct XlsxShapeNonVisual {
 
 /// A DrawingML shape (`xdr:sp`), typically a text box.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxShape {
+pub struct Shape {
     /// Non-visual identity and flags.
-    pub non_visual: XlsxShapeNonVisual,
+    pub non_visual: NonVisual,
     /// Whether the shape is a text box (`xdr:cNvSpPr@txBox`).
     pub is_text_box: bool,
     /// Mutually exclusive preset or custom geometry, when declared.
     pub geometry: Option<Geometry>,
     /// Rich-text story (`xdr:txBody`), when present.
-    pub text_body: Option<XlsxShapeTextBody>,
+    pub text_body: Option<TextBody>,
 }
 
-impl XlsxShape {
+impl Shape {
     /// Return the declared preset geometry, if any.
     pub fn preset(&self) -> Option<Preset> {
         self.geometry.as_ref().and_then(Geometry::preset)
@@ -396,7 +396,7 @@ impl XlsxShape {
 
 /// One end of a connection shape (`a:stCxn`/`a:endCxn`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsxShapeConnectionEnd {
+pub struct ConnectionEnd {
     /// Drawing object ID of the connected shape (`@id`).
     pub shape_id: u32,
     /// Connection site index on the connected shape (`@idx`).
@@ -405,20 +405,20 @@ pub struct XlsxShapeConnectionEnd {
 
 /// A connection shape (`xdr:cxnSp`) linking two shapes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxConnectionShape {
+pub struct ConnectionShape {
     /// Non-visual identity and flags.
-    pub non_visual: XlsxShapeNonVisual,
+    pub non_visual: NonVisual,
     /// Mutually exclusive preset or custom geometry, when declared.
     pub geometry: Option<Geometry>,
     /// Start connection, when declared.
-    pub start: Option<XlsxShapeConnectionEnd>,
+    pub start: Option<ConnectionEnd>,
     /// End connection, when declared.
-    pub end: Option<XlsxShapeConnectionEnd>,
+    pub end: Option<ConnectionEnd>,
     /// Rich-text story (`xdr:txBody`), when present.
-    pub text_body: Option<XlsxShapeTextBody>,
+    pub text_body: Option<TextBody>,
 }
 
-impl XlsxConnectionShape {
+impl ConnectionShape {
     /// Return the declared preset geometry, if any.
     pub fn preset(&self) -> Option<Preset> {
         self.geometry.as_ref().and_then(Geometry::preset)
@@ -432,26 +432,26 @@ impl XlsxConnectionShape {
 
 /// Group coordinate transform (`xdr:grpSpPr/a:xfrm`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsxGroupTransform {
+pub struct GroupTransform {
     /// Group offset (`a:off`), when declared.
-    pub offset: Option<XlsxEmuOffset>,
+    pub offset: Option<EmuOffset>,
     /// Group extent (`a:ext`), when declared.
-    pub extent: Option<XlsxEmuExtent>,
+    pub extent: Option<EmuExtent>,
     /// Child coordinate-space offset (`a:chOff`), when declared.
-    pub child_offset: Option<XlsxEmuOffset>,
+    pub child_offset: Option<EmuOffset>,
     /// Child coordinate-space extent (`a:chExt`), when declared.
-    pub child_extent: Option<XlsxEmuExtent>,
+    pub child_extent: Option<EmuExtent>,
 }
 
 /// A shape group (`xdr:grpSp`) with its nested objects.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxShapeGroup {
+pub struct Group {
     /// Non-visual identity and flags.
-    pub non_visual: XlsxShapeNonVisual,
+    pub non_visual: NonVisual,
     /// Group coordinate transform, when declared.
-    pub transform: Option<XlsxGroupTransform>,
+    pub transform: Option<GroupTransform>,
     /// Nested objects in document order; groups may nest.
-    pub children: Vec<XlsxDrawingObject>,
+    pub children: Vec<DrawingObject>,
 }
 
 /// Inert metadata of a legacy OLE object anchored through a
@@ -460,9 +460,9 @@ pub struct XlsxShapeGroup {
 /// The referenced payload and link targets are recorded as relationship IDs
 /// only; they are never resolved, fetched, or activated.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxDrawingOleObject {
+pub struct DrawingOleObject {
     /// Non-visual identity of the hosting graphic frame.
-    pub non_visual: XlsxShapeNonVisual,
+    pub non_visual: NonVisual,
     /// OLE program ID (`@progId`), when declared.
     pub program_id: Option<String>,
     /// Shape ID linked to the worksheet OLE object record (`@shapeId`).
@@ -482,20 +482,20 @@ pub struct XlsxDrawingOleObject {
 /// Pictures and chart graphic frames are deliberately not represented: they
 /// are covered by the image and chart support.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsxDrawingObject {
+pub enum DrawingObject {
     /// A DrawingML shape or text box.
-    Shape(XlsxShape),
+    Shape(Shape),
     /// A connection shape.
-    ConnectionShape(XlsxConnectionShape),
+    ConnectionShape(ConnectionShape),
     /// A shape group.
-    Group(XlsxShapeGroup),
+    Group(Group),
     /// A legacy OLE object hosted by a graphic frame.
-    OleObject(XlsxDrawingOleObject),
+    OleObject(DrawingOleObject),
 }
 
 /// Sheet-interaction flags of one anchor (`xdr:clientData`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsxClientData {
+pub struct ClientData {
     /// Whether the object locks with the sheet (`fLocksWithSheet`), when declared.
     pub locks_with_sheet: Option<bool>,
     /// Whether the object prints with the sheet (`fPrintsWithSheet`), when declared.
@@ -504,24 +504,24 @@ pub struct XlsxClientData {
 
 /// One anchored drawing object on a worksheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsxAnchoredObject {
+pub struct AnchoredObject {
     /// How the object is anchored to the grid.
-    pub anchor: XlsxShapeAnchor,
+    pub anchor: ShapeAnchor,
     /// The anchored object.
-    pub object: XlsxDrawingObject,
+    pub object: DrawingObject,
     /// Sheet-interaction flags from the anchor's `xdr:clientData`.
-    pub client_data: XlsxClientData,
+    pub client_data: ClientData,
 }
 
 /// Shape inventory of one worksheet drawing part.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsxWorksheetShapes {
+pub struct WorksheetShapes {
     /// Worksheet name from the workbook.
     pub worksheet_name: String,
     /// Worksheet part name (for example `/xl/worksheets/sheet1.xml`).
     pub worksheet_part_name: String,
     /// Anchored objects in drawing order.
-    pub objects: Vec<XlsxAnchoredObject>,
+    pub objects: Vec<AnchoredObject>,
 }
 
 /// Parse one SpreadsheetDrawing part into its anchored shape inventory.
@@ -530,7 +530,7 @@ pub struct XlsxWorksheetShapes {
 /// compatibility processing is applied so `mc:AlternateContent` fallbacks
 /// resolve before parsing. Pictures and chart graphic frames are skipped;
 /// structurally invalid anchors are errors.
-pub fn parse_drawing_shapes(xml: &str) -> Result<Option<Vec<XlsxAnchoredObject>>> {
+pub fn parse_drawing_shapes(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
     if xml.len() > MAX_DRAWING_PART_BYTES {
         return Err(limit("drawing part bytes"));
     }
@@ -542,7 +542,7 @@ pub fn parse_drawing_shapes(xml: &str) -> Result<Option<Vec<XlsxAnchoredObject>>
 ///
 /// One entry is returned per worksheet that anchors at least one shape-like
 /// object; worksheets without shapes are omitted.
-pub fn load_shapes(package: &OpcPackage) -> Result<Vec<XlsxWorksheetShapes>> {
+pub fn load_shapes(package: &OpcPackage) -> Result<Vec<WorksheetShapes>> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let mut output = Vec::new();
@@ -556,10 +556,7 @@ pub fn load_shapes(package: &OpcPackage) -> Result<Vec<XlsxWorksheetShapes>> {
 }
 
 /// Load the shape inventory of one worksheet, addressed by sheet name.
-pub fn load_worksheet_shapes(
-    package: &OpcPackage,
-    sheet_name: &str,
-) -> Result<XlsxWorksheetShapes> {
+pub fn load_worksheet_shapes(package: &OpcPackage, sheet_name: &str) -> Result<WorksheetShapes> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let sheet = sheets
@@ -610,23 +607,20 @@ struct Marker {
 }
 
 impl Marker {
-    fn finish(self, description: &str) -> Result<XlsxCellMarker> {
-        Ok(XlsxCellMarker {
+    fn finish(self, description: &str) -> Result<CellMarker> {
+        Ok(CellMarker {
             column: self
                 .column
                 .ok_or_else(|| invalid(format!("{description} is missing its column")))?,
-            column_offset: XlsxEmu(
-                self.column_offset.ok_or_else(|| {
-                    invalid(format!("{description} is missing its column offset"))
-                })?,
-            ),
+            column_offset: Emu(self
+                .column_offset
+                .ok_or_else(|| invalid(format!("{description} is missing its column offset")))?),
             row: self
                 .row
                 .ok_or_else(|| invalid(format!("{description} is missing its row")))?,
-            row_offset: XlsxEmu(
-                self.row_offset
-                    .ok_or_else(|| invalid(format!("{description} is missing its row offset")))?,
-            ),
+            row_offset: Emu(self
+                .row_offset
+                .ok_or_else(|| invalid(format!("{description} is missing its row offset")))?),
         })
     }
 }
@@ -641,13 +635,13 @@ enum AnchorKind {
 #[derive(Default)]
 struct PendingAnchor {
     kind: Option<AnchorKind>,
-    edit_as: XlsxEditAs,
+    edit_as: EditAs,
     from: Option<Marker>,
     to: Option<Marker>,
-    position: Option<XlsxEmuOffset>,
-    extent: Option<XlsxEmuExtent>,
-    object: Option<XlsxDrawingObject>,
-    client_data: XlsxClientData,
+    position: Option<EmuOffset>,
+    extent: Option<EmuExtent>,
+    object: Option<DrawingObject>,
+    client_data: ClientData,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -660,39 +654,39 @@ enum BuilderKind {
 
 #[derive(Default)]
 struct TextBodyBuilder {
-    properties: XlsxShapeBodyProperties,
-    paragraphs: Vec<XlsxShapeParagraph>,
-    paragraph: Option<XlsxShapeParagraph>,
-    run: Option<XlsxShapeRun>,
+    properties: BodyProperties,
+    paragraphs: Vec<Paragraph>,
+    paragraph: Option<Paragraph>,
+    run: Option<Run>,
     in_text_body: bool,
 }
 
 struct ObjectBuilder {
     kind: BuilderKind,
-    non_visual: XlsxShapeNonVisual,
+    non_visual: NonVisual,
     is_text_box: bool,
     geometry: Option<Geometry>,
     geometry_builder: Option<CustomGeometryBuilder>,
-    start: Option<XlsxShapeConnectionEnd>,
-    end: Option<XlsxShapeConnectionEnd>,
-    transform: XlsxGroupTransform,
+    start: Option<ConnectionEnd>,
+    end: Option<ConnectionEnd>,
+    transform: GroupTransform,
     saw_transform: bool,
     text_body: TextBodyBuilder,
-    children: Vec<XlsxDrawingObject>,
-    ole_object: Option<XlsxDrawingOleObject>,
+    children: Vec<DrawingObject>,
+    ole_object: Option<DrawingOleObject>,
 }
 
 impl ObjectBuilder {
     fn new(kind: BuilderKind) -> Self {
         Self {
             kind,
-            non_visual: XlsxShapeNonVisual::default(),
+            non_visual: NonVisual::default(),
             is_text_box: false,
             geometry: None,
             geometry_builder: None,
             start: None,
             end: None,
-            transform: XlsxGroupTransform::default(),
+            transform: GroupTransform::default(),
             saw_transform: false,
             text_body: TextBodyBuilder::default(),
             children: Vec::new(),
@@ -700,9 +694,9 @@ impl ObjectBuilder {
         }
     }
 
-    fn finish(self) -> Option<XlsxDrawingObject> {
+    fn finish(self) -> Option<DrawingObject> {
         let text_body = if self.text_body.in_text_body {
-            Some(XlsxShapeTextBody {
+            Some(TextBody {
                 body_properties: self.text_body.properties,
                 paragraphs: self.text_body.paragraphs,
             })
@@ -710,22 +704,20 @@ impl ObjectBuilder {
             None
         };
         match self.kind {
-            BuilderKind::Shape => Some(XlsxDrawingObject::Shape(XlsxShape {
+            BuilderKind::Shape => Some(DrawingObject::Shape(Shape {
                 non_visual: self.non_visual,
                 is_text_box: self.is_text_box,
                 geometry: self.geometry,
                 text_body,
             })),
-            BuilderKind::Connection => {
-                Some(XlsxDrawingObject::ConnectionShape(XlsxConnectionShape {
-                    non_visual: self.non_visual,
-                    geometry: self.geometry,
-                    start: self.start,
-                    end: self.end,
-                    text_body,
-                }))
-            },
-            BuilderKind::Group => Some(XlsxDrawingObject::Group(XlsxShapeGroup {
+            BuilderKind::Connection => Some(DrawingObject::ConnectionShape(ConnectionShape {
+                non_visual: self.non_visual,
+                geometry: self.geometry,
+                start: self.start,
+                end: self.end,
+                text_body,
+            })),
+            BuilderKind::Group => Some(DrawingObject::Group(Group {
                 non_visual: self.non_visual,
                 transform: self.saw_transform.then_some(self.transform),
                 children: self.children,
@@ -734,14 +726,14 @@ impl ObjectBuilder {
             // chart frames are covered by the chart support.
             BuilderKind::GraphicFrame => self.ole_object.map(|mut ole_object| {
                 ole_object.non_visual = self.non_visual;
-                XlsxDrawingObject::OleObject(ole_object)
+                DrawingObject::OleObject(ole_object)
             }),
         }
     }
 }
 
 struct Parser {
-    objects: Vec<XlsxAnchoredObject>,
+    objects: Vec<AnchoredObject>,
     object_count: usize,
     text_bytes: usize,
     anchor: Option<PendingAnchor>,
@@ -750,7 +742,7 @@ struct Parser {
 }
 
 impl Parser {
-    fn parse(xml: &str) -> Result<Option<Vec<XlsxAnchoredObject>>> {
+    fn parse(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
         let mut reader = NsReader::from_reader(xml.as_bytes());
         reader.config_mut().trim_text(false);
         let mut parser = Self {
@@ -940,9 +932,8 @@ impl Parser {
                 b"twoCellAnchor" => {
                     self.open_anchor(AnchorKind::TwoCell)?;
                     let edit_as = unqualified_attribute_value(element, b"editAs", decoder)?;
-                    self.anchor_mut()?.edit_as = edit_as
-                        .as_deref()
-                        .map_or(Ok(XlsxEditAs::TwoCell), |value| {
+                    self.anchor_mut()?.edit_as =
+                        edit_as.as_deref().map_or(Ok(EditAs::TwoCell), |value| {
                             parse_value(value, "drawing editAs")
                         })?;
                     return Ok(Context::Anchor);
@@ -973,9 +964,9 @@ impl Parser {
                     return Ok(Context::To);
                 },
                 b"pos" => {
-                    let position = XlsxEmuOffset {
-                        x: XlsxEmu(emu_attribute(element, b"x", decoder)?),
-                        y: XlsxEmu(emu_attribute(element, b"y", decoder)?),
+                    let position = EmuOffset {
+                        x: Emu(emu_attribute(element, b"x", decoder)?),
+                        y: Emu(emu_attribute(element, b"y", decoder)?),
                     };
                     if self.anchor_mut()?.position.replace(position).is_some() {
                         return Err(invalid("drawing anchor has duplicate positions"));
@@ -983,9 +974,9 @@ impl Parser {
                     return Ok(Context::Other);
                 },
                 b"ext" => {
-                    let extent = XlsxEmuExtent {
-                        width: XlsxEmu(emu_attribute(element, b"cx", decoder)?),
-                        height: XlsxEmu(emu_attribute(element, b"cy", decoder)?),
+                    let extent = EmuExtent {
+                        width: Emu(emu_attribute(element, b"cx", decoder)?),
+                        height: Emu(emu_attribute(element, b"cy", decoder)?),
                     };
                     if self.anchor_mut()?.extent.replace(extent).is_some() {
                         return Err(invalid("drawing anchor has duplicate extents"));
@@ -997,7 +988,7 @@ impl Parser {
                 b"cxnSp" => return self.open_object(BuilderKind::Connection),
                 b"graphicFrame" => return self.open_object(BuilderKind::GraphicFrame),
                 b"clientData" => {
-                    let client_data = XlsxClientData {
+                    let client_data = ClientData {
                         locks_with_sheet: bool_attribute(element, b"fLocksWithSheet", decoder)?,
                         prints_with_sheet: bool_attribute(element, b"fPrintsWithSheet", decoder)?,
                     };
@@ -1083,7 +1074,7 @@ impl Parser {
                     if builder.ole_object.is_some() {
                         return Err(invalid("graphic frame contains duplicate OLE objects"));
                     }
-                    builder.ole_object = Some(XlsxDrawingOleObject {
+                    builder.ole_object = Some(DrawingOleObject {
                         program_id: unqualified_attribute_value(element, b"progId", decoder)?,
                         shape_id: unqualified_attribute_value(element, b"shapeId", decoder)?
                             .and_then(|value| value.parse().ok()),
@@ -1102,7 +1093,7 @@ impl Parser {
                         link_relationship_id: relationship_attribute_value(
                             element, b"link", decoder, resolver,
                         )?,
-                        ..XlsxDrawingOleObject::default()
+                        ..DrawingOleObject::default()
                     });
                 },
                 _ => {},
@@ -1144,7 +1135,7 @@ impl Parser {
                     self.builder_mut()?.non_visual.locked = true;
                 },
                 b"stCxn" | b"endCxn" if builder_kind == Some(BuilderKind::Connection) => {
-                    let end = XlsxShapeConnectionEnd {
+                    let end = ConnectionEnd {
                         shape_id: required_u32_attribute(element, b"id", decoder, "connection ID")?,
                         site: required_u32_attribute(element, b"idx", decoder, "connection site")?,
                     };
@@ -1181,7 +1172,7 @@ impl Parser {
                     if builder.text_body.paragraph.is_some() {
                         return Err(invalid("nested drawing text paragraphs"));
                     }
-                    builder.text_body.paragraph = Some(XlsxShapeParagraph::default());
+                    builder.text_body.paragraph = Some(Paragraph::default());
                     return Ok(Context::Paragraph);
                 },
                 b"r" if parent == Context::Paragraph => {
@@ -1189,7 +1180,7 @@ impl Parser {
                     if builder.text_body.run.is_some() {
                         return Err(invalid("nested drawing text runs"));
                     }
-                    builder.text_body.run = Some(XlsxShapeRun::default());
+                    builder.text_body.run = Some(Run::default());
                     return Ok(Context::Run);
                 },
                 b"rPr" if parent == Context::Run => {
@@ -1203,9 +1194,9 @@ impl Parser {
                     // A DrawingML break contributes a newline to the paragraph.
                     let builder = self.builder_mut()?;
                     if let Some(paragraph) = builder.text_body.paragraph.as_mut() {
-                        paragraph.runs.push(XlsxShapeRun {
+                        paragraph.runs.push(Run {
                             text: "\n".to_string(),
-                            ..XlsxShapeRun::default()
+                            ..Run::default()
                         });
                     }
                 },
@@ -1272,27 +1263,27 @@ impl Parser {
         builder.saw_transform = true;
         match local {
             b"off" => {
-                builder.transform.offset = Some(XlsxEmuOffset {
-                    x: XlsxEmu(emu_attribute(element, b"x", decoder)?),
-                    y: XlsxEmu(emu_attribute(element, b"y", decoder)?),
+                builder.transform.offset = Some(EmuOffset {
+                    x: Emu(emu_attribute(element, b"x", decoder)?),
+                    y: Emu(emu_attribute(element, b"y", decoder)?),
                 });
             },
             b"ext" => {
-                builder.transform.extent = Some(XlsxEmuExtent {
-                    width: XlsxEmu(emu_attribute(element, b"cx", decoder)?),
-                    height: XlsxEmu(emu_attribute(element, b"cy", decoder)?),
+                builder.transform.extent = Some(EmuExtent {
+                    width: Emu(emu_attribute(element, b"cx", decoder)?),
+                    height: Emu(emu_attribute(element, b"cy", decoder)?),
                 });
             },
             b"chOff" => {
-                builder.transform.child_offset = Some(XlsxEmuOffset {
-                    x: XlsxEmu(emu_attribute(element, b"x", decoder)?),
-                    y: XlsxEmu(emu_attribute(element, b"y", decoder)?),
+                builder.transform.child_offset = Some(EmuOffset {
+                    x: Emu(emu_attribute(element, b"x", decoder)?),
+                    y: Emu(emu_attribute(element, b"y", decoder)?),
                 });
             },
             b"chExt" => {
-                builder.transform.child_extent = Some(XlsxEmuExtent {
-                    width: XlsxEmu(emu_attribute(element, b"cx", decoder)?),
-                    height: XlsxEmu(emu_attribute(element, b"cy", decoder)?),
+                builder.transform.child_extent = Some(EmuExtent {
+                    width: Emu(emu_attribute(element, b"cx", decoder)?),
+                    height: Emu(emu_attribute(element, b"cy", decoder)?),
                 });
             },
             _ => {},
@@ -1443,7 +1434,7 @@ impl Parser {
                     .finish("drawing to marker")?;
                 check_marker_bounds(from)?;
                 check_marker_bounds(to)?;
-                XlsxShapeAnchor::TwoCell {
+                ShapeAnchor::TwoCell {
                     from,
                     to,
                     edit_as: pending.edit_as,
@@ -1458,7 +1449,7 @@ impl Parser {
                 let extent = pending
                     .extent
                     .ok_or_else(|| invalid("one-cell anchor is missing its extent"))?;
-                XlsxShapeAnchor::OneCell { from, extent }
+                ShapeAnchor::OneCell { from, extent }
             },
             AnchorKind::Absolute => {
                 let position = pending
@@ -1467,13 +1458,13 @@ impl Parser {
                 let extent = pending
                     .extent
                     .ok_or_else(|| invalid("absolute anchor is missing its extent"))?;
-                XlsxShapeAnchor::Absolute { position, extent }
+                ShapeAnchor::Absolute { position, extent }
             },
         };
         if self.objects.len() >= MAX_ANCHORS_PER_DRAWING {
             return Err(limit("anchors per drawing"));
         }
-        self.objects.push(XlsxAnchoredObject {
+        self.objects.push(AnchoredObject {
             anchor,
             object,
             client_data: pending.client_data,
@@ -1493,7 +1484,7 @@ impl Parser {
     }
 }
 
-fn check_marker_bounds(marker: XlsxCellMarker) -> Result<()> {
+fn check_marker_bounds(marker: CellMarker) -> Result<()> {
     if marker.column >= 16_384 || marker.row >= 1_048_576 {
         return Err(invalid("drawing anchor exceeds worksheet bounds"));
     }
@@ -1514,7 +1505,7 @@ fn load_sheet_shapes(
     package: &OpcPackage,
     workbook_part: &dyn Part,
     sheet: &WorksheetInfo,
-) -> Result<XlsxWorksheetShapes> {
+) -> Result<WorksheetShapes> {
     let relationship = workbook_part
         .rels()
         .get(&sheet.relationship_id)
@@ -1581,7 +1572,7 @@ fn load_sheet_shapes(
             objects.push(object);
         }
     }
-    Ok(XlsxWorksheetShapes {
+    Ok(WorksheetShapes {
         worksheet_name: sheet.name.clone(),
         worksheet_part_name: sheet_uri.to_string(),
         objects,
@@ -1733,25 +1724,25 @@ mod tests {
         let anchored = &objects[0];
         assert_eq!(
             anchored.anchor,
-            XlsxShapeAnchor::TwoCell {
-                from: XlsxCellMarker {
+            ShapeAnchor::TwoCell {
+                from: CellMarker {
                     column: 1,
-                    column_offset: XlsxEmu(100),
+                    column_offset: Emu(100),
                     row: 2,
-                    row_offset: XlsxEmu(200),
+                    row_offset: Emu(200),
                 },
-                to: XlsxCellMarker {
+                to: CellMarker {
                     column: 5,
-                    column_offset: XlsxEmu(300),
+                    column_offset: Emu(300),
                     row: 9,
-                    row_offset: XlsxEmu(400),
+                    row_offset: Emu(400),
                 },
-                edit_as: XlsxEditAs::OneCell,
+                edit_as: EditAs::OneCell,
             }
         );
         assert_eq!(anchored.client_data.locks_with_sheet, Some(false));
         assert_eq!(anchored.client_data.prints_with_sheet, Some(true));
-        let XlsxDrawingObject::Shape(shape) = &anchored.object else {
+        let DrawingObject::Shape(shape) = &anchored.object else {
             panic!("expected a shape");
         };
         assert_eq!(shape.non_visual.id, Some(7));
@@ -1793,7 +1784,7 @@ mod tests {
         let objects = parse_drawing_shapes(&drawing(&two_cell_anchor(&shape)))
             .unwrap()
             .unwrap();
-        let XlsxDrawingObject::Shape(shape) = &objects[0].object else {
+        let DrawingObject::Shape(shape) = &objects[0].object else {
             panic!("expected a shape");
         };
         assert_eq!(shape.preset(), Some(Preset::RoundRect));
@@ -1813,16 +1804,16 @@ mod tests {
         assert_eq!(objects.len(), 1);
         assert_eq!(
             objects[0].anchor,
-            XlsxShapeAnchor::OneCell {
-                from: XlsxCellMarker::default(),
-                extent: XlsxEmuExtent {
-                    width: XlsxEmu(914400),
-                    height: XlsxEmu(457200),
+            ShapeAnchor::OneCell {
+                from: CellMarker::default(),
+                extent: EmuExtent {
+                    width: Emu(914400),
+                    height: Emu(457200),
                 },
             }
         );
-        assert_eq!(objects[0].client_data, XlsxClientData::default());
-        let XlsxDrawingObject::ConnectionShape(connection) = &objects[0].object else {
+        assert_eq!(objects[0].client_data, ClientData::default());
+        let DrawingObject::ConnectionShape(connection) = &objects[0].object else {
             panic!("expected a connection shape");
         };
         assert_eq!(connection.non_visual.id, Some(9));
@@ -1830,14 +1821,14 @@ mod tests {
         assert_eq!(connection.preset(), Some(Preset::BentConnector3));
         assert_eq!(
             connection.start,
-            Some(XlsxShapeConnectionEnd {
+            Some(ConnectionEnd {
                 shape_id: 7,
                 site: 3,
             })
         );
         assert_eq!(
             connection.end,
-            Some(XlsxShapeConnectionEnd {
+            Some(ConnectionEnd {
                 shape_id: 11,
                 site: 1,
             })
@@ -1856,7 +1847,7 @@ mod tests {
             marker(0, 0, 0, 0)
         );
         let objects = parse_drawing_shapes(&drawing(&anchor)).unwrap().unwrap();
-        let XlsxDrawingObject::ConnectionShape(connection) = &objects[0].object else {
+        let DrawingObject::ConnectionShape(connection) = &objects[0].object else {
             panic!("expected a connection shape");
         };
         assert_eq!(connection.preset(), None);
@@ -1955,21 +1946,21 @@ mod tests {
         let objects = parse_drawing_shapes(&drawing(&two_cell_anchor(&group)))
             .unwrap()
             .unwrap();
-        let XlsxDrawingObject::Group(group) = &objects[0].object else {
+        let DrawingObject::Group(group) = &objects[0].object else {
             panic!("expected a group");
         };
         assert_eq!(group.non_visual.id, Some(20));
         let transform = group.transform.unwrap();
-        assert_eq!(transform.offset.unwrap().x, XlsxEmu(1));
-        assert_eq!(transform.extent.unwrap().height, XlsxEmu(4));
-        assert_eq!(transform.child_offset.unwrap().y, XlsxEmu(6));
-        assert_eq!(transform.child_extent.unwrap().width, XlsxEmu(7));
+        assert_eq!(transform.offset.unwrap().x, Emu(1));
+        assert_eq!(transform.extent.unwrap().height, Emu(4));
+        assert_eq!(transform.child_offset.unwrap().y, Emu(6));
+        assert_eq!(transform.child_extent.unwrap().width, Emu(7));
         assert_eq!(group.children.len(), 2);
-        let XlsxDrawingObject::Shape(inner) = &group.children[0] else {
+        let DrawingObject::Shape(inner) = &group.children[0] else {
             panic!("expected an inner shape");
         };
         assert_eq!(inner.preset(), Some(Preset::Ellipse));
-        let XlsxDrawingObject::Group(nested) = &group.children[1] else {
+        let DrawingObject::Group(nested) = &group.children[1] else {
             panic!("expected a nested group");
         };
         assert!(nested.non_visual.locked);
@@ -1999,7 +1990,7 @@ mod tests {
         );
         let objects = parse_drawing_shapes(&drawing(&body)).unwrap().unwrap();
         assert_eq!(objects.len(), 1);
-        let XlsxDrawingObject::OleObject(ole_object) = &objects[0].object else {
+        let DrawingObject::OleObject(ole_object) = &objects[0].object else {
             panic!("expected an OLE object");
         };
         assert_eq!(ole_object.non_visual.id, Some(52));
@@ -2044,7 +2035,7 @@ mod tests {
             strict_marker(1, 1)
         );
         let objects = parse_drawing_shapes(&xml).unwrap().unwrap();
-        let XlsxDrawingObject::Shape(shape) = &objects[0].object else {
+        let DrawingObject::Shape(shape) = &objects[0].object else {
             panic!("expected a shape");
         };
         assert!(shape.is_text_box);
@@ -2064,7 +2055,7 @@ mod tests {
         let empty = drawing("");
         assert_eq!(
             parse_drawing_shapes(&empty).unwrap().unwrap(),
-            Vec::<XlsxAnchoredObject>::new()
+            Vec::<AnchoredObject>::new()
         );
         let empty_root = format!("<xdr:wsDr xmlns:xdr=\"{XDR}\"/>");
         assert!(
@@ -2176,7 +2167,7 @@ mod tests {
         assert_eq!(shapes.worksheet_name, "Data");
         assert_eq!(shapes.worksheet_part_name, "/xl/worksheets/sheet1.xml");
         assert_eq!(shapes.objects.len(), 1);
-        let XlsxDrawingObject::Shape(shape) = &shapes.objects[0].object else {
+        let DrawingObject::Shape(shape) = &shapes.objects[0].object else {
             panic!("expected a shape");
         };
         assert_eq!(shape.non_visual.name.as_deref(), Some("Text Box 7"));
@@ -2211,7 +2202,7 @@ mod tests {
             .iter()
             .flat_map(|sheet| sheet.objects.iter())
             .filter_map(|anchored| match &anchored.object {
-                XlsxDrawingObject::Shape(shape) => Some(shape),
+                DrawingObject::Shape(shape) => Some(shape),
                 _ => None,
             })
             .collect();
@@ -2234,7 +2225,7 @@ mod tests {
         assert!(
             all.iter()
                 .flat_map(|sheet| sheet.objects.iter())
-                .all(|anchored| matches!(anchored.anchor, XlsxShapeAnchor::TwoCell { .. }))
+                .all(|anchored| matches!(anchored.anchor, ShapeAnchor::TwoCell { .. }))
         );
     }
 }

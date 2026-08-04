@@ -182,7 +182,7 @@ pub struct SheetDrawing {
     /// Embedded image parts resolved from picture objects.
     pub images: Vec<EmbeddedImage>,
     /// Detailed standard DrawingML shapes, groups, and connectors.
-    pub shapes: Vec<crate::xlsx::XlsxAnchoredObject>,
+    pub shapes: Vec<crate::xlsx::AnchoredObject>,
 }
 
 /// One embedded image part resolved through a drawing picture.

@@ -4638,10 +4638,7 @@ impl Workbook {
     /// the worksheet's drawing part are returned in drawing order; pictures
     /// and charts are covered by `Worksheet::images()` and
     /// `Worksheet::charts()` instead. Everything is read-only and inert.
-    pub fn shapes_on_sheet(
-        &self,
-        sheet_name: &str,
-    ) -> SheetResult<super::shapes::XlsxWorksheetShapes> {
+    pub fn shapes_on_sheet(&self, sheet_name: &str) -> SheetResult<super::shapes::WorksheetShapes> {
         Ok(super::shapes::load_worksheet_shapes(
             self.package(),
             sheet_name,

@@ -13,7 +13,7 @@
 //! ST_AdjCoordinate/ST_AdjAngle unions.
 //!
 //! The model is shared by the shape inventory reader
-//! ([`crate::xlsx::shapes`], which fills `XlsxShape::custom_geometry`) and
+//! ([`crate::xlsx::shapes`], which fills `Shape::custom_geometry`) and
 //! the shape authoring pipeline ([`crate::xlsx::writer::shape`], through
 //! [`crate::xlsx::writer::Geometry::Custom`]), so authored geometry round-trips
 //! through the inventory with identical semantics. Everything here is inert:

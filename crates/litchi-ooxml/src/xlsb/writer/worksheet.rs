@@ -13,7 +13,7 @@ use crate::xlsb::sheet_view::{
     MAX_SHEET_VIEW_SELECTIONS, SheetPane, SheetPanePosition, SheetPaneState, SheetSelection,
     SheetView,
 };
-use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
+use crate::xlsb::web_extension_bindings::Binding;
 use litchi_core::sheet::CellValue;
 use litchi_xlsb::conditional_formatting::{Formatting, Rule, Value};
 use litchi_xlsb::raw::Writer;
@@ -136,7 +136,7 @@ pub struct MutableXlsbWorksheet {
     /// Conditional formatting rules.
     conditional_formattings: Vec<Formatting>,
     /// Inert Office Add-in range bindings.
-    web_extension_bindings: Vec<XlsbWebExtensionBinding>,
+    web_extension_bindings: Vec<Binding>,
     /// Array and shared formula definitions. Cell records contain only a
     /// `PtgExp` reference to one of these definitions.
     formula_groups: Vec<FormulaGroup>,
@@ -154,11 +154,11 @@ pub struct MutableXlsbWorksheet {
     /// Cached sum of encoded image bytes for constant-time safety checks.
     image_bytes: usize,
     /// Top-level DrawingML shapes and text boxes.
-    shapes: Vec<crate::xlsx::writer::XlsxShapeSpec>,
+    shapes: Vec<crate::xlsx::writer::ShapeSpec>,
     /// Top-level DrawingML shape groups.
-    groups: Vec<crate::xlsx::writer::XlsxGroupSpec>,
+    groups: Vec<crate::xlsx::writer::GroupSpec>,
     /// Top-level DrawingML connection shapes.
-    connections: Vec<crate::xlsx::writer::XlsxConnectionShapeSpec>,
+    connections: Vec<crate::xlsx::writer::ConnectionShapeSpec>,
     /// Relationship ID allocated for the sheet's Drawings part.
     drawing_rel_id: Option<String>,
     /// Relationship IDs allocated for `tables` by the workbook writer, in
@@ -1237,7 +1237,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Add a standard DrawingML shape or text box.
-    pub fn add_shape(&mut self, shape: crate::xlsx::writer::XlsxShapeSpec) -> XlsbResult<()> {
+    pub fn add_shape(&mut self, shape: crate::xlsx::writer::ShapeSpec) -> XlsbResult<()> {
         shape
             .validate(self.drawing_shape_count())
             .map_err(XlsbError::InvalidFormula)?;
@@ -1249,22 +1249,22 @@ impl MutableXlsbWorksheet {
     pub fn add_text_box(
         &mut self,
         name: impl Into<String>,
-        anchor: crate::xlsx::XlsxShapeAnchor,
+        anchor: crate::xlsx::ShapeAnchor,
         preset: crate::xlsx::Preset,
         text: &str,
     ) -> XlsbResult<()> {
-        self.add_shape(crate::xlsx::writer::XlsxShapeSpec::text_box(
+        self.add_shape(crate::xlsx::writer::ShapeSpec::text_box(
             name, anchor, preset, text,
         ))
     }
 
     /// Authored top-level shapes in drawing order.
-    pub fn shapes(&self) -> &[crate::xlsx::writer::XlsxShapeSpec] {
+    pub fn shapes(&self) -> &[crate::xlsx::writer::ShapeSpec] {
         &self.shapes
     }
 
     /// Remove one top-level shape.
-    pub fn remove_shape(&mut self, index: usize) -> XlsbResult<crate::xlsx::writer::XlsxShapeSpec> {
+    pub fn remove_shape(&mut self, index: usize) -> XlsbResult<crate::xlsx::writer::ShapeSpec> {
         if index >= self.shapes.len() {
             return Err(XlsbError::InvalidFormula(format!(
                 "shape index {index} is out of bounds for {} shapes",
@@ -1277,7 +1277,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Add a nested DrawingML shape group.
-    pub fn add_group(&mut self, group: crate::xlsx::writer::XlsxGroupSpec) -> XlsbResult<()> {
+    pub fn add_group(&mut self, group: crate::xlsx::writer::GroupSpec) -> XlsbResult<()> {
         group
             .validate(self.drawing_shape_count())
             .map_err(XlsbError::InvalidFormula)?;
@@ -1286,12 +1286,12 @@ impl MutableXlsbWorksheet {
     }
 
     /// Authored top-level shape groups in drawing order.
-    pub fn groups(&self) -> &[crate::xlsx::writer::XlsxGroupSpec] {
+    pub fn groups(&self) -> &[crate::xlsx::writer::GroupSpec] {
         &self.groups
     }
 
     /// Remove one top-level shape group.
-    pub fn remove_group(&mut self, index: usize) -> XlsbResult<crate::xlsx::writer::XlsxGroupSpec> {
+    pub fn remove_group(&mut self, index: usize) -> XlsbResult<crate::xlsx::writer::GroupSpec> {
         if index >= self.groups.len() {
             return Err(XlsbError::InvalidFormula(format!(
                 "group index {index} is out of bounds for {} groups",
@@ -1306,7 +1306,7 @@ impl MutableXlsbWorksheet {
     /// Add a DrawingML connection shape.
     pub fn add_connection(
         &mut self,
-        connection: crate::xlsx::writer::XlsxConnectionShapeSpec,
+        connection: crate::xlsx::writer::ConnectionShapeSpec,
     ) -> XlsbResult<()> {
         connection
             .validate(self.drawing_shape_count())
@@ -1316,7 +1316,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Authored top-level connection shapes in drawing order.
-    pub fn connections(&self) -> &[crate::xlsx::writer::XlsxConnectionShapeSpec] {
+    pub fn connections(&self) -> &[crate::xlsx::writer::ConnectionShapeSpec] {
         &self.connections
     }
 
@@ -1324,7 +1324,7 @@ impl MutableXlsbWorksheet {
     pub fn remove_connection(
         &mut self,
         index: usize,
-    ) -> XlsbResult<crate::xlsx::writer::XlsxConnectionShapeSpec> {
+    ) -> XlsbResult<crate::xlsx::writer::ConnectionShapeSpec> {
         if index >= self.connections.len() {
             return Err(XlsbError::InvalidFormula(format!(
                 "connection index {index} is out of bounds for {} connection shapes",
@@ -1411,10 +1411,7 @@ impl MutableXlsbWorksheet {
 
     /// Replace worksheet Office Add-in bindings after validating their payloads
     /// and unique application references.
-    pub fn set_web_extension_bindings(
-        &mut self,
-        bindings: Vec<XlsbWebExtensionBinding>,
-    ) -> XlsbResult<()> {
+    pub fn set_web_extension_bindings(&mut self, bindings: Vec<Binding>) -> XlsbResult<()> {
         let mut app_refs = HashSet::with_capacity(bindings.len());
         for binding in &bindings {
             binding.to_payload()?;
@@ -1436,7 +1433,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Office Add-in bindings that will be written to this worksheet.
-    pub fn web_extension_bindings(&self) -> &[XlsbWebExtensionBinding] {
+    pub fn web_extension_bindings(&self) -> &[Binding] {
         &self.web_extension_bindings
     }
 
@@ -2515,7 +2512,7 @@ mod tests {
     use crate::xlsb::data_validation::Validation;
     use crate::xlsb::hyperlinks::Hyperlink;
     use crate::xlsb::merged_cells::MergedCell;
-    use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
+    use crate::xlsb::web_extension_bindings::Binding;
     use litchi_core::binary;
     use litchi_xlsb::conditional_formatting::Formatting;
     use litchi_xlsb::raw::Records;
@@ -2537,8 +2534,7 @@ mod tests {
             rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
             rgcb: Vec::new(),
         };
-        let binding =
-            XlsbWebExtensionBinding::new("sales-table", formula, |index| index == 0).unwrap();
+        let binding = Binding::new("sales-table", formula, |index| index == 0).unwrap();
         let mut sheet = MutableXlsbWorksheet::new("Sheet1");
         sheet
             .set_web_extension_bindings(vec![binding.clone()])
@@ -2558,9 +2554,7 @@ mod tests {
         assert!(records[begin].payload().is_empty());
         assert_eq!(records[begin + 1].kind(), kind::WEB_EXTENSION);
         assert_eq!(
-            XlsbWebExtensionBinding::parse_payload(records[begin + 1].payload(), |index| index
-                == 0)
-            .unwrap(),
+            Binding::parse_payload(records[begin + 1].payload(), |index| index == 0).unwrap(),
             binding
         );
         assert_eq!(records[begin + 2].kind(), kind::END_WEB_EXTENSIONS);

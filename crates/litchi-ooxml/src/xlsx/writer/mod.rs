@@ -13,10 +13,7 @@ pub use crate::xlsx::conditional_formatting::{IconSet, Operator};
 pub use crate::xlsx::shapes::Geometry;
 pub use crate::xlsx::sheet_protection::WorksheetProtection as SheetProtection;
 pub use chart_sheet::MutableChartSheet;
-pub use shape::{
-    XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
-    XlsxShapeSpec,
-};
+pub use shape::{ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, GroupSpec, ShapeSpec};
 pub use sheet::{
     AutoFilter, CellComment, ConditionalFormat, ConditionalFormatType, DefinedNameBuiltIn,
     FreezePanes, HeaderFooter, Hyperlink, Image, MutableWorksheet, NamedRange, PageBreak,

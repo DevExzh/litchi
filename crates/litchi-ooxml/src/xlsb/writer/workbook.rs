@@ -1495,11 +1495,12 @@ impl Default for XlsbWorkbookWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xlsb::SharedStringRun;
     use crate::xlsb::comments::Comment;
     use crate::xlsb::data_validation::{
         DataValidationRecordKind, DataValidationSettings, Validation,
     };
-    use crate::xlsb::{SharedStringRun, SheetProtection};
+    use crate::xlsb::writer::SheetProtection;
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use litchi_xlsb::calc::{Delta, Mode, Opts, Threads};
     use litchi_xlsb::conditional_formatting::{
@@ -1786,7 +1787,7 @@ mod tests {
             XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
             XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView,
         };
-        use crate::xlsb::worksheet::XlsbStrongProtection;
+        use crate::xlsb::worksheet::StrongProtection;
         use crate::xlsx::{ChartAnchor, WorksheetChart};
 
         let chart = WorksheetChart::bar_chart_with_cache(
@@ -1821,7 +1822,7 @@ mod tests {
                 locked: true,
                 objects: false,
             });
-            metadata.strong_protection = Some(XlsbStrongProtection {
+            metadata.strong_protection = Some(StrongProtection {
                 spin_count: 100_000,
                 hash: vec![7; 64],
                 salt: vec![3; 16],
@@ -2239,7 +2240,7 @@ mod tests {
         let auto_filter = reader.worksheet(0).unwrap().auto_filter().unwrap();
         assert_eq!(
             auto_filter,
-            crate::xlsb::XlsbAutoFilter {
+            crate::xlsb::AutoFilter {
                 first_row: 0,
                 last_row: 20,
                 first_column: 0,
@@ -3481,8 +3482,8 @@ mod tests {
     fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
         use crate::xlsb::{AnchorKind, Image, ImageFormat, Object};
         use crate::xlsx::{
-            ChartAnchor, Preset, WorksheetChart, XlsxDrawingObject, XlsxEmu, XlsxEmuExtent,
-            XlsxEmuOffset, XlsxShapeAnchor,
+            ChartAnchor, DrawingObject, Emu, EmuExtent, EmuOffset, Preset, ShapeAnchor,
+            WorksheetChart,
         };
 
         const PNG_1X1: &[u8] = &[
@@ -3522,14 +3523,14 @@ mod tests {
         sheet
             .add_text_box(
                 "Caption",
-                XlsxShapeAnchor::Absolute {
-                    position: XlsxEmuOffset {
-                        x: XlsxEmu(100_000),
-                        y: XlsxEmu(100_000),
+                ShapeAnchor::Absolute {
+                    position: EmuOffset {
+                        x: Emu(100_000),
+                        y: Emu(100_000),
                     },
-                    extent: XlsxEmuExtent {
-                        width: XlsxEmu(1_000_000),
-                        height: XlsxEmu(500_000),
+                    extent: EmuExtent {
+                        width: Emu(1_000_000),
+                        height: Emu(500_000),
                     },
                 },
                 Preset::Rect,
@@ -3570,7 +3571,7 @@ mod tests {
         assert_eq!(drawing.charts[0].rel_id, "rId3");
         assert_eq!(drawing.drawing.anchors.len(), 4);
         assert_eq!(drawing.shapes.len(), 1);
-        let XlsxDrawingObject::Shape(caption) = &drawing.shapes[0].object else {
+        let DrawingObject::Shape(caption) = &drawing.shapes[0].object else {
             panic!("expected mixed-drawing caption");
         };
         assert_eq!(caption.non_visual.id, Some(4));
@@ -3681,86 +3682,83 @@ mod tests {
 
     #[test]
     fn worksheet_shapes_groups_and_connectors_round_trip() {
-        use crate::xlsx::writer::{
-            XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
-        };
+        use crate::xlsx::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
         use crate::xlsx::{
-            Preset, TextSize, XlsxCellMarker, XlsxDrawingObject, XlsxEditAs, XlsxEmu,
-            XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor,
+            CellMarker, DrawingObject, EditAs, Emu, EmuExtent, EmuOffset, GroupTransform, Preset,
+            ShapeAnchor, TextSize,
         };
 
-        fn marker(column: u32, row: u32) -> XlsxCellMarker {
-            XlsxCellMarker {
+        fn marker(column: u32, row: u32) -> CellMarker {
+            CellMarker {
                 column,
                 row,
-                column_offset: XlsxEmu(0),
-                row_offset: XlsxEmu(0),
+                column_offset: Emu(0),
+                row_offset: Emu(0),
             }
         }
 
-        let two_cell = XlsxShapeAnchor::TwoCell {
+        let two_cell = ShapeAnchor::TwoCell {
             from: marker(0, 0),
             to: marker(3, 4),
-            edit_as: XlsxEditAs::OneCell,
+            edit_as: EditAs::OneCell,
         };
-        let child_anchor = XlsxShapeAnchor::TwoCell {
+        let child_anchor = ShapeAnchor::TwoCell {
             from: marker(0, 0),
             to: marker(1, 1),
-            edit_as: XlsxEditAs::TwoCell,
+            edit_as: EditAs::TwoCell,
         };
-        let mut standalone =
-            XlsxShapeSpec::text_box("Standalone", two_cell, Preset::RoundRect, "A\nB");
+        let mut standalone = ShapeSpec::text_box("Standalone", two_cell, Preset::RoundRect, "A\nB");
         standalone.description = Some("Typed XLSB text box".to_string());
         standalone.paragraphs[0].runs[0].bold = Some(true);
         standalone.paragraphs[0].runs[0].font_size = Some(TextSize::new(1_400).unwrap());
 
-        let group_anchor = XlsxShapeAnchor::OneCell {
+        let group_anchor = ShapeAnchor::OneCell {
             from: marker(4, 1),
-            extent: XlsxEmuExtent {
-                width: XlsxEmu(4_000_000),
-                height: XlsxEmu(2_000_000),
+            extent: EmuExtent {
+                width: Emu(4_000_000),
+                height: Emu(2_000_000),
             },
         };
-        let mut group = XlsxGroupSpec::new("Pair", group_anchor)
-            .with_child(XlsxShapeSpec::shape("Left", child_anchor, Preset::Rect, "L").into())
-            .with_child(XlsxShapeSpec::shape("Right", child_anchor, Preset::Ellipse, "R").into());
-        group.transform = Some(XlsxGroupTransform {
-            offset: Some(XlsxEmuOffset {
-                x: XlsxEmu(0),
-                y: XlsxEmu(0),
+        let mut group = GroupSpec::new("Pair", group_anchor)
+            .with_child(ShapeSpec::shape("Left", child_anchor, Preset::Rect, "L").into())
+            .with_child(ShapeSpec::shape("Right", child_anchor, Preset::Ellipse, "R").into());
+        group.transform = Some(GroupTransform {
+            offset: Some(EmuOffset {
+                x: Emu(0),
+                y: Emu(0),
             }),
-            extent: Some(XlsxEmuExtent {
-                width: XlsxEmu(4_000_000),
-                height: XlsxEmu(2_000_000),
+            extent: Some(EmuExtent {
+                width: Emu(4_000_000),
+                height: Emu(2_000_000),
             }),
-            child_offset: Some(XlsxEmuOffset {
-                x: XlsxEmu(0),
-                y: XlsxEmu(0),
+            child_offset: Some(EmuOffset {
+                x: Emu(0),
+                y: Emu(0),
             }),
-            child_extent: Some(XlsxEmuExtent {
-                width: XlsxEmu(4_000_000),
-                height: XlsxEmu(2_000_000),
+            child_extent: Some(EmuExtent {
+                width: Emu(4_000_000),
+                height: Emu(2_000_000),
             }),
         });
 
-        let connection = XlsxConnectionShapeSpec::new(
+        let connection = ConnectionShapeSpec::new(
             "Bridge",
-            XlsxShapeAnchor::Absolute {
-                position: XlsxEmuOffset {
-                    x: XlsxEmu(500_000),
-                    y: XlsxEmu(500_000),
+            ShapeAnchor::Absolute {
+                position: EmuOffset {
+                    x: Emu(500_000),
+                    y: Emu(500_000),
                 },
-                extent: XlsxEmuExtent {
-                    width: XlsxEmu(1_000_000),
-                    height: XlsxEmu(1_000_000),
+                extent: EmuExtent {
+                    width: Emu(1_000_000),
+                    height: Emu(1_000_000),
                 },
             },
             Preset::StraightConnector1,
-            XlsxConnectionEndSpec {
+            ConnectionEndSpec {
                 shape_name: "Left".to_string(),
                 site: 1,
             },
-            XlsxConnectionEndSpec {
+            ConnectionEndSpec {
                 shape_name: "Right".to_string(),
                 site: 2,
             },
@@ -3782,7 +3780,7 @@ mod tests {
         assert_eq!(drawing.drawing.anchors.len(), 3);
         assert_eq!(drawing.shapes.len(), 3);
 
-        let XlsxDrawingObject::Shape(shape) = &drawing.shapes[0].object else {
+        let DrawingObject::Shape(shape) = &drawing.shapes[0].object else {
             panic!("expected standalone shape");
         };
         assert_eq!(shape.non_visual.id, Some(1));
@@ -3797,21 +3795,21 @@ mod tests {
             Some(true)
         );
 
-        let XlsxDrawingObject::Group(group) = &drawing.shapes[1].object else {
+        let DrawingObject::Group(group) = &drawing.shapes[1].object else {
             panic!("expected shape group");
         };
         assert_eq!(group.non_visual.id, Some(2));
         assert_eq!(group.children.len(), 2);
-        let XlsxDrawingObject::Shape(left) = &group.children[0] else {
+        let DrawingObject::Shape(left) = &group.children[0] else {
             panic!("expected left group child");
         };
-        let XlsxDrawingObject::Shape(right) = &group.children[1] else {
+        let DrawingObject::Shape(right) = &group.children[1] else {
             panic!("expected right group child");
         };
         assert_eq!(left.non_visual.id, Some(3));
         assert_eq!(right.non_visual.id, Some(4));
 
-        let XlsxDrawingObject::ConnectionShape(connection) = &drawing.shapes[2].object else {
+        let DrawingObject::ConnectionShape(connection) = &drawing.shapes[2].object else {
             panic!("expected connection shape");
         };
         assert_eq!(connection.non_visual.id, Some(5));
@@ -3828,29 +3826,25 @@ mod tests {
 
     #[test]
     fn worksheet_shape_crud_and_save_validation_are_lossless_or_refuse() {
-        use crate::xlsx::writer::{
-            XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
-        };
-        use crate::xlsx::{
-            Columns, Preset, TextSize, XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxShapeAnchor,
-        };
+        use crate::xlsx::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
+        use crate::xlsx::{CellMarker, Columns, EditAs, Emu, Preset, ShapeAnchor, TextSize};
 
-        fn anchor(from: (u32, u32), to: (u32, u32)) -> XlsxShapeAnchor {
-            let marker = |(column, row)| XlsxCellMarker {
+        fn anchor(from: (u32, u32), to: (u32, u32)) -> ShapeAnchor {
+            let marker = |(column, row)| CellMarker {
                 column,
                 row,
-                column_offset: XlsxEmu(0),
-                row_offset: XlsxEmu(0),
+                column_offset: Emu(0),
+                row_offset: Emu(0),
             };
-            XlsxShapeAnchor::TwoCell {
+            ShapeAnchor::TwoCell {
                 from: marker(from),
                 to: marker(to),
-                edit_as: XlsxEditAs::TwoCell,
+                edit_as: EditAs::TwoCell,
             }
         }
 
-        let valid = XlsxShapeSpec::shape("Target", anchor((0, 0), (2, 2)), Preset::Rect, "target");
-        let invalid = XlsxShapeSpec::shape("Descending", anchor((2, 2), (1, 1)), Preset::Rect, "");
+        let valid = ShapeSpec::shape("Target", anchor((0, 0), (2, 2)), Preset::Rect, "target");
+        let invalid = ShapeSpec::shape("Descending", anchor((2, 2), (1, 1)), Preset::Rect, "");
         let mut sheet = MutableXlsbWorksheet::new("Shapes");
         assert!(sheet.add_shape(invalid).is_err());
         assert!(sheet.shapes().is_empty());
@@ -3862,23 +3856,20 @@ mod tests {
         assert!(sheet.shapes().is_empty());
         sheet.add_shape(valid.clone()).unwrap();
         sheet
-            .add_group(
-                XlsxGroupSpec::new("Group", anchor((3, 3), (6, 6))).with_child(
-                    XlsxShapeSpec::shape("Nested", anchor((3, 3), (4, 4)), Preset::Ellipse, "")
-                        .into(),
-                ),
-            )
+            .add_group(GroupSpec::new("Group", anchor((3, 3), (6, 6))).with_child(
+                ShapeSpec::shape("Nested", anchor((3, 3), (4, 4)), Preset::Ellipse, "").into(),
+            ))
             .unwrap();
         sheet
-            .add_connection(XlsxConnectionShapeSpec::new(
+            .add_connection(ConnectionShapeSpec::new(
                 "Dangling",
                 anchor((1, 1), (2, 2)),
                 Preset::StraightConnector1,
-                XlsxConnectionEndSpec {
+                ConnectionEndSpec {
                     shape_name: "Missing".to_string(),
                     site: 0,
                 },
-                XlsxConnectionEndSpec {
+                ConnectionEndSpec {
                     shape_name: "Target".to_string(),
                     site: 0,
                 },

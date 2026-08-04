@@ -66,14 +66,13 @@ pub use crate::xlsb::external_link::{
     ValueMatrix,
 };
 pub use crate::xlsx::writer::{
-    Geometry, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
-    XlsxShapeSpec,
+    ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, Geometry, GroupSpec, ShapeSpec,
 };
 pub use crate::xlsx::{
-    ChartAnchor, Columns, Coordinate32, Preset, TextSize, WorksheetChart, XlsxCellMarker,
-    XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor,
-    XlsxShapeBodyProperties, XlsxShapeParagraph, XlsxShapeRun, XlsxTextAutofit, XlsxTextDirection,
-    XlsxTextInsets, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap,
+    BodyProperties, CellMarker, ChartAnchor, Columns, Coordinate32, EditAs, Emu, EmuExtent,
+    EmuOffset, GroupTransform, Paragraph, Preset, Run, ShapeAnchor, TextInsets, TextSize,
+    WorksheetChart, XlsxTextAutofit, XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor,
+    XlsxTextWrap,
 };
 pub use chartsheet::MutableXlsbChartSheet;
 pub use litchi_xlsb::pivot_view::Part;

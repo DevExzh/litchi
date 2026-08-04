@@ -15,9 +15,7 @@ use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
 use crate::xlsx::styles::Rgb;
 use crate::xlsx::table::Table;
 use crate::xlsx::views::{SheetPane, SheetSelection, SheetView};
-use crate::xlsx::writer::shape::{
-    ShapeEmitter, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
-};
+use crate::xlsx::writer::shape::{ConnectionShapeSpec, GroupSpec, ShapeEmitter, ShapeSpec};
 /// Writer module for creating and modifying Excel worksheets.
 use litchi_core::sheet::{CellValue, Result as SheetResult};
 use litchi_core::{id::generate_guid_braced, xml::escape::escape_xml};
@@ -466,11 +464,11 @@ pub struct MutableWorksheet {
     /// Images embedded in the worksheet
     images: Vec<Image>,
     /// DrawingML shapes and text boxes authored for the worksheet
-    shapes: Vec<XlsxShapeSpec>,
+    shapes: Vec<ShapeSpec>,
     /// DrawingML shape groups authored for the worksheet
-    groups: Vec<XlsxGroupSpec>,
+    groups: Vec<GroupSpec>,
     /// DrawingML connection shapes authored for the worksheet
-    connections: Vec<XlsxConnectionShapeSpec>,
+    connections: Vec<ConnectionShapeSpec>,
     /// Row outline levels (row -> level)
     row_outline_levels: HashMap<u32, u8>,
     /// Column outline levels (col -> level)
@@ -1600,7 +1598,7 @@ impl MutableWorksheet {
     /// The spec is validated against worksheet bounds and module limits;
     /// shapes coexist with images and charts in the same drawing part and are
     /// readable back through `Workbook::shapes_on_sheet`.
-    pub fn add_shape(&mut self, shape: XlsxShapeSpec) -> SheetResult<()> {
+    pub fn add_shape(&mut self, shape: ShapeSpec) -> SheetResult<()> {
         shape.validate(self.shapes.len())?;
         self.shapes.push(shape);
         self.modified = true;
@@ -1614,20 +1612,20 @@ impl MutableWorksheet {
     pub fn add_text_box(
         &mut self,
         name: &str,
-        anchor: crate::xlsx::XlsxShapeAnchor,
+        anchor: crate::xlsx::ShapeAnchor,
         preset: crate::xlsx::Preset,
         text: &str,
     ) -> SheetResult<()> {
-        self.add_shape(XlsxShapeSpec::text_box(name, anchor, preset, text))
+        self.add_shape(ShapeSpec::text_box(name, anchor, preset, text))
     }
 
     /// Get all authored shapes in the worksheet.
-    pub fn shapes(&self) -> &[XlsxShapeSpec] {
+    pub fn shapes(&self) -> &[ShapeSpec] {
         &self.shapes
     }
 
     /// Remove the authored shape at `index`, returning it.
-    pub fn remove_shape(&mut self, index: usize) -> SheetResult<XlsxShapeSpec> {
+    pub fn remove_shape(&mut self, index: usize) -> SheetResult<ShapeSpec> {
         if index >= self.shapes.len() {
             return Err(format!(
                 "shape index {index} out of bounds ({} shapes)",
@@ -1649,7 +1647,7 @@ impl MutableWorksheet {
     ///
     /// Group children may be text boxes, plain shapes, nested groups, and
     /// connection shapes; anchors of children are ignored inside the group.
-    pub fn add_group(&mut self, group: XlsxGroupSpec) -> SheetResult<()> {
+    pub fn add_group(&mut self, group: GroupSpec) -> SheetResult<()> {
         group.validate(self.drawing_object_count())?;
         self.groups.push(group);
         self.modified = true;
@@ -1657,12 +1655,12 @@ impl MutableWorksheet {
     }
 
     /// Get all authored shape groups in the worksheet.
-    pub fn groups(&self) -> &[XlsxGroupSpec] {
+    pub fn groups(&self) -> &[GroupSpec] {
         &self.groups
     }
 
     /// Remove the authored group at `index`, returning it.
-    pub fn remove_group(&mut self, index: usize) -> SheetResult<XlsxGroupSpec> {
+    pub fn remove_group(&mut self, index: usize) -> SheetResult<GroupSpec> {
         if index >= self.groups.len() {
             return Err(format!(
                 "group index {index} out of bounds ({} groups)",
@@ -1679,7 +1677,7 @@ impl MutableWorksheet {
     /// The start/end sites reference other authored shapes by name; the
     /// references are resolved to drawing object IDs when the drawing XML is
     /// generated, and unknown names fail serialization.
-    pub fn add_connection(&mut self, connection: XlsxConnectionShapeSpec) -> SheetResult<()> {
+    pub fn add_connection(&mut self, connection: ConnectionShapeSpec) -> SheetResult<()> {
         connection.validate(self.drawing_object_count())?;
         self.connections.push(connection);
         self.modified = true;
@@ -1687,12 +1685,12 @@ impl MutableWorksheet {
     }
 
     /// Get all authored connection shapes in the worksheet.
-    pub fn connections(&self) -> &[XlsxConnectionShapeSpec] {
+    pub fn connections(&self) -> &[ConnectionShapeSpec] {
         &self.connections
     }
 
     /// Remove the authored connection shape at `index`, returning it.
-    pub fn remove_connection(&mut self, index: usize) -> SheetResult<XlsxConnectionShapeSpec> {
+    pub fn remove_connection(&mut self, index: usize) -> SheetResult<ConnectionShapeSpec> {
         if index >= self.connections.len() {
             return Err(format!(
                 "connection index {index} out of bounds ({} connections)",

@@ -196,13 +196,12 @@ pub use printer_settings::{
     write_worksheet_printer_settings_reference,
 };
 pub use shapes::{
-    Columns, Coordinate32, Geometry, TextSize, XlsxAnchoredObject, XlsxCellMarker, XlsxClientData,
-    XlsxConnectionShape, XlsxDrawingObject, XlsxDrawingOleObject, XlsxEditAs, XlsxEditAsError,
-    XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShape, XlsxShapeAnchor,
-    XlsxShapeBodyProperties, XlsxShapeConnectionEnd, XlsxShapeGroup, XlsxShapeNonVisual,
-    XlsxShapeParagraph, XlsxShapeRun, XlsxShapeTextBody, XlsxTextAutofit, XlsxTextDirection,
-    XlsxTextInsets, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap, XlsxWorksheetShapes,
-    load_shapes, load_worksheet_shapes, parse_drawing_shapes,
+    AnchoredObject, BodyProperties, CellMarker, ClientData, Columns, ConnectionEnd,
+    ConnectionShape, Coordinate32, DrawingObject, DrawingOleObject, EditAs, EditAsError, Emu,
+    EmuExtent, EmuOffset, Geometry, Group, GroupTransform, NonVisual, Paragraph, Run, Shape,
+    ShapeAnchor, TextBody, TextInsets, TextSize, WorksheetShapes, XlsxTextAutofit,
+    XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap, load_shapes,
+    load_worksheet_shapes, parse_drawing_shapes,
 };
 pub use shared_strings::SharedStrings;
 pub use sheet_format::{WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties};
@@ -295,12 +294,11 @@ pub use pivot_chart::{
 // Re-export writer types
 pub use writer::{
     AutoFilter as WriterAutoFilter, CellComment as WriterCellComment, ConditionalFormat,
-    ConditionalFormatType, DefinedNameBuiltIn, FreezePanes, HeaderFooter,
-    Hyperlink as WriterHyperlink, Image, MutableSharedStrings, MutableWorkbookData,
-    MutableWorksheet, NamedRange, PageBreak as WriterPageBreak,
-    PageSetupProperties as WriterPageSetupProperties, RichTextRun, SheetProtection, StylesBuilder,
-    WorkbookProtection, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec,
-    XlsxGroupSpec, XlsxShapeSpec,
+    ConditionalFormatType, ConnectionEndSpec, ConnectionShapeSpec, DefinedNameBuiltIn,
+    DrawingObjectSpec, FreezePanes, GroupSpec, HeaderFooter, Hyperlink as WriterHyperlink, Image,
+    MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
+    PageBreak as WriterPageBreak, PageSetupProperties as WriterPageSetupProperties, RichTextRun,
+    ShapeSpec, SheetProtection, StylesBuilder, WorkbookProtection,
 };
 // Re-export host package CRUD; semantic values remain under the canonical
 // `xlsx::threaded_comments` owner facade.

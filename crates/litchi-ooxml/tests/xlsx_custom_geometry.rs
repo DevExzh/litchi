@@ -6,10 +6,9 @@ use litchi_ooxml::xlsx::shape_geometry::{
     AdjustHandle, AdjustValue, ConnectionSite, CustomGeometry, Formula, Guide, Path, PathCommand,
     PathFillMode, Point, PolarAdjustHandle, Rectangle, XyAdjustHandle,
 };
-use litchi_ooxml::xlsx::writer::XlsxShapeSpec;
+use litchi_ooxml::xlsx::writer::ShapeSpec;
 use litchi_ooxml::xlsx::{
-    Geometry, Workbook, XlsxCellMarker, XlsxDrawingObject, XlsxEditAs, XlsxEmu, XlsxShapeAnchor,
-    parse_drawing_shapes,
+    CellMarker, DrawingObject, EditAs, Emu, Geometry, ShapeAnchor, Workbook, parse_drawing_shapes,
 };
 use litchi_opc::{OpcPackage, PackURI, constants::relationship_type as rt};
 
@@ -36,20 +35,20 @@ fn value(value: i64) -> AdjustValue {
     AdjustValue::Value(value)
 }
 
-fn marker(column: u32, row: u32) -> XlsxCellMarker {
-    XlsxCellMarker {
+fn marker(column: u32, row: u32) -> CellMarker {
+    CellMarker {
         column,
-        column_offset: XlsxEmu(0),
+        column_offset: Emu(0),
         row,
-        row_offset: XlsxEmu(0),
+        row_offset: Emu(0),
     }
 }
 
-fn two_cell() -> XlsxShapeAnchor {
-    XlsxShapeAnchor::TwoCell {
+fn two_cell() -> ShapeAnchor {
+    ShapeAnchor::TwoCell {
         from: marker(1, 1),
         to: marker(6, 12),
-        edit_as: XlsxEditAs::TwoCell,
+        edit_as: EditAs::TwoCell,
     }
 }
 
@@ -132,10 +131,10 @@ fn full_geometry() -> CustomGeometry {
     }
 }
 
-fn parse_single_shape(xml: &str) -> litchi_ooxml::xlsx::XlsxShape {
+fn parse_single_shape(xml: &str) -> litchi_ooxml::xlsx::Shape {
     let objects = parse_drawing_shapes(xml).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
-    let XlsxDrawingObject::Shape(shape) = objects.into_iter().next().unwrap().object else {
+    let DrawingObject::Shape(shape) = objects.into_iter().next().unwrap().object else {
         panic!("expected a shape");
     };
     shape
@@ -291,7 +290,7 @@ fn schema_valid_geometry_guide_tokens_are_canonicalized_without_rejection() {
 #[test]
 fn authored_geometry_round_trips_through_the_parser() {
     let geometry = full_geometry();
-    let mut spec = XlsxShapeSpec::custom("Wave", two_cell(), geometry.clone(), "wave text");
+    let mut spec = ShapeSpec::custom("Wave", two_cell(), geometry.clone(), "wave text");
     spec.description = Some("custom wave".to_string());
 
     let mut workbook = Workbook::create().unwrap();
@@ -314,7 +313,7 @@ fn reparsed_geometry_serializes_identically() {
     let mut workbook = Workbook::create().unwrap();
     let worksheet = workbook.worksheet_mut(0).unwrap();
     worksheet
-        .add_shape(XlsxShapeSpec::custom("G", two_cell(), geometry, ""))
+        .add_shape(ShapeSpec::custom("G", two_cell(), geometry, ""))
         .unwrap();
     let first = worksheet.generate_drawing_xml().unwrap().unwrap();
 
@@ -326,7 +325,7 @@ fn reparsed_geometry_serializes_identically() {
     let mut workbook = Workbook::create().unwrap();
     let worksheet = workbook.worksheet_mut(0).unwrap();
     worksheet
-        .add_shape(XlsxShapeSpec::custom("G", two_cell(), reparsed, ""))
+        .add_shape(ShapeSpec::custom("G", two_cell(), reparsed, ""))
         .unwrap();
     let second = worksheet.generate_drawing_xml().unwrap().unwrap();
     assert_eq!(first, second);
@@ -343,7 +342,7 @@ fn authors_workbook_with_custom_geometry_shape() {
         let worksheet = workbook.worksheet_mut(0).unwrap();
         sheet_name = worksheet.name().to_string();
         worksheet
-            .add_shape(XlsxShapeSpec::custom(
+            .add_shape(ShapeSpec::custom(
                 "Wave",
                 two_cell(),
                 geometry.clone(),
@@ -376,7 +375,7 @@ fn authors_workbook_with_custom_geometry_shape() {
     let workbook = Workbook::open(&path).unwrap();
     let inventory = workbook.shapes_on_sheet(&sheet_name).unwrap();
     assert_eq!(inventory.objects.len(), 1);
-    let XlsxDrawingObject::Shape(shape) = &inventory.objects[0].object else {
+    let DrawingObject::Shape(shape) = &inventory.objects[0].object else {
         panic!("expected a shape");
     };
     assert_eq!(shape.non_visual.name.as_deref(), Some("Wave"));
@@ -390,7 +389,7 @@ fn preset_shapes_still_author_preset_geometry() {
     let mut workbook = Workbook::create().unwrap();
     let worksheet = workbook.worksheet_mut(0).unwrap();
     worksheet
-        .add_shape(XlsxShapeSpec::shape(
+        .add_shape(ShapeSpec::shape(
             "Plain",
             two_cell(),
             litchi_ooxml::xlsx::Preset::Ellipse,
@@ -409,18 +408,18 @@ fn validation_rejects_invalid_or_ambiguous_authored_geometry() {
 
     // The schema always requires a path list element; authored geometry
     // must also draw at least one path.
-    let empty = XlsxShapeSpec::custom("Empty", two_cell(), CustomGeometry::new(), "");
+    let empty = ShapeSpec::custom("Empty", two_cell(), CustomGeometry::new(), "");
     assert!(worksheet.add_shape(empty).is_err());
 
     let numeric_guide = CustomGeometry::new()
         .with_adjust_value(Guide::new("123", Formula::literal(1)))
         .with_path(Path::new(0, 0).with_command(PathCommand::MoveTo(Point::new(0, 0))));
-    let spec = XlsxShapeSpec::custom("Numeric guide", two_cell(), numeric_guide, "");
+    let spec = ShapeSpec::custom("Numeric guide", two_cell(), numeric_guide, "");
     assert!(worksheet.add_shape(spec).is_err());
 
     let mut negative_path = full_geometry();
     negative_path.paths[0].width = -1;
-    let spec = XlsxShapeSpec::custom("Negative", two_cell(), negative_path, "");
+    let spec = ShapeSpec::custom("Negative", two_cell(), negative_path, "");
     assert!(worksheet.add_shape(spec).is_err());
 
     assert!(worksheet.shapes().is_empty());
@@ -490,7 +489,7 @@ fn empty_path_list_parses_but_cannot_be_authored() {
     // Re-authoring it is rejected: authored geometry must draw something.
     let mut workbook = Workbook::create().unwrap();
     let worksheet = workbook.worksheet_mut(0).unwrap();
-    let spec = XlsxShapeSpec::custom("Empty", two_cell(), geometry, "");
+    let spec = ShapeSpec::custom("Empty", two_cell(), geometry, "");
     assert!(worksheet.add_shape(spec).is_err());
 }
 
@@ -510,7 +509,7 @@ fn custom_geometry_on_unknown_containers_is_skipped_inertly() {
     );
     let objects = parse_drawing_shapes(&xml).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
-    let XlsxDrawingObject::ConnectionShape(connection) = &objects[0].object else {
+    let DrawingObject::ConnectionShape(connection) = &objects[0].object else {
         panic!("expected a connection shape");
     };
     assert_eq!(connection.non_visual.name.as_deref(), Some("Line"));

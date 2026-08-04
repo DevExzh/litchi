@@ -4,28 +4,28 @@
 //! cargo run -p litchi --example xlsx_typed_page_and_shapes --features ooxml -- output.xlsx
 //! ```
 
-use litchi::ooxml::xlsx::writer::{ConditionalFormatType, IconSet, Operator, XlsxShapeSpec};
+use litchi::ooxml::xlsx::writer::{ConditionalFormatType, IconSet, Operator, ShapeSpec};
 use litchi::ooxml::xlsx::{
-    CellFont, CellFormat, Preset, Rgb, Scheme, Underline, Workbook, XlsxCellMarker, XlsxEditAs,
-    XlsxEmu, XlsxShapeAnchor,
+    CellFont, CellFormat, CellMarker, EditAs, Emu, Preset, Rgb, Scheme, ShapeAnchor, Underline,
+    Workbook,
     page_setup::{Fit, Orientation, Paper, Setup},
 };
 use std::path::PathBuf;
 
-fn marker(column: u32, row: u32) -> XlsxCellMarker {
-    XlsxCellMarker {
+fn marker(column: u32, row: u32) -> CellMarker {
+    CellMarker {
         column,
-        column_offset: XlsxEmu(0),
+        column_offset: Emu(0),
         row,
-        row_offset: XlsxEmu(0),
+        row_offset: Emu(0),
     }
 }
 
-fn anchor(from: (u32, u32), to: (u32, u32)) -> XlsxShapeAnchor {
-    XlsxShapeAnchor::TwoCell {
+fn anchor(from: (u32, u32), to: (u32, u32)) -> ShapeAnchor {
+    ShapeAnchor::TwoCell {
         from: marker(from.0, from.1),
         to: marker(to.0, to.1),
-        edit_as: XlsxEditAs::TwoCell,
+        edit_as: EditAs::TwoCell,
     }
 }
 
@@ -93,13 +93,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     });
     sheet.set_fit(Fit::ONE, Fit::NONE);
 
-    sheet.add_shape(XlsxShapeSpec::text_box(
+    sheet.add_shape(ShapeSpec::text_box(
         "Summary",
         anchor((0, 8), (4, 14)),
         Preset::RoundRect,
         "Closed preset domain\nNo string tokens",
     ))?;
-    sheet.add_shape(XlsxShapeSpec::shape(
+    sheet.add_shape(ShapeSpec::shape(
         "Status",
         anchor((5, 8), (9, 14)),
         Preset::Ellipse,
