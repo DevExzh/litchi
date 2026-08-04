@@ -1,6 +1,6 @@
 use super::{
-    FORM, MAX_RAW, OFFICE, OdfForm, OdfFormControl, OdfFormNode, OdfFormPart, OdfFormProperty,
-    OdfFormPropertyValue, OdfFormScalarValue, parse_form_parts,
+    FORM, Form, FormControl, FormNode, FormPart, FormProperty, FormPropertyValue, FormScalarValue,
+    MAX_RAW, OFFICE, parse_form_parts,
 };
 use crate::expanded_attributes;
 use litchi_core::{Error, Result};
@@ -12,12 +12,12 @@ const MAX_PROPERTY_BYTES: usize = 64 * 1024;
 
 /// A minimal standard form containing only typed custom properties.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfPropertyForm {
+pub struct PropertyForm {
     pub name: String,
-    pub properties: Vec<OdfFormProperty>,
+    pub properties: Vec<FormProperty>,
 }
 
-impl OdfPropertyForm {
+impl PropertyForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -25,7 +25,7 @@ impl OdfPropertyForm {
         }
     }
 
-    pub fn add_property(&mut self, property: OdfFormProperty) -> Result<&mut Self> {
+    pub fn add_property(&mut self, property: FormProperty) -> Result<&mut Self> {
         property.to_xml_fragment()?;
         if self
             .properties
@@ -48,8 +48,8 @@ impl OdfPropertyForm {
     }
 }
 
-pub fn form_properties(xml: &str) -> Result<Vec<OdfFormProperty>> {
-    let forms = parse_form_parts(&[(xml, OdfFormPart::Content)])?;
+pub fn form_properties(xml: &str) -> Result<Vec<FormProperty>> {
+    let forms = parse_form_parts(&[(xml, FormPart::Content)])?;
     let mut result = Vec::new();
     for group in forms.groups {
         for form in group.forms {
@@ -59,36 +59,36 @@ pub fn form_properties(xml: &str) -> Result<Vec<OdfFormProperty>> {
     Ok(result)
 }
 
-fn collect_form_properties(form: OdfForm, result: &mut Vec<OdfFormProperty>) {
+fn collect_form_properties(form: Form, result: &mut Vec<FormProperty>) {
     result.extend(form.properties);
     for node in form.children {
         match node {
-            OdfFormNode::Form(form) => collect_form_properties(form, result),
-            OdfFormNode::Control(control) => collect_control_properties(control, result),
+            FormNode::Form(form) => collect_form_properties(form, result),
+            FormNode::Control(control) => collect_control_properties(control, result),
         }
     }
 }
 
-fn collect_control_properties(control: OdfFormControl, result: &mut Vec<OdfFormProperty>) {
+fn collect_control_properties(control: FormControl, result: &mut Vec<FormProperty>) {
     result.extend(control.properties);
     for node in control.children {
-        if let OdfFormNode::Control(control) = node {
+        if let FormNode::Control(control) = node {
             collect_control_properties(control, result);
         }
     }
 }
 
-pub(crate) fn property_xml(property: &OdfFormProperty) -> Result<String> {
+pub(crate) fn property_xml(property: &FormProperty) -> Result<String> {
     validate_string("form property name", &property.name)?;
     let name = escape(&property.name);
     match &property.value {
-        OdfFormPropertyValue::Scalar(value) => {
+        FormPropertyValue::Scalar(value) => {
             let attributes = scalar_attributes(value, true)?;
             Ok(format!(
                 r#"<form:property form:property-name="{name}"{attributes}/>"#
             ))
         },
-        OdfFormPropertyValue::List { value_type, values } => {
+        FormPropertyValue::List { value_type, values } => {
             let value_type = value_type.as_deref().ok_or_else(|| {
                 Error::InvalidFormat("list form property requires office:value-type".to_string())
             })?;
@@ -114,7 +114,7 @@ pub(crate) fn property_xml(property: &OdfFormProperty) -> Result<String> {
     }
 }
 
-fn properties_container_xml(properties: &[OdfFormProperty]) -> Result<String> {
+fn properties_container_xml(properties: &[FormProperty]) -> Result<String> {
     if properties.is_empty() {
         return Ok(String::new());
     }
@@ -130,24 +130,24 @@ fn properties_container_xml(properties: &[OdfFormProperty]) -> Result<String> {
     Ok(xml)
 }
 
-fn scalar_type(value: &OdfFormScalarValue) -> Result<&str> {
+fn scalar_type(value: &FormScalarValue) -> Result<&str> {
     Ok(match value {
-        OdfFormScalarValue::Boolean(_) => "boolean",
-        OdfFormScalarValue::Number { value_type, .. } => {
+        FormScalarValue::Boolean(_) => "boolean",
+        FormScalarValue::Number { value_type, .. } => {
             validate_value_type(value_type)?;
             value_type
         },
-        OdfFormScalarValue::Text(_) => "string",
-        OdfFormScalarValue::Date(_) => "date",
-        OdfFormScalarValue::Time(_) => "time",
-        OdfFormScalarValue::Void => "void",
-        OdfFormScalarValue::Other { .. } => {
+        FormScalarValue::Text(_) => "string",
+        FormScalarValue::Date(_) => "date",
+        FormScalarValue::Time(_) => "time",
+        FormScalarValue::Void => "void",
+        FormScalarValue::Other { .. } => {
             return invalid("unsupported custom form property value type");
         },
     })
 }
 
-fn scalar_attributes(value: &OdfFormScalarValue, include_type: bool) -> Result<String> {
+fn scalar_attributes(value: &FormScalarValue, include_type: bool) -> Result<String> {
     let value_type = scalar_type(value)?;
     let mut result = if include_type {
         format!(r#" office:value-type="{value_type}""#)
@@ -155,12 +155,12 @@ fn scalar_attributes(value: &OdfFormScalarValue, include_type: bool) -> Result<S
         String::new()
     };
     match value {
-        OdfFormScalarValue::Boolean(value) => result.push_str(if *value {
+        FormScalarValue::Boolean(value) => result.push_str(if *value {
             r#" office:boolean-value="true""#
         } else {
             r#" office:boolean-value="false""#
         }),
-        OdfFormScalarValue::Number {
+        FormScalarValue::Number {
             value_type,
             lexical,
             currency,
@@ -184,20 +184,20 @@ fn scalar_attributes(value: &OdfFormScalarValue, include_type: bool) -> Result<S
                 return invalid("office:currency is valid only for currency form properties");
             }
         },
-        OdfFormScalarValue::Text(value) => {
+        FormScalarValue::Text(value) => {
             validate_string("form string property", value)?;
             result.push_str(&format!(r#" office:string-value="{}""#, escape(value)));
         },
-        OdfFormScalarValue::Date(value) => {
+        FormScalarValue::Date(value) => {
             validate_temporal("date", value)?;
             result.push_str(&format!(r#" office:date-value="{}""#, escape(value)));
         },
-        OdfFormScalarValue::Time(value) => {
+        FormScalarValue::Time(value) => {
             validate_temporal("time", value)?;
             result.push_str(&format!(r#" office:time-value="{}""#, escape(value)));
         },
-        OdfFormScalarValue::Void => {},
-        OdfFormScalarValue::Other { .. } => unreachable!(),
+        FormScalarValue::Void => {},
+        FormScalarValue::Other { .. } => unreachable!(),
     }
     Ok(result)
 }
@@ -232,7 +232,7 @@ fn validate_temporal(kind: &str, value: &str) -> Result<()> {
 pub fn insert_form_property_xml(
     xml: &str,
     owner_index: usize,
-    property: &OdfFormProperty,
+    property: &FormProperty,
 ) -> Result<String> {
     let _ = form_properties(xml)?;
     let scan = scan(xml)?;
@@ -278,7 +278,7 @@ pub fn insert_form_property_xml(
 pub fn replace_form_property_xml(
     xml: &str,
     property_index: usize,
-    replacement: &OdfFormProperty,
+    replacement: &FormProperty,
 ) -> Result<String> {
     let _ = form_properties(xml)?;
     let scan = scan(xml)?;
@@ -391,7 +391,7 @@ fn scan(xml: &str) -> Result<Scan> {
                 let mut property = None;
                 if form
                     && (local == b"form"
-                        || super::OdfFormControlKind::parse(std::str::from_utf8(local).map_err(
+                        || super::FormControlKind::parse(std::str::from_utf8(local).map_err(
                             |_| Error::InvalidFormat("invalid form element name".to_string()),
                         )?)
                         .is_some())
@@ -467,7 +467,7 @@ fn scan(xml: &str) -> Result<Scan> {
                 let local = local_name.as_ref();
                 if form
                     && (local == b"form"
-                        || super::OdfFormControlKind::parse(std::str::from_utf8(local).map_err(
+                        || super::FormControlKind::parse(std::str::from_utf8(local).map_err(
                             |_| Error::InvalidFormat("invalid form element name".to_string()),
                         )?)
                         .is_some())
@@ -688,23 +688,23 @@ mod tests {
     #[test]
     fn canonical_scalar_and_list_properties() {
         assert_eq!(
-            OdfFormProperty::boolean("Enabled", true)
+            FormProperty::boolean("Enabled", true)
                 .to_xml_fragment()
                 .unwrap(),
             r#"<form:property form:property-name="Enabled" office:value-type="boolean" office:boolean-value="true"/>"#
         );
         assert_eq!(
-            OdfFormProperty::text("Label", "A<&\"")
+            FormProperty::text("Label", "A<&\"")
                 .to_xml_fragment()
                 .unwrap(),
             r#"<form:property form:property-name="Label" office:value-type="string" office:string-value="A&lt;&amp;&quot;"/>"#
         );
-        let list = OdfFormProperty::list(
+        let list = FormProperty::list(
             "Choices",
             "string",
             vec![
-                OdfFormScalarValue::Text("A".into()),
-                OdfFormScalarValue::Text("B".into()),
+                FormScalarValue::Text("A".into()),
+                FormScalarValue::Text("B".into()),
             ],
         );
         assert_eq!(
@@ -719,11 +719,10 @@ mod tests {
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:f="{FORM}" xmlns:office="{OFFICE}" xmlns:form="{FORM}"><o:body><o:text><o:forms><f:form f:name="F"><!--keep--><f:properties><f:property f:property-name="Old" o:value-type="string" o:string-value="x"/></f:properties><f:text f:name="C"/></f:form></o:forms></o:text></o:body></o:document-content>"#
         );
         let inserted =
-            insert_form_property_xml(&source, 1, &OdfFormProperty::boolean("Enabled", true))
-                .unwrap();
+            insert_form_property_xml(&source, 1, &FormProperty::boolean("Enabled", true)).unwrap();
         assert!(inserted.contains(r#"<f:text f:name="C"><form:properties><form:property form:property-name="Enabled" office:value-type="boolean" office:boolean-value="true"/></form:properties></f:text>"#));
         let replaced =
-            replace_form_property_xml(&inserted, 0, &OdfFormProperty::text("New", "y")).unwrap();
+            replace_form_property_xml(&inserted, 0, &FormProperty::text("New", "y")).unwrap();
         assert!(replaced.contains("<!--keep--><f:properties>"));
         let removed = remove_form_property_xml(&replaced, 0).unwrap();
         assert!(!removed.contains("<f:properties>"));
@@ -733,23 +732,23 @@ mod tests {
     #[test]
     fn hostile_properties_are_rejected() {
         for property in [
-            OdfFormProperty::number("N", "float", "NaN", None),
-            OdfFormProperty::number("N", "currency", "1", None),
-            OdfFormProperty {
+            FormProperty::number("N", "float", "NaN", None),
+            FormProperty::number("N", "currency", "1", None),
+            FormProperty {
                 name: "X".into(),
-                value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Other {
+                value: FormPropertyValue::Scalar(FormScalarValue::Other {
                     value_type: "object".into(),
                     lexical: None,
                 }),
             },
-            OdfFormProperty::list("L", "string", Vec::new()),
+            FormProperty::list("L", "string", Vec::new()),
         ] {
             assert!(property.to_xml_fragment().is_err());
         }
         let hostile = format!(
             r#"<o:forms xmlns:o="{OFFICE}" xmlns:f="{FORM}" xmlns:u="urn:hostile"><f:form><f:properties><f:property f:property-name="X" o:value-type="string" o:string-value="x" u:extra="1"/></f:properties></f:form></o:forms>"#
         );
-        assert!(insert_form_property_xml(&hostile, 0, &OdfFormProperty::text("Y", "y")).is_err());
+        assert!(insert_form_property_xml(&hostile, 0, &FormProperty::text("Y", "y")).is_err());
     }
 
     #[test]
@@ -762,7 +761,7 @@ mod tests {
         let updated = replace_form_property_xml(
             libreoffice,
             0,
-            &OdfFormProperty::boolean("PropertyChangeNotificationEnabled", false),
+            &FormProperty::boolean("PropertyChangeNotificationEnabled", false),
         )
         .unwrap();
         assert!(updated.contains(r#"office:boolean-value="false""#));

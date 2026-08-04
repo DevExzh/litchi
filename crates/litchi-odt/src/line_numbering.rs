@@ -29,7 +29,7 @@ enum NamespaceKind {
 
 /// Numbering format for line numbers.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfLineNumberFormat {
+pub enum LineNumberFormat {
     Empty,
     Arabic,
     LowerRoman,
@@ -39,7 +39,7 @@ pub enum OdfLineNumberFormat {
     Custom(String),
 }
 
-impl OdfLineNumberFormat {
+impl LineNumberFormat {
     pub fn parse(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_VALUE_BYTES {
@@ -77,14 +77,14 @@ impl OdfLineNumberFormat {
 
 /// Placement of line numbers relative to the text area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfLineNumberPosition {
+pub enum LineNumberPosition {
     Left,
     Right,
     Inner,
     Outer,
 }
 
-impl OdfLineNumberPosition {
+impl LineNumberPosition {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "left" => Ok(Self::Left),
@@ -107,9 +107,9 @@ impl OdfLineNumberPosition {
 
 /// A validated ODF nonnegative length.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfNonNegativeLength(String);
+pub struct NonNegativeLength(String);
 
-impl OdfNonNegativeLength {
+impl NonNegativeLength {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_nonnegative_length(&value)?;
@@ -123,34 +123,34 @@ impl OdfNonNegativeLength {
 
 /// Optional separator emitted after every configured number of lines.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OdfLineNumberingSeparator {
+pub struct LineNumberingSeparator {
     pub increment: Option<u64>,
     pub text: String,
 }
 
 /// One standard `text:linenumbering-configuration` declaration.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OdfLineNumberingConfiguration {
+pub struct LineNumberingConfiguration {
     pub number_lines: Option<bool>,
-    pub number_format: Option<OdfLineNumberFormat>,
+    pub number_format: Option<LineNumberFormat>,
     pub letter_sync: Option<bool>,
     pub style_name: Option<String>,
     pub increment: Option<u64>,
-    pub number_position: Option<OdfLineNumberPosition>,
-    pub offset: Option<OdfNonNegativeLength>,
+    pub number_position: Option<LineNumberPosition>,
+    pub offset: Option<NonNegativeLength>,
     pub count_empty_lines: Option<bool>,
     pub count_in_text_boxes: Option<bool>,
     pub restart_on_page: Option<bool>,
-    pub separator: Option<OdfLineNumberingSeparator>,
+    pub separator: Option<LineNumberingSeparator>,
 }
 
-impl OdfLineNumberingConfiguration {
+impl LineNumberingConfiguration {
     pub fn validate(&self) -> Result<()> {
         if self.letter_sync.is_some()
             && !self
                 .number_format
                 .as_ref()
-                .is_some_and(OdfLineNumberFormat::permits_letter_sync)
+                .is_some_and(LineNumberFormat::permits_letter_sync)
         {
             return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
         }
@@ -182,7 +182,7 @@ impl OdfLineNumberingConfiguration {
         write_attr(
             &mut output,
             "style:num-format",
-            self.number_format.as_ref().map(OdfLineNumberFormat::as_str),
+            self.number_format.as_ref().map(LineNumberFormat::as_str),
         );
         write_bool_attr(&mut output, "style:num-letter-sync", self.letter_sync);
         write_attr(&mut output, "text:style-name", self.style_name.as_deref());
@@ -190,12 +190,12 @@ impl OdfLineNumberingConfiguration {
         write_attr(
             &mut output,
             "text:number-position",
-            self.number_position.map(OdfLineNumberPosition::as_str),
+            self.number_position.map(LineNumberPosition::as_str),
         );
         write_attr(
             &mut output,
             "text:offset",
-            self.offset.as_ref().map(OdfNonNegativeLength::as_str),
+            self.offset.as_ref().map(NonNegativeLength::as_str),
         );
         write_bool_attr(
             &mut output,
@@ -227,9 +227,7 @@ impl OdfLineNumberingConfiguration {
 }
 
 /// Parse the optional line-numbering declaration from an ODF styles document.
-pub fn parse_line_numbering_configuration(
-    xml: &str,
-) -> Result<Option<OdfLineNumberingConfiguration>> {
+pub fn parse_line_numbering_configuration(xml: &str) -> Result<Option<LineNumberingConfiguration>> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte line-numbering limit"
@@ -420,7 +418,7 @@ fn locate_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
 /// unrelated style XML.
 pub(crate) fn set_line_numbering_configuration_xml(
     xml: &str,
-    configuration: &OdfLineNumberingConfiguration,
+    configuration: &LineNumberingConfiguration,
 ) -> Result<String> {
     configuration.validate()?;
     let (target, site) = locate_configuration(xml)?;
@@ -472,7 +470,7 @@ impl OpenDocumentPackage {
     ///
     /// The declaration is presentation metadata only. It is never used to
     /// paginate a document or generate line numbers.
-    pub fn line_numbering_configuration(&self) -> Result<Option<OdfLineNumberingConfiguration>> {
+    pub fn line_numbering_configuration(&self) -> Result<Option<LineNumberingConfiguration>> {
         self.styles_xml()?
             .map_or_else(|| Ok(None), |xml| parse_line_numbering_configuration(&xml))
     }
@@ -483,7 +481,7 @@ impl FlatOpenDocument {
     ///
     /// The declaration is presentation metadata only. It is never used to
     /// paginate a document or generate line numbers.
-    pub fn line_numbering_configuration(&self) -> Result<Option<OdfLineNumberingConfiguration>> {
+    pub fn line_numbering_configuration(&self) -> Result<Option<LineNumberingConfiguration>> {
         parse_line_numbering_configuration(self.xml())
     }
 }
@@ -491,8 +489,8 @@ impl FlatOpenDocument {
 fn parse_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfLineNumberingConfiguration> {
-    let mut configuration = OdfLineNumberingConfiguration::default();
+) -> Result<LineNumberingConfiguration> {
+    let mut configuration = LineNumberingConfiguration::default();
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
@@ -514,7 +512,7 @@ fn parse_attributes(
                 configuration.number_lines = Some(parse_bool(&value, "text:number-lines")?)
             },
             (NamespaceKind::Style, b"num-format") => {
-                configuration.number_format = Some(OdfLineNumberFormat::parse(value)?)
+                configuration.number_format = Some(LineNumberFormat::parse(value)?)
             },
             (NamespaceKind::Style, b"num-letter-sync") => {
                 configuration.letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
@@ -527,10 +525,10 @@ fn parse_attributes(
                 configuration.increment = Some(parse_nonnegative_integer(&value, "text:increment")?)
             },
             (NamespaceKind::Text, b"number-position") => {
-                configuration.number_position = Some(OdfLineNumberPosition::parse(&value)?)
+                configuration.number_position = Some(LineNumberPosition::parse(&value)?)
             },
             (NamespaceKind::Text, b"offset") => {
-                configuration.offset = Some(OdfNonNegativeLength::new(value)?)
+                configuration.offset = Some(NonNegativeLength::new(value)?)
             },
             (NamespaceKind::Text, b"count-empty-lines") => {
                 configuration.count_empty_lines =
@@ -551,7 +549,7 @@ fn parse_attributes(
 
 fn parse_configuration_body(
     reader: &mut NsReader<&[u8]>,
-) -> Result<Option<OdfLineNumberingSeparator>> {
+) -> Result<Option<LineNumberingSeparator>> {
     let mut separator = None;
     let mut buffer = Vec::new();
     loop {
@@ -576,7 +574,7 @@ fn parse_configuration_body(
                 if separator.is_some() {
                     return invalid("duplicate text:linenumbering-separator");
                 }
-                separator = Some(OdfLineNumberingSeparator {
+                separator = Some(LineNumberingSeparator {
                     increment: parse_separator_increment(reader, &element)?,
                     text: String::new(),
                 });
@@ -604,7 +602,7 @@ fn parse_configuration_body(
 fn parse_separator(
     reader: &mut NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfLineNumberingSeparator> {
+) -> Result<LineNumberingSeparator> {
     let increment = parse_separator_increment(reader, element)?;
     let mut text = String::new();
     let mut buffer = Vec::new();
@@ -651,7 +649,7 @@ fn parse_separator(
         }
         buffer.clear();
     }
-    Ok(OdfLineNumberingSeparator { increment, text })
+    Ok(LineNumberingSeparator { increment, text })
 }
 
 fn parse_separator_increment(
@@ -846,11 +844,11 @@ mod tests {
         assert_eq!(configuration.number_lines, Some(true));
         assert_eq!(
             configuration.number_format,
-            Some(OdfLineNumberFormat::UpperAlpha)
+            Some(LineNumberFormat::UpperAlpha)
         );
         assert_eq!(
             configuration.number_position,
-            Some(OdfLineNumberPosition::Outer)
+            Some(LineNumberPosition::Outer)
         );
         assert_eq!(configuration.offset.as_ref().unwrap().as_str(), "0.25in");
         assert_eq!(configuration.separator.as_ref().unwrap().text, " / & ");
@@ -865,12 +863,12 @@ mod tests {
     #[test]
     fn preserves_empty_and_custom_number_formats() {
         for format in [
-            OdfLineNumberFormat::Empty,
-            OdfLineNumberFormat::Custom("一, 二, 三".to_string()),
+            LineNumberFormat::Empty,
+            LineNumberFormat::Custom("一, 二, 三".to_string()),
         ] {
-            let configuration = OdfLineNumberingConfiguration {
+            let configuration = LineNumberingConfiguration {
                 number_format: Some(format.clone()),
-                ..OdfLineNumberingConfiguration::default()
+                ..LineNumberingConfiguration::default()
             };
             let parsed =
                 parse_line_numbering_configuration(&styles(&configuration.to_xml().unwrap()))
@@ -913,18 +911,18 @@ mod tests {
         let original = styles(
             r#"<s:style s:name="Preserved"/><t:linenumbering-configuration t:number-lines="false" s:num-format="1"/>"#,
         );
-        let configuration = OdfLineNumberingConfiguration {
+        let configuration = LineNumberingConfiguration {
             number_lines: Some(true),
-            number_format: Some(OdfLineNumberFormat::LowerAlpha),
+            number_format: Some(LineNumberFormat::LowerAlpha),
             letter_sync: Some(true),
             style_name: Some("LineNumbers".to_string()),
             increment: Some(3),
-            number_position: Some(OdfLineNumberPosition::Outer),
-            offset: Some(OdfNonNegativeLength::new("0.25in").unwrap()),
+            number_position: Some(LineNumberPosition::Outer),
+            offset: Some(NonNegativeLength::new("0.25in").unwrap()),
             count_empty_lines: Some(true),
             count_in_text_boxes: Some(false),
             restart_on_page: Some(true),
-            separator: Some(OdfLineNumberingSeparator {
+            separator: Some(LineNumberingSeparator {
                 increment: Some(6),
                 text: " · ".to_string(),
             }),

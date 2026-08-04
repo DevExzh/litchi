@@ -1,6 +1,6 @@
 use litchi_odt::{
-    OdfVariableBody, OdfVariableDeclaration, OdfVariableDeclarationGroup, OdfVariableKind,
-    OdfVariablePart, OdfVariableScope, OdfVariableValueType, OpenDocumentPackage,
+    OpenDocumentPackage, VariableBody, VariableDeclaration, VariableDeclarationGroup, VariableKind,
+    VariablePart, VariableScope, VariableValueType,
 };
 mod support;
 
@@ -22,14 +22,14 @@ fn package(content: &str) -> Vec<u8> {
     )
 }
 
-fn group(name: &str) -> OdfVariableDeclarationGroup {
-    OdfVariableDeclarationGroup {
-        kind: OdfVariableKind::Simple,
-        part: OdfVariablePart::Content,
-        scope: OdfVariableScope::Body(OdfVariableBody::Text),
-        declarations: vec![OdfVariableDeclaration::Simple {
+fn group(name: &str) -> VariableDeclarationGroup {
+    VariableDeclarationGroup {
+        kind: VariableKind::Simple,
+        part: VariablePart::Content,
+        scope: VariableScope::Body(VariableBody::Text),
+        declarations: vec![VariableDeclaration::Simple {
             name: name.to_string(),
-            value_type: OdfVariableValueType::String,
+            value_type: VariableValueType::String,
         }],
     }
 }
@@ -67,9 +67,9 @@ fn mutates_packaged_declarations_and_preserves_auxiliary_parts() {
     assert_eq!(
         document
             .remove_variable_declaration_group(
-                OdfVariablePart::Content,
-                &OdfVariableScope::Body(OdfVariableBody::Text),
-                OdfVariableKind::Simple,
+                VariablePart::Content,
+                &VariableScope::Body(VariableBody::Text),
+                VariableKind::Simple,
             )
             .unwrap(),
         Some(replacement)
@@ -84,9 +84,9 @@ fn referenced_declaration_removal_is_atomic() {
     assert!(
         document
             .remove_variable_declaration_group(
-                OdfVariablePart::Content,
-                &OdfVariableScope::Body(OdfVariableBody::Text),
-                OdfVariableKind::Simple,
+                VariablePart::Content,
+                &VariableScope::Body(VariableBody::Text),
+                VariableKind::Simple,
             )
             .is_err()
     );

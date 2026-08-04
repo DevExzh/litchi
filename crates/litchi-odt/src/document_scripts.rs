@@ -24,7 +24,7 @@ const MAX_XML_DEPTH: usize = 128;
 
 /// One inert `office:script` declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfEmbeddedScript {
+pub struct EmbeddedScript {
     /// Required script language identifier.
     pub language: String,
     /// The exact inner XML payload. It is never interpreted or executed.
@@ -33,7 +33,7 @@ pub struct OdfEmbeddedScript {
 
 /// The target stored by a `script:event-listener`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfScriptBinding {
+pub enum ScriptBinding {
     /// An inert macro name. Litchi never invokes it.
     MacroName(String),
     /// An inert linked script reference. Litchi never resolves it.
@@ -42,16 +42,16 @@ pub enum OdfScriptBinding {
 
 /// One typed `script:event-listener` declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfScriptEventListener {
+pub struct ScriptEventListener {
     pub event_name: String,
     pub language: String,
-    pub binding: OdfScriptBinding,
+    pub binding: ScriptBinding,
 }
 
 /// One child of the document-level `office:event-listeners` element.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfDocumentEventListener {
-    Script(OdfScriptEventListener),
+pub enum DocumentEventListener {
+    Script(ScriptEventListener),
     /// A presentation listener preserved as inert XML for lossless round trips.
     PresentationXml(String),
 }
@@ -73,21 +73,21 @@ enum NamespaceKind {
 
 /// Semantic contents of an ODF `office:scripts` element.
 #[derive(Debug, Clone, Default)]
-pub struct OdfDocumentScripts {
-    pub scripts: Vec<OdfEmbeddedScript>,
-    pub event_listeners: Vec<OdfDocumentEventListener>,
+pub struct DocumentScripts {
+    pub scripts: Vec<EmbeddedScript>,
+    pub event_listeners: Vec<DocumentEventListener>,
     namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl PartialEq for OdfDocumentScripts {
+impl PartialEq for DocumentScripts {
     fn eq(&self, other: &Self) -> bool {
         self.scripts == other.scripts && self.event_listeners == other.event_listeners
     }
 }
 
-impl Eq for OdfDocumentScripts {}
+impl Eq for DocumentScripts {}
 
-impl OdfDocumentScripts {
+impl DocumentScripts {
     /// Validate resource limits, required values, and preserved XML fragments.
     pub fn validate(&self) -> Result<()> {
         if self.scripts.len() > MAX_SCRIPT_COUNT {
@@ -111,19 +111,19 @@ impl OdfDocumentScripts {
 
         for listener in &self.event_listeners {
             match listener {
-                OdfDocumentEventListener::Script(listener) => {
+                DocumentEventListener::Script(listener) => {
                     validate_required_value(&listener.event_name, "script:event-name")?;
                     validate_required_value(&listener.language, "script:language")?;
                     text_bytes = checked_text_bytes(text_bytes, listener.event_name.len())?;
                     text_bytes = checked_text_bytes(text_bytes, listener.language.len())?;
                     let value = match &listener.binding {
-                        OdfScriptBinding::MacroName(value) => value,
-                        OdfScriptBinding::Linked { href } => href,
+                        ScriptBinding::MacroName(value) => value,
+                        ScriptBinding::Linked { href } => href,
                     };
                     validate_required_value(value, "script event target")?;
                     text_bytes = checked_text_bytes(text_bytes, value.len())?;
                 },
-                OdfDocumentEventListener::PresentationXml(xml) => {
+                DocumentEventListener::PresentationXml(xml) => {
                     text_bytes = checked_text_bytes(text_bytes, xml.len())?;
                     validate_fragment(xml, &self.namespace_declarations)?;
                 },
@@ -184,25 +184,25 @@ impl OdfDocumentScripts {
             output.push_str("<office:event-listeners>");
             for listener in &self.event_listeners {
                 match listener {
-                    OdfDocumentEventListener::Script(listener) => {
+                    DocumentEventListener::Script(listener) => {
                         output.push_str("<script:event-listener script:event-name=\"");
                         escape_attribute(&mut output, &listener.event_name);
                         output.push_str("\" script:language=\"");
                         escape_attribute(&mut output, &listener.language);
                         match &listener.binding {
-                            OdfScriptBinding::MacroName(value) => {
+                            ScriptBinding::MacroName(value) => {
                                 output.push_str("\" script:macro-name=\"");
                                 escape_attribute(&mut output, value);
                                 output.push_str("\"/>");
                             },
-                            OdfScriptBinding::Linked { href } => {
+                            ScriptBinding::Linked { href } => {
                                 output.push_str("\" xlink:type=\"simple\" xlink:href=\"");
                                 escape_attribute(&mut output, href);
                                 output.push_str("\" xlink:actuate=\"onRequest\"/>");
                             },
                         }
                     },
-                    OdfDocumentEventListener::PresentationXml(xml) => output.push_str(xml),
+                    DocumentEventListener::PresentationXml(xml) => output.push_str(xml),
                 }
             }
             output.push_str("</office:event-listeners>");
@@ -216,22 +216,22 @@ impl OdfDocumentScripts {
             .iter()
             .map(|script| script.language.len() + script.content_xml.len())
             .chain(self.event_listeners.iter().map(|listener| match listener {
-                OdfDocumentEventListener::Script(listener) => {
+                DocumentEventListener::Script(listener) => {
                     listener.event_name.len()
                         + listener.language.len()
                         + match &listener.binding {
-                            OdfScriptBinding::MacroName(value) => value.len(),
-                            OdfScriptBinding::Linked { href } => href.len(),
+                            ScriptBinding::MacroName(value) => value.len(),
+                            ScriptBinding::Linked { href } => href.len(),
                         }
                 },
-                OdfDocumentEventListener::PresentationXml(xml) => xml.len(),
+                DocumentEventListener::PresentationXml(xml) => xml.len(),
             }))
             .sum()
     }
 }
 
 /// Parse the optional direct `office:scripts` child from an ODF XML document.
-pub fn parse_document_scripts(xml: &str) -> Result<Option<OdfDocumentScripts>> {
+pub fn parse_document_scripts(xml: &str) -> Result<Option<DocumentScripts>> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte script-inventory limit"
@@ -307,9 +307,9 @@ pub fn parse_document_scripts(xml: &str) -> Result<Option<OdfDocumentScripts>> {
                         &mut in_scope_namespaces,
                         namespace_declarations(&reader, &element)?,
                     );
-                    result = Some(OdfDocumentScripts {
+                    result = Some(DocumentScripts {
                         namespace_declarations: in_scope_namespaces,
-                        ..OdfDocumentScripts::default()
+                        ..DocumentScripts::default()
                     });
                 }
             },
@@ -335,7 +335,7 @@ fn parse_scripts_element(
     xml: &str,
     root_namespaces: &[NamespaceDeclaration],
     _content_start: usize,
-) -> Result<OdfDocumentScripts> {
+) -> Result<DocumentScripts> {
     let mut scripts = Vec::new();
     let mut event_listeners = Vec::new();
     let mut listener_container_seen = false;
@@ -368,7 +368,7 @@ fn parse_scripts_element(
                 let content_xml = capture_inner_xml(reader, xml, event_end, b"script")?;
                 text_bytes = checked_text_bytes(text_bytes, language.len())?;
                 text_bytes = checked_text_bytes(text_bytes, content_xml.len())?;
-                scripts.push(OdfEmbeddedScript {
+                scripts.push(EmbeddedScript {
                     language,
                     content_xml,
                 });
@@ -387,7 +387,7 @@ fn parse_scripts_element(
                 }
                 let language = required_script_language(reader, &element)?;
                 text_bytes = checked_text_bytes(text_bytes, language.len())?;
-                scripts.push(OdfEmbeddedScript {
+                scripts.push(EmbeddedScript {
                     language,
                     content_xml: String::new(),
                 });
@@ -436,7 +436,7 @@ fn parse_scripts_element(
         buffer.clear();
     }
 
-    Ok(OdfDocumentScripts {
+    Ok(DocumentScripts {
         scripts,
         event_listeners,
         namespace_declarations: root_namespaces.to_vec(),
@@ -447,7 +447,7 @@ fn parse_event_listeners(
     reader: &mut NsReader<&[u8]>,
     xml: &str,
     text_bytes: &mut usize,
-) -> Result<Vec<OdfDocumentEventListener>> {
+) -> Result<Vec<DocumentEventListener>> {
     let mut listeners = Vec::new();
     let mut buffer = Vec::new();
     loop {
@@ -467,7 +467,7 @@ fn parse_event_listeners(
                 ensure_listener_capacity(listeners.len())?;
                 let listener = parse_script_listener(reader, &element)?;
                 *text_bytes = checked_text_bytes(*text_bytes, script_listener_bytes(&listener))?;
-                listeners.push(OdfDocumentEventListener::Script(listener));
+                listeners.push(DocumentEventListener::Script(listener));
             },
             Event::Start(element)
                 if bound_to(&namespace, SCRIPT_NAMESPACE)
@@ -477,7 +477,7 @@ fn parse_event_listeners(
                 let listener = parse_script_listener(reader, &element)?;
                 require_empty_element(reader, b"event-listener", SCRIPT_NAMESPACE)?;
                 *text_bytes = checked_text_bytes(*text_bytes, script_listener_bytes(&listener))?;
-                listeners.push(OdfDocumentEventListener::Script(listener));
+                listeners.push(DocumentEventListener::Script(listener));
             },
             Event::Empty(element)
                 if bound_to(&namespace, PRESENTATION_NAMESPACE)
@@ -491,7 +491,7 @@ fn parse_event_listeners(
                     })?
                     .to_string();
                 *text_bytes = checked_text_bytes(*text_bytes, raw.len())?;
-                listeners.push(OdfDocumentEventListener::PresentationXml(raw));
+                listeners.push(DocumentEventListener::PresentationXml(raw));
             },
             Event::Start(element)
                 if bound_to(&namespace, PRESENTATION_NAMESPACE)
@@ -500,7 +500,7 @@ fn parse_event_listeners(
                 ensure_listener_capacity(listeners.len())?;
                 let raw = capture_full_xml(reader, xml, event_start, b"event-listener")?;
                 *text_bytes = checked_text_bytes(*text_bytes, raw.len())?;
-                listeners.push(OdfDocumentEventListener::PresentationXml(raw));
+                listeners.push(DocumentEventListener::PresentationXml(raw));
             },
             Event::End(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
@@ -529,7 +529,7 @@ fn parse_event_listeners(
 fn parse_script_listener(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfScriptEventListener> {
+) -> Result<ScriptEventListener> {
     let mut event_name = None;
     let mut language = None;
     let mut macro_name = None;
@@ -579,14 +579,14 @@ fn parse_script_listener(
     let binding = match (macro_name, xlink_type, href, actuate) {
         (Some(value), None, None, None) => {
             validate_required_value(&value, "script:macro-name")?;
-            OdfScriptBinding::MacroName(value)
+            ScriptBinding::MacroName(value)
         },
         (None, Some(kind), Some(href), actuate) if kind == "simple" => {
             if actuate.as_deref().is_some_and(|value| value != "onRequest") {
                 return invalid("script event xlink:actuate must be 'onRequest'");
             }
             validate_required_value(&href, "xlink:href")?;
-            OdfScriptBinding::Linked { href }
+            ScriptBinding::Linked { href }
         },
         _ => {
             return invalid(
@@ -594,7 +594,7 @@ fn parse_script_listener(
             );
         },
     };
-    Ok(OdfScriptEventListener {
+    Ok(ScriptEventListener {
         event_name,
         language,
         binding,
@@ -911,12 +911,12 @@ fn ensure_listener_capacity(count: usize) -> Result<()> {
     }
 }
 
-fn script_listener_bytes(listener: &OdfScriptEventListener) -> usize {
+fn script_listener_bytes(listener: &ScriptEventListener) -> usize {
     listener.event_name.len()
         + listener.language.len()
         + match &listener.binding {
-            OdfScriptBinding::MacroName(value) => value.len(),
-            OdfScriptBinding::Linked { href } => href.len(),
+            ScriptBinding::MacroName(value) => value.len(),
+            ScriptBinding::Linked { href } => href.len(),
         }
 }
 
@@ -975,8 +975,8 @@ mod tests {
         assert_eq!(scripts.event_listeners.len(), 3);
         assert!(matches!(
             &scripts.event_listeners[1],
-            OdfDocumentEventListener::Script(OdfScriptEventListener {
-                binding: OdfScriptBinding::Linked { href },
+            DocumentEventListener::Script(ScriptEventListener {
+                binding: ScriptBinding::Linked { href },
                 ..
             }) if href == "Scripts/close.js"
         ));

@@ -43,7 +43,7 @@ impl Paragraph {
     /// Append a validated, inert dynamic text field to this paragraph.
     pub fn add_dynamic_text_field(
         &mut self,
-        field: &crate::elements::field::OdfDynamicTextField,
+        field: &crate::elements::field::DynamicTextField,
     ) -> Result<()> {
         self.element.add_child(field.to_element()?);
         Ok(())

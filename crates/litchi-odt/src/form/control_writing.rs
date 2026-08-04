@@ -18,14 +18,14 @@ const MAX_STRING: usize = 1_048_576;
 const MAX_RESOURCE: usize = 8_192;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfTextControlKind {
+pub enum TextControlKind {
     Text,
     Textarea,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfTextControl {
-    pub kind: OdfTextControlKind,
+pub struct TextControl {
+    pub kind: TextControlKind,
     pub name: String,
     pub xml_id: String,
     pub value: Option<String>,
@@ -43,16 +43,16 @@ pub struct OdfTextControl {
     pub paragraphs: Vec<String>,
 }
 
-impl OdfTextControl {
+impl TextControl {
     pub fn text(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
-        Self::new(OdfTextControlKind::Text, name, xml_id)
+        Self::new(TextControlKind::Text, name, xml_id)
     }
 
     pub fn textarea(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
-        Self::new(OdfTextControlKind::Textarea, name, xml_id)
+        Self::new(TextControlKind::Textarea, name, xml_id)
     }
 
-    fn new(kind: OdfTextControlKind, name: impl Into<String>, xml_id: impl Into<String>) -> Self {
+    fn new(kind: TextControlKind, name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             kind,
             name: name.into(),
@@ -79,9 +79,9 @@ impl OdfTextControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfControlForm {
+pub struct ControlForm {
     pub name: String,
-    pub controls: Vec<OdfTextControl>,
+    pub controls: Vec<TextControl>,
     pub apply_filter: Option<bool>,
     pub command_type: Option<String>,
     pub command: Option<String>,
@@ -90,7 +90,7 @@ pub struct OdfControlForm {
     pub href: Option<String>,
 }
 
-impl OdfControlForm {
+impl ControlForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -104,7 +104,7 @@ impl OdfControlForm {
         }
     }
 
-    pub fn add_control(&mut self, control: OdfTextControl) -> Result<()> {
+    pub fn add_control(&mut self, control: TextControl) -> Result<()> {
         validate_control(&control)?;
         if self
             .controls
@@ -172,7 +172,7 @@ impl OdfControlForm {
     }
 }
 
-pub fn text_controls(xml: &str) -> Result<Vec<OdfTextControl>> {
+pub fn text_controls(xml: &str) -> Result<Vec<TextControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -183,7 +183,7 @@ pub fn text_controls(xml: &str) -> Result<Vec<OdfTextControl>> {
 pub fn insert_text_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfTextControl,
+    control: &TextControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -202,7 +202,7 @@ pub fn insert_text_control_xml(
 pub fn replace_text_control_xml(
     xml: &str,
     control_index: usize,
-    replacement: &OdfTextControl,
+    replacement: &TextControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -229,11 +229,11 @@ pub fn remove_text_control_xml(xml: &str, control_index: usize) -> Result<String
     apply(xml, current.span.clone(), "")
 }
 
-fn control_xml(control: &OdfTextControl) -> Result<String> {
+fn control_xml(control: &TextControl) -> Result<String> {
     validate_control(control)?;
     let tag = match control.kind {
-        OdfTextControlKind::Text => "form:text",
-        OdfTextControlKind::Textarea => "form:textarea",
+        TextControlKind::Text => "form:text",
+        TextControlKind::Textarea => "form:textarea",
     };
     let mut result = format!(
         r#"<{tag} form:name="{}" xml:id="{}""#,
@@ -280,7 +280,7 @@ fn control_xml(control: &OdfTextControl) -> Result<String> {
     Ok(result)
 }
 
-fn validate_control(control: &OdfTextControl) -> Result<()> {
+fn validate_control(control: &TextControl) -> Result<()> {
     validate_name("form control name", &control.name)?;
     validate_xml_id(&control.xml_id)?;
     for (label, value) in [
@@ -292,7 +292,7 @@ fn validate_control(control: &OdfTextControl) -> Result<()> {
     ] {
         validate_optional_string(label, value)?;
     }
-    if control.kind == OdfTextControlKind::Text && !control.paragraphs.is_empty() {
+    if control.kind == TextControlKind::Text && !control.paragraphs.is_empty() {
         return invalid("form:text cannot contain text:p paragraphs");
     }
     let mut aggregate = 0usize;
@@ -310,8 +310,8 @@ fn validate_control(control: &OdfTextControl) -> Result<()> {
 
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfTextControl,
-    current: Option<&OdfTextControl>,
+    replacement: &TextControl,
+    current: Option<&TextControl>,
 ) -> Result<()> {
     for index in &form.controls {
         let existing = &index.control;
@@ -353,7 +353,7 @@ struct FormLocation {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfTextControl,
+    control: TextControl,
 }
 struct Scan {
     forms: Vec<FormLocation>,
@@ -443,7 +443,7 @@ fn scan(xml: &str) -> Result<Scan> {
                     && local == b"p"
                     && let Some(control_index) = stack.iter().rev().find_map(|open| open.control)
                 {
-                    if controls[control_index].control.kind != OdfTextControlKind::Textarea {
+                    if controls[control_index].control.kind != TextControlKind::Textarea {
                         return invalid("text:p is only valid in form:textarea");
                     }
                     paragraph = true;
@@ -500,7 +500,7 @@ fn scan(xml: &str) -> Result<Scan> {
                     && local == b"p"
                     && let Some(control_index) = stack.iter().rev().find_map(|open| open.control)
                 {
-                    if controls[control_index].control.kind != OdfTextControlKind::Textarea {
+                    if controls[control_index].control.kind != TextControlKind::Textarea {
                         return invalid("text:p is only valid in form:textarea");
                     }
                     controls[control_index]
@@ -578,18 +578,18 @@ fn parse_control(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     local: &[u8],
-) -> Result<OdfTextControl> {
+) -> Result<TextControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(&attrs, CONTROL_ATTRS)?;
     let name = required(&attrs, FORM, "name")?;
     let xml_id = required(&attrs, XML, "id")?;
     validate_name("form control name", &name)?;
     validate_xml_id(&xml_id)?;
-    let mut control = OdfTextControl::new(
+    let mut control = TextControl::new(
         if local == b"text" {
-            OdfTextControlKind::Text
+            TextControlKind::Text
         } else {
-            OdfTextControlKind::Textarea
+            TextControlKind::Textarea
         },
         name,
         xml_id,
@@ -900,7 +900,7 @@ mod tests {
 
     #[test]
     fn canonical_text_and_textarea_are_strict_and_escaped() {
-        let mut text = OdfTextControl::text("Search & replace", "search_1");
+        let mut text = TextControl::text("Search & replace", "search_1");
         text.value = Some("<query>".to_string());
         text.readonly = Some(false);
         text.max_length = Some(40);
@@ -908,9 +908,9 @@ mod tests {
             text.to_xml_fragment().unwrap(),
             r#"<form:text form:name="Search &amp; replace" xml:id="search_1" form:value="&lt;query>" form:readonly="false" form:max-length="40"/>"#
         );
-        let mut area = OdfTextControl::textarea("Notes", "notes_1");
+        let mut area = TextControl::textarea("Notes", "notes_1");
         area.paragraphs = vec!["one".into(), "two & three".into()];
-        let mut form = OdfControlForm::new("Main");
+        let mut form = ControlForm::new("Main");
         form.apply_filter = Some(true);
         form.add_control(text).unwrap();
         form.add_control(area).unwrap();
@@ -927,11 +927,11 @@ mod tests {
         let xml = format!(
             r#"{ROOT}<f:form f:name="Main"><f:text f:name="A" xml:id="a" f:value="old"><f:properties><f:property f:property-name="Vendor" o:value-type="string" o:string-value="keep"/></f:properties></f:text><!--keep--></f:form>{END}"#
         );
-        let mut area = OdfTextControl::textarea("B", "b");
+        let mut area = TextControl::textarea("B", "b");
         area.current_value = Some("new".into());
         let inserted = insert_text_control_xml(&xml, 0, &area).unwrap();
         assert!(inserted.contains("<!--keep-->") && inserted.contains("form:textarea"));
-        let mut replacement = OdfTextControl::text("A2", "a2");
+        let mut replacement = TextControl::text("A2", "a2");
         replacement.value = Some("replaced".into());
         let replaced = replace_text_control_xml(&inserted, 0, &replacement).unwrap();
         assert!(replaced.contains("<!--keep-->") && !replaced.contains("Vendor"));
@@ -939,7 +939,7 @@ mod tests {
         assert_eq!(text_controls(&removed).unwrap().len(), 1);
         let empty = format!(r#"{ROOT}<f:form f:name="Empty"/>{END}"#);
         assert!(
-            insert_text_control_xml(&empty, 0, &OdfTextControl::text("T", "t"))
+            insert_text_control_xml(&empty, 0, &TextControl::text("T", "t"))
                 .unwrap()
                 .contains("</f:form>")
         );
@@ -947,7 +947,7 @@ mod tests {
 
     #[test]
     fn rejects_wrong_namespaces_hostile_attributes_resources_and_limits() {
-        assert!(OdfTextControl::text("T", "1bad").to_xml_fragment().is_err());
+        assert!(TextControl::text("T", "1bad").to_xml_fragment().is_err());
         let wrong =
             format!(r#"{ROOT}<f:form f:name="Main"><x:text f:name="T" xml:id="t"/></f:form>{END}"#);
         assert!(text_controls(&wrong).unwrap().is_empty());
@@ -961,10 +961,10 @@ mod tests {
         assert!(text_controls(&duplicate_id).is_err());
         let events = format!(r#"{ROOT}<f:form f:name="Main"><o:event-listeners/></f:form>{END}"#);
         assert!(text_controls(&events).is_err());
-        let mut form = OdfControlForm::new("Main");
+        let mut form = ControlForm::new("Main");
         form.href = Some("javascript:alert(1)".into());
         assert!(form.to_xml_fragment().is_err());
-        let mut huge = OdfTextControl::textarea("T", "t");
+        let mut huge = TextControl::textarea("T", "t");
         huge.paragraphs.push("x".repeat(MAX_STRING + 1));
         assert!(huge.to_xml_fragment().is_err());
     }
@@ -978,7 +978,7 @@ mod tests {
         assert!(
             controls
                 .iter()
-                .any(|control| control.kind == OdfTextControlKind::Textarea)
+                .any(|control| control.kind == TextControlKind::Textarea)
         );
         let producer = format!(
             r#"{ROOT}<f:form f:name="odfpy"><f:text f:name="Text" xml:id="odfpy_text" f:value="value"/><f:textarea f:name="Textarea" xml:id="odfdo_textarea" f:current-value="current"><t:p>body</t:p></f:textarea></f:form>{END}"#
@@ -992,8 +992,8 @@ mod tests {
     fn builder_and_mutable_document_round_trip_controls() {
         use crate::{Document, DocumentBuilder, MutableDocument};
 
-        let mut form = OdfControlForm::new("Main");
-        form.add_control(OdfTextControl::text("Query", "query_1"))
+        let mut form = ControlForm::new("Main");
+        form.add_control(TextControl::text("Query", "query_1"))
             .unwrap();
         let mut builder = DocumentBuilder::new();
         builder.add_control_form(&form).unwrap();
@@ -1002,10 +1002,10 @@ mod tests {
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.text_controls().unwrap().len(), 1);
 
-        let mut area = OdfTextControl::textarea("Notes", "notes_1");
+        let mut area = TextControl::textarea("Notes", "notes_1");
         area.paragraphs.push("inert text".into());
         mutable.insert_text_control(0, &area).unwrap();
-        let mut replacement = OdfTextControl::text("Search", "search_1");
+        let mut replacement = TextControl::text("Search", "search_1");
         replacement.current_value = Some("term".into());
         let old = mutable.replace_text_control(0, &replacement).unwrap();
         assert_eq!(old.name, "Query");

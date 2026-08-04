@@ -410,7 +410,7 @@ impl TextBibliographyType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextBibliographyEntryToken {
     Field {
-        field: crate::OdfBibliographyField,
+        field: crate::BibliographyField,
         style_name: Option<String>,
     },
     Span {
@@ -2987,7 +2987,7 @@ mod tests {
         let mut book =
             TextBibliographyEntryTemplate::new(TextBibliographyType::Book, "Bibliography_20_1");
         book.push(TextBibliographyEntryToken::Field {
-            field: crate::OdfBibliographyField::Identifier,
+            field: crate::BibliographyField::Identifier,
             style_name: None,
         })
         .push(TextBibliographyEntryToken::Span {
@@ -2995,7 +2995,7 @@ mod tests {
             text: ": ".to_string(),
         })
         .push(TextBibliographyEntryToken::Field {
-            field: crate::OdfBibliographyField::Issn,
+            field: crate::BibliographyField::Issn,
             style_name: None,
         });
         bibliography.push_entry_template(book);

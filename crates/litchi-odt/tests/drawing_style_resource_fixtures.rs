@@ -1,10 +1,10 @@
 use litchi_odt::{
     FlatOpenDocument,
-    drawing_fill_image::OdfFillImageLinkKind,
-    drawing_gradient::{OdfDrawingGradient, parse_drawing_gradients},
+    drawing_fill_image::FillImageLinkKind,
+    drawing_gradient::{DrawingGradient, parse_drawing_gradients},
     drawing_hatch::parse_drawing_hatches,
-    drawing_marker::OdfMarkerViewBox,
-    drawing_opacity::OdfOpacityStyle,
+    drawing_marker::MarkerViewBox,
+    drawing_opacity::OpacityStyle,
     drawing_stroke_dash::parse_drawing_stroke_dashes,
 };
 
@@ -25,7 +25,7 @@ const OPACITY_EXTENSION_STOPS: &str =
 fn local_gradient_fixture_preserves_multicolor_roundtrip_coverage() {
     let gradients = parse_drawing_gradients(MULTICOLOR_GRADIENT).unwrap();
     assert!(gradients.gradients.len() >= 6);
-    let OdfDrawingGradient::Legacy(first) = &gradients.gradients[0] else {
+    let DrawingGradient::Legacy(first) = &gradients.gradients[0] else {
         panic!("local fixture should begin with a legacy gradient");
     };
     assert_eq!(first.extension_stops.len(), 2);
@@ -88,7 +88,7 @@ fn local_fill_image_fixtures_preserve_link_and_inline_bytes() {
             .link()
             .unwrap()
             .kind(),
-        OdfFillImageLinkKind::InertExternal
+        FillImageLinkKind::InertExternal
     );
 
     let inline = FlatOpenDocument::from_bytes(FILL_IMAGE_INLINE.as_bytes().to_vec()).unwrap();
@@ -107,7 +107,7 @@ fn local_marker_fixture_preserves_view_box_and_path() {
     let document = FlatOpenDocument::from_bytes(MARKER_FLAT.as_bytes().to_vec()).unwrap();
     let markers = document.drawing_markers().unwrap();
     let marker = markers.get("Arrowheads_20_1").unwrap();
-    assert_eq!(marker.view_box, OdfMarkerViewBox::new(0, 0, 20, 30));
+    assert_eq!(marker.view_box, MarkerViewBox::new(0, 0, 20, 30));
     assert_eq!(marker.path_data.as_str(), "M10 0l-10 30h20z");
 }
 
@@ -132,6 +132,6 @@ fn local_opacity_fixtures_preserve_angles_and_extension_stops() {
     let stops = FlatOpenDocument::from_bytes(OPACITY_EXTENSION_STOPS.as_bytes().to_vec()).unwrap();
     let values = stops.drawing_opacities().unwrap();
     let value = values.get("Transparency_20_1").unwrap();
-    assert_eq!(value.style, OdfOpacityStyle::Ellipsoid);
+    assert_eq!(value.style, OpacityStyle::Ellipsoid);
     assert_eq!(value.extension_stops.len(), 2);
 }

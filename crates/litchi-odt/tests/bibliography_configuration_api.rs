@@ -1,6 +1,6 @@
 use litchi_odt::{
-    Document, MutableDocument, OdfBibliographyConfiguration, OdfBibliographyField,
-    OdfBibliographySortKey, OpenDocumentPackage,
+    BibliographyConfiguration, BibliographyField, BibliographySortKey, Document, MutableDocument,
+    OpenDocumentPackage,
 };
 mod support;
 
@@ -24,8 +24,8 @@ fn document(styles: &str) -> Document {
     .unwrap()
 }
 
-fn fixture_configuration() -> OdfBibliographyConfiguration {
-    OdfBibliographyConfiguration {
+fn fixture_configuration() -> BibliographyConfiguration {
+    BibliographyConfiguration {
         prefix: Some("[".to_string()),
         suffix: Some("]".to_string()),
         numbered_entries: Some(true),
@@ -36,32 +36,32 @@ fn fixture_configuration() -> OdfBibliographyConfiguration {
         script: Some("Latn".to_string()),
         rfc_language_tag: Some("en-US".to_string()),
         sort_keys: vec![
-            OdfBibliographySortKey {
-                field: OdfBibliographyField::Author,
+            BibliographySortKey {
+                field: BibliographyField::Author,
                 ascending: Some(true),
             },
-            OdfBibliographySortKey {
-                field: OdfBibliographyField::Year,
+            BibliographySortKey {
+                field: BibliographyField::Year,
                 ascending: Some(false),
             },
-            OdfBibliographySortKey {
-                field: OdfBibliographyField::Isbn,
+            BibliographySortKey {
+                field: BibliographyField::Isbn,
                 ascending: None,
             },
         ],
     }
 }
 
-fn replacement_configuration() -> OdfBibliographyConfiguration {
-    OdfBibliographyConfiguration {
+fn replacement_configuration() -> BibliographyConfiguration {
+    BibliographyConfiguration {
         prefix: Some("(".to_string()),
         suffix: Some(")".to_string()),
         numbered_entries: Some(false),
         language: Some("de".to_string()),
         country: Some("DE".to_string()),
         rfc_language_tag: Some("de-DE".to_string()),
-        sort_keys: vec![OdfBibliographySortKey {
-            field: OdfBibliographyField::Title,
+        sort_keys: vec![BibliographySortKey {
+            field: BibliographyField::Title,
             ascending: Some(false),
         }],
         ..Default::default()

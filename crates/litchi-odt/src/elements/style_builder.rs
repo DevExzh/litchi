@@ -14,7 +14,7 @@ use super::style::Style;
 /// # Examples
 ///
 /// ```
-/// use litchi_odf::elements::style_builder::StyleBuilder;
+/// use litchi_odt::elements::style_builder::StyleBuilder;
 ///
 /// let style = StyleBuilder::new("MyStyle")
 ///     .font_size("14pt")

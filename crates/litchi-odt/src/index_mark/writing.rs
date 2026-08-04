@@ -3,7 +3,7 @@
 use super::{TextIndexMark, TextIndexMarkKind, parse_text_index_marks};
 use crate::elements::xml::{TEXT_NAMESPACE, is_bound, namespaced_attribute};
 use crate::index::TextIndexAttribute;
-use crate::{OdfBibliographyField, TextBibliographyType};
+use crate::{BibliographyField, TextBibliographyType};
 use litchi_core::{Error, Result};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
@@ -97,7 +97,7 @@ impl TextIndexMark {
     pub fn bibliography_point(
         bibliography_type: TextBibliographyType,
         visible_text: impl Into<String>,
-        fields: Vec<(OdfBibliographyField, String)>,
+        fields: Vec<(BibliographyField, String)>,
     ) -> Result<Self> {
         if fields.len() > 64 {
             return invalid("bibliography mark has too many fields");
@@ -948,7 +948,7 @@ mod tests {
         let bibliography = TextIndexMark::bibliography_point(
             TextBibliographyType::Www,
             "[Test]",
-            vec![(OdfBibliographyField::Identifier, "Test".to_string())],
+            vec![(BibliographyField::Identifier, "Test".to_string())],
         )
         .unwrap();
         let xml = insert_text_index_mark_xml(&xml, 1, &bibliography).unwrap();
@@ -965,8 +965,8 @@ mod tests {
                 TextBibliographyType::Book,
                 "x",
                 vec![
-                    (OdfBibliographyField::Title, "a".to_string()),
-                    (OdfBibliographyField::Title, "b".to_string())
+                    (BibliographyField::Title, "a".to_string()),
+                    (BibliographyField::Title, "b".to_string())
                 ]
             )
             .is_err()

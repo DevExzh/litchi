@@ -20,65 +20,64 @@ mod value_range_writing;
 mod visual_writing;
 mod writing;
 pub use connection_resource_writing::{
-    OdfConnectionResourceForm, OdfFormConnectionResource, OdfOwnedFormConnectionResource,
+    ConnectionResourceForm, FormConnectionResource, OwnedFormConnectionResource,
     form_connection_resources, insert_form_connection_resource_xml,
     remove_form_connection_resource_xml, replace_form_connection_resource_xml,
 };
 pub use control_writing::{
-    OdfControlForm, OdfTextControl, OdfTextControlKind, insert_text_control_xml,
-    remove_text_control_xml, replace_text_control_xml, text_controls,
+    ControlForm, TextControl, TextControlKind, insert_text_control_xml, remove_text_control_xml,
+    replace_text_control_xml, text_controls,
 };
 pub use generic_writing::{
-    OdfFixedTextControl, OdfGenericControl, OdfGenericControlMetadata, OdfGenericForm,
-    OdfGenericFormControl, OdfHiddenControl, generic_form_controls,
-    insert_generic_form_control_xml, remove_generic_form_control_xml,
-    replace_generic_form_control_xml,
+    FixedTextControl, GenericControl, GenericControlMetadata, GenericForm, GenericFormControl,
+    HiddenControl, generic_form_controls, insert_generic_form_control_xml,
+    remove_generic_form_control_xml, replace_generic_form_control_xml,
 };
 pub use grid_writing::{
-    OdfGridColumn, OdfGridColumnControl, OdfGridColumnControlKind, OdfGridControl, OdfGridForm,
-    OdfGridNonNegativeInteger, grid_controls, insert_grid_control_xml, remove_grid_control_xml,
+    GridColumn, GridColumnControl, GridColumnControlKind, GridControl, GridForm,
+    GridNonNegativeInteger, grid_controls, insert_grid_control_xml, remove_grid_control_xml,
     replace_grid_control_xml,
 };
 pub use image_frame_writing::{
-    OdfImageFrameControl, OdfImageFrameForm, image_frame_controls, insert_image_frame_control_xml,
+    ImageFrameControl, ImageFrameForm, image_frame_controls, insert_image_frame_control_xml,
     remove_image_frame_control_xml, replace_image_frame_control_xml,
 };
 pub use input_writing::{
-    OdfFileControl, OdfPasswordControl, OdfPasswordFileControl, OdfPasswordFileForm,
+    FileControl, PasswordControl, PasswordFileControl, PasswordFileForm,
     insert_password_file_control_xml, password_file_controls, remove_password_file_control_xml,
     replace_password_file_control_xml,
 };
 pub use interactive_writing::{
-    OdfButtonControl, OdfButtonType, OdfCheckboxControl, OdfCheckboxState, OdfInteractiveControl,
-    OdfInteractiveForm, insert_interactive_control_xml, interactive_controls,
-    remove_interactive_control_xml, replace_interactive_control_xml,
+    ButtonControl, ButtonType, CheckboxControl, CheckboxState, InteractiveControl, InteractiveForm,
+    insert_interactive_control_xml, interactive_controls, remove_interactive_control_xml,
+    replace_interactive_control_xml,
 };
 pub use selection_writing::{
-    OdfComboItem, OdfComboboxControl, OdfListLinkageType, OdfListOption, OdfListSourceType,
-    OdfListboxControl, OdfSelectionControl, OdfSelectionForm, insert_selection_control_xml,
-    remove_selection_control_xml, replace_selection_control_xml, selection_controls,
+    ComboItem, ComboboxControl, ListLinkageType, ListOption, ListSourceType, ListboxControl,
+    SelectionControl, SelectionForm, insert_selection_control_xml, remove_selection_control_xml,
+    replace_selection_control_xml, selection_controls,
 };
 pub use typed_value_writing::{
-    OdfFormDate, OdfFormDouble, OdfTypedValueBound, OdfTypedValueControl, OdfTypedValueControlKind,
-    OdfTypedValueDuration, OdfTypedValueForm, OdfTypedValueNonNegativeInteger,
+    FormDate, FormDouble, TypedValueBound, TypedValueControl, TypedValueControlKind,
+    TypedValueDuration, TypedValueForm, TypedValueNonNegativeInteger,
     insert_typed_value_control_xml, remove_typed_value_control_xml,
     replace_typed_value_control_xml, typed_value_controls,
 };
 pub use value_range_writing::{
-    OdfValueRangeControl, OdfValueRangeDuration, OdfValueRangeForm, OdfValueRangeInteger,
-    OdfValueRangeNonNegativeInteger, OdfValueRangeOrientation, OdfValueRangePositiveInteger,
+    ValueRangeControl, ValueRangeDuration, ValueRangeForm, ValueRangeInteger,
+    ValueRangeNonNegativeInteger, ValueRangeOrientation, ValueRangePositiveInteger,
     insert_value_range_control_xml, remove_value_range_control_xml,
     replace_value_range_control_xml, value_range_controls,
 };
 pub use visual_writing::{
-    OdfFrameControl, OdfImageButtonType, OdfImageControl, OdfRadioControl, OdfRadioVisualEffect,
-    OdfRelativeImageAlign, OdfRelativeImagePosition, OdfVisualControl, OdfVisualForm,
+    FrameControl, ImageButtonType, ImageControl, RadioControl, RadioVisualEffect,
+    RelativeImageAlign, RelativeImagePosition, VisualControl, VisualForm,
     insert_visual_control_xml, remove_visual_control_xml, replace_visual_control_xml,
     visual_controls,
 };
 pub(crate) use writing::property_xml;
 pub use writing::{
-    OdfPropertyForm, form_properties, insert_form_property_xml, remove_form_property_xml,
+    PropertyForm, form_properties, insert_form_property_xml, remove_form_property_xml,
     replace_form_property_xml,
 };
 
@@ -104,7 +103,7 @@ const MAX_ATTRIBUTES: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfFormPart {
+pub enum FormPart {
     Content,
     Styles,
     Flat,
@@ -112,7 +111,7 @@ pub enum OdfFormPart {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfFormScope {
+pub enum FormScope {
     Document,
     Text,
     Sheet { index: usize, name: Option<String> },
@@ -122,18 +121,18 @@ pub enum OdfFormScope {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfFormAttribute {
+pub struct FormAttribute {
     pub namespace_uri: Option<String>,
     pub local_name: String,
     pub value: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct OdfForms {
-    pub groups: Vec<OdfFormGroup>,
-    pub control_shapes: Vec<OdfControlShape>,
+pub struct Forms {
+    pub groups: Vec<FormGroup>,
+    pub control_shapes: Vec<ControlShape>,
     /// Event declarations in document order. They are retained but never executed.
-    pub event_listeners: Vec<OdfEventListener>,
+    pub event_listeners: Vec<EventListener>,
     pub has_xforms: bool,
     pub has_event_listeners: bool,
 }
@@ -141,10 +140,10 @@ pub struct OdfForms {
 /// Stable identity snapshot for the element that owns an event declaration.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum OdfEventTarget {
+pub enum EventTarget {
     Forms {
-        part: OdfFormPart,
-        scope: OdfFormScope,
+        part: FormPart,
+        scope: FormScope,
     },
     Form {
         xml_id: Option<String>,
@@ -152,7 +151,7 @@ pub enum OdfEventTarget {
         name: Option<String>,
     },
     Control {
-        kind: OdfFormControlKind,
+        kind: FormControlKind,
         xml_id: Option<String>,
         form_id: Option<String>,
         name: Option<String>,
@@ -161,7 +160,7 @@ pub enum OdfEventTarget {
 
 /// XLink activation mode retained for an event declaration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfEventActuate {
+pub enum EventActuate {
     OnLoad,
     OnRequest,
     Other,
@@ -170,8 +169,8 @@ pub enum OdfEventActuate {
 
 /// An inert `script:event-listener` declaration.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfEventListener {
-    pub target: OdfEventTarget,
+pub struct EventListener {
+    pub target: EventTarget,
     /// Required by conforming ODF, but optional here for tolerant producer inspection.
     pub event_name: Option<String>,
     /// Required by conforming ODF, but optional here for tolerant producer inspection.
@@ -179,45 +178,45 @@ pub struct OdfEventListener {
     pub macro_name: Option<String>,
     /// URI retained verbatim; it is never fetched or resolved.
     pub href: Option<String>,
-    pub actuate: Option<OdfEventActuate>,
+    pub actuate: Option<EventActuate>,
     /// Whether the optional XLink type was explicitly `simple`.
     pub simple_link: bool,
-    pub attributes: Vec<OdfFormAttribute>,
+    pub attributes: Vec<FormAttribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfFormGroup {
-    pub part: OdfFormPart,
-    pub scope: OdfFormScope,
+pub struct FormGroup {
+    pub part: FormPart,
+    pub scope: FormScope,
     pub automatic_focus: Option<bool>,
     pub apply_design_mode: Option<bool>,
-    pub forms: Vec<OdfForm>,
+    pub forms: Vec<Form>,
     pub has_xforms: bool,
     pub has_event_listeners: bool,
-    pub attributes: Vec<OdfFormAttribute>,
+    pub attributes: Vec<FormAttribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfForm {
+pub struct Form {
     pub xml_id: Option<String>,
     pub form_id: Option<String>,
     pub name: Option<String>,
     pub control_implementation: Option<String>,
-    pub properties: Vec<OdfFormProperty>,
-    pub children: Vec<OdfFormNode>,
-    pub attributes: Vec<OdfFormAttribute>,
+    pub properties: Vec<FormProperty>,
+    pub children: Vec<FormNode>,
+    pub attributes: Vec<FormAttribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)] // public API; boxing would break callers
-pub enum OdfFormNode {
-    Form(OdfForm),
-    Control(OdfFormControl),
+pub enum FormNode {
+    Form(Form),
+    Control(FormControl),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfFormControlKind {
+pub enum FormControlKind {
     Text,
     TextArea,
     Password,
@@ -245,7 +244,7 @@ pub enum OdfFormControlKind {
     Other(String),
 }
 
-impl OdfFormControlKind {
+impl FormControlKind {
     fn parse(name: &str) -> Option<Self> {
         Some(match name {
             "text" => Self::Text,
@@ -284,8 +283,8 @@ impl OdfFormControlKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfFormControl {
-    pub kind: OdfFormControlKind,
+pub struct FormControl {
+    pub kind: FormControlKind,
     pub xml_id: Option<String>,
     pub form_id: Option<String>,
     pub name: Option<String>,
@@ -303,22 +302,22 @@ pub struct OdfFormControl {
     pub selected: Option<bool>,
     pub current_selected: Option<bool>,
     pub text: String,
-    pub properties: Vec<OdfFormProperty>,
-    pub children: Vec<OdfFormNode>,
-    pub attributes: Vec<OdfFormAttribute>,
+    pub properties: Vec<FormProperty>,
+    pub children: Vec<FormNode>,
+    pub attributes: Vec<FormAttribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfFormProperty {
+pub struct FormProperty {
     pub name: String,
-    pub value: OdfFormPropertyValue,
+    pub value: FormPropertyValue,
 }
 
-impl OdfFormProperty {
+impl FormProperty {
     pub fn boolean(name: impl Into<String>, value: bool) -> Self {
         Self {
             name: name.into(),
-            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Boolean(value)),
+            value: FormPropertyValue::Scalar(FormScalarValue::Boolean(value)),
         }
     }
 
@@ -330,7 +329,7 @@ impl OdfFormProperty {
     ) -> Self {
         Self {
             name: name.into(),
-            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Number {
+            value: FormPropertyValue::Scalar(FormScalarValue::Number {
                 value_type: value_type.into(),
                 lexical: lexical.into(),
                 currency,
@@ -341,39 +340,39 @@ impl OdfFormProperty {
     pub fn text(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Text(value.into())),
+            value: FormPropertyValue::Scalar(FormScalarValue::Text(value.into())),
         }
     }
 
     pub fn date(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Date(value.into())),
+            value: FormPropertyValue::Scalar(FormScalarValue::Date(value.into())),
         }
     }
 
     pub fn time(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Time(value.into())),
+            value: FormPropertyValue::Scalar(FormScalarValue::Time(value.into())),
         }
     }
 
     pub fn void(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Void),
+            value: FormPropertyValue::Scalar(FormScalarValue::Void),
         }
     }
 
     pub fn list(
         name: impl Into<String>,
         value_type: impl Into<String>,
-        values: Vec<OdfFormScalarValue>,
+        values: Vec<FormScalarValue>,
     ) -> Self {
         Self {
             name: name.into(),
-            value: OdfFormPropertyValue::List {
+            value: FormPropertyValue::List {
                 value_type: Some(value_type.into()),
                 values,
             },
@@ -386,17 +385,17 @@ impl OdfFormProperty {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum OdfFormPropertyValue {
-    Scalar(OdfFormScalarValue),
+pub enum FormPropertyValue {
+    Scalar(FormScalarValue),
     List {
         value_type: Option<String>,
-        values: Vec<OdfFormScalarValue>,
+        values: Vec<FormScalarValue>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum OdfFormScalarValue {
+pub enum FormScalarValue {
     Boolean(bool),
     Number {
         value_type: String,
@@ -414,18 +413,18 @@ pub enum OdfFormScalarValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfControlRef {
+pub struct ControlRef {
     pub group_index: usize,
     pub form_index: usize,
     pub node_path: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfControlShape {
-    pub part: OdfFormPart,
-    pub scope: OdfFormScope,
+pub struct ControlShape {
+    pub part: FormPart,
+    pub scope: FormScope,
     pub control_id: String,
-    pub resolved_control: Option<OdfControlRef>,
+    pub resolved_control: Option<ControlRef>,
     pub draw_name: Option<String>,
     pub style_name: Option<String>,
     pub text_style_name: Option<String>,
@@ -434,14 +433,14 @@ pub struct OdfControlShape {
     pub y: Option<String>,
     pub width: Option<String>,
     pub height: Option<String>,
-    pub attributes: Vec<OdfFormAttribute>,
+    pub attributes: Vec<FormAttribute>,
 }
 
 #[allow(clippy::large_enum_variant)] // parse-stack builder; boxing would churn many match sites
 enum Builder {
-    Form(usize, OdfForm),
-    Control(usize, OdfFormControl),
-    List(usize, String, Option<String>, Vec<OdfFormScalarValue>),
+    Form(usize, Form),
+    Control(usize, FormControl),
+    List(usize, String, Option<String>, Vec<FormScalarValue>),
 }
 
 impl Builder {
@@ -452,13 +451,13 @@ impl Builder {
     }
 }
 
-struct ScopeFrame(usize, OdfFormScope);
+struct ScopeFrame(usize, FormScope);
 
 struct EventListenersBuilder {
     depth: usize,
     listener_depth: Option<usize>,
-    target: OdfEventTarget,
-    listeners: Vec<OdfEventListener>,
+    target: EventTarget,
+    listeners: Vec<EventListener>,
 }
 
 #[derive(Default)]
@@ -468,7 +467,7 @@ struct Limits {
     decoded: usize,
 }
 
-pub(crate) fn parse_form_parts(parts: &[(&str, OdfFormPart)]) -> Result<OdfForms> {
+pub(crate) fn parse_form_parts(parts: &[(&str, FormPart)]) -> Result<Forms> {
     let raw = parts.iter().try_fold(0usize, |sum, (xml, _)| {
         sum.checked_add(xml.len())
             .ok_or_else(|| err("form XML size overflow"))
@@ -476,7 +475,7 @@ pub(crate) fn parse_form_parts(parts: &[(&str, OdfFormPart)]) -> Result<OdfForms
     if raw > MAX_RAW {
         return Err(err("form XML exceeds 64 MiB"));
     }
-    let mut result = OdfForms::default();
+    let mut result = Forms::default();
     let mut limits = Limits::default();
     for &(xml, part) in parts {
         parse_part(xml, part, &mut result, &mut limits)?;
@@ -485,12 +484,7 @@ pub(crate) fn parse_form_parts(parts: &[(&str, OdfFormPart)]) -> Result<OdfForms
     Ok(result)
 }
 
-fn parse_part(
-    xml: &str,
-    part: OdfFormPart,
-    result: &mut OdfForms,
-    limits: &mut Limits,
-) -> Result<()> {
+fn parse_part(xml: &str, part: FormPart, result: &mut Forms, limits: &mut Limits) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -498,7 +492,7 @@ fn parse_part(
     let mut scopes = Vec::<ScopeFrame>::new();
     let mut builders = Vec::<Builder>::new();
     let mut event_listeners: Option<EventListenersBuilder> = None;
-    let mut group: Option<(usize, OdfFormGroup)> = None;
+    let mut group: Option<(usize, FormGroup)> = None;
     let (mut sheet, mut page, mut notes, mut master) = (0, 0, 0, 0);
     loop {
         let (resolved, event) = reader
@@ -757,18 +751,14 @@ fn parse_part(
     Ok(())
 }
 
-fn event_target(
-    part: OdfFormPart,
-    scope: OdfFormScope,
-    builders: &[Builder],
-) -> Result<OdfEventTarget> {
+fn event_target(part: FormPart, scope: FormScope, builders: &[Builder]) -> Result<EventTarget> {
     Ok(match builders.last() {
-        Some(Builder::Form(_, form)) => OdfEventTarget::Form {
+        Some(Builder::Form(_, form)) => EventTarget::Form {
             xml_id: form.xml_id.clone(),
             form_id: form.form_id.clone(),
             name: form.name.clone(),
         },
-        Some(Builder::Control(_, control)) => OdfEventTarget::Control {
+        Some(Builder::Control(_, control)) => EventTarget::Control {
             kind: control.kind.clone(),
             xml_id: control.xml_id.clone(),
             form_id: control.form_id.clone(),
@@ -779,14 +769,14 @@ fn event_target(
                 "office:event-listeners cannot be nested in a form property",
             ));
         },
-        None => OdfEventTarget::Forms { part, scope },
+        None => EventTarget::Forms { part, scope },
     })
 }
 
 fn new_event_listener(
-    target: OdfEventTarget,
-    attributes: Vec<OdfFormAttribute>,
-) -> Result<OdfEventListener> {
+    target: EventTarget,
+    attributes: Vec<FormAttribute>,
+) -> Result<EventListener> {
     let event_name = owned(&attributes, SCRIPT, "event-name");
     let language = owned(&attributes, SCRIPT, "language");
     if event_name.as_deref().is_some_and(str::is_empty)
@@ -809,14 +799,14 @@ fn new_event_listener(
     };
     let actuate = owned(&attributes, XLINK, "actuate")
         .map(|value| match value.as_str() {
-            "onLoad" => Ok(OdfEventActuate::OnLoad),
-            "onRequest" => Ok(OdfEventActuate::OnRequest),
-            "other" => Ok(OdfEventActuate::Other),
-            "none" => Ok(OdfEventActuate::None),
+            "onLoad" => Ok(EventActuate::OnLoad),
+            "onRequest" => Ok(EventActuate::OnRequest),
+            "other" => Ok(EventActuate::Other),
+            "none" => Ok(EventActuate::None),
             _ => Err(err("invalid xlink:actuate on script:event-listener")),
         })
         .transpose()?;
-    Ok(OdfEventListener {
+    Ok(EventListener {
         target,
         event_name,
         language,
@@ -839,14 +829,14 @@ fn scope_start(
     notes: &mut usize,
     master: &mut usize,
     limits: &mut Limits,
-) -> Result<Option<OdfFormScope>> {
+) -> Result<Option<FormScope>> {
     if namespace == Some(OFFICE) && local == "text" {
-        return Ok(Some(OdfFormScope::Text));
+        return Ok(Some(FormScope::Text));
     }
     if namespace == Some(TABLE) && local == "table" {
         let index = next_index(sheet)?;
         let attrs = attrs(reader, element, limits)?;
-        return Ok(Some(OdfFormScope::Sheet {
+        return Ok(Some(FormScope::Sheet {
             index,
             name: owned(&attrs, TABLE, "name"),
         }));
@@ -854,20 +844,20 @@ fn scope_start(
     if namespace == Some(DRAW) && local == "page" {
         let index = next_index(page)?;
         let attrs = attrs(reader, element, limits)?;
-        return Ok(Some(OdfFormScope::DrawPage {
+        return Ok(Some(FormScope::DrawPage {
             index,
             name: owned(&attrs, DRAW, "name"),
         }));
     }
     if namespace == Some(PRESENTATION) && local == "notes" {
-        return Ok(Some(OdfFormScope::Notes {
+        return Ok(Some(FormScope::Notes {
             index: next_index(notes)?,
         }));
     }
     if namespace == Some(STYLE) && local == "master-page" {
         let index = next_index(master)?;
         let attrs = attrs(reader, element, limits)?;
-        return Ok(Some(OdfFormScope::MasterPage {
+        return Ok(Some(FormScope::MasterPage {
             index,
             name: owned(&attrs, STYLE, "name"),
         }));
@@ -906,7 +896,7 @@ fn form_start(
             list_value(builders, &attrs)?;
         },
         _ => {
-            if let Some(kind) = OdfFormControlKind::parse(local) {
+            if let Some(kind) = FormControlKind::parse(local) {
                 node(limits)?;
                 builders.push(Builder::Control(depth, new_control(kind, attrs)?));
             }
@@ -920,7 +910,7 @@ fn form_empty(
     element: &BytesStart<'_>,
     namespace: Option<&str>,
     local: &str,
-    group: &mut Option<(usize, OdfFormGroup)>,
+    group: &mut Option<(usize, FormGroup)>,
     builders: &mut [Builder],
     limits: &mut Limits,
 ) -> Result<()> {
@@ -944,9 +934,9 @@ fn form_empty(
             };
             attach_property(
                 builders,
-                OdfFormProperty {
+                FormProperty {
                     name,
-                    value: OdfFormPropertyValue::List { value_type, values },
+                    value: FormPropertyValue::List { value_type, values },
                 },
             )?;
         },
@@ -955,7 +945,7 @@ fn form_empty(
             list_value(builders, &attrs)?;
         },
         _ => {
-            if let Some(kind) = OdfFormControlKind::parse(local) {
+            if let Some(kind) = FormControlKind::parse(local) {
                 node(limits)?;
                 attach_control(builders, new_control(kind, attrs)?)?;
             }
@@ -965,7 +955,7 @@ fn form_empty(
 }
 
 fn finish_builder(
-    group: &mut Option<(usize, OdfFormGroup)>,
+    group: &mut Option<(usize, FormGroup)>,
     builders: &mut Vec<Builder>,
 ) -> Result<()> {
     match builders.pop().ok_or_else(|| err("form stack underflow"))? {
@@ -973,21 +963,21 @@ fn finish_builder(
         Builder::Control(_, value) => attach_control(builders, value),
         Builder::List(_, name, value_type, values) => attach_property(
             builders,
-            OdfFormProperty {
+            FormProperty {
                 name,
-                value: OdfFormPropertyValue::List { value_type, values },
+                value: FormPropertyValue::List { value_type, values },
             },
         ),
     }
 }
 
 fn attach_form(
-    group: &mut Option<(usize, OdfFormGroup)>,
+    group: &mut Option<(usize, FormGroup)>,
     builders: &mut [Builder],
-    form: OdfForm,
+    form: Form,
 ) -> Result<()> {
     match builders.last_mut() {
-        Some(Builder::Form(_, parent)) => parent.children.push(OdfFormNode::Form(form)),
+        Some(Builder::Form(_, parent)) => parent.children.push(FormNode::Form(form)),
         Some(_) => return Err(err("form:form has an invalid parent")),
         None => group
             .as_mut()
@@ -999,16 +989,16 @@ fn attach_form(
     Ok(())
 }
 
-fn attach_control(builders: &mut [Builder], control: OdfFormControl) -> Result<()> {
+fn attach_control(builders: &mut [Builder], control: FormControl) -> Result<()> {
     match builders.last_mut() {
-        Some(Builder::Form(_, parent)) => parent.children.push(OdfFormNode::Control(control)),
-        Some(Builder::Control(_, parent)) => parent.children.push(OdfFormNode::Control(control)),
+        Some(Builder::Form(_, parent)) => parent.children.push(FormNode::Control(control)),
+        Some(Builder::Control(_, parent)) => parent.children.push(FormNode::Control(control)),
         _ => return Err(err("form control has an invalid parent")),
     }
     Ok(())
 }
 
-fn attach_property(builders: &mut [Builder], property: OdfFormProperty) -> Result<()> {
+fn attach_property(builders: &mut [Builder], property: FormProperty) -> Result<()> {
     for builder in builders.iter_mut().rev() {
         match builder {
             Builder::Form(_, value) => {
@@ -1045,11 +1035,11 @@ fn append_text(builders: &mut [Builder], text: &str, limits: &mut Limits) -> Res
 }
 
 fn new_group(
-    part: OdfFormPart,
-    scope: OdfFormScope,
-    attributes: Vec<OdfFormAttribute>,
-) -> Result<OdfFormGroup> {
-    Ok(OdfFormGroup {
+    part: FormPart,
+    scope: FormScope,
+    attributes: Vec<FormAttribute>,
+) -> Result<FormGroup> {
+    Ok(FormGroup {
         part,
         scope,
         automatic_focus: bool_attr(&attributes, FORM, "automatic-focus")?,
@@ -1061,8 +1051,8 @@ fn new_group(
     })
 }
 
-fn new_form(attributes: Vec<OdfFormAttribute>) -> OdfForm {
-    OdfForm {
+fn new_form(attributes: Vec<FormAttribute>) -> Form {
+    Form {
         xml_id: owned(&attributes, XML, "id"),
         form_id: owned(&attributes, FORM, "id"),
         name: owned(&attributes, FORM, "name"),
@@ -1073,11 +1063,8 @@ fn new_form(attributes: Vec<OdfFormAttribute>) -> OdfForm {
     }
 }
 
-fn new_control(
-    kind: OdfFormControlKind,
-    attributes: Vec<OdfFormAttribute>,
-) -> Result<OdfFormControl> {
-    Ok(OdfFormControl {
+fn new_control(kind: FormControlKind, attributes: Vec<FormAttribute>) -> Result<FormControl> {
+    Ok(FormControl {
         kind,
         xml_id: owned(&attributes, XML, "id"),
         form_id: owned(&attributes, FORM, "id"),
@@ -1102,7 +1089,7 @@ fn new_control(
     })
 }
 
-fn list_builder(depth: usize, attributes: &[OdfFormAttribute]) -> Result<Builder> {
+fn list_builder(depth: usize, attributes: &[FormAttribute]) -> Result<Builder> {
     Ok(Builder::List(
         depth,
         required(attributes, FORM, "property-name")?.to_string(),
@@ -1111,7 +1098,7 @@ fn list_builder(depth: usize, attributes: &[OdfFormAttribute]) -> Result<Builder
     ))
 }
 
-fn list_value(builders: &mut [Builder], attributes: &[OdfFormAttribute]) -> Result<()> {
+fn list_value(builders: &mut [Builder], attributes: &[FormAttribute]) -> Result<()> {
     let Some(Builder::List(_, _, inherited, values)) = builders.last_mut() else {
         return Err(err("form:list-value outside form:list-property"));
     };
@@ -1119,19 +1106,19 @@ fn list_value(builders: &mut [Builder], attributes: &[OdfFormAttribute]) -> Resu
     Ok(())
 }
 
-fn scalar_property(attributes: &[OdfFormAttribute]) -> Result<OdfFormProperty> {
-    Ok(OdfFormProperty {
+fn scalar_property(attributes: &[FormAttribute]) -> Result<FormProperty> {
+    Ok(FormProperty {
         name: required(attributes, FORM, "property-name")?.to_string(),
-        value: OdfFormPropertyValue::Scalar(scalar(attributes, None)?),
+        value: FormPropertyValue::Scalar(scalar(attributes, None)?),
     })
 }
 
-fn scalar(attributes: &[OdfFormAttribute], inherited: Option<&str>) -> Result<OdfFormScalarValue> {
+fn scalar(attributes: &[FormAttribute], inherited: Option<&str>) -> Result<FormScalarValue> {
     let kind = attr(attributes, OFFICE, "value-type")
         .or(inherited)
         .ok_or_else(|| err("form property requires office:value-type"))?;
     Ok(match kind {
-        "boolean" => OdfFormScalarValue::Boolean(
+        "boolean" => FormScalarValue::Boolean(
             required(attributes, OFFICE, "boolean-value")?
                 .parse::<bool>()
                 .map_err(|_| err("invalid form boolean property"))?,
@@ -1144,21 +1131,21 @@ fn scalar(attributes: &[OdfFormAttribute], inherited: Option<&str>) -> Result<Od
             if !parsed.is_finite() {
                 return Err(err("non-finite numeric form property"));
             }
-            OdfFormScalarValue::Number {
+            FormScalarValue::Number {
                 value_type: kind.to_string(),
                 lexical: lexical.to_string(),
                 currency: owned(attributes, OFFICE, "currency"),
             }
         },
-        "string" => OdfFormScalarValue::Text(
+        "string" => FormScalarValue::Text(
             attr(attributes, OFFICE, "string-value")
                 .unwrap_or_default()
                 .to_string(),
         ),
-        "date" => OdfFormScalarValue::Date(required(attributes, OFFICE, "date-value")?.to_string()),
-        "time" => OdfFormScalarValue::Time(required(attributes, OFFICE, "time-value")?.to_string()),
-        "void" => OdfFormScalarValue::Void,
-        other => OdfFormScalarValue::Other {
+        "date" => FormScalarValue::Date(required(attributes, OFFICE, "date-value")?.to_string()),
+        "time" => FormScalarValue::Time(required(attributes, OFFICE, "time-value")?.to_string()),
+        "void" => FormScalarValue::Void,
+        other => FormScalarValue::Other {
             value_type: other.to_string(),
             lexical: attr(attributes, OFFICE, "string-value")
                 .or_else(|| attr(attributes, OFFICE, "value"))
@@ -1168,15 +1155,15 @@ fn scalar(attributes: &[OdfFormAttribute], inherited: Option<&str>) -> Result<Od
 }
 
 fn new_shape(
-    part: OdfFormPart,
-    scope: OdfFormScope,
-    attributes: Vec<OdfFormAttribute>,
-) -> Result<OdfControlShape> {
+    part: FormPart,
+    scope: FormScope,
+    attributes: Vec<FormAttribute>,
+) -> Result<ControlShape> {
     let control_id = required(&attributes, DRAW, "control")?.to_string();
     if control_id.is_empty() {
         return Err(err("empty draw:control reference"));
     }
-    Ok(OdfControlShape {
+    Ok(ControlShape {
         part,
         scope,
         control_id,
@@ -1199,7 +1186,7 @@ fn new_shape(
     })
 }
 
-fn push_shape(result: &mut OdfForms, shape: OdfControlShape, limits: &mut Limits) -> Result<()> {
+fn push_shape(result: &mut Forms, shape: ControlShape, limits: &mut Limits) -> Result<()> {
     limits.shapes = limits
         .shapes
         .checked_add(1)
@@ -1211,9 +1198,9 @@ fn push_shape(result: &mut OdfForms, shape: OdfControlShape, limits: &mut Limits
     Ok(())
 }
 
-fn resolve_links(result: &mut OdfForms) -> Result<()> {
-    type Key = (OdfFormPart, OdfFormScope, String);
-    let mut index = HashMap::<Key, OdfControlRef>::new();
+fn resolve_links(result: &mut Forms) -> Result<()> {
+    type Key = (FormPart, FormScope, String);
+    let mut index = HashMap::<Key, ControlRef>::new();
     for (group_index, group) in result.groups.iter().enumerate() {
         for (form_index, form) in group.forms.iter().enumerate() {
             collect_form(
@@ -1240,21 +1227,21 @@ fn resolve_links(result: &mut OdfForms) -> Result<()> {
 
 #[allow(clippy::too_many_arguments)]
 fn collect_form(
-    form: &OdfForm,
+    form: &Form,
     group: usize,
     form_index: usize,
-    part: OdfFormPart,
-    scope: &OdfFormScope,
+    part: FormPart,
+    scope: &FormScope,
     path: &mut Vec<usize>,
-    index: &mut HashMap<(OdfFormPart, OdfFormScope, String), OdfControlRef>,
+    index: &mut HashMap<(FormPart, FormScope, String), ControlRef>,
 ) -> Result<()> {
     for (position, node) in form.children.iter().enumerate() {
         path.push(position);
         match node {
-            OdfFormNode::Form(value) => {
+            FormNode::Form(value) => {
                 collect_form(value, group, form_index, part, scope, path, index)?
             },
-            OdfFormNode::Control(value) => {
+            FormNode::Control(value) => {
                 collect_control(value, group, form_index, part, scope, path, index)?
             },
         }
@@ -1265,15 +1252,15 @@ fn collect_form(
 
 #[allow(clippy::too_many_arguments)]
 fn collect_control(
-    control: &OdfFormControl,
+    control: &FormControl,
     group: usize,
     form_index: usize,
-    part: OdfFormPart,
-    scope: &OdfFormScope,
+    part: FormPart,
+    scope: &FormScope,
     path: &mut Vec<usize>,
-    index: &mut HashMap<(OdfFormPart, OdfFormScope, String), OdfControlRef>,
+    index: &mut HashMap<(FormPart, FormScope, String), ControlRef>,
 ) -> Result<()> {
-    let reference = OdfControlRef {
+    let reference = ControlRef {
         group_index: group,
         form_index,
         node_path: path.clone(),
@@ -1295,10 +1282,10 @@ fn collect_control(
     for (position, node) in control.children.iter().enumerate() {
         path.push(position);
         match node {
-            OdfFormNode::Control(value) => {
+            FormNode::Control(value) => {
                 collect_control(value, group, form_index, part, scope, path, index)?
             },
-            OdfFormNode::Form(_) => return Err(err("form nested inside control")),
+            FormNode::Form(_) => return Err(err("form nested inside control")),
         }
         path.pop();
     }
@@ -1309,7 +1296,7 @@ fn attrs(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     limits: &mut Limits,
-) -> Result<Vec<OdfFormAttribute>> {
+) -> Result<Vec<FormAttribute>> {
     let mut result = Vec::new();
     for raw in element.attributes().with_checks(true) {
         let raw = raw.map_err(|e| err(format!("invalid form attribute: {e}")))?;
@@ -1325,7 +1312,7 @@ fn attrs(
             return Err(err("form attribute exceeds 64 KiB"));
         }
         decoded(limits, value.len())?;
-        result.push(OdfFormAttribute {
+        result.push(FormAttribute {
             namespace_uri: ns(&resolved)?,
             local_name: name(local.as_ref())?,
             value,
@@ -1334,31 +1321,23 @@ fn attrs(
     Ok(result)
 }
 
-fn attr<'a>(attributes: &'a [OdfFormAttribute], namespace: &str, local: &str) -> Option<&'a str> {
+fn attr<'a>(attributes: &'a [FormAttribute], namespace: &str, local: &str) -> Option<&'a str> {
     attributes
         .iter()
         .find(|item| item.namespace_uri.as_deref() == Some(namespace) && item.local_name == local)
         .map(|item| item.value.as_str())
 }
 
-fn required<'a>(
-    attributes: &'a [OdfFormAttribute],
-    namespace: &str,
-    local: &str,
-) -> Result<&'a str> {
+fn required<'a>(attributes: &'a [FormAttribute], namespace: &str, local: &str) -> Result<&'a str> {
     attr(attributes, namespace, local)
         .ok_or_else(|| err(format!("missing required form attribute '{local}'")))
 }
 
-fn owned(attributes: &[OdfFormAttribute], namespace: &str, local: &str) -> Option<String> {
+fn owned(attributes: &[FormAttribute], namespace: &str, local: &str) -> Option<String> {
     attr(attributes, namespace, local).map(str::to_owned)
 }
 
-fn bool_attr(
-    attributes: &[OdfFormAttribute],
-    namespace: &str,
-    local: &str,
-) -> Result<Option<bool>> {
+fn bool_attr(attributes: &[FormAttribute], namespace: &str, local: &str) -> Result<Option<bool>> {
     attr(attributes, namespace, local)
         .map(|value| {
             value
@@ -1368,21 +1347,21 @@ fn bool_attr(
         .transpose()
 }
 
-fn current_scope(scopes: &[ScopeFrame]) -> OdfFormScope {
+fn current_scope(scopes: &[ScopeFrame]) -> FormScope {
     scopes
         .last()
         .map(|scope| scope.1.clone())
-        .unwrap_or(OdfFormScope::Document)
+        .unwrap_or(FormScope::Document)
 }
 
-fn mark_xforms(result: &mut OdfForms, group: Option<&mut (usize, OdfFormGroup)>) {
+fn mark_xforms(result: &mut Forms, group: Option<&mut (usize, FormGroup)>) {
     result.has_xforms = true;
     if let Some(group) = group {
         group.1.has_xforms = true;
     }
 }
 
-fn mark_events(result: &mut OdfForms, group: Option<&mut (usize, OdfFormGroup)>) {
+fn mark_events(result: &mut Forms, group: Option<&mut (usize, FormGroup)>) {
     result.has_event_listeners = true;
     if let Some(group) = group {
         group.1.has_event_listeners = true;
@@ -1482,18 +1461,18 @@ mod event_listener_tests {
         let xml = format!(
             r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="dom:click" s:language="ooo:script" s:macro-name="vnd.sun.star.script:Module.Run" x:type="simple" x:href="Scripts/Main" x:actuate="onRequest"/></o:event-listeners>{SUFFIX}"#
         );
-        let forms = parse_form_parts(&[(&xml, OdfFormPart::Content)]).unwrap();
+        let forms = parse_form_parts(&[(&xml, FormPart::Content)]).unwrap();
         assert!(forms.has_event_listeners);
         assert_eq!(forms.event_listeners.len(), 1);
         let listener = &forms.event_listeners[0];
         assert_eq!(listener.event_name.as_deref(), Some("dom:click"));
         assert_eq!(listener.language.as_deref(), Some("ooo:script"));
         assert_eq!(listener.href.as_deref(), Some("Scripts/Main"));
-        assert_eq!(listener.actuate, Some(OdfEventActuate::OnRequest));
+        assert_eq!(listener.actuate, Some(EventActuate::OnRequest));
         assert!(listener.simple_link);
         assert!(matches!(
             &listener.target,
-            OdfEventTarget::Control { name: Some(name), .. } if name == "Submit"
+            EventTarget::Control { name: Some(name), .. } if name == "Submit"
         ));
     }
 
@@ -1503,7 +1482,7 @@ mod event_listener_tests {
             r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="change" s:language="none"></s:event-listener></o:event-listeners>{SUFFIX}"#
         );
         assert_eq!(
-            parse_form_parts(&[(&expanded, OdfFormPart::Content)])
+            parse_form_parts(&[(&expanded, FormPart::Content)])
                 .unwrap()
                 .event_listeners
                 .len(),
@@ -1517,7 +1496,7 @@ mod event_listener_tests {
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(
-                parse_form_parts(&[(&xml, OdfFormPart::Content)]).is_err(),
+                parse_form_parts(&[(&xml, FormPart::Content)]).is_err(),
                 "accepted {body}"
             );
         }

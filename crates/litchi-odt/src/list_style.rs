@@ -1,8 +1,6 @@
 //! Typed ODF `text:list-style` declarations (numbered, bullet, and image levels).
 
-use crate::{
-    FlatOpenDocument, OdfOutlineNumberFormat, OdfOutlinePositiveInteger, OpenDocumentPackage,
-};
+use crate::{FlatOpenDocument, OpenDocumentPackage, OutlineNumberFormat, OutlinePositiveInteger};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -86,12 +84,12 @@ impl BulletRelativeSize {
 /// Level numbering decoration of a `text:list-level-style-number`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ListLevelNumberStyle {
-    pub format: Option<OdfOutlineNumberFormat>,
+    pub format: Option<OutlineNumberFormat>,
     pub prefix: Option<String>,
     pub suffix: Option<String>,
     pub letter_sync: Option<bool>,
-    pub display_levels: Option<OdfOutlinePositiveInteger>,
-    pub start_value: Option<OdfOutlinePositiveInteger>,
+    pub display_levels: Option<OutlinePositiveInteger>,
+    pub start_value: Option<OutlinePositiveInteger>,
 }
 impl ListLevelNumberStyle {
     pub fn validate(&self) -> Result<()> {
@@ -449,7 +447,7 @@ fn parse_number_level(mut attrs: Attrs) -> Result<ListLevelStyle> {
     let number = ListLevelNumberStyle {
         format: attrs
             .take(Ns::Style, b"num-format")
-            .map(OdfOutlineNumberFormat::new)
+            .map(OutlineNumberFormat::new)
             .transpose()?,
         prefix: attrs.take(Ns::Style, b"num-prefix"),
         suffix: attrs.take(Ns::Style, b"num-suffix"),
@@ -459,11 +457,11 @@ fn parse_number_level(mut attrs: Attrs) -> Result<ListLevelStyle> {
             .transpose()?,
         display_levels: attrs
             .take(Ns::Text, b"display-levels")
-            .map(OdfOutlinePositiveInteger::new)
+            .map(OutlinePositiveInteger::new)
             .transpose()?,
         start_value: attrs
             .take(Ns::Text, b"start-value")
-            .map(OdfOutlinePositiveInteger::new)
+            .map(OutlinePositiveInteger::new)
             .transpose()?,
     };
     attrs.reject_unknown("text:list-level-style-number")?;

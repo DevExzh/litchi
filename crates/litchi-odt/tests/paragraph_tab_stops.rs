@@ -1,8 +1,8 @@
 use litchi_odt::{
-    Document, DocumentBuilder, MutableDocument, OdfTabStopPosition, OpenDocumentPackage,
-    ParagraphStyleTabStops, ParagraphTabLeaderColor, ParagraphTabLeaderStyle,
-    ParagraphTabLeaderType, ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType,
-    ParagraphTabStops, parse_paragraph_style_tab_stops,
+    Document, DocumentBuilder, MutableDocument, OpenDocumentPackage, ParagraphStyleTabStops,
+    ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
+    ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
+    TabStopPosition, parse_paragraph_style_tab_stops,
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -127,7 +127,7 @@ fn rejects_malformed_structure_values_and_overflow() {
 
 #[test]
 fn builder_package_and_mutable_document_preserve_typed_styles() {
-    let mut first = ParagraphTabStop::new(OdfTabStopPosition::new("2.5cm").unwrap());
+    let mut first = ParagraphTabStop::new(TabStopPosition::new("2.5cm").unwrap());
     first.tab_type = ParagraphTabStopType::Right;
     first.leader_type = Some(ParagraphTabLeaderType::Single);
     first.leader_style = Some(ParagraphTabLeaderStyle::Dotted);

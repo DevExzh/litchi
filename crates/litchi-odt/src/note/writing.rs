@@ -363,9 +363,7 @@ const TEXT_NAMESPACE_STRING: &str = "urn:oasis:names:tc:opendocument:xmlns:text:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        NoteClass, OdfMetaFieldAttribute, OdfMetaFieldElement, OdfMetaFieldNode, OdfNoteBodyContent,
-    };
+    use crate::{MetaFieldAttribute, MetaFieldElement, MetaFieldNode, NoteBodyContent, NoteClass};
 
     const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
@@ -375,31 +373,31 @@ mod tests {
         )
     }
 
-    fn rich_body() -> OdfNoteBodyContent {
-        OdfNoteBodyContent::new(vec![
-            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+    fn rich_body() -> NoteBodyContent {
+        NoteBodyContent::new(vec![
+            MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT.to_string(),
                 local_name: "p".to_string(),
                 attributes: Vec::new(),
                 children: vec![
-                    OdfMetaFieldNode::Text("First ".to_string()),
-                    OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                    MetaFieldNode::Text("First ".to_string()),
+                    MetaFieldNode::Element(MetaFieldElement {
                         namespace_uri: TEXT.to_string(),
                         local_name: "span".to_string(),
-                        attributes: vec![OdfMetaFieldAttribute {
+                        attributes: vec![MetaFieldAttribute {
                             namespace_uri: TEXT.to_string(),
                             local_name: "style-name".to_string(),
                             value: "Emphasis".to_string(),
                         }],
-                        children: vec![OdfMetaFieldNode::Text("styled".to_string())],
+                        children: vec![MetaFieldNode::Text("styled".to_string())],
                     }),
                 ],
             }),
-            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+            MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT.to_string(),
                 local_name: "p".to_string(),
                 attributes: Vec::new(),
-                children: vec![OdfMetaFieldNode::Text("Second".to_string())],
+                children: vec![MetaFieldNode::Text("Second".to_string())],
             }),
         ])
         .unwrap()

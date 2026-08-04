@@ -215,7 +215,7 @@ static TEXT_ALIGNS: Set<&'static str> = phf_set! {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::attr_parser::parse_bool;
+/// # use litchi_odt::elements::attr_parser::parse_bool;
 /// assert_eq!(parse_bool(b"true").unwrap(), true);
 /// assert_eq!(parse_bool(b"false").unwrap(), false);
 /// ```
@@ -244,7 +244,7 @@ pub fn parse_bool(value: &[u8]) -> Result<bool> {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::attr_parser::parse_int;
+/// # use litchi_odt::elements::attr_parser::parse_int;
 /// assert_eq!(parse_int(b"42").unwrap(), 42);
 /// assert_eq!(parse_int(b"-123").unwrap(), -123);
 /// ```
@@ -292,7 +292,7 @@ pub fn parse_uint(value: &[u8]) -> Result<u64> {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::attr_parser::parse_float;
+/// # use litchi_odt::elements::attr_parser::parse_float;
 /// assert!((parse_float(b"3.14").unwrap() - 3.14).abs() < 0.0001);
 /// assert!((parse_float(b"-2.5e10").unwrap() + 2.5e10).abs() < 1.0);
 /// ```
@@ -322,7 +322,7 @@ pub fn parse_float(value: &[u8]) -> Result<f64> {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::attr_parser::parse_length;
+/// # use litchi_odt::elements::attr_parser::parse_length;
 /// let (val, unit) = parse_length(b"2.5cm").unwrap();
 /// assert!((val - 2.5).abs() < 0.0001);
 /// assert_eq!(unit, "cm");
@@ -387,7 +387,7 @@ pub fn parse_percentage(value: &[u8]) -> Result<f64> {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::attr_parser::parse_color;
+/// # use litchi_odt::elements::attr_parser::parse_color;
 /// let (r, g, b) = parse_color(b"#FF0000").unwrap();
 /// assert_eq!((r, g, b), (255, 0, 0));
 /// ```

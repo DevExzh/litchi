@@ -22,11 +22,11 @@ const MAX_AGGREGATE_SIZE: usize = 16 * 1024 * 1024;
 
 /// An inert form connection URI. The value is never opened or resolved.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfFormConnectionResource {
+pub struct FormConnectionResource {
     pub href: String,
 }
 
-impl OdfFormConnectionResource {
+impl FormConnectionResource {
     pub fn new(href: impl Into<String>) -> Result<Self> {
         let resource = Self { href: href.into() };
         validate_resource(&resource)?;
@@ -44,14 +44,14 @@ impl OdfFormConnectionResource {
 
 /// A form builder whose connection resource is its final child.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfConnectionResourceForm {
+pub struct ConnectionResourceForm {
     pub name: String,
     pub xml_id: Option<String>,
-    pub resource: OdfFormConnectionResource,
+    pub resource: FormConnectionResource,
 }
 
-impl OdfConnectionResourceForm {
-    pub fn new(name: impl Into<String>, resource: OdfFormConnectionResource) -> Self {
+impl ConnectionResourceForm {
+    pub fn new(name: impl Into<String>, resource: FormConnectionResource) -> Self {
         Self {
             name: name.into(),
             xml_id: None,
@@ -78,15 +78,15 @@ impl OdfConnectionResourceForm {
 
 /// A resource together with the direct `form:form` that owns it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfOwnedFormConnectionResource {
+pub struct OwnedFormConnectionResource {
     pub form_index: usize,
     pub form_name: Option<String>,
     pub form_xml_id: Option<String>,
-    pub resource: OdfFormConnectionResource,
+    pub resource: FormConnectionResource,
 }
 
 /// Parses direct, form-owned connection resources in document order.
-pub fn form_connection_resources(xml: &str) -> Result<Vec<OdfOwnedFormConnectionResource>> {
+pub fn form_connection_resources(xml: &str) -> Result<Vec<OwnedFormConnectionResource>> {
     Ok(scan_document(xml)?
         .resources
         .into_iter()
@@ -98,7 +98,7 @@ pub fn form_connection_resources(xml: &str) -> Result<Vec<OdfOwnedFormConnection
 pub fn insert_form_connection_resource_xml(
     xml: &str,
     form_index: usize,
-    resource: &OdfFormConnectionResource,
+    resource: &FormConnectionResource,
 ) -> Result<String> {
     let scan = scan_document(xml)?;
     let form = scan
@@ -132,7 +132,7 @@ pub fn insert_form_connection_resource_xml(
 pub fn replace_form_connection_resource_xml(
     xml: &str,
     resource_index: usize,
-    resource: &OdfFormConnectionResource,
+    resource: &FormConnectionResource,
 ) -> Result<String> {
     let scan = scan_document(xml)?;
     let old = scan.resources.get(resource_index).ok_or_else(|| {
@@ -180,7 +180,7 @@ struct FormSpan {
 
 #[derive(Debug)]
 struct ResourceSpan {
-    value: OdfOwnedFormConnectionResource,
+    value: OwnedFormConnectionResource,
     start: usize,
     end: usize,
 }
@@ -303,7 +303,7 @@ fn scan_document(xml: &str) -> Result<ScanResult> {
                         }
                         let entry_index = result.resources.len();
                         result.resources.push(ResourceSpan {
-                            value: OdfOwnedFormConnectionResource {
+                            value: OwnedFormConnectionResource {
                                 form_index,
                                 form_name: result.forms[form_index].name.clone(),
                                 form_xml_id: result.forms[form_index].xml_id.clone(),
@@ -497,7 +497,7 @@ fn parse_resource(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<OdfFormConnectionResource> {
+) -> Result<FormConnectionResource> {
     let mut href = None;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| {
@@ -528,7 +528,7 @@ fn parse_resource(
         append_aggregate(aggregate, value.len())?;
         href = Some(value);
     }
-    OdfFormConnectionResource::new(href.ok_or_else(|| {
+    FormConnectionResource::new(href.ok_or_else(|| {
         Error::InvalidFormat("form:connection-resource requires xlink:href".to_string())
     })?)
 }
@@ -546,7 +546,7 @@ fn resolved_namespace(result: ResolveResult<'_>) -> Result<Option<String>> {
     }
 }
 
-fn validate_resource(resource: &OdfFormConnectionResource) -> Result<()> {
+fn validate_resource(resource: &FormConnectionResource) -> Result<()> {
     if resource.href.len() > MAX_REFERENCE_SIZE {
         return Err(Error::InvalidFormat(format!(
             "form connection URI exceeds {MAX_REFERENCE_SIZE} bytes"
@@ -555,7 +555,7 @@ fn validate_resource(resource: &OdfFormConnectionResource) -> Result<()> {
     validate_xml_chars(&resource.href, "form connection URI")
 }
 
-fn validate_form(form: &OdfConnectionResourceForm) -> Result<()> {
+fn validate_form(form: &ConnectionResourceForm) -> Result<()> {
     validate_xml_chars(&form.name, "form name")?;
     if form.name.len() > MAX_REFERENCE_SIZE {
         return Err(Error::InvalidFormat(
@@ -636,7 +636,7 @@ fn push_xml_attribute(xml: &mut String, value: &str) {
     }
 }
 
-fn resource_mutation_fragment(resource: &OdfFormConnectionResource) -> Result<String> {
+fn resource_mutation_fragment(resource: &FormConnectionResource) -> Result<String> {
     validate_resource(resource)?;
     let mut xml = format!(
         "<form:connection-resource xmlns:form=\"{FORM_NAMESPACE}\" xmlns:xlink=\"{XLINK_NAMESPACE}\" xlink:href=\""
@@ -724,7 +724,7 @@ mod tests {
 
     #[test]
     fn canonical_writer_and_lossless_mutations_cover_empty_and_nested_forms() {
-        let resource = OdfFormConnectionResource::new("sdbc:a&b").unwrap();
+        let resource = FormConnectionResource::new("sdbc:a&b").unwrap();
         assert_eq!(
             resource.to_xml_fragment().unwrap(),
             r#"<form:connection-resource xlink:href="sdbc:a&amp;b"/>"#
@@ -735,14 +735,14 @@ mod tests {
         let inserted = insert_form_connection_resource_xml(&xml, 0, &resource).unwrap();
         assert!(inserted.contains(r#"data-v="1"><form:connection-resource"#));
         assert_eq!(form_connection_resources(&inserted).unwrap().len(), 1);
-        let replacement = OdfFormConnectionResource::new("sdbc:new").unwrap();
+        let replacement = FormConnectionResource::new("sdbc:new").unwrap();
         let replaced = replace_form_connection_resource_xml(&inserted, 0, &replacement).unwrap();
         assert!(replaced.contains("sdbc:new"));
         assert!(replaced.contains(r#"<f:form f:name="other"></f:form>"#));
         let removed = remove_form_connection_resource_xml(&replaced, 0).unwrap();
         assert!(form_connection_resources(&removed).unwrap().is_empty());
 
-        let mut form = OdfConnectionResourceForm::new("source", replacement);
+        let mut form = ConnectionResourceForm::new("source", replacement);
         form.xml_id = Some("source_1".into());
         assert!(
             form.to_xml_fragment()

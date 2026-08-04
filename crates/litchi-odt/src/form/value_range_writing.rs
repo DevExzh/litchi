@@ -7,7 +7,7 @@ use quick_xml::NsReader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
-use super::generic_writing::OdfGenericControlMetadata;
+use super::generic_writing::GenericControlMetadata;
 
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -23,33 +23,33 @@ const MAX_FORMS: usize = 4096;
 const MAX_CONTROLS: usize = 65_536;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfValueRangeControl {
+pub struct ValueRangeControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub input_required: Option<bool>,
     pub disabled: Option<bool>,
     pub printable: Option<bool>,
-    pub tab_index: Option<OdfValueRangeNonNegativeInteger>,
+    pub tab_index: Option<ValueRangeNonNegativeInteger>,
     pub tab_stop: Option<bool>,
     pub title: Option<String>,
     pub value: Option<String>,
     pub linked_cell: Option<String>,
     pub repeat: Option<bool>,
-    pub delay_for_repeat: Option<OdfValueRangeDuration>,
-    pub max_value: Option<OdfValueRangeInteger>,
-    pub min_value: Option<OdfValueRangeInteger>,
-    pub step_size: Option<OdfValueRangePositiveInteger>,
-    pub page_step_size: Option<OdfValueRangePositiveInteger>,
-    pub orientation: Option<OdfValueRangeOrientation>,
+    pub delay_for_repeat: Option<ValueRangeDuration>,
+    pub max_value: Option<ValueRangeInteger>,
+    pub min_value: Option<ValueRangeInteger>,
+    pub step_size: Option<ValueRangePositiveInteger>,
+    pub page_step_size: Option<ValueRangePositiveInteger>,
+    pub orientation: Option<ValueRangeOrientation>,
 }
 
-impl OdfValueRangeControl {
+impl ValueRangeControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             input_required: None,
             disabled: None,
             printable: None,
@@ -74,13 +74,13 @@ impl OdfValueRangeControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfValueRangeForm {
+pub struct ValueRangeForm {
     pub name: String,
-    pub controls: Vec<OdfValueRangeControl>,
+    pub controls: Vec<ValueRangeControl>,
     pub apply_filter: Option<bool>,
 }
 
-impl OdfValueRangeForm {
+impl ValueRangeForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -89,7 +89,7 @@ impl OdfValueRangeForm {
         }
     }
 
-    pub fn add_control(&mut self, control: OdfValueRangeControl) -> Result<()> {
+    pub fn add_control(&mut self, control: ValueRangeControl) -> Result<()> {
         validate_control(&control)?;
         if self
             .controls
@@ -139,7 +139,7 @@ impl OdfValueRangeForm {
     }
 }
 
-pub fn value_range_controls(xml: &str) -> Result<Vec<OdfValueRangeControl>> {
+pub fn value_range_controls(xml: &str) -> Result<Vec<ValueRangeControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -150,7 +150,7 @@ pub fn value_range_controls(xml: &str) -> Result<Vec<OdfValueRangeControl>> {
 pub fn insert_value_range_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfValueRangeControl,
+    control: &ValueRangeControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -172,7 +172,7 @@ pub fn insert_value_range_control_xml(
 pub fn replace_value_range_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfValueRangeControl,
+    replacement: &ValueRangeControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -200,7 +200,7 @@ pub fn remove_value_range_control_xml(xml: &str, index: usize) -> Result<String>
     apply(xml, old.span.clone(), "")
 }
 
-fn value_range_xml(value: &OdfValueRangeControl) -> Result<String> {
+fn value_range_xml(value: &ValueRangeControl) -> Result<String> {
     validate_control(value)?;
     let mut out = format!(
         r#"<form:value-range form:name="{}" xml:id="{}""#,
@@ -227,7 +227,7 @@ fn value_range_xml(value: &OdfValueRangeControl) -> Result<String> {
         value
             .tab_index
             .as_ref()
-            .map(OdfValueRangeNonNegativeInteger::as_str),
+            .map(ValueRangeNonNegativeInteger::as_str),
     );
     push_bool(&mut out, "form:tab-stop", value.tab_stop);
     push_string(&mut out, "form:title", value.title.as_deref());
@@ -240,17 +240,17 @@ fn value_range_xml(value: &OdfValueRangeControl) -> Result<String> {
         value
             .delay_for_repeat
             .as_ref()
-            .map(OdfValueRangeDuration::as_str),
+            .map(ValueRangeDuration::as_str),
     );
     push_string(
         &mut out,
         "form:max-value",
-        value.max_value.as_ref().map(OdfValueRangeInteger::as_str),
+        value.max_value.as_ref().map(ValueRangeInteger::as_str),
     );
     push_string(
         &mut out,
         "form:min-value",
-        value.min_value.as_ref().map(OdfValueRangeInteger::as_str),
+        value.min_value.as_ref().map(ValueRangeInteger::as_str),
     );
     push_string(
         &mut out,
@@ -258,7 +258,7 @@ fn value_range_xml(value: &OdfValueRangeControl) -> Result<String> {
         value
             .step_size
             .as_ref()
-            .map(OdfValueRangePositiveInteger::as_str),
+            .map(ValueRangePositiveInteger::as_str),
     );
     push_string(
         &mut out,
@@ -266,18 +266,18 @@ fn value_range_xml(value: &OdfValueRangeControl) -> Result<String> {
         value
             .page_step_size
             .as_ref()
-            .map(OdfValueRangePositiveInteger::as_str),
+            .map(ValueRangePositiveInteger::as_str),
     );
     push_string(
         &mut out,
         "form:orientation",
-        value.orientation.map(OdfValueRangeOrientation::as_str),
+        value.orientation.map(ValueRangeOrientation::as_str),
     );
     out.push_str("/>");
     Ok(out)
 }
 
-fn validate_control(value: &OdfValueRangeControl) -> Result<()> {
+fn validate_control(value: &ValueRangeControl) -> Result<()> {
     validate_name("value-range control name", &value.name)?;
     validate_xml_id(&value.xml_id)?;
     if let Some(form_id) = value.metadata.form_id.as_deref() {
@@ -306,7 +306,7 @@ fn validate_control(value: &OdfValueRangeControl) -> Result<()> {
     Ok(())
 }
 
-fn validate_controls(controls: &[OdfValueRangeControl]) -> Result<()> {
+fn validate_controls(controls: &[ValueRangeControl]) -> Result<()> {
     if controls.len() > MAX_CONTROLS {
         return invalid("too many value-range controls");
     }
@@ -337,7 +337,7 @@ fn validate_controls(controls: &[OdfValueRangeControl]) -> Result<()> {
     Ok(())
 }
 
-fn control_size(value: &OdfValueRangeControl) -> usize {
+fn control_size(value: &ValueRangeControl) -> usize {
     [&value.name, &value.xml_id]
         .iter()
         .fold(0usize, |sum, value| sum.saturating_add(value.len()))
@@ -389,7 +389,7 @@ fn control_size(value: &OdfValueRangeControl) -> usize {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfValueRangeControl,
+    control: ValueRangeControl,
 }
 #[derive(Clone)]
 struct FormLocation {
@@ -619,17 +619,14 @@ fn scan(xml: &str) -> Result<Scan> {
     })
 }
 
-fn parse_control(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<OdfValueRangeControl> {
+fn parse_control(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ValueRangeControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(&attrs, VALUE_RANGE_ATTRS)?;
-    let mut value = OdfValueRangeControl::new(
+    let mut value = ValueRangeControl::new(
         required(&attrs, FORM, "name")?,
         required(&attrs, XML, "id")?,
     );
-    value.metadata = OdfGenericControlMetadata {
+    value.metadata = GenericControlMetadata {
         form_id: optional(&attrs, FORM, "id"),
         control_implementation: optional(&attrs, FORM, "control-implementation"),
         xforms_bind: optional(&attrs, XFORMS, "bind"),
@@ -638,7 +635,7 @@ fn parse_control(
     value.disabled = optional_bool(&attrs, FORM, "disabled")?;
     value.printable = optional_bool(&attrs, FORM, "printable")?;
     value.tab_index = optional(&attrs, FORM, "tab-index")
-        .map(OdfValueRangeNonNegativeInteger::new)
+        .map(ValueRangeNonNegativeInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.tab_stop = optional_bool(&attrs, FORM, "tab-stop")?;
@@ -647,23 +644,23 @@ fn parse_control(
     value.linked_cell = optional(&attrs, FORM, "linked-cell");
     value.repeat = optional_bool(&attrs, FORM, "repeat")?;
     value.delay_for_repeat = optional(&attrs, FORM, "delay-for-repeat")
-        .map(OdfValueRangeDuration::new)
+        .map(ValueRangeDuration::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.max_value = optional(&attrs, FORM, "max-value")
-        .map(OdfValueRangeInteger::new)
+        .map(ValueRangeInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.min_value = optional(&attrs, FORM, "min-value")
-        .map(OdfValueRangeInteger::new)
+        .map(ValueRangeInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.step_size = optional(&attrs, FORM, "step-size")
-        .map(OdfValueRangePositiveInteger::new)
+        .map(ValueRangePositiveInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.page_step_size = optional(&attrs, FORM, "page-step-size")
-        .map(OdfValueRangePositiveInteger::new)
+        .map(ValueRangePositiveInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.orientation = optional(&attrs, FORM, "orientation")
@@ -877,8 +874,8 @@ fn validate_string(label: &str, value: &str, limit: usize) -> Result<()> {
 }
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfValueRangeControl,
-    current: Option<&OdfValueRangeControl>,
+    replacement: &ValueRangeControl,
+    current: Option<&ValueRangeControl>,
 ) -> Result<()> {
     for item in &form.controls {
         if current.is_some_and(|value| value.xml_id == item.control.xml_id) {
@@ -979,10 +976,7 @@ mod tests {
         assert_eq!(value.step_size.as_ref().unwrap().as_str(), "1");
         assert_eq!(value.page_step_size.as_ref().unwrap().as_str(), "10");
         assert_eq!(value.delay_for_repeat.as_ref().unwrap().as_str(), "PT0.5S");
-        assert_eq!(
-            value.orientation,
-            Some(OdfValueRangeOrientation::Horizontal)
-        );
+        assert_eq!(value.orientation, Some(ValueRangeOrientation::Horizontal));
         let canonical = value.to_xml_fragment().unwrap();
         assert!(canonical.contains(r#"form:tab-index="4""#));
         assert!(canonical.contains(r#"form:min-value="-2""#));
@@ -990,19 +984,19 @@ mod tests {
 
     #[test]
     fn lexical_domains_bounds_and_hostile_xml_are_rejected() {
-        assert_eq!(OdfValueRangeInteger::new("-000").unwrap().as_str(), "0");
+        assert_eq!(ValueRangeInteger::new("-000").unwrap().as_str(), "0");
         assert_eq!(
-            OdfValueRangeNonNegativeInteger::new("-0").unwrap().as_str(),
+            ValueRangeNonNegativeInteger::new("-0").unwrap().as_str(),
             "0"
         );
-        assert!(OdfValueRangePositiveInteger::new("0").is_err());
-        assert!(OdfValueRangeDuration::new("P1Y2M3DT4H5M6.75S").is_ok());
+        assert!(ValueRangePositiveInteger::new("0").is_err());
+        assert!(ValueRangeDuration::new("P1Y2M3DT4H5M6.75S").is_ok());
         for invalid in ["P", "PT", "+P1D", "P1S", "PT.5S", "P1DT", "PT1.0M"] {
-            assert!(OdfValueRangeDuration::new(invalid).is_err());
+            assert!(ValueRangeDuration::new(invalid).is_err());
         }
-        let mut inverted = OdfValueRangeControl::new("Spin", "spin1");
-        inverted.min_value = Some(OdfValueRangeInteger::new("2").unwrap());
-        inverted.max_value = Some(OdfValueRangeInteger::new("1").unwrap());
+        let mut inverted = ValueRangeControl::new("Spin", "spin1");
+        inverted.min_value = Some(ValueRangeInteger::new("2").unwrap());
+        inverted.max_value = Some(ValueRangeInteger::new("1").unwrap());
         assert!(inverted.to_xml_fragment().is_err());
         assert!(
             value_range_controls(&document(
@@ -1017,18 +1011,18 @@ mod tests {
     #[test]
     fn lossless_mutation_and_package_facades_round_trip() {
         let xml = document(r#"<form:value-range form:name="Old" xml:id="old" form:value="7"/>"#);
-        let inserted = OdfValueRangeControl::new("New", "new");
+        let inserted = ValueRangeControl::new("New", "new");
         let updated = insert_value_range_control_xml(&xml, 0, &inserted).unwrap();
         assert!(updated.contains("<office:tail/>"));
-        let replacement = OdfValueRangeControl::new("Replacement", "replacement");
+        let replacement = ValueRangeControl::new("Replacement", "replacement");
         let updated = replace_value_range_control_xml(&updated, 0, &replacement).unwrap();
         assert_eq!(
             value_range_controls(&remove_value_range_control_xml(&updated, 1).unwrap()).unwrap(),
             std::slice::from_ref(&replacement)
         );
 
-        let mut form = OdfValueRangeForm::new("Ranges");
-        form.add_control(OdfValueRangeControl::new("Initial", "initial"))
+        let mut form = ValueRangeForm::new("Ranges");
+        form.add_control(ValueRangeControl::new("Initial", "initial"))
             .unwrap();
         let mut builder = crate::DocumentBuilder::new();
         builder.add_value_range_form(&form).unwrap();
@@ -1056,12 +1050,12 @@ const MAX_VALUE_RANGE_DURATION_LEN: usize = 256;
 
 /// The direction in which a value-range control changes its value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfValueRangeOrientation {
+pub enum ValueRangeOrientation {
     Horizontal,
     Vertical,
 }
 
-impl OdfValueRangeOrientation {
+impl ValueRangeOrientation {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Horizontal => "horizontal",
@@ -1070,13 +1064,13 @@ impl OdfValueRangeOrientation {
     }
 }
 
-impl fmt::Display for OdfValueRangeOrientation {
+impl fmt::Display for ValueRangeOrientation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl FromStr for OdfValueRangeOrientation {
+impl FromStr for ValueRangeOrientation {
     type Err = String;
 
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
@@ -1116,9 +1110,9 @@ fn canonical_integer(value: &str) -> std::result::Result<String, String> {
 
 /// An arbitrary-precision XML Schema `integer` used by value-range bounds.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfValueRangeInteger(String);
+pub struct ValueRangeInteger(String);
 
-impl OdfValueRangeInteger {
+impl ValueRangeInteger {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         canonical_integer(value.as_ref()).map(Self)
     }
@@ -1128,13 +1122,13 @@ impl OdfValueRangeInteger {
     }
 }
 
-impl fmt::Display for OdfValueRangeInteger {
+impl fmt::Display for ValueRangeInteger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl FromStr for OdfValueRangeInteger {
+impl FromStr for ValueRangeInteger {
     type Err = String;
 
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
@@ -1142,7 +1136,7 @@ impl FromStr for OdfValueRangeInteger {
     }
 }
 
-impl Ord for OdfValueRangeInteger {
+impl Ord for ValueRangeInteger {
     fn cmp(&self, other: &Self) -> Ordering {
         let lhs_negative = self.0.starts_with('-');
         let rhs_negative = other.0.starts_with('-');
@@ -1163,7 +1157,7 @@ impl Ord for OdfValueRangeInteger {
     }
 }
 
-impl PartialOrd for OdfValueRangeInteger {
+impl PartialOrd for ValueRangeInteger {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -1171,9 +1165,9 @@ impl PartialOrd for OdfValueRangeInteger {
 
 /// An arbitrary-precision XML Schema `nonNegativeInteger` used by `form:tab-index`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfValueRangeNonNegativeInteger(String);
+pub struct ValueRangeNonNegativeInteger(String);
 
-impl OdfValueRangeNonNegativeInteger {
+impl ValueRangeNonNegativeInteger {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         let value = canonical_integer(value.as_ref())?;
         if value.starts_with('-') {
@@ -1187,13 +1181,13 @@ impl OdfValueRangeNonNegativeInteger {
     }
 }
 
-impl fmt::Display for OdfValueRangeNonNegativeInteger {
+impl fmt::Display for ValueRangeNonNegativeInteger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl FromStr for OdfValueRangeNonNegativeInteger {
+impl FromStr for ValueRangeNonNegativeInteger {
     type Err = String;
 
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
@@ -1203,9 +1197,9 @@ impl FromStr for OdfValueRangeNonNegativeInteger {
 
 /// An arbitrary-precision XML Schema `positiveInteger` used by step sizes.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfValueRangePositiveInteger(String);
+pub struct ValueRangePositiveInteger(String);
 
-impl OdfValueRangePositiveInteger {
+impl ValueRangePositiveInteger {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         let value = canonical_integer(value.as_ref())?;
         if value == "0" || value.starts_with('-') {
@@ -1219,13 +1213,13 @@ impl OdfValueRangePositiveInteger {
     }
 }
 
-impl fmt::Display for OdfValueRangePositiveInteger {
+impl fmt::Display for ValueRangePositiveInteger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl FromStr for OdfValueRangePositiveInteger {
+impl FromStr for ValueRangePositiveInteger {
     type Err = String;
 
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
@@ -1238,9 +1232,9 @@ impl FromStr for OdfValueRangePositiveInteger {
 /// It is deliberately not converted to a clock duration: year/month components
 /// have no context-independent length and form bindings must remain inert.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfValueRangeDuration(String);
+pub struct ValueRangeDuration(String);
 
-impl OdfValueRangeDuration {
+impl ValueRangeDuration {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         let value = value.as_ref();
         if !valid_xsd_duration(value) {
@@ -1256,13 +1250,13 @@ impl OdfValueRangeDuration {
     }
 }
 
-impl fmt::Display for OdfValueRangeDuration {
+impl fmt::Display for ValueRangeDuration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl FromStr for OdfValueRangeDuration {
+impl FromStr for ValueRangeDuration {
     type Err = String;
 
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {

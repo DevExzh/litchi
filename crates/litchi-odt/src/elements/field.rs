@@ -47,7 +47,7 @@ const SCRIPT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:script:1.0
 /// One of the five OpenDocument database field elements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfDatabaseFieldKind {
+pub enum DatabaseFieldKind {
     Display,
     Next,
     RowSelect,
@@ -57,13 +57,13 @@ pub enum OdfDatabaseFieldKind {
 
 /// Kind of database object selected by a field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfDatabaseTableType {
+pub enum DatabaseTableType {
     Table,
     Query,
     Command,
 }
 
-impl OdfDatabaseTableType {
+impl DatabaseTableType {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "table" => Ok(Self::Table),
@@ -86,25 +86,25 @@ impl OdfDatabaseTableType {
 
 /// An inert `form:connection-resource`. The URI is never resolved or opened.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfDatabaseConnectionResource {
+pub struct DatabaseConnectionResource {
     pub href: String,
     pub simple_link: bool,
 }
 
 /// Common source identity shared by all database fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfDatabaseSource {
+pub struct DatabaseSource {
     pub database_name: Option<String>,
     pub table_name: String,
-    pub table_type: Option<OdfDatabaseTableType>,
-    pub connection_resource: Option<OdfDatabaseConnectionResource>,
+    pub table_type: Option<DatabaseTableType>,
+    pub connection_resource: Option<DatabaseConnectionResource>,
 }
 
 /// Canonical, bounded XML Schema `nonNegativeInteger` without arithmetic semantics.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfNonNegativeInteger(String);
+pub struct NonNegativeInteger(String);
 
-impl OdfNonNegativeInteger {
+impl NonNegativeInteger {
     pub fn new(lexical: &str) -> Result<Self> {
         let lexical = lexical.trim_matches(|ch| matches!(ch, ' ' | '\t' | '\n' | '\r'));
         let (negative, digits) = match lexical.as_bytes().first() {
@@ -138,38 +138,38 @@ impl OdfNonNegativeInteger {
     }
 }
 
-impl OdfDatabaseSource {
+impl DatabaseSource {
     /// ODF defaults `text:table-type` to `table`.
-    pub fn effective_table_type(&self) -> OdfDatabaseTableType {
-        self.table_type.unwrap_or(OdfDatabaseTableType::Table)
+    pub fn effective_table_type(&self) -> DatabaseTableType {
+        self.table_type.unwrap_or(DatabaseTableType::Table)
     }
 }
 
 /// Typed, non-executing database field metadata in document order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfDatabaseField {
-    pub kind: OdfDatabaseFieldKind,
-    pub source: OdfDatabaseSource,
+pub struct DatabaseField {
+    pub kind: DatabaseFieldKind,
+    pub source: DatabaseSource,
     pub column_name: Option<String>,
     pub condition: Option<String>,
-    pub row_number: Option<OdfNonNegativeInteger>,
-    pub value: Option<OdfNonNegativeInteger>,
+    pub row_number: Option<NonNegativeInteger>,
+    pub value: Option<NonNegativeInteger>,
     pub data_style_name: Option<String>,
     pub number_format: Option<String>,
     pub number_letter_sync: Option<bool>,
     pub display_text: String,
 }
 
-impl OdfDatabaseField {
+impl DatabaseField {
     pub fn to_xml_fragment(&self) -> Result<String> {
         let field = validate_database_field(self.clone())?;
         validate_constructed_database_field(&field)?;
         let local = match field.kind {
-            OdfDatabaseFieldKind::Display => "database-display",
-            OdfDatabaseFieldKind::Next => "database-next",
-            OdfDatabaseFieldKind::RowSelect => "database-row-select",
-            OdfDatabaseFieldKind::RowNumber => "database-row-number",
-            OdfDatabaseFieldKind::Name => "database-name",
+            DatabaseFieldKind::Display => "database-display",
+            DatabaseFieldKind::Next => "database-next",
+            DatabaseFieldKind::RowSelect => "database-row-select",
+            DatabaseFieldKind::RowNumber => "database-row-number",
+            DatabaseFieldKind::Name => "database-name",
         };
         let mut xml = format!(
             "<text:{local} xmlns:text=\"{TEXT_DATABASE_NAMESPACE}\" xmlns:style=\"{STYLE_NAMESPACE}\" xmlns:form=\"{FORM_NAMESPACE}\" xmlns:xlink=\"{XLINK_NAMESPACE}\""
@@ -191,7 +191,7 @@ impl OdfDatabaseField {
             attribute("text", "table-type", value.as_str());
         }
         match field.kind {
-            OdfDatabaseFieldKind::Display => {
+            DatabaseFieldKind::Display => {
                 attribute(
                     "text",
                     "column-name",
@@ -201,12 +201,12 @@ impl OdfDatabaseField {
                     attribute("style", "data-style-name", value);
                 }
             },
-            OdfDatabaseFieldKind::Next => {
+            DatabaseFieldKind::Next => {
                 if let Some(value) = field.condition.as_deref() {
                     attribute("text", "condition", value);
                 }
             },
-            OdfDatabaseFieldKind::RowSelect => {
+            DatabaseFieldKind::RowSelect => {
                 if let Some(value) = field.condition.as_deref() {
                     attribute("text", "condition", value);
                 }
@@ -214,7 +214,7 @@ impl OdfDatabaseField {
                     attribute("text", "row-number", value.as_str());
                 }
             },
-            OdfDatabaseFieldKind::RowNumber => {
+            DatabaseFieldKind::RowNumber => {
                 if let Some(value) = field.value {
                     attribute("text", "value", value.as_str());
                 }
@@ -229,7 +229,7 @@ impl OdfDatabaseField {
                     );
                 }
             },
-            OdfDatabaseFieldKind::Name => {},
+            DatabaseFieldKind::Name => {},
         }
         let _ = attribute;
         if field.source.connection_resource.is_none() && field.display_text.is_empty() {
@@ -252,7 +252,7 @@ impl OdfDatabaseField {
 
 /// The content category requested by a `text:placeholder` field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfPlaceholderType {
+pub enum PlaceholderType {
     Text,
     Table,
     TextBox,
@@ -266,7 +266,7 @@ pub enum OdfPlaceholderType {
 /// this type only retains producer-supplied metadata and never displays a user
 /// interface or changes a selection.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct OdfDropDownLabel {
+pub struct DropDownLabel {
     /// Optional producer-supplied option value.
     pub value: Option<String>,
     /// Optional stored selected-state flag.
@@ -279,29 +279,29 @@ pub struct OdfDropDownLabel {
 /// `A`). Other format strings, including producer-defined values and the empty
 /// format, remain opaque and are preserved verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfSequenceNumberFormat {
+pub struct SequenceNumberFormat {
     format: String,
     letter_sync: Option<bool>,
 }
 
 /// Common numbering metadata used by document statistic fields.
-pub type OdfStatisticNumberFormat = OdfSequenceNumberFormat;
+pub type StatisticNumberFormat = SequenceNumberFormat;
 
 /// Numbering metadata used by `text:page-number`.
-pub type OdfPageNumberFormat = OdfSequenceNumberFormat;
+pub type PageNumberFormat = SequenceNumberFormat;
 
 /// Numbering metadata used by `text:page-variable-get`.
-pub type OdfPageVariableNumberFormat = OdfSequenceNumberFormat;
+pub type PageVariableNumberFormat = SequenceNumberFormat;
 
 /// Page selected by an ODF page-number field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfPageSelection {
+pub enum PageSelection {
     Previous,
     Current,
     Next,
 }
 
-impl OdfPageSelection {
+impl PageSelection {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Previous => "previous",
@@ -324,12 +324,12 @@ impl OdfPageSelection {
 
 /// Page selected by `text:page-continuation`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfPageContinuationSelection {
+pub enum PageContinuationSelection {
     Previous,
     Next,
 }
 
-impl OdfPageContinuationSelection {
+impl PageContinuationSelection {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Previous => "previous",
@@ -350,25 +350,25 @@ impl OdfPageContinuationSelection {
 
 /// Lexical category retained by a typed ODF date value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfDateValueKind {
+pub enum DateValueKind {
     Date,
     DateTime,
 }
 
 /// A validated XML Schema `dateOrDateTime` value for `text:date-value`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfFieldDateValue {
+pub struct FieldDateValue {
     lexical: String,
-    kind: OdfDateValueKind,
+    kind: DateValueKind,
 }
 
-impl OdfFieldDateValue {
+impl FieldDateValue {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let lexical = value.into();
         let kind = if lexical.contains('T') {
-            OdfDateValueKind::DateTime
+            DateValueKind::DateTime
         } else {
-            OdfDateValueKind::Date
+            DateValueKind::Date
         };
         let value = Self { lexical, kind };
         let mut aggregate = 0usize;
@@ -380,40 +380,40 @@ impl OdfFieldDateValue {
         &self.lexical
     }
 
-    pub const fn kind(&self) -> OdfDateValueKind {
+    pub const fn kind(&self) -> DateValueKind {
         self.kind
     }
 
     fn validate(&self, aggregate: &mut usize) -> Result<()> {
         validate_dynamic_value("text:date-value", Some(&self.lexical), true, aggregate)?;
         match self.kind {
-            OdfDateValueKind::Date => validate_xml_schema_date(&self.lexical),
-            OdfDateValueKind::DateTime => validate_xml_schema_date_time(&self.lexical),
+            DateValueKind::Date => validate_xml_schema_date(&self.lexical),
+            DateValueKind::DateTime => validate_xml_schema_date_time(&self.lexical),
         }
     }
 }
 
 /// Lexical category retained by a typed ODF time value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfTimeValueKind {
+pub enum TimeValueKind {
     Time,
     DateTime,
 }
 
 /// A validated XML Schema `timeOrDateTime` value for `text:time-value`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfFieldTimeValue {
+pub struct FieldTimeValue {
     lexical: String,
-    kind: OdfTimeValueKind,
+    kind: TimeValueKind,
 }
 
-impl OdfFieldTimeValue {
+impl FieldTimeValue {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let lexical = value.into();
         let kind = if lexical.contains('T') {
-            OdfTimeValueKind::DateTime
+            TimeValueKind::DateTime
         } else {
-            OdfTimeValueKind::Time
+            TimeValueKind::Time
         };
         let value = Self { lexical, kind };
         let mut aggregate = 0usize;
@@ -425,24 +425,24 @@ impl OdfFieldTimeValue {
         &self.lexical
     }
 
-    pub const fn kind(&self) -> OdfTimeValueKind {
+    pub const fn kind(&self) -> TimeValueKind {
         self.kind
     }
 
     fn validate(&self, aggregate: &mut usize) -> Result<()> {
         validate_dynamic_value("text:time-value", Some(&self.lexical), true, aggregate)?;
         match self.kind {
-            OdfTimeValueKind::Time => validate_xml_schema_time(&self.lexical),
-            OdfTimeValueKind::DateTime => validate_xml_schema_date_time(&self.lexical),
+            TimeValueKind::Time => validate_xml_schema_time(&self.lexical),
+            TimeValueKind::DateTime => validate_xml_schema_date_time(&self.lexical),
         }
     }
 }
 
 /// A validated, exactly retained XML Schema duration used for field adjustment.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfFieldDuration(String);
+pub struct FieldDuration(String);
 
-impl OdfFieldDuration {
+impl FieldDuration {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = Self(value.into());
         let mut aggregate = 0usize;
@@ -465,7 +465,7 @@ impl OdfFieldDuration {
 
 /// Display format for a `text:sequence-ref` field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfSequenceReferenceFormat {
+pub enum SequenceReferenceFormat {
     Page,
     Chapter,
     Direction,
@@ -477,12 +477,12 @@ pub enum OdfSequenceReferenceFormat {
 
 /// Display mode permitted by `text:variable-set`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfVariableSetDisplay {
+pub enum VariableSetDisplay {
     Value,
     None,
 }
 
-impl OdfVariableSetDisplay {
+impl VariableSetDisplay {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Value => "value",
@@ -503,12 +503,12 @@ impl OdfVariableSetDisplay {
 
 /// Display mode permitted by calculated expressions and variable getters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfFormulaFieldDisplay {
+pub enum FormulaFieldDisplay {
     Value,
     Formula,
 }
 
-impl OdfFormulaFieldDisplay {
+impl FormulaFieldDisplay {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Value => "value",
@@ -529,14 +529,14 @@ impl OdfFormulaFieldDisplay {
 
 /// Display format permitted by ODF 1.2's `text:file-name` field (§19.796.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfFileNameDisplay {
+pub enum FileNameDisplay {
     Full,
     Path,
     Name,
     NameAndExtension,
 }
 
-impl OdfFileNameDisplay {
+impl FileNameDisplay {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Full => "full",
@@ -561,7 +561,7 @@ impl OdfFileNameDisplay {
 
 /// Display format permitted by ODF 1.2's `text:template-name` field (§19.796.8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfTemplateNameDisplay {
+pub enum TemplateNameDisplay {
     Area,
     Full,
     Name,
@@ -570,7 +570,7 @@ pub enum OdfTemplateNameDisplay {
     Title,
 }
 
-impl OdfTemplateNameDisplay {
+impl TemplateNameDisplay {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Area => "area",
@@ -599,7 +599,7 @@ impl OdfTemplateNameDisplay {
 
 /// Display format permitted by ODF 1.2's `text:chapter` field (§19.796.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfChapterDisplay {
+pub enum ChapterDisplay {
     Name,
     Number,
     NumberAndName,
@@ -607,7 +607,7 @@ pub enum OdfChapterDisplay {
     PlainNumberAndName,
 }
 
-impl OdfChapterDisplay {
+impl ChapterDisplay {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Name => "name",
@@ -634,7 +634,7 @@ impl OdfChapterDisplay {
 
 /// Strict ODF `common-value-and-type-attlist` cached value group.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OdfCalculatedFieldValue {
+pub enum CalculatedFieldValue {
     Float(String),
     Percentage(String),
     Currency {
@@ -649,7 +649,7 @@ pub enum OdfCalculatedFieldValue {
 
 /// ODF `office:value-type` used by variable input fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfFieldValueType {
+pub enum FieldValueType {
     Float,
     Time,
     Date,
@@ -659,7 +659,7 @@ pub enum OdfFieldValueType {
     String,
 }
 
-impl OdfFieldValueType {
+impl FieldValueType {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Float => "float",
@@ -690,7 +690,7 @@ impl OdfFieldValueType {
 
 /// Display mode permitted by `text:user-field-get`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfUserFieldDisplay {
+pub enum UserFieldDisplay {
     Value,
     Formula,
     None,
@@ -698,7 +698,7 @@ pub enum OdfUserFieldDisplay {
 
 /// Component displayed by a `text:measure` field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfMeasureKind {
+pub enum MeasureKind {
     Value,
     Unit,
     Gap,
@@ -706,7 +706,7 @@ pub enum OdfMeasureKind {
 
 /// Display format shared by `text:reference-ref` and `text:bookmark-ref`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfCrossReferenceFormat {
+pub enum CrossReferenceFormat {
     Page,
     Chapter,
     Direction,
@@ -716,7 +716,7 @@ pub enum OdfCrossReferenceFormat {
     Number,
 }
 
-impl OdfCrossReferenceFormat {
+impl CrossReferenceFormat {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Page => "page",
@@ -747,14 +747,14 @@ impl OdfCrossReferenceFormat {
 
 /// Display format permitted by `text:note-ref`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfNoteReferenceFormat {
+pub enum NoteReferenceFormat {
     Page,
     Chapter,
     Direction,
     Text,
 }
 
-impl OdfNoteReferenceFormat {
+impl NoteReferenceFormat {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Page => "page",
@@ -779,14 +779,14 @@ impl OdfNoteReferenceFormat {
 
 /// Note class selected by `text:note-ref`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfNoteReferenceClass {
+pub enum NoteReferenceClass {
     Footnote,
     Endnote,
 }
 
 /// Kind of cached ODF document statistic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfDocumentStatisticKind {
+pub enum DocumentStatisticKind {
     Page,
     Paragraph,
     Word,
@@ -796,7 +796,7 @@ pub enum OdfDocumentStatisticKind {
     Object,
 }
 
-impl OdfDocumentStatisticKind {
+impl DocumentStatisticKind {
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::Page => "text:page-count",
@@ -812,7 +812,7 @@ impl OdfDocumentStatisticKind {
 
 /// One of the eight temporal/revision ODF document-metadata fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfDocumentMetadataFieldKind {
+pub enum DocumentMetadataFieldKind {
     CreationDate,
     CreationTime,
     PrintDate,
@@ -823,7 +823,7 @@ pub enum OdfDocumentMetadataFieldKind {
     ModificationTime,
 }
 
-impl OdfDocumentMetadataFieldKind {
+impl DocumentMetadataFieldKind {
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::CreationDate => "text:creation-date",
@@ -844,15 +844,15 @@ impl OdfDocumentMetadataFieldKind {
 
 /// Strict typed value attribute for a temporal document-metadata field.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OdfDocumentMetadataFieldValue {
-    Date(OdfFieldDateValue),
-    Time(OdfFieldTimeValue),
-    Duration(OdfFieldDuration),
+pub enum DocumentMetadataFieldValue {
+    Date(FieldDateValue),
+    Time(FieldTimeValue),
+    Duration(FieldDuration),
 }
 
 /// One of the nine fixed string/identity document-metadata fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfDocumentIdentityFieldKind {
+pub enum DocumentIdentityFieldKind {
     InitialCreator,
     Description,
     PrintedBy,
@@ -866,7 +866,7 @@ pub enum OdfDocumentIdentityFieldKind {
     AuthorInitials,
 }
 
-impl OdfDocumentIdentityFieldKind {
+impl DocumentIdentityFieldKind {
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::InitialCreator => "text:initial-creator",
@@ -884,7 +884,7 @@ impl OdfDocumentIdentityFieldKind {
 
 /// One of the fifteen ODF 1.2 subsequent-author `text:sender-*` field categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfSenderFieldKind {
+pub enum SenderFieldKind {
     FirstName,
     LastName,
     Initials,
@@ -902,7 +902,7 @@ pub enum OdfSenderFieldKind {
     StateOrProvince,
 }
 
-impl OdfSenderFieldKind {
+impl SenderFieldKind {
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::FirstName => "text:sender-firstname",
@@ -929,17 +929,17 @@ impl OdfSenderFieldKind {
 /// Unlike variable fields, ODF 1.2 does not use `office:value-type` here and
 /// its schema permits more than one of these attributes to coexist.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct OdfUserDefinedMetadataValues {
+pub struct UserDefinedMetadataValues {
     pub number: Option<String>,
-    pub date: Option<OdfFieldDateValue>,
-    pub time: Option<OdfFieldDuration>,
+    pub date: Option<FieldDateValue>,
+    pub time: Option<FieldDuration>,
     pub boolean: Option<bool>,
     pub string: Option<String>,
 }
 
 /// A namespace-resolved attribute on inert `text:meta-field` content.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfMetaFieldAttribute {
+pub struct MetaFieldAttribute {
     pub namespace_uri: String,
     pub local_name: String,
     pub value: String,
@@ -947,29 +947,29 @@ pub struct OdfMetaFieldAttribute {
 
 /// A namespace-resolved inert inline element.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfMetaFieldElement {
+pub struct MetaFieldElement {
     pub namespace_uri: String,
     pub local_name: String,
-    pub attributes: Vec<OdfMetaFieldAttribute>,
-    pub children: Vec<OdfMetaFieldNode>,
+    pub attributes: Vec<MetaFieldAttribute>,
+    pub children: Vec<MetaFieldNode>,
 }
 
 /// Ordered mixed content retained by `text:meta-field`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OdfMetaFieldNode {
+pub enum MetaFieldNode {
     Text(String),
-    Element(OdfMetaFieldElement),
+    Element(MetaFieldElement),
 }
 
 /// Validated, inert mixed content with a cached plain-text projection.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfMetaFieldContent {
-    nodes: Vec<OdfMetaFieldNode>,
+pub struct MetaFieldContent {
+    nodes: Vec<MetaFieldNode>,
     display_text: String,
 }
 
-impl OdfMetaFieldContent {
-    pub fn new(nodes: Vec<OdfMetaFieldNode>) -> Result<Self> {
+impl MetaFieldContent {
+    pub fn new(nodes: Vec<MetaFieldNode>) -> Result<Self> {
         let display_text =
             validated_meta_display_text(&nodes, MetaContentGrammar::ParagraphOrHyperlink)?;
         Ok(Self {
@@ -978,7 +978,7 @@ impl OdfMetaFieldContent {
         })
     }
 
-    pub fn nodes(&self) -> &[OdfMetaFieldNode] {
+    pub fn nodes(&self) -> &[MetaFieldNode] {
         &self.nodes
     }
 
@@ -1002,17 +1002,17 @@ impl OdfMetaFieldContent {
 /// elements. Links, fields, event listeners, and macro metadata are serialized
 /// only as inert XML; this type never follows, evaluates, or executes them.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfNoteBodyContent {
-    nodes: Vec<OdfMetaFieldNode>,
+pub struct NoteBodyContent {
+    nodes: Vec<MetaFieldNode>,
     display_text: String,
 }
 
-impl OdfNoteBodyContent {
+impl NoteBodyContent {
     /// Construct structured note-body content from namespace-resolved nodes.
-    pub fn new(nodes: Vec<OdfMetaFieldNode>) -> Result<Self> {
+    pub fn new(nodes: Vec<MetaFieldNode>) -> Result<Self> {
         if nodes
             .iter()
-            .any(|node| matches!(node, OdfMetaFieldNode::Text(_)))
+            .any(|node| matches!(node, MetaFieldNode::Text(_)))
         {
             return Err(Error::InvalidFormat(
                 "text:note-body cannot contain direct character data".to_string(),
@@ -1027,7 +1027,7 @@ impl OdfNoteBodyContent {
     }
 
     /// Return the ordered, namespace-resolved note-body nodes.
-    pub fn nodes(&self) -> &[OdfMetaFieldNode] {
+    pub fn nodes(&self) -> &[MetaFieldNode] {
         &self.nodes
     }
 
@@ -1060,7 +1060,7 @@ impl OdfNoteBodyContent {
 }
 
 fn validated_meta_display_text(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     grammar: MetaContentGrammar,
 ) -> Result<String> {
     let mut aggregate = 0usize;
@@ -1077,7 +1077,7 @@ fn validated_meta_display_text(
     Ok(display_text)
 }
 
-fn note_body_display_text(nodes: &[OdfMetaFieldNode]) -> Result<String> {
+fn note_body_display_text(nodes: &[MetaFieldNode]) -> Result<String> {
     let mut display_text = String::new();
     let mut seen_block = false;
     append_note_body_display_text(nodes, &mut display_text, &mut seen_block, false)?;
@@ -1085,22 +1085,22 @@ fn note_body_display_text(nodes: &[OdfMetaFieldNode]) -> Result<String> {
 }
 
 fn append_note_body_display_text(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     display_text: &mut String,
     seen_block: &mut bool,
     in_paragraph: bool,
 ) -> Result<()> {
     for node in nodes {
         match node {
-            OdfMetaFieldNode::Text(value) if in_paragraph => {
+            MetaFieldNode::Text(value) if in_paragraph => {
                 append_note_body_display_value(display_text, value)?;
             },
-            OdfMetaFieldNode::Text(_) => {},
-            OdfMetaFieldNode::Element(element) => {
+            MetaFieldNode::Text(_) => {},
+            MetaFieldNode::Element(element) => {
                 if element.namespace_uri == TEXT_DATABASE_NAMESPACE && element.local_name == "note"
                 {
                     if in_paragraph
-                        && let Some(OdfMetaFieldNode::Element(citation)) = element.children.first()
+                        && let Some(MetaFieldNode::Element(citation)) = element.children.first()
                         && citation.namespace_uri == TEXT_DATABASE_NAMESPACE
                         && citation.local_name == "note-citation"
                     {
@@ -1172,7 +1172,7 @@ fn append_note_body_display_value(output: &mut String, value: &str) -> Result<()
     Ok(())
 }
 
-fn append_note_body_spaces(output: &mut String, element: &OdfMetaFieldElement) -> Result<()> {
+fn append_note_body_spaces(output: &mut String, element: &MetaFieldElement) -> Result<()> {
     let count = element
         .attributes
         .iter()
@@ -1198,7 +1198,7 @@ fn append_note_body_spaces(output: &mut String, element: &OdfMetaFieldElement) -
     Ok(())
 }
 
-impl OdfUserDefinedMetadataValues {
+impl UserDefinedMetadataValues {
     fn validate(&self, aggregate: &mut usize) -> Result<()> {
         if let Some(number) = &self.number {
             validate_double(number)?;
@@ -1249,7 +1249,7 @@ impl OdfUserDefinedMetadataValues {
     }
 }
 
-impl OdfNoteReferenceClass {
+impl NoteReferenceClass {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Footnote => "footnote",
@@ -1268,7 +1268,7 @@ impl OdfNoteReferenceClass {
     }
 }
 
-impl OdfMeasureKind {
+impl MeasureKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Value => "value",
@@ -1289,7 +1289,7 @@ impl OdfMeasureKind {
     }
 }
 
-impl OdfUserFieldDisplay {
+impl UserFieldDisplay {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Value => "value",
@@ -1310,7 +1310,7 @@ impl OdfUserFieldDisplay {
     }
 }
 
-impl OdfCalculatedFieldValue {
+impl CalculatedFieldValue {
     fn validate(&self, aggregate: &mut usize) -> Result<()> {
         match self {
             Self::Float(value) | Self::Percentage(value) => {
@@ -1390,7 +1390,7 @@ impl OdfCalculatedFieldValue {
     }
 }
 
-impl OdfSequenceReferenceFormat {
+impl SequenceReferenceFormat {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Page => "page",
@@ -1419,7 +1419,7 @@ impl OdfSequenceReferenceFormat {
     }
 }
 
-impl OdfSequenceNumberFormat {
+impl SequenceNumberFormat {
     pub fn new(format: impl Into<String>, letter_sync: Option<bool>) -> Result<Self> {
         let value = Self {
             format: format.into(),
@@ -1454,7 +1454,7 @@ impl OdfSequenceNumberFormat {
     }
 }
 
-impl OdfPlaceholderType {
+impl PlaceholderType {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "text" => Ok(Self::Text),
@@ -1486,9 +1486,9 @@ impl OdfPlaceholderType {
 /// is the cached text stored by the document producer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfDynamicTextField {
+pub enum DynamicTextField {
     Placeholder {
-        placeholder_type: OdfPlaceholderType,
+        placeholder_type: PlaceholderType,
         description: Option<String>,
         display_text: String,
     },
@@ -1514,48 +1514,48 @@ pub enum OdfDynamicTextField {
     Sequence {
         name: String,
         formula: Option<String>,
-        number_format: Option<OdfSequenceNumberFormat>,
+        number_format: Option<SequenceNumberFormat>,
         reference_name: Option<String>,
         display_text: String,
     },
     /// A cached reference to a named sequence value.
     SequenceReference {
         reference_name: String,
-        reference_format: Option<OdfSequenceReferenceFormat>,
+        reference_format: Option<SequenceReferenceFormat>,
         display_text: String,
     },
     VariableSet {
         name: String,
         formula: Option<String>,
-        value: OdfCalculatedFieldValue,
-        display: Option<OdfVariableSetDisplay>,
+        value: CalculatedFieldValue,
+        display: Option<VariableSetDisplay>,
         data_style_name: Option<String>,
         display_text: String,
     },
     VariableGet {
         name: String,
-        display: Option<OdfFormulaFieldDisplay>,
+        display: Option<FormulaFieldDisplay>,
         data_style_name: Option<String>,
         display_text: String,
     },
     Expression {
         formula: Option<String>,
-        value: Option<OdfCalculatedFieldValue>,
-        display: Option<OdfFormulaFieldDisplay>,
+        value: Option<CalculatedFieldValue>,
+        display: Option<FormulaFieldDisplay>,
         data_style_name: Option<String>,
         display_text: String,
     },
     VariableInput {
         name: String,
         description: Option<String>,
-        value_type: OdfFieldValueType,
-        display: Option<OdfVariableSetDisplay>,
+        value_type: FieldValueType,
+        display: Option<VariableSetDisplay>,
         data_style_name: Option<String>,
         display_text: String,
     },
     UserFieldGet {
         name: String,
-        display: Option<OdfUserFieldDisplay>,
+        display: Option<UserFieldDisplay>,
         data_style_name: Option<String>,
         display_text: String,
     },
@@ -1576,7 +1576,7 @@ pub enum OdfDynamicTextField {
     /// changed, or resolved by this API.
     DropDown {
         name: String,
-        labels: Vec<OdfDropDownLabel>,
+        labels: Vec<DropDownLabel>,
         display_text: String,
     },
     /// An inert inline script declaration.
@@ -1594,63 +1594,63 @@ pub enum OdfDynamicTextField {
     /// An inert table-cell formula display field.
     TableFormula {
         formula: Option<String>,
-        display: Option<OdfFormulaFieldDisplay>,
+        display: Option<FormulaFieldDisplay>,
         data_style_name: Option<String>,
         display_text: String,
     },
     /// Cached, non-calculating measurement field text.
     Measure {
-        kind: OdfMeasureKind,
+        kind: MeasureKind,
         display_text: String,
     },
     Reference {
         reference_name: Option<String>,
-        reference_format: Option<OdfCrossReferenceFormat>,
+        reference_format: Option<CrossReferenceFormat>,
         display_text: String,
     },
     BookmarkReference {
         reference_name: Option<String>,
-        reference_format: Option<OdfCrossReferenceFormat>,
+        reference_format: Option<CrossReferenceFormat>,
         display_text: String,
     },
     NoteReference {
         reference_name: Option<String>,
-        note_class: OdfNoteReferenceClass,
-        reference_format: Option<OdfNoteReferenceFormat>,
+        note_class: NoteReferenceClass,
+        reference_format: Option<NoteReferenceFormat>,
         display_text: String,
     },
     DocumentStatistic {
-        kind: OdfDocumentStatisticKind,
-        number_format: Option<OdfStatisticNumberFormat>,
+        kind: DocumentStatisticKind,
+        number_format: Option<StatisticNumberFormat>,
         display_text: String,
     },
     /// Current, previous, or next page number with inert cached presentation.
     PageNumber {
-        number_format: Option<OdfPageNumberFormat>,
+        number_format: Option<PageNumberFormat>,
         fixed: Option<bool>,
         page_adjust: Option<i64>,
-        select_page: Option<OdfPageSelection>,
+        select_page: Option<PageSelection>,
         display_text: String,
     },
     /// Current date or an explicitly fixed date/date-time value.
     Date {
-        value: Option<OdfFieldDateValue>,
-        adjustment: Option<OdfFieldDuration>,
+        value: Option<FieldDateValue>,
+        adjustment: Option<FieldDuration>,
         fixed: Option<bool>,
         data_style_name: Option<String>,
         display_text: String,
     },
     /// Current time or an explicitly fixed time/date-time value.
     Time {
-        value: Option<OdfFieldTimeValue>,
-        adjustment: Option<OdfFieldDuration>,
+        value: Option<FieldTimeValue>,
+        adjustment: Option<FieldDuration>,
         fixed: Option<bool>,
         data_style_name: Option<String>,
         display_text: String,
     },
     /// Previous/next page continuation reminder.
     PageContinuation {
-        select_page: OdfPageContinuationSelection,
+        select_page: PageContinuationSelection,
         string_value: Option<String>,
         display_text: String,
     },
@@ -1662,32 +1662,32 @@ pub enum OdfDynamicTextField {
     },
     /// Display the current alternative page-variable value.
     PageVariableGet {
-        number_format: Option<OdfPageVariableNumberFormat>,
+        number_format: Option<PageVariableNumberFormat>,
         display_text: String,
     },
     /// Cached filename presentation; never reads a host path or document location.
     FileName {
-        display: Option<OdfFileNameDisplay>,
+        display: Option<FileNameDisplay>,
         fixed: Option<bool>,
         display_text: String,
     },
     /// Cached template presentation; never opens or locates a template resource.
     TemplateName {
-        display: Option<OdfTemplateNameDisplay>,
+        display: Option<TemplateNameDisplay>,
         display_text: String,
     },
     /// Cached active spreadsheet sheet label; never resolves live sheet state.
     SheetName { display_text: String },
     /// Cached chapter presentation; never resolves or updates the document outline.
     Chapter {
-        display: Option<OdfChapterDisplay>,
-        outline_level: Option<OdfNonNegativeInteger>,
+        display: Option<ChapterDisplay>,
+        outline_level: Option<NonNegativeInteger>,
         display_text: String,
     },
     /// Cached presentation and optional fixed value of a metadata field.
     DocumentMetadata {
-        kind: OdfDocumentMetadataFieldKind,
-        value: Option<OdfDocumentMetadataFieldValue>,
+        kind: DocumentMetadataFieldKind,
+        value: Option<DocumentMetadataFieldValue>,
         fixed: Option<bool>,
         data_style_name: Option<String>,
         display_text: String,
@@ -1697,7 +1697,7 @@ pub enum OdfDynamicTextField {
     /// Author fields retain stored text only and never read or modify host
     /// identity data.
     DocumentIdentity {
-        kind: OdfDocumentIdentityFieldKind,
+        kind: DocumentIdentityFieldKind,
         fixed: Option<bool>,
         display_text: String,
     },
@@ -1706,14 +1706,14 @@ pub enum OdfDynamicTextField {
     /// These fields never read or modify host identity or contact data, even when
     /// `text:fixed` is omitted or false.
     Sender {
-        kind: OdfSenderFieldKind,
+        kind: SenderFieldKind,
         fixed: Option<bool>,
         display_text: String,
     },
     /// Named custom document metadata with inert cached typed attributes.
     UserDefinedMetadata {
         name: String,
-        values: OdfUserDefinedMetadataValues,
+        values: UserDefinedMetadataValues,
         fixed: Option<bool>,
         data_style_name: Option<String>,
         display_text: String,
@@ -1727,11 +1727,11 @@ pub enum OdfDynamicTextField {
     MetaField {
         xml_id: String,
         data_style_name: Option<String>,
-        content: OdfMetaFieldContent,
+        content: MetaFieldContent,
     },
 }
 
-impl OdfDynamicTextField {
+impl DynamicTextField {
     /// The cached text present in the ODF file, without evaluating any formula.
     pub fn display_text(&self) -> &str {
         match self {
@@ -2388,7 +2388,7 @@ impl OdfDynamicTextField {
             } => {
                 validate_dynamic_value(
                     "text:outline-level",
-                    outline_level.as_ref().map(OdfNonNegativeInteger::as_str),
+                    outline_level.as_ref().map(NonNegativeInteger::as_str),
                     true,
                     &mut aggregate,
                 )?;
@@ -2477,7 +2477,7 @@ impl OdfDynamicTextField {
                     false,
                     &mut aggregate,
                 )?;
-                let rebuilt = OdfMetaFieldContent::new(content.nodes.clone())?;
+                let rebuilt = MetaFieldContent::new(content.nodes.clone())?;
                 if &rebuilt != content {
                     return Err(Error::InvalidFormat(
                         "inconsistent text:meta-field content cache".to_string(),
@@ -3067,13 +3067,13 @@ impl OdfDynamicTextField {
             } => {
                 if let Some(value) = value {
                     match value {
-                        OdfDocumentMetadataFieldValue::Date(value) => {
+                        DocumentMetadataFieldValue::Date(value) => {
                             element.set_attribute("text:date-value", value.as_str());
                         },
-                        OdfDocumentMetadataFieldValue::Time(value) => {
+                        DocumentMetadataFieldValue::Time(value) => {
                             element.set_attribute("text:time-value", value.as_str());
                         },
-                        OdfDocumentMetadataFieldValue::Duration(value) => {
+                        DocumentMetadataFieldValue::Duration(value) => {
                             element.set_attribute("text:duration", value.as_str());
                         },
                     }
@@ -3169,7 +3169,7 @@ const fn is_xml_1_0_char(value: char) -> bool {
 
 struct ActiveDatabaseField {
     depth: usize,
-    field: OdfDatabaseField,
+    field: DatabaseField,
     connection_depth: Option<usize>,
 }
 
@@ -3179,7 +3179,7 @@ struct ActiveDropDownField {
     display_started: bool,
     aggregate: usize,
     name: String,
-    labels: Vec<OdfDropDownLabel>,
+    labels: Vec<DropDownLabel>,
     display_text: String,
 }
 
@@ -3322,11 +3322,11 @@ impl Field {
     /// Convert a conditional-content field to its strict typed representation.
     ///
     /// Returns `Ok(None)` for other field kinds. Conditions remain inert strings.
-    pub fn dynamic_text_field(&self) -> Result<Option<OdfDynamicTextField>> {
+    pub fn dynamic_text_field(&self) -> Result<Option<DynamicTextField>> {
         let text = || self.value();
         let result = match self.field_type() {
-            "text:placeholder" => OdfDynamicTextField::Placeholder {
-                placeholder_type: OdfPlaceholderType::parse(required_field_attribute(
+            "text:placeholder" => DynamicTextField::Placeholder {
+                placeholder_type: PlaceholderType::parse(required_field_attribute(
                     self,
                     "text:placeholder-type",
                 )?)?,
@@ -3336,7 +3336,7 @@ impl Field {
                     .map(str::to_owned),
                 display_text: text(),
             },
-            "text:conditional-text" => OdfDynamicTextField::ConditionalText {
+            "text:conditional-text" => DynamicTextField::ConditionalText {
                 condition: required_field_attribute(self, "text:condition")?.to_owned(),
                 value_if_true: required_field_attribute(self, "text:string-value-if-true")?
                     .to_owned(),
@@ -3345,13 +3345,13 @@ impl Field {
                 current_value: optional_field_bool(self, "text:current-value")?,
                 display_text: text(),
             },
-            "text:hidden-text" => OdfDynamicTextField::HiddenText {
+            "text:hidden-text" => DynamicTextField::HiddenText {
                 condition: required_field_attribute(self, "text:condition")?.to_owned(),
                 string_value: required_field_attribute(self, "text:string-value")?.to_owned(),
                 is_hidden: optional_field_bool(self, "text:is-hidden")?,
                 display_text: text(),
             },
-            "text:hidden-paragraph" => OdfDynamicTextField::HiddenParagraph {
+            "text:hidden-paragraph" => DynamicTextField::HiddenParagraph {
                 condition: required_field_attribute(self, "text:condition")?.to_owned(),
                 is_hidden: optional_field_bool(self, "text:is-hidden")?,
                 display_text: text(),
@@ -3388,7 +3388,7 @@ impl Field {
                         )));
                     },
                 };
-                let result = OdfDynamicTextField::Script {
+                let result = DynamicTextField::Script {
                     href,
                     language: self
                         .element
@@ -3399,7 +3399,7 @@ impl Field {
                 result.validate()?;
                 result
             },
-            "text:dde-connection" => OdfDynamicTextField::DdeConnection {
+            "text:dde-connection" => DynamicTextField::DdeConnection {
                 connection_name: required_field_attribute(self, "text:connection-name")?.to_owned(),
                 display_text: text(),
             },
@@ -3408,7 +3408,7 @@ impl Field {
                 let letter_sync = optional_field_bool(self, "style:num-letter-sync")?;
                 let number_format = match (format, letter_sync) {
                     (Some(format), letter_sync) => {
-                        Some(OdfSequenceNumberFormat::new(format, letter_sync)?)
+                        Some(SequenceNumberFormat::new(format, letter_sync)?)
                     },
                     (None, Some(_)) => {
                         return Err(Error::InvalidFormat(
@@ -3417,7 +3417,7 @@ impl Field {
                     },
                     (None, None) => None,
                 };
-                OdfDynamicTextField::Sequence {
+                DynamicTextField::Sequence {
                     name: required_field_attribute(self, "text:name")?.to_owned(),
                     formula: self
                         .element
@@ -3431,16 +3431,16 @@ impl Field {
                     display_text: text(),
                 }
             },
-            "text:sequence-ref" => OdfDynamicTextField::SequenceReference {
+            "text:sequence-ref" => DynamicTextField::SequenceReference {
                 reference_name: required_field_attribute(self, "text:ref-name")?.to_owned(),
                 reference_format: self
                     .element
                     .get_attribute("text:reference-format")
-                    .map(OdfSequenceReferenceFormat::parse)
+                    .map(SequenceReferenceFormat::parse)
                     .transpose()?,
                 display_text: text(),
             },
-            "text:variable-set" => OdfDynamicTextField::VariableSet {
+            "text:variable-set" => DynamicTextField::VariableSet {
                 name: required_field_attribute(self, "text:name")?.to_owned(),
                 formula: self
                     .element
@@ -3450,7 +3450,7 @@ impl Field {
                 display: self
                     .element
                     .get_attribute("text:display")
-                    .map(OdfVariableSetDisplay::parse)
+                    .map(VariableSetDisplay::parse)
                     .transpose()?,
                 data_style_name: self
                     .element
@@ -3460,12 +3460,12 @@ impl Field {
             },
             "text:variable-get" => {
                 reject_calculated_value_attributes(self)?;
-                OdfDynamicTextField::VariableGet {
+                DynamicTextField::VariableGet {
                     name: required_field_attribute(self, "text:name")?.to_owned(),
                     display: self
                         .element
                         .get_attribute("text:display")
-                        .map(OdfFormulaFieldDisplay::parse)
+                        .map(FormulaFieldDisplay::parse)
                         .transpose()?,
                     data_style_name: self
                         .element
@@ -3474,7 +3474,7 @@ impl Field {
                     display_text: text(),
                 }
             },
-            "text:expression" => OdfDynamicTextField::Expression {
+            "text:expression" => DynamicTextField::Expression {
                 formula: self
                     .element
                     .get_attribute("text:formula")
@@ -3483,7 +3483,7 @@ impl Field {
                 display: self
                     .element
                     .get_attribute("text:display")
-                    .map(OdfFormulaFieldDisplay::parse)
+                    .map(FormulaFieldDisplay::parse)
                     .transpose()?,
                 data_style_name: self
                     .element
@@ -3491,7 +3491,7 @@ impl Field {
                     .map(str::to_owned),
                 display_text: text(),
             },
-            "text:variable-input" => OdfDynamicTextField::VariableInput {
+            "text:variable-input" => DynamicTextField::VariableInput {
                 name: required_field_attribute(self, "text:name")?.to_owned(),
                 description: self
                     .element
@@ -3501,7 +3501,7 @@ impl Field {
                 display: self
                     .element
                     .get_attribute("text:display")
-                    .map(OdfVariableSetDisplay::parse)
+                    .map(VariableSetDisplay::parse)
                     .transpose()?,
                 data_style_name: self
                     .element
@@ -3511,12 +3511,12 @@ impl Field {
             },
             "text:user-field-get" => {
                 reject_calculated_value_attributes(self)?;
-                OdfDynamicTextField::UserFieldGet {
+                DynamicTextField::UserFieldGet {
                     name: required_field_attribute(self, "text:name")?.to_owned(),
                     display: self
                         .element
                         .get_attribute("text:display")
-                        .map(OdfUserFieldDisplay::parse)
+                        .map(UserFieldDisplay::parse)
                         .transpose()?,
                     data_style_name: self
                         .element
@@ -3527,7 +3527,7 @@ impl Field {
             },
             "text:user-field-input" => {
                 reject_calculated_value_attributes(self)?;
-                OdfDynamicTextField::UserFieldInput {
+                DynamicTextField::UserFieldInput {
                     name: required_field_attribute(self, "text:name")?.to_owned(),
                     description: self
                         .element
@@ -3542,7 +3542,7 @@ impl Field {
             },
             "text:text-input" => {
                 reject_calculated_value_attributes(self)?;
-                OdfDynamicTextField::TextInput {
+                DynamicTextField::TextInput {
                     description: self
                         .element
                         .get_attribute("text:description")
@@ -3552,7 +3552,7 @@ impl Field {
             },
             "text:table-formula" => {
                 reject_calculated_value_attributes(self)?;
-                OdfDynamicTextField::TableFormula {
+                DynamicTextField::TableFormula {
                     formula: self
                         .element
                         .get_attribute("text:formula")
@@ -3560,7 +3560,7 @@ impl Field {
                     display: self
                         .element
                         .get_attribute("text:display")
-                        .map(OdfFormulaFieldDisplay::parse)
+                        .map(FormulaFieldDisplay::parse)
                         .transpose()?,
                     data_style_name: self
                         .element
@@ -3571,14 +3571,14 @@ impl Field {
             },
             "text:measure" => {
                 reject_unknown_field_attributes(self, &["text:kind"])?;
-                OdfDynamicTextField::Measure {
-                    kind: OdfMeasureKind::parse(required_field_attribute(self, "text:kind")?)?,
+                DynamicTextField::Measure {
+                    kind: MeasureKind::parse(required_field_attribute(self, "text:kind")?)?,
                     display_text: text(),
                 }
             },
             "text:reference-ref" => {
                 reject_unknown_field_attributes(self, &["text:ref-name", "text:reference-format"])?;
-                OdfDynamicTextField::Reference {
+                DynamicTextField::Reference {
                     reference_name: self
                         .element
                         .get_attribute("text:ref-name")
@@ -3586,14 +3586,14 @@ impl Field {
                     reference_format: self
                         .element
                         .get_attribute("text:reference-format")
-                        .map(OdfCrossReferenceFormat::parse)
+                        .map(CrossReferenceFormat::parse)
                         .transpose()?,
                     display_text: text(),
                 }
             },
             "text:bookmark-ref" => {
                 reject_unknown_field_attributes(self, &["text:ref-name", "text:reference-format"])?;
-                OdfDynamicTextField::BookmarkReference {
+                DynamicTextField::BookmarkReference {
                     reference_name: self
                         .element
                         .get_attribute("text:ref-name")
@@ -3601,7 +3601,7 @@ impl Field {
                     reference_format: self
                         .element
                         .get_attribute("text:reference-format")
-                        .map(OdfCrossReferenceFormat::parse)
+                        .map(CrossReferenceFormat::parse)
                         .transpose()?,
                     display_text: text(),
                 }
@@ -3611,19 +3611,19 @@ impl Field {
                     self,
                     &["text:ref-name", "text:reference-format", "text:note-class"],
                 )?;
-                OdfDynamicTextField::NoteReference {
+                DynamicTextField::NoteReference {
                     reference_name: self
                         .element
                         .get_attribute("text:ref-name")
                         .map(str::to_owned),
-                    note_class: OdfNoteReferenceClass::parse(required_field_attribute(
+                    note_class: NoteReferenceClass::parse(required_field_attribute(
                         self,
                         "text:note-class",
                     )?)?,
                     reference_format: self
                         .element
                         .get_attribute("text:reference-format")
-                        .map(OdfNoteReferenceFormat::parse)
+                        .map(NoteReferenceFormat::parse)
                         .transpose()?,
                     display_text: text(),
                 }
@@ -3640,16 +3640,16 @@ impl Field {
                     &["style:num-format", "style:num-letter-sync"],
                 )?;
                 let kind = match self.field_type() {
-                    "text:page-count" => OdfDocumentStatisticKind::Page,
-                    "text:paragraph-count" => OdfDocumentStatisticKind::Paragraph,
-                    "text:word-count" => OdfDocumentStatisticKind::Word,
-                    "text:character-count" => OdfDocumentStatisticKind::Character,
-                    "text:table-count" => OdfDocumentStatisticKind::Table,
-                    "text:image-count" => OdfDocumentStatisticKind::Image,
-                    "text:object-count" => OdfDocumentStatisticKind::Object,
+                    "text:page-count" => DocumentStatisticKind::Page,
+                    "text:paragraph-count" => DocumentStatisticKind::Paragraph,
+                    "text:word-count" => DocumentStatisticKind::Word,
+                    "text:character-count" => DocumentStatisticKind::Character,
+                    "text:table-count" => DocumentStatisticKind::Table,
+                    "text:image-count" => DocumentStatisticKind::Image,
+                    "text:object-count" => DocumentStatisticKind::Object,
                     _ => unreachable!(),
                 };
-                OdfDynamicTextField::DocumentStatistic {
+                DynamicTextField::DocumentStatistic {
                     kind,
                     number_format: parse_common_number_format(self)?,
                     display_text: text(),
@@ -3666,7 +3666,7 @@ impl Field {
                         "text:select-page",
                     ],
                 )?;
-                OdfDynamicTextField::PageNumber {
+                DynamicTextField::PageNumber {
                     number_format: parse_common_number_format(self)?,
                     fixed: optional_field_bool(self, "text:fixed")?,
                     page_adjust: self
@@ -3683,7 +3683,7 @@ impl Field {
                     select_page: self
                         .element
                         .get_attribute("text:select-page")
-                        .map(OdfPageSelection::parse)
+                        .map(PageSelection::parse)
                         .transpose()?,
                     display_text: text(),
                 }
@@ -3698,16 +3698,16 @@ impl Field {
                         "style:data-style-name",
                     ],
                 )?;
-                OdfDynamicTextField::Date {
+                DynamicTextField::Date {
                     value: self
                         .element
                         .get_attribute("text:date-value")
-                        .map(OdfFieldDateValue::new)
+                        .map(FieldDateValue::new)
                         .transpose()?,
                     adjustment: self
                         .element
                         .get_attribute("text:date-adjust")
-                        .map(OdfFieldDuration::new)
+                        .map(FieldDuration::new)
                         .transpose()?,
                     fixed: optional_field_bool(self, "text:fixed")?,
                     data_style_name: self
@@ -3727,16 +3727,16 @@ impl Field {
                         "style:data-style-name",
                     ],
                 )?;
-                OdfDynamicTextField::Time {
+                DynamicTextField::Time {
                     value: self
                         .element
                         .get_attribute("text:time-value")
-                        .map(OdfFieldTimeValue::new)
+                        .map(FieldTimeValue::new)
                         .transpose()?,
                     adjustment: self
                         .element
                         .get_attribute("text:time-adjust")
-                        .map(OdfFieldDuration::new)
+                        .map(FieldDuration::new)
                         .transpose()?,
                     fixed: optional_field_bool(self, "text:fixed")?,
                     data_style_name: self
@@ -3748,8 +3748,8 @@ impl Field {
             },
             "text:page-continuation" => {
                 reject_unknown_field_attributes(self, &["text:select-page", "text:string-value"])?;
-                OdfDynamicTextField::PageContinuation {
-                    select_page: OdfPageContinuationSelection::parse(required_field_attribute(
+                DynamicTextField::PageContinuation {
+                    select_page: PageContinuationSelection::parse(required_field_attribute(
                         self,
                         "text:select-page",
                     )?)?,
@@ -3762,7 +3762,7 @@ impl Field {
             },
             "text:page-variable-set" => {
                 reject_unknown_field_attributes(self, &["text:active", "text:page-adjust"])?;
-                OdfDynamicTextField::PageVariableSet {
+                DynamicTextField::PageVariableSet {
                     active: optional_field_bool(self, "text:active")?,
                     page_adjust: self
                         .element
@@ -3783,18 +3783,18 @@ impl Field {
                     self,
                     &["style:num-format", "style:num-letter-sync"],
                 )?;
-                OdfDynamicTextField::PageVariableGet {
+                DynamicTextField::PageVariableGet {
                     number_format: parse_common_number_format(self)?,
                     display_text: text(),
                 }
             },
             "text:file-name" => {
                 reject_unknown_field_attributes(self, &["text:display", "text:fixed"])?;
-                let result = OdfDynamicTextField::FileName {
+                let result = DynamicTextField::FileName {
                     display: self
                         .element
                         .get_attribute("text:display")
-                        .map(OdfFileNameDisplay::parse)
+                        .map(FileNameDisplay::parse)
                         .transpose()?,
                     fixed: optional_field_bool(self, "text:fixed")?,
                     display_text: text(),
@@ -3804,11 +3804,11 @@ impl Field {
             },
             "text:template-name" => {
                 reject_unknown_field_attributes(self, &["text:display"])?;
-                let result = OdfDynamicTextField::TemplateName {
+                let result = DynamicTextField::TemplateName {
                     display: self
                         .element
                         .get_attribute("text:display")
-                        .map(OdfTemplateNameDisplay::parse)
+                        .map(TemplateNameDisplay::parse)
                         .transpose()?,
                     display_text: text(),
                 };
@@ -3817,7 +3817,7 @@ impl Field {
             },
             "text:sheet-name" => {
                 reject_unknown_field_attributes(self, &[])?;
-                let result = OdfDynamicTextField::SheetName {
+                let result = DynamicTextField::SheetName {
                     display_text: text(),
                 };
                 result.validate()?;
@@ -3825,16 +3825,16 @@ impl Field {
             },
             "text:chapter" => {
                 reject_unknown_field_attributes(self, &["text:display", "text:outline-level"])?;
-                let result = OdfDynamicTextField::Chapter {
+                let result = DynamicTextField::Chapter {
                     display: self
                         .element
                         .get_attribute("text:display")
-                        .map(OdfChapterDisplay::parse)
+                        .map(ChapterDisplay::parse)
                         .transpose()?,
                     outline_level: self
                         .element
                         .get_attribute("text:outline-level")
-                        .map(OdfNonNegativeInteger::new)
+                        .map(NonNegativeInteger::new)
                         .transpose()?,
                     display_text: text(),
                 };
@@ -3850,59 +3850,59 @@ impl Field {
             | "text:modification-date"
             | "text:modification-time" => {
                 let kind = match self.field_type() {
-                    "text:creation-date" => OdfDocumentMetadataFieldKind::CreationDate,
-                    "text:creation-time" => OdfDocumentMetadataFieldKind::CreationTime,
-                    "text:print-date" => OdfDocumentMetadataFieldKind::PrintDate,
-                    "text:print-time" => OdfDocumentMetadataFieldKind::PrintTime,
-                    "text:editing-cycles" => OdfDocumentMetadataFieldKind::EditingCycles,
-                    "text:editing-duration" => OdfDocumentMetadataFieldKind::EditingDuration,
-                    "text:modification-date" => OdfDocumentMetadataFieldKind::ModificationDate,
-                    "text:modification-time" => OdfDocumentMetadataFieldKind::ModificationTime,
+                    "text:creation-date" => DocumentMetadataFieldKind::CreationDate,
+                    "text:creation-time" => DocumentMetadataFieldKind::CreationTime,
+                    "text:print-date" => DocumentMetadataFieldKind::PrintDate,
+                    "text:print-time" => DocumentMetadataFieldKind::PrintTime,
+                    "text:editing-cycles" => DocumentMetadataFieldKind::EditingCycles,
+                    "text:editing-duration" => DocumentMetadataFieldKind::EditingDuration,
+                    "text:modification-date" => DocumentMetadataFieldKind::ModificationDate,
+                    "text:modification-time" => DocumentMetadataFieldKind::ModificationTime,
                     _ => unreachable!(),
                 };
                 let allowed = match kind {
-                    OdfDocumentMetadataFieldKind::CreationDate
-                    | OdfDocumentMetadataFieldKind::PrintDate
-                    | OdfDocumentMetadataFieldKind::ModificationDate => {
+                    DocumentMetadataFieldKind::CreationDate
+                    | DocumentMetadataFieldKind::PrintDate
+                    | DocumentMetadataFieldKind::ModificationDate => {
                         &["text:fixed", "style:data-style-name", "text:date-value"][..]
                     },
-                    OdfDocumentMetadataFieldKind::CreationTime
-                    | OdfDocumentMetadataFieldKind::PrintTime
-                    | OdfDocumentMetadataFieldKind::ModificationTime => {
+                    DocumentMetadataFieldKind::CreationTime
+                    | DocumentMetadataFieldKind::PrintTime
+                    | DocumentMetadataFieldKind::ModificationTime => {
                         &["text:fixed", "style:data-style-name", "text:time-value"][..]
                     },
-                    OdfDocumentMetadataFieldKind::EditingDuration => {
+                    DocumentMetadataFieldKind::EditingDuration => {
                         &["text:fixed", "style:data-style-name", "text:duration"][..]
                     },
-                    OdfDocumentMetadataFieldKind::EditingCycles => &["text:fixed"][..],
+                    DocumentMetadataFieldKind::EditingCycles => &["text:fixed"][..],
                 };
                 reject_unknown_field_attributes(self, allowed)?;
                 let value = match kind {
-                    OdfDocumentMetadataFieldKind::CreationDate
-                    | OdfDocumentMetadataFieldKind::PrintDate
-                    | OdfDocumentMetadataFieldKind::ModificationDate => self
+                    DocumentMetadataFieldKind::CreationDate
+                    | DocumentMetadataFieldKind::PrintDate
+                    | DocumentMetadataFieldKind::ModificationDate => self
                         .element
                         .get_attribute("text:date-value")
-                        .map(OdfFieldDateValue::new)
+                        .map(FieldDateValue::new)
                         .transpose()?
-                        .map(OdfDocumentMetadataFieldValue::Date),
-                    OdfDocumentMetadataFieldKind::CreationTime
-                    | OdfDocumentMetadataFieldKind::PrintTime
-                    | OdfDocumentMetadataFieldKind::ModificationTime => self
+                        .map(DocumentMetadataFieldValue::Date),
+                    DocumentMetadataFieldKind::CreationTime
+                    | DocumentMetadataFieldKind::PrintTime
+                    | DocumentMetadataFieldKind::ModificationTime => self
                         .element
                         .get_attribute("text:time-value")
-                        .map(OdfFieldTimeValue::new)
+                        .map(FieldTimeValue::new)
                         .transpose()?
-                        .map(OdfDocumentMetadataFieldValue::Time),
-                    OdfDocumentMetadataFieldKind::EditingDuration => self
+                        .map(DocumentMetadataFieldValue::Time),
+                    DocumentMetadataFieldKind::EditingDuration => self
                         .element
                         .get_attribute("text:duration")
-                        .map(OdfFieldDuration::new)
+                        .map(FieldDuration::new)
                         .transpose()?
-                        .map(OdfDocumentMetadataFieldValue::Duration),
-                    OdfDocumentMetadataFieldKind::EditingCycles => None,
+                        .map(DocumentMetadataFieldValue::Duration),
+                    DocumentMetadataFieldKind::EditingCycles => None,
                 };
-                let result = OdfDynamicTextField::DocumentMetadata {
+                let result = DynamicTextField::DocumentMetadata {
                     kind,
                     value,
                     fixed: optional_field_bool(self, "text:fixed")?,
@@ -3926,18 +3926,18 @@ impl Field {
             | "text:author-initials" => {
                 reject_unknown_field_attributes(self, &["text:fixed"])?;
                 let kind = match self.field_type() {
-                    "text:initial-creator" => OdfDocumentIdentityFieldKind::InitialCreator,
-                    "text:description" => OdfDocumentIdentityFieldKind::Description,
-                    "text:printed-by" => OdfDocumentIdentityFieldKind::PrintedBy,
-                    "text:title" => OdfDocumentIdentityFieldKind::Title,
-                    "text:subject" => OdfDocumentIdentityFieldKind::Subject,
-                    "text:keywords" => OdfDocumentIdentityFieldKind::Keywords,
-                    "text:creator" => OdfDocumentIdentityFieldKind::Creator,
-                    "text:author-name" => OdfDocumentIdentityFieldKind::AuthorName,
-                    "text:author-initials" => OdfDocumentIdentityFieldKind::AuthorInitials,
+                    "text:initial-creator" => DocumentIdentityFieldKind::InitialCreator,
+                    "text:description" => DocumentIdentityFieldKind::Description,
+                    "text:printed-by" => DocumentIdentityFieldKind::PrintedBy,
+                    "text:title" => DocumentIdentityFieldKind::Title,
+                    "text:subject" => DocumentIdentityFieldKind::Subject,
+                    "text:keywords" => DocumentIdentityFieldKind::Keywords,
+                    "text:creator" => DocumentIdentityFieldKind::Creator,
+                    "text:author-name" => DocumentIdentityFieldKind::AuthorName,
+                    "text:author-initials" => DocumentIdentityFieldKind::AuthorInitials,
                     _ => unreachable!(),
                 };
-                OdfDynamicTextField::DocumentIdentity {
+                DynamicTextField::DocumentIdentity {
                     kind,
                     fixed: optional_field_bool(self, "text:fixed")?,
                     display_text: text(),
@@ -3960,24 +3960,24 @@ impl Field {
             | "text:sender-state-or-province" => {
                 reject_unknown_field_attributes(self, &["text:fixed"])?;
                 let kind = match self.field_type() {
-                    "text:sender-firstname" => OdfSenderFieldKind::FirstName,
-                    "text:sender-lastname" => OdfSenderFieldKind::LastName,
-                    "text:sender-initials" => OdfSenderFieldKind::Initials,
-                    "text:sender-title" => OdfSenderFieldKind::Title,
-                    "text:sender-position" => OdfSenderFieldKind::Position,
-                    "text:sender-email" => OdfSenderFieldKind::Email,
-                    "text:sender-phone-private" => OdfSenderFieldKind::PrivatePhone,
-                    "text:sender-fax" => OdfSenderFieldKind::Fax,
-                    "text:sender-company" => OdfSenderFieldKind::Company,
-                    "text:sender-phone-work" => OdfSenderFieldKind::WorkPhone,
-                    "text:sender-street" => OdfSenderFieldKind::Street,
-                    "text:sender-city" => OdfSenderFieldKind::City,
-                    "text:sender-postal-code" => OdfSenderFieldKind::PostalCode,
-                    "text:sender-country" => OdfSenderFieldKind::Country,
-                    "text:sender-state-or-province" => OdfSenderFieldKind::StateOrProvince,
+                    "text:sender-firstname" => SenderFieldKind::FirstName,
+                    "text:sender-lastname" => SenderFieldKind::LastName,
+                    "text:sender-initials" => SenderFieldKind::Initials,
+                    "text:sender-title" => SenderFieldKind::Title,
+                    "text:sender-position" => SenderFieldKind::Position,
+                    "text:sender-email" => SenderFieldKind::Email,
+                    "text:sender-phone-private" => SenderFieldKind::PrivatePhone,
+                    "text:sender-fax" => SenderFieldKind::Fax,
+                    "text:sender-company" => SenderFieldKind::Company,
+                    "text:sender-phone-work" => SenderFieldKind::WorkPhone,
+                    "text:sender-street" => SenderFieldKind::Street,
+                    "text:sender-city" => SenderFieldKind::City,
+                    "text:sender-postal-code" => SenderFieldKind::PostalCode,
+                    "text:sender-country" => SenderFieldKind::Country,
+                    "text:sender-state-or-province" => SenderFieldKind::StateOrProvince,
                     _ => unreachable!(),
                 };
-                let result = OdfDynamicTextField::Sender {
+                let result = DynamicTextField::Sender {
                     kind,
                     fixed: optional_field_bool(self, "text:fixed")?,
                     display_text: text(),
@@ -3999,9 +3999,9 @@ impl Field {
                         "office:string-value",
                     ],
                 )?;
-                let result = OdfDynamicTextField::UserDefinedMetadata {
+                let result = DynamicTextField::UserDefinedMetadata {
                     name: required_field_attribute(self, "text:name")?.to_owned(),
-                    values: OdfUserDefinedMetadataValues {
+                    values: UserDefinedMetadataValues {
                         number: self
                             .element
                             .get_attribute("office:value")
@@ -4009,12 +4009,12 @@ impl Field {
                         date: self
                             .element
                             .get_attribute("office:date-value")
-                            .map(OdfFieldDateValue::new)
+                            .map(FieldDateValue::new)
                             .transpose()?,
                         time: self
                             .element
                             .get_attribute("office:time-value")
-                            .map(OdfFieldDuration::new)
+                            .map(FieldDuration::new)
                             .transpose()?,
                         boolean: optional_field_bool(self, "office:boolean-value")?,
                         string: self
@@ -4046,33 +4046,31 @@ fn set_data_style(element: &mut Element, value: Option<&str>) {
 }
 
 fn validate_document_metadata_value(
-    kind: OdfDocumentMetadataFieldKind,
-    value: Option<&OdfDocumentMetadataFieldValue>,
+    kind: DocumentMetadataFieldKind,
+    value: Option<&DocumentMetadataFieldValue>,
     aggregate: &mut usize,
 ) -> Result<()> {
     match (kind, value) {
         (_, None) => Ok(()),
         (
-            OdfDocumentMetadataFieldKind::CreationDate,
-            Some(OdfDocumentMetadataFieldValue::Date(value)),
+            DocumentMetadataFieldKind::CreationDate,
+            Some(DocumentMetadataFieldValue::Date(value)),
         ) => value.validate(aggregate),
         (
-            OdfDocumentMetadataFieldKind::CreationTime,
-            Some(OdfDocumentMetadataFieldValue::Time(value)),
+            DocumentMetadataFieldKind::CreationTime,
+            Some(DocumentMetadataFieldValue::Time(value)),
         ) => value.validate(aggregate),
         (
-            OdfDocumentMetadataFieldKind::PrintDate
-            | OdfDocumentMetadataFieldKind::ModificationDate,
-            Some(OdfDocumentMetadataFieldValue::Date(value)),
-        ) if value.kind() == OdfDateValueKind::Date => value.validate(aggregate),
+            DocumentMetadataFieldKind::PrintDate | DocumentMetadataFieldKind::ModificationDate,
+            Some(DocumentMetadataFieldValue::Date(value)),
+        ) if value.kind() == DateValueKind::Date => value.validate(aggregate),
         (
-            OdfDocumentMetadataFieldKind::PrintTime
-            | OdfDocumentMetadataFieldKind::ModificationTime,
-            Some(OdfDocumentMetadataFieldValue::Time(value)),
-        ) if value.kind() == OdfTimeValueKind::Time => value.validate(aggregate),
+            DocumentMetadataFieldKind::PrintTime | DocumentMetadataFieldKind::ModificationTime,
+            Some(DocumentMetadataFieldValue::Time(value)),
+        ) if value.kind() == TimeValueKind::Time => value.validate(aggregate),
         (
-            OdfDocumentMetadataFieldKind::EditingDuration,
-            Some(OdfDocumentMetadataFieldValue::Duration(value)),
+            DocumentMetadataFieldKind::EditingDuration,
+            Some(DocumentMetadataFieldValue::Duration(value)),
         ) => value.validate("text:duration", aggregate),
         _ => Err(Error::InvalidFormat(format!(
             "value type is not permitted by {}",
@@ -4253,10 +4251,7 @@ fn reject_calculated_value_attributes(field: &Field) -> Result<()> {
     Ok(())
 }
 
-fn parse_calculated_value(
-    field: &Field,
-    required: bool,
-) -> Result<Option<OdfCalculatedFieldValue>> {
+fn parse_calculated_value(field: &Field, required: bool) -> Result<Option<CalculatedFieldValue>> {
     let Some(value_type) = field.element.get_attribute("office:value-type") else {
         if CALCULATED_VALUE_ATTRIBUTES[..6]
             .iter()
@@ -4282,24 +4277,22 @@ fn parse_calculated_value(
         })
     };
     let value = match value_type {
-        "float" => OdfCalculatedFieldValue::Float(required_attr("office:value")?.to_owned()),
-        "percentage" => {
-            OdfCalculatedFieldValue::Percentage(required_attr("office:value")?.to_owned())
-        },
-        "currency" => OdfCalculatedFieldValue::Currency {
+        "float" => CalculatedFieldValue::Float(required_attr("office:value")?.to_owned()),
+        "percentage" => CalculatedFieldValue::Percentage(required_attr("office:value")?.to_owned()),
+        "currency" => CalculatedFieldValue::Currency {
             value: required_attr("office:value")?.to_owned(),
             currency: attr("office:currency").map(str::to_owned),
         },
-        "date" => OdfCalculatedFieldValue::Date(required_attr("office:date-value")?.to_owned()),
-        "time" => OdfCalculatedFieldValue::Time(required_attr("office:time-value")?.to_owned()),
-        "boolean" => OdfCalculatedFieldValue::Boolean(
+        "date" => CalculatedFieldValue::Date(required_attr("office:date-value")?.to_owned()),
+        "time" => CalculatedFieldValue::Time(required_attr("office:time-value")?.to_owned()),
+        "boolean" => CalculatedFieldValue::Boolean(
             optional_field_bool(field, "office:boolean-value")?.ok_or_else(|| {
                 Error::InvalidFormat(
                     "office:value-type 'boolean' requires office:boolean-value".to_string(),
                 )
             })?,
         ),
-        "string" => OdfCalculatedFieldValue::String(attr("office:string-value").map(str::to_owned)),
+        "string" => CalculatedFieldValue::String(attr("office:string-value").map(str::to_owned)),
         _ => {
             return Err(Error::InvalidFormat(format!(
                 "invalid calculated field office:value-type '{value_type}'"
@@ -4328,9 +4321,8 @@ fn parse_calculated_value(
     Ok(Some(value))
 }
 
-fn parse_value_type_only(field: &Field) -> Result<OdfFieldValueType> {
-    let value_type =
-        OdfFieldValueType::parse(required_field_attribute(field, "office:value-type")?)?;
+fn parse_value_type_only(field: &Field) -> Result<FieldValueType> {
+    let value_type = FieldValueType::parse(required_field_attribute(field, "office:value-type")?)?;
     if let Some(extra) = CALCULATED_VALUE_ATTRIBUTES[..6]
         .iter()
         .find(|name| field.element.get_attribute(name).is_some())
@@ -4342,11 +4334,11 @@ fn parse_value_type_only(field: &Field) -> Result<OdfFieldValueType> {
     Ok(value_type)
 }
 
-fn parse_common_number_format(field: &Field) -> Result<Option<OdfSequenceNumberFormat>> {
+fn parse_common_number_format(field: &Field) -> Result<Option<SequenceNumberFormat>> {
     let format = field.element.get_attribute("style:num-format");
     let letter_sync = optional_field_bool(field, "style:num-letter-sync")?;
     match (format, letter_sync) {
-        (Some(format), letter_sync) => Ok(Some(OdfSequenceNumberFormat::new(format, letter_sync)?)),
+        (Some(format), letter_sync) => Ok(Some(SequenceNumberFormat::new(format, letter_sync)?)),
         (None, Some(_)) => Err(Error::InvalidFormat(
             "style:num-letter-sync requires style:num-format".to_string(),
         )),
@@ -4689,12 +4681,12 @@ impl FieldParser {
     }
 
     /// Parse database fields without contacting any declared database resource.
-    pub fn parse_database_fields(xml_content: &str) -> Result<Vec<OdfDatabaseField>> {
+    pub fn parse_database_fields(xml_content: &str) -> Result<Vec<DatabaseField>> {
         parse_database_fields(xml_content)
     }
 
     /// Parse typed dynamic text fields without evaluating them.
-    pub fn parse_dynamic_text_fields(xml_content: &str) -> Result<Vec<OdfDynamicTextField>> {
+    pub fn parse_dynamic_text_fields(xml_content: &str) -> Result<Vec<DynamicTextField>> {
         let mut meta_fields = parse_meta_fields(xml_content)?.into_iter();
         let mut drop_down_fields = parse_drop_down_fields(xml_content)?.into_iter();
         let mut result = Vec::new();
@@ -4743,8 +4735,8 @@ struct ActiveNoteBody {
 
 #[derive(Debug)]
 struct MetaContentBuilder {
-    roots: Vec<OdfMetaFieldNode>,
-    stack: Vec<OdfMetaFieldElement>,
+    roots: Vec<MetaFieldNode>,
+    stack: Vec<MetaFieldElement>,
     nodes: usize,
     aggregate: usize,
     root_grammar: MetaContentGrammar,
@@ -4783,12 +4775,12 @@ impl MetaContentBuilder {
             ));
         }
         add_meta_size(&mut self.aggregate, value.len())?;
-        if let Some(OdfMetaFieldNode::Text(text)) = self.current_nodes_mut().last_mut() {
+        if let Some(MetaFieldNode::Text(text)) = self.current_nodes_mut().last_mut() {
             text.push_str(value);
         } else {
             self.add_node()?;
             self.current_nodes_mut()
-                .push(OdfMetaFieldNode::Text(value.to_string()));
+                .push(MetaFieldNode::Text(value.to_string()));
         }
         Ok(())
     }
@@ -4797,7 +4789,7 @@ impl MetaContentBuilder {
         &mut self,
         namespace_uri: String,
         local_name: String,
-        attributes: Vec<OdfMetaFieldAttribute>,
+        attributes: Vec<MetaFieldAttribute>,
     ) -> Result<()> {
         if self.stack.is_empty()
             && meta_child_grammar(self.root_grammar, &namespace_uri, &local_name).is_err()
@@ -4819,7 +4811,7 @@ impl MetaContentBuilder {
             )));
         }
         self.add_node()?;
-        self.stack.push(OdfMetaFieldElement {
+        self.stack.push(MetaFieldElement {
             namespace_uri,
             local_name,
             attributes,
@@ -4832,7 +4824,7 @@ impl MetaContentBuilder {
         &mut self,
         namespace_uri: String,
         local_name: String,
-        attributes: Vec<OdfMetaFieldAttribute>,
+        attributes: Vec<MetaFieldAttribute>,
     ) -> Result<()> {
         self.start_element(namespace_uri, local_name, attributes)?;
         self.end_element()
@@ -4843,29 +4835,29 @@ impl MetaContentBuilder {
             Error::InvalidFormat("text:meta-field content stack underflow".to_string())
         })?;
         self.current_nodes_mut()
-            .push(OdfMetaFieldNode::Element(element));
+            .push(MetaFieldNode::Element(element));
         Ok(())
     }
 
-    fn finish_meta_field(self) -> Result<OdfMetaFieldContent> {
+    fn finish_meta_field(self) -> Result<MetaFieldContent> {
         if !self.stack.is_empty() {
             return Err(Error::InvalidFormat(
                 "incomplete text:meta-field content".to_string(),
             ));
         }
-        OdfMetaFieldContent::new(self.roots)
+        MetaFieldContent::new(self.roots)
     }
 
-    fn finish_note_body(self) -> Result<OdfNoteBodyContent> {
+    fn finish_note_body(self) -> Result<NoteBodyContent> {
         if !self.stack.is_empty() {
             return Err(Error::InvalidFormat(
                 "incomplete text:note-body content".to_string(),
             ));
         }
-        OdfNoteBodyContent::new(self.roots)
+        NoteBodyContent::new(self.roots)
     }
 
-    fn current_nodes_mut(&mut self) -> &mut Vec<OdfMetaFieldNode> {
+    fn current_nodes_mut(&mut self) -> &mut Vec<MetaFieldNode> {
         if let Some(element) = self.stack.last_mut() {
             &mut element.children
         } else {
@@ -4886,7 +4878,7 @@ impl MetaContentBuilder {
     }
 }
 
-fn parse_meta_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
+fn parse_meta_fields(xml: &str) -> Result<Vec<DynamicTextField>> {
     if xml.len() > MAX_META_FIELD_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
             "field XML exceeds {MAX_META_FIELD_XML_BYTES} bytes"
@@ -4975,10 +4967,10 @@ fn parse_meta_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
                     let (xml_id, data_style_name) = parse_meta_root_attributes(&reader, source)?;
                     completed.push((
                         next_order,
-                        OdfDynamicTextField::MetaField {
+                        DynamicTextField::MetaField {
                             xml_id,
                             data_style_name,
-                            content: OdfMetaFieldContent::new(Vec::new())?,
+                            content: MetaFieldContent::new(Vec::new())?,
                         },
                     ));
                     next_order += 1;
@@ -5019,7 +5011,7 @@ fn parse_meta_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
                 if let Some(field) = active.pop_if(|field| field.depth == depth) {
                     completed.push((
                         field.order,
-                        OdfDynamicTextField::MetaField {
+                        DynamicTextField::MetaField {
                             xml_id: field.xml_id,
                             data_style_name: field.data_style_name,
                             content: field.builder.finish_meta_field()?,
@@ -5060,7 +5052,7 @@ fn parse_meta_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
 /// Parse every direct `text:note-body` child of an ODF `text:note` into the
 /// shared inert mixed-content model. This does not evaluate fields, links,
 /// event listeners, scripts, or macros represented by the nodes.
-pub(crate) fn parse_note_body_contents(xml: &str) -> Result<Vec<OdfNoteBodyContent>> {
+pub(crate) fn parse_note_body_contents(xml: &str) -> Result<Vec<NoteBodyContent>> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
@@ -5159,7 +5151,7 @@ pub(crate) fn parse_note_body_contents(xml: &str) -> Result<Vec<OdfNoteBodyConte
                             "document exceeds note-body limit".to_string(),
                         ));
                     }
-                    completed.push((next_order, OdfNoteBodyContent::new(Vec::new())?));
+                    completed.push((next_order, NoteBodyContent::new(Vec::new())?));
                     next_order += 1;
                 }
             },
@@ -5317,7 +5309,7 @@ fn parse_meta_root_attributes(
 fn parse_meta_node_attributes(
     reader: &NsReader<&[u8]>,
     source: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<OdfMetaFieldAttribute>> {
+) -> Result<Vec<MetaFieldAttribute>> {
     let mut attributes = Vec::new();
     for attribute in source.attributes() {
         let attribute = attribute.map_err(|error| {
@@ -5341,7 +5333,7 @@ fn parse_meta_node_attributes(
                 "foreign meta-field attribute namespace '{namespace_uri}'"
             )));
         }
-        attributes.push(OdfMetaFieldAttribute {
+        attributes.push(MetaFieldAttribute {
             namespace_uri,
             local_name: utf8(local.as_ref(), "meta-field attribute name")?,
             value: attribute
@@ -5395,7 +5387,7 @@ enum MetaContentGrammar {
 }
 
 fn validate_meta_nodes(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     depth: usize,
     grammar: MetaContentGrammar,
     aggregate: &mut usize,
@@ -5512,7 +5504,7 @@ fn validate_meta_nodes(
                     "draw:a requires exactly one drawing shape".to_string(),
                 ));
             }
-            let OdfMetaFieldNode::Element(element) = &nodes[0] else {
+            let MetaFieldNode::Element(element) = &nodes[0] else {
                 return Err(Error::InvalidFormat(
                     "draw:a requires a drawing shape child".to_string(),
                 ));
@@ -5544,7 +5536,7 @@ fn validate_meta_nodes(
             )));
         }
         match node {
-            OdfMetaFieldNode::Text(value) => {
+            MetaFieldNode::Text(value) => {
                 if matches!(grammar, MetaContentGrammar::Empty) {
                     return Err(Error::InvalidFormat(
                         "ODF empty inline element contains character data".to_string(),
@@ -5553,7 +5545,7 @@ fn validate_meta_nodes(
                 validate_dynamic_value("meta-field text", Some(value), false, aggregate)?;
                 display_text.push_str(value);
             },
-            OdfMetaFieldNode::Element(element) => {
+            MetaFieldNode::Element(element) => {
                 validate_meta_element_parts(
                     &element.namespace_uri,
                     &element.local_name,
@@ -5579,7 +5571,7 @@ fn validate_meta_nodes(
 
 #[allow(clippy::too_many_arguments)]
 fn validate_meta_exact_pair(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     depth: usize,
     first: (&str, &str, MetaContentGrammar),
     second: (&str, &str, MetaContentGrammar),
@@ -5617,7 +5609,7 @@ fn validate_meta_exact_pair(
 
 #[allow(clippy::too_many_arguments)]
 fn validate_meta_required_element(
-    node: &OdfMetaFieldNode,
+    node: &MetaFieldNode,
     depth: usize,
     namespace: &str,
     local: &str,
@@ -5626,7 +5618,7 @@ fn validate_meta_required_element(
     node_count: &mut usize,
     display_text: &mut String,
 ) -> Result<()> {
-    let OdfMetaFieldNode::Element(element) = node else {
+    let MetaFieldNode::Element(element) = node else {
         return Err(Error::InvalidFormat(format!(
             "expected {namespace}:{local} element in structured metadata content"
         )));
@@ -5657,7 +5649,7 @@ fn validate_meta_required_element(
 }
 
 fn validate_meta_element_attributes_for_grammar(
-    element: &OdfMetaFieldElement,
+    element: &MetaFieldElement,
     grammar: MetaContentGrammar,
 ) -> Result<()> {
     if grammar == MetaContentGrammar::DropDown {
@@ -5667,7 +5659,7 @@ fn validate_meta_element_attributes_for_grammar(
 }
 
 fn validate_meta_drop_down(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     depth: usize,
     aggregate: &mut usize,
     node_count: &mut usize,
@@ -5685,12 +5677,12 @@ fn validate_meta_drop_down(
             )));
         }
         match node {
-            OdfMetaFieldNode::Text(value) => {
+            MetaFieldNode::Text(value) => {
                 display_started = true;
                 validate_dynamic_value("meta-field drop-down text", Some(value), false, aggregate)?;
                 display_text.push_str(value);
             },
-            OdfMetaFieldNode::Element(element) => {
+            MetaFieldNode::Element(element) => {
                 if display_started
                     || element.namespace_uri != TEXT_DATABASE_NAMESPACE
                     || element.local_name != "label"
@@ -5730,7 +5722,7 @@ fn validate_meta_drop_down(
     Ok(())
 }
 
-fn validate_meta_drop_down_attributes(attributes: &[OdfMetaFieldAttribute]) -> Result<()> {
+fn validate_meta_drop_down_attributes(attributes: &[MetaFieldAttribute]) -> Result<()> {
     let has_name = attributes.iter().any(|attribute| {
         attribute.namespace_uri == TEXT_DATABASE_NAMESPACE && attribute.local_name == "name"
     });
@@ -5749,7 +5741,7 @@ fn validate_meta_drop_down_attributes(attributes: &[OdfMetaFieldAttribute]) -> R
     Ok(())
 }
 
-fn validate_meta_drop_down_label_attributes(attributes: &[OdfMetaFieldAttribute]) -> Result<()> {
+fn validate_meta_drop_down_label_attributes(attributes: &[MetaFieldAttribute]) -> Result<()> {
     for attribute in attributes {
         if attribute.namespace_uri != TEXT_DATABASE_NAMESPACE
             || !matches!(attribute.local_name.as_str(), "value" | "current-selected")
@@ -5766,7 +5758,7 @@ fn validate_meta_drop_down_label_attributes(attributes: &[OdfMetaFieldAttribute]
 }
 
 fn validate_meta_optional_listener_then(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     depth: usize,
     remaining_grammar: MetaContentGrammar,
     owner: &str,
@@ -5775,7 +5767,7 @@ fn validate_meta_optional_listener_then(
     display_text: &mut String,
 ) -> Result<()> {
     let listener_position = nodes.iter().position(|node| {
-        matches!(node, OdfMetaFieldNode::Element(element)
+        matches!(node, MetaFieldNode::Element(element)
             if element.namespace_uri == OFFICE_NAMESPACE && element.local_name == "event-listeners")
     });
     let start = match listener_position {
@@ -5810,14 +5802,14 @@ fn validate_meta_optional_listener_then(
 }
 
 fn validate_meta_event_listeners(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     depth: usize,
     aggregate: &mut usize,
     node_count: &mut usize,
     display_text: &mut String,
 ) -> Result<()> {
     for node in nodes {
-        let OdfMetaFieldNode::Element(element) = node else {
+        let MetaFieldNode::Element(element) = node else {
             return Err(Error::InvalidFormat(
                 "office:event-listeners cannot contain character data".to_string(),
             ));
@@ -5849,7 +5841,7 @@ fn validate_meta_event_listeners(
 }
 
 fn validate_meta_annotation(
-    nodes: &[OdfMetaFieldNode],
+    nodes: &[MetaFieldNode],
     depth: usize,
     aggregate: &mut usize,
     node_count: &mut usize,
@@ -5862,7 +5854,7 @@ fn validate_meta_annotation(
     ];
     let mut position = 0usize;
     for (namespace, local) in metadata {
-        if matches!(nodes.get(position), Some(OdfMetaFieldNode::Element(element))
+        if matches!(nodes.get(position), Some(MetaFieldNode::Element(element))
             if element.namespace_uri == namespace && element.local_name == local)
         {
             validate_meta_required_element(
@@ -5879,7 +5871,7 @@ fn validate_meta_annotation(
         }
     }
     for node in &nodes[position..] {
-        let OdfMetaFieldNode::Element(element) = node else {
+        let MetaFieldNode::Element(element) = node else {
             return Err(Error::InvalidFormat(
                 "office:annotation only permits metadata followed by text:p or text:list"
                     .to_string(),
@@ -6112,7 +6104,7 @@ fn odf_shape_grammar(namespace: &str, local: &str) -> Option<MetaContentGrammar>
 fn validate_meta_element_parts(
     namespace_uri: &str,
     local_name: &str,
-    attributes: &[OdfMetaFieldAttribute],
+    attributes: &[MetaFieldAttribute],
     aggregate: &mut usize,
 ) -> Result<()> {
     if !is_allowed_meta_namespace(namespace_uri) || namespace_uri == XLINK_NAMESPACE {
@@ -6234,10 +6226,10 @@ fn canonical_meta_prefix(namespace: &str) -> &'static str {
     }
 }
 
-fn write_meta_node(node: &OdfMetaFieldNode, output: &mut String) {
+fn write_meta_node(node: &MetaFieldNode, output: &mut String) {
     match node {
-        OdfMetaFieldNode::Text(value) => push_xml_text(output, value),
-        OdfMetaFieldNode::Element(element) => {
+        MetaFieldNode::Text(value) => push_xml_text(output, value),
+        MetaFieldNode::Element(element) => {
             let prefix = canonical_meta_prefix(&element.namespace_uri);
             output.push('<');
             output.push_str(prefix);
@@ -6307,7 +6299,7 @@ fn push_xml_text(output: &mut String, value: &str) {
     }
 }
 
-fn parse_database_fields(xml: &str) -> Result<Vec<OdfDatabaseField>> {
+fn parse_database_fields(xml: &str) -> Result<Vec<DatabaseField>> {
     if xml.len() > MAX_META_FIELD_XML_BYTES {
         return Err(Error::InvalidFormat(
             "database field XML exceeds 64 MiB".to_string(),
@@ -6464,7 +6456,7 @@ fn parse_database_fields(xml: &str) -> Result<Vec<OdfDatabaseField>> {
     Ok(fields)
 }
 
-fn parse_drop_down_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
+fn parse_drop_down_fields(xml: &str) -> Result<Vec<DynamicTextField>> {
     if xml.len() > MAX_META_FIELD_XML_BYTES {
         return Err(Error::InvalidFormat(
             "drop-down field XML exceeds 64 MiB".to_string(),
@@ -6679,7 +6671,7 @@ fn parse_drop_down_label(
     reader: &NsReader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<OdfDropDownLabel> {
+) -> Result<DropDownLabel> {
     let attributes = drop_down_attributes(reader, element, aggregate)?;
     reject_drop_down_attributes(
         &attributes,
@@ -6688,7 +6680,7 @@ fn parse_drop_down_label(
             (TEXT_DATABASE_NAMESPACE, "current-selected"),
         ],
     )?;
-    Ok(OdfDropDownLabel {
+    Ok(DropDownLabel {
         value: drop_down_attribute(&attributes, TEXT_DATABASE_NAMESPACE, "value")
             .map(str::to_string),
         current_selected: drop_down_attribute(
@@ -6718,13 +6710,13 @@ fn append_drop_down_text(field: &mut ActiveDropDownField, depth: usize, value: &
     Ok(())
 }
 
-fn finish_drop_down_field(field: ActiveDropDownField) -> Result<OdfDynamicTextField> {
+fn finish_drop_down_field(field: ActiveDropDownField) -> Result<DynamicTextField> {
     if field.label_depth.is_some() {
         return Err(Error::InvalidFormat(
             "unterminated text:label in text:drop-down".to_string(),
         ));
     }
-    let field = OdfDynamicTextField::DropDown {
+    let field = DynamicTextField::DropDown {
         name: field.name,
         labels: field.labels,
         display_text: field.display_text,
@@ -6752,32 +6744,32 @@ fn validate_drop_down_parent(parent: Option<&(Option<String>, String)>) -> Resul
 fn parse_database_field(
     reader: &NsReader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
-    kind: OdfDatabaseFieldKind,
+    kind: DatabaseFieldKind,
     aggregate: &mut usize,
-) -> Result<OdfDatabaseField> {
+) -> Result<DatabaseField> {
     let attributes = database_attributes(reader, element, aggregate)?;
     let allowed = match kind {
-        OdfDatabaseFieldKind::Display => &[
+        DatabaseFieldKind::Display => &[
             (TEXT_DATABASE_NAMESPACE, "database-name"),
             (TEXT_DATABASE_NAMESPACE, "table-name"),
             (TEXT_DATABASE_NAMESPACE, "table-type"),
             (TEXT_DATABASE_NAMESPACE, "column-name"),
             (STYLE_NAMESPACE, "data-style-name"),
         ][..],
-        OdfDatabaseFieldKind::Next => &[
+        DatabaseFieldKind::Next => &[
             (TEXT_DATABASE_NAMESPACE, "database-name"),
             (TEXT_DATABASE_NAMESPACE, "table-name"),
             (TEXT_DATABASE_NAMESPACE, "table-type"),
             (TEXT_DATABASE_NAMESPACE, "condition"),
         ][..],
-        OdfDatabaseFieldKind::RowSelect => &[
+        DatabaseFieldKind::RowSelect => &[
             (TEXT_DATABASE_NAMESPACE, "database-name"),
             (TEXT_DATABASE_NAMESPACE, "table-name"),
             (TEXT_DATABASE_NAMESPACE, "table-type"),
             (TEXT_DATABASE_NAMESPACE, "condition"),
             (TEXT_DATABASE_NAMESPACE, "row-number"),
         ][..],
-        OdfDatabaseFieldKind::RowNumber => &[
+        DatabaseFieldKind::RowNumber => &[
             (TEXT_DATABASE_NAMESPACE, "database-name"),
             (TEXT_DATABASE_NAMESPACE, "table-name"),
             (TEXT_DATABASE_NAMESPACE, "table-type"),
@@ -6785,7 +6777,7 @@ fn parse_database_field(
             (STYLE_NAMESPACE, "num-format"),
             (STYLE_NAMESPACE, "num-letter-sync"),
         ][..],
-        OdfDatabaseFieldKind::Name => &[
+        DatabaseFieldKind::Name => &[
             (TEXT_DATABASE_NAMESPACE, "database-name"),
             (TEXT_DATABASE_NAMESPACE, "table-name"),
             (TEXT_DATABASE_NAMESPACE, "table-type"),
@@ -6795,20 +6787,20 @@ fn parse_database_field(
     let table_name =
         required_database_attribute(&attributes, TEXT_DATABASE_NAMESPACE, "table-name")?;
     let table_type = database_attribute(&attributes, TEXT_DATABASE_NAMESPACE, "table-type")
-        .map(OdfDatabaseTableType::parse)
+        .map(DatabaseTableType::parse)
         .transpose()?;
     let row_number = database_attribute(&attributes, TEXT_DATABASE_NAMESPACE, "row-number")
-        .map(OdfNonNegativeInteger::new)
+        .map(NonNegativeInteger::new)
         .transpose()?;
     let value = database_attribute(&attributes, TEXT_DATABASE_NAMESPACE, "value")
-        .map(OdfNonNegativeInteger::new)
+        .map(NonNegativeInteger::new)
         .transpose()?;
     let number_letter_sync = database_attribute(&attributes, STYLE_NAMESPACE, "num-letter-sync")
         .map(parse_database_bool)
         .transpose()?;
-    Ok(OdfDatabaseField {
+    Ok(DatabaseField {
         kind,
-        source: OdfDatabaseSource {
+        source: DatabaseSource {
             database_name: database_attribute(
                 &attributes,
                 TEXT_DATABASE_NAMESPACE,
@@ -6834,14 +6826,14 @@ fn parse_database_field(
     })
 }
 
-fn validate_database_field(field: OdfDatabaseField) -> Result<OdfDatabaseField> {
+fn validate_database_field(field: DatabaseField) -> Result<DatabaseField> {
     match field.kind {
-        OdfDatabaseFieldKind::Display if field.column_name.is_none() => {
+        DatabaseFieldKind::Display if field.column_name.is_none() => {
             return Err(Error::InvalidFormat(
                 "text:database-display requires text:column-name".to_string(),
             ));
         },
-        OdfDatabaseFieldKind::Next | OdfDatabaseFieldKind::RowSelect
+        DatabaseFieldKind::Next | DatabaseFieldKind::RowSelect
             if !field.display_text.is_empty() =>
         {
             return Err(Error::InvalidFormat(
@@ -6860,7 +6852,7 @@ fn validate_database_field(field: OdfDatabaseField) -> Result<OdfDatabaseField> 
     Ok(field)
 }
 
-fn validate_constructed_database_field(field: &OdfDatabaseField) -> Result<()> {
+fn validate_constructed_database_field(field: &DatabaseField) -> Result<()> {
     let mut aggregate = 0usize;
     for value in [
         field.source.database_name.as_deref(),
@@ -6897,14 +6889,14 @@ fn validate_constructed_database_field(field: &OdfDatabaseField) -> Result<()> {
         ));
     }
     let forbidden = match field.kind {
-        OdfDatabaseFieldKind::Display => {
+        DatabaseFieldKind::Display => {
             field.condition.is_some()
                 || field.row_number.is_some()
                 || field.value.is_some()
                 || field.number_format.is_some()
                 || field.number_letter_sync.is_some()
         },
-        OdfDatabaseFieldKind::Next => {
+        DatabaseFieldKind::Next => {
             field.column_name.is_some()
                 || field.row_number.is_some()
                 || field.value.is_some()
@@ -6912,20 +6904,20 @@ fn validate_constructed_database_field(field: &OdfDatabaseField) -> Result<()> {
                 || field.number_format.is_some()
                 || field.number_letter_sync.is_some()
         },
-        OdfDatabaseFieldKind::RowSelect => {
+        DatabaseFieldKind::RowSelect => {
             field.column_name.is_some()
                 || field.value.is_some()
                 || field.data_style_name.is_some()
                 || field.number_format.is_some()
                 || field.number_letter_sync.is_some()
         },
-        OdfDatabaseFieldKind::RowNumber => {
+        DatabaseFieldKind::RowNumber => {
             field.column_name.is_some()
                 || field.condition.is_some()
                 || field.row_number.is_some()
                 || field.data_style_name.is_some()
         },
-        OdfDatabaseFieldKind::Name => {
+        DatabaseFieldKind::Name => {
             field.column_name.is_some()
                 || field.condition.is_some()
                 || field.row_number.is_some()
@@ -6947,11 +6939,11 @@ fn parse_connection_resource(
     reader: &NsReader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<OdfDatabaseConnectionResource> {
+) -> Result<DatabaseConnectionResource> {
     let attributes = database_attributes(reader, element, aggregate)?;
     reject_database_attributes(&attributes, &[(XLINK_NAMESPACE, "href")])?;
     let href = required_database_attribute(&attributes, XLINK_NAMESPACE, "href")?;
-    Ok(OdfDatabaseConnectionResource {
+    Ok(DatabaseConnectionResource {
         href,
         simple_link: true,
     })
@@ -7125,13 +7117,13 @@ fn append_database_size(aggregate: &mut usize, amount: usize) -> Result<()> {
     Ok(())
 }
 
-fn database_field_kind(local: &str) -> Option<OdfDatabaseFieldKind> {
+fn database_field_kind(local: &str) -> Option<DatabaseFieldKind> {
     match local {
-        "database-display" => Some(OdfDatabaseFieldKind::Display),
-        "database-next" => Some(OdfDatabaseFieldKind::Next),
-        "database-row-select" => Some(OdfDatabaseFieldKind::RowSelect),
-        "database-row-number" => Some(OdfDatabaseFieldKind::RowNumber),
-        "database-name" => Some(OdfDatabaseFieldKind::Name),
+        "database-display" => Some(DatabaseFieldKind::Display),
+        "database-next" => Some(DatabaseFieldKind::Next),
+        "database-row-select" => Some(DatabaseFieldKind::RowSelect),
+        "database-row-number" => Some(DatabaseFieldKind::RowNumber),
+        "database-name" => Some(DatabaseFieldKind::Name),
         _ => None,
     }
 }
@@ -7252,17 +7244,17 @@ mod database_field_tests {
         );
         let fields = FieldParser::parse_database_fields(&xml).unwrap();
         assert_eq!(fields.len(), 5);
-        assert_eq!(fields[0].kind, OdfDatabaseFieldKind::Display);
+        assert_eq!(fields[0].kind, DatabaseFieldKind::Display);
         assert_eq!(fields[0].display_text, "A&B");
         assert_eq!(
             fields[0].source.effective_table_type(),
-            OdfDatabaseTableType::Query
+            DatabaseTableType::Query
         );
         assert_eq!(
             fields[2]
                 .row_number
                 .as_ref()
-                .map(OdfNonNegativeInteger::as_str),
+                .map(NonNegativeInteger::as_str),
             Some("42")
         );
         assert_eq!(
@@ -7302,15 +7294,15 @@ mod database_field_tests {
 
     #[test]
     fn database_fields_roundtrip_all_kinds_and_schema_optional_values() {
-        let source = || OdfDatabaseSource {
+        let source = || DatabaseSource {
             database_name: None,
             table_name: String::new(),
-            table_type: Some(OdfDatabaseTableType::Command),
+            table_type: Some(DatabaseTableType::Command),
             connection_resource: None,
         };
         let fields = vec![
-            OdfDatabaseField {
-                kind: OdfDatabaseFieldKind::Display,
+            DatabaseField {
+                kind: DatabaseFieldKind::Display,
                 source: source(),
                 column_name: Some(String::new()),
                 condition: None,
@@ -7321,8 +7313,8 @@ mod database_field_tests {
                 number_letter_sync: None,
                 display_text: "A&B".into(),
             },
-            OdfDatabaseField {
-                kind: OdfDatabaseFieldKind::Next,
+            DatabaseField {
+                kind: DatabaseFieldKind::Next,
                 source: source(),
                 column_name: None,
                 condition: Some("of:=TRUE()".into()),
@@ -7333,8 +7325,8 @@ mod database_field_tests {
                 number_letter_sync: None,
                 display_text: String::new(),
             },
-            OdfDatabaseField {
-                kind: OdfDatabaseFieldKind::RowSelect,
+            DatabaseField {
+                kind: DatabaseFieldKind::RowSelect,
                 source: source(),
                 column_name: None,
                 condition: None,
@@ -7345,22 +7337,22 @@ mod database_field_tests {
                 number_letter_sync: None,
                 display_text: String::new(),
             },
-            OdfDatabaseField {
-                kind: OdfDatabaseFieldKind::RowNumber,
+            DatabaseField {
+                kind: DatabaseFieldKind::RowNumber,
                 source: source(),
                 column_name: None,
                 condition: None,
                 row_number: None,
-                value: Some(OdfNonNegativeInteger::new("7").unwrap()),
+                value: Some(NonNegativeInteger::new("7").unwrap()),
                 data_style_name: None,
                 number_format: Some("A".into()),
                 number_letter_sync: Some(true),
                 display_text: "VII".into(),
             },
-            OdfDatabaseField {
-                kind: OdfDatabaseFieldKind::Name,
-                source: OdfDatabaseSource {
-                    connection_resource: Some(OdfDatabaseConnectionResource {
+            DatabaseField {
+                kind: DatabaseFieldKind::Name,
+                source: DatabaseSource {
+                    connection_resource: Some(DatabaseConnectionResource {
                         href: "sdbc:embedded:firebird".into(),
                         simple_link: true,
                     }),
@@ -7415,22 +7407,22 @@ mod database_field_tests {
             ("  0000\t", "0"),
         ] {
             assert_eq!(
-                OdfNonNegativeInteger::new(lexical).unwrap().as_str(),
+                NonNegativeInteger::new(lexical).unwrap().as_str(),
                 canonical
             );
         }
         for invalid in ["", "+", "-", "-1", "1.0", "1 2", "１２", "++1"] {
             assert!(
-                OdfNonNegativeInteger::new(invalid).is_err(),
+                NonNegativeInteger::new(invalid).is_err(),
                 "accepted {invalid}"
             );
         }
         let boundary = "9".repeat(MAX_DATABASE_INTEGER_DIGITS);
         assert_eq!(
-            OdfNonNegativeInteger::new(&boundary).unwrap().as_str(),
+            NonNegativeInteger::new(&boundary).unwrap().as_str(),
             boundary
         );
-        assert!(OdfNonNegativeInteger::new(&"9".repeat(MAX_DATABASE_INTEGER_DIGITS + 1)).is_err());
+        assert!(NonNegativeInteger::new(&"9".repeat(MAX_DATABASE_INTEGER_DIGITS + 1)).is_err());
 
         let xml = format!(
             "{PREFIX}<t:database-row-select t:table-name=\"t\" t:row-number=\"+000{beyond_u64}\"/><t:database-row-number t:table-name=\"t\" t:value=\"-000\">0</t:database-row-number>{SUFFIX}"
@@ -7440,7 +7432,7 @@ mod database_field_tests {
         assert_eq!(fields[1].value.as_ref().unwrap().as_str(), "0");
         let canonical = fields
             .iter()
-            .map(OdfDatabaseField::to_xml_fragment)
+            .map(DatabaseField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -7466,16 +7458,16 @@ mod script_field_tests {
         format!("{PREFIX}{body}{SUFFIX}")
     }
 
-    fn embedded_field() -> OdfDynamicTextField {
-        OdfDynamicTextField::Script {
+    fn embedded_field() -> DynamicTextField {
+        DynamicTextField::Script {
             href: None,
             language: Some("application/javascript".to_string()),
             content: "alert('stored & inert');".to_string(),
         }
     }
 
-    fn linked_field() -> OdfDynamicTextField {
-        OdfDynamicTextField::Script {
+    fn linked_field() -> DynamicTextField {
+        DynamicTextField::Script {
             href: Some("https://example.invalid/scripts/main.js?one=1&two=2".to_string()),
             language: Some("application/javascript".to_string()),
             content: String::new(),
@@ -7507,7 +7499,7 @@ mod script_field_tests {
             vec![embedded_field()]
         );
 
-        let empty = OdfDynamicTextField::Script {
+        let empty = DynamicTextField::Script {
             href: None,
             language: None,
             content: String::new(),
@@ -7539,7 +7531,7 @@ mod script_field_tests {
             );
         }
 
-        let oversized = OdfDynamicTextField::Script {
+        let oversized = DynamicTextField::Script {
             href: None,
             language: None,
             content: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
@@ -7562,19 +7554,19 @@ mod drop_down_field_tests {
         format!("{PREFIX}{body}{SUFFIX}")
     }
 
-    fn field() -> OdfDynamicTextField {
-        OdfDynamicTextField::DropDown {
+    fn field() -> DynamicTextField {
+        DynamicTextField::DropDown {
             name: "Priority & state".to_string(),
             labels: vec![
-                OdfDropDownLabel {
+                DropDownLabel {
                     value: Some("Low".to_string()),
                     current_selected: Some(false),
                 },
-                OdfDropDownLabel {
+                DropDownLabel {
                     value: Some("High & urgent".to_string()),
                     current_selected: Some(true),
                 },
-                OdfDropDownLabel::default(),
+                DropDownLabel::default(),
             ],
             display_text: "High & urgent".to_string(),
         }
@@ -7598,7 +7590,7 @@ mod drop_down_field_tests {
             vec![field()]
         );
 
-        let empty = OdfDynamicTextField::DropDown {
+        let empty = DynamicTextField::DropDown {
             name: String::new(),
             labels: Vec::new(),
             display_text: String::new(),
@@ -7623,10 +7615,10 @@ mod drop_down_field_tests {
         );
         let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
         assert_eq!(fields.len(), 4);
-        assert!(matches!(fields[0], OdfDynamicTextField::Date { .. }));
-        assert!(matches!(fields[1], OdfDynamicTextField::MetaField { .. }));
-        assert!(matches!(fields[2], OdfDynamicTextField::DropDown { .. }));
-        assert!(matches!(fields[3], OdfDynamicTextField::Time { .. }));
+        assert!(matches!(fields[0], DynamicTextField::Date { .. }));
+        assert!(matches!(fields[1], DynamicTextField::MetaField { .. }));
+        assert!(matches!(fields[2], DynamicTextField::DropDown { .. }));
+        assert!(matches!(fields[3], DynamicTextField::Time { .. }));
     }
 
     #[test]
@@ -7648,9 +7640,9 @@ mod drop_down_field_tests {
             );
         }
 
-        let oversized = OdfDynamicTextField::DropDown {
+        let oversized = DynamicTextField::DropDown {
             name: "choice".to_string(),
-            labels: vec![OdfDropDownLabel {
+            labels: vec![DropDownLabel {
                 value: Some("x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1)),
                 current_selected: None,
             }],
@@ -7678,36 +7670,36 @@ mod fixed_page_date_time_tests {
     #[test]
     fn fixed_page_date_time_round_trips_every_standard_field() {
         let fields = vec![
-            OdfDynamicTextField::PageNumber {
-                number_format: Some(OdfPageNumberFormat::new("A", Some(true)).unwrap()),
+            DynamicTextField::PageNumber {
+                number_format: Some(PageNumberFormat::new("A", Some(true)).unwrap()),
                 fixed: Some(false),
                 page_adjust: Some(-2),
-                select_page: Some(OdfPageSelection::Previous),
+                select_page: Some(PageSelection::Previous),
                 display_text: "IV & cached".to_string(),
             },
-            OdfDynamicTextField::Date {
-                value: Some(OdfFieldDateValue::new("2024-02-29Z").unwrap()),
-                adjustment: Some(OdfFieldDuration::new("-P1Y2M3DT4H5M6.7S").unwrap()),
+            DynamicTextField::Date {
+                value: Some(FieldDateValue::new("2024-02-29Z").unwrap()),
+                adjustment: Some(FieldDuration::new("-P1Y2M3DT4H5M6.7S").unwrap()),
                 fixed: Some(true),
                 data_style_name: Some("Date & Time".to_string()),
                 display_text: "29 < February".to_string(),
             },
-            OdfDynamicTextField::Time {
-                value: Some(OdfFieldTimeValue::new("2024-02-29T24:00:00+14:00").unwrap()),
-                adjustment: Some(OdfFieldDuration::new("PT15M").unwrap()),
+            DynamicTextField::Time {
+                value: Some(FieldTimeValue::new("2024-02-29T24:00:00+14:00").unwrap()),
+                adjustment: Some(FieldDuration::new("PT15M").unwrap()),
                 fixed: Some(false),
                 data_style_name: Some("Clock".to_string()),
                 display_text: "midnight".to_string(),
             },
-            OdfDynamicTextField::PageContinuation {
-                select_page: OdfPageContinuationSelection::Next,
+            DynamicTextField::PageContinuation {
+                select_page: PageContinuationSelection::Next,
                 string_value: Some("Continued on & next".to_string()),
                 display_text: "continued <cached>".to_string(),
             },
         ];
         let body = fields
             .iter()
-            .map(OdfDynamicTextField::to_xml_fragment)
+            .map(DynamicTextField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -7728,13 +7720,13 @@ mod fixed_page_date_time_tests {
         assert_eq!(fields.len(), 4);
         assert!(matches!(
             &fields[0],
-            OdfDynamicTextField::Date { value: Some(value), .. }
-                if value.kind() == OdfDateValueKind::Date
+            DynamicTextField::Date { value: Some(value), .. }
+                if value.kind() == DateValueKind::Date
         ));
         assert!(matches!(
             &fields[1],
-            OdfDynamicTextField::Time { value: Some(value), .. }
-                if value.kind() == OdfTimeValueKind::Time
+            DynamicTextField::Time { value: Some(value), .. }
+                if value.kind() == TimeValueKind::Time
         ));
     }
 
@@ -7746,13 +7738,13 @@ mod fixed_page_date_time_tests {
             "2024-01-01+14:01",
             "+2024-01-01",
         ] {
-            assert!(OdfFieldDateValue::new(value).is_err(), "accepted {value}");
+            assert!(FieldDateValue::new(value).is_err(), "accepted {value}");
         }
         for value in ["24:00:01", "12:60:00", "12:00:60", "12:00:00+15:00"] {
-            assert!(OdfFieldTimeValue::new(value).is_err(), "accepted {value}");
+            assert!(FieldTimeValue::new(value).is_err(), "accepted {value}");
         }
-        assert!(OdfFieldDuration::new("P").is_err());
-        assert!(OdfFieldDateValue::new("2024-01-01\u{0}").is_err());
+        assert!(FieldDuration::new("P").is_err());
+        assert!(FieldDateValue::new("2024-01-01\u{0}").is_err());
 
         let invalid = [
             r#"<t:page-number t:select-page="later">1</t:page-number>"#,
@@ -7787,8 +7779,8 @@ mod fixed_page_date_time_tests {
                 .is_empty()
         );
 
-        let oversized = OdfDynamicTextField::PageContinuation {
-            select_page: OdfPageContinuationSelection::Next,
+        let oversized = DynamicTextField::PageContinuation {
+            select_page: PageContinuationSelection::Next,
             string_value: Some("x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1)),
             display_text: String::new(),
         };
@@ -7814,19 +7806,19 @@ mod page_variable_family_tests {
     #[test]
     fn page_variable_family_round_trips_both_standard_elements() {
         let fields = vec![
-            OdfDynamicTextField::PageVariableSet {
+            DynamicTextField::PageVariableSet {
                 active: Some(false),
                 page_adjust: Some(i64::MIN),
                 display_text: "inert setter cache & <safe>".to_string(),
             },
-            OdfDynamicTextField::PageVariableGet {
-                number_format: Some(OdfPageVariableNumberFormat::new("A", Some(true)).unwrap()),
+            DynamicTextField::PageVariableGet {
+                number_format: Some(PageVariableNumberFormat::new("A", Some(true)).unwrap()),
                 display_text: "cached A & <not calculated>".to_string(),
             },
         ];
         let body = fields
             .iter()
-            .map(OdfDynamicTextField::to_xml_fragment)
+            .map(DynamicTextField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -7847,7 +7839,7 @@ mod page_variable_family_tests {
         assert_eq!(fields[0].effective_page_variable_adjustment(), Some(0));
         assert!(matches!(
             &fields[0],
-            OdfDynamicTextField::PageVariableSet {
+            DynamicTextField::PageVariableSet {
                 active: None,
                 page_adjust: None,
                 display_text,
@@ -7889,13 +7881,13 @@ mod page_variable_family_tests {
             </t:p></o:text></o:body></o:document-content>"#;
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
-        let oversized = OdfDynamicTextField::PageVariableSet {
+        let oversized = DynamicTextField::PageVariableSet {
             active: None,
             page_adjust: None,
             display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
         };
         assert!(oversized.to_xml_fragment().is_err());
-        let forbidden = OdfDynamicTextField::PageVariableGet {
+        let forbidden = DynamicTextField::PageVariableGet {
             number_format: None,
             display_text: "bad\u{0}".to_string(),
         };
@@ -7919,11 +7911,11 @@ mod document_metadata_fixed_field_tests {
     }
 
     fn metadata_field(
-        kind: OdfDocumentMetadataFieldKind,
-        value: Option<OdfDocumentMetadataFieldValue>,
+        kind: DocumentMetadataFieldKind,
+        value: Option<DocumentMetadataFieldValue>,
         display_text: &str,
-    ) -> OdfDynamicTextField {
-        OdfDynamicTextField::DocumentMetadata {
+    ) -> DynamicTextField {
+        DynamicTextField::DocumentMetadata {
             kind,
             value,
             fixed: Some(true),
@@ -7938,59 +7930,59 @@ mod document_metadata_fixed_field_tests {
     fn document_metadata_fixed_fields_round_trip_all_eight_standard_elements() {
         let fields = vec![
             metadata_field(
-                OdfDocumentMetadataFieldKind::CreationDate,
-                Some(OdfDocumentMetadataFieldValue::Date(
-                    OdfFieldDateValue::new("2024-02-29T23:59:59Z").unwrap(),
+                DocumentMetadataFieldKind::CreationDate,
+                Some(DocumentMetadataFieldValue::Date(
+                    FieldDateValue::new("2024-02-29T23:59:59Z").unwrap(),
                 )),
                 "created date & <cached>",
             ),
             metadata_field(
-                OdfDocumentMetadataFieldKind::CreationTime,
-                Some(OdfDocumentMetadataFieldValue::Time(
-                    OdfFieldTimeValue::new("2024-02-29T24:00:00+14:00").unwrap(),
+                DocumentMetadataFieldKind::CreationTime,
+                Some(DocumentMetadataFieldValue::Time(
+                    FieldTimeValue::new("2024-02-29T24:00:00+14:00").unwrap(),
                 )),
                 "created time",
             ),
             metadata_field(
-                OdfDocumentMetadataFieldKind::PrintDate,
-                Some(OdfDocumentMetadataFieldValue::Date(
-                    OdfFieldDateValue::new("2025-01-31-05:00").unwrap(),
+                DocumentMetadataFieldKind::PrintDate,
+                Some(DocumentMetadataFieldValue::Date(
+                    FieldDateValue::new("2025-01-31-05:00").unwrap(),
                 )),
                 "print date",
             ),
             metadata_field(
-                OdfDocumentMetadataFieldKind::PrintTime,
-                Some(OdfDocumentMetadataFieldValue::Time(
-                    OdfFieldTimeValue::new("12:34:56.789Z").unwrap(),
+                DocumentMetadataFieldKind::PrintTime,
+                Some(DocumentMetadataFieldValue::Time(
+                    FieldTimeValue::new("12:34:56.789Z").unwrap(),
                 )),
                 "print time",
             ),
-            metadata_field(OdfDocumentMetadataFieldKind::EditingCycles, None, "42"),
+            metadata_field(DocumentMetadataFieldKind::EditingCycles, None, "42"),
             metadata_field(
-                OdfDocumentMetadataFieldKind::EditingDuration,
-                Some(OdfDocumentMetadataFieldValue::Duration(
-                    OdfFieldDuration::new("P999999999999Y11M30DT23H59M59.5S").unwrap(),
+                DocumentMetadataFieldKind::EditingDuration,
+                Some(DocumentMetadataFieldValue::Duration(
+                    FieldDuration::new("P999999999999Y11M30DT23H59M59.5S").unwrap(),
                 )),
                 "edited duration",
             ),
             metadata_field(
-                OdfDocumentMetadataFieldKind::ModificationDate,
-                Some(OdfDocumentMetadataFieldValue::Date(
-                    OdfFieldDateValue::new("-12345-12-31Z").unwrap(),
+                DocumentMetadataFieldKind::ModificationDate,
+                Some(DocumentMetadataFieldValue::Date(
+                    FieldDateValue::new("-12345-12-31Z").unwrap(),
                 )),
                 "modified date",
             ),
             metadata_field(
-                OdfDocumentMetadataFieldKind::ModificationTime,
-                Some(OdfDocumentMetadataFieldValue::Time(
-                    OdfFieldTimeValue::new("00:00:00+05:30").unwrap(),
+                DocumentMetadataFieldKind::ModificationTime,
+                Some(DocumentMetadataFieldValue::Time(
+                    FieldTimeValue::new("00:00:00+05:30").unwrap(),
                 )),
                 "modified time",
             ),
         ];
         let body = fields
             .iter()
-            .map(OdfDynamicTextField::to_xml_fragment)
+            .map(DynamicTextField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -8015,8 +8007,8 @@ mod document_metadata_fixed_field_tests {
         assert_eq!(fields.len(), 8);
         assert!(matches!(
             &fields[0],
-            OdfDynamicTextField::DocumentMetadata {
-                kind: OdfDocumentMetadataFieldKind::CreationDate,
+            DynamicTextField::DocumentMetadata {
+                kind: DocumentMetadataFieldKind::CreationDate,
                 value: None,
                 fixed: None,
                 data_style_name: None,
@@ -8025,8 +8017,8 @@ mod document_metadata_fixed_field_tests {
         ));
         assert!(matches!(
             &fields[4],
-            OdfDynamicTextField::DocumentMetadata {
-                kind: OdfDocumentMetadataFieldKind::EditingCycles,
+            DynamicTextField::DocumentMetadata {
+                kind: DocumentMetadataFieldKind::EditingCycles,
                 fixed: Some(true),
                 ..
             }
@@ -8054,9 +8046,9 @@ mod document_metadata_fixed_field_tests {
         }
 
         let mismatched = metadata_field(
-            OdfDocumentMetadataFieldKind::PrintDate,
-            Some(OdfDocumentMetadataFieldValue::Date(
-                OdfFieldDateValue::new("2024-01-01T00:00:00Z").unwrap(),
+            DocumentMetadataFieldKind::PrintDate,
+            Some(DocumentMetadataFieldValue::Date(
+                FieldDateValue::new("2024-01-01T00:00:00Z").unwrap(),
             )),
             "bad",
         );
@@ -8070,16 +8062,16 @@ mod document_metadata_fixed_field_tests {
             </t:p></o:text></o:body></o:document-content>"#;
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
-        let oversized = OdfDynamicTextField::DocumentMetadata {
-            kind: OdfDocumentMetadataFieldKind::EditingCycles,
+        let oversized = DynamicTextField::DocumentMetadata {
+            kind: DocumentMetadataFieldKind::EditingCycles,
             value: None,
             fixed: None,
             data_style_name: None,
             display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
         };
         assert!(oversized.to_xml_fragment().is_err());
-        let forbidden = OdfDynamicTextField::DocumentMetadata {
-            kind: OdfDocumentMetadataFieldKind::EditingCycles,
+        let forbidden = DynamicTextField::DocumentMetadata {
+            kind: DocumentMetadataFieldKind::EditingCycles,
             value: None,
             fixed: None,
             data_style_name: None,
@@ -8106,20 +8098,20 @@ mod document_identity_fixed_field_tests {
     #[test]
     fn document_identity_fixed_fields_round_trip_all_nine_standard_elements() {
         let kinds = [
-            OdfDocumentIdentityFieldKind::InitialCreator,
-            OdfDocumentIdentityFieldKind::Description,
-            OdfDocumentIdentityFieldKind::PrintedBy,
-            OdfDocumentIdentityFieldKind::Title,
-            OdfDocumentIdentityFieldKind::Subject,
-            OdfDocumentIdentityFieldKind::Keywords,
-            OdfDocumentIdentityFieldKind::Creator,
-            OdfDocumentIdentityFieldKind::AuthorName,
-            OdfDocumentIdentityFieldKind::AuthorInitials,
+            DocumentIdentityFieldKind::InitialCreator,
+            DocumentIdentityFieldKind::Description,
+            DocumentIdentityFieldKind::PrintedBy,
+            DocumentIdentityFieldKind::Title,
+            DocumentIdentityFieldKind::Subject,
+            DocumentIdentityFieldKind::Keywords,
+            DocumentIdentityFieldKind::Creator,
+            DocumentIdentityFieldKind::AuthorName,
+            DocumentIdentityFieldKind::AuthorInitials,
         ];
         let fields = kinds
             .into_iter()
             .enumerate()
-            .map(|(index, kind)| OdfDynamicTextField::DocumentIdentity {
+            .map(|(index, kind)| DynamicTextField::DocumentIdentity {
                 kind,
                 fixed: Some(index % 2 == 0),
                 display_text: format!("cached {index} & <inert>"),
@@ -8127,7 +8119,7 @@ mod document_identity_fixed_field_tests {
             .collect::<Vec<_>>();
         let body = fields
             .iter()
-            .map(OdfDynamicTextField::to_xml_fragment)
+            .map(DynamicTextField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -8154,7 +8146,7 @@ mod document_identity_fixed_field_tests {
         for field in fields {
             assert!(matches!(
                 field,
-                OdfDynamicTextField::DocumentIdentity { fixed: None, .. }
+                DynamicTextField::DocumentIdentity { fixed: None, .. }
             ));
         }
     }
@@ -8187,14 +8179,14 @@ mod document_identity_fixed_field_tests {
             </t:p></o:text></o:body></o:document-content>"#;
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
-        let oversized = OdfDynamicTextField::DocumentIdentity {
-            kind: OdfDocumentIdentityFieldKind::Description,
+        let oversized = DynamicTextField::DocumentIdentity {
+            kind: DocumentIdentityFieldKind::Description,
             fixed: None,
             display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
         };
         assert!(oversized.to_xml_fragment().is_err());
-        let forbidden = OdfDynamicTextField::DocumentIdentity {
-            kind: OdfDocumentIdentityFieldKind::Title,
+        let forbidden = DynamicTextField::DocumentIdentity {
+            kind: DocumentIdentityFieldKind::Title,
             fixed: Some(true),
             display_text: "bad\u{0}".to_string(),
         };
@@ -8219,57 +8211,57 @@ mod document_context_field_tests {
     #[test]
     fn document_context_fields_round_trip_every_standard_display() {
         let fields = vec![
-            OdfDynamicTextField::FileName {
-                display: Some(OdfFileNameDisplay::Full),
+            DynamicTextField::FileName {
+                display: Some(FileNameDisplay::Full),
                 fixed: Some(true),
                 display_text: "file:///cached/report.odt".to_string(),
             },
-            OdfDynamicTextField::FileName {
-                display: Some(OdfFileNameDisplay::Path),
+            DynamicTextField::FileName {
+                display: Some(FileNameDisplay::Path),
                 fixed: Some(false),
                 display_text: "file:///cached/".to_string(),
             },
-            OdfDynamicTextField::FileName {
-                display: Some(OdfFileNameDisplay::Name),
+            DynamicTextField::FileName {
+                display: Some(FileNameDisplay::Name),
                 fixed: None,
                 display_text: "report".to_string(),
             },
-            OdfDynamicTextField::FileName {
-                display: Some(OdfFileNameDisplay::NameAndExtension),
+            DynamicTextField::FileName {
+                display: Some(FileNameDisplay::NameAndExtension),
                 fixed: None,
                 display_text: "report.odt".to_string(),
             },
-            OdfDynamicTextField::TemplateName {
-                display: Some(OdfTemplateNameDisplay::Area),
+            DynamicTextField::TemplateName {
+                display: Some(TemplateNameDisplay::Area),
                 display_text: "Business".to_string(),
             },
-            OdfDynamicTextField::TemplateName {
-                display: Some(OdfTemplateNameDisplay::Full),
+            DynamicTextField::TemplateName {
+                display: Some(TemplateNameDisplay::Full),
                 display_text: "file:///templates/Letter.ott".to_string(),
             },
-            OdfDynamicTextField::TemplateName {
-                display: Some(OdfTemplateNameDisplay::Name),
+            DynamicTextField::TemplateName {
+                display: Some(TemplateNameDisplay::Name),
                 display_text: "Letter".to_string(),
             },
-            OdfDynamicTextField::TemplateName {
-                display: Some(OdfTemplateNameDisplay::NameAndExtension),
+            DynamicTextField::TemplateName {
+                display: Some(TemplateNameDisplay::NameAndExtension),
                 display_text: "Letter.ott".to_string(),
             },
-            OdfDynamicTextField::TemplateName {
-                display: Some(OdfTemplateNameDisplay::Path),
+            DynamicTextField::TemplateName {
+                display: Some(TemplateNameDisplay::Path),
                 display_text: "file:///templates/".to_string(),
             },
-            OdfDynamicTextField::TemplateName {
-                display: Some(OdfTemplateNameDisplay::Title),
+            DynamicTextField::TemplateName {
+                display: Some(TemplateNameDisplay::Title),
                 display_text: "Cached template & <title>".to_string(),
             },
-            OdfDynamicTextField::SheetName {
+            DynamicTextField::SheetName {
                 display_text: "Sheet 1".to_string(),
             },
         ];
         let body = fields
             .iter()
-            .map(OdfDynamicTextField::to_xml_fragment)
+            .map(DynamicTextField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -8289,7 +8281,7 @@ mod document_context_field_tests {
         assert_eq!(fields.len(), 3);
         assert!(matches!(
             &fields[0],
-            OdfDynamicTextField::FileName {
+            DynamicTextField::FileName {
                 display: None,
                 fixed: None,
                 ..
@@ -8297,9 +8289,9 @@ mod document_context_field_tests {
         ));
         assert!(matches!(
             &fields[1],
-            OdfDynamicTextField::TemplateName { display: None, .. }
+            DynamicTextField::TemplateName { display: None, .. }
         ));
-        assert!(matches!(&fields[2], OdfDynamicTextField::SheetName { .. }));
+        assert!(matches!(&fields[2], DynamicTextField::SheetName { .. }));
     }
 
     #[test]
@@ -8327,14 +8319,14 @@ mod document_context_field_tests {
             </t:p></o:text></o:body></o:document-content>"#;
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
-        let oversized = OdfDynamicTextField::FileName {
+        let oversized = DynamicTextField::FileName {
             display: None,
             fixed: None,
             display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
         };
         assert!(oversized.to_xml_fragment().is_err());
-        let forbidden = OdfDynamicTextField::TemplateName {
-            display: Some(OdfTemplateNameDisplay::Title),
+        let forbidden = DynamicTextField::TemplateName {
+            display: Some(TemplateNameDisplay::Title),
             display_text: "bad\u{0}".to_string(),
         };
         assert!(forbidden.to_xml_fragment().is_err());
@@ -8358,26 +8350,26 @@ mod sender_field_tests {
     #[test]
     fn sender_fields_round_trip_all_fifteen_standard_elements() {
         let kinds = [
-            OdfSenderFieldKind::FirstName,
-            OdfSenderFieldKind::LastName,
-            OdfSenderFieldKind::Initials,
-            OdfSenderFieldKind::Title,
-            OdfSenderFieldKind::Position,
-            OdfSenderFieldKind::Email,
-            OdfSenderFieldKind::PrivatePhone,
-            OdfSenderFieldKind::Fax,
-            OdfSenderFieldKind::Company,
-            OdfSenderFieldKind::WorkPhone,
-            OdfSenderFieldKind::Street,
-            OdfSenderFieldKind::City,
-            OdfSenderFieldKind::PostalCode,
-            OdfSenderFieldKind::Country,
-            OdfSenderFieldKind::StateOrProvince,
+            SenderFieldKind::FirstName,
+            SenderFieldKind::LastName,
+            SenderFieldKind::Initials,
+            SenderFieldKind::Title,
+            SenderFieldKind::Position,
+            SenderFieldKind::Email,
+            SenderFieldKind::PrivatePhone,
+            SenderFieldKind::Fax,
+            SenderFieldKind::Company,
+            SenderFieldKind::WorkPhone,
+            SenderFieldKind::Street,
+            SenderFieldKind::City,
+            SenderFieldKind::PostalCode,
+            SenderFieldKind::Country,
+            SenderFieldKind::StateOrProvince,
         ];
         let fields = kinds
             .into_iter()
             .enumerate()
-            .map(|(index, kind)| OdfDynamicTextField::Sender {
+            .map(|(index, kind)| DynamicTextField::Sender {
                 kind,
                 fixed: match index % 3 {
                     0 => None,
@@ -8389,7 +8381,7 @@ mod sender_field_tests {
             .collect::<Vec<_>>();
         let body = fields
             .iter()
-            .map(OdfDynamicTextField::to_xml_fragment)
+            .map(DynamicTextField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -8409,24 +8401,24 @@ mod sender_field_tests {
         assert_eq!(fields.len(), 3);
         assert!(matches!(
             &fields[0],
-            OdfDynamicTextField::Sender {
-                kind: OdfSenderFieldKind::FirstName,
+            DynamicTextField::Sender {
+                kind: SenderFieldKind::FirstName,
                 fixed: None,
                 ..
             }
         ));
         assert!(matches!(
             &fields[1],
-            OdfDynamicTextField::Sender {
-                kind: OdfSenderFieldKind::LastName,
+            DynamicTextField::Sender {
+                kind: SenderFieldKind::LastName,
                 fixed: Some(true),
                 ..
             }
         ));
         assert!(matches!(
             &fields[2],
-            OdfDynamicTextField::Sender {
-                kind: OdfSenderFieldKind::Email,
+            DynamicTextField::Sender {
+                kind: SenderFieldKind::Email,
                 fixed: Some(false),
                 ..
             }
@@ -8456,14 +8448,14 @@ mod sender_field_tests {
             </t:p></o:text></o:body></o:document-content>"#;
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
-        let oversized = OdfDynamicTextField::Sender {
-            kind: OdfSenderFieldKind::Company,
+        let oversized = DynamicTextField::Sender {
+            kind: SenderFieldKind::Company,
             fixed: None,
             display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
         };
         assert!(oversized.to_xml_fragment().is_err());
-        let forbidden = OdfDynamicTextField::Sender {
-            kind: OdfSenderFieldKind::Email,
+        let forbidden = DynamicTextField::Sender {
+            kind: SenderFieldKind::Email,
             fixed: Some(false),
             display_text: "bad\u{0}".to_string(),
         };
@@ -8489,25 +8481,25 @@ mod chapter_field_tests {
     fn chapter_fields_round_trip_every_standard_display() {
         let displays = [
             None,
-            Some(OdfChapterDisplay::Name),
-            Some(OdfChapterDisplay::Number),
-            Some(OdfChapterDisplay::NumberAndName),
-            Some(OdfChapterDisplay::PlainNumber),
-            Some(OdfChapterDisplay::PlainNumberAndName),
+            Some(ChapterDisplay::Name),
+            Some(ChapterDisplay::Number),
+            Some(ChapterDisplay::NumberAndName),
+            Some(ChapterDisplay::PlainNumber),
+            Some(ChapterDisplay::PlainNumberAndName),
         ];
         let fields = displays
             .into_iter()
             .enumerate()
-            .map(|(index, display)| OdfDynamicTextField::Chapter {
+            .map(|(index, display)| DynamicTextField::Chapter {
                 display,
                 outline_level: (index % 2 == 0)
-                    .then(|| OdfNonNegativeInteger::new(&index.to_string()).unwrap()),
+                    .then(|| NonNegativeInteger::new(&index.to_string()).unwrap()),
                 display_text: format!("cached chapter {index} & <inert>"),
             })
             .collect::<Vec<_>>();
         let body = fields
             .iter()
-            .map(OdfDynamicTextField::to_xml_fragment)
+            .map(DynamicTextField::to_xml_fragment)
             .collect::<Result<Vec<_>>>()
             .unwrap()
             .join("");
@@ -8526,13 +8518,13 @@ mod chapter_field_tests {
         assert_eq!(fields.len(), 2);
         assert!(matches!(
             &fields[0],
-            OdfDynamicTextField::Chapter {
+            DynamicTextField::Chapter {
                 display: None,
                 outline_level: None,
                 ..
             }
         ));
-        let OdfDynamicTextField::Chapter {
+        let DynamicTextField::Chapter {
             display,
             outline_level,
             ..
@@ -8540,7 +8532,7 @@ mod chapter_field_tests {
         else {
             panic!("expected chapter field");
         };
-        assert_eq!(*display, Some(OdfChapterDisplay::NumberAndName));
+        assert_eq!(*display, Some(ChapterDisplay::NumberAndName));
         assert_eq!(outline_level.as_ref().unwrap().as_str(), "2");
     }
 
@@ -8568,15 +8560,15 @@ mod chapter_field_tests {
             </t:p></o:text></o:body></o:document-content>"#;
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
-        let oversized = OdfDynamicTextField::Chapter {
+        let oversized = DynamicTextField::Chapter {
             display: None,
             outline_level: None,
             display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
         };
         assert!(oversized.to_xml_fragment().is_err());
-        let forbidden = OdfDynamicTextField::Chapter {
-            display: Some(OdfChapterDisplay::Name),
-            outline_level: Some(OdfNonNegativeInteger::new("1").unwrap()),
+        let forbidden = DynamicTextField::Chapter {
+            display: Some(ChapterDisplay::Name),
+            outline_level: Some(NonNegativeInteger::new("1").unwrap()),
             display_text: "bad\u{0}".to_string(),
         };
         assert!(forbidden.to_xml_fragment().is_err());
@@ -8600,12 +8592,12 @@ mod user_defined_metadata_field_tests {
 
     #[test]
     fn user_defined_metadata_field_round_trips_every_independent_value_attribute() {
-        let field = OdfDynamicTextField::UserDefinedMetadata {
+        let field = DynamicTextField::UserDefinedMetadata {
             name: "custom & name".to_string(),
-            values: OdfUserDefinedMetadataValues {
+            values: UserDefinedMetadataValues {
                 number: Some("-INF".to_string()),
-                date: Some(OdfFieldDateValue::new("2024-02-29T23:59:59Z").unwrap()),
-                time: Some(OdfFieldDuration::new("P999999999999Y1M2DT3H4M5.6S").unwrap()),
+                date: Some(FieldDateValue::new("2024-02-29T23:59:59Z").unwrap()),
+                time: Some(FieldDuration::new("P999999999999Y1M2DT3H4M5.6S").unwrap()),
                 boolean: Some(false),
                 string: Some("cached & <string>".to_string()),
             },
@@ -8632,17 +8624,17 @@ mod user_defined_metadata_field_tests {
         assert_eq!(fields.len(), 2);
         assert!(matches!(
             &fields[0],
-            OdfDynamicTextField::UserDefinedMetadata {
+            DynamicTextField::UserDefinedMetadata {
                 name,
-                values: OdfUserDefinedMetadataValues { string: Some(value), .. },
+                values: UserDefinedMetadataValues { string: Some(value), .. },
                 fixed: Some(false),
                 ..
             } if name.is_empty() && value.is_empty()
         ));
         assert!(matches!(
             &fields[1],
-            OdfDynamicTextField::UserDefinedMetadata {
-                values: OdfUserDefinedMetadataValues {
+            DynamicTextField::UserDefinedMetadata {
+                values: UserDefinedMetadataValues {
                     number: None,
                     date: None,
                     time: None,
@@ -8683,20 +8675,20 @@ mod user_defined_metadata_field_tests {
             </t:p></o:text></o:body></o:document-content>"#;
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
-        let oversized = OdfDynamicTextField::UserDefinedMetadata {
+        let oversized = DynamicTextField::UserDefinedMetadata {
             name: "x".to_string(),
-            values: OdfUserDefinedMetadataValues {
+            values: UserDefinedMetadataValues {
                 string: Some("x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1)),
-                ..OdfUserDefinedMetadataValues::default()
+                ..UserDefinedMetadataValues::default()
             },
             fixed: None,
             data_style_name: None,
             display_text: String::new(),
         };
         assert!(oversized.to_xml_fragment().is_err());
-        let forbidden = OdfDynamicTextField::UserDefinedMetadata {
+        let forbidden = DynamicTextField::UserDefinedMetadata {
             name: "bad\u{0}".to_string(),
-            values: OdfUserDefinedMetadataValues::default(),
+            values: UserDefinedMetadataValues::default(),
             fixed: None,
             data_style_name: None,
             display_text: String::new(),
@@ -8730,7 +8722,7 @@ mod meta_field_tests {
         );
         let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
         assert_eq!(fields.len(), 1);
-        let OdfDynamicTextField::MetaField {
+        let DynamicTextField::MetaField {
             xml_id,
             data_style_name,
             content,
@@ -8744,11 +8736,11 @@ mod meta_field_tests {
         assert!(matches!(
             content.nodes(),
             [
-                OdfMetaFieldNode::Text(_),
-                OdfMetaFieldNode::Element(_),
-                OdfMetaFieldNode::Text(_),
-                OdfMetaFieldNode::Element(_),
-                OdfMetaFieldNode::Text(_),
+                MetaFieldNode::Text(_),
+                MetaFieldNode::Element(_),
+                MetaFieldNode::Text(_),
+                MetaFieldNode::Element(_),
+                MetaFieldNode::Text(_),
             ]
         ));
 
@@ -8770,7 +8762,7 @@ mod meta_field_tests {
         );
         let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
         assert_eq!(fields.len(), 2);
-        let OdfDynamicTextField::MetaField {
+        let DynamicTextField::MetaField {
             xml_id, content, ..
         } = &fields[0]
         else {
@@ -8779,9 +8771,9 @@ mod meta_field_tests {
         assert_eq!(xml_id, "outer");
         assert_eq!(content.display_text(), "ABC");
         assert!(
-            matches!(content.nodes().get(1), Some(OdfMetaFieldNode::Element(element)) if element.local_name == "meta-field")
+            matches!(content.nodes().get(1), Some(MetaFieldNode::Element(element)) if element.local_name == "meta-field")
         );
-        let OdfDynamicTextField::MetaField {
+        let DynamicTextField::MetaField {
             xml_id, content, ..
         } = &fields[1]
         else {
@@ -8919,77 +8911,74 @@ mod meta_field_tests {
     #[test]
     fn meta_field_content_constructor_enforces_resource_and_xml_bounds() {
         assert!(
-            OdfMetaFieldContent::new(vec![OdfMetaFieldNode::Text(
+            MetaFieldContent::new(vec![MetaFieldNode::Text(
                 "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
             )])
             .is_err()
         );
         assert!(
-            OdfMetaFieldContent::new(vec![OdfMetaFieldNode::Text("bad\u{1}control".to_string(),)])
+            MetaFieldContent::new(vec![MetaFieldNode::Text("bad\u{1}control".to_string(),)])
                 .is_err()
         );
 
-        let mut nested = OdfMetaFieldNode::Text("leaf".to_string());
+        let mut nested = MetaFieldNode::Text("leaf".to_string());
         for _ in 0..=MAX_META_FIELD_DEPTH {
-            nested = OdfMetaFieldNode::Element(OdfMetaFieldElement {
+            nested = MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                 local_name: "span".to_string(),
                 attributes: Vec::new(),
                 children: vec![nested],
             });
         }
-        assert!(OdfMetaFieldContent::new(vec![nested]).is_err());
+        assert!(MetaFieldContent::new(vec![nested]).is_err());
 
-        let oversized_attribute = OdfMetaFieldElement {
+        let oversized_attribute = MetaFieldElement {
             namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
             local_name: "span".to_string(),
-            attributes: vec![OdfMetaFieldAttribute {
+            attributes: vec![MetaFieldAttribute {
                 namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                 local_name: "style-name".to_string(),
                 value: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
             }],
             children: Vec::new(),
         };
-        assert!(
-            OdfMetaFieldContent::new(vec![OdfMetaFieldNode::Element(oversized_attribute,)])
-                .is_err()
-        );
+        assert!(MetaFieldContent::new(vec![MetaFieldNode::Element(oversized_attribute,)]).is_err());
     }
 
     #[test]
     fn note_body_content_enforces_block_root_grammar_and_projects_text() {
-        let content = OdfNoteBodyContent::new(vec![
-            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+        let content = NoteBodyContent::new(vec![
+            MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                 local_name: "p".to_string(),
                 attributes: Vec::new(),
                 children: vec![
-                    OdfMetaFieldNode::Text("First ".to_string()),
-                    OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                    MetaFieldNode::Text("First ".to_string()),
+                    MetaFieldNode::Element(MetaFieldElement {
                         namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                         local_name: "span".to_string(),
-                        attributes: vec![OdfMetaFieldAttribute {
+                        attributes: vec![MetaFieldAttribute {
                             namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                             local_name: "style-name".to_string(),
                             value: "Emphasis".to_string(),
                         }],
-                        children: vec![OdfMetaFieldNode::Text("styled".to_string())],
+                        children: vec![MetaFieldNode::Text("styled".to_string())],
                     }),
                 ],
             }),
-            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+            MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                 local_name: "list".to_string(),
                 attributes: Vec::new(),
-                children: vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                children: vec![MetaFieldNode::Element(MetaFieldElement {
                     namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                     local_name: "list-item".to_string(),
                     attributes: Vec::new(),
-                    children: vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                    children: vec![MetaFieldNode::Element(MetaFieldElement {
                         namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                         local_name: "p".to_string(),
                         attributes: Vec::new(),
-                        children: vec![OdfMetaFieldNode::Text("Second".to_string())],
+                        children: vec![MetaFieldNode::Text("Second".to_string())],
                     })],
                 })],
             }),
@@ -8999,15 +8988,14 @@ mod meta_field_tests {
         assert!(content.validate().is_ok());
 
         assert!(
-            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Text("not a block".to_string(),)])
-                .is_err()
+            NoteBodyContent::new(vec![MetaFieldNode::Text("not a block".to_string(),)]).is_err()
         );
         assert!(
-            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+            NoteBodyContent::new(vec![MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                 local_name: "span".to_string(),
                 attributes: Vec::new(),
-                children: vec![OdfMetaFieldNode::Text("not a root block".to_string())],
+                children: vec![MetaFieldNode::Text("not a root block".to_string())],
             },)])
             .is_err()
         );
@@ -9015,71 +9003,69 @@ mod meta_field_tests {
 
     #[test]
     fn note_body_content_projects_odf_whitespace_controls() {
-        let text_control = |local_name: &str, attributes: Vec<OdfMetaFieldAttribute>| {
-            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+        let text_control = |local_name: &str, attributes: Vec<MetaFieldAttribute>| {
+            MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                 local_name: local_name.to_string(),
                 attributes,
                 children: Vec::new(),
             })
         };
-        let content =
-            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
-                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
-                local_name: "p".to_string(),
-                attributes: Vec::new(),
-                children: vec![
-                    OdfMetaFieldNode::Text("A".to_string()),
-                    text_control(
-                        "s",
-                        vec![OdfMetaFieldAttribute {
-                            namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
-                            local_name: "c".to_string(),
-                            value: "2".to_string(),
-                        }],
-                    ),
-                    text_control("tab", Vec::new()),
-                    text_control("line-break", Vec::new()),
-                    OdfMetaFieldNode::Text("B".to_string()),
-                ],
-            })])
-            .unwrap();
-        assert_eq!(content.display_text(), "A  \t\nB");
-
-        let invalid =
-            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
-                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
-                local_name: "p".to_string(),
-                attributes: Vec::new(),
-                children: vec![text_control(
+        let content = NoteBodyContent::new(vec![MetaFieldNode::Element(MetaFieldElement {
+            namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+            local_name: "p".to_string(),
+            attributes: Vec::new(),
+            children: vec![
+                MetaFieldNode::Text("A".to_string()),
+                text_control(
                     "s",
-                    vec![OdfMetaFieldAttribute {
+                    vec![MetaFieldAttribute {
                         namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                         local_name: "c".to_string(),
-                        value: "two".to_string(),
+                        value: "2".to_string(),
                     }],
-                )],
-            })]);
+                ),
+                text_control("tab", Vec::new()),
+                text_control("line-break", Vec::new()),
+                MetaFieldNode::Text("B".to_string()),
+            ],
+        })])
+        .unwrap();
+        assert_eq!(content.display_text(), "A  \t\nB");
+
+        let invalid = NoteBodyContent::new(vec![MetaFieldNode::Element(MetaFieldElement {
+            namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+            local_name: "p".to_string(),
+            attributes: Vec::new(),
+            children: vec![text_control(
+                "s",
+                vec![MetaFieldAttribute {
+                    namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                    local_name: "c".to_string(),
+                    value: "two".to_string(),
+                }],
+            )],
+        })]);
         assert!(invalid.is_err());
     }
 
     #[test]
     fn meta_field_serialization_is_canonical_and_escaped() {
-        let content = OdfMetaFieldContent::new(vec![
-            OdfMetaFieldNode::Text("a<&".to_string()),
-            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+        let content = MetaFieldContent::new(vec![
+            MetaFieldNode::Text("a<&".to_string()),
+            MetaFieldNode::Element(MetaFieldElement {
                 namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                 local_name: "span".to_string(),
-                attributes: vec![OdfMetaFieldAttribute {
+                attributes: vec![MetaFieldAttribute {
                     namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
                     local_name: "style-name".to_string(),
                     value: "A&B\"".to_string(),
                 }],
-                children: vec![OdfMetaFieldNode::Text("z>".to_string())],
+                children: vec![MetaFieldNode::Text("z>".to_string())],
             }),
         ])
         .unwrap();
-        let field = OdfDynamicTextField::MetaField {
+        let field = DynamicTextField::MetaField {
             xml_id: "m1".to_string(),
             data_style_name: None,
             content,

@@ -1,5 +1,5 @@
 use litchi_odt::{
-    FlatOpenDocument, OdfFormControlKind, OdfFormNode, OdfFormPropertyValue, OdfFormScalarValue,
+    FlatOpenDocument, FormControlKind, FormNode, FormPropertyValue, FormScalarValue,
     OpenDocumentPackage,
 };
 use std::path::{Path, PathBuf};
@@ -25,11 +25,11 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn collect<'a>(nodes: &'a [OdfFormNode], out: &mut Vec<&'a litchi_odt::OdfFormControl>) {
+fn collect<'a>(nodes: &'a [FormNode], out: &mut Vec<&'a litchi_odt::FormControl>) {
     for node in nodes {
         match node {
-            OdfFormNode::Form(form) => collect(&form.children, out),
-            OdfFormNode::Control(control) => {
+            FormNode::Form(form) => collect(&form.children, out),
+            FormNode::Control(control) => {
                 out.push(control);
                 collect(&control.children, out);
             },
@@ -80,18 +80,15 @@ fn parses_all_controls_nesting_typed_properties_and_links() {
     let mut parsed = Vec::new();
     collect(&forms.groups[0].forms[0].children, &mut parsed);
     assert_eq!(parsed.len(), names.len());
-    assert!(matches!(parsed[0].kind, OdfFormControlKind::Text));
-    assert!(matches!(
-        parsed[23].kind,
-        OdfFormControlKind::GenericControl
-    ));
+    assert!(matches!(parsed[0].kind, FormControlKind::Text));
+    assert!(matches!(parsed[23].kind, FormControlKind::GenericControl));
     assert!(matches!(
         forms.groups[0].forms[0].properties[0].value,
-        OdfFormPropertyValue::Scalar(OdfFormScalarValue::Boolean(true))
+        FormPropertyValue::Scalar(FormScalarValue::Boolean(true))
     ));
     assert!(matches!(
         forms.groups[0].forms[0].properties[1].value,
-        OdfFormPropertyValue::List { ref values, .. } if values.len() == 2
+        FormPropertyValue::List { ref values, .. } if values.len() == 2
     ));
     assert!(forms.control_shapes[0].resolved_control.is_some());
 }
@@ -109,7 +106,7 @@ fn flags_behavior_but_preserves_external_values_inertly() {
             .iter()
             .any(|attribute| attribute.value == "DROP TABLE x")
     );
-    let OdfFormNode::Control(control) = &forms.groups[0].forms[0].children[0] else {
+    let FormNode::Control(control) = &forms.groups[0].forms[0].children[0] else {
         panic!()
     };
     assert_eq!(

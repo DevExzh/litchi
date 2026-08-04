@@ -140,17 +140,16 @@ pub mod variable_declaration;
     reason = "ODT facade exposes package annotation operations"
 )]
 pub use annotation_package::{
-    OdfAnnotation, OdfAnnotationAnchor, OdfAnnotationInfo, OdfAnnotationPosition,
-    OdfAnnotationUpdate,
+    Annotation, AnnotationAnchor, AnnotationInfo, AnnotationPosition, AnnotationUpdate,
 };
 #[allow(
     unused_imports,
     reason = "ODT facade exposes inert concordance metadata"
 )]
-pub use auto_mark_file::OdfAlphabeticalIndexAutoMarkFile;
+pub use auto_mark_file::AlphabeticalIndexAutoMarkFile;
 #[allow(unused_imports, reason = "ODT facade exposes bibliography semantics")]
 pub use bibliography_configuration::{
-    OdfBibliographyConfiguration, OdfBibliographyField, OdfBibliographySortKey,
+    BibliographyConfiguration, BibliographyField, BibliographySortKey,
 };
 #[allow(unused_imports, reason = "ODT facade exposes style geometry semantics")]
 pub use chart_properties::{
@@ -177,11 +176,11 @@ pub use core::{
     unused_imports,
     reason = "ODT facade exposes DDE metadata used by variables"
 )]
-pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
+pub use dde_connection::{DdeConnectionDeclaration, DdeConnectionUse};
 #[allow(unused_imports, reason = "ODT facade exposes document script metadata")]
 pub use document_scripts::{
-    OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
-    OdfScriptEventListener, parse_document_scripts,
+    DocumentEventListener, DocumentScripts, EmbeddedScript, ScriptBinding, ScriptEventListener,
+    parse_document_scripts,
 };
 #[allow(unused_imports, reason = "ODT facade exposes drawing style resources")]
 pub use drawing_page_properties::{
@@ -207,22 +206,20 @@ pub use elements::bookmark::{
     unused_imports,
     reason = "ODT facade exposes embedded-chart storage policy"
 )]
-pub use embedded_chart::OdfEmbeddedChartStorage;
+pub use embedded_chart::EmbeddedChartStorage;
 #[allow(
     unused_imports,
     reason = "ODT facade exposes inert embedded-resource models"
 )]
 pub use embedded_object::{
-    OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart, OdfEmbeddedObjectSource,
-    OdfInlineObjectRoot,
+    EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
 };
 #[allow(
     unused_imports,
     reason = "ODT facade exposes inert embedded-resource updates"
 )]
 pub use embedded_package::{
-    OdfEmbeddedResource, OdfEmbeddedResourceFile, OdfEmbeddedResourceKind,
-    OdfEmbeddedResourceSource,
+    EmbeddedResource, EmbeddedResourceFile, EmbeddedResourceKind, EmbeddedResourceSource,
 };
 #[allow(unused_imports, reason = "ODT facade exposes font-face semantics")]
 pub use font_face::{
@@ -239,32 +236,29 @@ pub use footnote_separator::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes typed form models")]
 pub use form::{
-    OdfButtonControl, OdfButtonType, OdfCheckboxControl, OdfCheckboxState, OdfComboItem,
-    OdfComboboxControl, OdfConnectionResourceForm, OdfControlForm, OdfControlRef, OdfControlShape,
-    OdfFileControl, OdfFixedTextControl, OdfForm, OdfFormAttribute, OdfFormConnectionResource,
-    OdfFormControl, OdfFormControlKind, OdfFormDate, OdfFormDouble, OdfFormGroup, OdfFormNode,
-    OdfFormPart, OdfFormProperty, OdfFormPropertyValue, OdfFormScalarValue, OdfFormScope, OdfForms,
-    OdfFrameControl, OdfGenericControl, OdfGenericControlMetadata, OdfGenericForm,
-    OdfGenericFormControl, OdfGridColumn, OdfGridColumnControl, OdfGridColumnControlKind,
-    OdfGridControl, OdfGridForm, OdfGridNonNegativeInteger, OdfHiddenControl, OdfImageButtonType,
-    OdfImageControl, OdfImageFrameControl, OdfImageFrameForm, OdfInteractiveControl,
-    OdfInteractiveForm, OdfListLinkageType, OdfListOption, OdfListSourceType, OdfListboxControl,
-    OdfOwnedFormConnectionResource, OdfPasswordControl, OdfPasswordFileControl,
-    OdfPasswordFileForm, OdfPropertyForm, OdfRadioControl, OdfRadioVisualEffect,
-    OdfRelativeImageAlign, OdfRelativeImagePosition, OdfSelectionControl, OdfSelectionForm,
-    OdfTextControl, OdfTextControlKind, OdfTypedValueBound, OdfTypedValueControl,
-    OdfTypedValueControlKind, OdfTypedValueDuration, OdfTypedValueForm,
-    OdfTypedValueNonNegativeInteger, OdfValueRangeControl, OdfValueRangeDuration,
-    OdfValueRangeForm, OdfValueRangeInteger, OdfValueRangeNonNegativeInteger,
-    OdfValueRangeOrientation, OdfValueRangePositiveInteger, OdfVisualControl, OdfVisualForm,
-    form_connection_resources, form_properties, generic_form_controls, grid_controls,
-    image_frame_controls, insert_form_connection_resource_xml, insert_form_property_xml,
-    insert_generic_form_control_xml, insert_grid_control_xml, insert_image_frame_control_xml,
-    insert_interactive_control_xml, insert_password_file_control_xml, insert_selection_control_xml,
-    insert_text_control_xml, insert_typed_value_control_xml, insert_value_range_control_xml,
-    insert_visual_control_xml, interactive_controls, password_file_controls,
-    remove_form_connection_resource_xml, remove_form_property_xml, remove_generic_form_control_xml,
-    remove_grid_control_xml, remove_image_frame_control_xml, remove_interactive_control_xml,
+    ButtonControl, ButtonType, CheckboxControl, CheckboxState, ComboItem, ComboboxControl,
+    ConnectionResourceForm, ControlForm, ControlRef, ControlShape, FileControl, FixedTextControl,
+    Form, FormAttribute, FormConnectionResource, FormControl, FormControlKind, FormDate,
+    FormDouble, FormGroup, FormNode, FormPart, FormProperty, FormPropertyValue, FormScalarValue,
+    FormScope, Forms, FrameControl, GenericControl, GenericControlMetadata, GenericForm,
+    GenericFormControl, GridColumn, GridColumnControl, GridColumnControlKind, GridControl,
+    GridForm, GridNonNegativeInteger, HiddenControl, ImageButtonType, ImageControl,
+    ImageFrameControl, ImageFrameForm, InteractiveControl, InteractiveForm, ListLinkageType,
+    ListOption, ListSourceType, ListboxControl, OwnedFormConnectionResource, PasswordControl,
+    PasswordFileControl, PasswordFileForm, PropertyForm, RadioControl, RadioVisualEffect,
+    RelativeImageAlign, RelativeImagePosition, SelectionControl, SelectionForm, TextControl,
+    TextControlKind, TypedValueBound, TypedValueControl, TypedValueControlKind, TypedValueDuration,
+    TypedValueForm, TypedValueNonNegativeInteger, ValueRangeControl, ValueRangeDuration,
+    ValueRangeForm, ValueRangeInteger, ValueRangeNonNegativeInteger, ValueRangeOrientation,
+    ValueRangePositiveInteger, VisualControl, VisualForm, form_connection_resources,
+    form_properties, generic_form_controls, grid_controls, image_frame_controls,
+    insert_form_connection_resource_xml, insert_form_property_xml, insert_generic_form_control_xml,
+    insert_grid_control_xml, insert_image_frame_control_xml, insert_interactive_control_xml,
+    insert_password_file_control_xml, insert_selection_control_xml, insert_text_control_xml,
+    insert_typed_value_control_xml, insert_value_range_control_xml, insert_visual_control_xml,
+    interactive_controls, password_file_controls, remove_form_connection_resource_xml,
+    remove_form_property_xml, remove_generic_form_control_xml, remove_grid_control_xml,
+    remove_image_frame_control_xml, remove_interactive_control_xml,
     remove_password_file_control_xml, remove_selection_control_xml, remove_text_control_xml,
     remove_typed_value_control_xml, remove_value_range_control_xml, remove_visual_control_xml,
     replace_form_connection_resource_xml, replace_form_property_xml,
@@ -275,7 +269,7 @@ pub use form::{
     typed_value_controls, value_range_controls, visual_controls,
 };
 #[allow(unused_imports, reason = "ODT facade exposes authored form operations")]
-pub use form_package::{OdfAuthoredForm, OdfAuthoredFormControl, OdfAuthoredFormNode};
+pub use form_package::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
@@ -295,8 +289,8 @@ pub use graphic_properties::{
 pub use header_footer_properties::{HeaderFooterStyleProperties, PageHeaderFooterRegion};
 #[allow(unused_imports, reason = "ODT facade exposes line-numbering semantics")]
 pub use line_numbering::{
-    OdfLineNumberFormat, OdfLineNumberPosition, OdfLineNumberingConfiguration,
-    OdfLineNumberingSeparator, OdfNonNegativeLength, parse_line_numbering_configuration,
+    LineNumberFormat, LineNumberPosition, LineNumberingConfiguration, LineNumberingSeparator,
+    NonNegativeLength, parse_line_numbering_configuration,
 };
 #[allow(
     unused_imports,
@@ -326,9 +320,8 @@ pub use media::{Image, ImageFrame, ImagePart, ImageSource};
     reason = "ODT facade exposes note configuration semantics"
 )]
 pub use notes_configuration::{
-    OdfFootnotePosition, OdfNoteClass, OdfNoteNumberingScope, OdfNotesConfiguration,
-    OdfNotesConfigurations, parse_notes_configurations, remove_notes_configuration_xml,
-    set_notes_configuration_xml,
+    FootnotePosition, NoteNumberingScope, NotesConfiguration, NotesConfigurations,
+    parse_notes_configurations, remove_notes_configuration_xml, set_notes_configuration_xml,
 };
 #[allow(
     unused_imports,
@@ -346,10 +339,10 @@ pub use odc::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes outline style semantics")]
 pub use outline_style::{
-    MAX_OUTLINE_LEVELS, OdfListLevelPositionMode, OdfOutlineAttribute, OdfOutlineLevelStyle,
-    OdfOutlineListLevelProperties, OdfOutlineNumberFormat, OdfOutlinePositiveInteger,
-    OdfOutlineStyle, OdfOutlineStyles, OdfOutlineTextAlign, OdfOutlineTextProperties,
-    parse_outline_styles, remove_outline_style_xml, set_outline_style_xml,
+    ListLevelPositionMode, MAX_OUTLINE_LEVELS, OutlineAttribute, OutlineLevelStyle,
+    OutlineListLevelProperties, OutlineNumberFormat, OutlinePositiveInteger, OutlineStyle,
+    OutlineStyles, OutlineTextAlign, OutlineTextProperties, parse_outline_styles,
+    remove_outline_style_xml, set_outline_style_xml,
 };
 #[allow(unused_imports, reason = "ODT facade exposes ruby semantics")]
 pub use ruby_family::{
@@ -362,7 +355,7 @@ pub use ruby_family::{
     unused_imports,
     reason = "ODT facade exposes inert package script resources"
 )]
-pub use script_package::{OdfScriptResource, OdfScriptResourceKind, OdfScriptResourceSpec};
+pub use script_package::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes common style configurations"
@@ -374,8 +367,7 @@ pub use section_properties::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes semantic ODF settings")]
 pub use settings::{
-    OdfConfigItem, OdfConfigMap, OdfConfigMapEntry, OdfConfigNode, OdfConfigSet, OdfConfigValue,
-    OdfSettings,
+    ConfigItem, ConfigMap, ConfigMapEntry, ConfigNode, ConfigSet, ConfigValue, Settings,
 };
 #[allow(
     unused_imports,
@@ -427,10 +419,10 @@ pub use style::paragraph::margin::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes paragraph tab semantics")]
 pub use style::paragraph::tab_stop::{
-    MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
+    MAX_PARAGRAPH_TAB_STOPS, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
     ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
     ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
-    parse_paragraph_style_tab_stops,
+    TabStopPosition, parse_paragraph_style_tab_stops,
 };
 #[allow(
     unused_imports,
@@ -494,10 +486,10 @@ pub use text_properties::{
     reason = "ODT facade exposes semantic ODF metadata models"
 )]
 pub use variable_declaration::{
-    OdfVariableBody, OdfVariableDateValue, OdfVariableDeclaration, OdfVariableDeclarationGroup,
-    OdfVariableDeclarations, OdfVariableHeaderFooter, OdfVariableKind, OdfVariablePart,
-    OdfVariableScope, OdfVariableValue, OdfVariableValueType,
-    remove_variable_declaration_group_xml, set_variable_declaration_group_xml,
+    VariableBody, VariableDateValue, VariableDeclaration, VariableDeclarationGroup,
+    VariableDeclarations, VariableHeaderFooter, VariableKind, VariablePart, VariableScope,
+    VariableValue, VariableValueType, remove_variable_declaration_group_xml,
+    set_variable_declaration_group_xml,
 };
 
 pub mod elements;
@@ -506,8 +498,7 @@ pub mod elements;
     reason = "ODT facade exposes rich field and text element models"
 )]
 pub use elements::field::{
-    OdfMetaFieldAttribute, OdfMetaFieldContent, OdfMetaFieldElement, OdfMetaFieldNode,
-    OdfNoteBodyContent,
+    MetaFieldAttribute, MetaFieldContent, MetaFieldElement, MetaFieldNode, NoteBodyContent,
 };
 #[allow(
     unused_imports,
@@ -546,7 +537,7 @@ pub use dynamic_text::{
     insert_database_field_xml, insert_dynamic_text_field_xml, remove_database_field_xml,
     remove_dynamic_text_field_xml, replace_database_field_xml, replace_dynamic_text_field_xml,
 };
-pub use frame::{OdfFrameAnchor, OdfImageFormat, OdfLength};
+pub use frame::{FrameAnchor, ImageFormat, Length};
 pub use header_footer::{
     HeaderFooter, HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
 };

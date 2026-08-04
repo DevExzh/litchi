@@ -1,6 +1,6 @@
 //! Inert, bounded OpenDocument text DDE connection declarations.
 
-use crate::{OdfVariableBody, OdfVariableHeaderFooter, OdfVariablePart, OdfVariableScope};
+use crate::{VariableBody, VariableHeaderFooter, VariablePart, VariableScope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -20,9 +20,9 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// A named DDE source declaration. It is retained but never contacted.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfDdeConnectionDeclaration {
-    pub part: OdfVariablePart,
-    pub scope: OdfVariableScope,
+pub struct DdeConnectionDeclaration {
+    pub part: VariablePart,
+    pub scope: VariableScope,
     pub name: String,
     pub application: String,
     pub topic: String,
@@ -30,7 +30,7 @@ pub struct OdfDdeConnectionDeclaration {
     pub automatic_update: Option<bool>,
 }
 
-impl OdfDdeConnectionDeclaration {
+impl DdeConnectionDeclaration {
     /// ODF defaults `office:automatic-update` to `false`.
     pub fn effective_automatic_update(&self) -> bool {
         self.automatic_update.unwrap_or(false)
@@ -39,16 +39,16 @@ impl OdfDdeConnectionDeclaration {
 
 /// One `text:dde-connection` occurrence referring to a declaration.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfDdeConnectionUse {
-    pub part: OdfVariablePart,
-    pub scope: OdfVariableScope,
+pub struct DdeConnectionUse {
+    pub part: VariablePart,
+    pub scope: VariableScope,
     pub connection_name: String,
 }
 
 #[derive(Default)]
 pub(crate) struct ParsedDdeConnections {
-    pub declarations: Vec<OdfDdeConnectionDeclaration>,
-    pub uses: Vec<OdfDdeConnectionUse>,
+    pub declarations: Vec<DdeConnectionDeclaration>,
+    pub uses: Vec<DdeConnectionUse>,
 }
 
 #[derive(Clone)]
@@ -60,8 +60,8 @@ struct Frame {
 
 struct ActiveGroup {
     depth: usize,
-    part: OdfVariablePart,
-    scope: OdfVariableScope,
+    part: VariablePart,
+    scope: VariableScope,
 }
 
 struct PendingElement {
@@ -71,7 +71,7 @@ struct PendingElement {
 type Attributes = HashMap<(String, String), String>;
 
 pub(crate) fn parse_dde_connection_parts(
-    parts: &[(&str, OdfVariablePart)],
+    parts: &[(&str, VariablePart)],
 ) -> Result<ParsedDdeConnections> {
     let total = parts.iter().try_fold(0usize, |total, (xml, _)| {
         total
@@ -84,7 +84,7 @@ pub(crate) fn parse_dde_connection_parts(
 
     let mut parsed = ParsedDdeConnections::default();
     let mut names = HashSet::<String>::new();
-    let mut containers = HashSet::<(OdfVariablePart, OdfVariableScope)>::new();
+    let mut containers = HashSet::<(VariablePart, VariableScope)>::new();
     let mut aggregate = 0usize;
     for (xml, part) in parts {
         parse_part(
@@ -109,10 +109,10 @@ pub(crate) fn parse_dde_connection_parts(
 
 fn parse_part(
     xml: &str,
-    part: OdfVariablePart,
+    part: VariablePart,
     parsed: &mut ParsedDdeConnections,
     names: &mut HashSet<String>,
-    containers: &mut HashSet<(OdfVariablePart, OdfVariableScope)>,
+    containers: &mut HashSet<(VariablePart, VariableScope)>,
     aggregate: &mut usize,
 ) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
@@ -281,10 +281,10 @@ fn parse_part(
 
 fn start_group(
     element: &BytesStart<'_>,
-    part: OdfVariablePart,
+    part: VariablePart,
     depth: usize,
     stack: &[Frame],
-    containers: &mut HashSet<(OdfVariablePart, OdfVariableScope)>,
+    containers: &mut HashSet<(VariablePart, VariableScope)>,
     active: &mut Option<ActiveGroup>,
 ) -> Result<()> {
     if element.attributes().next().is_some() {
@@ -308,10 +308,10 @@ fn start_group(
 fn parse_declaration(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: OdfVariablePart,
-    scope: OdfVariableScope,
+    part: VariablePart,
+    scope: VariableScope,
     aggregate: &mut usize,
-) -> Result<OdfDdeConnectionDeclaration> {
+) -> Result<DdeConnectionDeclaration> {
     let attributes = collect_attributes(reader, element, aggregate)?;
     reject_unexpected(
         &attributes,
@@ -330,7 +330,7 @@ fn parse_declaration(
     let automatic_update = get(&attributes, OFFICE, "automatic-update")
         .map(parse_bool)
         .transpose()?;
-    Ok(OdfDdeConnectionDeclaration {
+    Ok(DdeConnectionDeclaration {
         part,
         scope,
         name,
@@ -344,13 +344,13 @@ fn parse_declaration(
 fn parse_use(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: OdfVariablePart,
+    part: VariablePart,
     stack: &[Frame],
     aggregate: &mut usize,
-) -> Result<OdfDdeConnectionUse> {
+) -> Result<DdeConnectionUse> {
     let attributes = collect_attributes(reader, element, aggregate)?;
     reject_unexpected(&attributes, &[(TEXT, "connection-name")])?;
-    Ok(OdfDdeConnectionUse {
+    Ok(DdeConnectionUse {
         part,
         scope: nearest_scope(stack)?
             .ok_or_else(|| make_error("text:dde-connection occurs outside a document scope"))?,
@@ -359,7 +359,7 @@ fn parse_use(
 }
 
 fn add_declaration(
-    declaration: OdfDdeConnectionDeclaration,
+    declaration: DdeConnectionDeclaration,
     parsed: &mut ParsedDdeConnections,
     names: &mut HashSet<String>,
 ) -> Result<()> {
@@ -378,7 +378,7 @@ fn add_declaration(
     Ok(())
 }
 
-fn add_use(usage: OdfDdeConnectionUse, parsed: &mut ParsedDdeConnections) -> Result<()> {
+fn add_use(usage: DdeConnectionUse, parsed: &mut ParsedDdeConnections) -> Result<()> {
     if parsed.uses.len() >= MAX_REFERENCES {
         return invalid(format!(
             "document exceeds {MAX_REFERENCES} DDE connection references"
@@ -448,22 +448,22 @@ fn optional_attribute(
     Ok(value)
 }
 
-fn body_scope(parent: &Frame) -> Result<OdfVariableScope> {
+fn body_scope(parent: &Frame) -> Result<VariableScope> {
     if parent.namespace.as_deref() != Some(OFFICE) {
         return invalid("DDE declarations must be direct children of an office body element");
     }
     let body = match parent.local.as_str() {
-        "text" => OdfVariableBody::Text,
-        "spreadsheet" => OdfVariableBody::Spreadsheet,
-        "presentation" => OdfVariableBody::Presentation,
-        "drawing" => OdfVariableBody::Drawing,
-        "chart" => OdfVariableBody::Chart,
+        "text" => VariableBody::Text,
+        "spreadsheet" => VariableBody::Spreadsheet,
+        "presentation" => VariableBody::Presentation,
+        "drawing" => VariableBody::Drawing,
+        "chart" => VariableBody::Chart,
         _ => return invalid("DDE declarations must be direct children of an office body element"),
     };
-    Ok(OdfVariableScope::Body(body))
+    Ok(VariableScope::Body(body))
 }
 
-fn nearest_scope(stack: &[Frame]) -> Result<Option<OdfVariableScope>> {
+fn nearest_scope(stack: &[Frame]) -> Result<Option<VariableScope>> {
     for (index, frame) in stack.iter().enumerate().rev() {
         if frame.namespace.as_deref() == Some(OFFICE)
             && matches!(
@@ -475,12 +475,12 @@ fn nearest_scope(stack: &[Frame]) -> Result<Option<OdfVariableScope>> {
         }
         if frame.namespace.as_deref() == Some(STYLE) {
             let kind = match frame.local.as_str() {
-                "header" => Some(OdfVariableHeaderFooter::Header),
-                "header-first" => Some(OdfVariableHeaderFooter::HeaderFirst),
-                "header-left" => Some(OdfVariableHeaderFooter::HeaderLeft),
-                "footer" => Some(OdfVariableHeaderFooter::Footer),
-                "footer-first" => Some(OdfVariableHeaderFooter::FooterFirst),
-                "footer-left" => Some(OdfVariableHeaderFooter::FooterLeft),
+                "header" => Some(VariableHeaderFooter::Header),
+                "header-first" => Some(VariableHeaderFooter::HeaderFirst),
+                "header-left" => Some(VariableHeaderFooter::HeaderLeft),
+                "footer" => Some(VariableHeaderFooter::Footer),
+                "footer-first" => Some(VariableHeaderFooter::FooterFirst),
+                "footer-left" => Some(VariableHeaderFooter::FooterLeft),
                 _ => None,
             };
             if let Some(kind) = kind {
@@ -488,7 +488,7 @@ fn nearest_scope(stack: &[Frame]) -> Result<Option<OdfVariableScope>> {
                     .iter()
                     .rev()
                     .find_map(|candidate| candidate.master_page_name.clone());
-                return Ok(Some(OdfVariableScope::HeaderFooter {
+                return Ok(Some(VariableScope::HeaderFooter {
                     kind,
                     master_page_name,
                 }));
@@ -590,7 +590,7 @@ mod tests {
             </t:dde-connection-decls><t:p><t:dde-connection t:connection-name="Prices"/></t:p>{SUFFIX}"#
         );
         let inventory =
-            parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content)]).unwrap();
+            parse_variable_declaration_parts(&[(xml.as_str(), VariablePart::Content)]).unwrap();
         assert_eq!(inventory.dde_connections.len(), 1);
         assert_eq!(inventory.dde_connection_uses.len(), 1);
         let declaration = &inventory.dde_connections[0];
@@ -611,8 +611,8 @@ mod tests {
                 </t:dde-connection-decls><t:dde-connection t:connection-name="Feed"/>{SUFFIX}"#
         );
         let parsed = parse_variable_declaration_parts(&[
-            (styles.as_str(), OdfVariablePart::Styles),
-            (content.as_str(), OdfVariablePart::Content),
+            (styles.as_str(), VariablePart::Styles),
+            (content.as_str(), VariablePart::Content),
         ])
         .unwrap();
         assert!(!parsed.dde_connections[0].effective_automatic_update());
@@ -630,7 +630,7 @@ mod tests {
         for body in bodies {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(
-                parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content,)])
+                parse_variable_declaration_parts(&[(xml.as_str(), VariablePart::Content,)])
                     .is_err(),
                 "accepted {body}"
             );

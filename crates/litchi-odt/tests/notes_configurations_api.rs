@@ -1,6 +1,7 @@
+use litchi_odt::notes_configuration::NoteClass;
 use litchi_odt::{
-    Document, MutableDocument, OdfFootnotePosition, OdfLineNumberFormat, OdfNoteClass,
-    OdfNoteNumberingScope, OdfNotesConfiguration, OdfNotesConfigurations,
+    Document, FootnotePosition, LineNumberFormat, MutableDocument, NoteNumberingScope,
+    NotesConfiguration, NotesConfigurations,
 };
 mod support;
 
@@ -26,9 +27,9 @@ fn document(styles_body: &str) -> Document {
     .unwrap()
 }
 
-fn footnote() -> OdfNotesConfiguration {
-    OdfNotesConfiguration {
-        note_class: OdfNoteClass::Footnote,
+fn footnote() -> NotesConfiguration {
+    NotesConfiguration {
+        note_class: NoteClass::Footnote,
         citation_style_name: Some("FootnoteCitation".to_string()),
         citation_body_style_name: Some("FootnoteAnchor".to_string()),
         default_style_name: Some("Footnote".to_string()),
@@ -36,20 +37,20 @@ fn footnote() -> OdfNotesConfiguration {
         start_value: Some(2),
         number_prefix: Some("[".to_string()),
         number_suffix: Some("]".to_string()),
-        number_format: Some(OdfLineNumberFormat::LowerAlpha),
+        number_format: Some(LineNumberFormat::LowerAlpha),
         letter_sync: Some(true),
-        start_numbering_at: Some(OdfNoteNumberingScope::Chapter),
-        footnotes_position: Some(OdfFootnotePosition::Page),
+        start_numbering_at: Some(NoteNumberingScope::Chapter),
+        footnotes_position: Some(FootnotePosition::Page),
         continuation_notice_forward: Some("Continued on next page".to_string()),
         continuation_notice_backward: Some("Continued from previous page".to_string()),
     }
 }
 
-fn endnote() -> OdfNotesConfiguration {
-    let mut configuration = OdfNotesConfiguration::new(OdfNoteClass::Endnote);
+fn endnote() -> NotesConfiguration {
+    let mut configuration = NotesConfiguration::new(NoteClass::Endnote);
     configuration.start_value = Some(7);
-    configuration.number_format = Some(OdfLineNumberFormat::UpperRoman);
-    configuration.start_numbering_at = Some(OdfNoteNumberingScope::Document);
+    configuration.number_format = Some(LineNumberFormat::UpperRoman);
+    configuration.start_numbering_at = Some(NoteNumberingScope::Document);
     configuration
 }
 
@@ -63,7 +64,7 @@ fn document_reads_note_configurations_from_styles() {
 
     assert_eq!(
         source.notes_configurations().unwrap(),
-        OdfNotesConfigurations {
+        NotesConfigurations {
             footnote: Some(footnote),
             endnote: Some(endnote),
         }
@@ -86,7 +87,7 @@ fn mutable_document_updates_note_configurations_without_touching_unrelated_style
 
     assert_eq!(
         mutable
-            .set_notes_configurations(&OdfNotesConfigurations {
+            .set_notes_configurations(&NotesConfigurations {
                 footnote: None,
                 endnote: Some(endnote.clone()),
             })
@@ -96,7 +97,7 @@ fn mutable_document_updates_note_configurations_without_touching_unrelated_style
     );
     assert_eq!(
         mutable.notes_configurations().unwrap(),
-        OdfNotesConfigurations {
+        NotesConfigurations {
             footnote: None,
             endnote: Some(endnote.clone()),
         }
@@ -112,7 +113,7 @@ fn mutable_document_updates_note_configurations_without_touching_unrelated_style
 
     assert_eq!(
         mutable
-            .clear_notes_configuration(OdfNoteClass::Endnote)
+            .clear_notes_configuration(NoteClass::Endnote)
             .unwrap(),
         Some(endnote)
     );

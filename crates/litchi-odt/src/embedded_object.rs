@@ -35,7 +35,7 @@ const MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES: usize = 8 * 1024 * 1024;
 /// XML part containing an embedded-object occurrence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfEmbeddedObjectPart {
+pub enum EmbeddedObjectPart {
     Content,
     Styles,
     FlatDocument,
@@ -44,7 +44,7 @@ pub enum OdfEmbeddedObjectPart {
 /// Normative embedded-object element kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfEmbeddedObjectKind {
+pub enum EmbeddedObjectKind {
     Object,
     ObjectOle,
     Applet,
@@ -54,7 +54,7 @@ pub enum OdfEmbeddedObjectKind {
 
 /// One ordered, inert applet or plugin parameter.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfEmbeddedObjectParameter {
+pub struct EmbeddedObjectParameter {
     pub name: String,
     pub value: String,
 }
@@ -62,7 +62,7 @@ pub struct OdfEmbeddedObjectParameter {
 /// Root kind of an inline XML object payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfInlineObjectRoot {
+pub enum InlineObjectRoot {
     OpenDocument,
     MathMl,
 }
@@ -70,9 +70,9 @@ pub enum OdfInlineObjectRoot {
 /// Inert storage classification for an embedded object.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfEmbeddedObjectSource {
+pub enum EmbeddedObjectSource {
     InlineXml {
-        root: OdfInlineObjectRoot,
+        root: InlineObjectRoot,
         xml: String,
         ignored_href: Option<String>,
     },
@@ -103,10 +103,10 @@ pub enum OdfEmbeddedObjectSource {
 
 /// One inert `draw:object` or `draw:object-ole` occurrence.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfEmbeddedObject {
-    pub part: OdfEmbeddedObjectPart,
-    pub kind: OdfEmbeddedObjectKind,
-    pub source: OdfEmbeddedObjectSource,
+pub struct EmbeddedObject {
+    pub part: EmbeddedObjectPart,
+    pub kind: EmbeddedObjectKind,
+    pub source: EmbeddedObjectSource,
     pub frame: Option<ImageFrame>,
     pub xml_id: Option<String>,
     pub class_id: Option<String>,
@@ -122,7 +122,7 @@ pub struct OdfEmbeddedObject {
     pub applet_name: Option<String>,
     pub mime_type: Option<String>,
     pub frame_name: Option<String>,
-    pub parameters: Vec<OdfEmbeddedObjectParameter>,
+    pub parameters: Vec<EmbeddedObjectParameter>,
 }
 
 #[derive(Clone, Copy)]
@@ -156,13 +156,13 @@ struct AccessibilityText {
 
 struct InlineXmlCapture {
     depth: usize,
-    root: OdfInlineObjectRoot,
+    root: InlineObjectRoot,
     writer: Writer<Vec<u8>>,
 }
 
 struct ObjectBuilder {
     depth: usize,
-    kind: OdfEmbeddedObjectKind,
+    kind: EmbeddedObjectKind,
     href: Option<String>,
     frame: Option<ImageFrame>,
     xml_id: Option<String>,
@@ -178,8 +178,8 @@ struct ObjectBuilder {
     applet_name: Option<String>,
     mime_type: Option<String>,
     frame_name: Option<String>,
-    parameters: Vec<OdfEmbeddedObjectParameter>,
-    inline_xml: Option<(OdfInlineObjectRoot, String)>,
+    parameters: Vec<EmbeddedObjectParameter>,
+    inline_xml: Option<(InlineObjectRoot, String)>,
     binary_present: bool,
     binary_depth: Option<usize>,
     binary_encoded: String,
@@ -190,7 +190,7 @@ pub(crate) fn scan_packaged_objects(
     styles_xml: Option<&str>,
     has_file: impl Fn(&str) -> bool,
     media_type: impl Fn(&str) -> Option<String>,
-) -> Result<Vec<OdfEmbeddedObject>> {
+) -> Result<Vec<EmbeddedObject>> {
     let lookup = PackageLookup {
         has_file: &has_file,
         media_type: &media_type,
@@ -201,7 +201,7 @@ pub(crate) fn scan_packaged_objects(
     let mut total_accessibility = 0usize;
     scan_xml(
         content_xml,
-        OdfEmbeddedObjectPart::Content,
+        EmbeddedObjectPart::Content,
         Some(lookup),
         &mut objects,
         &mut total_xml,
@@ -211,7 +211,7 @@ pub(crate) fn scan_packaged_objects(
     if let Some(styles_xml) = styles_xml {
         scan_xml(
             styles_xml,
-            OdfEmbeddedObjectPart::Styles,
+            EmbeddedObjectPart::Styles,
             Some(lookup),
             &mut objects,
             &mut total_xml,
@@ -222,14 +222,14 @@ pub(crate) fn scan_packaged_objects(
     Ok(objects)
 }
 
-pub(crate) fn scan_flat_objects(xml: &str) -> Result<Vec<OdfEmbeddedObject>> {
+pub(crate) fn scan_flat_objects(xml: &str) -> Result<Vec<EmbeddedObject>> {
     let mut objects = Vec::new();
     let mut total_xml = 0usize;
     let mut total_binary = 0usize;
     let mut total_accessibility = 0usize;
     scan_xml(
         xml,
-        OdfEmbeddedObjectPart::FlatDocument,
+        EmbeddedObjectPart::FlatDocument,
         None,
         &mut objects,
         &mut total_xml,
@@ -242,9 +242,9 @@ pub(crate) fn scan_flat_objects(xml: &str) -> Result<Vec<OdfEmbeddedObject>> {
 #[allow(clippy::too_many_arguments)]
 fn scan_xml(
     xml: &str,
-    part: OdfEmbeddedObjectPart,
+    part: EmbeddedObjectPart,
     package: Option<PackageLookup<'_>>,
-    objects: &mut Vec<OdfEmbeddedObject>,
+    objects: &mut Vec<EmbeddedObject>,
     total_xml_bytes: &mut usize,
     total_binary_bytes: &mut usize,
     total_accessibility_bytes: &mut usize,
@@ -349,7 +349,7 @@ fn scan_xml(
                     } else if depth == object.depth + 1
                         && let Some(root) = inline_root(&namespace, &element)
                     {
-                        if object.kind != OdfEmbeddedObjectKind::Object {
+                        if object.kind != EmbeddedObjectKind::Object {
                             return Err(Error::InvalidFormat(
                                 "draw:object-ole must not contain inline XML objects".to_string(),
                             ));
@@ -370,7 +370,7 @@ fn scan_xml(
                         && bound_to(&namespace, OFFICE_NAMESPACE)
                         && element.local_name().as_ref() == b"binary-data"
                     {
-                        if object.kind != OdfEmbeddedObjectKind::ObjectOle {
+                        if object.kind != EmbeddedObjectKind::ObjectOle {
                             return Err(Error::InvalidFormat(
                                 "draw:object must not contain office:binary-data".to_string(),
                             ));
@@ -452,8 +452,7 @@ fn scan_xml(
                     } else if depth == object.depth
                         && let Some(root) = inline_root(&namespace, &element)
                     {
-                        if object.kind != OdfEmbeddedObjectKind::Object
-                            || object.inline_xml.is_some()
+                        if object.kind != EmbeddedObjectKind::Object || object.inline_xml.is_some()
                         {
                             return Err(Error::InvalidFormat(
                                 "invalid duplicate inline embedded-object payload".to_string(),
@@ -470,8 +469,7 @@ fn scan_xml(
                         && bound_to(&namespace, OFFICE_NAMESPACE)
                         && element.local_name().as_ref() == b"binary-data"
                     {
-                        if object.kind != OdfEmbeddedObjectKind::ObjectOle || object.binary_present
-                        {
+                        if object.kind != EmbeddedObjectKind::ObjectOle || object.binary_present {
                             return Err(Error::InvalidFormat(
                                 "invalid duplicate inline OLE payload".to_string(),
                             ));
@@ -668,16 +666,16 @@ fn ensure_object_capacity(current: usize) -> Result<()> {
 fn object_kind(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
-) -> Option<OdfEmbeddedObjectKind> {
+) -> Option<EmbeddedObjectKind> {
     if !bound_to(namespace, DRAW_NAMESPACE) {
         return None;
     }
     match element.local_name().as_ref() {
-        b"object" => Some(OdfEmbeddedObjectKind::Object),
-        b"object-ole" => Some(OdfEmbeddedObjectKind::ObjectOle),
-        b"applet" => Some(OdfEmbeddedObjectKind::Applet),
-        b"plugin" => Some(OdfEmbeddedObjectKind::Plugin),
-        b"floating-frame" => Some(OdfEmbeddedObjectKind::FloatingFrame),
+        b"object" => Some(EmbeddedObjectKind::Object),
+        b"object-ole" => Some(EmbeddedObjectKind::ObjectOle),
+        b"applet" => Some(EmbeddedObjectKind::Applet),
+        b"plugin" => Some(EmbeddedObjectKind::Plugin),
+        b"floating-frame" => Some(EmbeddedObjectKind::FloatingFrame),
         _ => None,
     }
 }
@@ -689,7 +687,7 @@ fn push_parameter(
 ) -> Result<()> {
     if !matches!(
         object.kind,
-        OdfEmbeddedObjectKind::Applet | OdfEmbeddedObjectKind::Plugin
+        EmbeddedObjectKind::Applet | EmbeddedObjectKind::Plugin
     ) {
         return Err(Error::InvalidFormat(
             "draw:param is allowed only in draw:applet or draw:plugin".to_string(),
@@ -711,18 +709,18 @@ fn push_parameter(
     }
     object
         .parameters
-        .push(OdfEmbeddedObjectParameter { name, value });
+        .push(EmbeddedObjectParameter { name, value });
     Ok(())
 }
 
 fn inline_root(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
-) -> Option<OdfInlineObjectRoot> {
+) -> Option<InlineObjectRoot> {
     if bound_to(namespace, OFFICE_NAMESPACE) && element.local_name().as_ref() == b"document" {
-        Some(OdfInlineObjectRoot::OpenDocument)
+        Some(InlineObjectRoot::OpenDocument)
     } else if bound_to(namespace, MATH_NAMESPACE) && element.local_name().as_ref() == b"math" {
-        Some(OdfInlineObjectRoot::MathMl)
+        Some(InlineObjectRoot::MathMl)
     } else {
         None
     }
@@ -732,7 +730,7 @@ fn start_object(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     depth: usize,
-    kind: OdfEmbeddedObjectKind,
+    kind: EmbeddedObjectKind,
     object_index: usize,
     frame: Option<&mut FrameState>,
 ) -> Result<ObjectBuilder> {
@@ -781,12 +779,12 @@ fn start_object(
 
 fn finish_object(
     object: ObjectBuilder,
-    part: OdfEmbeddedObjectPart,
+    part: EmbeddedObjectPart,
     package: Option<PackageLookup<'_>>,
     total_binary_bytes: &mut usize,
-) -> Result<OdfEmbeddedObject> {
+) -> Result<EmbeddedObject> {
     let source = if let Some((root, xml)) = object.inline_xml {
-        OdfEmbeddedObjectSource::InlineXml {
+        EmbeddedObjectSource::InlineXml {
             root,
             xml,
             ignored_href: object.href.clone(),
@@ -820,26 +818,26 @@ fn finish_object(
                 "total inline OLE data exceeds {MAX_TOTAL_INLINE_BINARY_BYTES} bytes"
             )));
         }
-        OdfEmbeddedObjectSource::InlineBinary {
+        EmbeddedObjectSource::InlineBinary {
             bytes,
             ignored_href: object.href.clone(),
         }
     } else if let Some(href) = object.href.clone().filter(|href| !href.is_empty()) {
         if matches!(
             object.kind,
-            OdfEmbeddedObjectKind::Applet
-                | OdfEmbeddedObjectKind::Plugin
-                | OdfEmbeddedObjectKind::FloatingFrame
+            EmbeddedObjectKind::Applet
+                | EmbeddedObjectKind::Plugin
+                | EmbeddedObjectKind::FloatingFrame
         ) {
-            OdfEmbeddedObjectSource::Linked { href }
+            EmbeddedObjectSource::Linked { href }
         } else {
             match package {
-                None => OdfEmbeddedObjectSource::Linked { href },
-                Some(_) if is_linked_href(&href) => OdfEmbeddedObjectSource::Linked { href },
+                None => EmbeddedObjectSource::Linked { href },
+                Some(_) if is_linked_href(&href) => EmbeddedObjectSource::Linked { href },
                 Some(package) => {
                     let path = resolve_package_path(&href)?;
                     if (package.has_file)(&path) {
-                        OdfEmbeddedObjectSource::PackageFile {
+                        EmbeddedObjectSource::PackageFile {
                             href,
                             manifest_media_type: (package.media_type)(&path),
                             path,
@@ -848,7 +846,7 @@ fn finish_object(
                         let content_path = format!("{path}/content.xml");
                         if (package.has_file)(&content_path) {
                             let root_path = format!("{path}/");
-                            OdfEmbeddedObjectSource::PackageSubdocument {
+                            EmbeddedObjectSource::PackageSubdocument {
                                 href,
                                 manifest_media_type: (package.media_type)(&root_path)
                                     .or_else(|| (package.media_type)(&path)),
@@ -856,7 +854,7 @@ fn finish_object(
                                 content_path,
                             }
                         } else {
-                            OdfEmbeddedObjectSource::MissingPackagePart {
+                            EmbeddedObjectSource::MissingPackagePart {
                                 href,
                                 resolved_path: path,
                             }
@@ -866,10 +864,10 @@ fn finish_object(
             }
         }
     } else {
-        OdfEmbeddedObjectSource::Missing
+        EmbeddedObjectSource::Missing
     };
 
-    Ok(OdfEmbeddedObject {
+    Ok(EmbeddedObject {
         part,
         kind: object.kind,
         source,
@@ -1132,20 +1130,20 @@ mod active_object_tests {
         );
         let objects = scan_flat_objects(&xml).unwrap();
         assert_eq!(objects.len(), 3);
-        assert_eq!(objects[0].kind, OdfEmbeddedObjectKind::Applet);
+        assert_eq!(objects[0].kind, EmbeddedObjectKind::Applet);
         assert_eq!(objects[0].code.as_deref(), Some("Main"));
         assert_eq!(objects[0].may_script, Some(true));
         assert_eq!(objects[0].parameters[0].name, "theme");
         assert!(matches!(
             objects[0].source,
-            OdfEmbeddedObjectSource::Linked { .. }
+            EmbeddedObjectSource::Linked { .. }
         ));
-        assert_eq!(objects[1].kind, OdfEmbeddedObjectKind::Plugin);
+        assert_eq!(objects[1].kind, EmbeddedObjectKind::Plugin);
         assert_eq!(
             objects[1].mime_type.as_deref(),
             Some("application/x-example")
         );
-        assert_eq!(objects[2].kind, OdfEmbeddedObjectKind::FloatingFrame);
+        assert_eq!(objects[2].kind, EmbeddedObjectKind::FloatingFrame);
         assert_eq!(objects[2].frame_name.as_deref(), Some("preview"));
     }
 

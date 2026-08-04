@@ -4,7 +4,7 @@
 //! words generate alphabetical index entries automatically. The reference is
 //! retained for inspection only; the file is never fetched or loaded.
 
-use crate::{OdfVariableBody, OdfVariablePart, OdfVariableScope};
+use crate::{VariableBody, VariablePart, VariableScope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -26,11 +26,11 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 /// The referenced concordance file remains external: it is never opened,
 /// fetched, or parsed.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfAlphabeticalIndexAutoMarkFile {
+pub struct AlphabeticalIndexAutoMarkFile {
     /// The package part (content or styles) declaring the reference.
-    pub part: OdfVariablePart,
+    pub part: VariablePart,
     /// The `office:text` scope declaring the reference.
-    pub scope: OdfVariableScope,
+    pub scope: VariableScope,
     /// The external concordance file URI from `xlink:href`.
     pub href: String,
 }
@@ -71,8 +71,8 @@ fn child_rank(namespace: Option<&str>, local: &str) -> u8 {
 type Attributes = HashMap<(String, String), String>;
 
 pub(crate) fn parse_auto_mark_file_parts(
-    parts: &[(&str, OdfVariablePart)],
-) -> Result<Vec<OdfAlphabeticalIndexAutoMarkFile>> {
+    parts: &[(&str, VariablePart)],
+) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
     let total = parts.iter().try_fold(0usize, |total, (xml, _)| {
         total
             .checked_add(xml.len())
@@ -83,7 +83,7 @@ pub(crate) fn parse_auto_mark_file_parts(
     }
 
     let mut references = Vec::new();
-    let mut scopes = HashSet::<(OdfVariablePart, OdfVariableScope)>::new();
+    let mut scopes = HashSet::<(VariablePart, VariableScope)>::new();
     let mut aggregate = 0usize;
     for (xml, part) in parts {
         parse_part(xml, *part, &mut references, &mut scopes, &mut aggregate)?;
@@ -93,9 +93,9 @@ pub(crate) fn parse_auto_mark_file_parts(
 
 fn parse_part(
     xml: &str,
-    part: OdfVariablePart,
-    references: &mut Vec<OdfAlphabeticalIndexAutoMarkFile>,
-    scopes: &mut HashSet<(OdfVariablePart, OdfVariableScope)>,
+    part: VariablePart,
+    references: &mut Vec<AlphabeticalIndexAutoMarkFile>,
+    scopes: &mut HashSet<(VariablePart, VariableScope)>,
     aggregate: &mut usize,
 ) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
@@ -250,10 +250,10 @@ fn is_auto_mark_file(namespace: Option<&str>, local: &str) -> bool {
 fn register_reference(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: OdfVariablePart,
+    part: VariablePart,
     scope: &mut TextScope,
-    references: &mut Vec<OdfAlphabeticalIndexAutoMarkFile>,
-    scopes: &mut HashSet<(OdfVariablePart, OdfVariableScope)>,
+    references: &mut Vec<AlphabeticalIndexAutoMarkFile>,
+    scopes: &mut HashSet<(VariablePart, VariableScope)>,
     aggregate: &mut usize,
 ) -> Result<()> {
     if scope.seen_auto_mark_file {
@@ -276,7 +276,7 @@ fn register_reference(
         },
     }
 
-    let scope_value = OdfVariableScope::Body(OdfVariableBody::Text);
+    let scope_value = VariableScope::Body(VariableBody::Text);
     if !scopes.insert((part, scope_value.clone())) {
         return invalid("duplicate text:alphabetical-index-auto-mark-file in one document part");
     }
@@ -285,7 +285,7 @@ fn register_reference(
             "document exceeds {MAX_OCCURRENCES} auto-mark-file references"
         ));
     }
-    references.push(OdfAlphabeticalIndexAutoMarkFile {
+    references.push(AlphabeticalIndexAutoMarkFile {
         part,
         scope: scope_value,
         href,
@@ -392,9 +392,9 @@ mod tests {
     const CONTENT_PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><o:body><o:text>"#;
     const CONTENT_SUFFIX: &str = r#"</o:text></o:body></o:document-content>"#;
 
-    fn parse(content: &str) -> Result<Vec<OdfAlphabeticalIndexAutoMarkFile>> {
+    fn parse(content: &str) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
         let xml = format!("{CONTENT_PREFIX}{content}{CONTENT_SUFFIX}");
-        parse_auto_mark_file_parts(&[(xml.as_str(), OdfVariablePart::Content)])
+        parse_auto_mark_file_parts(&[(xml.as_str(), VariablePart::Content)])
     }
 
     #[test]
@@ -403,11 +403,8 @@ mod tests {
             parse(r#"<t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="concordance.sdi"/><t:p>Text</t:p>"#).unwrap();
         assert_eq!(references.len(), 1);
         let reference = &references[0];
-        assert_eq!(reference.part, OdfVariablePart::Content);
-        assert_eq!(
-            reference.scope,
-            OdfVariableScope::Body(OdfVariableBody::Text)
-        );
+        assert_eq!(reference.part, VariablePart::Content);
+        assert_eq!(reference.scope, VariableScope::Body(VariableBody::Text));
         assert_eq!(reference.href, "concordance.sdi");
     }
 
@@ -461,7 +458,7 @@ mod tests {
     fn rejects_misplaced_or_spoofed_elements() {
         // Outside office:text.
         let floating = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><o:body><t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="a.sdi"/></o:body></o:document-content>"#;
-        assert!(parse_auto_mark_file_parts(&[(floating, OdfVariablePart::Content)]).is_err());
+        assert!(parse_auto_mark_file_parts(&[(floating, VariablePart::Content)]).is_err());
         // Nested inside document content.
         assert!(
             parse(r#"<t:p><t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="a.sdi"/></t:p>"#).is_err()

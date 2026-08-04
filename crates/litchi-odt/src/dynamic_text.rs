@@ -1,6 +1,6 @@
 //! Namespace-aware mutation of dynamic text fields in ODT `content.xml`.
 
-use crate::elements::field::{FieldParser, OdfDatabaseField, OdfDynamicTextField};
+use crate::elements::field::{DatabaseField, DynamicTextField, FieldParser};
 use litchi_core::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -21,7 +21,7 @@ struct Span {
 #[cfg(test)]
 mod meta_field_mutation_tests {
     use super::*;
-    use crate::elements::field::{OdfDynamicTextField, OdfMetaFieldContent, OdfMetaFieldNode};
+    use crate::elements::field::{DynamicTextField, MetaFieldContent, MetaFieldNode};
 
     fn content_xml(body: &str) -> String {
         format!(
@@ -46,7 +46,7 @@ mod meta_field_mutation_tests {
         let xml = replace_dynamic_text_field_xml(
             &xml,
             1,
-            &OdfDynamicTextField::PageVariableGet {
+            &DynamicTextField::PageVariableGet {
                 number_format: None,
                 display_text: "value".to_string(),
             },
@@ -64,10 +64,10 @@ mod meta_field_mutation_tests {
     #[test]
     fn meta_field_can_be_inserted_and_out_of_bounds_is_rejected() {
         let xml = content_xml("plain");
-        let field = OdfDynamicTextField::MetaField {
+        let field = DynamicTextField::MetaField {
             xml_id: "inserted".to_string(),
             data_style_name: None,
-            content: OdfMetaFieldContent::new(vec![OdfMetaFieldNode::Text("metadata".to_string())])
+            content: MetaFieldContent::new(vec![MetaFieldNode::Text("metadata".to_string())])
                 .unwrap(),
         };
         let xml = insert_dynamic_text_field_xml(&xml, 0, &field).unwrap();
@@ -80,10 +80,10 @@ mod meta_field_mutation_tests {
     #[test]
     fn meta_field_mutation_rejects_document_wide_xml_id_collisions() {
         let xml = content_xml(r#"<text:span xml:id="existing">plain</text:span>"#);
-        let field = OdfDynamicTextField::MetaField {
+        let field = DynamicTextField::MetaField {
             xml_id: "existing".to_string(),
             data_style_name: None,
-            content: OdfMetaFieldContent::new(vec![OdfMetaFieldNode::Text("metadata".to_string())])
+            content: MetaFieldContent::new(vec![MetaFieldNode::Text("metadata".to_string())])
                 .unwrap(),
         };
         assert!(insert_dynamic_text_field_xml(&xml, 0, &field).is_err());
@@ -93,14 +93,14 @@ mod meta_field_mutation_tests {
 #[cfg(test)]
 mod database_field_mutation_tests {
     use super::*;
-    use crate::elements::field::{OdfDatabaseFieldKind, OdfDatabaseSource, OdfNonNegativeInteger};
+    use crate::elements::field::{DatabaseFieldKind, DatabaseSource, NonNegativeInteger};
 
     const XML: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:p>before<t:database-name t:table-name="old">old</t:database-name>after</t:p></o:text></o:body></o:document-content>"#;
 
-    fn field(kind: OdfDatabaseFieldKind, table: &str, text: &str) -> OdfDatabaseField {
-        OdfDatabaseField {
+    fn field(kind: DatabaseFieldKind, table: &str, text: &str) -> DatabaseField {
+        DatabaseField {
             kind,
-            source: OdfDatabaseSource {
+            source: DatabaseSource {
                 database_name: None,
                 table_name: table.into(),
                 table_type: None,
@@ -119,11 +119,11 @@ mod database_field_mutation_tests {
 
     #[test]
     fn database_fields_insert_replace_remove_and_check_bounds() {
-        let replacement = field(OdfDatabaseFieldKind::Name, "new", "new");
+        let replacement = field(DatabaseFieldKind::Name, "new", "new");
         let xml = replace_database_field_xml(XML, 0, &replacement).unwrap();
         assert!(xml.contains("text:table-name=\"new\""));
         let inserted =
-            insert_database_field_xml(&xml, 0, &field(OdfDatabaseFieldKind::Next, "next", ""))
+            insert_database_field_xml(&xml, 0, &field(DatabaseFieldKind::Next, "next", ""))
                 .unwrap();
         assert_eq!(
             FieldParser::parse_database_fields(&inserted).unwrap().len(),
@@ -140,9 +140,9 @@ mod database_field_mutation_tests {
 
     #[test]
     fn database_mutation_preserves_arbitrary_width_row_numbers() {
-        let mut row = field(OdfDatabaseFieldKind::RowSelect, "table", "");
+        let mut row = field(DatabaseFieldKind::RowSelect, "table", "");
         let huge = "18446744073709551616000000000000000000";
-        row.row_number = Some(OdfNonNegativeInteger::new(&format!("+000{huge}")).unwrap());
+        row.row_number = Some(NonNegativeInteger::new(&format!("+000{huge}")).unwrap());
         let xml = insert_database_field_xml(XML, 0, &row).unwrap();
         assert!(xml.contains(&format!("text:row-number=\"{huge}\"")));
         let parsed = FieldParser::parse_database_fields(&xml).unwrap();
@@ -161,7 +161,7 @@ mod dde_connection_mutation_tests {
 
     #[test]
     fn dde_cached_fields_insert_replace_remove_and_check_bounds() {
-        let replacement = OdfDynamicTextField::DdeConnection {
+        let replacement = DynamicTextField::DdeConnection {
             connection_name: "new".into(),
             display_text: "new cache".into(),
         };
@@ -200,7 +200,7 @@ mod dde_connection_mutation_tests {
                 .unwrap()
                 .is_empty()
         );
-        let oversized = OdfDynamicTextField::DdeConnection {
+        let oversized = DynamicTextField::DdeConnection {
             connection_name: "x".repeat(65_537),
             display_text: String::new(),
         };
@@ -229,7 +229,7 @@ struct Scan {
 pub fn insert_database_field_xml(
     xml: &str,
     paragraph_index: usize,
-    field: &OdfDatabaseField,
+    field: &DatabaseField,
 ) -> Result<String> {
     let fragment = field.to_xml_fragment()?;
     let scan = scan(xml, Some(paragraph_index))?;
@@ -264,7 +264,7 @@ pub fn insert_database_field_xml(
 pub fn replace_database_field_xml(
     xml: &str,
     field_index: usize,
-    replacement: &OdfDatabaseField,
+    replacement: &DatabaseField,
 ) -> Result<String> {
     let fragment = replacement.to_xml_fragment()?;
     let mut scan = scan(xml, None)?;
@@ -292,7 +292,7 @@ fn take_database_field(fields: &mut Vec<Span>, index: usize) -> Result<Span> {
 pub fn insert_dynamic_text_field_xml(
     xml: &str,
     paragraph_index: usize,
-    field: &OdfDynamicTextField,
+    field: &DynamicTextField,
 ) -> Result<String> {
     let fragment = field.to_xml_fragment()?;
     let scan = scan(xml, Some(paragraph_index))?;
@@ -340,7 +340,7 @@ pub fn insert_dynamic_text_field_xml(
 pub fn replace_dynamic_text_field_xml(
     xml: &str,
     field_index: usize,
-    replacement: &OdfDynamicTextField,
+    replacement: &DynamicTextField,
 ) -> Result<String> {
     let fragment = replacement.to_xml_fragment()?;
     let mut scan = scan(xml, None)?;
@@ -349,12 +349,12 @@ pub fn replace_dynamic_text_field_xml(
     validate_meta_field_mutation(output, replacement)
 }
 
-fn validate_meta_field_mutation(output: String, field: &OdfDynamicTextField) -> Result<String> {
+fn validate_meta_field_mutation(output: String, field: &DynamicTextField) -> Result<String> {
     if matches!(
         field,
-        OdfDynamicTextField::MetaField { .. }
-            | OdfDynamicTextField::DropDown { .. }
-            | OdfDynamicTextField::Script { .. }
+        DynamicTextField::MetaField { .. }
+            | DynamicTextField::DropDown { .. }
+            | DynamicTextField::Script { .. }
     ) {
         FieldParser::parse_dynamic_text_fields(&output)?;
     }
@@ -642,9 +642,7 @@ fn is_dynamic_local(local: &[u8]) -> bool {
 #[cfg(test)]
 mod fixed_page_date_time_mutation_tests {
     use super::*;
-    use crate::elements::field::{
-        OdfDynamicTextField, OdfFieldDateValue, OdfPageContinuationSelection,
-    };
+    use crate::elements::field::{DynamicTextField, FieldDateValue, PageContinuationSelection};
 
     const XML: &str = r#"<o:document-content
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -654,8 +652,8 @@ mod fixed_page_date_time_mutation_tests {
 
     #[test]
     fn fixed_page_date_time_mutation_insert_replace_remove_is_namespace_aware() {
-        let replacement = OdfDynamicTextField::PageContinuation {
-            select_page: OdfPageContinuationSelection::Next,
+        let replacement = DynamicTextField::PageContinuation {
+            select_page: PageContinuationSelection::Next,
             string_value: Some("continued".to_string()),
             display_text: "cached".to_string(),
         };
@@ -666,8 +664,8 @@ mod fixed_page_date_time_mutation_tests {
         let inserted = insert_dynamic_text_field_xml(
             &replaced,
             0,
-            &OdfDynamicTextField::Date {
-                value: Some(OdfFieldDateValue::new("2024-12-31").unwrap()),
+            &DynamicTextField::Date {
+                value: Some(FieldDateValue::new("2024-12-31").unwrap()),
                 adjustment: None,
                 fixed: Some(true),
                 data_style_name: None,
@@ -686,7 +684,7 @@ mod fixed_page_date_time_mutation_tests {
 #[cfg(test)]
 mod page_variable_family_mutation_tests {
     use super::*;
-    use crate::elements::field::{OdfDynamicTextField, OdfPageVariableNumberFormat};
+    use crate::elements::field::{DynamicTextField, PageVariableNumberFormat};
 
     const XML: &str = r#"<o:document-content
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -696,15 +694,15 @@ mod page_variable_family_mutation_tests {
 
     #[test]
     fn page_variable_family_mutation_inserts_replaces_removes_and_checks_bounds() {
-        let getter = OdfDynamicTextField::PageVariableGet {
-            number_format: Some(OdfPageVariableNumberFormat::new("1", None).unwrap()),
+        let getter = DynamicTextField::PageVariableGet {
+            number_format: Some(PageVariableNumberFormat::new("1", None).unwrap()),
             display_text: "12".to_string(),
         };
         let replaced = replace_dynamic_text_field_xml(XML, 0, &getter).unwrap();
         assert!(replaced.contains("before<text:page-variable-get"));
         assert!(replaced.contains("</text:page-variable-get>after"));
 
-        let setter = OdfDynamicTextField::PageVariableSet {
+        let setter = DynamicTextField::PageVariableSet {
             active: Some(false),
             page_adjust: Some(-4),
             display_text: String::new(),
@@ -722,8 +720,7 @@ mod page_variable_family_mutation_tests {
 mod document_metadata_fixed_field_mutation_tests {
     use super::*;
     use crate::elements::field::{
-        OdfDocumentMetadataFieldKind, OdfDocumentMetadataFieldValue, OdfDynamicTextField,
-        OdfFieldDuration,
+        DocumentMetadataFieldKind, DocumentMetadataFieldValue, DynamicTextField, FieldDuration,
     };
 
     const XML: &str = r#"<o:document-content
@@ -734,10 +731,10 @@ mod document_metadata_fixed_field_mutation_tests {
 
     #[test]
     fn document_metadata_fixed_field_mutation_is_namespace_aware_and_bounded() {
-        let replacement = OdfDynamicTextField::DocumentMetadata {
-            kind: OdfDocumentMetadataFieldKind::EditingDuration,
-            value: Some(OdfDocumentMetadataFieldValue::Duration(
-                OdfFieldDuration::new("PT3H").unwrap(),
+        let replacement = DynamicTextField::DocumentMetadata {
+            kind: DocumentMetadataFieldKind::EditingDuration,
+            value: Some(DocumentMetadataFieldValue::Duration(
+                FieldDuration::new("PT3H").unwrap(),
             )),
             fixed: Some(true),
             data_style_name: Some("Elapsed".to_string()),
@@ -750,8 +747,8 @@ mod document_metadata_fixed_field_mutation_tests {
         let inserted = insert_dynamic_text_field_xml(
             &replaced,
             0,
-            &OdfDynamicTextField::DocumentMetadata {
-                kind: OdfDocumentMetadataFieldKind::ModificationTime,
+            &DynamicTextField::DocumentMetadata {
+                kind: DocumentMetadataFieldKind::ModificationTime,
                 value: None,
                 fixed: None,
                 data_style_name: None,
@@ -770,7 +767,7 @@ mod document_metadata_fixed_field_mutation_tests {
 #[cfg(test)]
 mod document_identity_fixed_field_mutation_tests {
     use super::*;
-    use crate::elements::field::{OdfDocumentIdentityFieldKind, OdfDynamicTextField};
+    use crate::elements::field::{DocumentIdentityFieldKind, DynamicTextField};
 
     const XML: &str = r#"<o:document-content
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -780,8 +777,8 @@ mod document_identity_fixed_field_mutation_tests {
 
     #[test]
     fn document_identity_fixed_field_mutation_is_namespace_aware_and_bounded() {
-        let replacement = OdfDynamicTextField::DocumentIdentity {
-            kind: OdfDocumentIdentityFieldKind::Creator,
+        let replacement = DynamicTextField::DocumentIdentity {
+            kind: DocumentIdentityFieldKind::Creator,
             fixed: Some(false),
             display_text: "new creator".to_string(),
         };
@@ -792,8 +789,8 @@ mod document_identity_fixed_field_mutation_tests {
         let inserted = insert_dynamic_text_field_xml(
             &replaced,
             0,
-            &OdfDynamicTextField::DocumentIdentity {
-                kind: OdfDocumentIdentityFieldKind::Keywords,
+            &DynamicTextField::DocumentIdentity {
+                kind: DocumentIdentityFieldKind::Keywords,
                 fixed: None,
                 display_text: "one, two".to_string(),
             },
@@ -810,7 +807,7 @@ mod document_identity_fixed_field_mutation_tests {
 #[cfg(test)]
 mod user_defined_metadata_field_mutation_tests {
     use super::*;
-    use crate::elements::field::{OdfDynamicTextField, OdfUserDefinedMetadataValues};
+    use crate::elements::field::{DynamicTextField, UserDefinedMetadataValues};
 
     const XML: &str = r#"<o:document-content
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -818,12 +815,12 @@ mod user_defined_metadata_field_mutation_tests {
         <o:body><o:text><u:p>before<u:user-defined u:name="old">old</u:user-defined>after</u:p></o:text></o:body>
     </o:document-content>"#;
 
-    fn field(name: &str, display_text: &str) -> OdfDynamicTextField {
-        OdfDynamicTextField::UserDefinedMetadata {
+    fn field(name: &str, display_text: &str) -> DynamicTextField {
+        DynamicTextField::UserDefinedMetadata {
             name: name.to_string(),
-            values: OdfUserDefinedMetadataValues {
+            values: UserDefinedMetadataValues {
                 string: Some(display_text.to_string()),
-                ..OdfUserDefinedMetadataValues::default()
+                ..UserDefinedMetadataValues::default()
             },
             fixed: Some(true),
             data_style_name: None,

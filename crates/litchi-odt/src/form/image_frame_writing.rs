@@ -7,7 +7,7 @@ use quick_xml::NsReader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
-use super::generic_writing::OdfGenericControlMetadata;
+use super::generic_writing::GenericControlMetadata;
 
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -24,10 +24,10 @@ const MAX_FORMS: usize = 4096;
 const MAX_CONTROLS: usize = 65_536;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfImageFrameControl {
+pub struct ImageFrameControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub data_field: Option<String>,
     pub disabled: Option<bool>,
     pub image_data: Option<String>,
@@ -36,12 +36,12 @@ pub struct OdfImageFrameControl {
     pub title: Option<String>,
 }
 
-impl OdfImageFrameControl {
+impl ImageFrameControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             data_field: None,
             disabled: None,
             image_data: None,
@@ -57,13 +57,13 @@ impl OdfImageFrameControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfImageFrameForm {
+pub struct ImageFrameForm {
     pub name: String,
-    pub controls: Vec<OdfImageFrameControl>,
+    pub controls: Vec<ImageFrameControl>,
     pub apply_filter: Option<bool>,
 }
 
-impl OdfImageFrameForm {
+impl ImageFrameForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -72,7 +72,7 @@ impl OdfImageFrameForm {
         }
     }
 
-    pub fn add_control(&mut self, control: OdfImageFrameControl) -> Result<()> {
+    pub fn add_control(&mut self, control: ImageFrameControl) -> Result<()> {
         validate_control(&control)?;
         if self
             .controls
@@ -122,7 +122,7 @@ impl OdfImageFrameForm {
     }
 }
 
-pub fn image_frame_controls(xml: &str) -> Result<Vec<OdfImageFrameControl>> {
+pub fn image_frame_controls(xml: &str) -> Result<Vec<ImageFrameControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -133,7 +133,7 @@ pub fn image_frame_controls(xml: &str) -> Result<Vec<OdfImageFrameControl>> {
 pub fn insert_image_frame_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfImageFrameControl,
+    control: &ImageFrameControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -155,7 +155,7 @@ pub fn insert_image_frame_control_xml(
 pub fn replace_image_frame_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfImageFrameControl,
+    replacement: &ImageFrameControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -183,7 +183,7 @@ pub fn remove_image_frame_control_xml(xml: &str, index: usize) -> Result<String>
     apply(xml, old.span.clone(), "")
 }
 
-fn image_frame_xml(value: &OdfImageFrameControl) -> Result<String> {
+fn image_frame_xml(value: &ImageFrameControl) -> Result<String> {
     validate_control(value)?;
     let mut out = format!(
         r#"<form:image-frame form:name="{}" xml:id="{}""#,
@@ -211,7 +211,7 @@ fn image_frame_xml(value: &OdfImageFrameControl) -> Result<String> {
     Ok(out)
 }
 
-fn validate_control(value: &OdfImageFrameControl) -> Result<()> {
+fn validate_control(value: &ImageFrameControl) -> Result<()> {
     validate_name("image-frame control name", &value.name)?;
     validate_xml_id(&value.xml_id)?;
     if let Some(form_id) = value.metadata.form_id.as_deref() {
@@ -236,7 +236,7 @@ fn validate_control(value: &OdfImageFrameControl) -> Result<()> {
     validate_optional("image-frame title", value.title.as_deref(), MAX_STRING)
 }
 
-fn validate_controls(controls: &[OdfImageFrameControl]) -> Result<()> {
+fn validate_controls(controls: &[ImageFrameControl]) -> Result<()> {
     if controls.len() > MAX_CONTROLS {
         return invalid("too many image-frame controls");
     }
@@ -267,7 +267,7 @@ fn validate_controls(controls: &[OdfImageFrameControl]) -> Result<()> {
     Ok(())
 }
 
-fn control_size(value: &OdfImageFrameControl) -> usize {
+fn control_size(value: &ImageFrameControl) -> usize {
     [&value.name, &value.xml_id]
         .iter()
         .fold(0usize, |sum, value| sum.saturating_add(value.len()))
@@ -311,7 +311,7 @@ fn validate_image_reference(value: Option<&str>) -> Result<()> {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfImageFrameControl,
+    control: ImageFrameControl,
 }
 #[derive(Clone)]
 struct FormLocation {
@@ -541,17 +541,14 @@ fn scan(xml: &str) -> Result<Scan> {
     })
 }
 
-fn parse_control(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<OdfImageFrameControl> {
+fn parse_control(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ImageFrameControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(&attrs, IMAGE_FRAME_ATTRS)?;
-    let mut value = OdfImageFrameControl::new(
+    let mut value = ImageFrameControl::new(
         required(&attrs, FORM, "name")?,
         required(&attrs, XML, "id")?,
     );
-    value.metadata = OdfGenericControlMetadata {
+    value.metadata = GenericControlMetadata {
         form_id: optional(&attrs, FORM, "id"),
         control_implementation: optional(&attrs, FORM, "control-implementation"),
         xforms_bind: optional(&attrs, XFORMS, "bind"),
@@ -761,8 +758,8 @@ fn validate_string(label: &str, value: &str, limit: usize) -> Result<()> {
 }
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfImageFrameControl,
-    current: Option<&OdfImageFrameControl>,
+    replacement: &ImageFrameControl,
+    current: Option<&ImageFrameControl>,
 ) -> Result<()> {
     for item in &form.controls {
         if current.is_some_and(|value| value.xml_id == item.control.xml_id) {
@@ -847,12 +844,12 @@ mod tests {
 
     #[test]
     fn canonical_control_round_trips_without_resolving_image() {
-        let mut control = OdfImageFrameControl::new("Photo", "photo_1");
+        let mut control = ImageFrameControl::new("Photo", "photo_1");
         control.image_data = Some("Pictures/missing.png".into());
         control.data_field = Some("Portrait".into());
         control.readonly = Some(true);
         control.title = Some("A & B".into());
-        let mut form = OdfImageFrameForm::new("Main");
+        let mut form = ImageFrameForm::new("Main");
         form.add_control(control.clone()).unwrap();
         let parsed =
             image_frame_controls(&format!("{ROOT}{}{END}", form.to_xml_fragment().unwrap()))
@@ -875,10 +872,10 @@ mod tests {
         let xml = format!(
             r#"{ROOT}<f:form f:name="Main"><f:image-frame f:name="Old" xml:id="old"><f:properties><f:property f:property-name="Keep" o:value-type="void"/></f:properties></f:image-frame><!--keep--><f:text f:name="Text" xml:id="text"/></f:form>{END}"#
         );
-        let inserted_control = OdfImageFrameControl::new("Inserted", "inserted");
+        let inserted_control = ImageFrameControl::new("Inserted", "inserted");
         let inserted = insert_image_frame_control_xml(&xml, 0, &inserted_control).unwrap();
         assert!(inserted.contains("<!--keep-->") && inserted.contains("f:text"));
-        let replacement = OdfImageFrameControl::new("Replacement", "replacement");
+        let replacement = ImageFrameControl::new("Replacement", "replacement");
         let replaced = replace_image_frame_control_xml(&inserted, 0, &replacement).unwrap();
         let removed = remove_image_frame_control_xml(&replaced, 1).unwrap();
         assert_eq!(image_frame_controls(&removed).unwrap(), [replacement]);
@@ -893,7 +890,7 @@ mod tests {
     #[test]
     fn hostile_namespaces_resources_children_and_active_content_are_rejected() {
         assert!(
-            OdfImageFrameControl::new("I", "1bad")
+            ImageFrameControl::new("I", "1bad")
                 .to_xml_fragment()
                 .is_err()
         );
@@ -913,11 +910,11 @@ mod tests {
             "javascript:alert(1)",
             "data:image/png;base64,AA==",
         ] {
-            let mut control = OdfImageFrameControl::new("I", "i");
+            let mut control = ImageFrameControl::new("I", "i");
             control.image_data = Some(reference.into());
             assert!(control.to_xml_fragment().is_err());
         }
-        let mut oversized = OdfImageFrameControl::new("I", "i");
+        let mut oversized = ImageFrameControl::new("I", "i");
         oversized.image_data = Some("x".repeat(MAX_IMAGE_REFERENCE + 1));
         assert!(oversized.to_xml_fragment().is_err());
     }
@@ -925,9 +922,9 @@ mod tests {
     #[test]
     fn builder_and_mutable_document_round_trip_without_image_io() {
         use crate::{Document, DocumentBuilder, MutableDocument};
-        let mut initial = OdfImageFrameControl::new("Image", "image");
+        let mut initial = ImageFrameControl::new("Image", "image");
         initial.image_data = Some("Pictures/intentionally-missing.png".into());
-        let mut form = OdfImageFrameForm::new("Main");
+        let mut form = ImageFrameForm::new("Main");
         form.add_control(initial.clone()).unwrap();
         let mut builder = DocumentBuilder::new();
         builder.add_image_frame_form(&form).unwrap();
@@ -935,9 +932,9 @@ mod tests {
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.image_frame_controls().unwrap(), [initial]);
-        let inserted = OdfImageFrameControl::new("Inserted", "inserted");
+        let inserted = ImageFrameControl::new("Inserted", "inserted");
         mutable.insert_image_frame_control(0, &inserted).unwrap();
-        let replacement = OdfImageFrameControl::new("Replacement", "replacement");
+        let replacement = ImageFrameControl::new("Replacement", "replacement");
         assert_eq!(
             mutable
                 .replace_image_frame_control(0, &replacement)

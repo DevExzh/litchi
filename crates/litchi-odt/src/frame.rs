@@ -24,7 +24,7 @@ fn invalid(message: impl Into<String>) -> Error {
 
 /// Anchor behavior of a `draw:frame` (`text:anchor-type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfFrameAnchor {
+pub enum FrameAnchor {
     /// Anchored to a paragraph, floating beside it (`paragraph`).
     Paragraph,
     /// Anchored to a character position (`char`).
@@ -37,7 +37,7 @@ pub enum OdfFrameAnchor {
     Frame,
 }
 
-impl OdfFrameAnchor {
+impl FrameAnchor {
     /// The ODF attribute spelling.
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -64,9 +64,9 @@ impl OdfFrameAnchor {
 
 /// An ODF length value such as `5cm` (`svg:width`/`svg:height`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfLength(String);
+pub struct Length(String);
 
-impl OdfLength {
+impl Length {
     /// A length in centimeters.
     pub fn centimeters(value: f64) -> Self {
         Self::format(value, "cm")
@@ -135,7 +135,7 @@ impl OdfLength {
 
 /// A sniffed raster image format accepted for frame authoring.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfImageFormat {
+pub enum ImageFormat {
     /// Portable Network Graphics.
     Png,
     /// JPEG.
@@ -144,7 +144,7 @@ pub enum OdfImageFormat {
     Gif,
 }
 
-impl OdfImageFormat {
+impl ImageFormat {
     /// File extension used for the package part.
     pub const fn extension(self) -> &'static str {
         match self {
@@ -222,9 +222,9 @@ pub(crate) fn allocate_picture_path(
 /// Build the `draw:frame` element for a package-linked image.
 pub(crate) fn image_frame_element(
     name: &str,
-    width: &OdfLength,
-    height: &OdfLength,
-    anchor: OdfFrameAnchor,
+    width: &Length,
+    height: &Length,
+    anchor: FrameAnchor,
     href: &str,
 ) -> Result<Element> {
     validate_frame_name(name)?;
@@ -241,9 +241,9 @@ pub(crate) fn image_frame_element(
 /// Build the `draw:frame` element for a plain-text text box.
 pub(crate) fn text_box_frame_element(
     name: &str,
-    width: &OdfLength,
-    height: &OdfLength,
-    anchor: OdfFrameAnchor,
+    width: &Length,
+    height: &Length,
+    anchor: FrameAnchor,
     text: &str,
 ) -> Result<Element> {
     validate_frame_name(name)?;
@@ -267,12 +267,7 @@ pub(crate) fn text_box_frame_element(
     Ok(frame)
 }
 
-fn frame_shell(
-    name: &str,
-    width: &OdfLength,
-    height: &OdfLength,
-    anchor: OdfFrameAnchor,
-) -> Element {
+fn frame_shell(name: &str, width: &Length, height: &Length, anchor: FrameAnchor) -> Element {
     let mut frame = Element::new("draw:frame");
     frame.set_attribute("draw:name", name);
     frame.set_attribute("text:anchor-type", anchor.as_str());
@@ -282,11 +277,11 @@ fn frame_shell(
 }
 
 /// Validate an image payload and bound its size.
-pub(crate) fn validate_image_payload(bytes: &[u8]) -> Result<OdfImageFormat> {
+pub(crate) fn validate_image_payload(bytes: &[u8]) -> Result<ImageFormat> {
     if bytes.len() > MAX_IMAGE_BYTES {
         return Err(invalid("ODF image payload exceeds the size limit"));
     }
-    OdfImageFormat::sniff(bytes)
+    ImageFormat::sniff(bytes)
         .ok_or_else(|| invalid("unsupported image format: PNG, JPEG, and GIF are accepted"))
 }
 
@@ -296,47 +291,44 @@ mod tests {
 
     #[test]
     fn length_construction_and_parsing() {
-        assert_eq!(OdfLength::centimeters(5.0).as_str(), "5cm");
-        assert_eq!(OdfLength::inches(2.5).as_str(), "2.50in");
-        assert_eq!(OdfLength::points(12.0).as_str(), "12pt");
-        assert_eq!(OdfLength::parse("10mm").unwrap().as_str(), "10mm");
-        assert_eq!(OdfLength::parse("3.25px").unwrap().as_str(), "3.25px");
-        assert!(OdfLength::parse("10").is_err());
-        assert!(OdfLength::parse("cm").is_err());
-        assert!(OdfLength::parse("10furlongs").is_err());
-        assert!(OdfLength::parse("xcm").is_err());
+        assert_eq!(Length::centimeters(5.0).as_str(), "5cm");
+        assert_eq!(Length::inches(2.5).as_str(), "2.50in");
+        assert_eq!(Length::points(12.0).as_str(), "12pt");
+        assert_eq!(Length::parse("10mm").unwrap().as_str(), "10mm");
+        assert_eq!(Length::parse("3.25px").unwrap().as_str(), "3.25px");
+        assert!(Length::parse("10").is_err());
+        assert!(Length::parse("cm").is_err());
+        assert!(Length::parse("10furlongs").is_err());
+        assert!(Length::parse("xcm").is_err());
     }
 
     #[test]
     fn anchor_round_trip() {
         for anchor in [
-            OdfFrameAnchor::Paragraph,
-            OdfFrameAnchor::Char,
-            OdfFrameAnchor::AsChar,
-            OdfFrameAnchor::Page,
-            OdfFrameAnchor::Frame,
+            FrameAnchor::Paragraph,
+            FrameAnchor::Char,
+            FrameAnchor::AsChar,
+            FrameAnchor::Page,
+            FrameAnchor::Frame,
         ] {
-            assert_eq!(OdfFrameAnchor::parse(anchor.as_str()), Some(anchor));
+            assert_eq!(FrameAnchor::parse(anchor.as_str()), Some(anchor));
         }
-        assert_eq!(OdfFrameAnchor::parse("marginalia"), None);
+        assert_eq!(FrameAnchor::parse("marginalia"), None);
     }
 
     #[test]
     fn sniffs_supported_formats_and_rejects_others() {
         assert_eq!(
-            OdfImageFormat::sniff(b"\x89PNG\r\n\x1a\nrest"),
-            Some(OdfImageFormat::Png)
+            ImageFormat::sniff(b"\x89PNG\r\n\x1a\nrest"),
+            Some(ImageFormat::Png)
         );
         assert_eq!(
-            OdfImageFormat::sniff(b"\xff\xd8\xff\xe0rest"),
-            Some(OdfImageFormat::Jpeg)
+            ImageFormat::sniff(b"\xff\xd8\xff\xe0rest"),
+            Some(ImageFormat::Jpeg)
         );
-        assert_eq!(
-            OdfImageFormat::sniff(b"GIF89a-rest"),
-            Some(OdfImageFormat::Gif)
-        );
-        assert_eq!(OdfImageFormat::sniff(b"BM bitmap"), None);
-        assert_eq!(OdfImageFormat::sniff(b""), None);
+        assert_eq!(ImageFormat::sniff(b"GIF89a-rest"), Some(ImageFormat::Gif));
+        assert_eq!(ImageFormat::sniff(b"BM bitmap"), None);
+        assert_eq!(ImageFormat::sniff(b""), None);
         assert!(validate_image_payload(b"\x89PNG\r\n\x1a\nrest").is_ok());
         assert!(validate_image_payload(b"tiff?").is_err());
     }
@@ -355,9 +347,9 @@ mod tests {
     fn image_frame_carries_identity_anchor_geometry_and_link() {
         let frame = image_frame_element(
             "Chart 1",
-            &OdfLength::centimeters(10.0),
-            &OdfLength::centimeters(4.0),
-            OdfFrameAnchor::AsChar,
+            &Length::centimeters(10.0),
+            &Length::centimeters(4.0),
+            FrameAnchor::AsChar,
             "Pictures/image1.png",
         )
         .unwrap();
@@ -378,9 +370,9 @@ mod tests {
     fn text_box_frame_splits_lines_and_escapes_text() {
         let frame = text_box_frame_element(
             "Box",
-            &OdfLength::inches(2.0),
-            &OdfLength::inches(1.0),
-            OdfFrameAnchor::Paragraph,
+            &Length::inches(2.0),
+            &Length::inches(1.0),
+            FrameAnchor::Paragraph,
             "a < b\nsecond & line",
         )
         .unwrap();
@@ -393,9 +385,9 @@ mod tests {
         assert!(
             text_box_frame_element(
                 "B",
-                &OdfLength::points(1.0),
-                &OdfLength::points(1.0),
-                OdfFrameAnchor::Page,
+                &Length::points(1.0),
+                &Length::points(1.0),
+                FrameAnchor::Page,
                 ""
             )
             .is_ok()
@@ -408,9 +400,9 @@ mod tests {
             assert!(
                 image_frame_element(
                     name,
-                    &OdfLength::points(1.0),
-                    &OdfLength::points(1.0),
-                    OdfFrameAnchor::Page,
+                    &Length::points(1.0),
+                    &Length::points(1.0),
+                    FrameAnchor::Page,
                     "Pictures/image1.png",
                 )
                 .is_err(),

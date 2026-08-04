@@ -16,7 +16,7 @@ use std::{ops::Range, path::Path};
 /// # Examples
 ///
 /// ```no_run
-/// use litchi_odf::DocumentBuilder;
+/// use litchi_odt::DocumentBuilder;
 ///
 /// # fn main() -> litchi_core::Result<()> {
 /// let mut builder = DocumentBuilder::new();
@@ -58,18 +58,18 @@ pub struct DocumentBuilder {
     ruby_annotations: Vec<RubyAnnotationInsertion>,
     notes: Vec<(usize, crate::Note)>,
     ruby_styles: Vec<crate::RubyStyle>,
-    property_forms: Vec<crate::OdfPropertyForm>,
-    control_forms: Vec<crate::OdfControlForm>,
-    interactive_forms: Vec<crate::OdfInteractiveForm>,
-    selection_forms: Vec<crate::OdfSelectionForm>,
-    visual_forms: Vec<crate::OdfVisualForm>,
-    generic_forms: Vec<crate::OdfGenericForm>,
-    password_file_forms: Vec<crate::OdfPasswordFileForm>,
-    image_frame_forms: Vec<crate::OdfImageFrameForm>,
-    value_range_forms: Vec<crate::OdfValueRangeForm>,
-    typed_value_forms: Vec<crate::OdfTypedValueForm>,
-    grid_forms: Vec<crate::OdfGridForm>,
-    connection_resource_forms: Vec<crate::OdfConnectionResourceForm>,
+    property_forms: Vec<crate::PropertyForm>,
+    control_forms: Vec<crate::ControlForm>,
+    interactive_forms: Vec<crate::InteractiveForm>,
+    selection_forms: Vec<crate::SelectionForm>,
+    visual_forms: Vec<crate::VisualForm>,
+    generic_forms: Vec<crate::GenericForm>,
+    password_file_forms: Vec<crate::PasswordFileForm>,
+    image_frame_forms: Vec<crate::ImageFrameForm>,
+    value_range_forms: Vec<crate::ValueRangeForm>,
+    typed_value_forms: Vec<crate::TypedValueForm>,
+    grid_forms: Vec<crate::GridForm>,
+    connection_resource_forms: Vec<crate::ConnectionResourceForm>,
     metadata: Metadata,
     paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
     paragraph_drop_cap_styles: Vec<crate::ParagraphStyleDropCap>,
@@ -94,8 +94,8 @@ pub struct DocumentBuilder {
         crate::PageHeaderFooterRegion,
         crate::HeaderFooterStyleProperties,
     )>,
-    notes_configurations: crate::OdfNotesConfigurations,
-    line_numbering_configuration: Option<crate::OdfLineNumberingConfiguration>,
+    notes_configurations: crate::NotesConfigurations,
+    line_numbering_configuration: Option<crate::LineNumberingConfiguration>,
     page_sequence: Option<crate::OdtPageSequence>,
 }
 
@@ -111,7 +111,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// let builder = DocumentBuilder::new();
     /// ```
@@ -157,7 +157,7 @@ impl DocumentBuilder {
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
             page_layout_header_footer_properties: Vec::new(),
-            notes_configurations: crate::OdfNotesConfigurations::default(),
+            notes_configurations: crate::NotesConfigurations::default(),
             line_numbering_configuration: None,
             page_sequence: None,
         }
@@ -166,7 +166,7 @@ impl DocumentBuilder {
     /// Add a paragraph containing one validated, inert dynamic text field.
     pub fn add_dynamic_text_field(
         &mut self,
-        field: &crate::elements::field::OdfDynamicTextField,
+        field: &crate::elements::field::DynamicTextField,
     ) -> Result<&mut Self> {
         let mut paragraph = Paragraph::new();
         paragraph.add_dynamic_text_field(field)?;
@@ -175,14 +175,14 @@ impl DocumentBuilder {
     }
 
     /// Return footnote and endnote configurations emitted to `styles.xml`.
-    pub fn notes_configurations(&self) -> &crate::OdfNotesConfigurations {
+    pub fn notes_configurations(&self) -> &crate::NotesConfigurations {
         &self.notes_configurations
     }
 
     /// Replace the validated footnote and endnote configurations.
     pub fn set_notes_configurations(
         &mut self,
-        configurations: crate::OdfNotesConfigurations,
+        configurations: crate::NotesConfigurations,
     ) -> Result<&mut Self> {
         configurations.validate()?;
         self.notes_configurations = configurations;
@@ -192,14 +192,16 @@ impl DocumentBuilder {
     /// Set one validated note-class configuration.
     pub fn set_notes_configuration(
         &mut self,
-        configuration: crate::OdfNotesConfiguration,
+        configuration: crate::NotesConfiguration,
     ) -> Result<&mut Self> {
         configuration.validate()?;
         match configuration.note_class {
-            crate::OdfNoteClass::Footnote => {
+            crate::notes_configuration::NoteClass::Footnote => {
                 self.notes_configurations.footnote = Some(configuration)
             },
-            crate::OdfNoteClass::Endnote => self.notes_configurations.endnote = Some(configuration),
+            crate::notes_configuration::NoteClass::Endnote => {
+                self.notes_configurations.endnote = Some(configuration)
+            },
         }
         Ok(self)
     }
@@ -208,7 +210,7 @@ impl DocumentBuilder {
     ///
     /// The configuration is serialized as style metadata only. Building a
     /// document never calculates page or line numbers.
-    pub fn line_numbering_configuration(&self) -> Option<&crate::OdfLineNumberingConfiguration> {
+    pub fn line_numbering_configuration(&self) -> Option<&crate::LineNumberingConfiguration> {
         self.line_numbering_configuration.as_ref()
     }
 
@@ -218,7 +220,7 @@ impl DocumentBuilder {
     /// generates line numbers.
     pub fn set_line_numbering_configuration(
         &mut self,
-        configuration: crate::OdfLineNumberingConfiguration,
+        configuration: crate::LineNumberingConfiguration,
     ) -> Result<&mut Self> {
         configuration.validate()?;
         self.line_numbering_configuration = Some(configuration);
@@ -700,7 +702,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     /// use litchi_core::Metadata;
     ///
     /// let mut builder = DocumentBuilder::new();
@@ -722,7 +724,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -768,7 +770,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -798,7 +800,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -837,7 +839,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -869,7 +871,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -903,7 +905,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::{DocumentBuilder, Paragraph};
+    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::elements::text::Paragraph;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -928,8 +931,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
-    /// use litchi_odf::elements::text::Heading;
+    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::elements::text::Heading;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -953,8 +956,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::DocumentBuilder;
-    /// use litchi_odf::elements::text::{List, ListItem};
+    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::elements::text::{List, ListItem};
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -980,7 +983,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::{DocumentBuilder, Table};
+    /// use litchi_odt::DocumentBuilder;
+    /// use litchi_odt::elements::table::Table;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -1180,7 +1184,7 @@ impl DocumentBuilder {
     /// The note is inserted at the paragraph end selected in document order,
     /// including paragraphs nested in lists, table cells, and note bodies.
     /// Plain-text body newlines create separate ODF paragraphs; a note with an
-    /// `OdfNoteBodyContent` retains its validated structured body. No field,
+    /// `NoteBodyContent` retains its validated structured body. No field,
     /// link, script, macro, event listener, or embedded payload is evaluated.
     pub fn add_note(&mut self, paragraph_index: usize, note: &crate::Note) -> Result<&mut Self> {
         note.validate()?;
@@ -1227,7 +1231,7 @@ impl DocumentBuilder {
     }
 
     /// Add a minimal inert form containing typed custom properties.
-    pub fn add_property_form(&mut self, form: &crate::OdfPropertyForm) -> Result<&mut Self> {
+    pub fn add_property_form(&mut self, form: &crate::PropertyForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .property_forms
@@ -1244,7 +1248,7 @@ impl DocumentBuilder {
     }
 
     /// Add a canonical form containing typed text and textarea controls.
-    pub fn add_control_form(&mut self, form: &crate::OdfControlForm) -> Result<&mut Self> {
+    pub fn add_control_form(&mut self, form: &crate::ControlForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .control_forms
@@ -1265,7 +1269,7 @@ impl DocumentBuilder {
     }
 
     /// Add a canonical form containing typed button and checkbox controls.
-    pub fn add_interactive_form(&mut self, form: &crate::OdfInteractiveForm) -> Result<&mut Self> {
+    pub fn add_interactive_form(&mut self, form: &crate::InteractiveForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .interactive_forms
@@ -1290,7 +1294,7 @@ impl DocumentBuilder {
     }
 
     /// Add a canonical form containing typed listbox and combobox controls.
-    pub fn add_selection_form(&mut self, form: &crate::OdfSelectionForm) -> Result<&mut Self> {
+    pub fn add_selection_form(&mut self, form: &crate::SelectionForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .selection_forms
@@ -1319,7 +1323,7 @@ impl DocumentBuilder {
     }
 
     /// Add a canonical form containing radio, frame, and image-button controls.
-    pub fn add_visual_form(&mut self, form: &crate::OdfVisualForm) -> Result<&mut Self> {
+    pub fn add_visual_form(&mut self, form: &crate::VisualForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .visual_forms
@@ -1352,7 +1356,7 @@ impl DocumentBuilder {
     }
 
     /// Add a canonical form containing fixed-text, hidden, and generic controls.
-    pub fn add_generic_form(&mut self, form: &crate::OdfGenericForm) -> Result<&mut Self> {
+    pub fn add_generic_form(&mut self, form: &crate::GenericForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .generic_forms
@@ -1389,10 +1393,7 @@ impl DocumentBuilder {
     }
 
     /// Add a canonical form containing password and file controls.
-    pub fn add_password_file_form(
-        &mut self,
-        form: &crate::OdfPasswordFileForm,
-    ) -> Result<&mut Self> {
+    pub fn add_password_file_form(&mut self, form: &crate::PasswordFileForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .password_file_forms
@@ -1433,7 +1434,7 @@ impl DocumentBuilder {
     }
 
     /// Add a canonical form containing image-frame controls.
-    pub fn add_image_frame_form(&mut self, form: &crate::OdfImageFrameForm) -> Result<&mut Self> {
+    pub fn add_image_frame_form(&mut self, form: &crate::ImageFrameForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .image_frame_forms
@@ -2073,7 +2074,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -2121,7 +2122,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odt::DocumentBuilder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
@@ -2139,7 +2140,7 @@ impl DocumentBuilder {
 
 impl DocumentBuilder {
     /// Add a validated value-range form to the document.
-    pub fn add_value_range_form(&mut self, form: &crate::OdfValueRangeForm) -> Result<&mut Self> {
+    pub fn add_value_range_form(&mut self, form: &crate::ValueRangeForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .value_range_forms
@@ -2190,7 +2191,7 @@ impl DocumentBuilder {
 
 impl DocumentBuilder {
     /// Add a validated form containing formatted-text, number, date, or time controls.
-    pub fn add_typed_value_form(&mut self, form: &crate::OdfTypedValueForm) -> Result<&mut Self> {
+    pub fn add_typed_value_form(&mut self, form: &crate::TypedValueForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .typed_value_forms
@@ -2247,7 +2248,7 @@ impl DocumentBuilder {
     /// Adds a form whose final child is an inert `form:connection-resource`.
     pub fn add_connection_resource_form(
         &mut self,
-        form: &crate::OdfConnectionResourceForm,
+        form: &crate::ConnectionResourceForm,
     ) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
@@ -2308,7 +2309,7 @@ impl DocumentBuilder {
         Ok(self)
     }
 
-    pub fn add_grid_form(&mut self, form: &crate::OdfGridForm) -> Result<&mut Self> {
+    pub fn add_grid_form(&mut self, form: &crate::GridForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .grid_forms
@@ -2692,18 +2693,18 @@ mod tests {
 
     #[test]
     fn line_numbering_configuration_round_trips_through_an_odt_package() {
-        let configuration = crate::OdfLineNumberingConfiguration {
+        let configuration = crate::LineNumberingConfiguration {
             number_lines: Some(true),
-            number_format: Some(crate::OdfLineNumberFormat::UpperAlpha),
+            number_format: Some(crate::LineNumberFormat::UpperAlpha),
             letter_sync: Some(true),
             style_name: Some("LineNumbers".to_string()),
             increment: Some(5),
-            number_position: Some(crate::OdfLineNumberPosition::Outer),
-            offset: Some(crate::OdfNonNegativeLength::new("0.25in").unwrap()),
+            number_position: Some(crate::LineNumberPosition::Outer),
+            offset: Some(crate::NonNegativeLength::new("0.25in").unwrap()),
             count_empty_lines: Some(true),
             count_in_text_boxes: Some(false),
             restart_on_page: Some(true),
-            separator: Some(crate::OdfLineNumberingSeparator {
+            separator: Some(crate::LineNumberingSeparator {
                 increment: Some(10),
                 text: " / ".to_string(),
             }),

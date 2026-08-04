@@ -31,7 +31,7 @@ const MAX_REFERENCES: usize = 1_000_000;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi_odf::Document;
+/// use litchi_odt::Document;
 ///
 /// # fn main() -> litchi_core::Result<()> {
 /// // Open a document
@@ -97,7 +97,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("my_document.odt")?;
@@ -134,7 +134,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let bytes = std::fs::read("document.odt")?;
@@ -235,7 +235,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -253,7 +253,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -274,7 +274,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -298,7 +298,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -328,8 +328,8 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
-    /// use litchi_odf::elements::parser::DocumentOrderElement;
+    /// use litchi_odt::Document;
+    /// use litchi_odt::elements::parser::DocumentOrderElement;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -377,7 +377,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -416,7 +416,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -460,7 +460,7 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::DrawingGradients> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing_gradient::parse_drawing_gradients(styles.xml_content()),
@@ -471,7 +471,7 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::DrawingHatches> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing_hatch::parse_drawing_hatches(styles.xml_content()),
@@ -482,9 +482,7 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render strokes.
-    pub fn drawing_stroke_dashes(
-        &self,
-    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+    pub fn drawing_stroke_dashes(&self) -> Result<crate::drawing_stroke_dash::DrawingStrokeDashes> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing_stroke_dash::parse_drawing_stroke_dashes(styles.xml_content()),
@@ -495,7 +493,7 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
-    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::DrawingFillImages> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing_fill_image::parse_drawing_fill_images(styles.xml_content()),
@@ -506,7 +504,7 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
-    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::DrawingMarkers> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing_marker::parse_drawing_markers(styles.xml_content()),
@@ -517,7 +515,7 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
-    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::DrawingOpacities> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing_opacity::parse_drawing_opacities(styles.xml_content()),
@@ -554,7 +552,7 @@ impl Document {
     /// These style declarations are retained as metadata only. This API does
     /// not renumber notes, resolve style references, or render continuation
     /// notices.
-    pub fn notes_configurations(&self) -> Result<crate::OdfNotesConfigurations> {
+    pub fn notes_configurations(&self) -> Result<crate::NotesConfigurations> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::parse_notes_configurations(styles.xml_content()),
@@ -565,7 +563,7 @@ impl Document {
     ///
     /// These are styles metadata only. This API does not apply styles to
     /// headings, generate labels, or update tables of contents.
-    pub fn outline_styles(&self) -> Result<crate::OdfOutlineStyles> {
+    pub fn outline_styles(&self) -> Result<crate::OutlineStyles> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::parse_outline_styles(styles.xml_content()),
@@ -576,9 +574,7 @@ impl Document {
     ///
     /// This styles metadata remains inert: the API does not generate
     /// bibliography entries, resolve citations, or access external sources.
-    pub fn bibliography_configuration(
-        &self,
-    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+    pub fn bibliography_configuration(&self) -> Result<Option<crate::BibliographyConfiguration>> {
         self.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| {
@@ -603,7 +599,7 @@ impl Document {
     /// paginate the document or generate line numbers.
     pub fn line_numbering_configuration(
         &self,
-    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+    ) -> Result<Option<crate::LineNumberingConfiguration>> {
         self.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| crate::parse_line_numbering_configuration(styles.xml_content()),
@@ -626,7 +622,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -653,7 +649,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -682,7 +678,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -706,7 +702,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -777,7 +773,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -803,7 +799,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -831,7 +827,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -852,7 +848,7 @@ impl Document {
     ///
     /// Conditions and formulas are returned as inert strings. This method never
     /// evaluates them and returns only the cached display text stored in the file.
-    pub fn dynamic_text_fields(&self) -> Result<Vec<crate::elements::field::OdfDynamicTextField>> {
+    pub fn dynamic_text_fields(&self) -> Result<Vec<crate::elements::field::DynamicTextField>> {
         use crate::elements::field::FieldParser;
         FieldParser::parse_dynamic_text_fields(self.content.xml_content())
     }
@@ -865,7 +861,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -899,7 +895,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("input.odt")?;
@@ -927,7 +923,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -947,7 +943,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -969,7 +965,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -992,7 +988,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -1021,10 +1017,10 @@ impl Document {
     }
 
     /// Inspect classic forms without executing bindings, events, or external resources.
-    pub fn forms(&self) -> Result<crate::OdfForms> {
-        let mut parts = vec![(self.content.xml_content(), crate::OdfFormPart::Content)];
+    pub fn forms(&self) -> Result<crate::Forms> {
+        let mut parts = vec![(self.content.xml_content(), crate::FormPart::Content)];
         if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
-            parts.push((styles, crate::OdfFormPart::Styles));
+            parts.push((styles, crate::FormPart::Styles));
         }
         crate::form::parse_form_parts(&parts)
     }
@@ -1084,7 +1080,7 @@ impl Document {
         Ok(())
     }
 
-    pub fn add_form(&mut self, group_index: usize, form: &crate::OdfAuthoredForm) -> Result<usize> {
+    pub fn add_form(&mut self, group_index: usize, form: &crate::AuthoredForm) -> Result<usize> {
         let (bytes, index) = crate::form_package::add_form(
             &self.package,
             self.content.xml_content(),
@@ -1100,7 +1096,7 @@ impl Document {
     pub fn add_nested_form(
         &mut self,
         parent_form: usize,
-        form: &crate::OdfAuthoredForm,
+        form: &crate::AuthoredForm,
     ) -> Result<usize> {
         let (bytes, index) = crate::form_package::add_form(
             &self.package,
@@ -1114,7 +1110,7 @@ impl Document {
         *self = Self::from_bytes(bytes)?;
         Ok(index)
     }
-    pub fn replace_form(&mut self, index: usize, form: &crate::OdfAuthoredForm) -> Result<()> {
+    pub fn replace_form(&mut self, index: usize, form: &crate::AuthoredForm) -> Result<()> {
         let bytes = crate::form_package::replace_form(
             &self.package,
             self.content.xml_content(),
@@ -1149,7 +1145,7 @@ impl Document {
     pub fn add_form_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfAuthoredFormControl,
+        control: &crate::AuthoredFormControl,
     ) -> Result<usize> {
         let (bytes, index) = crate::form_package::add_control(
             &self.package,
@@ -1164,7 +1160,7 @@ impl Document {
     pub fn replace_form_control(
         &mut self,
         index: usize,
-        control: &crate::OdfAuthoredFormControl,
+        control: &crate::AuthoredFormControl,
     ) -> Result<()> {
         let bytes = crate::form_package::replace_control(
             &self.package,
@@ -1199,16 +1195,16 @@ impl Document {
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
-    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
-        let mut parts = vec![(self.content.xml_content(), crate::OdfVariablePart::Content)];
+    pub fn variable_declarations(&self) -> Result<crate::VariableDeclarations> {
+        let mut parts = vec![(self.content.xml_content(), crate::VariablePart::Content)];
         if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
-            parts.push((styles, crate::OdfVariablePart::Styles));
+            parts.push((styles, crate::VariablePart::Styles));
         }
         crate::variable_declaration::parse_variable_declaration_parts(&parts)
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
+    pub fn embedded_objects(&self) -> Result<Vec<crate::EmbeddedObject>> {
         let package = self.package.package()?;
         crate::embedded_object::scan_packaged_objects(
             self.content.xml_content(),
@@ -1232,7 +1228,7 @@ impl Document {
     pub fn add_embedded_chart(&mut self, definition: &crate::ChartDefinition) -> Result<usize> {
         self.add_embedded_chart_with_storage(
             definition,
-            crate::OdfEmbeddedChartStorage::PackageSubdocument,
+            crate::EmbeddedChartStorage::PackageSubdocument,
         )
     }
 
@@ -1240,7 +1236,7 @@ impl Document {
     pub fn add_embedded_chart_with_storage(
         &mut self,
         definition: &crate::ChartDefinition,
-        storage: crate::OdfEmbeddedChartStorage,
+        storage: crate::EmbeddedChartStorage,
     ) -> Result<usize> {
         let (bytes, index) = crate::embedded_chart::add_embedded_chart(
             &self.package,
@@ -1282,10 +1278,7 @@ impl Document {
     }
 
     /// Append an inert embedded object or image to the text body.
-    pub fn add_embedded_resource(
-        &mut self,
-        resource: &crate::OdfEmbeddedResource,
-    ) -> Result<usize> {
+    pub fn add_embedded_resource(&mut self, resource: &crate::EmbeddedResource) -> Result<usize> {
         let (bytes, index) = crate::embedded_package::add(
             &self.package,
             self.content.xml_content(),
@@ -1300,7 +1293,7 @@ impl Document {
     pub fn replace_embedded_object(
         &mut self,
         index: usize,
-        resource: &crate::OdfEmbeddedResource,
+        resource: &crate::EmbeddedResource,
     ) -> Result<()> {
         let bytes = crate::embedded_package::replace(
             &self.package,
@@ -1317,7 +1310,7 @@ impl Document {
     pub fn replace_embedded_image(
         &mut self,
         index: usize,
-        resource: &crate::OdfEmbeddedResource,
+        resource: &crate::EmbeddedResource,
     ) -> Result<()> {
         let bytes = crate::embedded_package::replace(
             &self.package,
@@ -1400,7 +1393,7 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Document;
+    /// use litchi_odt::Document;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;

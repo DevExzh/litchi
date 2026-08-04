@@ -1,6 +1,6 @@
 //! Bounded OpenDocument bibliography configuration metadata.
 
-use crate::{FlatOpenDocument, OdfVariablePart, OpenDocumentPackage};
+use crate::{FlatOpenDocument, OpenDocumentPackage, VariablePart};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -21,7 +21,7 @@ const MAX_AGGREGATE_BYTES: usize = 4 * 1_048_576;
 /// A bibliography field used for document-wide entry ordering.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfBibliographyField {
+pub enum BibliographyField {
     Identifier,
     BibliographyType,
     Address,
@@ -56,7 +56,7 @@ pub enum OdfBibliographyField {
     Issn,
 }
 
-impl OdfBibliographyField {
+impl BibliographyField {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Identifier => "identifier",
@@ -135,12 +135,12 @@ impl OdfBibliographyField {
 
 /// One ordered bibliography sort key.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfBibliographySortKey {
-    pub field: OdfBibliographyField,
+pub struct BibliographySortKey {
+    pub field: BibliographyField,
     pub ascending: Option<bool>,
 }
 
-impl OdfBibliographySortKey {
+impl BibliographySortKey {
     /// ODF defaults `text:sort-ascending` to `true`.
     pub fn effective_ascending(&self) -> bool {
         self.ascending.unwrap_or(true)
@@ -149,7 +149,7 @@ impl OdfBibliographySortKey {
 
 /// Document-wide bibliography formatting and ordering policy.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct OdfBibliographyConfiguration {
+pub struct BibliographyConfiguration {
     pub prefix: Option<String>,
     pub suffix: Option<String>,
     pub numbered_entries: Option<bool>,
@@ -159,10 +159,10 @@ pub struct OdfBibliographyConfiguration {
     pub country: Option<String>,
     pub script: Option<String>,
     pub rfc_language_tag: Option<String>,
-    pub sort_keys: Vec<OdfBibliographySortKey>,
+    pub sort_keys: Vec<BibliographySortKey>,
 }
 
-impl OdfBibliographyConfiguration {
+impl BibliographyConfiguration {
     pub fn effective_numbered_entries(&self) -> bool {
         self.numbered_entries.unwrap_or(false)
     }
@@ -336,20 +336,20 @@ struct Frame {
 
 struct ActiveConfiguration {
     depth: usize,
-    value: OdfBibliographyConfiguration,
+    value: BibliographyConfiguration,
 }
 
 type Attributes = HashMap<(String, String), String>;
 
 pub(crate) fn parse_bibliography_configuration(
     xml: &str,
-) -> Result<Option<OdfBibliographyConfiguration>> {
-    parse_bibliography_configuration_parts(&[(xml, OdfVariablePart::Styles)])
+) -> Result<Option<BibliographyConfiguration>> {
+    parse_bibliography_configuration_parts(&[(xml, VariablePart::Styles)])
 }
 
 pub(crate) fn parse_bibliography_configuration_parts(
-    parts: &[(&str, OdfVariablePart)],
-) -> Result<Option<OdfBibliographyConfiguration>> {
+    parts: &[(&str, VariablePart)],
+) -> Result<Option<BibliographyConfiguration>> {
     if !parts
         .iter()
         .any(|(xml, _)| xml.contains("bibliography-configuration"))
@@ -375,8 +375,8 @@ pub(crate) fn parse_bibliography_configuration_parts(
 
 fn parse_part(
     xml: &str,
-    part: OdfVariablePart,
-    result: &mut Option<OdfBibliographyConfiguration>,
+    part: VariablePart,
+    result: &mut Option<BibliographyConfiguration>,
     aggregate: &mut usize,
 ) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
@@ -659,7 +659,7 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
 /// rewriting unrelated styles XML.
 pub(crate) fn set_bibliography_configuration_xml(
     xml: &str,
-    configuration: &OdfBibliographyConfiguration,
+    configuration: &BibliographyConfiguration,
 ) -> Result<String> {
     configuration.validate()?;
     let (target, site) = locate_bibliography_configuration(xml)?;
@@ -711,7 +711,7 @@ impl OpenDocumentPackage {
     ///
     /// The policy is metadata in `styles.xml`. This method does not generate
     /// bibliography entries, resolve citations, or access external sources.
-    pub fn bibliography_configuration(&self) -> Result<Option<OdfBibliographyConfiguration>> {
+    pub fn bibliography_configuration(&self) -> Result<Option<BibliographyConfiguration>> {
         self.styles_xml()?
             .map_or_else(|| Ok(None), |xml| parse_bibliography_configuration(&xml))
     }
@@ -722,8 +722,8 @@ impl FlatOpenDocument {
     ///
     /// The policy is metadata in the flat document's `office:styles` element.
     /// This method does not generate bibliography entries or resolve citations.
-    pub fn bibliography_configuration(&self) -> Result<Option<OdfBibliographyConfiguration>> {
-        parse_bibliography_configuration_parts(&[(self.xml(), OdfVariablePart::Flat)])
+    pub fn bibliography_configuration(&self) -> Result<Option<BibliographyConfiguration>> {
+        parse_bibliography_configuration_parts(&[(self.xml(), VariablePart::Flat)])
     }
 }
 
@@ -731,17 +731,17 @@ impl FlatOpenDocument {
 fn start_configuration(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: OdfVariablePart,
+    part: VariablePart,
     depth: usize,
     stack: &[Frame],
-    result: &Option<OdfBibliographyConfiguration>,
+    result: &Option<BibliographyConfiguration>,
     aggregate: &mut usize,
     active: &mut Option<ActiveConfiguration>,
 ) -> Result<()> {
     if result.is_some() {
         return invalid("duplicate document bibliography configuration");
     }
-    if part == OdfVariablePart::Content {
+    if part == VariablePart::Content {
         return invalid("bibliography configuration must reside in styles metadata");
     }
     let parent = stack
@@ -765,7 +765,7 @@ fn start_configuration(
             (STYLE, "rfc-language-tag"),
         ],
     )?;
-    let configuration = OdfBibliographyConfiguration {
+    let configuration = BibliographyConfiguration {
         prefix: get_owned(&attributes, TEXT, "prefix"),
         suffix: get_owned(&attributes, TEXT, "suffix"),
         numbered_entries: get(&attributes, TEXT, "numbered-entries")
@@ -801,7 +801,7 @@ fn add_sort_key(
     }
     let attributes = collect_attributes(reader, element, aggregate)?;
     reject_unexpected(&attributes, &[(TEXT, "key"), (TEXT, "sort-ascending")])?;
-    let field = OdfBibliographyField::parse(
+    let field = BibliographyField::parse(
         get(&attributes, TEXT, "key")
             .ok_or_else(|| make_error("text:sort-key requires text:key"))?,
     )?;
@@ -811,7 +811,7 @@ fn add_sort_key(
     configuration
         .value
         .sort_keys
-        .push(OdfBibliographySortKey { field, ascending });
+        .push(BibliographySortKey { field, ascending });
     Ok(())
 }
 
@@ -946,12 +946,9 @@ mod tests {
         assert!(configuration.effective_numbered_entries());
         assert!(!configuration.effective_sort_by_position());
         assert_eq!(configuration.sort_keys.len(), 3);
-        assert_eq!(
-            configuration.sort_keys[0].field,
-            OdfBibliographyField::Author
-        );
+        assert_eq!(configuration.sort_keys[0].field, BibliographyField::Author);
         assert!(!configuration.sort_keys[1].effective_ascending());
-        assert_eq!(configuration.sort_keys[2].field, OdfBibliographyField::Isbn);
+        assert_eq!(configuration.sort_keys[2].field, BibliographyField::Isbn);
     }
 
     #[test]
@@ -989,9 +986,7 @@ mod tests {
             xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
             <o:body><o:text><t:bibliography-configuration/></o:text></o:body>
         </o:document-content>"#;
-        assert!(
-            parse_bibliography_configuration_parts(&[(xml, OdfVariablePart::Content)]).is_err()
-        );
+        assert!(parse_bibliography_configuration_parts(&[(xml, VariablePart::Content)]).is_err());
     }
 
     #[test]
@@ -1006,7 +1001,7 @@ mod tests {
         let document = FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         assert_eq!(
             document.bibliography_configuration().unwrap(),
-            Some(OdfBibliographyConfiguration {
+            Some(BibliographyConfiguration {
                 prefix: Some("[".to_string()),
                 ..Default::default()
             })
@@ -1016,12 +1011,12 @@ mod tests {
     #[test]
     fn replaces_and_removes_only_bibliography_metadata() {
         let original = format!(r#"{PREFIX}<s:style s:name="Keep"/>{SUFFIX}"#);
-        let configuration = OdfBibliographyConfiguration {
+        let configuration = BibliographyConfiguration {
             prefix: Some("[".to_string()),
             suffix: Some("]".to_string()),
             numbered_entries: Some(true),
-            sort_keys: vec![OdfBibliographySortKey {
-                field: OdfBibliographyField::Author,
+            sort_keys: vec![BibliographySortKey {
+                field: BibliographyField::Author,
                 ascending: Some(false),
             }],
             ..Default::default()
@@ -1045,7 +1040,7 @@ mod tests {
             xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
             <o:styles/>
         </o:document-styles>"#;
-        let configuration = OdfBibliographyConfiguration {
+        let configuration = BibliographyConfiguration {
             prefix: Some("[".to_string()),
             ..Default::default()
         };

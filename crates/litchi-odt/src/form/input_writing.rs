@@ -7,7 +7,7 @@ use quick_xml::NsReader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
-use super::generic_writing::OdfGenericControlMetadata;
+use super::generic_writing::GenericControlMetadata;
 
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -23,10 +23,10 @@ const MAX_FORMS: usize = 4096;
 const MAX_CONTROLS: usize = 65_536;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfPasswordControl {
+pub struct PasswordControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub disabled: Option<bool>,
     pub max_length: Option<u64>,
     pub printable: Option<bool>,
@@ -39,12 +39,12 @@ pub struct OdfPasswordControl {
     pub echo_char: Option<char>,
 }
 
-impl OdfPasswordControl {
+impl PasswordControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             disabled: None,
             max_length: None,
             printable: None,
@@ -64,10 +64,10 @@ impl OdfPasswordControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfFileControl {
+pub struct FileControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub current_value: Option<String>,
     pub disabled: Option<bool>,
     pub max_length: Option<u64>,
@@ -80,12 +80,12 @@ pub struct OdfFileControl {
     pub linked_cell: Option<String>,
 }
 
-impl OdfFileControl {
+impl FileControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             current_value: None,
             disabled: None,
             max_length: None,
@@ -105,24 +105,24 @@ impl OdfFileControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfPasswordFileControl {
-    Password(OdfPasswordControl),
-    File(OdfFileControl),
+pub enum PasswordFileControl {
+    Password(PasswordControl),
+    File(FileControl),
 }
 
-impl From<OdfPasswordControl> for OdfPasswordFileControl {
-    fn from(value: OdfPasswordControl) -> Self {
+impl From<PasswordControl> for PasswordFileControl {
+    fn from(value: PasswordControl) -> Self {
         Self::Password(value)
     }
 }
 
-impl From<OdfFileControl> for OdfPasswordFileControl {
-    fn from(value: OdfFileControl) -> Self {
+impl From<FileControl> for PasswordFileControl {
+    fn from(value: FileControl) -> Self {
         Self::File(value)
     }
 }
 
-impl OdfPasswordFileControl {
+impl PasswordFileControl {
     pub fn name(&self) -> &str {
         match self {
             Self::Password(value) => &value.name,
@@ -146,13 +146,13 @@ impl OdfPasswordFileControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfPasswordFileForm {
+pub struct PasswordFileForm {
     pub name: String,
-    pub controls: Vec<OdfPasswordFileControl>,
+    pub controls: Vec<PasswordFileControl>,
     pub apply_filter: Option<bool>,
 }
 
-impl OdfPasswordFileForm {
+impl PasswordFileForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -161,7 +161,7 @@ impl OdfPasswordFileForm {
         }
     }
 
-    pub fn add_control(&mut self, control: impl Into<OdfPasswordFileControl>) -> Result<()> {
+    pub fn add_control(&mut self, control: impl Into<PasswordFileControl>) -> Result<()> {
         let control = control.into();
         validate_control(&control)?;
         if self
@@ -212,7 +212,7 @@ impl OdfPasswordFileForm {
     }
 }
 
-pub fn password_file_controls(xml: &str) -> Result<Vec<OdfPasswordFileControl>> {
+pub fn password_file_controls(xml: &str) -> Result<Vec<PasswordFileControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -223,7 +223,7 @@ pub fn password_file_controls(xml: &str) -> Result<Vec<OdfPasswordFileControl>> 
 pub fn insert_password_file_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfPasswordFileControl,
+    control: &PasswordFileControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -245,7 +245,7 @@ pub fn insert_password_file_control_xml(
 pub fn replace_password_file_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfPasswordFileControl,
+    replacement: &PasswordFileControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -273,7 +273,7 @@ pub fn remove_password_file_control_xml(xml: &str, index: usize) -> Result<Strin
     apply(xml, old.span.clone(), "")
 }
 
-fn password_xml(value: &OdfPasswordControl) -> Result<String> {
+fn password_xml(value: &PasswordControl) -> Result<String> {
     validate_password(value)?;
     let mut out = control_start("password", &value.name, &value.xml_id, &value.metadata);
     push_bool(&mut out, "form:disabled", value.disabled);
@@ -297,7 +297,7 @@ fn password_xml(value: &OdfPasswordControl) -> Result<String> {
     Ok(out)
 }
 
-fn file_xml(value: &OdfFileControl) -> Result<String> {
+fn file_xml(value: &FileControl) -> Result<String> {
     validate_file(value)?;
     let mut out = control_start("file", &value.name, &value.xml_id, &value.metadata);
     push_string(
@@ -322,7 +322,7 @@ fn control_start(
     kind: &str,
     name: &str,
     xml_id: &str,
-    metadata: &OdfGenericControlMetadata,
+    metadata: &GenericControlMetadata,
 ) -> String {
     let mut out = format!(
         r#"<form:{kind} form:name="{}" xml:id="{}""#,
@@ -339,14 +339,14 @@ fn control_start(
     out
 }
 
-fn validate_control(value: &OdfPasswordFileControl) -> Result<()> {
+fn validate_control(value: &PasswordFileControl) -> Result<()> {
     match value {
-        OdfPasswordFileControl::Password(value) => validate_password(value),
-        OdfPasswordFileControl::File(value) => validate_file(value),
+        PasswordFileControl::Password(value) => validate_password(value),
+        PasswordFileControl::File(value) => validate_file(value),
     }
 }
 
-fn validate_password(value: &OdfPasswordControl) -> Result<()> {
+fn validate_password(value: &PasswordControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id, &value.metadata)?;
     validate_optional("password title", value.title.as_deref(), MAX_STRING)?;
     validate_optional("password value", value.value.as_deref(), MAX_STRING)?;
@@ -363,7 +363,7 @@ fn validate_password(value: &OdfPasswordControl) -> Result<()> {
     Ok(())
 }
 
-fn validate_file(value: &OdfFileControl) -> Result<()> {
+fn validate_file(value: &FileControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id, &value.metadata)?;
     validate_optional(
         "file current value",
@@ -379,7 +379,7 @@ fn validate_file(value: &OdfFileControl) -> Result<()> {
     )
 }
 
-fn validate_identity(name: &str, xml_id: &str, metadata: &OdfGenericControlMetadata) -> Result<()> {
+fn validate_identity(name: &str, xml_id: &str, metadata: &GenericControlMetadata) -> Result<()> {
     validate_name("password/file control name", name)?;
     validate_xml_id(xml_id)?;
     if let Some(form_id) = metadata.form_id.as_deref() {
@@ -397,7 +397,7 @@ fn validate_identity(name: &str, xml_id: &str, metadata: &OdfGenericControlMetad
     )
 }
 
-fn validate_controls(controls: &[OdfPasswordFileControl]) -> Result<()> {
+fn validate_controls(controls: &[PasswordFileControl]) -> Result<()> {
     if controls.len() > MAX_CONTROLS {
         return invalid("too many password/file controls");
     }
@@ -428,9 +428,9 @@ fn validate_controls(controls: &[OdfPasswordFileControl]) -> Result<()> {
     Ok(())
 }
 
-fn control_size(control: &OdfPasswordFileControl) -> usize {
+fn control_size(control: &PasswordFileControl) -> usize {
     match control {
-        OdfPasswordFileControl::Password(value) => {
+        PasswordFileControl::Password(value) => {
             identity_size(&value.name, &value.xml_id, &value.metadata).saturating_add(options_size(
                 &[
                     value.title.as_ref(),
@@ -439,7 +439,7 @@ fn control_size(control: &OdfPasswordFileControl) -> usize {
                 ],
             ))
         },
-        OdfPasswordFileControl::File(value) => {
+        PasswordFileControl::File(value) => {
             identity_size(&value.name, &value.xml_id, &value.metadata).saturating_add(options_size(
                 &[
                     value.current_value.as_ref(),
@@ -452,7 +452,7 @@ fn control_size(control: &OdfPasswordFileControl) -> usize {
     }
 }
 
-fn identity_size(name: &str, id: &str, metadata: &OdfGenericControlMetadata) -> usize {
+fn identity_size(name: &str, id: &str, metadata: &GenericControlMetadata) -> usize {
     name.len()
         .saturating_add(id.len())
         .saturating_add(metadata.form_id.as_ref().map_or(0, String::len))
@@ -476,7 +476,7 @@ fn options_size(values: &[Option<&String>]) -> usize {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfPasswordFileControl,
+    control: PasswordFileControl,
 }
 #[derive(Clone)]
 struct FormLocation {
@@ -712,7 +712,7 @@ fn parse_control(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     local: &[u8],
-) -> Result<OdfPasswordFileControl> {
+) -> Result<PasswordFileControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(
         &attrs,
@@ -724,13 +724,13 @@ fn parse_control(
     )?;
     let name = required(&attrs, FORM, "name")?;
     let xml_id = required(&attrs, XML, "id")?;
-    let metadata = OdfGenericControlMetadata {
+    let metadata = GenericControlMetadata {
         form_id: optional(&attrs, FORM, "id"),
         control_implementation: optional(&attrs, FORM, "control-implementation"),
         xforms_bind: optional(&attrs, XFORMS, "bind"),
     };
     if local == b"password" {
-        let mut value = OdfPasswordControl::new(name, xml_id);
+        let mut value = PasswordControl::new(name, xml_id);
         value.metadata = metadata;
         value.disabled = optional_bool(&attrs, FORM, "disabled")?;
         value.max_length = optional_u64(&attrs, FORM, "max-length")?;
@@ -747,7 +747,7 @@ fn parse_control(
         validate_password(&value)?;
         Ok(value.into())
     } else {
-        let mut value = OdfFileControl::new(name, xml_id);
+        let mut value = FileControl::new(name, xml_id);
         value.metadata = metadata;
         value.current_value = optional(&attrs, FORM, "current-value");
         value.disabled = optional_bool(&attrs, FORM, "disabled")?;
@@ -1009,8 +1009,8 @@ fn validate_string(label: &str, value: &str, limit: usize) -> Result<()> {
 
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfPasswordFileControl,
-    current: Option<&OdfPasswordFileControl>,
+    replacement: &PasswordFileControl,
+    current: Option<&PasswordFileControl>,
 ) -> Result<()> {
     for item in &form.controls {
         if current.is_some_and(|value| value.xml_id() == item.control.xml_id()) {
@@ -1101,15 +1101,15 @@ mod tests {
 
     #[test]
     fn canonical_controls_round_trip() {
-        let mut password = OdfPasswordControl::new("Password", "password_1");
+        let mut password = PasswordControl::new("Password", "password_1");
         password.value = Some("secret & value".into());
         password.echo_char = Some('●');
         password.max_length = Some(64);
-        let mut file = OdfFileControl::new("File", "file_1");
+        let mut file = FileControl::new("File", "file_1");
         file.value = Some("../../not-opened.txt".into());
         file.current_value = Some("C:\\private\\not-opened.txt".into());
         file.readonly = Some(true);
-        let mut form = OdfPasswordFileForm::new("Main");
+        let mut form = PasswordFileForm::new("Main");
         form.add_control(password).unwrap();
         form.add_control(file).unwrap();
         let parsed =
@@ -1117,10 +1117,10 @@ mod tests {
                 .unwrap();
         assert_eq!(parsed.len(), 2);
         assert!(
-            matches!(&parsed[0], OdfPasswordFileControl::Password(value) if value.echo_char == Some('●'))
+            matches!(&parsed[0], PasswordFileControl::Password(value) if value.echo_char == Some('●'))
         );
         assert!(
-            matches!(&parsed[1], OdfPasswordFileControl::File(value) if value.value.as_deref() == Some("../../not-opened.txt"))
+            matches!(&parsed[1], PasswordFileControl::File(value) if value.value.as_deref() == Some("../../not-opened.txt"))
         );
     }
 
@@ -1132,7 +1132,7 @@ mod tests {
         let parsed = password_file_controls(&producer).unwrap();
         assert_eq!(parsed.len(), 2);
         assert!(
-            matches!(&parsed[1], OdfPasswordFileControl::File(value) if value.current_value.as_deref() == Some("final"))
+            matches!(&parsed[1], PasswordFileControl::File(value) if value.current_value.as_deref() == Some("final"))
         );
     }
 
@@ -1141,11 +1141,10 @@ mod tests {
         let xml = format!(
             r#"{ROOT}<f:form f:name="Main"><f:password f:name="Old" xml:id="old"><f:properties><f:property f:property-name="Keep" o:value-type="void"/></f:properties></f:password><!--keep--><f:text f:name="Text" xml:id="text"/></f:form>{END}"#
         );
-        let file: OdfPasswordFileControl = OdfFileControl::new("File", "file").into();
+        let file: PasswordFileControl = FileControl::new("File", "file").into();
         let inserted = insert_password_file_control_xml(&xml, 0, &file).unwrap();
         assert!(inserted.contains("<!--keep-->") && inserted.contains("f:text"));
-        let password: OdfPasswordFileControl =
-            OdfPasswordControl::new("Password", "password").into();
+        let password: PasswordFileControl = PasswordControl::new("Password", "password").into();
         let replaced = replace_password_file_control_xml(&inserted, 0, &password).unwrap();
         let removed = remove_password_file_control_xml(&replaced, 1).unwrap();
         assert_eq!(password_file_controls(&removed).unwrap(), [password]);
@@ -1159,11 +1158,7 @@ mod tests {
 
     #[test]
     fn hostile_values_children_duplicates_and_active_content_are_rejected() {
-        assert!(
-            OdfPasswordControl::new("P", "1bad")
-                .to_xml_fragment()
-                .is_err()
-        );
+        assert!(PasswordControl::new("P", "1bad").to_xml_fragment().is_err());
         let echo = format!(
             r#"{ROOT}<f:form f:name="Main"><f:password f:name="P" xml:id="p" f:echo-char="**"/></f:form>{END}"#
         );
@@ -1182,7 +1177,7 @@ mod tests {
             r#"{ROOT}<o:p xml:id="same"/><f:form f:name="Main"><f:file f:name="F" xml:id="same"/></f:form>{END}"#
         );
         assert!(password_file_controls(&duplicate).is_err());
-        let mut file = OdfFileControl::new("F", "f");
+        let mut file = FileControl::new("F", "f");
         file.value = Some("x".repeat(MAX_STRING + 1));
         assert!(file.to_xml_fragment().is_err());
     }
@@ -1190,9 +1185,9 @@ mod tests {
     #[test]
     fn builder_and_mutable_document_round_trip() {
         use crate::{Document, DocumentBuilder, MutableDocument};
-        let mut initial = OdfFileControl::new("File", "file");
+        let mut initial = FileControl::new("File", "file");
         initial.current_value = Some("/host/path/is/not/read".into());
-        let mut form = OdfPasswordFileForm::new("Main");
+        let mut form = PasswordFileForm::new("Main");
         form.add_control(initial).unwrap();
         let mut builder = DocumentBuilder::new();
         builder.add_password_file_form(&form).unwrap();
@@ -1200,21 +1195,20 @@ mod tests {
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert!(
-            matches!(&mutable.password_file_controls().unwrap()[0], OdfPasswordFileControl::File(value) if value.current_value.as_deref() == Some("/host/path/is/not/read"))
+            matches!(&mutable.password_file_controls().unwrap()[0], PasswordFileControl::File(value) if value.current_value.as_deref() == Some("/host/path/is/not/read"))
         );
-        let password: OdfPasswordFileControl =
-            OdfPasswordControl::new("Password", "password").into();
+        let password: PasswordFileControl = PasswordControl::new("Password", "password").into();
         mutable.insert_password_file_control(0, &password).unwrap();
-        let replacement: OdfPasswordFileControl = OdfFileControl::new("Other", "other").into();
+        let replacement: PasswordFileControl = FileControl::new("Other", "other").into();
         assert!(matches!(
             mutable
                 .replace_password_file_control(0, &replacement)
                 .unwrap(),
-            OdfPasswordFileControl::File(_)
+            PasswordFileControl::File(_)
         ));
         assert!(matches!(
             mutable.remove_password_file_control(1).unwrap(),
-            OdfPasswordFileControl::Password(_)
+            PasswordFileControl::Password(_)
         ));
         assert_eq!(mutable.password_file_controls().unwrap(), [replacement]);
     }

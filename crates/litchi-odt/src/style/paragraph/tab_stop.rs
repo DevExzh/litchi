@@ -18,9 +18,9 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 pub const MAX_PARAGRAPH_TAB_STOPS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct OdfTabStopPosition(String);
+pub struct TabStopPosition(String);
 
-impl OdfTabStopPosition {
+impl TabStopPosition {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_length(&value, false, "style:position")?;
@@ -31,13 +31,13 @@ impl OdfTabStopPosition {
     }
 }
 
-impl fmt::Display for OdfTabStopPosition {
+impl fmt::Display for TabStopPosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl FromStr for OdfTabStopPosition {
+impl FromStr for TabStopPosition {
     type Err = Error;
     fn from_str(value: &str) -> Result<Self> {
         Self::new(value)
@@ -161,7 +161,7 @@ impl ParagraphTabLeaderColor {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParagraphTabStop {
-    pub position: OdfTabStopPosition,
+    pub position: TabStopPosition,
     pub tab_type: ParagraphTabStopType,
     pub leader_type: Option<ParagraphTabLeaderType>,
     pub leader_style: Option<ParagraphTabLeaderStyle>,
@@ -172,7 +172,7 @@ pub struct ParagraphTabStop {
 }
 
 impl ParagraphTabStop {
-    pub fn new(position: OdfTabStopPosition) -> Self {
+    pub fn new(position: TabStopPosition) -> Self {
         Self {
             position,
             tab_type: ParagraphTabStopType::Left,
@@ -606,7 +606,7 @@ fn parse_stop(
     aggregate: &mut usize,
 ) -> Result<ParagraphTabStop> {
     let mut attrs = attributes(reader, element, aggregate)?;
-    let position = OdfTabStopPosition::new(
+    let position = TabStopPosition::new(
         take(&mut attrs, "position").ok_or_else(|| error("missing style:position"))?,
     )?;
     let kind = take(&mut attrs, "type").unwrap_or_else(|| "left".into());

@@ -9,7 +9,7 @@ use crate::ReferenceMark;
 use crate::TextIndex;
 use crate::TextIndexMark;
 use crate::core::{MetaXmlPatch, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml};
-use crate::elements::field::{FieldParser, OdfDynamicTextField};
+use crate::elements::field::{DynamicTextField, FieldParser};
 use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, Hyperlink, List, Paragraph};
@@ -19,10 +19,9 @@ use crate::header_footer::{
 };
 use crate::page_layout::{PageLayout, parse_page_layouts, set_page_layout_xml};
 use crate::page_sequence::{OdtPageSequence, parse_page_sequence, set_page_sequence_xml};
-use crate::{OdfFormProperty, OdfInteractiveControl, OdfSelectionControl, OdfTextControl};
+use crate::{FormProperty, InteractiveControl, SelectionControl, TextControl};
 use crate::{
-    OdfVariableDeclarationGroup, OdfVariableDeclarations, OdfVariableKind, OdfVariablePart,
-    OdfVariableScope,
+    VariableDeclarationGroup, VariableDeclarations, VariableKind, VariablePart, VariableScope,
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::{ops::Range, path::Path};
@@ -50,7 +49,7 @@ enum DocumentElement {
 /// # Examples
 ///
 /// ```no_run
-/// use litchi_odf::{Document, MutableDocument};
+/// use litchi_odt::{Document, MutableDocument};
 ///
 /// # fn main() -> litchi_core::Result<()> {
 /// // Open an existing document
@@ -97,7 +96,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::{Document, MutableDocument};
+    /// use litchi_odt::{Document, MutableDocument};
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -152,7 +151,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// let doc = MutableDocument::new();
     /// ```
@@ -178,7 +177,7 @@ impl MutableDocument {
     }
 
     /// Return typed dynamic fields from the current authoritative content XML.
-    pub fn dynamic_text_fields(&self) -> Result<Vec<OdfDynamicTextField>> {
+    pub fn dynamic_text_fields(&self) -> Result<Vec<DynamicTextField>> {
         self.with_content_xml(FieldParser::parse_dynamic_text_fields)
     }
 
@@ -220,7 +219,7 @@ impl MutableDocument {
     /// Replace one note selected in document order and return its old semantic value.
     ///
     /// Replacement emits the public note model, including validated structured
-    /// content when the replacement carries an `OdfNoteBodyContent`.
+    /// content when the replacement carries an `NoteBodyContent`.
     pub fn replace_note(
         &mut self,
         note_index: usize,
@@ -448,7 +447,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::DrawingGradients> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing_gradient::parse_drawing_gradients,
@@ -459,7 +458,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::DrawingHatches> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing_hatch::parse_drawing_hatches,
@@ -470,9 +469,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render strokes.
-    pub fn drawing_stroke_dashes(
-        &self,
-    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+    pub fn drawing_stroke_dashes(&self) -> Result<crate::drawing_stroke_dash::DrawingStrokeDashes> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing_stroke_dash::parse_drawing_stroke_dashes,
@@ -483,7 +480,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
-    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::DrawingFillImages> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing_fill_image::parse_drawing_fill_images,
@@ -494,7 +491,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
-    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::DrawingMarkers> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing_marker::parse_drawing_markers,
@@ -505,7 +502,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
-    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::DrawingOpacities> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing_opacity::parse_drawing_opacities,
@@ -516,7 +513,7 @@ impl MutableDocument {
     ///
     /// The result describes style metadata only. It never renumbers, lays out,
     /// or renders notes.
-    pub fn notes_configurations(&self) -> Result<crate::OdfNotesConfigurations> {
+    pub fn notes_configurations(&self) -> Result<crate::NotesConfigurations> {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(Default::default()), crate::parse_notes_configurations)
@@ -526,7 +523,7 @@ impl MutableDocument {
     ///
     /// The result does not apply styles to headings, generate labels, or
     /// update tables of contents.
-    pub fn outline_styles(&self) -> Result<crate::OdfOutlineStyles> {
+    pub fn outline_styles(&self) -> Result<crate::OutlineStyles> {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(Default::default()), crate::parse_outline_styles)
@@ -538,8 +535,8 @@ impl MutableDocument {
     /// same name. It does not alter heading structure or cached index content.
     pub fn set_outline_style(
         &mut self,
-        style: &crate::OdfOutlineStyle,
-    ) -> Result<Option<crate::OdfOutlineStyle>> {
+        style: &crate::OutlineStyle,
+    ) -> Result<Option<crate::OutlineStyle>> {
         style.validate()?;
         let styles = self
             .styles_xml
@@ -554,7 +551,7 @@ impl MutableDocument {
     ///
     /// Existing heading references are retained verbatim, allowing callers to
     /// manage those references separately.
-    pub fn remove_outline_style(&mut self, name: &str) -> Result<Option<crate::OdfOutlineStyle>> {
+    pub fn remove_outline_style(&mut self, name: &str) -> Result<Option<crate::OutlineStyle>> {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
@@ -569,8 +566,8 @@ impl MutableDocument {
     /// same note class. It never changes note anchors, citations, or numbering.
     pub fn set_notes_configuration(
         &mut self,
-        configuration: &crate::OdfNotesConfiguration,
-    ) -> Result<Option<crate::OdfNotesConfiguration>> {
+        configuration: &crate::NotesConfiguration,
+    ) -> Result<Option<crate::NotesConfiguration>> {
         configuration.validate()?;
         let old = self
             .notes_configurations()?
@@ -590,8 +587,8 @@ impl MutableDocument {
     /// never recalculates citations, sequence numbers, or page layout.
     pub fn set_notes_configurations(
         &mut self,
-        configurations: &crate::OdfNotesConfigurations,
-    ) -> Result<crate::OdfNotesConfigurations> {
+        configurations: &crate::NotesConfigurations,
+    ) -> Result<crate::NotesConfigurations> {
         configurations.validate()?;
         let old = self.notes_configurations()?;
         if self.styles_xml.is_none()
@@ -604,7 +601,7 @@ impl MutableDocument {
             .styles_xml
             .clone()
             .unwrap_or_else(OdfStructure::default_styles_xml);
-        for note_class in crate::OdfNoteClass::ALL {
+        for note_class in crate::notes_configuration::NoteClass::ALL {
             styles = match configurations.get(note_class) {
                 Some(configuration) => crate::set_notes_configuration_xml(&styles, configuration)?,
                 None => crate::remove_notes_configuration_xml(&styles, note_class)?,
@@ -620,8 +617,8 @@ impl MutableDocument {
     /// are preserved verbatim.
     pub fn clear_notes_configuration(
         &mut self,
-        note_class: crate::OdfNoteClass,
-    ) -> Result<Option<crate::OdfNotesConfiguration>> {
+        note_class: crate::notes_configuration::NoteClass,
+    ) -> Result<Option<crate::NotesConfiguration>> {
         let old = self.notes_configurations()?.get(note_class).cloned();
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
@@ -634,9 +631,7 @@ impl MutableDocument {
     ///
     /// The policy is styles metadata only. It is never used to generate
     /// bibliography entries, resolve citations, or access external sources.
-    pub fn bibliography_configuration(
-        &self,
-    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+    pub fn bibliography_configuration(&self) -> Result<Option<crate::BibliographyConfiguration>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
             crate::bibliography_configuration::parse_bibliography_configuration,
@@ -649,8 +644,8 @@ impl MutableDocument {
     /// regenerate bibliography entries or modify bibliography marks.
     pub fn set_bibliography_configuration(
         &mut self,
-        configuration: &crate::OdfBibliographyConfiguration,
-    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+        configuration: &crate::BibliographyConfiguration,
+    ) -> Result<Option<crate::BibliographyConfiguration>> {
         configuration.validate()?;
         let old = self.bibliography_configuration()?;
         let styles = self
@@ -672,7 +667,7 @@ impl MutableDocument {
     /// source marks are preserved verbatim.
     pub fn clear_bibliography_configuration(
         &mut self,
-    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+    ) -> Result<Option<crate::BibliographyConfiguration>> {
         let old = self.bibliography_configuration()?;
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
@@ -688,7 +683,7 @@ impl MutableDocument {
     /// the document or generate line numbers.
     pub fn line_numbering_configuration(
         &self,
-    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+    ) -> Result<Option<crate::LineNumberingConfiguration>> {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(None), crate::parse_line_numbering_configuration)
@@ -700,8 +695,8 @@ impl MutableDocument {
     /// line numbers.
     pub fn set_line_numbering_configuration(
         &mut self,
-        configuration: &crate::OdfLineNumberingConfiguration,
-    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+        configuration: &crate::LineNumberingConfiguration,
+    ) -> Result<Option<crate::LineNumberingConfiguration>> {
         configuration.validate()?;
         let old = self.line_numbering_configuration()?;
         let styles = self
@@ -718,7 +713,7 @@ impl MutableDocument {
     /// Remove document line-numbering configuration and return its old value.
     pub fn clear_line_numbering_configuration(
         &mut self,
-    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+    ) -> Result<Option<crate::LineNumberingConfiguration>> {
         let old = self.line_numbering_configuration()?;
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
@@ -935,7 +930,7 @@ impl MutableDocument {
     }
 
     /// Return all typed form/control custom properties in document order.
-    pub fn form_properties(&self) -> Result<Vec<OdfFormProperty>> {
+    pub fn form_properties(&self) -> Result<Vec<FormProperty>> {
         self.with_content_xml(crate::form_properties)
     }
 
@@ -943,7 +938,7 @@ impl MutableDocument {
     pub fn insert_form_property(
         &mut self,
         owner_index: usize,
-        property: &OdfFormProperty,
+        property: &FormProperty,
     ) -> Result<()> {
         let updated = self
             .with_content_xml(|xml| crate::insert_form_property_xml(xml, owner_index, property))?;
@@ -955,8 +950,8 @@ impl MutableDocument {
     pub fn replace_form_property(
         &mut self,
         property_index: usize,
-        replacement: &OdfFormProperty,
-    ) -> Result<OdfFormProperty> {
+        replacement: &FormProperty,
+    ) -> Result<FormProperty> {
         let old = self
             .form_properties()?
             .get(property_index)
@@ -974,7 +969,7 @@ impl MutableDocument {
     }
 
     /// Remove a form property and remove its container when it becomes empty.
-    pub fn remove_form_property(&mut self, property_index: usize) -> Result<OdfFormProperty> {
+    pub fn remove_form_property(&mut self, property_index: usize) -> Result<FormProperty> {
         let old = self
             .form_properties()?
             .get(property_index)
@@ -991,16 +986,12 @@ impl MutableDocument {
     }
 
     /// Return text and textarea controls in document order.
-    pub fn text_controls(&self) -> Result<Vec<OdfTextControl>> {
+    pub fn text_controls(&self) -> Result<Vec<TextControl>> {
         self.with_content_xml(crate::text_controls)
     }
 
     /// Insert a text or textarea control into a form selected in document order.
-    pub fn insert_text_control(
-        &mut self,
-        form_index: usize,
-        control: &OdfTextControl,
-    ) -> Result<()> {
+    pub fn insert_text_control(&mut self, form_index: usize, control: &TextControl) -> Result<()> {
         let updated =
             self.with_content_xml(|xml| crate::insert_text_control_xml(xml, form_index, control))?;
         self.content_xml = Some(updated);
@@ -1011,8 +1002,8 @@ impl MutableDocument {
     pub fn replace_text_control(
         &mut self,
         control_index: usize,
-        replacement: &OdfTextControl,
-    ) -> Result<OdfTextControl> {
+        replacement: &TextControl,
+    ) -> Result<TextControl> {
         let old = self
             .text_controls()?
             .get(control_index)
@@ -1030,7 +1021,7 @@ impl MutableDocument {
     }
 
     /// Remove a text or textarea control selected in document order.
-    pub fn remove_text_control(&mut self, control_index: usize) -> Result<OdfTextControl> {
+    pub fn remove_text_control(&mut self, control_index: usize) -> Result<TextControl> {
         let old = self
             .text_controls()?
             .get(control_index)
@@ -1047,7 +1038,7 @@ impl MutableDocument {
     }
 
     /// Return button and checkbox controls in document order.
-    pub fn interactive_controls(&self) -> Result<Vec<OdfInteractiveControl>> {
+    pub fn interactive_controls(&self) -> Result<Vec<InteractiveControl>> {
         self.with_content_xml(crate::interactive_controls)
     }
 
@@ -1055,7 +1046,7 @@ impl MutableDocument {
     pub fn insert_interactive_control(
         &mut self,
         form_index: usize,
-        control: &OdfInteractiveControl,
+        control: &InteractiveControl,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_interactive_control_xml(xml, form_index, control)
@@ -1068,8 +1059,8 @@ impl MutableDocument {
     pub fn replace_interactive_control(
         &mut self,
         control_index: usize,
-        replacement: &OdfInteractiveControl,
-    ) -> Result<OdfInteractiveControl> {
+        replacement: &InteractiveControl,
+    ) -> Result<InteractiveControl> {
         let old = self
             .interactive_controls()?
             .get(control_index)
@@ -1090,7 +1081,7 @@ impl MutableDocument {
     pub fn remove_interactive_control(
         &mut self,
         control_index: usize,
-    ) -> Result<OdfInteractiveControl> {
+    ) -> Result<InteractiveControl> {
         let old = self
             .interactive_controls()?
             .get(control_index)
@@ -1107,7 +1098,7 @@ impl MutableDocument {
     }
 
     /// Return listbox and combobox controls in document order.
-    pub fn selection_controls(&self) -> Result<Vec<OdfSelectionControl>> {
+    pub fn selection_controls(&self) -> Result<Vec<SelectionControl>> {
         self.with_content_xml(crate::selection_controls)
     }
 
@@ -1115,7 +1106,7 @@ impl MutableDocument {
     pub fn insert_selection_control(
         &mut self,
         form_index: usize,
-        control: &OdfSelectionControl,
+        control: &SelectionControl,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_selection_control_xml(xml, form_index, control)
@@ -1128,8 +1119,8 @@ impl MutableDocument {
     pub fn replace_selection_control(
         &mut self,
         control_index: usize,
-        replacement: &OdfSelectionControl,
-    ) -> Result<OdfSelectionControl> {
+        replacement: &SelectionControl,
+    ) -> Result<SelectionControl> {
         let old = self
             .selection_controls()?
             .get(control_index)
@@ -1147,10 +1138,7 @@ impl MutableDocument {
     }
 
     /// Remove a listbox or combobox selected in document order.
-    pub fn remove_selection_control(
-        &mut self,
-        control_index: usize,
-    ) -> Result<OdfSelectionControl> {
+    pub fn remove_selection_control(&mut self, control_index: usize) -> Result<SelectionControl> {
         let old = self
             .selection_controls()?
             .get(control_index)
@@ -1167,7 +1155,7 @@ impl MutableDocument {
     }
 
     /// Return radio, frame, and image-button controls in document order.
-    pub fn visual_controls(&self) -> Result<Vec<crate::OdfVisualControl>> {
+    pub fn visual_controls(&self) -> Result<Vec<crate::VisualControl>> {
         self.with_content_xml(crate::visual_controls)
     }
 
@@ -1175,7 +1163,7 @@ impl MutableDocument {
     pub fn insert_visual_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfVisualControl,
+        control: &crate::VisualControl,
     ) -> Result<()> {
         let updated = self
             .with_content_xml(|xml| crate::insert_visual_control_xml(xml, form_index, control))?;
@@ -1187,8 +1175,8 @@ impl MutableDocument {
     pub fn replace_visual_control(
         &mut self,
         control_index: usize,
-        replacement: &crate::OdfVisualControl,
-    ) -> Result<crate::OdfVisualControl> {
+        replacement: &crate::VisualControl,
+    ) -> Result<crate::VisualControl> {
         let old = self
             .visual_controls()?
             .get(control_index)
@@ -1206,10 +1194,7 @@ impl MutableDocument {
     }
 
     /// Remove a radio, frame, or image-button selected in document order.
-    pub fn remove_visual_control(
-        &mut self,
-        control_index: usize,
-    ) -> Result<crate::OdfVisualControl> {
+    pub fn remove_visual_control(&mut self, control_index: usize) -> Result<crate::VisualControl> {
         let old = self
             .visual_controls()?
             .get(control_index)
@@ -1226,7 +1211,7 @@ impl MutableDocument {
     }
 
     /// Return fixed-text, hidden, and generic controls in document order.
-    pub fn generic_form_controls(&self) -> Result<Vec<crate::OdfGenericFormControl>> {
+    pub fn generic_form_controls(&self) -> Result<Vec<crate::GenericFormControl>> {
         self.with_content_xml(crate::generic_form_controls)
     }
 
@@ -1234,7 +1219,7 @@ impl MutableDocument {
     pub fn insert_generic_form_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfGenericFormControl,
+        control: &crate::GenericFormControl,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_generic_form_control_xml(xml, form_index, control)
@@ -1247,8 +1232,8 @@ impl MutableDocument {
     pub fn replace_generic_form_control(
         &mut self,
         control_index: usize,
-        replacement: &crate::OdfGenericFormControl,
-    ) -> Result<crate::OdfGenericFormControl> {
+        replacement: &crate::GenericFormControl,
+    ) -> Result<crate::GenericFormControl> {
         let old = self
             .generic_form_controls()?
             .get(control_index)
@@ -1269,7 +1254,7 @@ impl MutableDocument {
     pub fn remove_generic_form_control(
         &mut self,
         control_index: usize,
-    ) -> Result<crate::OdfGenericFormControl> {
+    ) -> Result<crate::GenericFormControl> {
         let old = self
             .generic_form_controls()?
             .get(control_index)
@@ -1286,7 +1271,7 @@ impl MutableDocument {
     }
 
     /// Return password and file controls in document order.
-    pub fn password_file_controls(&self) -> Result<Vec<crate::OdfPasswordFileControl>> {
+    pub fn password_file_controls(&self) -> Result<Vec<crate::PasswordFileControl>> {
         self.with_content_xml(crate::password_file_controls)
     }
 
@@ -1294,7 +1279,7 @@ impl MutableDocument {
     pub fn insert_password_file_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfPasswordFileControl,
+        control: &crate::PasswordFileControl,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_password_file_control_xml(xml, form_index, control)
@@ -1307,8 +1292,8 @@ impl MutableDocument {
     pub fn replace_password_file_control(
         &mut self,
         control_index: usize,
-        replacement: &crate::OdfPasswordFileControl,
-    ) -> Result<crate::OdfPasswordFileControl> {
+        replacement: &crate::PasswordFileControl,
+    ) -> Result<crate::PasswordFileControl> {
         let old = self
             .password_file_controls()?
             .get(control_index)
@@ -1329,7 +1314,7 @@ impl MutableDocument {
     pub fn remove_password_file_control(
         &mut self,
         control_index: usize,
-    ) -> Result<crate::OdfPasswordFileControl> {
+    ) -> Result<crate::PasswordFileControl> {
         let old = self
             .password_file_controls()?
             .get(control_index)
@@ -1346,7 +1331,7 @@ impl MutableDocument {
     }
 
     /// Return image-frame controls in document order without resolving image references.
-    pub fn image_frame_controls(&self) -> Result<Vec<crate::OdfImageFrameControl>> {
+    pub fn image_frame_controls(&self) -> Result<Vec<crate::ImageFrameControl>> {
         self.with_content_xml(crate::image_frame_controls)
     }
 
@@ -1354,7 +1339,7 @@ impl MutableDocument {
     pub fn insert_image_frame_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfImageFrameControl,
+        control: &crate::ImageFrameControl,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_image_frame_control_xml(xml, form_index, control)
@@ -1367,8 +1352,8 @@ impl MutableDocument {
     pub fn replace_image_frame_control(
         &mut self,
         control_index: usize,
-        replacement: &crate::OdfImageFrameControl,
-    ) -> Result<crate::OdfImageFrameControl> {
+        replacement: &crate::ImageFrameControl,
+    ) -> Result<crate::ImageFrameControl> {
         let old = self
             .image_frame_controls()?
             .get(control_index)
@@ -1389,7 +1374,7 @@ impl MutableDocument {
     pub fn remove_image_frame_control(
         &mut self,
         control_index: usize,
-    ) -> Result<crate::OdfImageFrameControl> {
+    ) -> Result<crate::ImageFrameControl> {
         let old = self
             .image_frame_controls()?
             .get(control_index)
@@ -1406,7 +1391,7 @@ impl MutableDocument {
     }
 
     /// Return value-range controls in document order without resolving bindings.
-    pub fn value_range_controls(&self) -> Result<Vec<crate::OdfValueRangeControl>> {
+    pub fn value_range_controls(&self) -> Result<Vec<crate::ValueRangeControl>> {
         self.with_content_xml(crate::value_range_controls)
     }
 
@@ -1414,7 +1399,7 @@ impl MutableDocument {
     pub fn insert_value_range_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfValueRangeControl,
+        control: &crate::ValueRangeControl,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_value_range_control_xml(xml, form_index, control)
@@ -1427,8 +1412,8 @@ impl MutableDocument {
     pub fn replace_value_range_control(
         &mut self,
         control_index: usize,
-        replacement: &crate::OdfValueRangeControl,
-    ) -> Result<crate::OdfValueRangeControl> {
+        replacement: &crate::ValueRangeControl,
+    ) -> Result<crate::ValueRangeControl> {
         let old = self
             .value_range_controls()?
             .get(control_index)
@@ -1449,7 +1434,7 @@ impl MutableDocument {
     pub fn remove_value_range_control(
         &mut self,
         control_index: usize,
-    ) -> Result<crate::OdfValueRangeControl> {
+    ) -> Result<crate::ValueRangeControl> {
         let old = self
             .value_range_controls()?
             .get(control_index)
@@ -1466,7 +1451,7 @@ impl MutableDocument {
     }
 
     /// Return formatted-text, number, date, and time controls in document order.
-    pub fn typed_value_controls(&self) -> Result<Vec<crate::OdfTypedValueControl>> {
+    pub fn typed_value_controls(&self) -> Result<Vec<crate::TypedValueControl>> {
         self.with_content_xml(crate::typed_value_controls)
     }
 
@@ -1474,7 +1459,7 @@ impl MutableDocument {
     pub fn insert_typed_value_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfTypedValueControl,
+        control: &crate::TypedValueControl,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_typed_value_control_xml(xml, form_index, control)
@@ -1487,8 +1472,8 @@ impl MutableDocument {
     pub fn replace_typed_value_control(
         &mut self,
         control_index: usize,
-        replacement: &crate::OdfTypedValueControl,
-    ) -> Result<crate::OdfTypedValueControl> {
+        replacement: &crate::TypedValueControl,
+    ) -> Result<crate::TypedValueControl> {
         let old = self
             .typed_value_controls()?
             .get(control_index)
@@ -1509,7 +1494,7 @@ impl MutableDocument {
     pub fn remove_typed_value_control(
         &mut self,
         control_index: usize,
-    ) -> Result<crate::OdfTypedValueControl> {
+    ) -> Result<crate::TypedValueControl> {
         let old = self
             .typed_value_controls()?
             .get(control_index)
@@ -1525,13 +1510,13 @@ impl MutableDocument {
         Ok(old)
     }
 
-    pub fn grid_controls(&self) -> Result<Vec<crate::OdfGridControl>> {
+    pub fn grid_controls(&self) -> Result<Vec<crate::GridControl>> {
         self.with_content_xml(crate::grid_controls)
     }
     pub fn insert_grid_control(
         &mut self,
         form_index: usize,
-        control: &crate::OdfGridControl,
+        control: &crate::GridControl,
     ) -> Result<()> {
         let updated =
             self.with_content_xml(|xml| crate::insert_grid_control_xml(xml, form_index, control))?;
@@ -1541,8 +1526,8 @@ impl MutableDocument {
     pub fn replace_grid_control(
         &mut self,
         control_index: usize,
-        replacement: &crate::OdfGridControl,
-    ) -> Result<crate::OdfGridControl> {
+        replacement: &crate::GridControl,
+    ) -> Result<crate::GridControl> {
         let old = self
             .grid_controls()?
             .get(control_index)
@@ -1558,7 +1543,7 @@ impl MutableDocument {
         self.content_xml = Some(updated);
         Ok(old)
     }
-    pub fn remove_grid_control(&mut self, control_index: usize) -> Result<crate::OdfGridControl> {
+    pub fn remove_grid_control(&mut self, control_index: usize) -> Result<crate::GridControl> {
         let old = self
             .grid_controls()?
             .get(control_index)
@@ -1578,7 +1563,7 @@ impl MutableDocument {
     pub fn insert_dynamic_text_field(
         &mut self,
         paragraph_index: usize,
-        field: &OdfDynamicTextField,
+        field: &DynamicTextField,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_dynamic_text_field_xml(xml, paragraph_index, field)
@@ -1591,8 +1576,8 @@ impl MutableDocument {
     pub fn replace_dynamic_text_field(
         &mut self,
         field_index: usize,
-        replacement: &OdfDynamicTextField,
-    ) -> Result<OdfDynamicTextField> {
+        replacement: &DynamicTextField,
+    ) -> Result<DynamicTextField> {
         let old = self
             .dynamic_text_fields()?
             .get(field_index)
@@ -1610,7 +1595,7 @@ impl MutableDocument {
     }
 
     /// Remove a dynamic field selected in document order and return its old value.
-    pub fn remove_dynamic_text_field(&mut self, field_index: usize) -> Result<OdfDynamicTextField> {
+    pub fn remove_dynamic_text_field(&mut self, field_index: usize) -> Result<DynamicTextField> {
         let old = self
             .dynamic_text_fields()?
             .get(field_index)
@@ -1648,17 +1633,17 @@ impl MutableDocument {
     }
 
     /// Return validated variable, user-field, sequence, and DDE declarations.
-    pub fn variable_declarations(&self) -> Result<OdfVariableDeclarations> {
+    pub fn variable_declarations(&self) -> Result<VariableDeclarations> {
         self.with_content_xml(|content| {
             if let Some(styles) = self.styles_xml.as_deref() {
                 crate::variable_declaration::parse_variable_declaration_parts(&[
-                    (content, OdfVariablePart::Content),
-                    (styles, OdfVariablePart::Styles),
+                    (content, VariablePart::Content),
+                    (styles, VariablePart::Styles),
                 ])
             } else {
                 crate::variable_declaration::parse_variable_declaration_parts(&[(
                     content,
-                    OdfVariablePart::Content,
+                    VariablePart::Content,
                 )])
             }
         })
@@ -1670,8 +1655,8 @@ impl MutableDocument {
     /// cross-part declaration and field-reference invariants.
     pub fn set_variable_declaration_group(
         &mut self,
-        group: &OdfVariableDeclarationGroup,
-    ) -> Result<Option<OdfVariableDeclarationGroup>> {
+        group: &VariableDeclarationGroup,
+    ) -> Result<Option<VariableDeclarationGroup>> {
         let current = self.variable_declarations()?;
         let old = current
             .groups
@@ -1683,37 +1668,37 @@ impl MutableDocument {
             })
             .cloned();
         match group.part {
-            OdfVariablePart::Content => {
+            VariablePart::Content => {
                 let updated = self.with_content_xml(|xml| {
                     crate::set_variable_declaration_group_xml(xml, group)
                 })?;
                 if let Some(styles) = self.styles_xml.as_deref() {
                     crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (&updated, OdfVariablePart::Content),
-                        (styles, OdfVariablePart::Styles),
+                        (&updated, VariablePart::Content),
+                        (styles, VariablePart::Styles),
                     ])?;
                 } else {
                     crate::variable_declaration::parse_variable_declaration_parts(&[(
                         &updated,
-                        OdfVariablePart::Content,
+                        VariablePart::Content,
                     )])?;
                 }
                 self.content_xml = Some(updated);
             },
-            OdfVariablePart::Styles => {
+            VariablePart::Styles => {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
                 let updated = crate::set_variable_declaration_group_xml(styles, group)?;
                 self.with_content_xml(|content| {
                     crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (content, OdfVariablePart::Content),
-                        (&updated, OdfVariablePart::Styles),
+                        (content, VariablePart::Content),
+                        (&updated, VariablePart::Styles),
                     ])
                 })?;
                 self.styles_xml = Some(updated);
             },
-            OdfVariablePart::Flat => {
+            VariablePart::Flat => {
                 return Err(litchi_core::Error::InvalidFormat(
                     "MutableDocument cannot edit flat-document declarations".to_string(),
                 ));
@@ -1728,10 +1713,10 @@ impl MutableDocument {
     /// declaration from the removed container.
     pub fn remove_variable_declaration_group(
         &mut self,
-        part: OdfVariablePart,
-        scope: &OdfVariableScope,
-        kind: OdfVariableKind,
-    ) -> Result<Option<OdfVariableDeclarationGroup>> {
+        part: VariablePart,
+        scope: &VariableScope,
+        kind: VariableKind,
+    ) -> Result<Option<VariableDeclarationGroup>> {
         let current = self.variable_declarations()?;
         let Some(old) = current
             .groups
@@ -1744,37 +1729,37 @@ impl MutableDocument {
             return Ok(None);
         };
         match part {
-            OdfVariablePart::Content => {
+            VariablePart::Content => {
                 let updated = self.with_content_xml(|xml| {
                     crate::remove_variable_declaration_group_xml(xml, scope, kind)
                 })?;
                 if let Some(styles) = self.styles_xml.as_deref() {
                     crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (&updated, OdfVariablePart::Content),
-                        (styles, OdfVariablePart::Styles),
+                        (&updated, VariablePart::Content),
+                        (styles, VariablePart::Styles),
                     ])?;
                 } else {
                     crate::variable_declaration::parse_variable_declaration_parts(&[(
                         &updated,
-                        OdfVariablePart::Content,
+                        VariablePart::Content,
                     )])?;
                 }
                 self.content_xml = Some(updated);
             },
-            OdfVariablePart::Styles => {
+            VariablePart::Styles => {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
                 let updated = crate::remove_variable_declaration_group_xml(styles, scope, kind)?;
                 self.with_content_xml(|content| {
                     crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (content, OdfVariablePart::Content),
-                        (&updated, OdfVariablePart::Styles),
+                        (content, VariablePart::Content),
+                        (&updated, VariablePart::Styles),
                     ])
                 })?;
                 self.styles_xml = Some(updated);
             },
-            OdfVariablePart::Flat => {
+            VariablePart::Flat => {
                 return Err(litchi_core::Error::InvalidFormat(
                     "MutableDocument cannot edit flat-document declarations".to_string(),
                 ));
@@ -2353,7 +2338,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2419,7 +2404,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2457,7 +2442,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::{MutableDocument, OdfFrameAnchor, OdfLength};
+    /// use litchi_odt::{MutableDocument, FrameAnchor, Length};
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2465,9 +2450,9 @@ impl MutableDocument {
     /// let path = doc.insert_image(
     ///     0,
     ///     png,
-    ///     &OdfLength::centimeters(10.0),
-    ///     &OdfLength::centimeters(4.0),
-    ///     OdfFrameAnchor::AsChar,
+    ///     &Length::centimeters(10.0),
+    ///     &Length::centimeters(4.0),
+    ///     FrameAnchor::AsChar,
     /// )?;
     /// assert!(path.starts_with("Pictures/"));
     /// # Ok(())
@@ -2477,9 +2462,9 @@ impl MutableDocument {
         &mut self,
         index: usize,
         image: &[u8],
-        width: &crate::OdfLength,
-        height: &crate::OdfLength,
-        anchor: crate::OdfFrameAnchor,
+        width: &crate::Length,
+        height: &crate::Length,
+        anchor: crate::FrameAnchor,
     ) -> Result<String> {
         use crate::frame;
         let format = frame::validate_image_payload(image)?;
@@ -2535,9 +2520,9 @@ impl MutableDocument {
         &mut self,
         index: usize,
         text: &str,
-        width: &crate::OdfLength,
-        height: &crate::OdfLength,
-        anchor: crate::OdfFrameAnchor,
+        width: &crate::Length,
+        height: &crate::Length,
+        anchor: crate::FrameAnchor,
     ) -> Result<String> {
         use crate::frame;
         let name = format!("Text Box {}", self.next_frame_number);
@@ -2566,7 +2551,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2616,7 +2601,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2661,7 +2646,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2687,7 +2672,8 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::{MutableDocument, Table};
+    /// use litchi_odt::MutableDocument;
+    /// use litchi_odt::elements::table::Table;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2712,7 +2698,8 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::{MutableDocument, Table};
+    /// use litchi_odt::MutableDocument;
+    /// use litchi_odt::elements::table::Table;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2918,7 +2905,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2938,7 +2925,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutableDocument;
+    /// use litchi_odt::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -3023,24 +3010,24 @@ mod tests {
         Document::from_bytes(builder.build().unwrap()).unwrap()
     }
 
-    fn rich_note_body() -> crate::OdfNoteBodyContent {
+    fn rich_note_body() -> crate::NoteBodyContent {
         const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-        crate::OdfNoteBodyContent::new(vec![crate::OdfMetaFieldNode::Element(
-            crate::OdfMetaFieldElement {
+        crate::NoteBodyContent::new(vec![crate::MetaFieldNode::Element(
+            crate::MetaFieldElement {
                 namespace_uri: TEXT.to_string(),
                 local_name: "p".to_string(),
                 attributes: Vec::new(),
                 children: vec![
-                    crate::OdfMetaFieldNode::Text("Styled ".to_string()),
-                    crate::OdfMetaFieldNode::Element(crate::OdfMetaFieldElement {
+                    crate::MetaFieldNode::Text("Styled ".to_string()),
+                    crate::MetaFieldNode::Element(crate::MetaFieldElement {
                         namespace_uri: TEXT.to_string(),
                         local_name: "span".to_string(),
-                        attributes: vec![crate::OdfMetaFieldAttribute {
+                        attributes: vec![crate::MetaFieldAttribute {
                             namespace_uri: TEXT.to_string(),
                             local_name: "style-name".to_string(),
                             value: "Emphasis".to_string(),
                         }],
-                        children: vec![crate::OdfMetaFieldNode::Text("body".to_string())],
+                        children: vec![crate::MetaFieldNode::Text("body".to_string())],
                     }),
                 ],
             },
@@ -3177,27 +3164,27 @@ mod tests {
 
     #[test]
     fn mutable_line_numbering_configuration_round_trips_without_generation() {
-        let first = crate::OdfLineNumberingConfiguration {
+        let first = crate::LineNumberingConfiguration {
             number_lines: Some(true),
-            number_format: Some(crate::OdfLineNumberFormat::LowerAlpha),
+            number_format: Some(crate::LineNumberFormat::LowerAlpha),
             letter_sync: Some(true),
             style_name: Some("LineNumbers".to_string()),
             increment: Some(2),
-            number_position: Some(crate::OdfLineNumberPosition::Inner),
-            offset: Some(crate::OdfNonNegativeLength::new("0.2in").unwrap()),
+            number_position: Some(crate::LineNumberPosition::Inner),
+            offset: Some(crate::NonNegativeLength::new("0.2in").unwrap()),
             count_empty_lines: Some(false),
             count_in_text_boxes: Some(true),
             restart_on_page: Some(false),
-            separator: Some(crate::OdfLineNumberingSeparator {
+            separator: Some(crate::LineNumberingSeparator {
                 increment: Some(4),
                 text: " · ".to_string(),
             }),
         };
-        let replacement = crate::OdfLineNumberingConfiguration {
+        let replacement = crate::LineNumberingConfiguration {
             number_lines: Some(false),
-            number_format: Some(crate::OdfLineNumberFormat::UpperRoman),
+            number_format: Some(crate::LineNumberFormat::UpperRoman),
             increment: Some(1),
-            ..crate::OdfLineNumberingConfiguration::default()
+            ..crate::LineNumberingConfiguration::default()
         };
 
         let mut mutable = MutableDocument::new();
@@ -3472,7 +3459,7 @@ mod tests {
 
     #[test]
     fn insert_image_round_trips_through_package_and_read_api() {
-        use crate::{OdfFrameAnchor, OdfLength};
+        use crate::{FrameAnchor, Length};
 
         let mut doc = MutableDocument::new();
         doc.add_paragraph("Before image").unwrap();
@@ -3481,9 +3468,9 @@ mod tests {
             .insert_image(
                 1,
                 &png,
-                &OdfLength::centimeters(10.0),
-                &OdfLength::centimeters(4.0),
-                OdfFrameAnchor::AsChar,
+                &Length::centimeters(10.0),
+                &Length::centimeters(4.0),
+                FrameAnchor::AsChar,
             )
             .unwrap();
         assert_eq!(path, "Pictures/image1.png");
@@ -3492,9 +3479,9 @@ mod tests {
             doc.insert_image(
                 99,
                 &png,
-                &OdfLength::points(1.0),
-                &OdfLength::points(1.0),
-                OdfFrameAnchor::Page
+                &Length::points(1.0),
+                &Length::points(1.0),
+                FrameAnchor::Page
             )
             .is_err()
         );
@@ -3502,9 +3489,9 @@ mod tests {
             doc.insert_image(
                 0,
                 b"not-an-image",
-                &OdfLength::points(1.0),
-                &OdfLength::points(1.0),
-                OdfFrameAnchor::Page
+                &Length::points(1.0),
+                &Length::points(1.0),
+                FrameAnchor::Page
             )
             .is_err()
         );
@@ -3528,25 +3515,25 @@ mod tests {
 
     #[test]
     fn insert_image_coexists_with_existing_media() {
-        use crate::{OdfFrameAnchor, OdfLength};
+        use crate::{FrameAnchor, Length};
 
         let mut doc = MutableDocument::new();
         let first = doc
             .insert_image(
                 0,
                 &minimal_png(),
-                &OdfLength::points(8.0),
-                &OdfLength::points(8.0),
-                OdfFrameAnchor::Page,
+                &Length::points(8.0),
+                &Length::points(8.0),
+                FrameAnchor::Page,
             )
             .unwrap();
         let second = doc
             .insert_image(
                 1,
                 &minimal_jpeg(),
-                &OdfLength::points(8.0),
-                &OdfLength::points(8.0),
-                OdfFrameAnchor::Page,
+                &Length::points(8.0),
+                &Length::points(8.0),
+                FrameAnchor::Page,
             )
             .unwrap();
         assert_eq!(first, "Pictures/image1.png");
@@ -3565,7 +3552,7 @@ mod tests {
 
     #[test]
     fn insert_text_box_round_trips_story_text() {
-        use crate::{OdfFrameAnchor, OdfLength};
+        use crate::{FrameAnchor, Length};
 
         let mut doc = MutableDocument::new();
         doc.add_paragraph("Intro").unwrap();
@@ -3573,9 +3560,9 @@ mod tests {
             .insert_text_box(
                 1,
                 "boxed <text> & more\nsecond line",
-                &OdfLength::inches(2.0),
-                &OdfLength::inches(1.0),
-                OdfFrameAnchor::Paragraph,
+                &Length::inches(2.0),
+                &Length::inches(1.0),
+                FrameAnchor::Paragraph,
             )
             .unwrap();
         assert_eq!(name, "Text Box 1");

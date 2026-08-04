@@ -23,7 +23,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 /// Six legacy ODF gradient geometries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfLegacyGradientStyle {
+pub enum LegacyGradientStyle {
     Linear,
     Axial,
     Radial,
@@ -32,7 +32,7 @@ pub enum OdfLegacyGradientStyle {
     Rectangular,
 }
 
-impl OdfLegacyGradientStyle {
+impl LegacyGradientStyle {
     fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "linear" => Self::Linear,
@@ -59,9 +59,9 @@ impl OdfLegacyGradientStyle {
 
 /// A finite signed percentage.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OdfGradientPercent(f64);
+pub struct GradientPercent(f64);
 
-impl OdfGradientPercent {
+impl GradientPercent {
     pub fn new(value: f64) -> Result<Self> {
         finite(value, "gradient percentage")?;
         Ok(Self(value))
@@ -72,7 +72,7 @@ impl OdfGradientPercent {
     }
 }
 
-impl fmt::Display for OdfGradientPercent {
+impl fmt::Display for GradientPercent {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}%", canonical_number(self.0))
     }
@@ -80,9 +80,9 @@ impl fmt::Display for OdfGradientPercent {
 
 /// A gradient intensity constrained to 0 through 100 percent.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OdfGradientIntensity(f64);
+pub struct GradientIntensity(f64);
 
-impl OdfGradientIntensity {
+impl GradientIntensity {
     pub fn new(value: f64) -> Result<Self> {
         finite(value, "gradient intensity")?;
         if !(0.0..=100.0).contains(&value) {
@@ -96,7 +96,7 @@ impl OdfGradientIntensity {
     }
 }
 
-impl fmt::Display for OdfGradientIntensity {
+impl fmt::Display for GradientIntensity {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}%", canonical_number(self.0))
     }
@@ -104,19 +104,19 @@ impl fmt::Display for OdfGradientIntensity {
 
 /// An RGB color represented by its three channels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct OdfRgbColor {
+pub struct RgbColor {
     pub red: u8,
     pub green: u8,
     pub blue: u8,
 }
 
-impl OdfRgbColor {
+impl RgbColor {
     pub const fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
 }
 
-impl FromStr for OdfRgbColor {
+impl FromStr for RgbColor {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -133,7 +133,7 @@ impl FromStr for OdfRgbColor {
     }
 }
 
-impl fmt::Display for OdfRgbColor {
+impl fmt::Display for RgbColor {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -145,9 +145,9 @@ impl fmt::Display for OdfRgbColor {
 
 /// An inert lexical ODF angle, retained because ODF 1.2 deliberately leaves its grammar open.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfGradientAngle(String);
+pub struct GradientAngle(String);
 
-impl OdfGradientAngle {
+impl GradientAngle {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_text(&value, "gradient angle", false)?;
@@ -162,7 +162,7 @@ impl OdfGradientAngle {
 /// Unit for an SVG gradient coordinate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfGradientCoordinateUnit {
+pub enum GradientCoordinateUnit {
     Centimeter,
     Millimeter,
     Inch,
@@ -172,7 +172,7 @@ pub enum OdfGradientCoordinateUnit {
     Percent,
 }
 
-impl OdfGradientCoordinateUnit {
+impl GradientCoordinateUnit {
     const fn suffix(self) -> &'static str {
         match self {
             Self::Centimeter => "cm",
@@ -188,13 +188,13 @@ impl OdfGradientCoordinateUnit {
 
 /// A finite SVG coordinate expressed as an ODF length or percentage.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OdfGradientCoordinate {
+pub struct GradientCoordinate {
     value: f64,
-    unit: OdfGradientCoordinateUnit,
+    unit: GradientCoordinateUnit,
 }
 
-impl OdfGradientCoordinate {
-    pub fn new(value: f64, unit: OdfGradientCoordinateUnit) -> Result<Self> {
+impl GradientCoordinate {
+    pub fn new(value: f64, unit: GradientCoordinateUnit) -> Result<Self> {
         finite(value, "gradient coordinate")?;
         Ok(Self { value, unit })
     }
@@ -203,12 +203,12 @@ impl OdfGradientCoordinate {
         self.value
     }
 
-    pub const fn unit(self) -> OdfGradientCoordinateUnit {
+    pub const fn unit(self) -> GradientCoordinateUnit {
         self.unit
     }
 }
 
-impl FromStr for OdfGradientCoordinate {
+impl FromStr for GradientCoordinate {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -221,7 +221,7 @@ impl FromStr for OdfGradientCoordinate {
     }
 }
 
-impl fmt::Display for OdfGradientCoordinate {
+impl fmt::Display for GradientCoordinate {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -235,13 +235,13 @@ impl fmt::Display for OdfGradientCoordinate {
 /// SVG gradient spread behavior.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfGradientSpreadMethod {
+pub enum GradientSpreadMethod {
     Pad,
     Reflect,
     Repeat,
 }
 
-impl OdfGradientSpreadMethod {
+impl GradientSpreadMethod {
     fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "pad" => Self::Pad,
@@ -262,16 +262,16 @@ impl OdfGradientSpreadMethod {
 
 /// A stop position represented either as a number or percentage.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum OdfGradientStopOffset {
+pub enum GradientStopOffset {
     Number(f64),
-    Percent(OdfGradientPercent),
+    Percent(GradientPercent),
 }
 
-impl OdfGradientStopOffset {
+impl GradientStopOffset {
     fn parse(value: &str) -> Result<Self> {
         if let Some(number) = value.strip_suffix('%') {
             validate_decimal(number, value)?;
-            return Ok(Self::Percent(OdfGradientPercent::new(parse_number(
+            return Ok(Self::Percent(GradientPercent::new(parse_number(
                 number,
                 "gradient stop offset",
             )?)?));
@@ -287,7 +287,7 @@ impl OdfGradientStopOffset {
     }
 }
 
-impl fmt::Display for OdfGradientStopOffset {
+impl fmt::Display for GradientStopOffset {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Number(value) => formatter.write_str(&canonical_number(*value)),
@@ -298,13 +298,13 @@ impl fmt::Display for OdfGradientStopOffset {
 
 /// One standard SVG gradient stop.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OdfSvgGradientStop {
-    pub offset: OdfGradientStopOffset,
-    pub color: Option<OdfRgbColor>,
+pub struct SvgGradientStop {
+    pub offset: GradientStopOffset,
+    pub color: Option<RgbColor>,
     pub opacity: Option<f64>,
 }
 
-impl OdfSvgGradientStop {
+impl SvgGradientStop {
     fn validate(&self) -> Result<()> {
         self.offset.validate()?;
         if let Some(value) = self.opacity {
@@ -317,13 +317,13 @@ impl OdfSvgGradientStop {
 /// Color representation used by LibreOffice multi-color gradient stops.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfLibreOfficeGradientColorType {
+pub enum LibreOfficeGradientColorType {
     Rgb,
     Theme,
     Other(String),
 }
 
-impl OdfLibreOfficeGradientColorType {
+impl LibreOfficeGradientColorType {
     fn parse(value: String) -> Self {
         match value.as_str() {
             "rgb" => Self::Rgb,
@@ -343,13 +343,13 @@ impl OdfLibreOfficeGradientColorType {
 
 /// Inert LibreOffice multi-color stop metadata retained on a legacy gradient.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OdfLibreOfficeGradientStop {
-    pub offset: OdfGradientStopOffset,
-    pub color_type: OdfLibreOfficeGradientColorType,
+pub struct LibreOfficeGradientStop {
+    pub offset: GradientStopOffset,
+    pub color_type: LibreOfficeGradientColorType,
     pub color_value: String,
 }
 
-impl OdfLibreOfficeGradientStop {
+impl LibreOfficeGradientStop {
     fn validate(&self) -> Result<()> {
         self.offset.validate()?;
         validate_text(
@@ -363,22 +363,22 @@ impl OdfLibreOfficeGradientStop {
 
 /// Legacy ODF `draw:gradient` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OdfLegacyGradient {
+pub struct LegacyGradient {
     pub name: Option<String>,
     pub display_name: Option<String>,
-    pub style: OdfLegacyGradientStyle,
-    pub center_x: Option<OdfGradientPercent>,
-    pub center_y: Option<OdfGradientPercent>,
-    pub start_color: Option<OdfRgbColor>,
-    pub end_color: Option<OdfRgbColor>,
-    pub start_intensity: Option<OdfGradientIntensity>,
-    pub end_intensity: Option<OdfGradientIntensity>,
-    pub angle: Option<OdfGradientAngle>,
-    pub border: Option<OdfGradientPercent>,
-    pub extension_stops: Vec<OdfLibreOfficeGradientStop>,
+    pub style: LegacyGradientStyle,
+    pub center_x: Option<GradientPercent>,
+    pub center_y: Option<GradientPercent>,
+    pub start_color: Option<RgbColor>,
+    pub end_color: Option<RgbColor>,
+    pub start_intensity: Option<GradientIntensity>,
+    pub end_intensity: Option<GradientIntensity>,
+    pub angle: Option<GradientAngle>,
+    pub border: Option<GradientPercent>,
+    pub extension_stops: Vec<LibreOfficeGradientStop>,
 }
 
-impl OdfLegacyGradient {
+impl LegacyGradient {
     fn validate(&self) -> Result<()> {
         if let Some(value) = &self.name {
             validate_text(value, "gradient name", false)?;
@@ -401,16 +401,16 @@ impl OdfLegacyGradient {
 
 /// Attributes shared by SVG linear and radial gradients.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OdfSvgGradientCommon {
+pub struct SvgGradientCommon {
     pub name: String,
     pub display_name: Option<String>,
     pub object_bounding_box_units: Option<bool>,
     pub transform: Option<String>,
-    pub spread_method: Option<OdfGradientSpreadMethod>,
-    pub stops: Vec<OdfSvgGradientStop>,
+    pub spread_method: Option<GradientSpreadMethod>,
+    pub stops: Vec<SvgGradientStop>,
 }
 
-impl OdfSvgGradientCommon {
+impl SvgGradientCommon {
     fn validate(&self) -> Result<()> {
         validate_text(&self.name, "SVG gradient name", false)?;
         if let Some(value) = &self.display_name {
@@ -434,34 +434,34 @@ impl OdfSvgGradientCommon {
 
 /// Standard SVG linear gradient resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OdfSvgLinearGradient {
-    pub common: OdfSvgGradientCommon,
-    pub x1: Option<OdfGradientCoordinate>,
-    pub y1: Option<OdfGradientCoordinate>,
-    pub x2: Option<OdfGradientCoordinate>,
-    pub y2: Option<OdfGradientCoordinate>,
+pub struct SvgLinearGradient {
+    pub common: SvgGradientCommon,
+    pub x1: Option<GradientCoordinate>,
+    pub y1: Option<GradientCoordinate>,
+    pub x2: Option<GradientCoordinate>,
+    pub y2: Option<GradientCoordinate>,
 }
 
 /// Standard SVG radial gradient resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OdfSvgRadialGradient {
-    pub common: OdfSvgGradientCommon,
-    pub center_x: Option<OdfGradientCoordinate>,
-    pub center_y: Option<OdfGradientCoordinate>,
-    pub radius: Option<OdfGradientCoordinate>,
-    pub focus_x: Option<OdfGradientCoordinate>,
-    pub focus_y: Option<OdfGradientCoordinate>,
+pub struct SvgRadialGradient {
+    pub common: SvgGradientCommon,
+    pub center_x: Option<GradientCoordinate>,
+    pub center_y: Option<GradientCoordinate>,
+    pub radius: Option<GradientCoordinate>,
+    pub focus_x: Option<GradientCoordinate>,
+    pub focus_y: Option<GradientCoordinate>,
 }
 
 /// One gradient resource in document order.
 #[derive(Clone, Debug, PartialEq)]
-pub enum OdfDrawingGradient {
-    Legacy(OdfLegacyGradient),
-    Linear(OdfSvgLinearGradient),
-    Radial(OdfSvgRadialGradient),
+pub enum DrawingGradient {
+    Legacy(LegacyGradient),
+    Linear(SvgLinearGradient),
+    Radial(SvgRadialGradient),
 }
 
-impl OdfDrawingGradient {
+impl DrawingGradient {
     pub fn name(&self) -> Option<&str> {
         match self {
             Self::Legacy(value) => value.name.as_deref(),
@@ -488,12 +488,12 @@ impl OdfDrawingGradient {
 
 /// Ordered named gradients from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct OdfDrawingGradients {
-    pub gradients: Vec<OdfDrawingGradient>,
+pub struct DrawingGradients {
+    pub gradients: Vec<DrawingGradient>,
 }
 
-impl OdfDrawingGradients {
-    pub fn get(&self, name: &str) -> Option<&OdfDrawingGradient> {
+impl DrawingGradients {
+    pub fn get(&self, name: &str) -> Option<&DrawingGradient> {
         self.gradients
             .iter()
             .find(|value| value.name() == Some(name))
@@ -555,15 +555,15 @@ struct Frame {
 
 struct ActiveGradient {
     depth: usize,
-    value: OdfDrawingGradient,
+    value: DrawingGradient,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse legacy and SVG gradient resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_gradients(xml: &str) -> Result<OdfDrawingGradients> {
+pub fn parse_drawing_gradients(xml: &str) -> Result<DrawingGradients> {
     if !xml.contains("gradient") && !xml.contains("Gradient") {
-        return Ok(OdfDrawingGradients::default());
+        return Ok(DrawingGradients::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing gradient XML exceeds 64 MiB");
@@ -574,7 +574,7 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<OdfDrawingGradients> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveGradient> = None;
-    let mut result = OdfDrawingGradients::default();
+    let mut result = DrawingGradients::default();
 
     loop {
         let (resolved, event) = reader
@@ -675,16 +675,16 @@ fn parse_gradient_start(
     namespace: NamespaceKind,
     local: &str,
     element: &BytesStart<'_>,
-) -> Result<Option<OdfDrawingGradient>> {
+) -> Result<Option<DrawingGradient>> {
     Ok(Some(match (namespace, local) {
         (NamespaceKind::Draw, "gradient") => {
-            OdfDrawingGradient::Legacy(parse_legacy_gradient(reader, element)?)
+            DrawingGradient::Legacy(parse_legacy_gradient(reader, element)?)
         },
         (NamespaceKind::Svg, "linearGradient") => {
-            OdfDrawingGradient::Linear(parse_linear_gradient(reader, element)?)
+            DrawingGradient::Linear(parse_linear_gradient(reader, element)?)
         },
         (NamespaceKind::Svg, "radialGradient") => {
-            OdfDrawingGradient::Radial(parse_radial_gradient(reader, element)?)
+            DrawingGradient::Radial(parse_radial_gradient(reader, element)?)
         },
         _ => return Ok(None),
     }))
@@ -693,11 +693,11 @@ fn parse_gradient_start(
 fn parse_legacy_gradient(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfLegacyGradient> {
+) -> Result<LegacyGradient> {
     let mut values = attributes(reader, element)?;
     let name = take(&mut values, NamespaceKind::Draw, "name");
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
-    let style = OdfLegacyGradientStyle::parse(&required(
+    let style = LegacyGradientStyle::parse(&required(
         &mut values,
         NamespaceKind::Draw,
         "style",
@@ -722,13 +722,13 @@ fn parse_legacy_gradient(
         .map(|value| parse_intensity(&value, "draw:end-intensity"))
         .transpose()?;
     let angle = take(&mut values, NamespaceKind::Draw, "angle")
-        .map(OdfGradientAngle::new)
+        .map(GradientAngle::new)
         .transpose()?;
     let border = take(&mut values, NamespaceKind::Draw, "border")
         .map(|value| parse_percent(&value, "draw:border"))
         .transpose()?;
     reject_attributes(&values, "draw:gradient")?;
-    Ok(OdfLegacyGradient {
+    Ok(LegacyGradient {
         name,
         display_name,
         style,
@@ -747,7 +747,7 @@ fn parse_legacy_gradient(
 fn parse_linear_gradient(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfSvgLinearGradient> {
+) -> Result<SvgLinearGradient> {
     let mut values = attributes(reader, element)?;
     let common = parse_svg_common(&mut values)?;
     let x1 = take_coordinate(&mut values, "x1")?;
@@ -755,7 +755,7 @@ fn parse_linear_gradient(
     let x2 = take_coordinate(&mut values, "x2")?;
     let y2 = take_coordinate(&mut values, "y2")?;
     reject_attributes(&values, "svg:linearGradient")?;
-    Ok(OdfSvgLinearGradient {
+    Ok(SvgLinearGradient {
         common,
         x1,
         y1,
@@ -767,7 +767,7 @@ fn parse_linear_gradient(
 fn parse_radial_gradient(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfSvgRadialGradient> {
+) -> Result<SvgRadialGradient> {
     let mut values = attributes(reader, element)?;
     let common = parse_svg_common(&mut values)?;
     let center_x = take_coordinate(&mut values, "cx")?;
@@ -776,7 +776,7 @@ fn parse_radial_gradient(
     let focus_x = take_coordinate(&mut values, "fx")?;
     let focus_y = take_coordinate(&mut values, "fy")?;
     reject_attributes(&values, "svg:radialGradient")?;
-    Ok(OdfSvgRadialGradient {
+    Ok(SvgRadialGradient {
         common,
         center_x,
         center_y,
@@ -786,7 +786,7 @@ fn parse_radial_gradient(
     })
 }
 
-fn parse_svg_common(values: &mut Attributes) -> Result<OdfSvgGradientCommon> {
+fn parse_svg_common(values: &mut Attributes) -> Result<SvgGradientCommon> {
     let name = required(values, NamespaceKind::Draw, "name", "draw:name")?;
     let display_name = take(values, NamespaceKind::Draw, "display-name");
     let object_bounding_box_units = take(values, NamespaceKind::Svg, "gradientUnits")
@@ -800,9 +800,9 @@ fn parse_svg_common(values: &mut Attributes) -> Result<OdfSvgGradientCommon> {
         .transpose()?;
     let transform = take(values, NamespaceKind::Svg, "gradientTransform");
     let spread_method = take(values, NamespaceKind::Svg, "spreadMethod")
-        .map(|value| OdfGradientSpreadMethod::parse(&value))
+        .map(|value| GradientSpreadMethod::parse(&value))
         .transpose()?;
-    Ok(OdfSvgGradientCommon {
+    Ok(SvgGradientCommon {
         name,
         display_name,
         object_bounding_box_units,
@@ -817,10 +817,10 @@ fn add_stop(
     namespace: NamespaceKind,
     local: &str,
     element: &BytesStart<'_>,
-    gradient: &mut OdfDrawingGradient,
+    gradient: &mut DrawingGradient,
 ) -> Result<()> {
     match gradient {
-        OdfDrawingGradient::Legacy(value)
+        DrawingGradient::Legacy(value)
             if namespace == NamespaceKind::Loext && local == "gradient-stop" =>
         {
             if value.extension_stops.len() >= MAX_STOPS {
@@ -830,13 +830,13 @@ fn add_stop(
                 .extension_stops
                 .push(parse_loext_stop(reader, element)?);
         },
-        OdfDrawingGradient::Linear(value) if namespace == NamespaceKind::Svg && local == "stop" => {
+        DrawingGradient::Linear(value) if namespace == NamespaceKind::Svg && local == "stop" => {
             if value.common.stops.len() >= MAX_STOPS {
                 return invalid(format!("SVG gradient exceeds {MAX_STOPS} stops"));
             }
             value.common.stops.push(parse_svg_stop(reader, element)?);
         },
-        OdfDrawingGradient::Radial(value) if namespace == NamespaceKind::Svg && local == "stop" => {
+        DrawingGradient::Radial(value) if namespace == NamespaceKind::Svg && local == "stop" => {
             if value.common.stops.len() >= MAX_STOPS {
                 return invalid(format!("SVG gradient exceeds {MAX_STOPS} stops"));
             }
@@ -847,12 +847,9 @@ fn add_stop(
     Ok(())
 }
 
-fn parse_svg_stop(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<OdfSvgGradientStop> {
+fn parse_svg_stop(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<SvgGradientStop> {
     let mut values = attributes(reader, element)?;
-    let offset = OdfGradientStopOffset::parse(&required(
+    let offset = GradientStopOffset::parse(&required(
         &mut values,
         NamespaceKind::Svg,
         "offset",
@@ -865,7 +862,7 @@ fn parse_svg_stop(
         .map(|value| parse_number(&value, "svg:stop-opacity"))
         .transpose()?;
     reject_attributes(&values, "svg:stop")?;
-    let value = OdfSvgGradientStop {
+    let value = SvgGradientStop {
         offset,
         color,
         opacity,
@@ -877,15 +874,15 @@ fn parse_svg_stop(
 fn parse_loext_stop(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfLibreOfficeGradientStop> {
+) -> Result<LibreOfficeGradientStop> {
     let mut values = attributes(reader, element)?;
-    let offset = OdfGradientStopOffset::parse(&required(
+    let offset = GradientStopOffset::parse(&required(
         &mut values,
         NamespaceKind::Svg,
         "offset",
         "svg:offset",
     )?)?;
-    let color_type = OdfLibreOfficeGradientColorType::parse(required(
+    let color_type = LibreOfficeGradientColorType::parse(required(
         &mut values,
         NamespaceKind::Loext,
         "color-type",
@@ -898,7 +895,7 @@ fn parse_loext_stop(
         "loext:color-value",
     )?;
     reject_attributes(&values, "loext:gradient-stop")?;
-    let value = OdfLibreOfficeGradientStop {
+    let value = LibreOfficeGradientStop {
         offset,
         color_type,
         color_value,
@@ -907,7 +904,7 @@ fn parse_loext_stop(
     Ok(value)
 }
 
-fn take_coordinate(values: &mut Attributes, local: &str) -> Result<Option<OdfGradientCoordinate>> {
+fn take_coordinate(values: &mut Attributes, local: &str) -> Result<Option<GradientCoordinate>> {
     take(values, NamespaceKind::Svg, local)
         .map(|value| value.parse())
         .transpose()
@@ -1014,15 +1011,15 @@ fn reject_spoofed_name(namespace: NamespaceKind, local: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_gradient(output: &mut String, gradient: &OdfDrawingGradient, standalone: bool) {
+fn write_gradient(output: &mut String, gradient: &DrawingGradient, standalone: bool) {
     match gradient {
-        OdfDrawingGradient::Legacy(value) => write_legacy(output, value, standalone),
-        OdfDrawingGradient::Linear(value) => write_linear(output, value, standalone),
-        OdfDrawingGradient::Radial(value) => write_radial(output, value, standalone),
+        DrawingGradient::Legacy(value) => write_legacy(output, value, standalone),
+        DrawingGradient::Linear(value) => write_linear(output, value, standalone),
+        DrawingGradient::Radial(value) => write_radial(output, value, standalone),
     }
 }
 
-fn write_legacy(output: &mut String, value: &OdfLegacyGradient, standalone: bool) {
+fn write_legacy(output: &mut String, value: &LegacyGradient, standalone: bool) {
     output.push_str("<draw:gradient");
     write_namespaces(output, standalone);
     if let Some(name) = &value.name {
@@ -1057,7 +1054,7 @@ fn write_legacy(output: &mut String, value: &OdfLegacyGradient, standalone: bool
     output.push_str("</draw:gradient>");
 }
 
-fn write_linear(output: &mut String, value: &OdfSvgLinearGradient, standalone: bool) {
+fn write_linear(output: &mut String, value: &SvgLinearGradient, standalone: bool) {
     output.push_str("<svg:linearGradient");
     write_namespaces(output, standalone);
     write_svg_common(output, &value.common);
@@ -1068,7 +1065,7 @@ fn write_linear(output: &mut String, value: &OdfSvgLinearGradient, standalone: b
     write_svg_stops(output, "linearGradient", &value.common.stops);
 }
 
-fn write_radial(output: &mut String, value: &OdfSvgRadialGradient, standalone: bool) {
+fn write_radial(output: &mut String, value: &SvgRadialGradient, standalone: bool) {
     output.push_str("<svg:radialGradient");
     write_namespaces(output, standalone);
     write_svg_common(output, &value.common);
@@ -1080,7 +1077,7 @@ fn write_radial(output: &mut String, value: &OdfSvgRadialGradient, standalone: b
     write_svg_stops(output, "radialGradient", &value.common.stops);
 }
 
-fn write_svg_common(output: &mut String, value: &OdfSvgGradientCommon) {
+fn write_svg_common(output: &mut String, value: &SvgGradientCommon) {
     push_attribute(output, "draw:name", &value.name);
     if let Some(name) = &value.display_name {
         push_attribute(output, "draw:display-name", name);
@@ -1096,7 +1093,7 @@ fn write_svg_common(output: &mut String, value: &OdfSvgGradientCommon) {
     }
 }
 
-fn write_svg_stops(output: &mut String, tag: &str, stops: &[OdfSvgGradientStop]) {
+fn write_svg_stops(output: &mut String, tag: &str, stops: &[SvgGradientStop]) {
     if stops.is_empty() {
         output.push_str("/>");
         return;
@@ -1147,40 +1144,40 @@ fn push_attribute(output: &mut String, name: &str, value: &str) {
     output.push('"');
 }
 
-fn split_measure(value: &str) -> Result<(&str, OdfGradientCoordinateUnit)> {
+fn split_measure(value: &str) -> Result<(&str, GradientCoordinateUnit)> {
     if let Some(number) = value.strip_suffix('%') {
-        return Ok((number, OdfGradientCoordinateUnit::Percent));
+        return Ok((number, GradientCoordinateUnit::Percent));
     }
     if value.len() < 2 {
         return invalid(format!("invalid gradient coordinate '{value}'"));
     }
     let (number, suffix) = value.split_at(value.len() - 2);
     let unit = match suffix {
-        "cm" => OdfGradientCoordinateUnit::Centimeter,
-        "mm" => OdfGradientCoordinateUnit::Millimeter,
-        "in" => OdfGradientCoordinateUnit::Inch,
-        "pt" => OdfGradientCoordinateUnit::Point,
-        "pc" => OdfGradientCoordinateUnit::Pica,
-        "px" => OdfGradientCoordinateUnit::Pixel,
+        "cm" => GradientCoordinateUnit::Centimeter,
+        "mm" => GradientCoordinateUnit::Millimeter,
+        "in" => GradientCoordinateUnit::Inch,
+        "pt" => GradientCoordinateUnit::Point,
+        "pc" => GradientCoordinateUnit::Pica,
+        "px" => GradientCoordinateUnit::Pixel,
         _ => return invalid(format!("invalid gradient coordinate '{value}'")),
     };
     Ok((number, unit))
 }
 
-fn parse_percent(value: &str, context: &str) -> Result<OdfGradientPercent> {
+fn parse_percent(value: &str, context: &str) -> Result<GradientPercent> {
     let number = value
         .strip_suffix('%')
         .ok_or_else(|| make_error(format!("{context} must be a percentage")))?;
     validate_decimal(number, value)?;
-    OdfGradientPercent::new(parse_number(number, context)?)
+    GradientPercent::new(parse_number(number, context)?)
 }
 
-fn parse_intensity(value: &str, context: &str) -> Result<OdfGradientIntensity> {
+fn parse_intensity(value: &str, context: &str) -> Result<GradientIntensity> {
     let number = value
         .strip_suffix('%')
         .ok_or_else(|| make_error(format!("{context} must be a percentage")))?;
     validate_decimal(number, value)?;
-    OdfGradientIntensity::new(parse_number(number, context)?)
+    GradientIntensity::new(parse_number(number, context)?)
 }
 
 fn parse_number(value: &str, context: &str) -> Result<f64> {
@@ -1269,11 +1266,11 @@ mod tests {
         let gradients = parse_drawing_gradients(&xml).unwrap();
         assert_eq!(gradients.gradients.len(), 3);
         assert_eq!(gradients.get("legacy").unwrap().name(), Some("legacy"));
-        let OdfDrawingGradient::Legacy(legacy) = &gradients.gradients[0] else {
+        let DrawingGradient::Legacy(legacy) = &gradients.gradients[0] else {
             panic!("expected legacy gradient");
         };
         assert_eq!(legacy.extension_stops.len(), 2);
-        assert_eq!(legacy.start_color, Some(OdfRgbColor::new(255, 0, 0)));
+        assert_eq!(legacy.start_color, Some(RgbColor::new(255, 0, 0)));
 
         let serialized = gradients.to_xml().unwrap();
         assert_eq!(parse_drawing_gradients(&serialized).unwrap(), gradients);
@@ -1302,7 +1299,7 @@ mod tests {
         let xml = include_str!("../../../test-data/odf/drawing/multicolor-gradient.fodp");
         let gradients = parse_drawing_gradients(xml).unwrap();
         assert!(gradients.gradients.len() >= 6);
-        let OdfDrawingGradient::Legacy(first) = &gradients.gradients[0] else {
+        let DrawingGradient::Legacy(first) = &gradients.gradients[0] else {
             panic!("local fixture should begin with a legacy gradient");
         };
         assert_eq!(first.extension_stops.len(), 2);

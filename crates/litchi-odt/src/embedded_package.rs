@@ -6,8 +6,8 @@ use crate::embedded_chart::{
     splice, unused_object_root,
 };
 use crate::{
-    ImagePart, ImageSource, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart, OdfEmbeddedObjectSource,
-    OdfInlineObjectRoot, constants,
+    EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, ImagePart, ImageSource,
+    InlineObjectRoot, constants,
 };
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -31,7 +31,7 @@ const MAX_INLINE_BYTES: usize = 16 * 1024 * 1024;
 /// Element kind for an authored embedded package resource.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfEmbeddedResourceKind {
+pub enum EmbeddedResourceKind {
     Object,
     ObjectOle,
     Image,
@@ -39,7 +39,7 @@ pub enum OdfEmbeddedResourceKind {
 
 /// One file in an authored embedded OpenDocument subdocument.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfEmbeddedResourceFile {
+pub struct EmbeddedResourceFile {
     /// Path relative to the subdocument root, such as `content.xml`.
     pub path: String,
     pub bytes: Vec<u8>,
@@ -50,7 +50,7 @@ pub struct OdfEmbeddedResourceFile {
 /// Storage for a newly authored inert resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfEmbeddedResourceSource {
+pub enum EmbeddedResourceSource {
     /// An external target retained as an inert link. It is never fetched or executed.
     Linked { href: String },
     /// One opaque package file.
@@ -61,15 +61,12 @@ pub enum OdfEmbeddedResourceSource {
     },
     /// An embedded OpenDocument package rooted at one package directory.
     PackageSubdocument {
-        files: Vec<OdfEmbeddedResourceFile>,
+        files: Vec<EmbeddedResourceFile>,
         media_type: String,
         preferred_root: Option<String>,
     },
     /// A complete inline `office:document` or `math:math` element.
-    InlineXml {
-        root: OdfInlineObjectRoot,
-        xml: String,
-    },
+    InlineXml { root: InlineObjectRoot, xml: String },
     /// Base64-encoded into an `office:binary-data` child.
     InlineBinary {
         bytes: Vec<u8>,
@@ -79,9 +76,9 @@ pub enum OdfEmbeddedResourceSource {
 
 /// Typed input for adding or replacing an embedded package resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfEmbeddedResource {
-    pub kind: OdfEmbeddedResourceKind,
-    pub source: OdfEmbeddedResourceSource,
+pub struct EmbeddedResource {
+    pub kind: EmbeddedResourceKind,
+    pub source: EmbeddedResourceSource,
     pub frame_name: Option<String>,
     pub xml_id: Option<String>,
     /// Optional OLE class identifier. Only valid for `ObjectOle`.
@@ -111,7 +108,7 @@ pub(crate) fn add(
     content: &str,
     styles: Option<&str>,
     host: EmbeddedChartHost<'_>,
-    resource: &OdfEmbeddedResource,
+    resource: &EmbeddedResource,
 ) -> Result<(Vec<u8>, usize)> {
     let target = target(resource.kind);
     let index = target_count(package, content, styles, target)?;
@@ -134,7 +131,7 @@ pub(crate) fn replace(
     styles: Option<&str>,
     index: usize,
     target: ResourceTarget,
-    resource: &OdfEmbeddedResource,
+    resource: &EmbeddedResource,
 ) -> Result<Vec<u8>> {
     if self::target(resource.kind) != target {
         return invalid("replacement resource kind does not match the selected API");
@@ -225,14 +222,14 @@ pub(crate) fn reorder(
 
 fn build_resource(
     package: &OwnedPackage,
-    resource: &OdfEmbeddedResource,
+    resource: &EmbeddedResource,
     replacing: Option<&StoredLocation>,
 ) -> Result<BuiltResource> {
     validate_metadata(resource)?;
     let mut additions = Vec::new();
     let mut directories = Vec::new();
     let body = match &resource.source {
-        OdfEmbeddedResourceSource::Linked { href } => {
+        EmbeddedResourceSource::Linked { href } => {
             if !is_linked_href(href) {
                 return invalid(
                     "linked resources must use an external, fragment, or otherwise inert target",
@@ -240,7 +237,7 @@ fn build_resource(
             }
             href_element(resource, href, None)?
         },
-        OdfEmbeddedResourceSource::PackageFile {
+        EmbeddedResourceSource::PackageFile {
             bytes,
             media_type,
             preferred_path,
@@ -258,12 +255,12 @@ fn build_resource(
             });
             href_element(resource, &path, Some(media_type))?
         },
-        OdfEmbeddedResourceSource::PackageSubdocument {
+        EmbeddedResourceSource::PackageSubdocument {
             files,
             media_type,
             preferred_root,
         } => {
-            if resource.kind != OdfEmbeddedResourceKind::Object {
+            if resource.kind != EmbeddedResourceKind::Object {
                 return invalid("only draw:object supports package subdocuments");
             }
             validate_media_type(resource.kind, media_type, true)?;
@@ -310,15 +307,15 @@ fn build_resource(
             directories.push((root.clone(), media_type.clone()));
             href_element(resource, root.trim_end_matches('/'), None)?
         },
-        OdfEmbeddedResourceSource::InlineXml { root, xml } => {
-            if resource.kind != OdfEmbeddedResourceKind::Object {
+        EmbeddedResourceSource::InlineXml { root, xml } => {
+            if resource.kind != EmbeddedResourceKind::Object {
                 return invalid("inline XML is only valid for draw:object");
             }
             validate_inline_xml(*root, xml)?;
             element(resource, xml, None)?
         },
-        OdfEmbeddedResourceSource::InlineBinary { bytes, media_type } => {
-            if resource.kind == OdfEmbeddedResourceKind::Object {
+        EmbeddedResourceSource::InlineBinary { bytes, media_type } => {
+            if resource.kind == EmbeddedResourceKind::Object {
                 return invalid("draw:object inline payloads must be XML");
             }
             validate_payload(bytes.len())?;
@@ -348,7 +345,7 @@ fn build_resource(
 }
 
 fn href_element(
-    resource: &OdfEmbeddedResource,
+    resource: &EmbeddedResource,
     href: &str,
     media_type: Option<&str>,
 ) -> Result<String> {
@@ -361,20 +358,16 @@ fn href_element(
     })
 }
 
-fn element(
-    resource: &OdfEmbeddedResource,
-    payload: &str,
-    media_type: Option<&str>,
-) -> Result<String> {
+fn element(resource: &EmbeddedResource, payload: &str, media_type: Option<&str>) -> Result<String> {
     let local = match resource.kind {
-        OdfEmbeddedResourceKind::Object => "object",
-        OdfEmbeddedResourceKind::ObjectOle => "object-ole",
-        OdfEmbeddedResourceKind::Image => "image",
+        EmbeddedResourceKind::Object => "object",
+        EmbeddedResourceKind::ObjectOle => "object-ole",
+        EmbeddedResourceKind::Image => "image",
     };
     let mut out = format!("<draw:{local}");
     attribute(&mut out, "xml:id", resource.xml_id.as_deref())?;
     attribute(&mut out, "draw:class-id", resource.class_id.as_deref())?;
-    if resource.kind == OdfEmbeddedResourceKind::Image {
+    if resource.kind == EmbeddedResourceKind::Image {
         attribute(&mut out, "draw:mime-type", media_type)?;
     }
     out.push('>');
@@ -385,8 +378,8 @@ fn element(
     Ok(out)
 }
 
-fn validate_metadata(resource: &OdfEmbeddedResource) -> Result<()> {
-    if resource.kind != OdfEmbeddedResourceKind::ObjectOle && resource.class_id.is_some() {
+fn validate_metadata(resource: &EmbeddedResource) -> Result<()> {
+    if resource.kind != EmbeddedResourceKind::ObjectOle && resource.class_id.is_some() {
         return invalid("draw:class-id is only valid for ObjectOle resources");
     }
     for value in [
@@ -402,7 +395,7 @@ fn validate_metadata(resource: &OdfEmbeddedResource) -> Result<()> {
     Ok(())
 }
 
-fn validate_inline_xml(root: OdfInlineObjectRoot, xml: &str) -> Result<()> {
+fn validate_inline_xml(root: InlineObjectRoot, xml: &str) -> Result<()> {
     if xml.len() > MAX_INLINE_BYTES {
         return invalid("inline XML exceeds size limit");
     }
@@ -424,13 +417,13 @@ fn validate_inline_xml(root: OdfInlineObjectRoot, xml: &str) -> Result<()> {
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let expected = match root {
-                    OdfInlineObjectRoot::OpenDocument => b"document".as_slice(),
-                    OdfInlineObjectRoot::MathMl => b"math".as_slice(),
+                    InlineObjectRoot::OpenDocument => b"document".as_slice(),
+                    InlineObjectRoot::MathMl => b"math".as_slice(),
                 };
                 if element.local_name().as_ref() != expected {
                     return invalid("inline XML root does not match its declared kind");
                 }
-                if root == OdfInlineObjectRoot::OpenDocument {
+                if root == InlineObjectRoot::OpenDocument {
                     let valid_ns = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == OFFICE_NS);
                     if !valid_ns {
                         return invalid("inline OpenDocument root has the wrong namespace");
@@ -506,7 +499,7 @@ fn validate_xml_document(bytes: &[u8], label: &str) -> Result<()> {
 }
 
 fn validate_media_type(
-    kind: OdfEmbeddedResourceKind,
+    kind: EmbeddedResourceKind,
     media_type: &str,
     subdocument: bool,
 ) -> Result<()> {
@@ -522,7 +515,7 @@ fn validate_media_type(
     {
         return invalid("active or executable embedded media types are prohibited");
     }
-    if kind == OdfEmbeddedResourceKind::Image && !lower.starts_with("image/") {
+    if kind == EmbeddedResourceKind::Image && !lower.starts_with("image/") {
         return invalid("draw:image package payloads require an image media type");
     }
     if subdocument && !constants::is_odf_mime_type(media_type) {
@@ -603,10 +596,10 @@ fn protected_path(path: &str) -> bool {
 
 fn unused_file_path(
     package: &OwnedPackage,
-    kind: OdfEmbeddedResourceKind,
+    kind: EmbeddedResourceKind,
     media_type: &str,
 ) -> Result<String> {
-    let extension = if kind == OdfEmbeddedResourceKind::Image {
+    let extension = if kind == EmbeddedResourceKind::Image {
         match media_type.to_ascii_lowercase().as_str() {
             "image/png" => "png",
             "image/jpeg" => "jpg",
@@ -619,7 +612,7 @@ fn unused_file_path(
         "bin"
     };
     for index in 1..=100_000usize {
-        let path = if kind == OdfEmbeddedResourceKind::Image {
+        let path = if kind == EmbeddedResourceKind::Image {
             format!("Pictures/Image_{index}.{extension}")
         } else {
             format!("Object_{index}.{extension}")
@@ -662,7 +655,7 @@ fn selected_spans(
             let objects = scan_objects(package, content, styles)?;
             let content_objects: Vec<_> = objects
                 .iter()
-                .filter(|object| object.part == OdfEmbeddedObjectPart::Content)
+                .filter(|object| object.part == EmbeddedObjectPart::Content)
                 .collect();
             if all_spans.len() != content_objects.len() {
                 return invalid("embedded-object XML scan disagreement");
@@ -673,7 +666,7 @@ fn selected_spans(
                 .filter_map(|(span, object)| {
                     matches!(
                         object.kind,
-                        OdfEmbeddedObjectKind::Object | OdfEmbeddedObjectKind::ObjectOle
+                        EmbeddedObjectKind::Object | EmbeddedObjectKind::ObjectOle
                     )
                     .then_some(span)
                 })
@@ -692,18 +685,16 @@ fn selected_locations(
     match target {
         ResourceTarget::Object => Ok(scan_objects(package, content, styles)?
             .into_iter()
-            .filter(|object| object.part == OdfEmbeddedObjectPart::Content)
+            .filter(|object| object.part == EmbeddedObjectPart::Content)
             .filter(|object| {
                 matches!(
                     object.kind,
-                    OdfEmbeddedObjectKind::Object | OdfEmbeddedObjectKind::ObjectOle
+                    EmbeddedObjectKind::Object | EmbeddedObjectKind::ObjectOle
                 )
             })
             .map(|object| match object.source {
-                OdfEmbeddedObjectSource::PackageFile { path, .. } => {
-                    Some(StoredLocation::File(path))
-                },
-                OdfEmbeddedObjectSource::PackageSubdocument { root_path, .. } => {
+                EmbeddedObjectSource::PackageFile { path, .. } => Some(StoredLocation::File(path)),
+                EmbeddedObjectSource::PackageSubdocument { root_path, .. } => {
                     Some(StoredLocation::Directory(root_path))
                 },
                 _ => None,
@@ -786,9 +777,9 @@ fn cleanup(
         crate::embedded_object::scan_packaged_objects(content, styles, has_file, media_type)?;
     let images = crate::media::scan_packaged_images(content, styles, has_file, media_type)?;
     let referenced = match old {
-        StoredLocation::File(path) => objects.iter().any(|object| matches!(&object.source, OdfEmbeddedObjectSource::PackageFile { path: candidate, .. } if candidate == path))
+        StoredLocation::File(path) => objects.iter().any(|object| matches!(&object.source, EmbeddedObjectSource::PackageFile { path: candidate, .. } if candidate == path))
             || images.iter().any(|image| matches!(&image.source, ImageSource::PackagePart { path: candidate, .. } if candidate == path)),
-        StoredLocation::Directory(root) => objects.iter().any(|object| matches!(&object.source, OdfEmbeddedObjectSource::PackageSubdocument { root_path, .. } if root_path == root)),
+        StoredLocation::Directory(root) => objects.iter().any(|object| matches!(&object.source, EmbeddedObjectSource::PackageSubdocument { root_path, .. } if root_path == root)),
     };
     if referenced {
         return Ok((excluded_paths, excluded_prefixes));
@@ -812,7 +803,7 @@ fn scan_objects(
     package: &OwnedPackage,
     content: &str,
     styles: Option<&str>,
-) -> Result<Vec<crate::OdfEmbeddedObject>> {
+) -> Result<Vec<crate::EmbeddedObject>> {
     let archive = package.package()?;
     crate::embedded_object::scan_packaged_objects(
         content,
@@ -901,9 +892,9 @@ fn locate_images(xml: &str) -> Result<Vec<ObjectSpan>> {
     Ok(spans)
 }
 
-fn target(kind: OdfEmbeddedResourceKind) -> ResourceTarget {
+fn target(kind: EmbeddedResourceKind) -> ResourceTarget {
     match kind {
-        OdfEmbeddedResourceKind::Image => ResourceTarget::Image,
+        EmbeddedResourceKind::Image => ResourceTarget::Image,
         _ => ResourceTarget::Object,
     }
 }

@@ -21,17 +21,17 @@ const MAX_FORMS: usize = 4096;
 const MAX_CONTROLS: usize = 65_536;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct OdfGenericControlMetadata {
+pub struct GenericControlMetadata {
     pub form_id: Option<String>,
     pub control_implementation: Option<String>,
     pub xforms_bind: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfFixedTextControl {
+pub struct FixedTextControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub form_for: Option<String>,
     pub disabled: Option<bool>,
     pub label: Option<String>,
@@ -40,12 +40,12 @@ pub struct OdfFixedTextControl {
     pub multi_line: Option<bool>,
 }
 
-impl OdfFixedTextControl {
+impl FixedTextControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             form_for: None,
             disabled: None,
             label: None,
@@ -61,19 +61,19 @@ impl OdfFixedTextControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfHiddenControl {
+pub struct HiddenControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub value: Option<String>,
 }
 
-impl OdfHiddenControl {
+impl HiddenControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             value: None,
         }
     }
@@ -84,18 +84,18 @@ impl OdfHiddenControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfGenericControl {
+pub struct GenericControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
 }
 
-impl OdfGenericControl {
+impl GenericControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
         }
     }
 
@@ -105,31 +105,31 @@ impl OdfGenericControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfGenericFormControl {
-    FixedText(OdfFixedTextControl),
-    Hidden(OdfHiddenControl),
-    Generic(OdfGenericControl),
+pub enum GenericFormControl {
+    FixedText(FixedTextControl),
+    Hidden(HiddenControl),
+    Generic(GenericControl),
 }
 
-impl From<OdfFixedTextControl> for OdfGenericFormControl {
-    fn from(value: OdfFixedTextControl) -> Self {
+impl From<FixedTextControl> for GenericFormControl {
+    fn from(value: FixedTextControl) -> Self {
         Self::FixedText(value)
     }
 }
 
-impl From<OdfHiddenControl> for OdfGenericFormControl {
-    fn from(value: OdfHiddenControl) -> Self {
+impl From<HiddenControl> for GenericFormControl {
+    fn from(value: HiddenControl) -> Self {
         Self::Hidden(value)
     }
 }
 
-impl From<OdfGenericControl> for OdfGenericFormControl {
-    fn from(value: OdfGenericControl) -> Self {
+impl From<GenericControl> for GenericFormControl {
+    fn from(value: GenericControl) -> Self {
         Self::Generic(value)
     }
 }
 
-impl OdfGenericFormControl {
+impl GenericFormControl {
     pub fn name(&self) -> &str {
         match self {
             Self::FixedText(value) => &value.name,
@@ -156,13 +156,13 @@ impl OdfGenericFormControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfGenericForm {
+pub struct GenericForm {
     pub name: String,
-    pub controls: Vec<OdfGenericFormControl>,
+    pub controls: Vec<GenericFormControl>,
     pub apply_filter: Option<bool>,
 }
 
-impl OdfGenericForm {
+impl GenericForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -171,7 +171,7 @@ impl OdfGenericForm {
         }
     }
 
-    pub fn add_control(&mut self, control: impl Into<OdfGenericFormControl>) -> Result<()> {
+    pub fn add_control(&mut self, control: impl Into<GenericFormControl>) -> Result<()> {
         let control = control.into();
         validate_control(&control)?;
         if self
@@ -232,7 +232,7 @@ impl OdfGenericForm {
     }
 }
 
-pub fn generic_form_controls(xml: &str) -> Result<Vec<OdfGenericFormControl>> {
+pub fn generic_form_controls(xml: &str) -> Result<Vec<GenericFormControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -243,7 +243,7 @@ pub fn generic_form_controls(xml: &str) -> Result<Vec<OdfGenericFormControl>> {
 pub fn insert_generic_form_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfGenericFormControl,
+    control: &GenericFormControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -265,7 +265,7 @@ pub fn insert_generic_form_control_xml(
 pub fn replace_generic_form_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfGenericFormControl,
+    replacement: &GenericFormControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -293,7 +293,7 @@ pub fn remove_generic_form_control_xml(xml: &str, index: usize) -> Result<String
     apply(xml, old.span.clone(), "")
 }
 
-fn fixed_text_xml(value: &OdfFixedTextControl) -> Result<String> {
+fn fixed_text_xml(value: &FixedTextControl) -> Result<String> {
     validate_fixed_text(value)?;
     let mut out = control_start("fixed-text", &value.name, &value.xml_id, &value.metadata);
     push_string(&mut out, "form:for", value.form_for.as_deref());
@@ -306,7 +306,7 @@ fn fixed_text_xml(value: &OdfFixedTextControl) -> Result<String> {
     Ok(out)
 }
 
-fn hidden_xml(value: &OdfHiddenControl) -> Result<String> {
+fn hidden_xml(value: &HiddenControl) -> Result<String> {
     validate_hidden(value)?;
     let mut out = control_start("hidden", &value.name, &value.xml_id, &value.metadata);
     push_string(&mut out, "form:value", value.value.as_deref());
@@ -314,7 +314,7 @@ fn hidden_xml(value: &OdfHiddenControl) -> Result<String> {
     Ok(out)
 }
 
-fn generic_xml(value: &OdfGenericControl) -> Result<String> {
+fn generic_xml(value: &GenericControl) -> Result<String> {
     validate_generic(value)?;
     let mut out = control_start(
         "generic-control",
@@ -330,7 +330,7 @@ fn control_start(
     kind: &str,
     name: &str,
     xml_id: &str,
-    metadata: &OdfGenericControlMetadata,
+    metadata: &GenericControlMetadata,
 ) -> String {
     let mut out = format!(
         r#"<form:{kind} form:name="{}" xml:id="{}""#,
@@ -347,31 +347,31 @@ fn control_start(
     out
 }
 
-fn validate_control(value: &OdfGenericFormControl) -> Result<()> {
+fn validate_control(value: &GenericFormControl) -> Result<()> {
     match value {
-        OdfGenericFormControl::FixedText(value) => validate_fixed_text(value),
-        OdfGenericFormControl::Hidden(value) => validate_hidden(value),
-        OdfGenericFormControl::Generic(value) => validate_generic(value),
+        GenericFormControl::FixedText(value) => validate_fixed_text(value),
+        GenericFormControl::Hidden(value) => validate_hidden(value),
+        GenericFormControl::Generic(value) => validate_generic(value),
     }
 }
 
-fn validate_fixed_text(value: &OdfFixedTextControl) -> Result<()> {
+fn validate_fixed_text(value: &FixedTextControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id, &value.metadata)?;
     validate_optional("fixed-text for", value.form_for.as_deref(), MAX_REFERENCE)?;
     validate_optional("fixed-text label", value.label.as_deref(), MAX_STRING)?;
     validate_optional("fixed-text title", value.title.as_deref(), MAX_STRING)
 }
 
-fn validate_hidden(value: &OdfHiddenControl) -> Result<()> {
+fn validate_hidden(value: &HiddenControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id, &value.metadata)?;
     validate_optional("hidden value", value.value.as_deref(), MAX_STRING)
 }
 
-fn validate_generic(value: &OdfGenericControl) -> Result<()> {
+fn validate_generic(value: &GenericControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id, &value.metadata)
 }
 
-fn validate_identity(name: &str, xml_id: &str, metadata: &OdfGenericControlMetadata) -> Result<()> {
+fn validate_identity(name: &str, xml_id: &str, metadata: &GenericControlMetadata) -> Result<()> {
     validate_name("generic form control name", name)?;
     validate_xml_id(xml_id)?;
     if let Some(form_id) = metadata.form_id.as_deref() {
@@ -389,7 +389,7 @@ fn validate_identity(name: &str, xml_id: &str, metadata: &OdfGenericControlMetad
     )
 }
 
-fn validate_controls(controls: &[OdfGenericFormControl]) -> Result<()> {
+fn validate_controls(controls: &[GenericFormControl]) -> Result<()> {
     if controls.len() > MAX_CONTROLS {
         return invalid("too many generic form controls");
     }
@@ -429,23 +429,23 @@ fn validate_controls(controls: &[OdfGenericFormControl]) -> Result<()> {
     Ok(())
 }
 
-fn fixed_text_target(control: &OdfGenericFormControl) -> Option<&str> {
+fn fixed_text_target(control: &GenericFormControl) -> Option<&str> {
     match control {
-        OdfGenericFormControl::FixedText(value) => {
+        GenericFormControl::FixedText(value) => {
             value.form_for.as_deref().filter(|value| !value.is_empty())
         },
         _ => None,
     }
 }
 
-fn control_size(control: &OdfGenericFormControl) -> usize {
+fn control_size(control: &GenericFormControl) -> usize {
     let (name, id, metadata, extras): (
         &String,
         &String,
-        &OdfGenericControlMetadata,
+        &GenericControlMetadata,
         &[Option<&String>],
     ) = match control {
-        OdfGenericFormControl::FixedText(value) => (
+        GenericFormControl::FixedText(value) => (
             &value.name,
             &value.xml_id,
             &value.metadata,
@@ -455,13 +455,13 @@ fn control_size(control: &OdfGenericFormControl) -> usize {
                 value.title.as_ref(),
             ],
         ),
-        OdfGenericFormControl::Hidden(value) => (
+        GenericFormControl::Hidden(value) => (
             &value.name,
             &value.xml_id,
             &value.metadata,
             &[value.value.as_ref()],
         ),
-        OdfGenericFormControl::Generic(value) => (&value.name, &value.xml_id, &value.metadata, &[]),
+        GenericFormControl::Generic(value) => (&value.name, &value.xml_id, &value.metadata, &[]),
     };
     name.len()
         .saturating_add(id.len())
@@ -485,7 +485,7 @@ fn control_size(control: &OdfGenericFormControl) -> usize {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfGenericFormControl,
+    control: GenericFormControl,
 }
 
 #[derive(Clone)]
@@ -723,7 +723,7 @@ fn parse_control(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     local: &[u8],
-) -> Result<OdfGenericFormControl> {
+) -> Result<GenericFormControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(
         &attrs,
@@ -735,14 +735,14 @@ fn parse_control(
     )?;
     let name = required(&attrs, FORM, "name")?;
     let xml_id = required(&attrs, XML, "id")?;
-    let metadata = OdfGenericControlMetadata {
+    let metadata = GenericControlMetadata {
         form_id: optional(&attrs, FORM, "id"),
         control_implementation: optional(&attrs, FORM, "control-implementation"),
         xforms_bind: optional(&attrs, XFORMS, "bind"),
     };
     match local {
         b"fixed-text" => {
-            let mut value = OdfFixedTextControl::new(name, xml_id);
+            let mut value = FixedTextControl::new(name, xml_id);
             value.metadata = metadata;
             value.form_for = optional(&attrs, FORM, "for");
             value.disabled = optional_bool(&attrs, FORM, "disabled")?;
@@ -754,14 +754,14 @@ fn parse_control(
             Ok(value.into())
         },
         b"hidden" => {
-            let mut value = OdfHiddenControl::new(name, xml_id);
+            let mut value = HiddenControl::new(name, xml_id);
             value.metadata = metadata;
             value.value = optional(&attrs, FORM, "value");
             validate_hidden(&value)?;
             Ok(value.into())
         },
         _ => {
-            let mut value = OdfGenericControl::new(name, xml_id);
+            let mut value = GenericControl::new(name, xml_id);
             value.metadata = metadata;
             validate_generic(&value)?;
             Ok(value.into())
@@ -995,8 +995,8 @@ fn validate_string(label: &str, value: &str, limit: usize) -> Result<()> {
 
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfGenericFormControl,
-    current: Option<&OdfGenericFormControl>,
+    replacement: &GenericFormControl,
+    current: Option<&GenericFormControl>,
 ) -> Result<()> {
     for item in &form.controls {
         if current.is_some_and(|value| value.xml_id() == item.control.xml_id()) {
@@ -1096,16 +1096,16 @@ mod tests {
 
     #[test]
     fn canonical_controls_round_trip() {
-        let mut fixed = OdfFixedTextControl::new("Label", "fixed_1");
+        let mut fixed = FixedTextControl::new("Label", "fixed_1");
         fixed.label = Some("Name & address".into());
         fixed.form_for = Some("text_1".into());
         fixed.multi_line = Some(true);
         fixed.metadata.control_implementation = Some("com.example.FixedText".into());
-        let mut hidden = OdfHiddenControl::new("Token", "hidden_1");
+        let mut hidden = HiddenControl::new("Token", "hidden_1");
         hidden.value = Some("A < B".into());
-        let mut generic = OdfGenericControl::new("Custom", "generic_1");
+        let mut generic = GenericControl::new("Custom", "generic_1");
         generic.metadata.xforms_bind = Some("bind_1".into());
-        let mut form = OdfGenericForm::new("Main");
+        let mut form = GenericForm::new("Main");
         form.add_control(fixed).unwrap();
         form.add_control(hidden).unwrap();
         form.add_control(generic).unwrap();
@@ -1114,10 +1114,10 @@ mod tests {
                 .unwrap();
         assert_eq!(parsed.len(), 3);
         assert!(
-            matches!(&parsed[0], OdfGenericFormControl::FixedText(value) if value.label.as_deref() == Some("Name & address"))
+            matches!(&parsed[0], GenericFormControl::FixedText(value) if value.label.as_deref() == Some("Name & address"))
         );
         assert!(
-            matches!(&parsed[1], OdfGenericFormControl::Hidden(value) if value.value.as_deref() == Some("A < B"))
+            matches!(&parsed[1], GenericFormControl::Hidden(value) if value.value.as_deref() == Some("A < B"))
         );
     }
 
@@ -1128,7 +1128,7 @@ mod tests {
         );
         let parsed = generic_form_controls(&producer).unwrap();
         assert_eq!(parsed.len(), 3);
-        assert!(matches!(&parsed[2], OdfGenericFormControl::Generic(_)));
+        assert!(matches!(&parsed[2], GenericFormControl::Generic(_)));
     }
 
     #[test]
@@ -1136,10 +1136,10 @@ mod tests {
         let xml = format!(
             r#"{ROOT}<f:form f:name="Main"><f:hidden f:name="Old" xml:id="old"><f:properties><f:property f:property-name="Keep" o:value-type="void"/></f:properties></f:hidden><!--keep--><f:text f:name="Text" xml:id="text"/></f:form>{END}"#
         );
-        let generic: OdfGenericFormControl = OdfGenericControl::new("Generic", "generic").into();
+        let generic: GenericFormControl = GenericControl::new("Generic", "generic").into();
         let inserted = insert_generic_form_control_xml(&xml, 0, &generic).unwrap();
         assert!(inserted.contains("<!--keep-->") && inserted.contains("f:text"));
-        let fixed: OdfGenericFormControl = OdfFixedTextControl::new("Fixed", "fixed").into();
+        let fixed: GenericFormControl = FixedTextControl::new("Fixed", "fixed").into();
         let replaced = replace_generic_form_control_xml(&inserted, 0, &fixed).unwrap();
         let removed = remove_generic_form_control_xml(&replaced, 1).unwrap();
         assert_eq!(generic_form_controls(&removed).unwrap(), [fixed]);
@@ -1153,11 +1153,7 @@ mod tests {
 
     #[test]
     fn hostile_values_children_duplicates_and_active_content_are_rejected() {
-        assert!(
-            OdfHiddenControl::new("H", "1bad")
-                .to_xml_fragment()
-                .is_err()
-        );
+        assert!(HiddenControl::new("H", "1bad").to_xml_fragment().is_err());
         let bad_bool = format!(
             r#"{ROOT}<f:form f:name="Main"><f:fixed-text f:name="F" xml:id="f" f:multi-line="yes"/></f:form>{END}"#
         );
@@ -1172,7 +1168,7 @@ mod tests {
             r#"{ROOT}<o:p xml:id="same"/><f:form f:name="Main"><f:hidden f:name="H" xml:id="same"/></f:form>{END}"#
         );
         assert!(generic_form_controls(&duplicate).is_err());
-        let mut hidden = OdfHiddenControl::new("H", "h");
+        let mut hidden = HiddenControl::new("H", "h");
         hidden.value = Some("x".repeat(MAX_STRING + 1));
         assert!(hidden.to_xml_fragment().is_err());
     }
@@ -1180,8 +1176,8 @@ mod tests {
     #[test]
     fn builder_and_mutable_document_round_trip() {
         use crate::{Document, DocumentBuilder, MutableDocument};
-        let mut form = OdfGenericForm::new("Main");
-        form.add_control(OdfHiddenControl::new("Hidden", "hidden"))
+        let mut form = GenericForm::new("Main");
+        form.add_control(HiddenControl::new("Hidden", "hidden"))
             .unwrap();
         let mut builder = DocumentBuilder::new();
         builder.add_generic_form(&form).unwrap();
@@ -1189,27 +1185,27 @@ mod tests {
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.generic_form_controls().unwrap().len(), 1);
-        let generic: OdfGenericFormControl = OdfGenericControl::new("Generic", "generic").into();
+        let generic: GenericFormControl = GenericControl::new("Generic", "generic").into();
         mutable.insert_generic_form_control(0, &generic).unwrap();
-        let fixed: OdfGenericFormControl = OdfFixedTextControl::new("Fixed", "fixed").into();
+        let fixed: GenericFormControl = FixedTextControl::new("Fixed", "fixed").into();
         assert!(matches!(
             mutable.replace_generic_form_control(0, &fixed).unwrap(),
-            OdfGenericFormControl::Hidden(_)
+            GenericFormControl::Hidden(_)
         ));
         assert!(matches!(
             mutable.remove_generic_form_control(1).unwrap(),
-            OdfGenericFormControl::Generic(_)
+            GenericFormControl::Generic(_)
         ));
         assert_eq!(mutable.generic_form_controls().unwrap(), [fixed]);
     }
 
     #[test]
     fn fixed_text_target_cardinality_is_atomic() {
-        let mut first = OdfFixedTextControl::new("First", "first");
+        let mut first = FixedTextControl::new("First", "first");
         first.form_for = Some("target".into());
-        let mut second = OdfFixedTextControl::new("Second", "second");
+        let mut second = FixedTextControl::new("Second", "second");
         second.form_for = Some("target".into());
-        let mut form = OdfGenericForm::new("Main");
+        let mut form = GenericForm::new("Main");
         form.add_control(first).unwrap();
         assert!(form.add_control(second).is_err());
         assert_eq!(form.controls.len(), 1);

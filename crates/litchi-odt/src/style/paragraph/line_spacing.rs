@@ -6,7 +6,7 @@
 //! `style:justify-single-word`, `style:auto-text-indent`,
 //! `style:snap-to-layout-grid`, `style:tab-stop-distance`, `fo:text-align-last`).
 
-use crate::{FlatOpenDocument, OdfNonNegativeLength, OpenDocumentPackage};
+use crate::{FlatOpenDocument, NonNegativeLength, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -123,7 +123,7 @@ impl LineHeightPercent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LineHeight {
     Normal,
-    Length(OdfNonNegativeLength),
+    Length(NonNegativeLength),
     Percent(LineHeightPercent),
 }
 impl LineHeight {
@@ -134,7 +134,7 @@ impl LineHeight {
         if value.ends_with('%') {
             return Ok(Self::Percent(LineHeightPercent::new(value)?));
         }
-        Ok(Self::Length(OdfNonNegativeLength::new(value)?))
+        Ok(Self::Length(NonNegativeLength::new(value)?))
     }
     fn xml(&self) -> &str {
         match self {
@@ -197,13 +197,13 @@ impl TextAlignLast {
 pub struct ParagraphLineSpacing {
     pub line_height: Option<LineHeight>,
     pub line_spacing: Option<LineSpacingLength>,
-    pub line_height_at_least: Option<OdfNonNegativeLength>,
+    pub line_height_at_least: Option<NonNegativeLength>,
     pub font_independent_line_spacing: Option<bool>,
     pub text_autospace: Option<TextAutospace>,
     pub justify_single_word: Option<bool>,
     pub auto_text_indent: Option<bool>,
     pub snap_to_layout_grid: Option<bool>,
-    pub tab_stop_distance: Option<OdfNonNegativeLength>,
+    pub tab_stop_distance: Option<NonNegativeLength>,
     pub text_align_last: Option<TextAlignLast>,
 }
 impl ParagraphLineSpacing {
@@ -456,7 +456,7 @@ fn property_attrs(
                 properties.line_spacing = Some(LineSpacingLength::new(value)?);
             },
             (Ns::Style, b"line-height-at-least") => {
-                properties.line_height_at_least = Some(OdfNonNegativeLength::new(value)?);
+                properties.line_height_at_least = Some(NonNegativeLength::new(value)?);
             },
             (Ns::Style, b"font-independent-line-spacing") => {
                 properties.font_independent_line_spacing =
@@ -477,7 +477,7 @@ fn property_attrs(
                     Some(parse_bool(&value, "style:snap-to-layout-grid")?);
             },
             (Ns::Style, b"tab-stop-distance") => {
-                properties.tab_stop_distance = Some(OdfNonNegativeLength::new(value)?);
+                properties.tab_stop_distance = Some(NonNegativeLength::new(value)?);
             },
             // Other paragraph-properties attributes are owned by sibling modules.
             _ => {},

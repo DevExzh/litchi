@@ -20,53 +20,53 @@ const MAX_ATTRIBUTES: usize = 32;
 
 /// Semantic contents of one `office:settings` element.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct OdfSettings {
+pub struct Settings {
     /// Top-level configuration sets in document order.
-    pub sets: Vec<OdfConfigSet>,
+    pub sets: Vec<ConfigSet>,
 }
 
 /// A named `config:config-item-set`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfConfigSet {
+pub struct ConfigSet {
     pub name: String,
-    pub children: Vec<OdfConfigNode>,
+    pub children: Vec<ConfigNode>,
 }
 
 /// A setting node retained in document order.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum OdfConfigNode {
-    Item(OdfConfigItem),
-    Set(OdfConfigSet),
-    IndexedMap(OdfConfigMap),
-    NamedMap(OdfConfigMap),
+pub enum ConfigNode {
+    Item(ConfigItem),
+    Set(ConfigSet),
+    IndexedMap(ConfigMap),
+    NamedMap(ConfigMap),
 }
 
 /// One typed `config:config-item`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfConfigItem {
+pub struct ConfigItem {
     pub name: String,
-    pub value: OdfConfigValue,
+    pub value: ConfigValue,
 }
 
 /// Entries of an indexed or named configuration map.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfConfigMap {
+pub struct ConfigMap {
     pub name: String,
-    pub entries: Vec<OdfConfigMapEntry>,
+    pub entries: Vec<ConfigMapEntry>,
 }
 
 /// One map entry. Names are required in named maps and absent in indexed maps.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfConfigMapEntry {
+pub struct ConfigMapEntry {
     pub name: Option<String>,
-    pub children: Vec<OdfConfigNode>,
+    pub children: Vec<ConfigNode>,
 }
 
 /// The scalar types defined for OpenDocument configuration items.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum OdfConfigValue {
+pub enum ConfigValue {
     Boolean(bool),
     Short(i16),
     Int(i32),
@@ -86,7 +86,7 @@ pub(crate) enum SettingsDocumentKind {
 enum Frame {
     Set {
         name: String,
-        children: Vec<OdfConfigNode>,
+        children: Vec<ConfigNode>,
     },
     Item {
         name: String,
@@ -95,21 +95,21 @@ enum Frame {
     },
     IndexedMap {
         name: String,
-        entries: Vec<OdfConfigMapEntry>,
+        entries: Vec<ConfigMapEntry>,
     },
     NamedMap {
         name: String,
-        entries: Vec<OdfConfigMapEntry>,
+        entries: Vec<ConfigMapEntry>,
     },
     Entry {
         name: Option<String>,
-        children: Vec<OdfConfigNode>,
+        children: Vec<ConfigNode>,
     },
 }
 
 enum Finished {
-    Node(OdfConfigNode),
-    Entry(OdfConfigMapEntry),
+    Node(ConfigNode),
+    Entry(ConfigMapEntry),
 }
 
 impl Frame {
@@ -126,28 +126,28 @@ impl Frame {
     fn finish(self) -> Result<Finished> {
         Ok(match self {
             Self::Set { name, children } => {
-                Finished::Node(OdfConfigNode::Set(OdfConfigSet { name, children }))
+                Finished::Node(ConfigNode::Set(ConfigSet { name, children }))
             },
             Self::Item {
                 name,
                 value_type,
                 text,
-            } => Finished::Node(OdfConfigNode::Item(OdfConfigItem {
+            } => Finished::Node(ConfigNode::Item(ConfigItem {
                 name,
                 value: parse_value(&value_type, &text)?,
             })),
             Self::IndexedMap { name, entries } => {
-                Finished::Node(OdfConfigNode::IndexedMap(OdfConfigMap { name, entries }))
+                Finished::Node(ConfigNode::IndexedMap(ConfigMap { name, entries }))
             },
             Self::NamedMap { name, entries } => {
-                Finished::Node(OdfConfigNode::NamedMap(OdfConfigMap { name, entries }))
+                Finished::Node(ConfigNode::NamedMap(ConfigMap { name, entries }))
             },
-            Self::Entry { name, children } => Finished::Entry(OdfConfigMapEntry { name, children }),
+            Self::Entry { name, children } => Finished::Entry(ConfigMapEntry { name, children }),
         })
     }
 }
 
-pub(crate) fn parse_settings(xml: &str, kind: SettingsDocumentKind) -> Result<OdfSettings> {
+pub(crate) fn parse_settings(xml: &str, kind: SettingsDocumentKind) -> Result<Settings> {
     if xml.len() > MAX_XML_BYTES {
         return invalid("settings XML exceeds the configured size limit");
     }
@@ -165,7 +165,7 @@ pub(crate) fn parse_settings(xml: &str, kind: SettingsDocumentKind) -> Result<Od
     let mut node_count = 0usize;
     let mut stack = Vec::<Frame>::new();
     let mut namespace_scopes = Vec::<Vec<(Vec<u8>, Vec<u8>)>>::new();
-    let mut result = OdfSettings::default();
+    let mut result = Settings::default();
 
     loop {
         let (namespace, event) = reader
@@ -334,7 +334,7 @@ fn process_start(
     settings_depth: &mut usize,
     node_count: &mut usize,
     stack: &mut Vec<Frame>,
-    result: &mut OdfSettings,
+    result: &mut Settings,
 ) -> Result<()> {
     let local = start.local_name();
     if depth == 0 {
@@ -438,9 +438,9 @@ fn validate_placement(frame: &Frame, stack: &[Frame]) -> Result<()> {
     }
 }
 
-fn attach(finished: Finished, stack: &mut [Frame], result: &mut OdfSettings) -> Result<()> {
+fn attach(finished: Finished, stack: &mut [Frame], result: &mut Settings) -> Result<()> {
     match (stack.last_mut(), finished) {
-        (None, Finished::Node(OdfConfigNode::Set(set))) => {
+        (None, Finished::Node(ConfigNode::Set(set))) => {
             result.sets.push(set);
             Ok(())
         },
@@ -584,18 +584,18 @@ fn required(value: Option<String>, message: &'static str) -> Result<String> {
     }
 }
 
-fn parse_value(value_type: &str, text: &str) -> Result<OdfConfigValue> {
+fn parse_value(value_type: &str, text: &str) -> Result<ConfigValue> {
     let trimmed = text.trim();
     Ok(match value_type {
-        "boolean" => OdfConfigValue::Boolean(match trimmed {
+        "boolean" => ConfigValue::Boolean(match trimmed {
             "true" | "1" => true,
             "false" | "0" => false,
             _ => return invalid("invalid boolean configuration value"),
         }),
-        "short" => OdfConfigValue::Short(parse_integer(trimmed, "short")?),
-        "int" => OdfConfigValue::Int(parse_integer(trimmed, "int")?),
-        "long" => OdfConfigValue::Long(parse_integer(trimmed, "long")?),
-        "double" => OdfConfigValue::Double(match trimmed {
+        "short" => ConfigValue::Short(parse_integer(trimmed, "short")?),
+        "int" => ConfigValue::Int(parse_integer(trimmed, "int")?),
+        "long" => ConfigValue::Long(parse_integer(trimmed, "long")?),
+        "double" => ConfigValue::Double(match trimmed {
             "INF" => f64::INFINITY,
             "-INF" => f64::NEG_INFINITY,
             "NaN" => f64::NAN,
@@ -609,14 +609,14 @@ fn parse_value(value_type: &str, text: &str) -> Result<OdfConfigValue> {
                 value
             },
         }),
-        "string" => OdfConfigValue::String(text.to_string()),
+        "string" => ConfigValue::String(text.to_string()),
         "datetime" => {
             if !is_datetime(trimmed) {
                 return invalid("invalid datetime configuration value");
             }
-            OdfConfigValue::DateTime(trimmed.to_string())
+            ConfigValue::DateTime(trimmed.to_string())
         },
-        "base64Binary" => OdfConfigValue::Base64Binary(decode_base64(trimmed)?),
+        "base64Binary" => ConfigValue::Base64Binary(decode_base64(trimmed)?),
         _ => return invalid("unknown configuration value type"),
     })
 }
@@ -880,12 +880,12 @@ mod tests {
         assert_eq!(settings.sets[0].name, "ViewSettings");
         assert_eq!(
             settings.sets[0].children[0],
-            OdfConfigNode::Item(OdfConfigItem {
+            ConfigNode::Item(ConfigItem {
                 name: "ShowGrid".to_string(),
-                value: OdfConfigValue::Boolean(true),
+                value: ConfigValue::Boolean(true),
             })
         );
-        let OdfConfigNode::NamedMap(map) = &settings.sets[0].children[2] else {
+        let ConfigNode::NamedMap(map) = &settings.sets[0].children[2] else {
             panic!("expected named map");
         };
         assert_eq!(map.entries[0].name.as_deref(), Some("main"));

@@ -62,7 +62,7 @@ pub struct FlatOpenDocument {
 
 impl FlatOpenDocument {
     /// Parses the optional flat-document `office:settings` inventory.
-    pub fn settings(&self) -> Result<crate::OdfSettings> {
+    pub fn settings(&self) -> Result<crate::Settings> {
         crate::settings::parse_settings(self.xml(), crate::settings::SettingsDocumentKind::Flat)
     }
 
@@ -153,15 +153,15 @@ impl FlatOpenDocument {
     }
 
     /// Inspect classic forms without executing bindings, events, or external resources.
-    pub fn forms(&self) -> Result<crate::OdfForms> {
-        crate::form::parse_form_parts(&[(self.xml(), crate::OdfFormPart::Flat)])
+    pub fn forms(&self) -> Result<crate::Forms> {
+        crate::form::parse_form_parts(&[(self.xml(), crate::FormPart::Flat)])
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
-    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+    pub fn variable_declarations(&self) -> Result<crate::VariableDeclarations> {
         crate::variable_declaration::parse_variable_declaration_parts(&[(
             self.xml(),
-            crate::OdfVariablePart::Flat,
+            crate::VariablePart::Flat,
         )])
     }
 
@@ -171,11 +171,11 @@ impl FlatOpenDocument {
     /// inert; this method only updates XML metadata and never evaluates fields.
     pub fn set_variable_declaration_group(
         &mut self,
-        group: &crate::OdfVariableDeclarationGroup,
-    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
-        if group.part != crate::OdfVariablePart::Flat {
+        group: &crate::VariableDeclarationGroup,
+    ) -> Result<Option<crate::VariableDeclarationGroup>> {
+        if group.part != crate::VariablePart::Flat {
             return Err(Error::InvalidFormat(
-                "FlatOpenDocument requires OdfVariablePart::Flat".to_string(),
+                "FlatOpenDocument requires VariablePart::Flat".to_string(),
             ));
         }
         let current = self.variable_declarations()?;
@@ -188,7 +188,7 @@ impl FlatOpenDocument {
         validate_flat_document(&updated, self.family)?;
         crate::variable_declaration::parse_variable_declaration_parts(&[(
             updated.as_str(),
-            crate::OdfVariablePart::Flat,
+            crate::VariablePart::Flat,
         )])?;
         self.xml = updated;
         Ok(old)
@@ -200,9 +200,9 @@ impl FlatOpenDocument {
     /// declaration owned by the container.
     pub fn remove_variable_declaration_group(
         &mut self,
-        scope: &crate::OdfVariableScope,
-        kind: crate::OdfVariableKind,
-    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
+        scope: &crate::VariableScope,
+        kind: crate::VariableKind,
+    ) -> Result<Option<crate::VariableDeclarationGroup>> {
         let current = self.variable_declarations()?;
         let Some(old) = current
             .groups
@@ -216,14 +216,14 @@ impl FlatOpenDocument {
         validate_flat_document(&updated, self.family)?;
         crate::variable_declaration::parse_variable_declaration_parts(&[(
             updated.as_str(),
-            crate::OdfVariablePart::Flat,
+            crate::VariablePart::Flat,
         )])?;
         self.xml = updated;
         Ok(Some(old))
     }
 
     /// Discover inert inline and linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
+    pub fn embedded_objects(&self) -> Result<Vec<crate::EmbeddedObject>> {
         crate::embedded_object::scan_flat_objects(&self.xml)
     }
 
@@ -497,7 +497,7 @@ impl OpenDocumentPackage {
     }
 
     /// Parses the package settings part without evaluating any stored values.
-    pub fn settings(&self) -> Result<Option<crate::OdfSettings>> {
+    pub fn settings(&self) -> Result<Option<crate::Settings>> {
         let Some(xml) = self.settings_xml()? else {
             return Ok(None);
         };
@@ -565,23 +565,23 @@ impl OpenDocumentPackage {
     }
 
     /// Inspect classic forms in content and styles without executing behavior.
-    pub fn forms(&self) -> Result<crate::OdfForms> {
+    pub fn forms(&self) -> Result<crate::Forms> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
-        let mut parts = vec![(content.as_str(), crate::OdfFormPart::Content)];
+        let mut parts = vec![(content.as_str(), crate::FormPart::Content)];
         if let Some(styles) = styles.as_deref() {
-            parts.push((styles, crate::OdfFormPart::Styles));
+            parts.push((styles, crate::FormPart::Styles));
         }
         crate::form::parse_form_parts(&parts)
     }
 
     /// Inspect ordered ODF variable declarations in content and styles.
-    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+    pub fn variable_declarations(&self) -> Result<crate::VariableDeclarations> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
-        let mut parts = vec![(content.as_str(), crate::OdfVariablePart::Content)];
+        let mut parts = vec![(content.as_str(), crate::VariablePart::Content)];
         if let Some(styles) = styles.as_deref() {
-            parts.push((styles, crate::OdfVariablePart::Styles));
+            parts.push((styles, crate::VariablePart::Styles));
         }
         crate::variable_declaration::parse_variable_declaration_parts(&parts)
     }
@@ -592,11 +592,11 @@ impl OpenDocumentPackage {
     /// entries remain byte-for-byte intact, and formulas remain inert.
     pub fn set_variable_declaration_group(
         &mut self,
-        group: &crate::OdfVariableDeclarationGroup,
-    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
-        if group.part == crate::OdfVariablePart::Flat {
+        group: &crate::VariableDeclarationGroup,
+    ) -> Result<Option<crate::VariableDeclarationGroup>> {
+        if group.part == crate::VariablePart::Flat {
             return Err(Error::InvalidFormat(
-                "OpenDocumentPackage cannot write OdfVariablePart::Flat".to_string(),
+                "OpenDocumentPackage cannot write VariablePart::Flat".to_string(),
             ));
         }
 
@@ -613,11 +613,11 @@ impl OpenDocumentPackage {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let (content, styles) = match group.part {
-            crate::OdfVariablePart::Content => (
+            crate::VariablePart::Content => (
                 crate::set_variable_declaration_group_xml(&content, group)?,
                 styles,
             ),
-            crate::OdfVariablePart::Styles => {
+            crate::VariablePart::Styles => {
                 let styles = styles.ok_or_else(|| {
                     Error::InvalidFormat(
                         "cannot write a styles declaration without styles.xml".to_string(),
@@ -628,7 +628,7 @@ impl OpenDocumentPackage {
                     Some(crate::set_variable_declaration_group_xml(&styles, group)?),
                 )
             },
-            crate::OdfVariablePart::Flat => unreachable!(),
+            crate::VariablePart::Flat => unreachable!(),
         };
 
         self.replace_variable_xml(content, styles, old)
@@ -640,13 +640,13 @@ impl OpenDocumentPackage {
     /// declaration owned by the container.
     pub fn remove_variable_declaration_group(
         &mut self,
-        part: crate::OdfVariablePart,
-        scope: &crate::OdfVariableScope,
-        kind: crate::OdfVariableKind,
-    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
-        if part == crate::OdfVariablePart::Flat {
+        part: crate::VariablePart,
+        scope: &crate::VariableScope,
+        kind: crate::VariableKind,
+    ) -> Result<Option<crate::VariableDeclarationGroup>> {
+        if part == crate::VariablePart::Flat {
             return Err(Error::InvalidFormat(
-                "OpenDocumentPackage cannot remove OdfVariablePart::Flat".to_string(),
+                "OpenDocumentPackage cannot remove VariablePart::Flat".to_string(),
             ));
         }
 
@@ -664,11 +664,11 @@ impl OpenDocumentPackage {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let (content, styles) = match part {
-            crate::OdfVariablePart::Content => (
+            crate::VariablePart::Content => (
                 crate::remove_variable_declaration_group_xml(&content, scope, kind)?,
                 styles,
             ),
-            crate::OdfVariablePart::Styles => {
+            crate::VariablePart::Styles => {
                 let styles = styles.ok_or_else(|| {
                     Error::InvalidFormat(
                         "cannot remove a styles declaration without styles.xml".to_string(),
@@ -681,7 +681,7 @@ impl OpenDocumentPackage {
                     )?),
                 )
             },
-            crate::OdfVariablePart::Flat => unreachable!(),
+            crate::VariablePart::Flat => unreachable!(),
         };
 
         self.replace_variable_xml(content, styles, Some(old))
@@ -691,11 +691,11 @@ impl OpenDocumentPackage {
         &mut self,
         content: String,
         styles: Option<String>,
-        old: Option<crate::OdfVariableDeclarationGroup>,
-    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
-        let mut parts = vec![(content.as_str(), crate::OdfVariablePart::Content)];
+        old: Option<crate::VariableDeclarationGroup>,
+    ) -> Result<Option<crate::VariableDeclarationGroup>> {
+        let mut parts = vec![(content.as_str(), crate::VariablePart::Content)];
         if let Some(styles) = styles.as_deref() {
-            parts.push((styles, crate::OdfVariablePart::Styles));
+            parts.push((styles, crate::VariablePart::Styles));
         }
         crate::variable_declaration::parse_variable_declaration_parts(&parts)?;
 
@@ -716,7 +716,7 @@ impl OpenDocumentPackage {
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
+    pub fn embedded_objects(&self) -> Result<Vec<crate::EmbeddedObject>> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let package = self.package.package()?;
@@ -993,14 +993,14 @@ mod tests {
             constants::ODF_TEXT,
         );
         let mut document = FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
-        let scope = crate::OdfVariableScope::Body(crate::OdfVariableBody::Text);
-        let first = crate::OdfVariableDeclarationGroup {
-            kind: crate::OdfVariableKind::Simple,
-            part: crate::OdfVariablePart::Flat,
+        let scope = crate::VariableScope::Body(crate::VariableBody::Text);
+        let first = crate::VariableDeclarationGroup {
+            kind: crate::VariableKind::Simple,
+            part: crate::VariablePart::Flat,
             scope: scope.clone(),
-            declarations: vec![crate::OdfVariableDeclaration::Simple {
+            declarations: vec![crate::VariableDeclaration::Simple {
                 name: "counter".to_string(),
-                value_type: crate::OdfVariableValueType::Float,
+                value_type: crate::VariableValueType::Float,
             }],
         };
         assert!(
@@ -1014,14 +1014,14 @@ mod tests {
             document
                 .variable_declarations()
                 .unwrap()
-                .find(crate::OdfVariableKind::Simple, "counter")
+                .find(crate::VariableKind::Simple, "counter")
                 .is_some()
         );
 
-        let second = crate::OdfVariableDeclarationGroup {
-            declarations: vec![crate::OdfVariableDeclaration::Simple {
+        let second = crate::VariableDeclarationGroup {
+            declarations: vec![crate::VariableDeclaration::Simple {
                 name: "replacement".to_string(),
-                value_type: crate::OdfVariableValueType::String,
+                value_type: crate::VariableValueType::String,
             }],
             ..first.clone()
         };
@@ -1033,12 +1033,12 @@ mod tests {
             document
                 .variable_declarations()
                 .unwrap()
-                .find(crate::OdfVariableKind::Simple, "replacement")
+                .find(crate::VariableKind::Simple, "replacement")
                 .is_some()
         );
         assert_eq!(
             document
-                .remove_variable_declaration_group(&scope, crate::OdfVariableKind::Simple)
+                .remove_variable_declaration_group(&scope, crate::VariableKind::Simple)
                 .unwrap(),
             Some(second),
         );

@@ -3,9 +3,8 @@
 use crate::core::{OwnedPackage, PackageWriter};
 use crate::elements::xml::namespaced_attribute;
 use crate::{
-    ChartDefinition, ChartDocument, OdfEmbeddedObject, OdfEmbeddedObjectKind,
-    OdfEmbeddedObjectPart, OdfEmbeddedObjectSource, OdfInlineObjectRoot, constants,
-    serialize_chart_content,
+    ChartDefinition, ChartDocument, EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart,
+    EmbeddedObjectSource, InlineObjectRoot, constants, serialize_chart_content,
 };
 use litchi_core::{Error, Result};
 pub(crate) use litchi_odf_common::package::{Addition, rebuild_package, splice};
@@ -27,7 +26,7 @@ const MAX_CONTENT_BYTES: usize = 16 * 1024 * 1024;
 /// Storage form for a newly created embedded chart.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfEmbeddedChartStorage {
+pub enum EmbeddedChartStorage {
     /// A referenced `Object_N/` subdocument with manifest entries.
     #[default]
     PackageSubdocument,
@@ -69,13 +68,13 @@ pub(crate) fn open_embedded_chart(
     let current_objects = objects(package, content, styles)?;
     let object = select_chart_object(&current_objects, index)?;
     match &object.source {
-        OdfEmbeddedObjectSource::PackageSubdocument {
+        EmbeddedObjectSource::PackageSubdocument {
             root_path,
             manifest_media_type,
             ..
         } => open_subdocument(package, root_path, manifest_media_type.as_deref()),
-        OdfEmbeddedObjectSource::InlineXml {
-            root: OdfInlineObjectRoot::OpenDocument,
+        EmbeddedObjectSource::InlineXml {
+            root: InlineObjectRoot::OpenDocument,
             xml,
             ..
         } => open_inline(xml),
@@ -96,7 +95,7 @@ pub(crate) fn replace_embedded_chart(
     let _ = open_embedded_chart(package, content, styles, index)?;
     let chart_content = serialize_chart_content(definition)?;
     match &object.source {
-        OdfEmbeddedObjectSource::PackageSubdocument { content_path, .. } => rebuild_package(
+        EmbeddedObjectSource::PackageSubdocument { content_path, .. } => rebuild_package(
             package,
             content,
             vec![Addition {
@@ -108,7 +107,7 @@ pub(crate) fn replace_embedded_chart(
             vec![content_path.clone()],
             Vec::new(),
         ),
-        OdfEmbeddedObjectSource::InlineXml { .. } => {
+        EmbeddedObjectSource::InlineXml { .. } => {
             let spans = locate_objects(content)?;
             let span = spans.get(index).ok_or_else(|| {
                 Error::InvalidFormat("embedded-object scanner/span mismatch".to_string())
@@ -146,10 +145,10 @@ pub(crate) fn remove_embedded_chart(
         .ok_or_else(|| Error::InvalidFormat("embedded-object scanner/span mismatch".to_string()))?;
     let updated = splice(content, span.start, span.end, "")?;
     let mut excluded_prefixes = Vec::new();
-    if let OdfEmbeddedObjectSource::PackageSubdocument { root_path, .. } = &object.source {
+    if let EmbeddedObjectSource::PackageSubdocument { root_path, .. } = &object.source {
         let remaining = objects(package, &updated, styles)?;
         let still_referenced = remaining.iter().any(|candidate| {
-            matches!(&candidate.source, OdfEmbeddedObjectSource::PackageSubdocument { root_path: candidate_root, .. } if candidate_root.as_str() == root_path.as_str())
+            matches!(&candidate.source, EmbeddedObjectSource::PackageSubdocument { root_path: candidate_root, .. } if candidate_root.as_str() == root_path.as_str())
         });
         if !still_referenced {
             excluded_prefixes.push(root_path.clone());
@@ -170,18 +169,18 @@ pub(crate) fn add_embedded_chart(
     content: &str,
     styles: Option<&str>,
     host: EmbeddedChartHost<'_>,
-    storage: OdfEmbeddedChartStorage,
+    storage: EmbeddedChartStorage,
     definition: &ChartDefinition,
 ) -> Result<(Vec<u8>, usize)> {
     let current = objects(package, content, styles)?;
     let index = current
         .iter()
-        .filter(|object| object.part == OdfEmbeddedObjectPart::Content)
+        .filter(|object| object.part == EmbeddedObjectPart::Content)
         .count();
     let chart_content = serialize_chart_content(definition)?;
     let root = unused_object_root(package)?;
     let (object_xml, additions, directories) = match storage {
-        OdfEmbeddedChartStorage::PackageSubdocument => {
+        EmbeddedChartStorage::PackageSubdocument => {
             let href = root.trim_end_matches('/');
             (
                 format!(
@@ -195,7 +194,7 @@ pub(crate) fn add_embedded_chart(
                 vec![(root.clone(), constants::ODF_CHART.to_string())],
             )
         },
-        OdfEmbeddedChartStorage::InlineXml => (
+        EmbeddedChartStorage::InlineXml => (
             format!(
                 "<draw:object>{}</draw:object>",
                 content_to_inline(&chart_content)?
@@ -224,7 +223,7 @@ fn objects(
     package: &OwnedPackage,
     content: &str,
     styles: Option<&str>,
-) -> Result<Vec<OdfEmbeddedObject>> {
+) -> Result<Vec<EmbeddedObject>> {
     let borrowed = package.package()?;
     crate::embedded_object::scan_packaged_objects(
         content,
@@ -234,12 +233,12 @@ fn objects(
     )
 }
 
-fn select_chart_object(objects: &[OdfEmbeddedObject], index: usize) -> Result<&OdfEmbeddedObject> {
+fn select_chart_object(objects: &[EmbeddedObject], index: usize) -> Result<&EmbeddedObject> {
     let object = objects.get(index).ok_or_else(|| {
         Error::InvalidFormat(format!("embedded-object index {index} is out of bounds"))
     })?;
-    if object.part != OdfEmbeddedObjectPart::Content
-        || object.kind != OdfEmbeddedObjectKind::Object
+    if object.part != EmbeddedObjectPart::Content
+        || object.kind != EmbeddedObjectKind::Object
         || object.class_id.is_some()
         || object.code.is_some()
         || object.archive.is_some()

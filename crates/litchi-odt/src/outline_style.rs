@@ -37,9 +37,9 @@ enum NamespaceKind {
 
 /// A positive XML Schema integer retained without narrowing its value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfOutlinePositiveInteger(String);
+pub struct OutlinePositiveInteger(String);
 
-impl OdfOutlinePositiveInteger {
+impl OutlinePositiveInteger {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.is_empty()
@@ -59,9 +59,9 @@ impl OdfOutlinePositiveInteger {
 
 /// Number-format lexical value. ODF explicitly permits the empty string.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfOutlineNumberFormat(String);
+pub struct OutlineNumberFormat(String);
 
-impl OdfOutlineNumberFormat {
+impl OutlineNumberFormat {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_text(&value, "style:num-format", true)?;
@@ -75,13 +75,13 @@ impl OdfOutlineNumberFormat {
 
 /// Namespace-resolved formatting or producer-extension attribute.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfOutlineAttribute {
+pub struct OutlineAttribute {
     namespace_uri: String,
     local_name: String,
     value: String,
 }
 
-impl OdfOutlineAttribute {
+impl OutlineAttribute {
     pub fn new(
         namespace_uri: impl Into<String>,
         local_name: impl Into<String>,
@@ -120,7 +120,7 @@ impl OdfOutlineAttribute {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfOutlineTextAlign {
+pub enum OutlineTextAlign {
     Start,
     End,
     Left,
@@ -129,7 +129,7 @@ pub enum OdfOutlineTextAlign {
     Justify,
 }
 
-impl OdfOutlineTextAlign {
+impl OutlineTextAlign {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "start" => Ok(Self::Start),
@@ -155,12 +155,12 @@ impl OdfOutlineTextAlign {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfListLevelPositionMode {
+pub enum ListLevelPositionMode {
     LabelWidthAndPosition,
     LabelAlignment,
 }
 
-impl OdfListLevelPositionMode {
+impl ListLevelPositionMode {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "label-width-and-position" => Ok(Self::LabelWidthAndPosition),
@@ -179,8 +179,8 @@ impl OdfListLevelPositionMode {
 
 /// Complete positioning metadata below one outline level.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OdfOutlineListLevelProperties {
-    pub text_align: Option<OdfOutlineTextAlign>,
+pub struct OutlineListLevelProperties {
+    pub text_align: Option<OutlineTextAlign>,
     pub space_before: Option<ListLabelLength>,
     pub minimum_label_width: Option<ListLabelLength>,
     pub minimum_label_distance: Option<ListLabelLength>,
@@ -189,43 +189,43 @@ pub struct OdfOutlineListLevelProperties {
     pub height: Option<ListLabelLength>,
     pub vertical_relation: Option<String>,
     pub vertical_position: Option<String>,
-    pub position_mode: Option<OdfListLevelPositionMode>,
+    pub position_mode: Option<ListLevelPositionMode>,
     pub label_alignment: Option<ListLevelLabelAlignment>,
-    pub extensions: Vec<OdfOutlineAttribute>,
+    pub extensions: Vec<OutlineAttribute>,
 }
 
 /// Namespace-resolved `style:text-properties` attributes for one level.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OdfOutlineTextProperties {
-    pub attributes: Vec<OdfOutlineAttribute>,
+pub struct OutlineTextProperties {
+    pub attributes: Vec<OutlineAttribute>,
 }
 
 /// One `text:outline-level-style` declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfOutlineLevelStyle {
+pub struct OutlineLevelStyle {
     pub level: u16,
     pub text_style_name: Option<String>,
-    pub number_format: Option<OdfOutlineNumberFormat>,
+    pub number_format: Option<OutlineNumberFormat>,
     pub number_prefix: Option<String>,
     pub number_suffix: Option<String>,
     pub letter_sync: Option<bool>,
-    pub display_levels: Option<OdfOutlinePositiveInteger>,
-    pub start_value: Option<OdfOutlinePositiveInteger>,
-    pub list_level_properties: Option<OdfOutlineListLevelProperties>,
-    pub text_properties: Option<OdfOutlineTextProperties>,
-    pub extensions: Vec<OdfOutlineAttribute>,
+    pub display_levels: Option<OutlinePositiveInteger>,
+    pub start_value: Option<OutlinePositiveInteger>,
+    pub list_level_properties: Option<OutlineListLevelProperties>,
+    pub text_properties: Option<OutlineTextProperties>,
+    pub extensions: Vec<OutlineAttribute>,
 }
 
 /// One named outline numbering style.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfOutlineStyle {
+pub struct OutlineStyle {
     pub name: String,
-    pub levels: Vec<OdfOutlineLevelStyle>,
-    pub extensions: Vec<OdfOutlineAttribute>,
+    pub levels: Vec<OutlineLevelStyle>,
+    pub extensions: Vec<OutlineAttribute>,
 }
 
-impl OdfOutlineStyle {
-    pub fn level(&self, level: u16) -> Option<&OdfOutlineLevelStyle> {
+impl OutlineStyle {
+    pub fn level(&self, level: u16) -> Option<&OutlineLevelStyle> {
         self.levels
             .iter()
             .find(|candidate| candidate.level == level)
@@ -278,7 +278,7 @@ impl OdfOutlineStyle {
     }
 }
 
-impl OdfOutlineLevelStyle {
+impl OutlineLevelStyle {
     pub fn validate(&self) -> Result<()> {
         if !(1..=MAX_OUTLINE_LEVELS).contains(&self.level) {
             return invalid("outline level is outside the supported range");
@@ -313,7 +313,7 @@ impl OdfOutlineLevelStyle {
     }
 }
 
-impl OdfOutlineListLevelProperties {
+impl OutlineListLevelProperties {
     pub fn validate(&self) -> Result<()> {
         if let Some(value) = self.font_name.as_deref() {
             validate_text(value, "style:font-name", true)?;
@@ -326,7 +326,7 @@ impl OdfOutlineListLevelProperties {
                 validate_text(value, name, false)?;
             }
         }
-        if self.position_mode == Some(OdfListLevelPositionMode::LabelAlignment)
+        if self.position_mode == Some(ListLevelPositionMode::LabelAlignment)
             && self.label_alignment.is_none()
         {
             return invalid("label-alignment mode requires style:list-level-label-alignment");
@@ -340,7 +340,7 @@ impl OdfOutlineListLevelProperties {
 
 fn write_level(
     output: &mut String,
-    level: &OdfOutlineLevelStyle,
+    level: &OutlineLevelStyle,
     namespaces: &[String],
 ) -> Result<()> {
     output.push_str("<text:outline-level-style");
@@ -352,7 +352,7 @@ fn write_level(
         level
             .number_format
             .as_ref()
-            .map(OdfOutlineNumberFormat::as_str),
+            .map(OutlineNumberFormat::as_str),
     );
     write_optional_attribute(output, "style:num-prefix", level.number_prefix.as_deref());
     write_optional_attribute(output, "style:num-suffix", level.number_suffix.as_deref());
@@ -369,7 +369,7 @@ fn write_level(
         level
             .display_levels
             .as_ref()
-            .map(OdfOutlinePositiveInteger::as_str),
+            .map(OutlinePositiveInteger::as_str),
     );
     write_optional_attribute(
         output,
@@ -377,7 +377,7 @@ fn write_level(
         level
             .start_value
             .as_ref()
-            .map(OdfOutlinePositiveInteger::as_str),
+            .map(OutlinePositiveInteger::as_str),
     );
     write_descriptors(output, &level.extensions, namespaces)?;
     if level.list_level_properties.is_none() && level.text_properties.is_none() {
@@ -399,14 +399,14 @@ fn write_level(
 
 fn write_list_properties(
     output: &mut String,
-    properties: &OdfOutlineListLevelProperties,
+    properties: &OutlineListLevelProperties,
     namespaces: &[String],
 ) -> Result<()> {
     output.push_str("<style:list-level-properties");
     write_optional_attribute(
         output,
         "fo:text-align",
-        properties.text_align.map(OdfOutlineTextAlign::as_str),
+        properties.text_align.map(OutlineTextAlign::as_str),
     );
     for (name, value) in [
         ("text:space-before", properties.space_before.as_ref()),
@@ -437,9 +437,7 @@ fn write_list_properties(
     write_optional_attribute(
         output,
         "text:list-level-position-and-space-mode",
-        properties
-            .position_mode
-            .map(OdfListLevelPositionMode::as_str),
+        properties.position_mode.map(ListLevelPositionMode::as_str),
     );
     write_descriptors(output, &properties.extensions, namespaces)?;
     let Some(alignment) = properties.label_alignment.as_ref() else {
@@ -479,9 +477,9 @@ fn write_list_properties(
     Ok(())
 }
 
-fn collect_extension_namespaces(style: &OdfOutlineStyle) -> Vec<String> {
+fn collect_extension_namespaces(style: &OutlineStyle) -> Vec<String> {
     let mut namespaces = Vec::new();
-    let mut visit = |attribute: &OdfOutlineAttribute| {
+    let mut visit = |attribute: &OutlineAttribute| {
         if namespace_kind(attribute.namespace_uri.as_bytes()) == NamespaceKind::Other
             && !namespaces.contains(&attribute.namespace_uri)
         {
@@ -511,7 +509,7 @@ fn collect_extension_namespaces(style: &OdfOutlineStyle) -> Vec<String> {
 
 fn write_descriptors(
     output: &mut String,
-    attributes: &[OdfOutlineAttribute],
+    attributes: &[OutlineAttribute],
     namespaces: &[String],
 ) -> Result<()> {
     let mut seen = HashSet::new();
@@ -543,7 +541,7 @@ fn write_descriptors(
 }
 
 fn validate_extension_attributes(
-    attributes: &[OdfOutlineAttribute],
+    attributes: &[OutlineAttribute],
     foreign_only: bool,
 ) -> Result<()> {
     let mut seen = HashSet::new();
@@ -576,12 +574,12 @@ fn write_attribute(output: &mut String, name: &str, value: &str) {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OdfOutlineStyles {
-    pub styles: Vec<OdfOutlineStyle>,
+pub struct OutlineStyles {
+    pub styles: Vec<OutlineStyle>,
 }
 
-impl OdfOutlineStyles {
-    pub fn get(&self, name: &str) -> Option<&OdfOutlineStyle> {
+impl OutlineStyles {
+    pub fn get(&self, name: &str) -> Option<&OutlineStyle> {
         self.styles.iter().find(|style| style.name == name)
     }
 }
@@ -597,26 +595,26 @@ struct ResolvedAttribute {
 #[derive(Debug)]
 struct ActiveOutline {
     depth: usize,
-    value: OdfOutlineStyle,
+    value: OutlineStyle,
     levels: HashSet<u16>,
 }
 
 #[derive(Debug)]
 struct ActiveLevel {
     depth: usize,
-    value: OdfOutlineLevelStyle,
+    value: OutlineLevelStyle,
     child_order: u8,
 }
 
 #[derive(Debug)]
 struct ActiveProperties {
     depth: usize,
-    value: OdfOutlineListLevelProperties,
+    value: OutlineListLevelProperties,
     alignment_depth: Option<usize>,
 }
 
 /// Parse every outline numbering style in `office:styles`.
-pub fn parse_outline_styles(xml: &str) -> Result<OdfOutlineStyles> {
+pub fn parse_outline_styles(xml: &str) -> Result<OutlineStyles> {
     if xml.len() > MAX_XML_BYTES {
         return invalid("outline style XML exceeds the resource limit");
     }
@@ -746,7 +744,7 @@ pub fn parse_outline_styles(xml: &str) -> Result<OdfOutlineStyles> {
     if outline.is_some() || level.is_some() || properties.is_some() {
         return invalid("unterminated outline style");
     }
-    Ok(OdfOutlineStyles { styles })
+    Ok(OutlineStyles { styles })
 }
 
 #[derive(Clone)]
@@ -762,8 +760,8 @@ struct XmlSpan {
 /// Insert or replace one outline style while preserving unrelated XML bytes.
 pub fn set_outline_style_xml(
     xml: &str,
-    style: &OdfOutlineStyle,
-) -> Result<(String, Option<OdfOutlineStyle>)> {
+    style: &OutlineStyle,
+) -> Result<(String, Option<OutlineStyle>)> {
     style.validate()?;
     let parsed = parse_outline_styles(xml)?;
     let old = parsed.get(&style.name).cloned();
@@ -783,10 +781,7 @@ pub fn set_outline_style_xml(
 }
 
 /// Remove one outline style while preserving unrelated XML bytes.
-pub fn remove_outline_style_xml(
-    xml: &str,
-    name: &str,
-) -> Result<(String, Option<OdfOutlineStyle>)> {
+pub fn remove_outline_style_xml(xml: &str, name: &str) -> Result<(String, Option<OutlineStyle>)> {
     validate_text(name, "style:name", false)?;
     let parsed = parse_outline_styles(xml)?;
     let Some(old) = parsed.get(name).cloned() else {
@@ -945,7 +940,7 @@ fn handle_start(
     level: &mut Option<ActiveLevel>,
     properties: &mut Option<ActiveProperties>,
     text_properties_depth: &mut Option<usize>,
-    styles: &mut Vec<OdfOutlineStyle>,
+    styles: &mut Vec<OutlineStyle>,
     names: &mut HashSet<String>,
     total_attribute_bytes: &mut usize,
 ) -> Result<()> {
@@ -964,7 +959,7 @@ fn handle_start(
             let extensions = finish_attributes(attributes, "text:outline-style")?;
             *outline = Some(ActiveOutline {
                 depth,
-                value: OdfOutlineStyle {
+                value: OutlineStyle {
                     name,
                     levels: Vec::new(),
                     extensions,
@@ -1058,7 +1053,7 @@ fn handle_start(
         }
         active_level.child_order = 2;
         let attributes = attributes(reader, version, start, total_attribute_bytes)?;
-        active_level.value.text_properties = Some(OdfOutlineTextProperties {
+        active_level.value.text_properties = Some(OutlineTextProperties {
             attributes: attributes
                 .into_iter()
                 .map(attribute_descriptor)
@@ -1078,7 +1073,7 @@ fn parse_level(
     version: XmlVersion,
     start: &BytesStart<'_>,
     total: &mut usize,
-) -> Result<OdfOutlineLevelStyle> {
+) -> Result<OutlineLevelStyle> {
     let mut attributes = attributes(reader, version, start, total)?;
     let level = take(&mut attributes, NamespaceKind::Text, "level")
         .ok_or_else(|| invalid_error("outline level requires text:level"))?
@@ -1092,7 +1087,7 @@ fn parse_level(
         validate_text(value, "text:style-name", false)?;
     }
     let number_format = take(&mut attributes, NamespaceKind::Style, "num-format")
-        .map(OdfOutlineNumberFormat::new)
+        .map(OutlineNumberFormat::new)
         .transpose()?;
     let number_prefix = take(&mut attributes, NamespaceKind::Style, "num-prefix");
     let number_suffix = take(&mut attributes, NamespaceKind::Style, "num-suffix");
@@ -1113,12 +1108,12 @@ fn parse_level(
         return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
     }
     let display_levels = take(&mut attributes, NamespaceKind::Text, "display-levels")
-        .map(OdfOutlinePositiveInteger::new)
+        .map(OutlinePositiveInteger::new)
         .transpose()?;
     let start_value = take(&mut attributes, NamespaceKind::Text, "start-value")
-        .map(OdfOutlinePositiveInteger::new)
+        .map(OutlinePositiveInteger::new)
         .transpose()?;
-    Ok(OdfOutlineLevelStyle {
+    Ok(OutlineLevelStyle {
         level,
         text_style_name,
         number_format,
@@ -1138,10 +1133,10 @@ fn parse_list_properties(
     version: XmlVersion,
     start: &BytesStart<'_>,
     total: &mut usize,
-) -> Result<OdfOutlineListLevelProperties> {
+) -> Result<OutlineListLevelProperties> {
     let mut attributes = attributes(reader, version, start, total)?;
     let text_align = take(&mut attributes, NamespaceKind::Fo, "text-align")
-        .map(|value| OdfOutlineTextAlign::parse(&value))
+        .map(|value| OutlineTextAlign::parse(&value))
         .transpose()?;
     let space_before = length(
         &mut attributes,
@@ -1185,9 +1180,9 @@ fn parse_list_properties(
         NamespaceKind::Text,
         "list-level-position-and-space-mode",
     )
-    .map(|value| OdfListLevelPositionMode::parse(&value))
+    .map(|value| ListLevelPositionMode::parse(&value))
     .transpose()?;
-    Ok(OdfOutlineListLevelProperties {
+    Ok(OutlineListLevelProperties {
         text_align,
         space_before,
         minimum_label_width,
@@ -1243,7 +1238,7 @@ fn parse_alignment(
 
 fn finish_level(outline: &mut Option<ActiveOutline>, level: ActiveLevel) -> Result<()> {
     if let Some(properties) = level.value.list_level_properties.as_ref()
-        && properties.position_mode == Some(OdfListLevelPositionMode::LabelAlignment)
+        && properties.position_mode == Some(ListLevelPositionMode::LabelAlignment)
         && properties.label_alignment.is_none()
     {
         return invalid("label-alignment mode requires style:list-level-label-alignment");
@@ -1258,7 +1253,7 @@ fn finish_level(outline: &mut Option<ActiveOutline>, level: ActiveLevel) -> Resu
 }
 
 fn finish_outline(
-    styles: &mut Vec<OdfOutlineStyle>,
+    styles: &mut Vec<OutlineStyle>,
     names: &mut HashSet<String>,
     outline: ActiveOutline,
 ) -> Result<()> {
@@ -1320,7 +1315,7 @@ fn attributes(
 fn finish_attributes(
     attributes: Vec<ResolvedAttribute>,
     element: &str,
-) -> Result<Vec<OdfOutlineAttribute>> {
+) -> Result<Vec<OutlineAttribute>> {
     attributes
         .into_iter()
         .map(|attribute| {
@@ -1332,11 +1327,11 @@ fn finish_attributes(
         .collect()
 }
 
-fn attribute_descriptor(attribute: ResolvedAttribute) -> Result<OdfOutlineAttribute> {
+fn attribute_descriptor(attribute: ResolvedAttribute) -> Result<OutlineAttribute> {
     if attribute.namespace_uri.is_empty() {
         return invalid("unqualified outline formatting attributes are not allowed");
     }
-    Ok(OdfOutlineAttribute {
+    Ok(OutlineAttribute {
         namespace_uri: attribute.namespace_uri,
         local_name: attribute.local_name,
         value: attribute.value,
@@ -1452,9 +1447,9 @@ fn invalid_error(message: impl Into<String>) -> Error {
 
 impl OpenDocumentPackage {
     /// Return outline numbering styles from `styles.xml`.
-    pub fn outline_styles(&self) -> Result<OdfOutlineStyles> {
+    pub fn outline_styles(&self) -> Result<OutlineStyles> {
         self.styles_xml()?.map_or_else(
-            || Ok(OdfOutlineStyles::default()),
+            || Ok(OutlineStyles::default()),
             |styles| parse_outline_styles(&styles),
         )
     }
@@ -1462,7 +1457,7 @@ impl OpenDocumentPackage {
 
 impl FlatOpenDocument {
     /// Return outline numbering styles without interpreting heading content.
-    pub fn outline_styles(&self) -> Result<OdfOutlineStyles> {
+    pub fn outline_styles(&self) -> Result<OutlineStyles> {
         parse_outline_styles(self.xml())
     }
 }

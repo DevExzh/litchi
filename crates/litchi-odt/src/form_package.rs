@@ -3,9 +3,9 @@
 use crate::core::OwnedPackage;
 use crate::embedded_chart::{rebuild_package, splice};
 use crate::{
-    OdfForm, OdfFormNode, OdfFormPart, OdfFormProperty, OdfGenericFormControl, OdfGridControl,
-    OdfImageFrameControl, OdfInteractiveControl, OdfPasswordFileControl, OdfSelectionControl,
-    OdfTextControl, OdfTypedValueControl, OdfValueRangeControl, OdfVisualControl,
+    Form, FormNode, FormPart, FormProperty, GenericFormControl, GridControl, ImageFrameControl,
+    InteractiveControl, PasswordFileControl, SelectionControl, TextControl, TypedValueControl,
+    ValueRangeControl, VisualControl,
 };
 use litchi_core::{Error, Result};
 use quick_xml::events::Event;
@@ -28,20 +28,20 @@ const MAX_STRING: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum OdfAuthoredFormControl {
-    Text(OdfTextControl),
-    TypedValue(OdfTypedValueControl),
-    Selection(OdfSelectionControl),
-    Interactive(OdfInteractiveControl),
-    Visual(OdfVisualControl),
-    PasswordFile(OdfPasswordFileControl),
-    Generic(OdfGenericFormControl),
-    Grid(OdfGridControl),
-    ImageFrame(OdfImageFrameControl),
-    ValueRange(OdfValueRangeControl),
+pub enum AuthoredFormControl {
+    Text(TextControl),
+    TypedValue(TypedValueControl),
+    Selection(SelectionControl),
+    Interactive(InteractiveControl),
+    Visual(VisualControl),
+    PasswordFile(PasswordFileControl),
+    Generic(GenericFormControl),
+    Grid(GridControl),
+    ImageFrame(ImageFrameControl),
+    ValueRange(ValueRangeControl),
 }
 
-impl OdfAuthoredFormControl {
+impl AuthoredFormControl {
     pub fn to_xml_fragment(&self) -> Result<String> {
         let fragment = match self {
             Self::Text(value) => value.to_xml_fragment()?,
@@ -61,33 +61,33 @@ impl OdfAuthoredFormControl {
 
 macro_rules! authored_from {
     ($variant:ident, $type:ty) => {
-        impl From<$type> for OdfAuthoredFormControl {
+        impl From<$type> for AuthoredFormControl {
             fn from(value: $type) -> Self {
                 Self::$variant(value)
             }
         }
     };
 }
-authored_from!(Text, OdfTextControl);
-authored_from!(TypedValue, OdfTypedValueControl);
-authored_from!(Selection, OdfSelectionControl);
-authored_from!(Interactive, OdfInteractiveControl);
-authored_from!(Visual, OdfVisualControl);
-authored_from!(PasswordFile, OdfPasswordFileControl);
-authored_from!(Generic, OdfGenericFormControl);
-authored_from!(Grid, OdfGridControl);
-authored_from!(ImageFrame, OdfImageFrameControl);
-authored_from!(ValueRange, OdfValueRangeControl);
+authored_from!(Text, TextControl);
+authored_from!(TypedValue, TypedValueControl);
+authored_from!(Selection, SelectionControl);
+authored_from!(Interactive, InteractiveControl);
+authored_from!(Visual, VisualControl);
+authored_from!(PasswordFile, PasswordFileControl);
+authored_from!(Generic, GenericFormControl);
+authored_from!(Grid, GridControl);
+authored_from!(ImageFrame, ImageFrameControl);
+authored_from!(ValueRange, ValueRangeControl);
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum OdfAuthoredFormNode {
-    Form(OdfAuthoredForm),
-    Control(OdfAuthoredFormControl),
+pub enum AuthoredFormNode {
+    Form(AuthoredForm),
+    Control(AuthoredFormControl),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfAuthoredForm {
+pub struct AuthoredForm {
     pub name: String,
     pub xml_id: Option<String>,
     pub form_id: Option<String>,
@@ -97,11 +97,11 @@ pub struct OdfAuthoredForm {
     pub command: Option<String>,
     pub datasource: Option<String>,
     pub href: Option<String>,
-    pub properties: Vec<OdfFormProperty>,
-    pub children: Vec<OdfAuthoredFormNode>,
+    pub properties: Vec<FormProperty>,
+    pub children: Vec<AuthoredFormNode>,
 }
 
-impl OdfAuthoredForm {
+impl AuthoredForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -118,20 +118,20 @@ impl OdfAuthoredForm {
         }
     }
 
-    pub fn add_control(&mut self, control: impl Into<OdfAuthoredFormControl>) -> Result<()> {
+    pub fn add_control(&mut self, control: impl Into<AuthoredFormControl>) -> Result<()> {
         if self.children.len() >= MAX_CHILDREN {
             return invalid("form exceeds child limit");
         }
         self.children
-            .push(OdfAuthoredFormNode::Control(control.into()));
+            .push(AuthoredFormNode::Control(control.into()));
         Ok(())
     }
 
-    pub fn add_form(&mut self, form: OdfAuthoredForm) -> Result<()> {
+    pub fn add_form(&mut self, form: AuthoredForm) -> Result<()> {
         if self.children.len() >= MAX_CHILDREN {
             return invalid("form exceeds child limit");
         }
-        self.children.push(OdfAuthoredFormNode::Form(form));
+        self.children.push(AuthoredFormNode::Form(form));
         Ok(())
     }
 
@@ -177,7 +177,7 @@ pub(crate) fn add_form(
     host: FormHost,
     group_index: usize,
     parent_form: Option<usize>,
-    form: &OdfAuthoredForm,
+    form: &AuthoredForm,
 ) -> Result<(Vec<u8>, usize)> {
     let fragment = form.to_xml_fragment()?;
     let scan = scan(content)?;
@@ -206,7 +206,7 @@ pub(crate) fn replace_form(
     content: &str,
     styles: Option<&str>,
     index: usize,
-    form: &OdfAuthoredForm,
+    form: &AuthoredForm,
 ) -> Result<Vec<u8>> {
     let scan = scan(content)?;
     let span = scan
@@ -259,7 +259,7 @@ pub(crate) fn add_control(
     content: &str,
     styles: Option<&str>,
     form_index: usize,
-    control: &OdfAuthoredFormControl,
+    control: &AuthoredFormControl,
 ) -> Result<(Vec<u8>, usize)> {
     let scan = scan(content)?;
     let form = scan
@@ -276,7 +276,7 @@ pub(crate) fn replace_control(
     content: &str,
     styles: Option<&str>,
     index: usize,
-    control: &OdfAuthoredFormControl,
+    control: &AuthoredFormControl,
 ) -> Result<Vec<u8>> {
     let scan = scan(content)?;
     let span = scan
@@ -334,9 +334,9 @@ fn rebuild_validated(
     if content.len() > MAX_XML {
         return invalid("form mutation exceeds XML size limit");
     }
-    let mut parts = vec![(content, OdfFormPart::Content)];
+    let mut parts = vec![(content, FormPart::Content)];
     if let Some(styles) = styles {
-        parts.push((styles, OdfFormPart::Styles));
+        parts.push((styles, FormPart::Styles));
     }
     let parsed = crate::form::parse_form_parts(&parts)?;
     validate_unique(&parsed)?;
@@ -350,7 +350,7 @@ fn rebuild_validated(
     )
 }
 
-fn validate_unique(forms: &crate::OdfForms) -> Result<()> {
+fn validate_unique(forms: &crate::Forms) -> Result<()> {
     let mut ids = HashSet::new();
     for group in &forms.groups {
         sibling_form_names(&group.forms)?;
@@ -361,7 +361,7 @@ fn validate_unique(forms: &crate::OdfForms) -> Result<()> {
     Ok(())
 }
 
-fn sibling_form_names(forms: &[OdfForm]) -> Result<()> {
+fn sibling_form_names(forms: &[Form]) -> Result<()> {
     let mut names = HashSet::new();
     for form in forms {
         if let Some(name) = &form.name
@@ -373,7 +373,7 @@ fn sibling_form_names(forms: &[OdfForm]) -> Result<()> {
     Ok(())
 }
 
-fn unique_form(form: &OdfForm, ids: &mut HashSet<String>) -> Result<()> {
+fn unique_form(form: &Form, ids: &mut HashSet<String>) -> Result<()> {
     for id in [form.xml_id.as_deref(), form.form_id.as_deref()]
         .into_iter()
         .flatten()
@@ -382,11 +382,11 @@ fn unique_form(form: &OdfForm, ids: &mut HashSet<String>) -> Result<()> {
             return invalid(format!("duplicate form ID '{id}'"));
         }
     }
-    let nested: Vec<&OdfForm> = form
+    let nested: Vec<&Form> = form
         .children
         .iter()
         .filter_map(|node| match node {
-            OdfFormNode::Form(value) => Some(value),
+            FormNode::Form(value) => Some(value),
             _ => None,
         })
         .collect();
@@ -401,8 +401,8 @@ fn unique_form(form: &OdfForm, ids: &mut HashSet<String>) -> Result<()> {
     let mut control_names = HashSet::new();
     for node in &form.children {
         match node {
-            OdfFormNode::Form(value) => unique_form(value, ids)?,
-            OdfFormNode::Control(value) => {
+            FormNode::Form(value) => unique_form(value, ids)?,
+            FormNode::Control(value) => {
                 if let Some(name) = &value.name
                     && !control_names.insert(name.as_str())
                 {
@@ -422,7 +422,7 @@ fn unique_form(form: &OdfForm, ids: &mut HashSet<String>) -> Result<()> {
     Ok(())
 }
 
-fn serialize_form(form: &OdfAuthoredForm, depth: usize, nodes: &mut usize) -> Result<String> {
+fn serialize_form(form: &AuthoredForm, depth: usize, nodes: &mut usize) -> Result<String> {
     if depth > MAX_DEPTH {
         return invalid("authored form nesting exceeds limit");
     }
@@ -487,10 +487,10 @@ fn serialize_form(form: &OdfAuthoredForm, depth: usize, nodes: &mut usize) -> Re
     }
     for child in &form.children {
         match child {
-            OdfAuthoredFormNode::Form(value) => {
+            AuthoredFormNode::Form(value) => {
                 out.push_str(&serialize_form(value, depth + 1, nodes)?)
             },
-            OdfAuthoredFormNode::Control(value) => {
+            AuthoredFormNode::Control(value) => {
                 *nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("form node overflow".to_string()))?;

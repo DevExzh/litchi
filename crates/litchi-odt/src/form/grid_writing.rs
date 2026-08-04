@@ -7,7 +7,7 @@ use quick_xml::NsReader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
-use super::generic_writing::OdfGenericControlMetadata;
+use super::generic_writing::GenericControlMetadata;
 
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -25,7 +25,7 @@ const MAX_COLUMNS: usize = 16_384;
 const MAX_COLUMN_CONTROLS: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfGridColumnControlKind {
+pub enum GridColumnControlKind {
     Text,
     Textarea,
     Password,
@@ -38,7 +38,7 @@ pub enum OdfGridColumnControlKind {
     Combobox,
 }
 
-impl OdfGridColumnControlKind {
+impl GridColumnControlKind {
     fn from_local(local: &[u8]) -> Option<Self> {
         match local {
             b"text" => Some(Self::Text),
@@ -57,13 +57,13 @@ impl OdfGridColumnControlKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfGridColumnControl {
-    pub kind: OdfGridColumnControlKind,
+pub struct GridColumnControl {
+    pub kind: GridColumnControlKind,
     pub xml: String,
 }
 
-impl OdfGridColumnControl {
-    pub fn new(kind: OdfGridColumnControlKind, xml: impl Into<String>) -> Result<Self> {
+impl GridColumnControl {
+    pub fn new(kind: GridColumnControlKind, xml: impl Into<String>) -> Result<Self> {
         let value = Self {
             kind,
             xml: xml.into(),
@@ -77,21 +77,21 @@ impl OdfGridColumnControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfGridColumn {
+pub struct GridColumn {
     pub name: Option<String>,
     pub control_implementation: Option<String>,
     pub label: Option<String>,
     pub text_style_name: Option<String>,
-    pub controls: Vec<OdfGridColumnControl>,
+    pub controls: Vec<GridColumnControl>,
 }
 
-impl Default for OdfGridColumn {
+impl Default for GridColumn {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl OdfGridColumn {
+impl GridColumn {
     pub fn new() -> Self {
         Self {
             name: None,
@@ -101,7 +101,7 @@ impl OdfGridColumn {
             controls: Vec::new(),
         }
     }
-    pub fn add_control(&mut self, control: OdfGridColumnControl) -> Result<()> {
+    pub fn add_control(&mut self, control: GridColumnControl) -> Result<()> {
         validate_column_control(&control)?;
         if self.controls.len() >= MAX_COLUMN_CONTROLS {
             return invalid("too many controls in form:column");
@@ -112,24 +112,24 @@ impl OdfGridColumn {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfGridControl {
+pub struct GridControl {
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub disabled: Option<bool>,
     pub printable: Option<bool>,
-    pub tab_index: Option<OdfGridNonNegativeInteger>,
+    pub tab_index: Option<GridNonNegativeInteger>,
     pub tab_stop: Option<bool>,
     pub title: Option<String>,
-    pub columns: Vec<OdfGridColumn>,
+    pub columns: Vec<GridColumn>,
 }
 
-impl OdfGridControl {
+impl GridControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             disabled: None,
             printable: None,
             tab_index: None,
@@ -142,7 +142,7 @@ impl OdfGridControl {
     pub fn to_xml_fragment(&self) -> Result<String> {
         grid_xml(self)
     }
-    pub fn add_column(&mut self, column: OdfGridColumn) -> Result<()> {
+    pub fn add_column(&mut self, column: GridColumn) -> Result<()> {
         validate_column(&column)?;
         if self.columns.len() >= MAX_COLUMNS {
             return invalid("too many form:grid columns");
@@ -153,13 +153,13 @@ impl OdfGridControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfGridForm {
+pub struct GridForm {
     pub name: String,
-    pub controls: Vec<OdfGridControl>,
+    pub controls: Vec<GridControl>,
     pub apply_filter: Option<bool>,
 }
 
-impl OdfGridForm {
+impl GridForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -168,7 +168,7 @@ impl OdfGridForm {
         }
     }
 
-    pub fn add_control(&mut self, control: OdfGridControl) -> Result<()> {
+    pub fn add_control(&mut self, control: GridControl) -> Result<()> {
         validate_control(&control)?;
         if self
             .controls
@@ -215,7 +215,7 @@ impl OdfGridForm {
     }
 }
 
-pub fn grid_controls(xml: &str) -> Result<Vec<OdfGridControl>> {
+pub fn grid_controls(xml: &str) -> Result<Vec<GridControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -226,7 +226,7 @@ pub fn grid_controls(xml: &str) -> Result<Vec<OdfGridControl>> {
 pub fn insert_grid_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfGridControl,
+    control: &GridControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -248,7 +248,7 @@ pub fn insert_grid_control_xml(
 pub fn replace_grid_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfGridControl,
+    replacement: &GridControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -278,7 +278,7 @@ pub fn remove_grid_control_xml(xml: &str, index: usize) -> Result<String> {
     apply(xml, old.span.clone(), "")
 }
 
-fn grid_xml(value: &OdfGridControl) -> Result<String> {
+fn grid_xml(value: &GridControl) -> Result<String> {
     validate_control(value)?;
     let mut out = format!(
         r#"<form:grid form:name="{}" xml:id="{}""#,
@@ -301,10 +301,7 @@ fn grid_xml(value: &OdfGridControl) -> Result<String> {
     push_string(
         &mut out,
         "form:tab-index",
-        value
-            .tab_index
-            .as_ref()
-            .map(OdfGridNonNegativeInteger::as_str),
+        value.tab_index.as_ref().map(GridNonNegativeInteger::as_str),
     );
     push_bool(&mut out, "form:tab-stop", value.tab_stop);
     push_string(&mut out, "form:title", value.title.as_deref());
@@ -338,7 +335,7 @@ fn grid_xml(value: &OdfGridControl) -> Result<String> {
     Ok(out)
 }
 
-fn validate_control(value: &OdfGridControl) -> Result<()> {
+fn validate_control(value: &GridControl) -> Result<()> {
     validate_name("grid control name", &value.name)?;
     validate_xml_id(&value.xml_id)?;
     if let Some(form_id) = value.metadata.form_id.as_deref() {
@@ -364,7 +361,7 @@ fn validate_control(value: &OdfGridControl) -> Result<()> {
     Ok(())
 }
 
-fn validate_column(value: &OdfGridColumn) -> Result<()> {
+fn validate_column(value: &GridColumn) -> Result<()> {
     validate_optional("column name", value.name.as_deref(), MAX_STRING)?;
     validate_optional(
         "column implementation",
@@ -389,7 +386,7 @@ fn validate_column(value: &OdfGridColumn) -> Result<()> {
     Ok(())
 }
 
-fn validate_controls(controls: &[OdfGridControl]) -> Result<()> {
+fn validate_controls(controls: &[GridControl]) -> Result<()> {
     if controls.len() > MAX_CONTROLS {
         return invalid("too many grid controls");
     }
@@ -417,7 +414,7 @@ fn validate_controls(controls: &[OdfGridControl]) -> Result<()> {
     Ok(())
 }
 
-fn control_size(value: &OdfGridControl) -> usize {
+fn control_size(value: &GridControl) -> usize {
     [&value.name, &value.xml_id]
         .iter()
         .fold(0usize, |sum, value| sum.saturating_add(value.len()))
@@ -445,7 +442,7 @@ fn control_size(value: &OdfGridControl) -> usize {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfGridControl,
+    control: GridControl,
 }
 #[derive(Clone)]
 struct FormLocation {
@@ -671,14 +668,14 @@ fn scan(xml: &str) -> Result<Scan> {
     })
 }
 
-fn parse_control(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<OdfGridControl> {
+fn parse_control(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<GridControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(&attrs, GRID_ATTRS)?;
-    let mut value = OdfGridControl::new(
+    let mut value = GridControl::new(
         required(&attrs, FORM, "name")?,
         required(&attrs, XML, "id")?,
     );
-    value.metadata = OdfGenericControlMetadata {
+    value.metadata = GenericControlMetadata {
         form_id: optional(&attrs, FORM, "id"),
         control_implementation: optional(&attrs, FORM, "control-implementation"),
         xforms_bind: optional(&attrs, XFORMS, "bind"),
@@ -686,7 +683,7 @@ fn parse_control(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<O
     value.disabled = optional_bool(&attrs, FORM, "disabled")?;
     value.printable = optional_bool(&attrs, FORM, "printable")?;
     value.tab_index = optional(&attrs, FORM, "tab-index")
-        .map(OdfGridNonNegativeInteger::new)
+        .map(GridNonNegativeInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.tab_stop = optional_bool(&attrs, FORM, "tab-stop")?;
@@ -715,15 +712,15 @@ const COLUMN_ATTRS: &[(&str, &str)] = &[
     (FORM, "text-style-name"),
 ];
 
-fn parse_grid_fragment(raw: &str) -> Result<OdfGridControl> {
+fn parse_grid_fragment(raw: &str) -> Result<GridControl> {
     let xml = bind_fragment(raw.to_string());
     let mut reader = NsReader::from_str(&xml);
     let mut buffer = Vec::new();
     let mut previous = 0usize;
     let mut depth = 0usize;
     let mut grid = None;
-    let mut column = None::<OdfGridColumn>;
-    let mut capture = None::<(OdfGridColumnControlKind, usize, usize)>;
+    let mut column = None::<GridColumn>;
+    let mut capture = None::<(GridColumnControlKind, usize, usize)>;
     let mut skip_depth = None::<usize>;
     let mut saw_column = false;
     loop {
@@ -759,7 +756,7 @@ fn parse_grid_fragment(raw: &str) -> Result<OdfGridControl> {
                     saw_column = true;
                     column = Some(parse_column(&reader, element)?);
                 } else if depth == 2 && column.is_some() && namespace.as_deref() == Some(FORM) {
-                    let kind = OdfGridColumnControlKind::from_local(&local).ok_or_else(|| {
+                    let kind = GridColumnControlKind::from_local(&local).ok_or_else(|| {
                         Error::InvalidFormat("invalid form:column control kind".to_string())
                     })?;
                     capture = Some((kind, previous, depth + 1));
@@ -786,10 +783,10 @@ fn parse_grid_fragment(raw: &str) -> Result<OdfGridControl> {
                     && namespace.as_deref() == Some(FORM)
                     && let Some(column) = column.as_mut()
                 {
-                    let kind = OdfGridColumnControlKind::from_local(&local).ok_or_else(|| {
+                    let kind = GridColumnControlKind::from_local(&local).ok_or_else(|| {
                         Error::InvalidFormat("invalid form:column control kind".to_string())
                     })?;
-                    let control = OdfGridColumnControl::new(kind, &xml[previous..end])?;
+                    let control = GridColumnControl::new(kind, &xml[previous..end])?;
                     column.add_control(control)?;
                 } else {
                     return invalid("invalid empty element in form:grid");
@@ -802,7 +799,7 @@ fn parse_grid_fragment(raw: &str) -> Result<OdfGridControl> {
                 depth -= 1;
                 if let Some((kind, start, capture_depth)) = capture {
                     if depth + 1 == capture_depth {
-                        let control = OdfGridColumnControl::new(kind, &xml[start..end])?;
+                        let control = GridColumnControl::new(kind, &xml[start..end])?;
                         column.as_mut().unwrap().add_control(control)?;
                         capture = None;
                     }
@@ -837,10 +834,10 @@ fn parse_grid_fragment(raw: &str) -> Result<OdfGridControl> {
     Ok(grid)
 }
 
-fn parse_column(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<OdfGridColumn> {
+fn parse_column(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<GridColumn> {
     let attrs = attributes(reader, element)?;
     validate_allowed(&attrs, COLUMN_ATTRS)?;
-    let mut column = OdfGridColumn::new();
+    let mut column = GridColumn::new();
     column.name = optional(&attrs, FORM, "name");
     column.control_implementation = optional(&attrs, FORM, "control-implementation");
     column.label = optional(&attrs, FORM, "label");
@@ -848,25 +845,25 @@ fn parse_column(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Od
     Ok(column)
 }
 
-fn validate_column_control(value: &OdfGridColumnControl) -> Result<()> {
+fn validate_column_control(value: &GridColumnControl) -> Result<()> {
     validate_string("column control XML", &value.xml, MAX_STRING)?;
     let wrapped = format!(
         r#"<form:form xmlns:form="{FORM}" xmlns:xforms="{XFORMS}" form:name="Column">{}</form:form>"#,
         value.xml
     );
     let count = match value.kind {
-        OdfGridColumnControlKind::Text | OdfGridColumnControlKind::Textarea => {
+        GridColumnControlKind::Text | GridColumnControlKind::Textarea => {
             crate::text_controls(&wrapped)?.len()
         },
-        OdfGridColumnControlKind::Password => crate::password_file_controls(&wrapped)?.len(),
-        OdfGridColumnControlKind::Checkbox => crate::interactive_controls(&wrapped)?.len(),
-        OdfGridColumnControlKind::Listbox | OdfGridColumnControlKind::Combobox => {
+        GridColumnControlKind::Password => crate::password_file_controls(&wrapped)?.len(),
+        GridColumnControlKind::Checkbox => crate::interactive_controls(&wrapped)?.len(),
+        GridColumnControlKind::Listbox | GridColumnControlKind::Combobox => {
             crate::selection_controls(&wrapped)?.len()
         },
-        OdfGridColumnControlKind::FormattedText
-        | OdfGridColumnControlKind::Number
-        | OdfGridColumnControlKind::Date
-        | OdfGridColumnControlKind::Time => crate::typed_value_controls(&wrapped)?.len(),
+        GridColumnControlKind::FormattedText
+        | GridColumnControlKind::Number
+        | GridColumnControlKind::Date
+        | GridColumnControlKind::Time => crate::typed_value_controls(&wrapped)?.len(),
     };
     if count != 1 {
         return invalid("column control fragment does not match its declared kind");
@@ -1048,8 +1045,8 @@ fn validate_string(label: &str, value: &str, limit: usize) -> Result<()> {
 }
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfGridControl,
-    current: Option<&OdfGridControl>,
+    replacement: &GridControl,
+    current: Option<&GridControl>,
 ) -> Result<()> {
     for item in &form.controls {
         if current.is_some_and(|value| value.xml_id == item.control.xml_id) {
@@ -1159,8 +1156,8 @@ fn canonical_nonnegative(value: &str) -> std::result::Result<String, String> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfGridNonNegativeInteger(String);
-impl OdfGridNonNegativeInteger {
+pub struct GridNonNegativeInteger(String);
+impl GridNonNegativeInteger {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         canonical_nonnegative(value.as_ref()).map(Self)
     }
@@ -1168,12 +1165,12 @@ impl OdfGridNonNegativeInteger {
         &self.0
     }
 }
-impl fmt::Display for OdfGridNonNegativeInteger {
+impl fmt::Display for GridNonNegativeInteger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
-impl FromStr for OdfGridNonNegativeInteger {
+impl FromStr for GridNonNegativeInteger {
     type Err = String;
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         Self::new(value)
@@ -1210,16 +1207,16 @@ mod tests {
                 .map(|c| c.kind)
                 .collect::<Vec<_>>(),
             [
-                OdfGridColumnControlKind::Text,
-                OdfGridColumnControlKind::Textarea,
-                OdfGridColumnControlKind::Password,
-                OdfGridColumnControlKind::FormattedText,
-                OdfGridColumnControlKind::Number,
-                OdfGridColumnControlKind::Date,
-                OdfGridColumnControlKind::Time,
-                OdfGridColumnControlKind::Checkbox,
-                OdfGridColumnControlKind::Listbox,
-                OdfGridColumnControlKind::Combobox,
+                GridColumnControlKind::Text,
+                GridColumnControlKind::Textarea,
+                GridColumnControlKind::Password,
+                GridColumnControlKind::FormattedText,
+                GridColumnControlKind::Number,
+                GridColumnControlKind::Date,
+                GridColumnControlKind::Time,
+                GridColumnControlKind::Checkbox,
+                GridColumnControlKind::Listbox,
+                GridColumnControlKind::Combobox,
             ]
         );
         assert_eq!(grid.columns[0].label.as_deref(), Some("Primary"));
@@ -1250,9 +1247,9 @@ mod tests {
             ))
             .is_err()
         );
-        assert!(OdfGridColumnControl::new(OdfGridColumnControlKind::Number, r#"<form:text xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" form:name="T" xml:id="t"/>"#).is_err());
-        assert_eq!(OdfGridNonNegativeInteger::new("-0").unwrap().as_str(), "0");
-        assert!(OdfGridNonNegativeInteger::new("-1").is_err());
+        assert!(GridColumnControl::new(GridColumnControlKind::Number, r#"<form:text xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" form:name="T" xml:id="t"/>"#).is_err());
+        assert_eq!(GridNonNegativeInteger::new("-0").unwrap().as_str(), "0");
+        assert!(GridNonNegativeInteger::new("-1").is_err());
     }
 
     #[test]
@@ -1260,26 +1257,26 @@ mod tests {
         let xml = document(
             r#"<form:grid form:name="Old" xml:id="old"><form:column form:label="A"><form:text form:name="Text" xml:id="text"/></form:column></form:grid>"#,
         );
-        let nested = OdfGridColumnControl::new(
-            OdfGridColumnControlKind::Number,
+        let nested = GridColumnControl::new(
+            GridColumnControlKind::Number,
             r#"<form:number form:name="Number" xml:id="number"/>"#,
         )
         .unwrap();
-        let mut column = OdfGridColumn::new();
+        let mut column = GridColumn::new();
         column.label = Some("Amount".into());
         column.add_control(nested).unwrap();
-        let mut inserted = OdfGridControl::new("Inserted", "inserted");
+        let mut inserted = GridControl::new("Inserted", "inserted");
         inserted.add_column(column).unwrap();
         let updated = insert_grid_control_xml(&xml, 0, &inserted).unwrap();
         assert!(updated.contains("<office:tail/>"));
-        let replacement = OdfGridControl::new("Replacement", "replacement");
+        let replacement = GridControl::new("Replacement", "replacement");
         let updated = replace_grid_control_xml(&updated, 0, &replacement).unwrap();
         assert_eq!(
             grid_controls(&remove_grid_control_xml(&updated, 1).unwrap()).unwrap(),
             std::slice::from_ref(&replacement)
         );
 
-        let mut form = OdfGridForm::new("Grids");
+        let mut form = GridForm::new("Grids");
         form.add_control(inserted.clone()).unwrap();
         let mut builder = crate::DocumentBuilder::new();
         builder.add_grid_form(&form).unwrap();

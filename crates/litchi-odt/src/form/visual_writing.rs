@@ -20,14 +20,14 @@ const MAX_FORMS: usize = 4096;
 const MAX_CONTROLS: usize = 65_536;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfImageButtonType {
+pub enum ImageButtonType {
     Submit,
     Reset,
     Push,
     Url,
 }
 
-impl OdfImageButtonType {
+impl ImageButtonType {
     fn token(self) -> &'static str {
         match self {
             Self::Submit => "submit",
@@ -49,12 +49,12 @@ impl OdfImageButtonType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfRadioVisualEffect {
+pub enum RadioVisualEffect {
     Flat,
     ThreeD,
 }
 
-impl OdfRadioVisualEffect {
+impl RadioVisualEffect {
     fn token(self) -> &'static str {
         match self {
             Self::Flat => "flat",
@@ -72,7 +72,7 @@ impl OdfRadioVisualEffect {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfRelativeImagePosition {
+pub enum RelativeImagePosition {
     Center,
     Start,
     End,
@@ -80,7 +80,7 @@ pub enum OdfRelativeImagePosition {
     Bottom,
 }
 
-impl OdfRelativeImagePosition {
+impl RelativeImagePosition {
     fn token(self) -> &'static str {
         match self {
             Self::Center => "center",
@@ -104,13 +104,13 @@ impl OdfRelativeImagePosition {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfRelativeImageAlign {
+pub enum RelativeImageAlign {
     Start,
     Center,
     End,
 }
 
-impl OdfRelativeImageAlign {
+impl RelativeImageAlign {
     fn token(self) -> &'static str {
         match self {
             Self::Start => "start",
@@ -130,7 +130,7 @@ impl OdfRelativeImageAlign {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfRadioControl {
+pub struct RadioControl {
     pub name: String,
     pub xml_id: String,
     pub current_selected: Option<bool>,
@@ -143,13 +143,13 @@ pub struct OdfRadioControl {
     pub title: Option<String>,
     pub value: Option<String>,
     pub data_field: Option<String>,
-    pub visual_effect: Option<OdfRadioVisualEffect>,
-    pub image_position: Option<OdfRelativeImagePosition>,
-    pub image_align: Option<OdfRelativeImageAlign>,
+    pub visual_effect: Option<RadioVisualEffect>,
+    pub image_position: Option<RelativeImagePosition>,
+    pub image_align: Option<RelativeImageAlign>,
     pub linked_cell: Option<String>,
 }
 
-impl OdfRadioControl {
+impl RadioControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -177,7 +177,7 @@ impl OdfRadioControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfFrameControl {
+pub struct FrameControl {
     pub name: String,
     pub xml_id: String,
     pub disabled: Option<bool>,
@@ -187,7 +187,7 @@ pub struct OdfFrameControl {
     pub title: Option<String>,
 }
 
-impl OdfFrameControl {
+impl FrameControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -206,10 +206,10 @@ impl OdfFrameControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfImageControl {
+pub struct ImageControl {
     pub name: String,
     pub xml_id: String,
-    pub button_type: Option<OdfImageButtonType>,
+    pub button_type: Option<ImageButtonType>,
     pub disabled: Option<bool>,
     pub image_data: Option<String>,
     pub printable: Option<bool>,
@@ -221,7 +221,7 @@ pub struct OdfImageControl {
     pub value: Option<String>,
 }
 
-impl OdfImageControl {
+impl ImageControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -245,31 +245,31 @@ impl OdfImageControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfVisualControl {
-    Radio(OdfRadioControl),
-    Frame(OdfFrameControl),
-    Image(OdfImageControl),
+pub enum VisualControl {
+    Radio(RadioControl),
+    Frame(FrameControl),
+    Image(ImageControl),
 }
 
-impl From<OdfRadioControl> for OdfVisualControl {
-    fn from(value: OdfRadioControl) -> Self {
+impl From<RadioControl> for VisualControl {
+    fn from(value: RadioControl) -> Self {
         Self::Radio(value)
     }
 }
 
-impl From<OdfFrameControl> for OdfVisualControl {
-    fn from(value: OdfFrameControl) -> Self {
+impl From<FrameControl> for VisualControl {
+    fn from(value: FrameControl) -> Self {
         Self::Frame(value)
     }
 }
 
-impl From<OdfImageControl> for OdfVisualControl {
-    fn from(value: OdfImageControl) -> Self {
+impl From<ImageControl> for VisualControl {
+    fn from(value: ImageControl) -> Self {
         Self::Image(value)
     }
 }
 
-impl OdfVisualControl {
+impl VisualControl {
     pub fn name(&self) -> &str {
         match self {
             Self::Radio(v) => &v.name,
@@ -296,13 +296,13 @@ impl OdfVisualControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfVisualForm {
+pub struct VisualForm {
     pub name: String,
-    pub controls: Vec<OdfVisualControl>,
+    pub controls: Vec<VisualControl>,
     pub apply_filter: Option<bool>,
 }
 
-impl OdfVisualForm {
+impl VisualForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -311,7 +311,7 @@ impl OdfVisualForm {
         }
     }
 
-    pub fn add_control(&mut self, control: impl Into<OdfVisualControl>) -> Result<()> {
+    pub fn add_control(&mut self, control: impl Into<VisualControl>) -> Result<()> {
         let control = control.into();
         validate_control(&control)?;
         if self
@@ -353,7 +353,7 @@ impl OdfVisualForm {
     }
 }
 
-pub fn visual_controls(xml: &str) -> Result<Vec<OdfVisualControl>> {
+pub fn visual_controls(xml: &str) -> Result<Vec<VisualControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -364,7 +364,7 @@ pub fn visual_controls(xml: &str) -> Result<Vec<OdfVisualControl>> {
 pub fn insert_visual_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfVisualControl,
+    control: &VisualControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -386,7 +386,7 @@ pub fn insert_visual_control_xml(
 pub fn replace_visual_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfVisualControl,
+    replacement: &VisualControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -416,7 +416,7 @@ pub fn remove_visual_control_xml(xml: &str, index: usize) -> Result<String> {
     apply(xml, old.span.clone(), "")
 }
 
-fn radio_xml(value: &OdfRadioControl) -> Result<String> {
+fn radio_xml(value: &RadioControl) -> Result<String> {
     validate_radio(value)?;
     let mut out = control_start("radio", &value.name, &value.xml_id);
     push_bool(&mut out, "form:current-selected", value.current_selected);
@@ -443,7 +443,7 @@ fn radio_xml(value: &OdfRadioControl) -> Result<String> {
     Ok(out)
 }
 
-fn frame_xml(value: &OdfFrameControl) -> Result<String> {
+fn frame_xml(value: &FrameControl) -> Result<String> {
     validate_frame(value)?;
     let mut out = control_start("frame", &value.name, &value.xml_id);
     push_bool(&mut out, "form:disabled", value.disabled);
@@ -455,7 +455,7 @@ fn frame_xml(value: &OdfFrameControl) -> Result<String> {
     Ok(out)
 }
 
-fn image_xml(value: &OdfImageControl) -> Result<String> {
+fn image_xml(value: &ImageControl) -> Result<String> {
     validate_image(value)?;
     let mut out = control_start("image", &value.name, &value.xml_id);
     if let Some(v) = value.button_type {
@@ -486,15 +486,15 @@ fn control_start(kind: &str, name: &str, xml_id: &str) -> String {
     )
 }
 
-fn validate_control(value: &OdfVisualControl) -> Result<()> {
+fn validate_control(value: &VisualControl) -> Result<()> {
     match value {
-        OdfVisualControl::Radio(v) => validate_radio(v),
-        OdfVisualControl::Frame(v) => validate_frame(v),
-        OdfVisualControl::Image(v) => validate_image(v),
+        VisualControl::Radio(v) => validate_radio(v),
+        VisualControl::Frame(v) => validate_frame(v),
+        VisualControl::Image(v) => validate_image(v),
     }
 }
 
-fn validate_radio(value: &OdfRadioControl) -> Result<()> {
+fn validate_radio(value: &RadioControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id)?;
     validate_optionals(&[
         ("radio label", value.label.as_deref()),
@@ -507,10 +507,10 @@ fn validate_radio(value: &OdfRadioControl) -> Result<()> {
         && !matches!(
             value.image_position,
             Some(
-                OdfRelativeImagePosition::Start
-                    | OdfRelativeImagePosition::End
-                    | OdfRelativeImagePosition::Top
-                    | OdfRelativeImagePosition::Bottom
+                RelativeImagePosition::Start
+                    | RelativeImagePosition::End
+                    | RelativeImagePosition::Top
+                    | RelativeImagePosition::Bottom
             )
         )
     {
@@ -519,7 +519,7 @@ fn validate_radio(value: &OdfRadioControl) -> Result<()> {
     Ok(())
 }
 
-fn validate_frame(value: &OdfFrameControl) -> Result<()> {
+fn validate_frame(value: &FrameControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id)?;
     validate_optionals(&[
         ("frame for", value.form_for.as_deref()),
@@ -528,7 +528,7 @@ fn validate_frame(value: &OdfFrameControl) -> Result<()> {
     ])
 }
 
-fn validate_image(value: &OdfImageControl) -> Result<()> {
+fn validate_image(value: &ImageControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id)?;
     validate_optionals(&[
         ("image target frame", value.target_frame.as_deref()),
@@ -539,7 +539,7 @@ fn validate_image(value: &OdfImageControl) -> Result<()> {
     validate_uri("image href", value.href.as_deref())
 }
 
-fn validate_controls(controls: &[OdfVisualControl]) -> Result<()> {
+fn validate_controls(controls: &[VisualControl]) -> Result<()> {
     if controls.len() > MAX_CONTROLS {
         return invalid("too many visual controls");
     }
@@ -562,13 +562,13 @@ fn validate_controls(controls: &[OdfVisualControl]) -> Result<()> {
     validate_radio_groups(controls)
 }
 
-fn validate_radio_groups(controls: &[OdfVisualControl]) -> Result<()> {
+fn validate_radio_groups(controls: &[VisualControl]) -> Result<()> {
     for (index, control) in controls.iter().enumerate() {
-        let OdfVisualControl::Radio(radio) = control else {
+        let VisualControl::Radio(radio) = control else {
             continue;
         };
         for other in &controls[index + 1..] {
-            let OdfVisualControl::Radio(other) = other else {
+            let VisualControl::Radio(other) = other else {
                 continue;
             };
             if radio.name == other.name
@@ -596,7 +596,7 @@ fn validate_radio_groups(controls: &[OdfVisualControl]) -> Result<()> {
 
 fn reject_group_conflict(
     controls: &[ControlLocation],
-    replacement: &OdfVisualControl,
+    replacement: &VisualControl,
     replaced_index: Option<usize>,
 ) -> Result<()> {
     let mut values = Vec::with_capacity(controls.len() + 1);
@@ -610,9 +610,9 @@ fn reject_group_conflict(
     validate_radio_groups(&values)
 }
 
-fn control_size(control: &OdfVisualControl) -> usize {
+fn control_size(control: &VisualControl) -> usize {
     match control {
-        OdfVisualControl::Radio(v) => string_size(&[
+        VisualControl::Radio(v) => string_size(&[
             Some(&v.name),
             Some(&v.xml_id),
             v.label.as_ref(),
@@ -621,14 +621,14 @@ fn control_size(control: &OdfVisualControl) -> usize {
             v.data_field.as_ref(),
             v.linked_cell.as_ref(),
         ]),
-        OdfVisualControl::Frame(v) => string_size(&[
+        VisualControl::Frame(v) => string_size(&[
             Some(&v.name),
             Some(&v.xml_id),
             v.form_for.as_ref(),
             v.label.as_ref(),
             v.title.as_ref(),
         ]),
-        OdfVisualControl::Image(v) => string_size(&[
+        VisualControl::Image(v) => string_size(&[
             Some(&v.name),
             Some(&v.xml_id),
             v.image_data.as_ref(),
@@ -652,7 +652,7 @@ struct ControlLocation {
     span: Range<usize>,
     form: usize,
     global_index: usize,
-    control: OdfVisualControl,
+    control: VisualControl,
 }
 
 #[derive(Clone)]
@@ -903,7 +903,7 @@ fn parse_control(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     local: &[u8],
-) -> Result<OdfVisualControl> {
+) -> Result<VisualControl> {
     let attrs = attributes(reader, element)?;
     let allowed = match local {
         b"radio" => RADIO_ATTRS,
@@ -915,7 +915,7 @@ fn parse_control(
     let xml_id = required(&attrs, XML, "id")?;
     match local {
         b"radio" => {
-            let mut value = OdfRadioControl::new(name, xml_id);
+            let mut value = RadioControl::new(name, xml_id);
             value.current_selected = optional_bool(&attrs, FORM, "current-selected")?;
             value.disabled = optional_bool(&attrs, FORM, "disabled")?;
             value.label = optional(&attrs, FORM, "label");
@@ -927,20 +927,20 @@ fn parse_control(
             value.value = optional(&attrs, FORM, "value");
             value.data_field = optional(&attrs, FORM, "data-field");
             value.visual_effect = optional(&attrs, FORM, "visual-effect")
-                .map(|v| OdfRadioVisualEffect::parse(&v))
+                .map(|v| RadioVisualEffect::parse(&v))
                 .transpose()?;
             value.image_position = optional(&attrs, FORM, "image-position")
-                .map(|v| OdfRelativeImagePosition::parse(&v))
+                .map(|v| RelativeImagePosition::parse(&v))
                 .transpose()?;
             value.image_align = optional(&attrs, FORM, "image-align")
-                .map(|v| OdfRelativeImageAlign::parse(&v))
+                .map(|v| RelativeImageAlign::parse(&v))
                 .transpose()?;
             value.linked_cell = optional(&attrs, FORM, "linked-cell");
             validate_radio(&value)?;
             Ok(value.into())
         },
         b"frame" => {
-            let mut value = OdfFrameControl::new(name, xml_id);
+            let mut value = FrameControl::new(name, xml_id);
             value.disabled = optional_bool(&attrs, FORM, "disabled")?;
             value.form_for = optional(&attrs, FORM, "for");
             value.label = optional(&attrs, FORM, "label");
@@ -950,9 +950,9 @@ fn parse_control(
             Ok(value.into())
         },
         _ => {
-            let mut value = OdfImageControl::new(name, xml_id);
+            let mut value = ImageControl::new(name, xml_id);
             value.button_type = optional(&attrs, FORM, "button-type")
-                .map(|v| OdfImageButtonType::parse(&v))
+                .map(|v| ImageButtonType::parse(&v))
                 .transpose()?;
             value.disabled = optional_bool(&attrs, FORM, "disabled")?;
             value.image_data = optional(&attrs, FORM, "image-data");
@@ -1329,18 +1329,18 @@ mod tests {
 
     #[test]
     fn canonical_family_round_trips() {
-        let mut radio = OdfRadioControl::new("Group", "radio_1");
+        let mut radio = RadioControl::new("Group", "radio_1");
         radio.label = Some("A & B".into());
         radio.selected = Some(true);
-        radio.image_position = Some(OdfRelativeImagePosition::Start);
-        radio.image_align = Some(OdfRelativeImageAlign::Center);
-        let mut frame = OdfFrameControl::new("Frame", "frame_1");
+        radio.image_position = Some(RelativeImagePosition::Start);
+        radio.image_align = Some(RelativeImageAlign::Center);
+        let mut frame = FrameControl::new("Frame", "frame_1");
         frame.form_for = Some("radio_1".into());
-        let mut image = OdfImageControl::new("Image", "image_1");
-        image.button_type = Some(OdfImageButtonType::Submit);
+        let mut image = ImageControl::new("Image", "image_1");
+        image.button_type = Some(ImageButtonType::Submit);
         image.image_data = Some("Pictures/form.png".into());
         image.href = Some("https://example.invalid/submit".into());
-        let mut form = OdfVisualForm::new("Main");
+        let mut form = VisualForm::new("Main");
         form.add_control(radio).unwrap();
         form.add_control(frame).unwrap();
         form.add_control(image).unwrap();
@@ -1348,10 +1348,10 @@ mod tests {
         let parsed = visual_controls(&xml).unwrap();
         assert_eq!(parsed.len(), 3);
         assert!(
-            matches!(&parsed[0], OdfVisualControl::Radio(v) if v.label.as_deref() == Some("A & B"))
+            matches!(&parsed[0], VisualControl::Radio(v) if v.label.as_deref() == Some("A & B"))
         );
         assert!(
-            matches!(&parsed[2], OdfVisualControl::Image(v) if v.button_type == Some(OdfImageButtonType::Submit))
+            matches!(&parsed[2], VisualControl::Image(v) if v.button_type == Some(ImageButtonType::Submit))
         );
     }
 
@@ -1364,7 +1364,7 @@ mod tests {
         assert_eq!(
             parsed
                 .iter()
-                .filter(|v| matches!(v, OdfVisualControl::Radio(_)))
+                .filter(|v| matches!(v, VisualControl::Radio(_)))
                 .count(),
             3
         );
@@ -1379,10 +1379,10 @@ mod tests {
         let xml = format!(
             r#"{ROOT}<f:form f:name="Main"><f:radio f:name="Old" xml:id="old"><f:properties><f:property f:property-name="keep" o:value-type="void"/></f:properties></f:radio><!--keep--><f:text f:name="Text" xml:id="text"/></f:form>{END}"#
         );
-        let image: OdfVisualControl = OdfImageControl::new("Image", "image").into();
+        let image: VisualControl = ImageControl::new("Image", "image").into();
         let inserted = insert_visual_control_xml(&xml, 0, &image).unwrap();
         assert!(inserted.contains("<!--keep-->") && inserted.contains("f:text"));
-        let frame: OdfVisualControl = OdfFrameControl::new("Frame", "frame").into();
+        let frame: VisualControl = FrameControl::new("Frame", "frame").into();
         let replaced = replace_visual_control_xml(&inserted, 0, &frame).unwrap();
         let removed = remove_visual_control_xml(&replaced, 1).unwrap();
         assert_eq!(visual_controls(&removed).unwrap(), [frame]);
@@ -1396,7 +1396,7 @@ mod tests {
 
     #[test]
     fn hostile_values_children_resources_and_active_content_are_rejected() {
-        assert!(OdfRadioControl::new("R", "1bad").to_xml_fragment().is_err());
+        assert!(RadioControl::new("R", "1bad").to_xml_fragment().is_err());
         let bad_token = format!(
             r#"{ROOT}<f:form f:name="Main"><f:radio f:name="R" xml:id="r" f:visual-effect="raised"/></f:form>{END}"#
         );
@@ -1407,7 +1407,7 @@ mod tests {
         assert!(visual_controls(&bad_child).is_err());
         let event = format!(r#"{ROOT}<f:form f:name="Main"><o:event-listeners/></f:form>{END}"#);
         assert!(visual_controls(&event).is_err());
-        let mut image = OdfImageControl::new("I", "i");
+        let mut image = ImageControl::new("I", "i");
         image.href = Some("javascript:alert(1)".into());
         assert!(image.to_xml_fragment().is_err());
         image.href = None;
@@ -1417,11 +1417,11 @@ mod tests {
 
     #[test]
     fn radio_group_cardinality_is_atomic() {
-        let mut first = OdfRadioControl::new("Group", "r1");
+        let mut first = RadioControl::new("Group", "r1");
         first.selected = Some(true);
-        let mut second = OdfRadioControl::new("Group", "r2");
+        let mut second = RadioControl::new("Group", "r2");
         second.selected = Some(true);
-        let mut form = OdfVisualForm::new("Main");
+        let mut form = VisualForm::new("Main");
         form.add_control(first).unwrap();
         assert!(form.add_control(second).is_err());
         assert_eq!(form.controls.len(), 1);
@@ -1430,8 +1430,8 @@ mod tests {
     #[test]
     fn builder_and_mutable_document_round_trip() {
         use crate::{Document, DocumentBuilder, MutableDocument};
-        let mut form = OdfVisualForm::new("Main");
-        form.add_control(OdfRadioControl::new("Group", "radio"))
+        let mut form = VisualForm::new("Main");
+        form.add_control(RadioControl::new("Group", "radio"))
             .unwrap();
         let mut builder = DocumentBuilder::new();
         builder.add_visual_form(&form).unwrap();
@@ -1439,16 +1439,16 @@ mod tests {
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.visual_controls().unwrap().len(), 1);
-        let image: OdfVisualControl = OdfImageControl::new("Image", "image").into();
+        let image: VisualControl = ImageControl::new("Image", "image").into();
         mutable.insert_visual_control(0, &image).unwrap();
-        let frame: OdfVisualControl = OdfFrameControl::new("Frame", "frame").into();
+        let frame: VisualControl = FrameControl::new("Frame", "frame").into();
         assert!(matches!(
             mutable.replace_visual_control(0, &frame).unwrap(),
-            OdfVisualControl::Radio(_)
+            VisualControl::Radio(_)
         ));
         assert!(matches!(
             mutable.remove_visual_control(1).unwrap(),
-            OdfVisualControl::Image(_)
+            VisualControl::Image(_)
         ));
         assert_eq!(mutable.visual_controls().unwrap(), [frame]);
     }

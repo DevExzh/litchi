@@ -8,7 +8,7 @@
 //! duplicates and malformed owned values are rejected.
 
 use crate::{
-    FlatOpenDocument, HorizontalBackgroundPosition, OdfNonNegativeLength, OpenDocumentPackage,
+    FlatOpenDocument, HorizontalBackgroundPosition, NonNegativeLength, OpenDocumentPackage,
     TableRowBackgroundColor, TableRowBackgroundImage, TableRowBackgroundPosition,
     TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowOpacity, TableShadow,
     VerticalBackgroundPosition, style::paragraph::margin::rewrite_start_tag,
@@ -214,11 +214,11 @@ pub struct ParagraphBorderProperties {
     pub border_line_width_bottom: Option<ParagraphBorderWidths>,
     pub border_line_width_left: Option<ParagraphBorderWidths>,
     pub border_line_width_right: Option<ParagraphBorderWidths>,
-    pub padding: Option<OdfNonNegativeLength>,
-    pub padding_top: Option<OdfNonNegativeLength>,
-    pub padding_bottom: Option<OdfNonNegativeLength>,
-    pub padding_left: Option<OdfNonNegativeLength>,
-    pub padding_right: Option<OdfNonNegativeLength>,
+    pub padding: Option<NonNegativeLength>,
+    pub padding_top: Option<NonNegativeLength>,
+    pub padding_bottom: Option<NonNegativeLength>,
+    pub padding_left: Option<NonNegativeLength>,
+    pub padding_right: Option<NonNegativeLength>,
     pub shadow: Option<TableShadow>,
     pub background_color: Option<TableRowBackgroundColor>,
     pub background_transparency: Option<ParagraphBackgroundTransparency>,
@@ -502,7 +502,7 @@ fn border_properties(
     };
     let padding = |attrs: &mut Vec<(Ns, Vec<u8>, String)>, local: &[u8]| {
         take(attrs, Ns::Fo, local)
-            .map(OdfNonNegativeLength::new)
+            .map(NonNegativeLength::new)
             .transpose()
     };
     let value = ParagraphBorderProperties {

@@ -1,5 +1,5 @@
 use litchi_odt::{
-    FlatOpenDocument, LineHeight, LineHeightPercent, LineSpacingLength, OdfNonNegativeLength,
+    FlatOpenDocument, LineHeight, LineHeightPercent, LineSpacingLength, NonNegativeLength,
     ParagraphLineSpacing, TextAlignLast, TextAutospace, parse_paragraph_style_line_spacings,
 };
 use std::io::Cursor;
@@ -29,7 +29,7 @@ fn parses_all_line_spacing_attributes() {
     );
     assert_eq!(
         p.line_height_at_least,
-        Some(OdfNonNegativeLength::new("0.5cm").unwrap())
+        Some(NonNegativeLength::new("0.5cm").unwrap())
     );
     assert_eq!(p.font_independent_line_spacing, Some(true));
     assert_eq!(p.text_autospace, Some(TextAutospace::IdeographAlpha));
@@ -38,7 +38,7 @@ fn parses_all_line_spacing_attributes() {
     assert_eq!(p.snap_to_layout_grid, Some(false));
     assert_eq!(
         p.tab_stop_distance,
-        Some(OdfNonNegativeLength::new("1.251cm").unwrap())
+        Some(NonNegativeLength::new("1.251cm").unwrap())
     );
     assert_eq!(p.text_align_last, Some(TextAlignLast::Center));
 }
@@ -65,9 +65,7 @@ fn parses_normal_and_length_line_heights() {
             .as_ref()
             .unwrap()
             .line_height,
-        Some(LineHeight::Length(
-            OdfNonNegativeLength::new("0.6cm").unwrap()
-        ))
+        Some(LineHeight::Length(NonNegativeLength::new("0.6cm").unwrap()))
     );
 }
 
@@ -82,7 +80,7 @@ fn resolves_through_parent_and_default_style() {
     let default = set.resolved("Missing").unwrap().unwrap();
     assert_eq!(
         default.tab_stop_distance,
-        Some(OdfNonNegativeLength::new("1cm").unwrap())
+        Some(NonNegativeLength::new("1cm").unwrap())
     );
 }
 
@@ -93,7 +91,7 @@ fn fragment_round_trip() {
     p.text_autospace = Some(TextAutospace::None);
     p.justify_single_word = Some(true);
     p.text_align_last = Some(TextAlignLast::Start);
-    p.tab_stop_distance = Some(OdfNonNegativeLength::new("2cm").unwrap());
+    p.tab_stop_distance = Some(NonNegativeLength::new("2cm").unwrap());
     let fragment = p.to_xml_fragment().unwrap();
     assert!(fragment.contains(r#"fo:line-height="normal""#));
     assert!(fragment.contains(r#"style:text-autospace="none""#));

@@ -1,6 +1,6 @@
 use litchi_odt::{
     BulletRelativeSize, FlatOpenDocument, ListLevelBulletStyle, ListLevelImageSource,
-    ListLevelKind, ListLevelStyle, ListStyle, OdfOutlineNumberFormat, OdfOutlinePositiveInteger,
+    ListLevelKind, ListLevelStyle, ListStyle, OutlineNumberFormat, OutlinePositiveInteger,
     parse_list_styles,
 };
 use std::io::Cursor;
@@ -73,12 +73,12 @@ fn round_trip_fragment_reparses_identically() {
         level: 1,
         style_name: None,
         kind: ListLevelKind::Number(litchi_odt::ListLevelNumberStyle {
-            format: Some(OdfOutlineNumberFormat::new("I").unwrap()),
+            format: Some(OutlineNumberFormat::new("I").unwrap()),
             prefix: None,
             suffix: Some(".".to_string()),
             letter_sync: None,
             display_levels: None,
-            start_value: Some(OdfOutlinePositiveInteger::new("4").unwrap()),
+            start_value: Some(OutlinePositiveInteger::new("4").unwrap()),
         }),
     });
     style.levels.push(ListLevelStyle {

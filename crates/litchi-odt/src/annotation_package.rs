@@ -29,12 +29,12 @@ const MAX_ANNOTATIONS: usize = 65_536;
 const MAX_EVENTS: usize = 1_000_000;
 
 /// Rich annotation value shared by ODT, ODS, and ODP.
-pub type OdfAnnotation = CellAnnotation;
+pub type Annotation = CellAnnotation;
 
 /// A schema location to which an annotation is attached.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfAnnotationPosition {
+pub enum AnnotationPosition {
     TextParagraph {
         paragraph_index: usize,
     },
@@ -57,17 +57,17 @@ pub enum OdfAnnotationPosition {
 
 /// Start position and optional named-range end position.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfAnnotationAnchor {
-    pub start: OdfAnnotationPosition,
-    pub end: Option<OdfAnnotationPosition>,
+pub struct AnnotationAnchor {
+    pub start: AnnotationPosition,
+    pub end: Option<AnnotationPosition>,
 }
 
-impl OdfAnnotationAnchor {
-    pub fn point(start: OdfAnnotationPosition) -> Self {
+impl AnnotationAnchor {
+    pub fn point(start: AnnotationPosition) -> Self {
         Self { start, end: None }
     }
 
-    pub fn range(start: OdfAnnotationPosition, end: OdfAnnotationPosition) -> Self {
+    pub fn range(start: AnnotationPosition, end: AnnotationPosition) -> Self {
         Self {
             start,
             end: Some(end),
@@ -77,15 +77,15 @@ impl OdfAnnotationAnchor {
 
 /// One annotation in document order.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfAnnotationInfo {
+pub struct AnnotationInfo {
     pub index: usize,
-    pub annotation: OdfAnnotation,
-    pub anchor: OdfAnnotationAnchor,
+    pub annotation: Annotation,
+    pub anchor: AnnotationAnchor,
 }
 
 /// Partial typed metadata update. `None` retains a value; `Some(None)` clears it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct OdfAnnotationUpdate {
+pub struct AnnotationUpdate {
     pub creator: Option<Option<String>>,
     pub date: Option<Option<String>>,
     pub date_string: Option<Option<String>>,
@@ -110,22 +110,22 @@ struct Span {
 
 #[derive(Clone)]
 struct Site {
-    position: OdfAnnotationPosition,
+    position: AnnotationPosition,
     span: Span,
 }
 
 struct Record {
     span: Span,
     parent_start: usize,
-    annotation: Option<OdfAnnotation>,
-    start_position: OdfAnnotationPosition,
-    end: Option<(Span, OdfAnnotationPosition)>,
+    annotation: Option<Annotation>,
+    start_position: AnnotationPosition,
+    end: Option<(Span, AnnotationPosition)>,
 }
 
 struct EndMarker {
     span: Span,
     name: String,
-    position: OdfAnnotationPosition,
+    position: AnnotationPosition,
 }
 
 struct Scan {
@@ -173,19 +173,19 @@ struct ActiveBuilder {
     builder: AnnotationBuilder,
 }
 
-pub(crate) fn annotations(content: &str, host: AnnotationHost) -> Result<Vec<OdfAnnotationInfo>> {
+pub(crate) fn annotations(content: &str, host: AnnotationHost) -> Result<Vec<AnnotationInfo>> {
     let scan = scan(content, host)?;
     scan.records
         .into_iter()
         .enumerate()
         .map(|(index, mut record)| {
-            Ok(OdfAnnotationInfo {
+            Ok(AnnotationInfo {
                 index,
                 annotation: record
                     .annotation
                     .take()
                     .ok_or_else(|| invalid_error("unterminated annotation"))?,
-                anchor: OdfAnnotationAnchor {
+                anchor: AnnotationAnchor {
                     start: record.start_position,
                     end: record.end.map(|(_, position)| position),
                 },
@@ -198,7 +198,7 @@ pub(crate) fn find_annotation(
     content: &str,
     host: AnnotationHost,
     name: &str,
-) -> Result<Option<OdfAnnotationInfo>> {
+) -> Result<Option<AnnotationInfo>> {
     if name.is_empty() {
         return invalid("annotation name cannot be empty");
     }
@@ -211,8 +211,8 @@ pub(crate) fn add(
     package: &OwnedPackage,
     content: &str,
     host: AnnotationHost,
-    anchor: &OdfAnnotationAnchor,
-    annotation: &OdfAnnotation,
+    anchor: &AnnotationAnchor,
+    annotation: &Annotation,
 ) -> Result<(Vec<u8>, usize)> {
     let (updated, index) = add_xml(content, host, anchor, annotation)?;
     rebuild(package, &updated).map(|bytes| (bytes, index))
@@ -223,7 +223,7 @@ pub(crate) fn replace(
     content: &str,
     host: AnnotationHost,
     index: usize,
-    annotation: &OdfAnnotation,
+    annotation: &Annotation,
 ) -> Result<Vec<u8>> {
     rebuild(package, &replace_xml(content, host, index, annotation)?)
 }
@@ -233,7 +233,7 @@ pub(crate) fn update(
     content: &str,
     host: AnnotationHost,
     index: usize,
-    update: &OdfAnnotationUpdate,
+    update: &AnnotationUpdate,
 ) -> Result<Vec<u8>> {
     let items = annotations(content, host)?;
     let len = items.len();
@@ -281,8 +281,8 @@ pub(crate) fn reorder(
 fn add_xml(
     content: &str,
     host: AnnotationHost,
-    anchor: &OdfAnnotationAnchor,
-    annotation: &OdfAnnotation,
+    anchor: &AnnotationAnchor,
+    annotation: &Annotation,
 ) -> Result<(String, usize)> {
     validate_anchor_host(host, anchor)?;
     annotation.validate()?;
@@ -328,7 +328,7 @@ fn replace_xml(
     content: &str,
     host: AnnotationHost,
     index: usize,
-    annotation: &OdfAnnotation,
+    annotation: &Annotation,
 ) -> Result<String> {
     annotation.validate()?;
     let scan = scan(content, host)?;
@@ -694,7 +694,7 @@ fn structural_kind(
         let repeat =
             optional_usize(reader, element, TABLE_NS, b"number-columns-repeated")?.unwrap_or(1);
         let (sheet, row, column) = take_row_cell(frames, repeat)?;
-        let position = OdfAnnotationPosition::SpreadsheetCell {
+        let position = AnnotationPosition::SpreadsheetCell {
             sheet_index: sheet,
             row,
             column,
@@ -709,7 +709,7 @@ fn structural_kind(
             .ok_or_else(|| invalid_error("page index overflow"))?;
         let site = push_site(
             sites,
-            OdfAnnotationPosition::PresentationPage { page_index: page },
+            AnnotationPosition::PresentationPage { page_index: page },
             start,
             end,
             empty,
@@ -725,7 +725,7 @@ fn structural_kind(
     {
         let site = push_site(
             sites,
-            OdfAnnotationPosition::PresentationShape {
+            AnnotationPosition::PresentationShape {
                 page_index: page,
                 shape_name: name,
             },
@@ -738,7 +738,7 @@ fn structural_kind(
     }
     if ns == Ns::Text && matches!(local, b"p" | b"h") {
         let position = if let Some(annotation) = current_annotation(frames) {
-            Some(OdfAnnotationPosition::AnnotationBody {
+            Some(AnnotationPosition::AnnotationBody {
                 annotation_index: annotation,
             })
         } else if host == AnnotationHost::Text {
@@ -746,7 +746,7 @@ fn structural_kind(
             *next_paragraph = next_paragraph
                 .checked_add(1)
                 .ok_or_else(|| invalid_error("paragraph index overflow"))?;
-            Some(OdfAnnotationPosition::TextParagraph {
+            Some(AnnotationPosition::TextParagraph {
                 paragraph_index: index,
             })
         } else {
@@ -799,7 +799,7 @@ fn take_row_cell(frames: &mut [Frame], repeat: usize) -> Result<(usize, usize, u
 
 fn push_site(
     sites: &mut Vec<Site>,
-    position: OdfAnnotationPosition,
+    position: AnnotationPosition,
     start: usize,
     end: usize,
     empty: bool,
@@ -836,9 +836,9 @@ fn current_position(
     frames: &[Frame],
     sites: &[Site],
     host: AnnotationHost,
-) -> Result<OdfAnnotationPosition> {
+) -> Result<AnnotationPosition> {
     if let Some(annotation) = current_annotation(frames) {
-        return Ok(OdfAnnotationPosition::AnnotationBody {
+        return Ok(AnnotationPosition::AnnotationBody {
             annotation_index: annotation,
         });
     }
@@ -965,26 +965,26 @@ fn validate_new_name(scan: &Scan, name: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-fn validate_anchor_host(host: AnnotationHost, anchor: &OdfAnnotationAnchor) -> Result<()> {
-    let valid = |position: &OdfAnnotationPosition| {
+fn validate_anchor_host(host: AnnotationHost, anchor: &AnnotationAnchor) -> Result<()> {
+    let valid = |position: &AnnotationPosition| {
         matches!(
             (host, position),
-            (_, OdfAnnotationPosition::AnnotationBody { .. })
+            (_, AnnotationPosition::AnnotationBody { .. })
                 | (
                     AnnotationHost::Text,
-                    OdfAnnotationPosition::TextParagraph { .. }
+                    AnnotationPosition::TextParagraph { .. }
                 )
                 | (
                     AnnotationHost::Spreadsheet,
-                    OdfAnnotationPosition::SpreadsheetCell { .. }
+                    AnnotationPosition::SpreadsheetCell { .. }
                 )
                 | (
                     AnnotationHost::Presentation,
-                    OdfAnnotationPosition::PresentationPage { .. }
+                    AnnotationPosition::PresentationPage { .. }
                 )
                 | (
                     AnnotationHost::Presentation,
-                    OdfAnnotationPosition::PresentationShape { .. }
+                    AnnotationPosition::PresentationShape { .. }
                 )
         )
     };
@@ -993,27 +993,26 @@ fn validate_anchor_host(host: AnnotationHost, anchor: &OdfAnnotationAnchor) -> R
     }
     if anchor.end.is_some()
         && host != AnnotationHost::Text
-        && !matches!(anchor.start, OdfAnnotationPosition::AnnotationBody { .. })
+        && !matches!(anchor.start, AnnotationPosition::AnnotationBody { .. })
     {
         return invalid("named annotation ranges must be inserted in text paragraph content");
     }
     Ok(())
 }
 
-fn site_for<'a>(scan: &'a Scan, position: &OdfAnnotationPosition) -> Result<&'a Site> {
+fn site_for<'a>(scan: &'a Scan, position: &AnnotationPosition) -> Result<&'a Site> {
     let mut matches = scan.sites.iter().filter(|site| &site.position == position);
     let site = matches
         .next()
         .ok_or_else(|| invalid_error(format!("annotation anchor {position:?} was not found")))?;
-    if matches.next().is_some()
-        && matches!(position, OdfAnnotationPosition::PresentationShape { .. })
+    if matches.next().is_some() && matches!(position, AnnotationPosition::PresentationShape { .. })
     {
         return invalid("presentation shape annotation anchor is ambiguous");
     }
     Ok(site)
 }
 
-fn serialize(annotation: &OdfAnnotation) -> Result<String> {
+fn serialize(annotation: &Annotation) -> Result<String> {
     let mut annotation = annotation.clone();
     for (prefix, uri) in [
         ("office", OFFICE),
@@ -1225,7 +1224,7 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 macro_rules! annotation_facade_methods {
     ($host:ident) => {
         /// Inspect annotations in document order without following body links.
-        pub fn annotations(&self) -> litchi_core::Result<Vec<crate::OdfAnnotationInfo>> {
+        pub fn annotations(&self) -> litchi_core::Result<Vec<crate::AnnotationInfo>> {
             crate::annotation_package::annotations(
                 self.content.xml_content(),
                 crate::annotation_package::AnnotationHost::$host,
@@ -1236,7 +1235,7 @@ macro_rules! annotation_facade_methods {
         pub fn find_annotation(
             &self,
             name: &str,
-        ) -> litchi_core::Result<Option<crate::OdfAnnotationInfo>> {
+        ) -> litchi_core::Result<Option<crate::AnnotationInfo>> {
             crate::annotation_package::find_annotation(
                 self.content.xml_content(),
                 crate::annotation_package::AnnotationHost::$host,
@@ -1247,8 +1246,8 @@ macro_rules! annotation_facade_methods {
         /// Add a point or named-range annotation atomically.
         pub fn add_annotation(
             &mut self,
-            anchor: &crate::OdfAnnotationAnchor,
-            annotation: &crate::OdfAnnotation,
+            anchor: &crate::AnnotationAnchor,
+            annotation: &crate::Annotation,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::annotation_package::add(
                 &self.package,
@@ -1266,7 +1265,7 @@ macro_rules! annotation_facade_methods {
         pub fn replace_annotation(
             &mut self,
             index: usize,
-            annotation: &crate::OdfAnnotation,
+            annotation: &crate::Annotation,
         ) -> litchi_core::Result<()> {
             let bytes = crate::annotation_package::replace(
                 &self.package,
@@ -1284,7 +1283,7 @@ macro_rules! annotation_facade_methods {
         pub fn update_annotation(
             &mut self,
             index: usize,
-            update: &crate::OdfAnnotationUpdate,
+            update: &crate::AnnotationUpdate,
         ) -> litchi_core::Result<()> {
             let bytes = crate::annotation_package::update(
                 &self.package,
@@ -1346,7 +1345,7 @@ mod tests {
         assert!(items[0].anchor.end.is_some());
         assert_eq!(
             items[1].anchor.start,
-            OdfAnnotationPosition::AnnotationBody {
+            AnnotationPosition::AnnotationBody {
                 annotation_index: 0
             }
         );
@@ -1362,7 +1361,7 @@ mod tests {
             .remove(0);
         assert_eq!(
             item.anchor.start,
-            OdfAnnotationPosition::SpreadsheetCell {
+            AnnotationPosition::SpreadsheetCell {
                 sheet_index: 0,
                 row: 0,
                 column: 0
@@ -1377,7 +1376,7 @@ mod tests {
             .remove(0);
         assert_eq!(
             item.anchor.start,
-            OdfAnnotationPosition::PresentationShape {
+            AnnotationPosition::PresentationShape {
                 page_index: 0,
                 shape_name: "Title".to_string()
             }
@@ -1401,12 +1400,12 @@ mod tests {
         let xml = format!(
             "<office:document {NS} xmlns:v='urn:vendor'><office:body><office:text><text:p><v:keep key='1'/>text</text:p></office:text></office:body></office:document>"
         );
-        let mut annotation = OdfAnnotation::new("review");
+        let mut annotation = Annotation::new("review");
         annotation.set_name(Some("r1"));
         annotation.set_creator(Some("Ada"));
-        let anchor = OdfAnnotationAnchor::range(
-            OdfAnnotationPosition::TextParagraph { paragraph_index: 0 },
-            OdfAnnotationPosition::TextParagraph { paragraph_index: 0 },
+        let anchor = AnnotationAnchor::range(
+            AnnotationPosition::TextParagraph { paragraph_index: 0 },
+            AnnotationPosition::TextParagraph { paragraph_index: 0 },
         );
         let (updated, index) = add_xml(&xml, AnnotationHost::Text, &anchor, &annotation).unwrap();
         assert_eq!(index, 0);

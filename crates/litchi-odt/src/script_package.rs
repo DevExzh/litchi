@@ -4,8 +4,7 @@
 
 use crate::core::OwnedPackage;
 use crate::document_scripts::{
-    OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
-    parse_document_scripts,
+    DocumentEventListener, DocumentScripts, EmbeddedScript, ScriptBinding, parse_document_scripts,
 };
 use crate::embedded_chart::{Addition, rebuild_package};
 use litchi_core::{Error, Result};
@@ -25,7 +24,7 @@ const MAX_XML_EVENTS: usize = 1_000_000;
 
 /// The inert role of a package-contained script resource.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfScriptResourceKind {
+pub enum ScriptResourceKind {
     BasicLibrary,
     BasicModule,
     Dialog,
@@ -34,8 +33,8 @@ pub enum OdfScriptResourceKind {
 
 /// One discovered package-contained script resource.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfScriptResource {
-    pub kind: OdfScriptResourceKind,
+pub struct ScriptResource {
+    pub kind: ScriptResourceKind,
     /// Safe package-relative location.
     pub path: String,
     /// Exact manifest media type.
@@ -46,19 +45,19 @@ pub struct OdfScriptResource {
 
 /// Authored bytes and metadata for a package-contained script resource.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfScriptResourceSpec {
-    pub kind: OdfScriptResourceKind,
+pub struct ScriptResourceSpec {
+    pub kind: ScriptResourceKind,
     /// Optional requested location; a collision-safe location is allocated when absent.
     pub preferred_path: Option<String>,
     pub media_type: String,
     pub bytes: Vec<u8>,
 }
 
-pub(crate) fn document_scripts(content: &str) -> Result<Option<OdfDocumentScripts>> {
+pub(crate) fn document_scripts(content: &str) -> Result<Option<DocumentScripts>> {
     parse_document_scripts(content)
 }
 
-pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<OdfScriptResource>> {
+pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<ScriptResource>> {
     let archive = package.package()?;
     let mut paths: Vec<String> = archive
         .files()?
@@ -84,7 +83,7 @@ pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<OdfScriptResource>
         if total > MAX_TOTAL_RESOURCE_BYTES {
             return invalid("script resources exceed aggregate package limit");
         }
-        output.push(OdfScriptResource {
+        output.push(ScriptResource {
             kind,
             path,
             media_type: entry.media_type.clone(),
@@ -94,10 +93,7 @@ pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<OdfScriptResource>
     Ok(output)
 }
 
-pub(crate) fn find_resource(
-    package: &OwnedPackage,
-    path: &str,
-) -> Result<Option<OdfScriptResource>> {
+pub(crate) fn find_resource(package: &OwnedPackage, path: &str) -> Result<Option<ScriptResource>> {
     let path = safe_script_path(path, None)?;
     Ok(resources(package)?
         .into_iter()
@@ -107,7 +103,7 @@ pub(crate) fn find_resource(
 pub(crate) fn set_document_scripts(
     package: &OwnedPackage,
     content: &str,
-    scripts: Option<&OdfDocumentScripts>,
+    scripts: Option<&DocumentScripts>,
 ) -> Result<Vec<u8>> {
     if let Some(scripts) = scripts {
         validate_script_links(scripts)?;
@@ -131,7 +127,7 @@ pub(crate) fn set_document_scripts(
 pub(crate) fn add_embedded_script(
     package: &OwnedPackage,
     content: &str,
-    script: &OdfEmbeddedScript,
+    script: &EmbeddedScript,
 ) -> Result<(Vec<u8>, usize)> {
     let mut scripts = parse_document_scripts(content)?.unwrap_or_default();
     let index = scripts.scripts.len();
@@ -146,7 +142,7 @@ pub(crate) fn replace_embedded_script(
     package: &OwnedPackage,
     content: &str,
     index: usize,
-    script: &OdfEmbeddedScript,
+    script: &EmbeddedScript,
 ) -> Result<Vec<u8>> {
     let mut scripts = require_scripts(content)?;
     *scripts
@@ -183,7 +179,7 @@ pub(crate) fn move_embedded_script(
 pub(crate) fn add_event_listener(
     package: &OwnedPackage,
     content: &str,
-    listener: &OdfDocumentEventListener,
+    listener: &DocumentEventListener,
 ) -> Result<(Vec<u8>, usize)> {
     let mut scripts = parse_document_scripts(content)?.unwrap_or_default();
     let index = scripts.event_listeners.len();
@@ -198,7 +194,7 @@ pub(crate) fn replace_event_listener(
     package: &OwnedPackage,
     content: &str,
     index: usize,
-    listener: &OdfDocumentEventListener,
+    listener: &DocumentEventListener,
 ) -> Result<Vec<u8>> {
     let mut scripts = require_scripts(content)?;
     *scripts
@@ -235,7 +231,7 @@ pub(crate) fn move_event_listener(
 pub(crate) fn add_resource(
     package: &OwnedPackage,
     content: &str,
-    resource: &OdfScriptResourceSpec,
+    resource: &ScriptResourceSpec,
 ) -> Result<(Vec<u8>, String)> {
     validate_resource(resource.kind, &resource.media_type, &resource.bytes, false)?;
     let path = match resource.preferred_path.as_deref() {
@@ -267,7 +263,7 @@ pub(crate) fn replace_resource(
     package: &OwnedPackage,
     content: &str,
     path: &str,
-    resource: &OdfScriptResourceSpec,
+    resource: &ScriptResourceSpec,
 ) -> Result<Vec<u8>> {
     let path = safe_script_path(path, Some(resource.kind))?;
     if let Some(preferred) = resource.preferred_path.as_deref()
@@ -316,7 +312,7 @@ pub(crate) fn remove_resource(
     )
 }
 
-fn require_scripts(content: &str) -> Result<OdfDocumentScripts> {
+fn require_scripts(content: &str) -> Result<DocumentScripts> {
     parse_document_scripts(content)?
         .ok_or_else(|| Error::InvalidFormat("document has no office:scripts element".to_string()))
 }
@@ -335,10 +331,10 @@ fn move_item<T>(items: &mut Vec<T>, from: usize, to: usize, what: &str) -> Resul
     Ok(())
 }
 
-fn replace_scripts_element(content: &str, scripts: Option<&OdfDocumentScripts>) -> Result<String> {
+fn replace_scripts_element(content: &str, scripts: Option<&DocumentScripts>) -> Result<String> {
     let (span, root_open_end) = locate_scripts_element(content)?;
     let replacement = scripts
-        .map(OdfDocumentScripts::to_xml)
+        .map(DocumentScripts::to_xml)
         .transpose()?
         .unwrap_or_default();
     let (start, end) = span.unwrap_or((root_open_end, root_open_end));
@@ -424,11 +420,11 @@ fn is_office_scripts(office_namespace: bool, local: &[u8]) -> bool {
     local == b"scripts" && office_namespace
 }
 
-fn validate_script_links(scripts: &OdfDocumentScripts) -> Result<()> {
+fn validate_script_links(scripts: &DocumentScripts) -> Result<()> {
     scripts.validate()?;
     for listener in &scripts.event_listeners {
-        if let OdfDocumentEventListener::Script(listener) = listener
-            && let OdfScriptBinding::Linked { href } = &listener.binding
+        if let DocumentEventListener::Script(listener) = listener
+            && let ScriptBinding::Linked { href } = &listener.binding
         {
             validate_inert_href(href)?;
         }
@@ -474,8 +470,8 @@ fn resource_is_referenced(content: &str, path: &str) -> Result<bool> {
         return Ok(false);
     };
     for listener in scripts.event_listeners {
-        if let OdfDocumentEventListener::Script(listener) = listener
-            && let OdfScriptBinding::Linked { href } = listener.binding
+        if let DocumentEventListener::Script(listener) = listener
+            && let ScriptBinding::Linked { href } = listener.binding
         {
             validate_inert_href(&href)?;
             if !href.starts_with('#')
@@ -490,7 +486,7 @@ fn resource_is_referenced(content: &str, path: &str) -> Result<bool> {
     Ok(false)
 }
 
-fn classify_path(path: &str) -> Option<OdfScriptResourceKind> {
+fn classify_path(path: &str) -> Option<ScriptResourceKind> {
     if path.ends_with('/') {
         return None;
     }
@@ -499,23 +495,23 @@ fn classify_path(path: &str) -> Option<OdfScriptResourceKind> {
             || path.ends_with("/script-lb.xml")
             || path == "Basic/script-lc.xml"
         {
-            Some(OdfScriptResourceKind::BasicLibrary)
+            Some(ScriptResourceKind::BasicLibrary)
         } else if path.ends_with(".xml") {
-            Some(OdfScriptResourceKind::BasicModule)
+            Some(ScriptResourceKind::BasicModule)
         } else {
-            Some(OdfScriptResourceKind::Opaque)
+            Some(ScriptResourceKind::Opaque)
         }
     } else if path.starts_with("Dialogs/") || path.starts_with("Dialog/") {
-        Some(OdfScriptResourceKind::Dialog)
+        Some(ScriptResourceKind::Dialog)
     } else if path.starts_with("Scripts/") {
-        Some(OdfScriptResourceKind::Opaque)
+        Some(ScriptResourceKind::Opaque)
     } else {
         None
     }
 }
 
 fn validate_resource(
-    kind: OdfScriptResourceKind,
+    kind: ScriptResourceKind,
     media_type: &str,
     bytes: &[u8],
     allow_legacy_doctype: bool,
@@ -528,9 +524,9 @@ fn validate_resource(
     }
     if matches!(
         kind,
-        OdfScriptResourceKind::BasicLibrary
-            | OdfScriptResourceKind::BasicModule
-            | OdfScriptResourceKind::Dialog
+        ScriptResourceKind::BasicLibrary
+            | ScriptResourceKind::BasicModule
+            | ScriptResourceKind::Dialog
     ) {
         if !matches!(media_type, "text/xml" | "application/xml" | "") {
             return invalid("XML script resource has a non-XML media type");
@@ -607,7 +603,7 @@ fn validate_inert_xml(bytes: &[u8], allow_legacy_doctype: bool) -> Result<()> {
     Ok(())
 }
 
-fn safe_script_path(path: &str, expected: Option<OdfScriptResourceKind>) -> Result<String> {
+fn safe_script_path(path: &str, expected: Option<ScriptResourceKind>) -> Result<String> {
     if path.len() > MAX_VALUE_BYTES {
         return invalid("script resource path exceeds limit");
     }
@@ -649,7 +645,7 @@ fn ensure_available(package: &OwnedPackage, path: &str, replacing: Option<&str>)
     Ok(())
 }
 
-fn allocate_path(package: &OwnedPackage, kind: OdfScriptResourceKind) -> Result<String> {
+fn allocate_path(package: &OwnedPackage, kind: ScriptResourceKind) -> Result<String> {
     let archive = package.package()?;
     let occupied: HashSet<String> = archive
         .files()?
@@ -658,10 +654,10 @@ fn allocate_path(package: &OwnedPackage, kind: OdfScriptResourceKind) -> Result<
         .collect();
     for index in 1..=100_000usize {
         let candidate = match kind {
-            OdfScriptResourceKind::BasicLibrary => format!("Basic/Library_{index}/script-lb.xml"),
-            OdfScriptResourceKind::BasicModule => format!("Basic/Library_1/Module_{index}.xml"),
-            OdfScriptResourceKind::Dialog => format!("Dialogs/Dialog_{index}.xml"),
-            OdfScriptResourceKind::Opaque => format!("Scripts/Script_{index}.bin"),
+            ScriptResourceKind::BasicLibrary => format!("Basic/Library_{index}/script-lb.xml"),
+            ScriptResourceKind::BasicModule => format!("Basic/Library_1/Module_{index}.xml"),
+            ScriptResourceKind::Dialog => format!("Dialogs/Dialog_{index}.xml"),
+            ScriptResourceKind::Opaque => format!("Scripts/Script_{index}.bin"),
         };
         if !occupied.contains(&candidate) {
             return Ok(candidate);
@@ -693,12 +689,12 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 macro_rules! script_facade_methods {
     () => {
-        pub fn document_scripts(&self) -> litchi_core::Result<Option<crate::OdfDocumentScripts>> {
+        pub fn document_scripts(&self) -> litchi_core::Result<Option<crate::DocumentScripts>> {
             crate::script_package::document_scripts(self.content.xml_content())
         }
         pub fn set_document_scripts(
             &mut self,
-            scripts: Option<&crate::OdfDocumentScripts>,
+            scripts: Option<&crate::DocumentScripts>,
         ) -> litchi_core::Result<()> {
             let bytes = crate::script_package::set_document_scripts(
                 &self.package,
@@ -710,7 +706,7 @@ macro_rules! script_facade_methods {
         }
         pub fn add_document_script(
             &mut self,
-            script: &crate::OdfEmbeddedScript,
+            script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::script_package::add_embedded_script(
                 &self.package,
@@ -723,7 +719,7 @@ macro_rules! script_facade_methods {
         pub fn replace_document_script(
             &mut self,
             index: usize,
-            script: &crate::OdfEmbeddedScript,
+            script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<()> {
             let bytes = crate::script_package::replace_embedded_script(
                 &self.package,
@@ -755,7 +751,7 @@ macro_rules! script_facade_methods {
         }
         pub fn add_document_event_listener(
             &mut self,
-            listener: &crate::OdfDocumentEventListener,
+            listener: &crate::DocumentEventListener,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::script_package::add_event_listener(
                 &self.package,
@@ -768,7 +764,7 @@ macro_rules! script_facade_methods {
         pub fn replace_document_event_listener(
             &mut self,
             index: usize,
-            listener: &crate::OdfDocumentEventListener,
+            listener: &crate::DocumentEventListener,
         ) -> litchi_core::Result<()> {
             let bytes = crate::script_package::replace_event_listener(
                 &self.package,
@@ -802,18 +798,18 @@ macro_rules! script_facade_methods {
             *self = Self::from_bytes(bytes)?;
             Ok(())
         }
-        pub fn script_resources(&self) -> litchi_core::Result<Vec<crate::OdfScriptResource>> {
+        pub fn script_resources(&self) -> litchi_core::Result<Vec<crate::ScriptResource>> {
             crate::script_package::resources(&self.package)
         }
         pub fn find_script_resource(
             &self,
             path: &str,
-        ) -> litchi_core::Result<Option<crate::OdfScriptResource>> {
+        ) -> litchi_core::Result<Option<crate::ScriptResource>> {
             crate::script_package::find_resource(&self.package, path)
         }
         pub fn add_script_resource(
             &mut self,
-            resource: &crate::OdfScriptResourceSpec,
+            resource: &crate::ScriptResourceSpec,
         ) -> litchi_core::Result<String> {
             let (bytes, path) = crate::script_package::add_resource(
                 &self.package,
@@ -826,7 +822,7 @@ macro_rules! script_facade_methods {
         pub fn replace_script_resource(
             &mut self,
             path: &str,
-            resource: &crate::OdfScriptResourceSpec,
+            resource: &crate::ScriptResourceSpec,
         ) -> litchi_core::Result<()> {
             let bytes = crate::script_package::replace_resource(
                 &self.package,
@@ -840,7 +836,7 @@ macro_rules! script_facade_methods {
         pub fn update_script_resource(
             &mut self,
             path: &str,
-            resource: &crate::OdfScriptResourceSpec,
+            resource: &crate::ScriptResourceSpec,
         ) -> litchi_core::Result<()> {
             self.replace_script_resource(path, resource)
         }

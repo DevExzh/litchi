@@ -28,7 +28,7 @@ const MAX_AGGREGATE_BYTES: usize = 96 * 1_048_576;
 /// Unit for an optional fill-image intrinsic size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfFillImageLengthUnit {
+pub enum FillImageLengthUnit {
     Centimeter,
     Millimeter,
     Inch,
@@ -37,7 +37,7 @@ pub enum OdfFillImageLengthUnit {
     Pixel,
 }
 
-impl OdfFillImageLengthUnit {
+impl FillImageLengthUnit {
     const fn suffix(self) -> &'static str {
         match self {
             Self::Centimeter => "cm",
@@ -52,13 +52,13 @@ impl OdfFillImageLengthUnit {
 
 /// A finite, nonnegative ODF length.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OdfFillImageLength {
+pub struct FillImageLength {
     value: f64,
-    unit: OdfFillImageLengthUnit,
+    unit: FillImageLengthUnit,
 }
 
-impl OdfFillImageLength {
-    pub fn new(value: f64, unit: OdfFillImageLengthUnit) -> Result<Self> {
+impl FillImageLength {
+    pub fn new(value: f64, unit: FillImageLengthUnit) -> Result<Self> {
         if !value.is_finite() || value < 0.0 {
             return invalid("fill-image length must be finite and nonnegative");
         }
@@ -69,12 +69,12 @@ impl OdfFillImageLength {
         self.value
     }
 
-    pub const fn unit(self) -> OdfFillImageLengthUnit {
+    pub const fn unit(self) -> FillImageLengthUnit {
         self.unit
     }
 }
 
-impl FromStr for OdfFillImageLength {
+impl FromStr for FillImageLength {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -87,7 +87,7 @@ impl FromStr for OdfFillImageLength {
     }
 }
 
-impl fmt::Display for OdfFillImageLength {
+impl fmt::Display for FillImageLength {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -101,26 +101,26 @@ impl fmt::Display for OdfFillImageLength {
 /// Whether an inert href is a safe relative package path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfFillImageLinkKind {
+pub enum FillImageLinkKind {
     PackagePart,
     InertExternal,
 }
 
 /// A retained link which is never automatically dereferenced.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct OdfFillImageLink {
+pub struct FillImageLink {
     href: String,
-    kind: OdfFillImageLinkKind,
+    kind: FillImageLinkKind,
 }
 
-impl OdfFillImageLink {
+impl FillImageLink {
     pub fn new(href: impl Into<String>) -> Result<Self> {
         let href = href.into();
         validate_text(&href, "xlink:href", true, MAX_VALUE_BYTES)?;
         let kind = if safe_package_path(&href) {
-            OdfFillImageLinkKind::PackagePart
+            FillImageLinkKind::PackagePart
         } else {
-            OdfFillImageLinkKind::InertExternal
+            FillImageLinkKind::InertExternal
         };
         Ok(Self { href, kind })
     }
@@ -129,28 +129,28 @@ impl OdfFillImageLink {
         &self.href
     }
 
-    pub const fn kind(&self) -> OdfFillImageLinkKind {
+    pub const fn kind(&self) -> FillImageLinkKind {
         self.kind
     }
 
     pub fn package_path(&self) -> Option<&str> {
-        (self.kind == OdfFillImageLinkKind::PackagePart).then_some(&self.href)
+        (self.kind == FillImageLinkKind::PackagePart).then_some(&self.href)
     }
 }
 
 /// The source of a fill-image resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfFillImageSource {
-    Linked(OdfFillImageLink),
+pub enum FillImageSource {
+    Linked(FillImageLink),
     Inline {
         bytes: Vec<u8>,
         /// ODF consumers ignore this link when inline data is present.
-        ignored_link: Option<OdfFillImageLink>,
+        ignored_link: Option<FillImageLink>,
     },
 }
 
-impl OdfFillImageSource {
+impl FillImageSource {
     pub fn inline_bytes(&self) -> Option<&[u8]> {
         match self {
             Self::Inline { bytes, .. } => Some(bytes),
@@ -158,7 +158,7 @@ impl OdfFillImageSource {
         }
     }
 
-    pub fn link(&self) -> Option<&OdfFillImageLink> {
+    pub fn link(&self) -> Option<&FillImageLink> {
         match self {
             Self::Linked(link) => Some(link),
             Self::Inline { ignored_link, .. } => ignored_link.as_ref(),
@@ -168,40 +168,40 @@ impl OdfFillImageSource {
 
 /// The only schema-defined `xlink:show` mode for fill images.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum OdfFillImageShow {
+pub enum FillImageShow {
     Embed,
 }
 
 /// The only schema-defined `xlink:actuate` mode for fill images.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum OdfFillImageActuate {
+pub enum FillImageActuate {
     OnLoad,
 }
 
 /// One named `draw:fill-image` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OdfDrawingFillImage {
+pub struct DrawingFillImage {
     pub name: String,
     pub display_name: Option<String>,
-    pub width: Option<OdfFillImageLength>,
-    pub height: Option<OdfFillImageLength>,
-    pub source: OdfFillImageSource,
-    pub show: Option<OdfFillImageShow>,
-    pub actuate: Option<OdfFillImageActuate>,
+    pub width: Option<FillImageLength>,
+    pub height: Option<FillImageLength>,
+    pub source: FillImageSource,
+    pub show: Option<FillImageShow>,
+    pub actuate: Option<FillImageActuate>,
 }
 
-impl OdfDrawingFillImage {
+impl DrawingFillImage {
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
             validate_text(display_name, "draw:display-name", true, MAX_VALUE_BYTES)?;
         }
         for length in [self.width, self.height].into_iter().flatten() {
-            OdfFillImageLength::new(length.value, length.unit)?;
+            FillImageLength::new(length.value, length.unit)?;
         }
         match &self.source {
-            OdfFillImageSource::Linked(link) => validate_link(link)?,
-            OdfFillImageSource::Inline {
+            FillImageSource::Linked(link) => validate_link(link)?,
+            FillImageSource::Inline {
                 bytes,
                 ignored_link,
             } => {
@@ -228,12 +228,12 @@ impl OdfDrawingFillImage {
 
 /// Ordered fill-image resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct OdfDrawingFillImages {
-    pub images: Vec<OdfDrawingFillImage>,
+pub struct DrawingFillImages {
+    pub images: Vec<DrawingFillImage>,
 }
 
-impl OdfDrawingFillImages {
-    pub fn get(&self, name: &str) -> Option<&OdfDrawingFillImage> {
+impl DrawingFillImages {
+    pub fn get(&self, name: &str) -> Option<&DrawingFillImage> {
         self.images.iter().find(|image| image.name == name)
     }
 
@@ -291,7 +291,7 @@ impl OdfDrawingFillImages {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn drawing_fill_images(&self) -> Result<OdfDrawingFillImages> {
+    pub fn drawing_fill_images(&self) -> Result<DrawingFillImages> {
         let styles = self.styles_xml()?;
         parse_drawing_fill_images(styles.as_deref().unwrap_or_default())
     }
@@ -299,11 +299,11 @@ impl crate::OpenDocumentPackage {
     /// Load a safe package image or borrow inline bytes without copying.
     pub fn drawing_fill_image_bytes<'a>(
         &self,
-        image: &'a OdfDrawingFillImage,
+        image: &'a DrawingFillImage,
     ) -> Result<Option<Cow<'a, [u8]>>> {
         match &image.source {
-            OdfFillImageSource::Inline { bytes, .. } => Ok(Some(Cow::Borrowed(bytes))),
-            OdfFillImageSource::Linked(link) => {
+            FillImageSource::Inline { bytes, .. } => Ok(Some(Cow::Borrowed(bytes))),
+            FillImageSource::Linked(link) => {
                 let Some(path) = link.package_path() else {
                     return Ok(None);
                 };
@@ -318,7 +318,7 @@ impl crate::OpenDocumentPackage {
 }
 
 impl crate::FlatOpenDocument {
-    pub fn drawing_fill_images(&self) -> Result<OdfDrawingFillImages> {
+    pub fn drawing_fill_images(&self) -> Result<DrawingFillImages> {
         parse_drawing_fill_images(self.xml())
     }
 }
@@ -343,11 +343,11 @@ struct FillBuilder {
     parent_depth: usize,
     name: String,
     display_name: Option<String>,
-    width: Option<OdfFillImageLength>,
-    height: Option<OdfFillImageLength>,
-    link: Option<OdfFillImageLink>,
-    show: Option<OdfFillImageShow>,
-    actuate: Option<OdfFillImageActuate>,
+    width: Option<FillImageLength>,
+    height: Option<FillImageLength>,
+    link: Option<FillImageLink>,
+    show: Option<FillImageShow>,
+    actuate: Option<FillImageActuate>,
     binary_present: bool,
     binary_parent_depth: Option<usize>,
     encoded: String,
@@ -355,9 +355,9 @@ struct FillBuilder {
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
-pub fn parse_drawing_fill_images(xml: &str) -> Result<OdfDrawingFillImages> {
+pub fn parse_drawing_fill_images(xml: &str) -> Result<DrawingFillImages> {
     if !xml.contains("fill-image") {
-        return Ok(OdfDrawingFillImages::default());
+        return Ok(DrawingFillImages::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing fill-image XML exceeds 64 MiB");
@@ -367,7 +367,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<OdfDrawingFillImages> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<FillBuilder> = None;
-    let mut result = OdfDrawingFillImages::default();
+    let mut result = DrawingFillImages::default();
     let mut aggregate = 0usize;
     let mut inline_total = 0usize;
 
@@ -523,18 +523,18 @@ fn parse_fill_start(
     let link_type = take(&mut values, NamespaceKind::Xlink, "type");
     let show = take(&mut values, NamespaceKind::Xlink, "show")
         .map(|value| match value.as_str() {
-            "embed" => Ok(OdfFillImageShow::Embed),
+            "embed" => Ok(FillImageShow::Embed),
             _ => invalid(format!("unsupported xlink:show '{value}'")),
         })
         .transpose()?;
     let actuate = take(&mut values, NamespaceKind::Xlink, "actuate")
         .map(|value| match value.as_str() {
-            "onLoad" => Ok(OdfFillImageActuate::OnLoad),
+            "onLoad" => Ok(FillImageActuate::OnLoad),
             _ => invalid(format!("unsupported xlink:actuate '{value}'")),
         })
         .transpose()?;
     reject_attributes(&values)?;
-    let link = href.map(OdfFillImageLink::new).transpose()?;
+    let link = href.map(FillImageLink::new).transpose()?;
     match (&link, link_type.as_deref()) {
         (Some(_), Some("simple")) => {},
         (Some(_), _) => return invalid("linked fill image requires xlink:type='simple'"),
@@ -556,7 +556,7 @@ fn parse_fill_start(
     })
 }
 
-fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<OdfDrawingFillImage> {
+fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<DrawingFillImage> {
     let source = if builder.binary_present {
         let bytes = BASE64_STANDARD
             .decode(builder.encoded.as_bytes())
@@ -570,18 +570,18 @@ fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<OdfDraw
         if *inline_total > MAX_TOTAL_INLINE_BYTES {
             return invalid("inline fill images exceed 64 MiB");
         }
-        OdfFillImageSource::Inline {
+        FillImageSource::Inline {
             bytes,
             ignored_link: builder.link,
         }
     } else {
-        OdfFillImageSource::Linked(
+        FillImageSource::Linked(
             builder
                 .link
                 .ok_or_else(|| make_error("fill image requires xlink:href or binary data"))?,
         )
     };
-    let image = OdfDrawingFillImage {
+    let image = DrawingFillImage {
         name: builder.name,
         display_name: builder.display_name,
         width: builder.width,
@@ -724,13 +724,13 @@ fn reject_attributes(values: &Attributes) -> Result<()> {
     Ok(())
 }
 
-fn validate_link(link: &OdfFillImageLink) -> Result<()> {
+fn validate_link(link: &FillImageLink) -> Result<()> {
     validate_text(link.href(), "xlink:href", true, MAX_VALUE_BYTES)?;
     if link.kind
         != if safe_package_path(link.href()) {
-            OdfFillImageLinkKind::PackagePart
+            FillImageLinkKind::PackagePart
         } else {
-            OdfFillImageLinkKind::InertExternal
+            FillImageLinkKind::InertExternal
         }
     {
         return invalid("fill-image link classification is inconsistent");
@@ -749,14 +749,14 @@ fn safe_package_path(value: &str) -> bool {
             .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
 }
 
-fn split_length(value: &str) -> Result<(&str, OdfFillImageLengthUnit)> {
+fn split_length(value: &str) -> Result<(&str, FillImageLengthUnit)> {
     for (suffix, unit) in [
-        ("cm", OdfFillImageLengthUnit::Centimeter),
-        ("mm", OdfFillImageLengthUnit::Millimeter),
-        ("in", OdfFillImageLengthUnit::Inch),
-        ("pt", OdfFillImageLengthUnit::Point),
-        ("pc", OdfFillImageLengthUnit::Pica),
-        ("px", OdfFillImageLengthUnit::Pixel),
+        ("cm", FillImageLengthUnit::Centimeter),
+        ("mm", FillImageLengthUnit::Millimeter),
+        ("in", FillImageLengthUnit::Inch),
+        ("pt", FillImageLengthUnit::Point),
+        ("pc", FillImageLengthUnit::Pica),
+        ("px", FillImageLengthUnit::Pixel),
     ] {
         if let Some(number) = value.strip_suffix(suffix) {
             return Ok((number, unit));
@@ -803,7 +803,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool, limit: usize) -> Re
     Ok(())
 }
 
-fn write_fill_image(output: &mut String, image: &OdfDrawingFillImage, standalone: bool) {
+fn write_fill_image(output: &mut String, image: &DrawingFillImage, standalone: bool) {
     output.push_str("<draw:fill-image");
     if standalone {
         output.push_str(
@@ -831,8 +831,8 @@ fn write_fill_image(output: &mut String, image: &OdfDrawingFillImage, standalone
         }
     }
     match &image.source {
-        OdfFillImageSource::Linked(_) => output.push_str("/>"),
-        OdfFillImageSource::Inline { bytes, .. } => {
+        FillImageSource::Linked(_) => output.push_str("/>"),
+        FillImageSource::Inline { bytes, .. } => {
             output.push_str("><office:binary-data>");
             BASE64_STANDARD.encode_string(bytes, output);
             output.push_str("</office:binary-data></draw:fill-image>");
@@ -840,7 +840,7 @@ fn write_fill_image(output: &mut String, image: &OdfDrawingFillImage, standalone
     }
 }
 
-fn encoded_size(source: &OdfFillImageSource) -> usize {
+fn encoded_size(source: &FillImageSource) -> usize {
     source
         .inline_bytes()
         .map_or(0, |bytes| bytes.len().saturating_add(2) / 3 * 4)
@@ -917,11 +917,11 @@ mod tests {
         );
         assert_eq!(
             parsed.get("package").unwrap().source.link().unwrap().kind(),
-            OdfFillImageLinkKind::PackagePart
+            FillImageLinkKind::PackagePart
         );
         assert_eq!(
             parsed.get("remote").unwrap().source.link().unwrap().kind(),
-            OdfFillImageLinkKind::InertExternal
+            FillImageLinkKind::InertExternal
         );
         let serialized = parsed.to_xml().unwrap();
         assert_eq!(parse_drawing_fill_images(&serialized).unwrap(), parsed);
@@ -958,8 +958,8 @@ mod tests {
             assert!(parse_drawing_fill_images(&xml).is_err(), "accepted {xml}");
         }
         assert_eq!(
-            OdfFillImageLink::new("../Pictures/x.png").unwrap().kind(),
-            OdfFillImageLinkKind::InertExternal
+            FillImageLink::new("../Pictures/x.png").unwrap().kind(),
+            FillImageLinkKind::InertExternal
         );
     }
 
@@ -976,7 +976,7 @@ mod tests {
                 .link()
                 .unwrap()
                 .kind(),
-            OdfFillImageLinkKind::InertExternal
+            FillImageLinkKind::InertExternal
         );
 
         let inline_xml = include_str!("../../../test-data/odf/drawing/fill-image-inline.fodg");

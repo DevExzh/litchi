@@ -1,9 +1,8 @@
 use litchi_odt::elements::field::{
-    OdfCalculatedFieldValue, OdfCrossReferenceFormat, OdfDocumentStatisticKind, OdfDropDownLabel,
-    OdfDynamicTextField, OdfFieldValueType, OdfFormulaFieldDisplay, OdfMeasureKind,
-    OdfNoteReferenceClass, OdfNoteReferenceFormat, OdfPlaceholderType, OdfSequenceNumberFormat,
-    OdfSequenceReferenceFormat, OdfStatisticNumberFormat, OdfUserFieldDisplay,
-    OdfVariableSetDisplay,
+    CalculatedFieldValue, CrossReferenceFormat, DocumentStatisticKind, DropDownLabel,
+    DynamicTextField, FieldValueType, FormulaFieldDisplay, MeasureKind, NoteReferenceClass,
+    NoteReferenceFormat, PlaceholderType, SequenceNumberFormat, SequenceReferenceFormat,
+    StatisticNumberFormat, UserFieldDisplay, VariableSetDisplay,
 };
 use litchi_odt::{Document, DocumentBuilder, MutableDocument};
 mod support;
@@ -36,15 +35,15 @@ fn parses_typed_dynamic_text_fields_in_document_order_without_evaluation() {
     assert_eq!(fields.len(), 4);
     assert!(matches!(
         &fields[0],
-        OdfDynamicTextField::Placeholder {
-            placeholder_type: OdfPlaceholderType::TextBox,
+        DynamicTextField::Placeholder {
+            placeholder_type: PlaceholderType::TextBox,
             description: Some(description),
             display_text,
         } if description == "Prompt" && display_text == "Enter & edit"
     ));
     assert!(matches!(
         &fields[1],
-        OdfDynamicTextField::ConditionalText {
+        DynamicTextField::ConditionalText {
             condition,
             value_if_true,
             value_if_false,
@@ -57,7 +56,7 @@ fn parses_typed_dynamic_text_fields_in_document_order_without_evaluation() {
     ));
     assert!(matches!(
         &fields[2],
-        OdfDynamicTextField::HiddenText {
+        DynamicTextField::HiddenText {
             string_value,
             is_hidden: Some(false),
             ..
@@ -92,8 +91,8 @@ fn accepts_namespace_aliases_and_ignores_spoofed_vocabulary() {
     assert_eq!(fields.len(), 1);
     assert!(matches!(
         fields[0],
-        OdfDynamicTextField::Placeholder {
-            placeholder_type: OdfPlaceholderType::Image,
+        DynamicTextField::Placeholder {
+            placeholder_type: PlaceholderType::Image,
             ..
         }
     ));
@@ -102,25 +101,25 @@ fn accepts_namespace_aliases_and_ignores_spoofed_vocabulary() {
 #[test]
 fn serializes_every_dynamic_field_with_escaping_and_round_trips_inert_values() {
     let fields = vec![
-        OdfDynamicTextField::Placeholder {
-            placeholder_type: OdfPlaceholderType::Object,
+        DynamicTextField::Placeholder {
+            placeholder_type: PlaceholderType::Object,
             description: Some("Choose \"A&B\" <object>".to_string()),
             display_text: "cached <object> & text".to_string(),
         },
-        OdfDynamicTextField::ConditionalText {
+        DynamicTextField::ConditionalText {
             condition: "of:=WEBSERVICE(\"https://never.invalid/?a=1&b=2\")<3".to_string(),
             value_if_true: "yes & <true>".to_string(),
             value_if_false: "no \"false\"".to_string(),
             current_value: Some(true),
             display_text: "cached & true".to_string(),
         },
-        OdfDynamicTextField::HiddenText {
+        DynamicTextField::HiddenText {
             condition: "ooow:flag & 1".to_string(),
             string_value: "secret <&>".to_string(),
             is_hidden: Some(false),
             display_text: "visible <cache>".to_string(),
         },
-        OdfDynamicTextField::HiddenParagraph {
+        DynamicTextField::HiddenParagraph {
             condition: "ooow:hide > 0".to_string(),
             is_hidden: None,
             display_text: "paragraph & cache".to_string(),
@@ -140,14 +139,14 @@ fn serializes_every_dynamic_field_with_escaping_and_round_trips_inert_values() {
 
 #[test]
 fn writer_rejects_empty_conditions_forbidden_xml_characters_and_oversized_values() {
-    let empty_condition = OdfDynamicTextField::HiddenParagraph {
+    let empty_condition = DynamicTextField::HiddenParagraph {
         condition: " \t".to_string(),
         is_hidden: None,
         display_text: String::new(),
     };
     assert!(empty_condition.to_xml_fragment().is_err());
 
-    let forbidden_character = OdfDynamicTextField::HiddenText {
+    let forbidden_character = DynamicTextField::HiddenText {
         condition: "ooow:flag".to_string(),
         string_value: "bad\u{0}value".to_string(),
         is_hidden: None,
@@ -155,8 +154,8 @@ fn writer_rejects_empty_conditions_forbidden_xml_characters_and_oversized_values
     };
     assert!(forbidden_character.validate().is_err());
 
-    let oversized = OdfDynamicTextField::Placeholder {
-        placeholder_type: OdfPlaceholderType::Text,
+    let oversized = DynamicTextField::Placeholder {
+        placeholder_type: PlaceholderType::Text,
         description: None,
         display_text: "x".repeat(65_537),
     };
@@ -170,7 +169,7 @@ fn mutable_document_inserts_replaces_and_removes_fields_without_rewriting_neighb
         r#"<t:placeholder t:placeholder-type="text">old</t:placeholder>after"#,
     ));
     let mut mutable = MutableDocument::from_document(source).unwrap();
-    let conditional = OdfDynamicTextField::ConditionalText {
+    let conditional = DynamicTextField::ConditionalText {
         condition: "of:=1<2 & 3>2".to_string(),
         value_if_true: "yes".to_string(),
         value_if_false: "no".to_string(),
@@ -179,14 +178,14 @@ fn mutable_document_inserts_replaces_and_removes_fields_without_rewriting_neighb
     };
     mutable.insert_dynamic_text_field(0, &conditional).unwrap();
 
-    let hidden = OdfDynamicTextField::HiddenText {
+    let hidden = DynamicTextField::HiddenText {
         condition: "ooow:flag".to_string(),
         string_value: "secret".to_string(),
         is_hidden: Some(false),
         display_text: "visible".to_string(),
     };
     let replaced = mutable.replace_dynamic_text_field(0, &hidden).unwrap();
-    assert!(matches!(replaced, OdfDynamicTextField::Placeholder { .. }));
+    assert!(matches!(replaced, DynamicTextField::Placeholder { .. }));
     let removed = mutable.remove_dynamic_text_field(1).unwrap();
     assert_eq!(removed, conditional);
 
@@ -201,7 +200,7 @@ fn mutable_document_inserts_replaces_and_removes_fields_without_rewriting_neighb
 
 #[test]
 fn insertion_supports_empty_prefixed_paragraphs_and_builder_round_trips() {
-    let field = OdfDynamicTextField::HiddenParagraph {
+    let field = DynamicTextField::HiddenParagraph {
         condition: "ooow:hide".to_string(),
         is_hidden: Some(true),
         display_text: "cached".to_string(),
@@ -227,8 +226,8 @@ fn mutation_rejects_out_of_bounds_targets_without_changing_content() {
         .unwrap()
         .get_file("content.xml")
         .unwrap();
-    let field = OdfDynamicTextField::Placeholder {
-        placeholder_type: OdfPlaceholderType::TextBox,
+    let field = DynamicTextField::Placeholder {
+        placeholder_type: PlaceholderType::TextBox,
         description: None,
         display_text: "prompt".to_string(),
     };
@@ -244,10 +243,10 @@ fn mutation_rejects_out_of_bounds_targets_without_changing_content() {
 
 #[test]
 fn sequence_fields_parse_serialize_and_retain_formulas_inertly() {
-    let field = OdfDynamicTextField::Sequence {
+    let field = DynamicTextField::Sequence {
         name: "Figure & Diagram".to_string(),
         formula: Some("ooow:Figure+WEBSERVICE(\"https://never.invalid/?a=1&b=2\")".to_string()),
-        number_format: Some(OdfSequenceNumberFormat::new("A", Some(true)).unwrap()),
+        number_format: Some(SequenceNumberFormat::new("A", Some(true)).unwrap()),
         reference_name: Some("fig<&>1".to_string()),
         display_text: "Figure <1> & cached".to_string(),
     };
@@ -264,19 +263,19 @@ fn sequence_fields_support_document_mutation_and_namespace_aliases() {
     let source = document(
         r#"<t:sequence xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" t:name="Old" t:formula="ooow:1+1" s:num-format="a" s:num-letter-sync="1" t:ref-name="old-ref">1</t:sequence>"#,
     );
-    let old = OdfDynamicTextField::Sequence {
+    let old = DynamicTextField::Sequence {
         name: "Old".to_string(),
         formula: Some("ooow:1+1".to_string()),
-        number_format: Some(OdfSequenceNumberFormat::new("a", Some(true)).unwrap()),
+        number_format: Some(SequenceNumberFormat::new("a", Some(true)).unwrap()),
         reference_name: Some("old-ref".to_string()),
         display_text: "1".to_string(),
     };
     assert_eq!(source.dynamic_text_fields().unwrap(), vec![old.clone()]);
 
-    let replacement = OdfDynamicTextField::Sequence {
+    let replacement = DynamicTextField::Sequence {
         name: "New".to_string(),
         formula: Some("of:=2+2".to_string()),
-        number_format: Some(OdfSequenceNumberFormat::new("I", None).unwrap()),
+        number_format: Some(SequenceNumberFormat::new("I", None).unwrap()),
         reference_name: None,
         display_text: "IV".to_string(),
     };
@@ -304,8 +303,8 @@ fn sequence_fields_support_document_mutation_and_namespace_aliases() {
 
 #[test]
 fn sequence_numbering_rejects_schema_invalid_letter_sync_combinations() {
-    assert!(OdfSequenceNumberFormat::new("1", Some(true)).is_err());
-    assert!(OdfSequenceNumberFormat::new("i", Some(false)).is_err());
+    assert!(SequenceNumberFormat::new("1", Some(true)).is_err());
+    assert!(SequenceNumberFormat::new("i", Some(false)).is_err());
     assert!(document(
         r#"<t:sequence xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" t:name="x" s:num-letter-sync="true">1</t:sequence>"#
     )
@@ -321,16 +320,16 @@ fn sequence_numbering_rejects_schema_invalid_letter_sync_combinations() {
 #[test]
 fn sequence_references_round_trip_every_schema_format() {
     let formats = [
-        OdfSequenceReferenceFormat::Page,
-        OdfSequenceReferenceFormat::Chapter,
-        OdfSequenceReferenceFormat::Direction,
-        OdfSequenceReferenceFormat::Text,
-        OdfSequenceReferenceFormat::CategoryAndValue,
-        OdfSequenceReferenceFormat::Caption,
-        OdfSequenceReferenceFormat::Value,
+        SequenceReferenceFormat::Page,
+        SequenceReferenceFormat::Chapter,
+        SequenceReferenceFormat::Direction,
+        SequenceReferenceFormat::Text,
+        SequenceReferenceFormat::CategoryAndValue,
+        SequenceReferenceFormat::Caption,
+        SequenceReferenceFormat::Value,
     ];
     for format in formats.into_iter().map(Some).chain(std::iter::once(None)) {
-        let field = OdfDynamicTextField::SequenceReference {
+        let field = DynamicTextField::SequenceReference {
             reference_name: "figure<&>1".to_string(),
             reference_format: format,
             display_text: "Figure <1> & cached".to_string(),
@@ -346,16 +345,16 @@ fn sequence_references_support_namespace_aware_document_mutation() {
     let source = document(
         r#"<t:sequence-ref t:ref-name="old" t:reference-format="caption">Old caption</t:sequence-ref>"#,
     );
-    let old = OdfDynamicTextField::SequenceReference {
+    let old = DynamicTextField::SequenceReference {
         reference_name: "old".to_string(),
-        reference_format: Some(OdfSequenceReferenceFormat::Caption),
+        reference_format: Some(SequenceReferenceFormat::Caption),
         display_text: "Old caption".to_string(),
     };
     assert_eq!(source.dynamic_text_fields().unwrap(), vec![old.clone()]);
 
-    let replacement = OdfDynamicTextField::SequenceReference {
+    let replacement = DynamicTextField::SequenceReference {
         reference_name: "new&ref".to_string(),
-        reference_format: Some(OdfSequenceReferenceFormat::CategoryAndValue),
+        reference_format: Some(SequenceReferenceFormat::CategoryAndValue),
         display_text: "Figure 2".to_string(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
@@ -369,9 +368,9 @@ fn sequence_references_support_namespace_aware_document_mutation() {
         vec![replacement.clone()]
     );
 
-    let inserted = OdfDynamicTextField::SequenceReference {
+    let inserted = DynamicTextField::SequenceReference {
         reference_name: "page-ref".to_string(),
-        reference_format: Some(OdfSequenceReferenceFormat::Page),
+        reference_format: Some(SequenceReferenceFormat::Page),
         display_text: "12".to_string(),
     };
     let mut mutable = MutableDocument::from_document(round_trip).unwrap();
@@ -398,15 +397,15 @@ fn sequence_references_reject_missing_empty_and_invalid_reference_metadata() {
         .dynamic_text_fields()
         .is_err()
     );
-    let empty = OdfDynamicTextField::SequenceReference {
+    let empty = DynamicTextField::SequenceReference {
         reference_name: String::new(),
         reference_format: None,
         display_text: String::new(),
     };
     assert!(empty.to_xml_fragment().is_err());
-    let oversized = OdfDynamicTextField::SequenceReference {
+    let oversized = DynamicTextField::SequenceReference {
         reference_name: "x".repeat(65_537),
-        reference_format: Some(OdfSequenceReferenceFormat::Text),
+        reference_format: Some(SequenceReferenceFormat::Text),
         display_text: String::new(),
     };
     assert!(oversized.validate().is_err());
@@ -415,27 +414,27 @@ fn sequence_references_reject_missing_empty_and_invalid_reference_metadata() {
 #[test]
 fn calculated_variable_fields_round_trip_typed_values_and_inert_formulas() {
     let fields = vec![
-        OdfDynamicTextField::VariableSet {
+        DynamicTextField::VariableSet {
             name: "Total".to_string(),
             formula: Some("of:=SUM([.A1:.A3])&WEBSERVICE(\"https://never.invalid\")".to_string()),
-            value: OdfCalculatedFieldValue::Currency {
+            value: CalculatedFieldValue::Currency {
                 value: "12.50".to_string(),
                 currency: Some("C&Y".to_string()),
             },
-            display: Some(OdfVariableSetDisplay::Value),
+            display: Some(VariableSetDisplay::Value),
             data_style_name: Some("Money&Style".to_string()),
             display_text: "$12.50 <cached>".to_string(),
         },
-        OdfDynamicTextField::VariableGet {
+        DynamicTextField::VariableGet {
             name: "Total".to_string(),
-            display: Some(OdfFormulaFieldDisplay::Formula),
+            display: Some(FormulaFieldDisplay::Formula),
             data_style_name: None,
             display_text: "Total".to_string(),
         },
-        OdfDynamicTextField::Expression {
+        DynamicTextField::Expression {
             formula: Some("of:=1<2".to_string()),
-            value: Some(OdfCalculatedFieldValue::Boolean(true)),
-            display: Some(OdfFormulaFieldDisplay::Value),
+            value: Some(CalculatedFieldValue::Boolean(true)),
+            display: Some(FormulaFieldDisplay::Value),
             data_style_name: None,
             display_text: "true & cached".to_string(),
         },
@@ -453,19 +452,19 @@ fn calculated_variable_fields_round_trip_typed_values_and_inert_formulas() {
 #[test]
 fn calculated_field_values_cover_every_odf_value_group() {
     let values = [
-        OdfCalculatedFieldValue::Float("-1.25E2".to_string()),
-        OdfCalculatedFieldValue::Percentage("0.25".to_string()),
-        OdfCalculatedFieldValue::Currency {
+        CalculatedFieldValue::Float("-1.25E2".to_string()),
+        CalculatedFieldValue::Percentage("0.25".to_string()),
+        CalculatedFieldValue::Currency {
             value: "5".to_string(),
             currency: None,
         },
-        OdfCalculatedFieldValue::Date("2026-07-18T10:20:30Z".to_string()),
-        OdfCalculatedFieldValue::Time("PT1H2M3.5S".to_string()),
-        OdfCalculatedFieldValue::Boolean(false),
-        OdfCalculatedFieldValue::String(None),
+        CalculatedFieldValue::Date("2026-07-18T10:20:30Z".to_string()),
+        CalculatedFieldValue::Time("PT1H2M3.5S".to_string()),
+        CalculatedFieldValue::Boolean(false),
+        CalculatedFieldValue::String(None),
     ];
     for value in values {
-        let field = OdfDynamicTextField::Expression {
+        let field = DynamicTextField::Expression {
             formula: None,
             value: Some(value),
             display: None,
@@ -485,18 +484,18 @@ fn calculated_variables_support_namespace_aware_document_mutation() {
     let source = document(
         r#"<t:expression xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" t:formula="of:=1+1" o:value-type="float" o:value="2">2</t:expression>"#,
     );
-    let replacement = OdfDynamicTextField::VariableSet {
+    let replacement = DynamicTextField::VariableSet {
         name: "Counter".to_string(),
         formula: Some("ooow:Counter+1".to_string()),
-        value: OdfCalculatedFieldValue::Float("3".to_string()),
-        display: Some(OdfVariableSetDisplay::None),
+        value: CalculatedFieldValue::Float("3".to_string()),
+        display: Some(VariableSetDisplay::None),
         data_style_name: None,
         display_text: String::new(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
-        OdfDynamicTextField::Expression { .. }
+        DynamicTextField::Expression { .. }
     ));
     let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -534,27 +533,27 @@ fn calculated_fields_reject_mismatched_value_groups_displays_and_lexicals() {
 #[test]
 fn interactive_input_fields_round_trip_all_typed_attributes() {
     let fields = vec![
-        OdfDynamicTextField::VariableInput {
+        DynamicTextField::VariableInput {
             name: "Amount".to_string(),
             description: Some("Enter <amount> & currency".to_string()),
-            value_type: OdfFieldValueType::Currency,
-            display: Some(OdfVariableSetDisplay::Value),
+            value_type: FieldValueType::Currency,
+            display: Some(VariableSetDisplay::Value),
             data_style_name: Some("Money&Style".to_string()),
             display_text: "$5 <cached>".to_string(),
         },
-        OdfDynamicTextField::UserFieldGet {
+        DynamicTextField::UserFieldGet {
             name: "Company".to_string(),
-            display: Some(OdfUserFieldDisplay::None),
+            display: Some(UserFieldDisplay::None),
             data_style_name: None,
             display_text: "Example & Co".to_string(),
         },
-        OdfDynamicTextField::UserFieldInput {
+        DynamicTextField::UserFieldInput {
             name: "Company".to_string(),
             description: Some("Edit \"company\"".to_string()),
             data_style_name: Some("TextStyle".to_string()),
             display_text: "Example <Co>".to_string(),
         },
-        OdfDynamicTextField::TextInput {
+        DynamicTextField::TextInput {
             description: Some("Free & safe".to_string()),
             display_text: "cached <input>".to_string(),
         },
@@ -573,9 +572,9 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
     let source = document(
         r#"<t:drop-down t:name="old"><t:label t:value="old" t:current-selected="true"/>old</t:drop-down>"#,
     );
-    let old = OdfDynamicTextField::DropDown {
+    let old = DynamicTextField::DropDown {
         name: "old".to_string(),
-        labels: vec![OdfDropDownLabel {
+        labels: vec![DropDownLabel {
             value: Some("old".to_string()),
             current_selected: Some(true),
         }],
@@ -583,14 +582,14 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
     };
     assert_eq!(source.dynamic_text_fields().unwrap(), vec![old.clone()]);
 
-    let replacement = OdfDynamicTextField::DropDown {
+    let replacement = DynamicTextField::DropDown {
         name: "Priority & state".to_string(),
         labels: vec![
-            OdfDropDownLabel {
+            DropDownLabel {
                 value: Some("Low".to_string()),
                 current_selected: Some(false),
             },
-            OdfDropDownLabel {
+            DropDownLabel {
                 value: Some("High & urgent".to_string()),
                 current_selected: Some(true),
             },
@@ -608,9 +607,9 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
         vec![replacement.clone()]
     );
 
-    let inserted = OdfDynamicTextField::DropDown {
+    let inserted = DynamicTextField::DropDown {
         name: "Status".to_string(),
-        labels: vec![OdfDropDownLabel {
+        labels: vec![DropDownLabel {
             value: Some("Open".to_string()),
             current_selected: None,
         }],
@@ -639,14 +638,14 @@ fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
     let source = document(
         r#"<t:script xmlns:l="http://www.w3.org/1999/xlink" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0" l:type="simple" l:href="https://example.invalid/never-open?one=1&amp;two=2" s:language="application/javascript"/>"#,
     );
-    let old = OdfDynamicTextField::Script {
+    let old = DynamicTextField::Script {
         href: Some("https://example.invalid/never-open?one=1&two=2".to_string()),
         language: Some("application/javascript".to_string()),
         content: String::new(),
     };
     assert_eq!(source.dynamic_text_fields().unwrap(), vec![old.clone()]);
 
-    let replacement = OdfDynamicTextField::Script {
+    let replacement = DynamicTextField::Script {
         href: None,
         language: Some("text/x-basic".to_string()),
         content: "REM stored macro payload".to_string(),
@@ -662,7 +661,7 @@ fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
         vec![replacement.clone()]
     );
 
-    let inserted = OdfDynamicTextField::Script {
+    let inserted = DynamicTextField::Script {
         href: Some("vnd.example:stored-only".to_string()),
         language: None,
         content: String::new(),
@@ -687,15 +686,15 @@ fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
 #[test]
 fn variable_input_round_trips_every_odf_value_type() {
     for value_type in [
-        OdfFieldValueType::Float,
-        OdfFieldValueType::Time,
-        OdfFieldValueType::Date,
-        OdfFieldValueType::Percentage,
-        OdfFieldValueType::Currency,
-        OdfFieldValueType::Boolean,
-        OdfFieldValueType::String,
+        FieldValueType::Float,
+        FieldValueType::Time,
+        FieldValueType::Date,
+        FieldValueType::Percentage,
+        FieldValueType::Currency,
+        FieldValueType::Boolean,
+        FieldValueType::String,
     ] {
-        let field = OdfDynamicTextField::VariableInput {
+        let field = DynamicTextField::VariableInput {
             name: "Value".to_string(),
             description: None,
             value_type,
@@ -715,20 +714,20 @@ fn variable_input_round_trips_every_odf_value_type() {
 #[test]
 fn interactive_fields_support_namespace_aware_mutation() {
     let source = document(r#"<t:user-field-get t:name="Company">Old</t:user-field-get>"#);
-    let replacement = OdfDynamicTextField::VariableInput {
+    let replacement = DynamicTextField::VariableInput {
         name: "Count".to_string(),
         description: Some("Count".to_string()),
-        value_type: OdfFieldValueType::Float,
-        display: Some(OdfVariableSetDisplay::None),
+        value_type: FieldValueType::Float,
+        display: Some(VariableSetDisplay::None),
         data_style_name: None,
         display_text: String::new(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
-        OdfDynamicTextField::UserFieldGet { .. }
+        DynamicTextField::UserFieldGet { .. }
     ));
-    let input = OdfDynamicTextField::TextInput {
+    let input = DynamicTextField::TextInput {
         description: None,
         display_text: "Prompt".to_string(),
     };
@@ -757,7 +756,7 @@ fn interactive_fields_reject_required_type_name_and_display_violations() {
             "accepted {invalid}"
         );
     }
-    let oversized = OdfDynamicTextField::TextInput {
+    let oversized = DynamicTextField::TextInput {
         description: Some("x".repeat(65_537)),
         display_text: String::new(),
     };
@@ -766,11 +765,11 @@ fn interactive_fields_reject_required_type_name_and_display_violations() {
 
 #[test]
 fn table_formula_round_trips_inert_formula_display_and_style() {
-    let field = OdfDynamicTextField::TableFormula {
+    let field = DynamicTextField::TableFormula {
         formula: Some(
             "of:=SUM([.A1:.A3])&WEBSERVICE(\"https://never.invalid/?a=1&b=2\")".to_string(),
         ),
-        display: Some(OdfFormulaFieldDisplay::Formula),
+        display: Some(FormulaFieldDisplay::Formula),
         data_style_name: Some("Number<&>Style".to_string()),
         display_text: "SUM <cached> & safe".to_string(),
     };
@@ -789,18 +788,18 @@ fn table_formula_supports_namespace_aware_insert_replace_and_remove() {
     let source = document(
         r#"<t:table-formula xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" t:formula="ooow:=1+1" t:display="value" s:data-style-name="N1">2</t:table-formula>"#,
     );
-    let replacement = OdfDynamicTextField::TableFormula {
+    let replacement = DynamicTextField::TableFormula {
         formula: Some("of:=2+2".to_string()),
-        display: Some(OdfFormulaFieldDisplay::Value),
+        display: Some(FormulaFieldDisplay::Value),
         data_style_name: None,
         display_text: "4".to_string(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
-        OdfDynamicTextField::TableFormula { .. }
+        DynamicTextField::TableFormula { .. }
     ));
-    let inserted = OdfDynamicTextField::TableFormula {
+    let inserted = DynamicTextField::TableFormula {
         formula: None,
         display: None,
         data_style_name: None,
@@ -827,14 +826,14 @@ fn table_formula_rejects_invalid_display_cached_value_groups_and_bounds() {
             "accepted {invalid}"
         );
     }
-    let oversized = OdfDynamicTextField::TableFormula {
+    let oversized = DynamicTextField::TableFormula {
         formula: Some("x".repeat(65_537)),
         display: None,
         data_style_name: None,
         display_text: String::new(),
     };
     assert!(oversized.to_xml_fragment().is_err());
-    let forbidden = OdfDynamicTextField::TableFormula {
+    let forbidden = DynamicTextField::TableFormula {
         formula: Some("of:=1\u{0}+1".to_string()),
         display: None,
         data_style_name: None,
@@ -845,12 +844,8 @@ fn table_formula_rejects_invalid_display_cached_value_groups_and_bounds() {
 
 #[test]
 fn measure_fields_round_trip_every_kind_and_escape_cached_text() {
-    for kind in [
-        OdfMeasureKind::Value,
-        OdfMeasureKind::Unit,
-        OdfMeasureKind::Gap,
-    ] {
-        let field = OdfDynamicTextField::Measure {
+    for kind in [MeasureKind::Value, MeasureKind::Unit, MeasureKind::Gap] {
+        let field = DynamicTextField::Measure {
             kind,
             display_text: "12 <cm> & cached".to_string(),
         };
@@ -867,20 +862,20 @@ fn measure_fields_round_trip_every_kind_and_escape_cached_text() {
 #[test]
 fn measure_fields_support_namespace_aware_insert_replace_and_remove() {
     let source = document(r#"<t:measure t:kind="unit">cm</t:measure>"#);
-    let replacement = OdfDynamicTextField::Measure {
-        kind: OdfMeasureKind::Value,
+    let replacement = DynamicTextField::Measure {
+        kind: MeasureKind::Value,
         display_text: "12.5".to_string(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
-        OdfDynamicTextField::Measure {
-            kind: OdfMeasureKind::Unit,
+        DynamicTextField::Measure {
+            kind: MeasureKind::Unit,
             ..
         }
     ));
-    let inserted = OdfDynamicTextField::Measure {
-        kind: OdfMeasureKind::Gap,
+    let inserted = DynamicTextField::Measure {
+        kind: MeasureKind::Gap,
         display_text: " ".to_string(),
     };
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
@@ -906,13 +901,13 @@ fn measure_fields_reject_missing_spoofed_invalid_and_extra_attributes() {
             "accepted {invalid}"
         );
     }
-    let oversized = OdfDynamicTextField::Measure {
-        kind: OdfMeasureKind::Value,
+    let oversized = DynamicTextField::Measure {
+        kind: MeasureKind::Value,
         display_text: "x".repeat(65_537),
     };
     assert!(oversized.validate().is_err());
-    let forbidden = OdfDynamicTextField::Measure {
-        kind: OdfMeasureKind::Unit,
+    let forbidden = DynamicTextField::Measure {
+        kind: MeasureKind::Unit,
         display_text: "cm\u{0}".to_string(),
     };
     assert!(forbidden.to_xml_fragment().is_err());
@@ -921,22 +916,22 @@ fn measure_fields_reject_missing_spoofed_invalid_and_extra_attributes() {
 #[test]
 fn mark_and_bookmark_references_round_trip_all_schema_formats() {
     let formats = [
-        OdfCrossReferenceFormat::Page,
-        OdfCrossReferenceFormat::Chapter,
-        OdfCrossReferenceFormat::Direction,
-        OdfCrossReferenceFormat::Text,
-        OdfCrossReferenceFormat::NumberNoSuperior,
-        OdfCrossReferenceFormat::NumberAllSuperior,
-        OdfCrossReferenceFormat::Number,
+        CrossReferenceFormat::Page,
+        CrossReferenceFormat::Chapter,
+        CrossReferenceFormat::Direction,
+        CrossReferenceFormat::Text,
+        CrossReferenceFormat::NumberNoSuperior,
+        CrossReferenceFormat::NumberAllSuperior,
+        CrossReferenceFormat::Number,
     ];
     for format in formats.into_iter().map(Some).chain(std::iter::once(None)) {
         for field in [
-            OdfDynamicTextField::Reference {
+            DynamicTextField::Reference {
                 reference_name: Some("mark<&>1".to_string()),
                 reference_format: format,
                 display_text: "Mark <1> & cached".to_string(),
             },
-            OdfDynamicTextField::BookmarkReference {
+            DynamicTextField::BookmarkReference {
                 reference_name: Some("bookmark<&>1".to_string()),
                 reference_format: format,
                 display_text: "Bookmark <1> & cached".to_string(),
@@ -954,17 +949,14 @@ fn mark_and_bookmark_references_round_trip_all_schema_formats() {
 #[test]
 fn note_references_round_trip_classes_formats_and_schema_optional_targets() {
     let formats = [
-        OdfNoteReferenceFormat::Page,
-        OdfNoteReferenceFormat::Chapter,
-        OdfNoteReferenceFormat::Direction,
-        OdfNoteReferenceFormat::Text,
+        NoteReferenceFormat::Page,
+        NoteReferenceFormat::Chapter,
+        NoteReferenceFormat::Direction,
+        NoteReferenceFormat::Text,
     ];
-    for note_class in [
-        OdfNoteReferenceClass::Footnote,
-        OdfNoteReferenceClass::Endnote,
-    ] {
+    for note_class in [NoteReferenceClass::Footnote, NoteReferenceClass::Endnote] {
         for format in formats.into_iter().map(Some).chain(std::iter::once(None)) {
-            let field = OdfDynamicTextField::NoteReference {
+            let field = DynamicTextField::NoteReference {
                 reference_name: None,
                 note_class,
                 reference_format: format,
@@ -985,20 +977,20 @@ fn cross_references_support_namespace_aware_insert_replace_and_remove() {
     let source = document(
         r#"<t:bookmark-ref t:ref-name="old" t:reference-format="page">1</t:bookmark-ref>"#,
     );
-    let replacement = OdfDynamicTextField::Reference {
+    let replacement = DynamicTextField::Reference {
         reference_name: Some("new&mark".to_string()),
-        reference_format: Some(OdfCrossReferenceFormat::NumberAllSuperior),
+        reference_format: Some(CrossReferenceFormat::NumberAllSuperior),
         display_text: "1.2.3".to_string(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
-        OdfDynamicTextField::BookmarkReference { .. }
+        DynamicTextField::BookmarkReference { .. }
     ));
-    let inserted = OdfDynamicTextField::NoteReference {
+    let inserted = DynamicTextField::NoteReference {
         reference_name: Some("note-1".to_string()),
-        note_class: OdfNoteReferenceClass::Footnote,
-        reference_format: Some(OdfNoteReferenceFormat::Text),
+        note_class: NoteReferenceClass::Footnote,
+        reference_format: Some(NoteReferenceFormat::Text),
         display_text: "footnote".to_string(),
     };
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
@@ -1026,13 +1018,13 @@ fn cross_references_reject_invalid_classes_formats_namespaces_attributes_and_bou
             "accepted {invalid}"
         );
     }
-    let oversized = OdfDynamicTextField::Reference {
+    let oversized = DynamicTextField::Reference {
         reference_name: Some("x".repeat(65_537)),
         reference_format: None,
         display_text: String::new(),
     };
     assert!(oversized.validate().is_err());
-    let forbidden = OdfDynamicTextField::BookmarkReference {
+    let forbidden = DynamicTextField::BookmarkReference {
         reference_name: Some("bad\u{0}name".to_string()),
         reference_format: None,
         display_text: String::new(),
@@ -1043,21 +1035,21 @@ fn cross_references_reject_invalid_classes_formats_namespaces_attributes_and_bou
 #[test]
 fn document_statistics_round_trip_all_seven_kinds_and_numbering_modes() {
     let kinds = [
-        OdfDocumentStatisticKind::Page,
-        OdfDocumentStatisticKind::Paragraph,
-        OdfDocumentStatisticKind::Word,
-        OdfDocumentStatisticKind::Character,
-        OdfDocumentStatisticKind::Table,
-        OdfDocumentStatisticKind::Image,
-        OdfDocumentStatisticKind::Object,
+        DocumentStatisticKind::Page,
+        DocumentStatisticKind::Paragraph,
+        DocumentStatisticKind::Word,
+        DocumentStatisticKind::Character,
+        DocumentStatisticKind::Table,
+        DocumentStatisticKind::Image,
+        DocumentStatisticKind::Object,
     ];
     for (index, kind) in kinds.into_iter().enumerate() {
         let number_format = match index % 3 {
             0 => None,
-            1 => Some(OdfStatisticNumberFormat::new("I", None).unwrap()),
-            _ => Some(OdfStatisticNumberFormat::new("A", Some(true)).unwrap()),
+            1 => Some(StatisticNumberFormat::new("I", None).unwrap()),
+            _ => Some(StatisticNumberFormat::new("A", Some(true)).unwrap()),
         };
-        let field = OdfDynamicTextField::DocumentStatistic {
+        let field = DynamicTextField::DocumentStatistic {
             kind,
             number_format,
             display_text: format!("{} <cached> & safe", index + 1),
@@ -1076,21 +1068,21 @@ fn document_statistics_parse_style_aliases_and_support_mutation() {
     let source = document(
         r#"<t:word-count xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" s:num-format="a" s:num-letter-sync="1">ten</t:word-count>"#,
     );
-    let replacement = OdfDynamicTextField::DocumentStatistic {
-        kind: OdfDocumentStatisticKind::Page,
-        number_format: Some(OdfStatisticNumberFormat::new("1", None).unwrap()),
+    let replacement = DynamicTextField::DocumentStatistic {
+        kind: DocumentStatisticKind::Page,
+        number_format: Some(StatisticNumberFormat::new("1", None).unwrap()),
         display_text: "12".to_string(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
-        OdfDynamicTextField::DocumentStatistic {
-            kind: OdfDocumentStatisticKind::Word,
+        DynamicTextField::DocumentStatistic {
+            kind: DocumentStatisticKind::Word,
             ..
         }
     ));
-    let inserted = OdfDynamicTextField::DocumentStatistic {
-        kind: OdfDocumentStatisticKind::Image,
+    let inserted = DynamicTextField::DocumentStatistic {
+        kind: DocumentStatisticKind::Image,
         number_format: None,
         display_text: "3".to_string(),
     };
@@ -1117,14 +1109,14 @@ fn document_statistics_reject_invalid_numbering_namespaces_attributes_and_bounds
             "accepted {invalid}"
         );
     }
-    let oversized = OdfDynamicTextField::DocumentStatistic {
-        kind: OdfDocumentStatisticKind::Character,
+    let oversized = DynamicTextField::DocumentStatistic {
+        kind: DocumentStatisticKind::Character,
         number_format: None,
         display_text: "x".repeat(65_537),
     };
     assert!(oversized.validate().is_err());
-    let forbidden = OdfDynamicTextField::DocumentStatistic {
-        kind: OdfDocumentStatisticKind::Table,
+    let forbidden = DynamicTextField::DocumentStatistic {
+        kind: DocumentStatisticKind::Table,
         number_format: None,
         display_text: "1\u{0}".to_string(),
     };

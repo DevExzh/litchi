@@ -18,13 +18,13 @@ const MAX_FORMS: usize = 16_384;
 const MAX_CONTROLS: usize = 65_536;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfButtonType {
+pub enum ButtonType {
     Submit,
     Reset,
     Push,
     Url,
 }
-impl OdfButtonType {
+impl ButtonType {
     fn token(self) -> &'static str {
         match self {
             Self::Submit => "submit",
@@ -36,12 +36,12 @@ impl OdfButtonType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfCheckboxState {
+pub enum CheckboxState {
     Unchecked,
     Checked,
     Unknown,
 }
-impl OdfCheckboxState {
+impl CheckboxState {
     fn token(self) -> &'static str {
         match self {
             Self::Unchecked => "unchecked",
@@ -60,12 +60,12 @@ impl OdfCheckboxState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfButtonControl {
+pub struct ButtonControl {
     pub name: String,
     pub xml_id: String,
     pub label: Option<String>,
     pub value: Option<String>,
-    pub button_type: Option<OdfButtonType>,
+    pub button_type: Option<ButtonType>,
     pub disabled: Option<bool>,
     pub printable: Option<bool>,
     pub tab_index: Option<u64>,
@@ -83,7 +83,7 @@ pub struct OdfButtonControl {
     pub focus_on_click: Option<bool>,
 }
 
-impl OdfButtonControl {
+impl ButtonControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -114,7 +114,7 @@ impl OdfButtonControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfCheckboxControl {
+pub struct CheckboxControl {
     pub name: String,
     pub xml_id: String,
     pub label: Option<String>,
@@ -126,15 +126,15 @@ pub struct OdfCheckboxControl {
     pub title: Option<String>,
     pub data_field: Option<String>,
     pub linked_cell: Option<String>,
-    pub state: Option<OdfCheckboxState>,
-    pub current_state: Option<OdfCheckboxState>,
+    pub state: Option<CheckboxState>,
+    pub current_state: Option<CheckboxState>,
     pub is_tristate: Option<bool>,
     pub visual_effect: Option<String>,
     pub image_align: Option<String>,
     pub image_position: Option<String>,
 }
 
-impl OdfCheckboxControl {
+impl CheckboxControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -162,21 +162,21 @@ impl OdfCheckboxControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfInteractiveControl {
-    Button(OdfButtonControl),
-    Checkbox(OdfCheckboxControl),
+pub enum InteractiveControl {
+    Button(ButtonControl),
+    Checkbox(CheckboxControl),
 }
-impl From<OdfButtonControl> for OdfInteractiveControl {
-    fn from(value: OdfButtonControl) -> Self {
+impl From<ButtonControl> for InteractiveControl {
+    fn from(value: ButtonControl) -> Self {
         Self::Button(value)
     }
 }
-impl From<OdfCheckboxControl> for OdfInteractiveControl {
-    fn from(value: OdfCheckboxControl) -> Self {
+impl From<CheckboxControl> for InteractiveControl {
+    fn from(value: CheckboxControl) -> Self {
         Self::Checkbox(value)
     }
 }
-impl OdfInteractiveControl {
+impl InteractiveControl {
     pub fn name(&self) -> &str {
         match self {
             Self::Button(value) => &value.name,
@@ -198,12 +198,12 @@ impl OdfInteractiveControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfInteractiveForm {
+pub struct InteractiveForm {
     pub name: String,
-    pub controls: Vec<OdfInteractiveControl>,
+    pub controls: Vec<InteractiveControl>,
     pub apply_filter: Option<bool>,
 }
-impl OdfInteractiveForm {
+impl InteractiveForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -211,7 +211,7 @@ impl OdfInteractiveForm {
             apply_filter: None,
         }
     }
-    pub fn add_control(&mut self, control: impl Into<OdfInteractiveControl>) -> Result<()> {
+    pub fn add_control(&mut self, control: impl Into<InteractiveControl>) -> Result<()> {
         let control = control.into();
         validate_control(&control)?;
         if self
@@ -254,7 +254,7 @@ impl OdfInteractiveForm {
     }
 }
 
-pub fn interactive_controls(xml: &str) -> Result<Vec<OdfInteractiveControl>> {
+pub fn interactive_controls(xml: &str) -> Result<Vec<InteractiveControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -264,7 +264,7 @@ pub fn interactive_controls(xml: &str) -> Result<Vec<OdfInteractiveControl>> {
 pub fn insert_interactive_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfInteractiveControl,
+    control: &InteractiveControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -282,7 +282,7 @@ pub fn insert_interactive_control_xml(
 pub fn replace_interactive_control_xml(
     xml: &str,
     control_index: usize,
-    replacement: &OdfInteractiveControl,
+    replacement: &InteractiveControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -312,7 +312,7 @@ pub fn remove_interactive_control_xml(xml: &str, control_index: usize) -> Result
     apply(xml, current.span.clone(), "")
 }
 
-fn button_xml(value: &OdfButtonControl) -> Result<String> {
+fn button_xml(value: &ButtonControl) -> Result<String> {
     validate_button(value)?;
     let mut output = format!(
         r#"<form:button form:name="{}" xml:id="{}""#,
@@ -361,7 +361,7 @@ fn button_xml(value: &OdfButtonControl) -> Result<String> {
     output.push_str("/>");
     Ok(output)
 }
-fn checkbox_xml(value: &OdfCheckboxControl) -> Result<String> {
+fn checkbox_xml(value: &CheckboxControl) -> Result<String> {
     validate_checkbox(value)?;
     let mut output = format!(
         r#"<form:checkbox form:name="{}" xml:id="{}""#,
@@ -406,13 +406,13 @@ fn checkbox_xml(value: &OdfCheckboxControl) -> Result<String> {
     output.push_str("/>");
     Ok(output)
 }
-fn validate_control(value: &OdfInteractiveControl) -> Result<()> {
+fn validate_control(value: &InteractiveControl) -> Result<()> {
     match value {
-        OdfInteractiveControl::Button(value) => validate_button(value),
-        OdfInteractiveControl::Checkbox(value) => validate_checkbox(value),
+        InteractiveControl::Button(value) => validate_button(value),
+        InteractiveControl::Checkbox(value) => validate_checkbox(value),
     }
 }
-fn validate_button(value: &OdfButtonControl) -> Result<()> {
+fn validate_button(value: &ButtonControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id)?;
     for (label, item) in [
         ("button label", value.label.as_deref()),
@@ -449,7 +449,7 @@ fn validate_button(value: &OdfButtonControl) -> Result<()> {
     }
     Ok(())
 }
-fn validate_checkbox(value: &OdfCheckboxControl) -> Result<()> {
+fn validate_checkbox(value: &CheckboxControl) -> Result<()> {
     validate_identity(&value.name, &value.xml_id)?;
     for (label, item) in [
         ("checkbox label", value.label.as_deref()),
@@ -486,8 +486,8 @@ fn validate_checkbox(value: &OdfCheckboxControl) -> Result<()> {
         ],
     )?;
     if value.is_tristate == Some(false)
-        && (matches!(value.state, Some(OdfCheckboxState::Unknown))
-            || matches!(value.current_state, Some(OdfCheckboxState::Unknown)))
+        && (matches!(value.state, Some(CheckboxState::Unknown))
+            || matches!(value.current_state, Some(CheckboxState::Unknown)))
     {
         return invalid("non-tristate checkbox cannot have unknown state");
     }
@@ -514,7 +514,7 @@ struct FormLocation {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfInteractiveControl,
+    control: InteractiveControl,
 }
 struct Scan {
     forms: Vec<FormLocation>,
@@ -701,7 +701,7 @@ fn parse_control(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     local: &[u8],
-) -> Result<OdfInteractiveControl> {
+) -> Result<InteractiveControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(
         &attrs,
@@ -714,15 +714,15 @@ fn parse_control(
     let name = required(&attrs, FORM, "name")?;
     let xml_id = required(&attrs, XML, "id")?;
     if local == b"button" {
-        let mut value = OdfButtonControl::new(name, xml_id);
+        let mut value = ButtonControl::new(name, xml_id);
         value.label = optional(&attrs, FORM, "label");
         value.value = optional(&attrs, FORM, "value");
         value.button_type = optional(&attrs, FORM, "button-type")
             .map(|item| match item.as_str() {
-                "submit" => Ok(OdfButtonType::Submit),
-                "reset" => Ok(OdfButtonType::Reset),
-                "push" => Ok(OdfButtonType::Push),
-                "url" => Ok(OdfButtonType::Url),
+                "submit" => Ok(ButtonType::Submit),
+                "reset" => Ok(ButtonType::Reset),
+                "push" => Ok(ButtonType::Push),
+                "url" => Ok(ButtonType::Url),
                 _ => invalid(format!("invalid button type '{item}'")),
             })
             .transpose()?;
@@ -749,7 +749,7 @@ fn parse_control(
         validate_button(&value)?;
         Ok(value.into())
     } else {
-        let mut value = OdfCheckboxControl::new(name, xml_id);
+        let mut value = CheckboxControl::new(name, xml_id);
         value.label = optional(&attrs, FORM, "label");
         value.value = optional(&attrs, FORM, "value");
         value.disabled = optional_bool(&attrs, FORM, "disabled")?;
@@ -760,10 +760,10 @@ fn parse_control(
         value.data_field = optional(&attrs, FORM, "data-field");
         value.linked_cell = optional(&attrs, FORM, "linked-cell");
         value.state = optional(&attrs, FORM, "state")
-            .map(|item| OdfCheckboxState::parse(&item))
+            .map(|item| CheckboxState::parse(&item))
             .transpose()?;
         value.current_state = optional(&attrs, FORM, "current-state")
-            .map(|item| OdfCheckboxState::parse(&item))
+            .map(|item| CheckboxState::parse(&item))
             .transpose()?;
         value.is_tristate = optional_bool(&attrs, FORM, "is-tristate")?;
         value.visual_effect = optional(&attrs, FORM, "visual-effect");
@@ -916,8 +916,8 @@ fn register_name(form: &mut FormLocation, name: &str) -> Result<()> {
 }
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfInteractiveControl,
-    current: Option<&OdfInteractiveControl>,
+    replacement: &InteractiveControl,
+    current: Option<&InteractiveControl>,
 ) -> Result<()> {
     for name in &form.names {
         if name == replacement.name() && current.is_none_or(|value| value.name() != name) {
@@ -1226,21 +1226,21 @@ mod tests {
 
     #[test]
     fn canonical_button_and_checkbox_are_typed_and_escaped() {
-        let mut button = OdfButtonControl::new("Run & go", "run_1");
+        let mut button = ButtonControl::new("Run & go", "run_1");
         button.label = Some("Run <now>".into());
-        button.button_type = Some(OdfButtonType::Push);
+        button.button_type = Some(ButtonType::Push);
         button.href = Some("https://example.invalid/action?a=1&b=2".into());
         button.image_data = Some("Pictures/run.png".into());
         button.repeat = Some(true);
         button.delay_for_repeat = Some("PT0.05S".into());
         let xml = button.to_xml_fragment().unwrap();
         assert!(xml.contains("form:button-type=\"push\"") && xml.contains("a=1&amp;b=2"));
-        let mut check = OdfCheckboxControl::new("Enabled", "enabled_1");
+        let mut check = CheckboxControl::new("Enabled", "enabled_1");
         check.label = Some("Enabled".into());
         check.is_tristate = Some(true);
-        check.state = Some(OdfCheckboxState::Unknown);
-        check.current_state = Some(OdfCheckboxState::Checked);
-        let mut form = OdfInteractiveForm::new("Main");
+        check.state = Some(CheckboxState::Unknown);
+        check.current_state = Some(CheckboxState::Checked);
+        let mut form = InteractiveForm::new("Main");
         form.add_control(button).unwrap();
         form.add_control(check).unwrap();
         let document = format!("{ROOT}{}{END}", form.to_xml_fragment().unwrap());
@@ -1252,10 +1252,10 @@ mod tests {
         let xml = format!(
             r#"{ROOT}<f:form f:name="Main"><f:button f:name="A" xml:id="a" f:label="old"><f:properties><f:property f:property-name="Keep" o:value-type="void"/></f:properties></f:button><!--keep--><f:text f:name="Text" xml:id="text_1"/></f:form>{END}"#
         );
-        let check: OdfInteractiveControl = OdfCheckboxControl::new("B", "b").into();
+        let check: InteractiveControl = CheckboxControl::new("B", "b").into();
         let inserted = insert_interactive_control_xml(&xml, 0, &check).unwrap();
         assert!(inserted.contains("<!--keep-->") && inserted.contains("form:checkbox"));
-        let mut replacement = OdfButtonControl::new("A2", "a2");
+        let mut replacement = ButtonControl::new("A2", "a2");
         replacement.label = Some("new".into());
         let replaced = replace_interactive_control_xml(&inserted, 0, &replacement.into()).unwrap();
         assert!(replaced.contains("<!--keep-->") && replaced.contains("f:text"));
@@ -1263,7 +1263,7 @@ mod tests {
         assert_eq!(interactive_controls(&removed).unwrap().len(), 1);
         let empty = format!(r#"{ROOT}<f:form f:name="Empty"/>{END}"#);
         assert!(
-            insert_interactive_control_xml(&empty, 0, &OdfCheckboxControl::new("C", "c").into())
+            insert_interactive_control_xml(&empty, 0, &CheckboxControl::new("C", "c").into())
                 .unwrap()
                 .contains("</f:form>")
         );
@@ -1271,11 +1271,7 @@ mod tests {
 
     #[test]
     fn hostile_namespaces_attributes_events_resources_and_limits_are_rejected() {
-        assert!(
-            OdfButtonControl::new("B", "1bad")
-                .to_xml_fragment()
-                .is_err()
-        );
+        assert!(ButtonControl::new("B", "1bad").to_xml_fragment().is_err());
         let wrong = format!(
             r#"{ROOT}<f:form f:name="Main"><x:button f:name="B" xml:id="b"/></f:form>{END}"#
         );
@@ -1290,7 +1286,7 @@ mod tests {
             r#"{ROOT}<o:p xml:id="same"/><f:form f:name="Main"><f:checkbox f:name="C" xml:id="same"/></f:form>{END}"#
         );
         assert!(interactive_controls(&duplicate).is_err());
-        let mut button = OdfButtonControl::new("B", "b");
+        let mut button = ButtonControl::new("B", "b");
         button.href = Some("javascript:alert(1)".into());
         assert!(button.to_xml_fragment().is_err());
         button.href = None;
@@ -1312,7 +1308,7 @@ mod tests {
         assert!(
             parsed
                 .iter()
-                .any(|item| matches!(item, OdfInteractiveControl::Checkbox(_)))
+                .any(|item| matches!(item, InteractiveControl::Checkbox(_)))
         );
         let producer = format!(
             r#"{ROOT}<f:form f:name="Producers"><f:button f:name="odfpy" xml:id="button_1" f:label="Run" f:button-type="push" o:target-frame="" x:href="" f:image-data="" f:delay-for-repeat="PT0.050000000S" f:image-position="center"/><f:checkbox f:name="odfdo" xml:id="check_1" f:label="Check" f:state="checked" f:current-state="unknown" f:is-tristate="true"/></f:form>{END}"#
@@ -1323,8 +1319,8 @@ mod tests {
     #[test]
     fn builder_and_mutable_package_round_trip() {
         use crate::{Document, DocumentBuilder, MutableDocument};
-        let mut form = OdfInteractiveForm::new("Main");
-        form.add_control(OdfButtonControl::new("Run", "run_1"))
+        let mut form = InteractiveForm::new("Main");
+        form.add_control(ButtonControl::new("Run", "run_1"))
             .unwrap();
         let mut builder = DocumentBuilder::new();
         builder.add_interactive_form(&form).unwrap();
@@ -1332,9 +1328,9 @@ mod tests {
         let document = Document::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.interactive_controls().unwrap().len(), 1);
-        let checkbox: OdfInteractiveControl = OdfCheckboxControl::new("Check", "check_1").into();
+        let checkbox: InteractiveControl = CheckboxControl::new("Check", "check_1").into();
         mutable.insert_interactive_control(0, &checkbox).unwrap();
-        let replacement: OdfInteractiveControl = OdfButtonControl::new("Go", "go_1").into();
+        let replacement: InteractiveControl = ButtonControl::new("Go", "go_1").into();
         assert_eq!(
             mutable
                 .replace_interactive_control(0, &replacement)

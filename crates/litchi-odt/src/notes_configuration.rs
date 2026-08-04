@@ -10,7 +10,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::line_numbering::OdfLineNumberFormat;
+use crate::line_numbering::LineNumberFormat;
 use crate::{FlatOpenDocument, OpenDocumentPackage};
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -30,12 +30,12 @@ enum NamespaceKind {
 
 /// Note class selected by `text:note-class`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfNoteClass {
+pub enum NoteClass {
     Footnote,
     Endnote,
 }
 
-impl OdfNoteClass {
+impl NoteClass {
     pub const ALL: [Self; 2] = [Self::Footnote, Self::Endnote];
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -55,13 +55,13 @@ impl OdfNoteClass {
 
 /// Scope at which note numbering restarts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfNoteNumberingScope {
+pub enum NoteNumberingScope {
     Document,
     Chapter,
     Page,
 }
 
-impl OdfNoteNumberingScope {
+impl NoteNumberingScope {
     pub const ALL: [Self; 3] = [Self::Document, Self::Chapter, Self::Page];
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -83,14 +83,14 @@ impl OdfNoteNumberingScope {
 
 /// Placement of footnotes in the document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfFootnotePosition {
+pub enum FootnotePosition {
     Text,
     Page,
     Section,
     Document,
 }
 
-impl OdfFootnotePosition {
+impl FootnotePosition {
     pub const ALL: [Self; 4] = [Self::Text, Self::Page, Self::Section, Self::Document];
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -114,8 +114,8 @@ impl OdfFootnotePosition {
 
 /// One `text:notes-configuration` declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfNotesConfiguration {
-    pub note_class: OdfNoteClass,
+pub struct NotesConfiguration {
+    pub note_class: NoteClass,
     pub citation_style_name: Option<String>,
     pub citation_body_style_name: Option<String>,
     pub default_style_name: Option<String>,
@@ -123,16 +123,16 @@ pub struct OdfNotesConfiguration {
     pub start_value: Option<u64>,
     pub number_prefix: Option<String>,
     pub number_suffix: Option<String>,
-    pub number_format: Option<OdfLineNumberFormat>,
+    pub number_format: Option<LineNumberFormat>,
     pub letter_sync: Option<bool>,
-    pub start_numbering_at: Option<OdfNoteNumberingScope>,
-    pub footnotes_position: Option<OdfFootnotePosition>,
+    pub start_numbering_at: Option<NoteNumberingScope>,
+    pub footnotes_position: Option<FootnotePosition>,
     pub continuation_notice_forward: Option<String>,
     pub continuation_notice_backward: Option<String>,
 }
 
-impl OdfNotesConfiguration {
-    pub fn new(note_class: OdfNoteClass) -> Self {
+impl NotesConfiguration {
+    pub fn new(note_class: NoteClass) -> Self {
         Self {
             note_class,
             citation_style_name: None,
@@ -155,7 +155,7 @@ impl OdfNotesConfiguration {
         if self.letter_sync.is_some()
             && !matches!(
                 self.number_format,
-                Some(OdfLineNumberFormat::LowerAlpha | OdfLineNumberFormat::UpperAlpha)
+                Some(LineNumberFormat::LowerAlpha | LineNumberFormat::UpperAlpha)
             )
         {
             return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
@@ -251,18 +251,18 @@ impl OdfNotesConfiguration {
         write_attr(
             &mut output,
             "style:num-format",
-            self.number_format.as_ref().map(OdfLineNumberFormat::as_str),
+            self.number_format.as_ref().map(LineNumberFormat::as_str),
         );
         write_bool_attr(&mut output, "style:num-letter-sync", self.letter_sync);
         write_attr(
             &mut output,
             "text:start-numbering-at",
-            self.start_numbering_at.map(OdfNoteNumberingScope::as_str),
+            self.start_numbering_at.map(NoteNumberingScope::as_str),
         );
         write_attr(
             &mut output,
             "text:footnotes-position",
-            self.footnotes_position.map(OdfFootnotePosition::as_str),
+            self.footnotes_position.map(FootnotePosition::as_str),
         );
         if self.continuation_notice_forward.is_none() && self.continuation_notice_backward.is_none()
         {
@@ -287,28 +287,28 @@ impl OdfNotesConfiguration {
 
 /// The at-most-one configuration for each standard note class.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OdfNotesConfigurations {
-    pub footnote: Option<OdfNotesConfiguration>,
-    pub endnote: Option<OdfNotesConfiguration>,
+pub struct NotesConfigurations {
+    pub footnote: Option<NotesConfiguration>,
+    pub endnote: Option<NotesConfiguration>,
 }
 
-impl OdfNotesConfigurations {
-    pub fn get(&self, note_class: OdfNoteClass) -> Option<&OdfNotesConfiguration> {
+impl NotesConfigurations {
+    pub fn get(&self, note_class: NoteClass) -> Option<&NotesConfiguration> {
         match note_class {
-            OdfNoteClass::Footnote => self.footnote.as_ref(),
-            OdfNoteClass::Endnote => self.endnote.as_ref(),
+            NoteClass::Footnote => self.footnote.as_ref(),
+            NoteClass::Endnote => self.endnote.as_ref(),
         }
     }
 
     pub fn validate(&self) -> Result<()> {
         if let Some(configuration) = &self.footnote {
-            if configuration.note_class != OdfNoteClass::Footnote {
+            if configuration.note_class != NoteClass::Footnote {
                 return invalid("footnote slot contains an endnote configuration");
             }
             configuration.validate()?;
         }
         if let Some(configuration) = &self.endnote {
-            if configuration.note_class != OdfNoteClass::Endnote {
+            if configuration.note_class != NoteClass::Endnote {
                 return invalid("endnote slot contains a footnote configuration");
             }
             configuration.validate()?;
@@ -331,7 +331,7 @@ impl OdfNotesConfigurations {
 }
 
 /// Parse footnote/endnote configurations from an ODF styles document.
-pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
+pub fn parse_notes_configurations(xml: &str) -> Result<NotesConfigurations> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte notes limit"
@@ -343,7 +343,7 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
     let mut depth = 0usize;
     let mut styles_content_depth = None;
     let mut section_properties_depth = None;
-    let mut result = OdfNotesConfigurations::default();
+    let mut result = NotesConfigurations::default();
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
@@ -442,7 +442,7 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
 fn parse_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<OdfNotesConfiguration> {
+) -> Result<NotesConfiguration> {
     let mut note_class = None;
     let mut citation_style_name = None;
     let mut citation_body_style_name = None;
@@ -473,7 +473,7 @@ fn parse_attributes(
             .into_owned();
         validate_value(&value, "notes configuration attribute", true)?;
         match (namespace, local.as_ref()) {
-            (NamespaceKind::Text, b"note-class") => note_class = Some(OdfNoteClass::parse(&value)?),
+            (NamespaceKind::Text, b"note-class") => note_class = Some(NoteClass::parse(&value)?),
             (NamespaceKind::Text, b"citation-style-name") => citation_style_name = Some(value),
             (NamespaceKind::Text, b"citation-body-style-name") => {
                 citation_body_style_name = Some(value)
@@ -486,16 +486,16 @@ fn parse_attributes(
             (NamespaceKind::Style, b"num-prefix") => number_prefix = Some(value),
             (NamespaceKind::Style, b"num-suffix") => number_suffix = Some(value),
             (NamespaceKind::Style, b"num-format") => {
-                number_format = Some(OdfLineNumberFormat::parse(value)?)
+                number_format = Some(LineNumberFormat::parse(value)?)
             },
             (NamespaceKind::Style, b"num-letter-sync") => {
                 letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
             },
             (NamespaceKind::Text, b"start-numbering-at") => {
-                start_numbering_at = Some(OdfNoteNumberingScope::parse(&value)?)
+                start_numbering_at = Some(NoteNumberingScope::parse(&value)?)
             },
             (NamespaceKind::Text, b"footnotes-position") => {
-                footnotes_position = Some(OdfFootnotePosition::parse(&value)?)
+                footnotes_position = Some(FootnotePosition::parse(&value)?)
             },
             _ => return invalid("unsupported text:notes-configuration attribute"),
         }
@@ -503,7 +503,7 @@ fn parse_attributes(
     let note_class = note_class.ok_or_else(|| {
         Error::InvalidFormat("notes configuration requires text:note-class".to_string())
     })?;
-    Ok(OdfNotesConfiguration {
+    Ok(NotesConfiguration {
         note_class,
         citation_style_name,
         citation_body_style_name,
@@ -523,7 +523,7 @@ fn parse_attributes(
 
 fn parse_notices(
     reader: &mut NsReader<&[u8]>,
-    configuration: &mut OdfNotesConfiguration,
+    configuration: &mut NotesConfiguration,
 ) -> Result<()> {
     let mut buffer = Vec::new();
     loop {
@@ -637,12 +637,12 @@ fn reject_attributes(element: &BytesStart<'_>) -> Result<()> {
 }
 
 fn insert_configuration(
-    result: &mut OdfNotesConfigurations,
-    configuration: OdfNotesConfiguration,
+    result: &mut NotesConfigurations,
+    configuration: NotesConfiguration,
 ) -> Result<()> {
     let slot = match configuration.note_class {
-        OdfNoteClass::Footnote => &mut result.footnote,
-        OdfNoteClass::Endnote => &mut result.endnote,
+        NoteClass::Footnote => &mut result.footnote,
+        NoteClass::Endnote => &mut result.endnote,
     };
     if slot.replace(configuration).is_some() {
         return invalid("duplicate notes configuration for the same note class");
@@ -675,10 +675,7 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat("invalid notes XML event boundary".to_string()))
 }
 
-fn locate_configuration(
-    xml: &str,
-    note_class: OdfNoteClass,
-) -> Result<(Option<XmlSpan>, StylesSite)> {
+fn locate_configuration(xml: &str, note_class: NoteClass) -> Result<(Option<XmlSpan>, StylesSite)> {
     parse_notes_configurations(xml)?;
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -764,7 +761,7 @@ fn locate_configuration(
 /// Insert or replace one note-class configuration without rewriting unrelated XML.
 pub fn set_notes_configuration_xml(
     xml: &str,
-    configuration: &OdfNotesConfiguration,
+    configuration: &NotesConfiguration,
 ) -> Result<String> {
     configuration.validate()?;
     let (target, site) = locate_configuration(xml, configuration.note_class)?;
@@ -802,7 +799,7 @@ pub fn set_notes_configuration_xml(
 }
 
 /// Remove one note-class configuration without rewriting unrelated XML.
-pub fn remove_notes_configuration_xml(xml: &str, note_class: OdfNoteClass) -> Result<String> {
+pub fn remove_notes_configuration_xml(xml: &str, note_class: NoteClass) -> Result<String> {
     let (target, _) = locate_configuration(xml, note_class)?;
     let Some(span) = target else {
         return Ok(xml.to_string());
@@ -811,16 +808,16 @@ pub fn remove_notes_configuration_xml(xml: &str, note_class: OdfNoteClass) -> Re
 }
 
 impl OpenDocumentPackage {
-    pub fn notes_configurations(&self) -> Result<OdfNotesConfigurations> {
+    pub fn notes_configurations(&self) -> Result<NotesConfigurations> {
         self.styles_xml()?.map_or_else(
-            || Ok(OdfNotesConfigurations::default()),
+            || Ok(NotesConfigurations::default()),
             |xml| parse_notes_configurations(&xml),
         )
     }
 }
 
 impl FlatOpenDocument {
-    pub fn notes_configurations(&self) -> Result<OdfNotesConfigurations> {
+    pub fn notes_configurations(&self) -> Result<NotesConfigurations> {
         parse_notes_configurations(self.xml())
     }
 }
@@ -1029,12 +1026,9 @@ mod tests {
             r#"<t:notes-configuration t:note-class="footnote" t:citation-style-name="Footnote_20_Symbol" t:citation-body-style-name="Footnote_20_anchor" t:default-style-name="Footnote" t:master-page-name="Standard" t:start-value="2" s:num-prefix="[" s:num-suffix="]" s:num-format="a" s:num-letter-sync="true" t:start-numbering-at="chapter" t:footnotes-position="page"><t:note-continuation-notice-forward>Continued &amp; next</t:note-continuation-notice-forward><t:note-continuation-notice-backward><![CDATA[From <previous>]]></t:note-continuation-notice-backward></t:notes-configuration><t:notes-configuration t:note-class="endnote" s:num-format="I" t:start-numbering-at="document"/>"#,
         );
         let configurations = parse_notes_configurations(&xml).unwrap();
-        let footnote = configurations.get(OdfNoteClass::Footnote).unwrap();
+        let footnote = configurations.get(NoteClass::Footnote).unwrap();
         assert_eq!(footnote.start_value, Some(2));
-        assert_eq!(
-            footnote.number_format,
-            Some(OdfLineNumberFormat::LowerAlpha)
-        );
+        assert_eq!(footnote.number_format, Some(LineNumberFormat::LowerAlpha));
         assert_eq!(footnote.letter_sync, Some(true));
         assert_eq!(
             footnote.continuation_notice_forward.as_deref(),
@@ -1044,7 +1038,7 @@ mod tests {
             footnote.continuation_notice_backward.as_deref(),
             Some("From <previous>")
         );
-        assert!(configurations.get(OdfNoteClass::Endnote).is_some());
+        assert!(configurations.get(NoteClass::Endnote).is_some());
 
         let serialized = configurations.to_xml_fragment().unwrap();
         let reparsed = parse_notes_configurations(&styles(&serialized)).unwrap();
@@ -1077,13 +1071,13 @@ mod tests {
 
     #[test]
     fn exhaustive_enums_and_number_formats_round_trip() {
-        for note_class in OdfNoteClass::ALL {
-            for scope in OdfNoteNumberingScope::ALL {
-                for position in OdfFootnotePosition::ALL {
-                    let mut value = OdfNotesConfiguration::new(note_class);
+        for note_class in NoteClass::ALL {
+            for scope in NoteNumberingScope::ALL {
+                for position in FootnotePosition::ALL {
+                    let mut value = NotesConfiguration::new(note_class);
                     value.citation_style_name = Some(String::new());
                     value.default_style_name = Some("Style_1".to_string());
-                    value.number_format = Some(OdfLineNumberFormat::LowerAlpha);
+                    value.number_format = Some(LineNumberFormat::LowerAlpha);
                     value.letter_sync = Some(false);
                     value.start_numbering_at = Some(scope);
                     value.footnotes_position = Some(position);
@@ -1094,18 +1088,18 @@ mod tests {
             }
         }
         for format in [
-            OdfLineNumberFormat::Empty,
-            OdfLineNumberFormat::Arabic,
-            OdfLineNumberFormat::LowerRoman,
-            OdfLineNumberFormat::UpperRoman,
-            OdfLineNumberFormat::LowerAlpha,
-            OdfLineNumberFormat::UpperAlpha,
-            OdfLineNumberFormat::Custom("①".to_string()),
+            LineNumberFormat::Empty,
+            LineNumberFormat::Arabic,
+            LineNumberFormat::LowerRoman,
+            LineNumberFormat::UpperRoman,
+            LineNumberFormat::LowerAlpha,
+            LineNumberFormat::UpperAlpha,
+            LineNumberFormat::Custom("①".to_string()),
         ] {
-            let mut value = OdfNotesConfiguration::new(OdfNoteClass::Footnote);
+            let mut value = NotesConfiguration::new(NoteClass::Footnote);
             value.letter_sync = matches!(
                 format,
-                OdfLineNumberFormat::LowerAlpha | OdfLineNumberFormat::UpperAlpha
+                LineNumberFormat::LowerAlpha | LineNumberFormat::UpperAlpha
             )
             .then_some(true);
             value.number_format = Some(format);
@@ -1148,11 +1142,11 @@ mod tests {
         let real = parse_notes_configurations(fixture).unwrap();
         assert_eq!(
             real.footnote.as_ref().unwrap().number_format,
-            Some(OdfLineNumberFormat::Arabic)
+            Some(LineNumberFormat::Arabic)
         );
         assert_eq!(
             real.endnote.as_ref().unwrap().number_format,
-            Some(OdfLineNumberFormat::LowerRoman)
+            Some(LineNumberFormat::LowerRoman)
         );
         let flat = FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
         assert_eq!(flat.notes_configurations().unwrap(), real);
@@ -1177,7 +1171,7 @@ mod tests {
             r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:x="urn:wrong"><o:styles><x:notes-configuration t:note-class="footnote"/></o:styles></o:document-styles>"#
         );
         assert!(parse_notes_configurations(&wrong_namespace).is_err());
-        let mut capped = OdfNotesConfiguration::new(OdfNoteClass::Footnote);
+        let mut capped = NotesConfiguration::new(NoteClass::Footnote);
         capped.continuation_notice_forward = Some("x".repeat(MAX_VALUE_BYTES + 1));
         assert!(capped.validate().is_err());
     }
@@ -1189,7 +1183,7 @@ mod tests {
         let original = styles(
             r#"<!--keep--><style:list-style xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="L"/>"#,
         );
-        let mut value = OdfNotesConfiguration::new(OdfNoteClass::Footnote);
+        let mut value = NotesConfiguration::new(NoteClass::Footnote);
         value.start_value = Some(2);
         let inserted = set_notes_configuration_xml(&original, &value).unwrap();
         assert!(inserted.contains("<!--keep--><style:list-style"));
@@ -1198,7 +1192,7 @@ mod tests {
         assert!(replaced.contains("text:start-value=\"3\""));
         assert!(!replaced.contains("text:start-value=\"2\""));
         assert_eq!(
-            remove_notes_configuration_xml(&replaced, OdfNoteClass::Footnote).unwrap(),
+            remove_notes_configuration_xml(&replaced, NoteClass::Footnote).unwrap(),
             original
         );
 

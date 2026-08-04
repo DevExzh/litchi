@@ -4,7 +4,7 @@ mod writing;
 
 pub use writing::{insert_note_xml, remove_note_xml, replace_note_xml};
 
-use crate::elements::field::OdfNoteBodyContent;
+use crate::elements::field::NoteBodyContent;
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, decode_reference, is_bound,
     namespaced_attribute,
@@ -46,7 +46,7 @@ pub struct Note {
     citation: String,
     label: Option<String>,
     body: String,
-    rich_body: Option<OdfNoteBodyContent>,
+    rich_body: Option<NoteBodyContent>,
 }
 
 impl PartialEq for Note {
@@ -92,7 +92,7 @@ impl Note {
     pub fn with_rich_body(
         class: NoteClass,
         citation: impl Into<String>,
-        rich_body: OdfNoteBodyContent,
+        rich_body: NoteBodyContent,
     ) -> Result<Self> {
         let value = Self {
             class,
@@ -127,7 +127,7 @@ impl Note {
     ///
     /// All dynamic descendants remain inert. The parallel [`Self::body`]
     /// accessor provides the bounded visible-text projection.
-    pub fn rich_body(&self) -> Option<&OdfNoteBodyContent> {
+    pub fn rich_body(&self) -> Option<&NoteBodyContent> {
         self.rich_body.as_ref()
     }
 
@@ -174,7 +174,7 @@ impl Note {
     /// Its visible-text projection becomes [`Self::body`]. The content remains
     /// inert: serializing a note never evaluates fields, follows links, or
     /// executes scripts, macros, or event listeners.
-    pub fn set_rich_body(&mut self, rich_body: OdfNoteBodyContent) -> Result<()> {
+    pub fn set_rich_body(&mut self, rich_body: NoteBodyContent) -> Result<()> {
         rich_body.validate()?;
         let body = rich_body.display_text().to_string();
         validate_note_text(&body, "note body")?;
@@ -563,7 +563,7 @@ mod tests {
         assert_eq!(notes[0].body(), "xyz");
         let rich_body = notes[0].rich_body().unwrap();
         assert_eq!(rich_body.display_text(), "xyz");
-        let crate::OdfMetaFieldNode::Element(list) = &rich_body.nodes()[0] else {
+        let crate::MetaFieldNode::Element(list) = &rich_body.nodes()[0] else {
             panic!("expected LibreOffice note body list");
         };
         assert_eq!(list.namespace_uri, TEXT);

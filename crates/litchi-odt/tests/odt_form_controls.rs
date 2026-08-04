@@ -8,70 +8,69 @@
 //! round trips.
 
 use litchi_odt::{
-    Document, DocumentBuilder, FlatOpenDocument, MutableDocument, OdfButtonControl,
-    OdfCheckboxControl, OdfCheckboxState, OdfComboItem, OdfComboboxControl, OdfControlForm,
-    OdfFixedTextControl, OdfFormControlKind, OdfFormNode, OdfGenericForm, OdfHiddenControl,
-    OdfInteractiveForm, OdfListOption, OdfListboxControl, OdfRadioControl, OdfSelectionForm,
-    OdfTextControl, OdfTypedValueControl, OdfTypedValueControlKind, OdfTypedValueForm,
-    OdfVisualForm,
+    ButtonControl, CheckboxControl, CheckboxState, ComboItem, ComboboxControl, ControlForm,
+    Document, DocumentBuilder, FixedTextControl, FlatOpenDocument, FormControlKind, FormNode,
+    GenericForm, HiddenControl, InteractiveForm, ListOption, ListboxControl, MutableDocument,
+    RadioControl, SelectionForm, TextControl, TypedValueControl, TypedValueControlKind,
+    TypedValueForm, VisualForm,
 };
 
 /// Flat text document holding one form with every common control kind.
 const FIXTURE: &str = "../../test-data/odf/odt/form-controls.fodt";
 
-fn text_form() -> OdfControlForm {
-    let mut form = OdfControlForm::new("texts");
-    let mut name = OdfTextControl::text("Name", "name_field");
+fn text_form() -> ControlForm {
+    let mut form = ControlForm::new("texts");
+    let mut name = TextControl::text("Name", "name_field");
     name.current_value = Some("Ada".to_string());
     name.title = Some("Your name".to_string());
     name.max_length = Some(40);
     form.add_control(name).unwrap();
-    let mut bio = OdfTextControl::textarea("Bio", "bio_field");
+    let mut bio = TextControl::textarea("Bio", "bio_field");
     bio.readonly = Some(true);
     bio.paragraphs = vec!["first line".to_string(), "second line".to_string()];
     form.add_control(bio).unwrap();
     form
 }
 
-fn interactive_form() -> OdfInteractiveForm {
-    let mut form = OdfInteractiveForm::new("buttons");
-    let mut subscribe = OdfCheckboxControl::new("Subscribe", "subscribe_box");
+fn interactive_form() -> InteractiveForm {
+    let mut form = InteractiveForm::new("buttons");
+    let mut subscribe = CheckboxControl::new("Subscribe", "subscribe_box");
     subscribe.label = Some("Subscribe to newsletter".to_string());
-    subscribe.current_state = Some(OdfCheckboxState::Checked);
+    subscribe.current_state = Some(CheckboxState::Checked);
     form.add_control(subscribe).unwrap();
-    let mut go = OdfButtonControl::new("Go", "go_button");
+    let mut go = ButtonControl::new("Go", "go_button");
     go.label = Some("Go".to_string());
     form.add_control(go).unwrap();
     form
 }
 
-fn selection_form() -> OdfSelectionForm {
-    let mut form = OdfSelectionForm::new("choices");
-    let mut city = OdfComboboxControl::new("City", "city_combo");
+fn selection_form() -> SelectionForm {
+    let mut form = SelectionForm::new("choices");
+    let mut city = ComboboxControl::new("City", "city_combo");
     city.current_value = Some("Paris".to_string());
     city.dropdown = Some(true);
     city.items = vec![
-        OdfComboItem {
+        ComboItem {
             label: Some("Paris".to_string()),
             text: String::new(),
         },
-        OdfComboItem {
+        ComboItem {
             label: Some("London".to_string()),
             text: String::new(),
         },
     ];
     form.add_control(city).unwrap();
-    let mut color = OdfListboxControl::new("Color", "color_list");
+    let mut color = ListboxControl::new("Color", "color_list");
     color.dropdown = Some(true);
     color.options = vec![
-        OdfListOption {
+        ListOption {
             label: Some("Red".to_string()),
             value: Some("r".to_string()),
             selected: None,
             current_selected: Some(true),
             text: String::new(),
         },
-        OdfListOption {
+        ListOption {
             label: Some("Blue".to_string()),
             value: Some("b".to_string()),
             selected: None,
@@ -83,35 +82,35 @@ fn selection_form() -> OdfSelectionForm {
     form
 }
 
-fn typed_value_form() -> OdfTypedValueForm {
-    let mut form = OdfTypedValueForm::new("values");
-    let mut age = OdfTypedValueControl::new(OdfTypedValueControlKind::Number, "Age", "age_number");
+fn typed_value_form() -> TypedValueForm {
+    let mut form = TypedValueForm::new("values");
+    let mut age = TypedValueControl::new(TypedValueControlKind::Number, "Age", "age_number");
     age.current_value = Some("36".to_string());
     form.add_control(age).unwrap();
-    let mut when = OdfTypedValueControl::new(OdfTypedValueControlKind::Date, "When", "when_date");
+    let mut when = TypedValueControl::new(TypedValueControlKind::Date, "When", "when_date");
     when.current_value = Some("2024-01-31".to_string());
     form.add_control(when).unwrap();
-    let mut at = OdfTypedValueControl::new(OdfTypedValueControlKind::Time, "At", "at_time");
+    let mut at = TypedValueControl::new(TypedValueControlKind::Time, "At", "at_time");
     at.current_value = Some("12:30:00".to_string());
     form.add_control(at).unwrap();
     form
 }
 
-fn generic_form() -> OdfGenericForm {
-    let mut form = OdfGenericForm::new("labels");
-    let mut caption = OdfFixedTextControl::new("Caption", "caption_label");
+fn generic_form() -> GenericForm {
+    let mut form = GenericForm::new("labels");
+    let mut caption = FixedTextControl::new("Caption", "caption_label");
     caption.label = Some("Static caption".to_string());
     caption.form_for = Some("name_field".to_string());
     form.add_control(caption).unwrap();
-    let mut token = OdfHiddenControl::new("Token", "hidden_token");
+    let mut token = HiddenControl::new("Token", "hidden_token");
     token.value = Some("inert-token".to_string());
     form.add_control(token).unwrap();
     form
 }
 
-fn visual_form() -> OdfVisualForm {
-    let mut form = OdfVisualForm::new("radios");
-    let mut choice = OdfRadioControl::new("Choice", "choice_a");
+fn visual_form() -> VisualForm {
+    let mut form = VisualForm::new("radios");
+    let mut choice = RadioControl::new("Choice", "choice_a");
     choice.label = Some("Option A".to_string());
     choice.value = Some("a".to_string());
     choice.current_selected = Some(true);
@@ -129,30 +128,30 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     let form = &forms.groups[0].forms[0];
     assert_eq!(form.name.as_deref(), Some("registration"));
 
-    let controls: Vec<&litchi_odt::OdfFormControl> = form
+    let controls: Vec<&litchi_odt::FormControl> = form
         .children
         .iter()
         .map(|node| match node {
-            OdfFormNode::Control(control) => control,
-            OdfFormNode::Form(_) => panic!("no nested forms in fixture"),
+            FormNode::Control(control) => control,
+            FormNode::Form(_) => panic!("no nested forms in fixture"),
         })
         .collect();
-    let kinds: Vec<&OdfFormControlKind> = controls.iter().map(|control| &control.kind).collect();
+    let kinds: Vec<&FormControlKind> = controls.iter().map(|control| &control.kind).collect();
     assert_eq!(
         kinds,
         [
-            &OdfFormControlKind::Text,
-            &OdfFormControlKind::TextArea,
-            &OdfFormControlKind::CheckBox,
-            &OdfFormControlKind::Button,
-            &OdfFormControlKind::ComboBox,
-            &OdfFormControlKind::ListBox,
-            &OdfFormControlKind::Radio,
-            &OdfFormControlKind::FixedText,
-            &OdfFormControlKind::Hidden,
-            &OdfFormControlKind::Number,
-            &OdfFormControlKind::Date,
-            &OdfFormControlKind::Time,
+            &FormControlKind::Text,
+            &FormControlKind::TextArea,
+            &FormControlKind::CheckBox,
+            &FormControlKind::Button,
+            &FormControlKind::ComboBox,
+            &FormControlKind::ListBox,
+            &FormControlKind::Radio,
+            &FormControlKind::FixedText,
+            &FormControlKind::Hidden,
+            &FormControlKind::Number,
+            &FormControlKind::Date,
+            &FormControlKind::Time,
         ]
     );
 
@@ -171,15 +170,15 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     assert_eq!(controls[9].current_value.as_deref(), Some("36"));
 
     // Combobox items and listbox options are nested typed controls.
-    let OdfFormNode::Control(item) = &controls[4].children[0] else {
+    let FormNode::Control(item) = &controls[4].children[0] else {
         panic!("combobox items are nested controls")
     };
-    assert_eq!(item.kind, OdfFormControlKind::Item);
+    assert_eq!(item.kind, FormControlKind::Item);
     assert_eq!(item.label.as_deref(), Some("Paris"));
-    let OdfFormNode::Control(option) = &controls[5].children[0] else {
+    let FormNode::Control(option) = &controls[5].children[0] else {
         panic!("listbox options are nested controls")
     };
-    assert_eq!(option.kind, OdfFormControlKind::Option);
+    assert_eq!(option.kind, FormControlKind::Option);
     assert_eq!(option.current_selected, Some(true));
     assert_eq!(option.value.as_deref(), Some("r"));
 
@@ -267,10 +266,10 @@ fn mutable_inserts_replaces_and_removes_controls() {
     let mut mutable = MutableDocument::from_document(document).unwrap();
 
     // Insert a new textarea into the first form (document order).
-    let extra = OdfTextControl::textarea("Notes", "notes_area");
+    let extra = TextControl::textarea("Notes", "notes_area");
     mutable.insert_text_control(0, &extra).unwrap();
     // Replace the name field's current value.
-    let mut renamed = OdfTextControl::text("Name", "name_field");
+    let mut renamed = TextControl::text("Name", "name_field");
     renamed.current_value = Some("Grace".to_string());
     renamed.title = Some("Your name".to_string());
     renamed.max_length = Some(40);
@@ -283,11 +282,11 @@ fn mutable_inserts_replaces_and_removes_controls() {
     assert_eq!(removed_hidden.xml_id(), "hidden_token");
     // Insert a second radio option into the radio form (document order index 3)
     // and retitle the date control.
-    let mut choice_b = OdfRadioControl::new("ChoiceB", "choice_b");
+    let mut choice_b = RadioControl::new("ChoiceB", "choice_b");
     choice_b.label = Some("Option B".to_string());
     choice_b.value = Some("b".to_string());
     mutable.insert_visual_control(3, &choice_b.into()).unwrap();
-    let mut when = OdfTypedValueControl::new(OdfTypedValueControlKind::Date, "When", "when_date");
+    let mut when = TypedValueControl::new(TypedValueControlKind::Date, "When", "when_date");
     when.current_value = Some("2024-02-29".to_string());
     when.title = Some("Pick a day".to_string());
     mutable.replace_typed_value_control(1, &when).unwrap();

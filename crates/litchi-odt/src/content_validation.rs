@@ -21,20 +21,20 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfContentValidationPart {
+pub enum ContentValidationPart {
     Content,
     FlatDocument,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfValidationDisplayList {
+pub enum ValidationDisplayList {
     None,
     Unsorted,
     SortAscending,
 }
 
-impl OdfValidationDisplayList {
+impl ValidationDisplayList {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
@@ -54,13 +54,13 @@ impl OdfValidationDisplayList {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OdfValidationMessageType {
+pub enum ValidationMessageType {
     Stop,
     Warning,
     Information,
 }
 
-impl OdfValidationMessageType {
+impl ValidationMessageType {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "stop" => Ok(Self::Stop),
@@ -95,17 +95,17 @@ macro_rules! lexical_type {
     };
 }
 
-lexical_type!(OdfValidationCondition, "table:condition", true);
-lexical_type!(OdfValidationCellAddress, "table:base-cell-address", false);
+lexical_type!(ValidationCondition, "table:condition", true);
+lexical_type!(ValidationCellAddress, "table:base-cell-address", false);
 
 /// One message paragraph with its inert XML and flattened text.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfValidationParagraph {
+pub struct ValidationParagraph {
     xml: String,
     text: String,
 }
 
-impl OdfValidationParagraph {
+impl ValidationParagraph {
     pub fn from_text(value: impl Into<String>) -> Result<Self> {
         let text = value.into();
         validate_text(&text, "validation paragraph", true)?;
@@ -125,27 +125,27 @@ impl OdfValidationParagraph {
 
 /// A help or ordinary error message. `message_type` is valid only for errors.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct OdfValidationMessage {
+pub struct ValidationMessage {
     pub title: Option<String>,
     pub display: Option<bool>,
-    pub message_type: Option<OdfValidationMessageType>,
-    pub paragraphs: Vec<OdfValidationParagraph>,
+    pub message_type: Option<ValidationMessageType>,
+    pub paragraphs: Vec<ValidationParagraph>,
 }
 
-impl OdfValidationMessage {
+impl ValidationMessage {
     pub fn effective_display(&self) -> bool {
         self.display.unwrap_or(false)
     }
-    pub fn effective_message_type(&self) -> OdfValidationMessageType {
-        self.message_type.unwrap_or(OdfValidationMessageType::Stop)
+    pub fn effective_message_type(&self) -> ValidationMessageType {
+        self.message_type.unwrap_or(ValidationMessageType::Stop)
     }
 }
 
 /// Bounded `office:event-listeners` XML retained without dispatching it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfValidationEventListeners(String);
+pub struct ValidationEventListeners(String);
 
-impl OdfValidationEventListeners {
+impl ValidationEventListeners {
     pub fn as_xml(&self) -> &str {
         &self.0
     }
@@ -153,32 +153,31 @@ impl OdfValidationEventListeners {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OdfValidationFailure {
-    Message(OdfValidationMessage),
+pub enum ValidationFailure {
+    Message(ValidationMessage),
     Macro {
         execute: Option<bool>,
-        event_listeners: Option<OdfValidationEventListeners>,
+        event_listeners: Option<ValidationEventListeners>,
     },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfContentValidation {
+pub struct ContentValidation {
     pub name: String,
-    pub condition: Option<OdfValidationCondition>,
-    pub base_cell_address: Option<OdfValidationCellAddress>,
+    pub condition: Option<ValidationCondition>,
+    pub base_cell_address: Option<ValidationCellAddress>,
     pub allow_empty_cell: Option<bool>,
-    pub display_list: Option<OdfValidationDisplayList>,
-    pub help_message: Option<OdfValidationMessage>,
-    pub failure: Option<OdfValidationFailure>,
+    pub display_list: Option<ValidationDisplayList>,
+    pub help_message: Option<ValidationMessage>,
+    pub failure: Option<ValidationFailure>,
 }
 
-impl OdfContentValidation {
+impl ContentValidation {
     pub fn effective_allow_empty_cell(&self) -> bool {
         self.allow_empty_cell.unwrap_or(true)
     }
-    pub fn effective_display_list(&self) -> OdfValidationDisplayList {
-        self.display_list
-            .unwrap_or(OdfValidationDisplayList::Unsorted)
+    pub fn effective_display_list(&self) -> ValidationDisplayList {
+        self.display_list.unwrap_or(ValidationDisplayList::Unsorted)
     }
     fn validate(&self) -> Result<()> {
         validate_text(&self.name, "table:name", false)?;
@@ -196,10 +195,8 @@ impl OdfContentValidation {
         }
         if let Some(failure) = &self.failure {
             match failure {
-                OdfValidationFailure::Message(message) => {
-                    validate_message(message, "error message")?
-                },
-                OdfValidationFailure::Macro {
+                ValidationFailure::Message(message) => validate_message(message, "error message")?,
+                ValidationFailure::Macro {
                     event_listeners, ..
                 } => {
                     if let Some(value) = event_listeners
@@ -215,13 +212,13 @@ impl OdfContentValidation {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfContentValidations {
-    pub part: OdfContentValidationPart,
-    pub validations: Vec<OdfContentValidation>,
+pub struct ContentValidations {
+    pub part: ContentValidationPart,
+    pub validations: Vec<ContentValidation>,
 }
 
-impl OdfContentValidations {
-    pub fn get(&self, name: &str) -> Option<&OdfContentValidation> {
+impl ContentValidations {
+    pub fn get(&self, name: &str) -> Option<&ContentValidation> {
         self.validations.iter().find(|value| value.name == name)
     }
     pub fn validate(&self) -> Result<()> {
@@ -258,7 +255,7 @@ impl OdfContentValidations {
                 .help_message
                 .iter()
                 .chain(match &validation.failure {
-                    Some(OdfValidationFailure::Message(value)) => Some(value),
+                    Some(ValidationFailure::Message(value)) => Some(value),
                     _ => None,
                 })
             {
@@ -279,7 +276,7 @@ impl OdfContentValidations {
                         .ok_or_else(|| make_error("content-validation size overflow"))?;
                 }
             }
-            if let Some(OdfValidationFailure::Macro {
+            if let Some(ValidationFailure::Macro {
                 event_listeners: Some(value),
                 ..
             }) = &validation.failure
@@ -310,18 +307,18 @@ impl OdfContentValidations {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn content_validations(&self) -> Result<OdfContentValidations> {
-        parse_part(&self.content_xml()?, OdfContentValidationPart::Content)
+    pub fn content_validations(&self) -> Result<ContentValidations> {
+        parse_part(&self.content_xml()?, ContentValidationPart::Content)
     }
 }
 
 impl crate::FlatOpenDocument {
-    pub fn content_validations(&self) -> Result<OdfContentValidations> {
+    pub fn content_validations(&self) -> Result<ContentValidations> {
         parse_content_validations(self.xml())
     }
 }
 
-fn validate_message(message: &OdfValidationMessage, context: &str) -> Result<()> {
+fn validate_message(message: &ValidationMessage, context: &str) -> Result<()> {
     if let Some(value) = &message.title {
         validate_text(value, "table:title", true)?;
     }
@@ -337,7 +334,7 @@ fn validate_message(message: &OdfValidationMessage, context: &str) -> Result<()>
     Ok(())
 }
 
-fn write_validation(output: &mut String, value: &OdfContentValidation) {
+fn write_validation(output: &mut String, value: &ContentValidation) {
     output.push_str("<table:content-validation table:name=\"");
     escape_attribute(output, &value.name);
     output.push('"');
@@ -371,10 +368,10 @@ fn write_validation(output: &mut String, value: &OdfContentValidation) {
     }
     if let Some(failure) = &value.failure {
         match failure {
-            OdfValidationFailure::Message(message) => {
+            ValidationFailure::Message(message) => {
                 write_message(output, "error-message", message, true)
             },
-            OdfValidationFailure::Macro {
+            ValidationFailure::Macro {
                 execute,
                 event_listeners,
             } => {
@@ -394,7 +391,7 @@ fn write_validation(output: &mut String, value: &OdfContentValidation) {
     output.push_str("</table:content-validation>");
 }
 
-fn write_message(output: &mut String, element: &str, message: &OdfValidationMessage, error: bool) {
+fn write_message(output: &mut String, element: &str, message: &ValidationMessage, error: bool) {
     output.push_str("<table:");
     output.push_str(element);
     if let Some(title) = &message.title {
@@ -445,7 +442,7 @@ struct ActiveContainer {
 struct ActiveValidation {
     parent_depth: usize,
     child_order: u8,
-    value: OdfContentValidation,
+    value: ContentValidation,
 }
 #[derive(Clone, Copy)]
 enum MessageKind {
@@ -455,7 +452,7 @@ enum MessageKind {
 struct ActiveMessage {
     parent_depth: usize,
     kind: MessageKind,
-    value: OdfValidationMessage,
+    value: ValidationMessage,
 }
 struct ActiveMacro {
     parent_depth: usize,
@@ -473,11 +470,11 @@ struct Capture {
 }
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
-pub fn parse_content_validations(xml: &str) -> Result<OdfContentValidations> {
-    parse_part(xml, OdfContentValidationPart::FlatDocument)
+pub fn parse_content_validations(xml: &str) -> Result<ContentValidations> {
+    parse_part(xml, ContentValidationPart::FlatDocument)
 }
 
-fn parse_part(xml: &str, part: OdfContentValidationPart) -> Result<OdfContentValidations> {
+fn parse_part(xml: &str, part: ContentValidationPart) -> Result<ContentValidations> {
     if xml.len() > MAX_XML_BYTES {
         return invalid("content-validation XML exceeds 64 MiB");
     }
@@ -491,7 +488,7 @@ fn parse_part(xml: &str, part: OdfContentValidationPart) -> Result<OdfContentVal
     let mut active_macro: Option<ActiveMacro> = None;
     let mut capture: Option<Capture> = None;
     let mut seen_container = false;
-    let mut result = OdfContentValidations {
+    let mut result = ContentValidations {
         part,
         validations: Vec::new(),
     };
@@ -759,7 +756,7 @@ fn handle_start(
     namespace: NamespaceKind,
     local: &str,
     attributes: Attributes,
-    part: OdfContentValidationPart,
+    part: ContentValidationPart,
     depth: usize,
     parent: Option<&Frame>,
     container: &mut Option<ActiveContainer>,
@@ -849,7 +846,7 @@ fn handle_empty(
     namespace: NamespaceKind,
     local: &str,
     attributes: Attributes,
-    part: OdfContentValidationPart,
+    part: ContentValidationPart,
     depth: usize,
     parent: Option<&Frame>,
     container: &mut Option<ActiveContainer>,
@@ -857,7 +854,7 @@ fn handle_empty(
     message: &mut Option<ActiveMessage>,
     active_macro: &mut Option<ActiveMacro>,
     element: &BytesStart<'_>,
-    result: &mut OdfContentValidations,
+    result: &mut ContentValidations,
     seen: bool,
 ) -> Result<()> {
     if active_macro.is_some() {
@@ -970,7 +967,7 @@ fn start_validation_child(
         (NamespaceKind::Table, "error-macro") if active.child_order < 2 => {
             active.child_order = 2;
             let execute = parse_macro(attributes)?;
-            active.value.failure = Some(OdfValidationFailure::Macro {
+            active.value.failure = Some(ValidationFailure::Macro {
                 execute,
                 event_listeners: None,
             });
@@ -995,7 +992,7 @@ fn start_validation_child(
 
 fn require_macro_events(active: &ActiveValidation) -> Result<()> {
     match &active.value.failure {
-        Some(OdfValidationFailure::Macro {
+        Some(ValidationFailure::Macro {
             event_listeners: None,
             ..
         }) => Ok(()),
@@ -1014,7 +1011,7 @@ fn assign_message(active: &mut ActiveValidation, message: ActiveMessage) -> Resu
             if active
                 .value
                 .failure
-                .replace(OdfValidationFailure::Message(message.value))
+                .replace(ValidationFailure::Message(message.value))
                 .is_some()
             {
                 return invalid("duplicate validation failure action");
@@ -1043,7 +1040,7 @@ fn finish_capture(
                     "validation message exceeds {MAX_PARAGRAPHS} paragraphs"
                 ));
             }
-            message.value.paragraphs.push(OdfValidationParagraph {
+            message.value.paragraphs.push(ValidationParagraph {
                 xml,
                 text: capture.text,
             });
@@ -1052,10 +1049,10 @@ fn finish_capture(
             let validation = validation
                 .ok_or_else(|| make_error("captured event listeners have no validation"))?;
             match validation.value.failure.as_mut() {
-                Some(OdfValidationFailure::Macro {
+                Some(ValidationFailure::Macro {
                     event_listeners, ..
                 }) if event_listeners.is_none() => {
-                    *event_listeners = Some(OdfValidationEventListeners(xml))
+                    *event_listeners = Some(ValidationEventListeners(xml))
                 },
                 _ => return invalid("captured event listeners do not follow a macro"),
             }
@@ -1099,16 +1096,16 @@ fn append_capture_text(capture: &mut Capture, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn parse_validation(mut attributes: Attributes) -> Result<OdfContentValidation> {
+fn parse_validation(mut attributes: Attributes) -> Result<ContentValidation> {
     let name = required(&mut attributes, "name")?;
     validate_text(&name, "table:name", false)?;
     let condition = attributes
         .remove(&(NamespaceKind::Table, "condition".to_owned()))
-        .map(OdfValidationCondition::new)
+        .map(ValidationCondition::new)
         .transpose()?;
     let base_cell_address = attributes
         .remove(&(NamespaceKind::Table, "base-cell-address".to_owned()))
-        .map(OdfValidationCellAddress::new)
+        .map(ValidationCellAddress::new)
         .transpose()?;
     let allow_empty_cell = attributes
         .remove(&(NamespaceKind::Table, "allow-empty-cell".to_owned()))
@@ -1116,10 +1113,10 @@ fn parse_validation(mut attributes: Attributes) -> Result<OdfContentValidation> 
         .transpose()?;
     let display_list = attributes
         .remove(&(NamespaceKind::Table, "display-list".to_owned()))
-        .map(|value| OdfValidationDisplayList::parse(&value))
+        .map(|value| ValidationDisplayList::parse(&value))
         .transpose()?;
     reject_remaining(attributes, "content-validation")?;
-    Ok(OdfContentValidation {
+    Ok(ContentValidation {
         name,
         condition,
         base_cell_address,
@@ -1130,7 +1127,7 @@ fn parse_validation(mut attributes: Attributes) -> Result<OdfContentValidation> 
     })
 }
 
-fn parse_message(mut attributes: Attributes, error: bool) -> Result<OdfValidationMessage> {
+fn parse_message(mut attributes: Attributes, error: bool) -> Result<ValidationMessage> {
     let title = attributes.remove(&(NamespaceKind::Table, "title".to_owned()));
     let display = attributes
         .remove(&(NamespaceKind::Table, "display".to_owned()))
@@ -1138,7 +1135,7 @@ fn parse_message(mut attributes: Attributes, error: bool) -> Result<OdfValidatio
         .transpose()?;
     let message_type = attributes
         .remove(&(NamespaceKind::Table, "message-type".to_owned()))
-        .map(|value| OdfValidationMessageType::parse(&value))
+        .map(|value| ValidationMessageType::parse(&value))
         .transpose()?;
     if !error && message_type.is_some() {
         return invalid("table:help-message cannot have table:message-type");
@@ -1151,7 +1148,7 @@ fn parse_message(mut attributes: Attributes, error: bool) -> Result<OdfValidatio
             "help-message"
         },
     )?;
-    Ok(OdfValidationMessage {
+    Ok(ValidationMessage {
         title,
         display,
         message_type,
@@ -1358,7 +1355,7 @@ mod tests {
         );
         assert!(matches!(
             parsed.validations[1].failure,
-            Some(OdfValidationFailure::Macro {
+            Some(ValidationFailure::Macro {
                 execute: Some(false),
                 event_listeners: Some(_),
                 ..
@@ -1398,7 +1395,7 @@ mod tests {
         let value = parsed.get("val1").unwrap();
         assert_eq!(
             value.effective_display_list(),
-            OdfValidationDisplayList::Unsorted
+            ValidationDisplayList::Unsorted
         );
         assert!(
             value

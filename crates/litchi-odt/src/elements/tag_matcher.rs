@@ -34,7 +34,7 @@ use phf::{Map, phf_map};
 /// efficient dispatch via match expressions (jump tables) instead of string comparisons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u16)]
-pub enum OdfTag {
+pub enum Tag {
     // Text elements
     TextP,
     TextH,
@@ -208,176 +208,176 @@ pub enum OdfTag {
 // COMPILE-TIME TAG MAPPING
 // ============================================================================
 
-/// Tag string to OdfTag enum mapping (compile-time perfect hash map)
+/// Tag string to Tag enum mapping (compile-time perfect hash map)
 ///
 /// This provides O(1) lookup from tag string to enum variant with zero runtime overhead.
 /// The perfect hash function is generated at compile time by the `phf` crate.
-static TAG_MAP: Map<&'static [u8], OdfTag> = phf_map! {
+static TAG_MAP: Map<&'static [u8], Tag> = phf_map! {
     // Text elements
-    b"text:p" => OdfTag::TextP,
-    b"text:h" => OdfTag::TextH,
-    b"text:span" => OdfTag::TextSpan,
-    b"text:a" => OdfTag::TextA,
-    b"text:line-break" => OdfTag::TextLineBreak,
-    b"text:s" => OdfTag::TextS,
-    b"text:tab" => OdfTag::TextTab,
-    b"text:list" => OdfTag::TextList,
-    b"text:list-item" => OdfTag::TextListItem,
-    b"text:bookmark" => OdfTag::TextBookmark,
-    b"text:bookmark-start" => OdfTag::TextBookmarkStart,
-    b"text:bookmark-end" => OdfTag::TextBookmarkEnd,
-    b"text:sequence" => OdfTag::TextSequence,
-    b"text:note" => OdfTag::TextNote,
-    b"text:note-body" => OdfTag::TextNoteBody,
-    b"text:note-citation" => OdfTag::TextNoteCitation,
+    b"text:p" => Tag::TextP,
+    b"text:h" => Tag::TextH,
+    b"text:span" => Tag::TextSpan,
+    b"text:a" => Tag::TextA,
+    b"text:line-break" => Tag::TextLineBreak,
+    b"text:s" => Tag::TextS,
+    b"text:tab" => Tag::TextTab,
+    b"text:list" => Tag::TextList,
+    b"text:list-item" => Tag::TextListItem,
+    b"text:bookmark" => Tag::TextBookmark,
+    b"text:bookmark-start" => Tag::TextBookmarkStart,
+    b"text:bookmark-end" => Tag::TextBookmarkEnd,
+    b"text:sequence" => Tag::TextSequence,
+    b"text:note" => Tag::TextNote,
+    b"text:note-body" => Tag::TextNoteBody,
+    b"text:note-citation" => Tag::TextNoteCitation,
 
     // Table elements
-    b"table:table" => OdfTag::TableTable,
-    b"table:table-row" => OdfTag::TableTableRow,
-    b"table:table-cell" => OdfTag::TableTableCell,
-    b"table:table-column" => OdfTag::TableTableColumn,
-    b"table:table-header-rows" => OdfTag::TableTableHeaderRows,
-    b"table:table-header-columns" => OdfTag::TableTableHeaderColumns,
-    b"table:covered-table-cell" => OdfTag::TableCoveredTableCell,
-    b"table:table-row-group" => OdfTag::TableTableRowGroup,
-    b"table:table-column-group" => OdfTag::TableTableColumnGroup,
+    b"table:table" => Tag::TableTable,
+    b"table:table-row" => Tag::TableTableRow,
+    b"table:table-cell" => Tag::TableTableCell,
+    b"table:table-column" => Tag::TableTableColumn,
+    b"table:table-header-rows" => Tag::TableTableHeaderRows,
+    b"table:table-header-columns" => Tag::TableTableHeaderColumns,
+    b"table:covered-table-cell" => Tag::TableCoveredTableCell,
+    b"table:table-row-group" => Tag::TableTableRowGroup,
+    b"table:table-column-group" => Tag::TableTableColumnGroup,
 
     // Drawing elements
-    b"draw:frame" => OdfTag::DrawFrame,
-    b"draw:image" => OdfTag::DrawImage,
-    b"draw:text-box" => OdfTag::DrawTextBox,
-    b"draw:rect" => OdfTag::DrawRect,
-    b"draw:circle" => OdfTag::DrawCircle,
-    b"draw:ellipse" => OdfTag::DrawEllipse,
-    b"draw:line" => OdfTag::DrawLine,
-    b"draw:polygon" => OdfTag::DrawPolygon,
-    b"draw:polyline" => OdfTag::DrawPolyline,
-    b"draw:path" => OdfTag::DrawPath,
-    b"draw:g" => OdfTag::DrawG,
-    b"draw:page" => OdfTag::DrawPage,
-    b"draw:custom-shape" => OdfTag::DrawCustomShape,
+    b"draw:frame" => Tag::DrawFrame,
+    b"draw:image" => Tag::DrawImage,
+    b"draw:text-box" => Tag::DrawTextBox,
+    b"draw:rect" => Tag::DrawRect,
+    b"draw:circle" => Tag::DrawCircle,
+    b"draw:ellipse" => Tag::DrawEllipse,
+    b"draw:line" => Tag::DrawLine,
+    b"draw:polygon" => Tag::DrawPolygon,
+    b"draw:polyline" => Tag::DrawPolyline,
+    b"draw:path" => Tag::DrawPath,
+    b"draw:g" => Tag::DrawG,
+    b"draw:page" => Tag::DrawPage,
+    b"draw:custom-shape" => Tag::DrawCustomShape,
 
     // Style elements
-    b"style:style" => OdfTag::StyleStyle,
-    b"style:paragraph-properties" => OdfTag::StyleParagraphProperties,
-    b"style:text-properties" => OdfTag::StyleTextProperties,
-    b"style:table-cell-properties" => OdfTag::StyleTableCellProperties,
-    b"style:table-row-properties" => OdfTag::StyleTableRowProperties,
-    b"style:table-column-properties" => OdfTag::StyleTableColumnProperties,
-    b"style:graphic-properties" => OdfTag::StyleGraphicProperties,
-    b"style:font-face" => OdfTag::StyleFontFace,
-    b"style:default-style" => OdfTag::StyleDefaultStyle,
-    b"style:master-page" => OdfTag::StyleMasterPage,
-    b"style:page-layout" => OdfTag::StylePageLayout,
-    b"style:header" => OdfTag::StyleHeaderFooter,
-    b"style:footer" => OdfTag::StyleHeaderFooter,
-    b"style:background-image" => OdfTag::StyleBackgroundImage,
+    b"style:style" => Tag::StyleStyle,
+    b"style:paragraph-properties" => Tag::StyleParagraphProperties,
+    b"style:text-properties" => Tag::StyleTextProperties,
+    b"style:table-cell-properties" => Tag::StyleTableCellProperties,
+    b"style:table-row-properties" => Tag::StyleTableRowProperties,
+    b"style:table-column-properties" => Tag::StyleTableColumnProperties,
+    b"style:graphic-properties" => Tag::StyleGraphicProperties,
+    b"style:font-face" => Tag::StyleFontFace,
+    b"style:default-style" => Tag::StyleDefaultStyle,
+    b"style:master-page" => Tag::StyleMasterPage,
+    b"style:page-layout" => Tag::StylePageLayout,
+    b"style:header" => Tag::StyleHeaderFooter,
+    b"style:footer" => Tag::StyleHeaderFooter,
+    b"style:background-image" => Tag::StyleBackgroundImage,
 
     // Office elements
-    b"office:body" => OdfTag::OfficeBody,
-    b"office:text" => OdfTag::OfficeText,
-    b"office:spreadsheet" => OdfTag::OfficeSpreadsheet,
-    b"office:presentation" => OdfTag::OfficePresentation,
-    b"office:drawing" => OdfTag::OfficeDrawing,
-    b"office:master-styles" => OdfTag::OfficeMasterStyles,
-    b"office:automatic-styles" => OdfTag::OfficeAutomaticStyles,
-    b"office:styles" => OdfTag::OfficeStyles,
-    b"office:font-face-decls" => OdfTag::OfficeFontFaceDecls,
-    b"office:scripts" => OdfTag::OfficeScripts,
-    b"office:settings" => OdfTag::OfficeSettings,
-    b"office:meta" => OdfTag::OfficeMeta,
-    b"office:annotation" => OdfTag::OfficeAnnotation,
+    b"office:body" => Tag::OfficeBody,
+    b"office:text" => Tag::OfficeText,
+    b"office:spreadsheet" => Tag::OfficeSpreadsheet,
+    b"office:presentation" => Tag::OfficePresentation,
+    b"office:drawing" => Tag::OfficeDrawing,
+    b"office:master-styles" => Tag::OfficeMasterStyles,
+    b"office:automatic-styles" => Tag::OfficeAutomaticStyles,
+    b"office:styles" => Tag::OfficeStyles,
+    b"office:font-face-decls" => Tag::OfficeFontFaceDecls,
+    b"office:scripts" => Tag::OfficeScripts,
+    b"office:settings" => Tag::OfficeSettings,
+    b"office:meta" => Tag::OfficeMeta,
+    b"office:annotation" => Tag::OfficeAnnotation,
 
     // Form elements
-    b"form:form" => OdfTag::FormForm,
-    b"form:text" => OdfTag::FormText,
-    b"form:textarea" => OdfTag::FormTextarea,
-    b"form:button" => OdfTag::FormButton,
-    b"form:checkbox" => OdfTag::FormCheckbox,
-    b"form:radio" => OdfTag::FormRadio,
-    b"form:listbox" => OdfTag::FormListbox,
-    b"form:combobox" => OdfTag::FormCombobox,
+    b"form:form" => Tag::FormForm,
+    b"form:text" => Tag::FormText,
+    b"form:textarea" => Tag::FormTextarea,
+    b"form:button" => Tag::FormButton,
+    b"form:checkbox" => Tag::FormCheckbox,
+    b"form:radio" => Tag::FormRadio,
+    b"form:listbox" => Tag::FormListbox,
+    b"form:combobox" => Tag::FormCombobox,
 
     // Chart elements
-    b"chart:chart" => OdfTag::ChartChart,
-    b"chart:title" => OdfTag::ChartTitle,
-    b"chart:subtitle" => OdfTag::ChartSubtitle,
-    b"chart:legend" => OdfTag::ChartLegend,
-    b"chart:plot-area" => OdfTag::ChartPlotArea,
-    b"chart:series" => OdfTag::ChartSeries,
-    b"chart:domain" => OdfTag::ChartDomain,
-    b"chart:axis" => OdfTag::ChartAxis,
+    b"chart:chart" => Tag::ChartChart,
+    b"chart:title" => Tag::ChartTitle,
+    b"chart:subtitle" => Tag::ChartSubtitle,
+    b"chart:legend" => Tag::ChartLegend,
+    b"chart:plot-area" => Tag::ChartPlotArea,
+    b"chart:series" => Tag::ChartSeries,
+    b"chart:domain" => Tag::ChartDomain,
+    b"chart:axis" => Tag::ChartAxis,
 
     // Meta elements
-    b"meta:generator" => OdfTag::MetaGenerator,
-    b"meta:creation-date" => OdfTag::MetaCreationDate,
-    b"meta:editing-duration" => OdfTag::MetaEditingDuration,
-    b"meta:editing-cycles" => OdfTag::MetaEditingCycles,
-    b"meta:document-statistic" => OdfTag::MetaDocumentStatistic,
-    b"meta:keyword" => OdfTag::MetaKeyword,
-    b"meta:user-defined" => OdfTag::MetaUserDefined,
+    b"meta:generator" => Tag::MetaGenerator,
+    b"meta:creation-date" => Tag::MetaCreationDate,
+    b"meta:editing-duration" => Tag::MetaEditingDuration,
+    b"meta:editing-cycles" => Tag::MetaEditingCycles,
+    b"meta:document-statistic" => Tag::MetaDocumentStatistic,
+    b"meta:keyword" => Tag::MetaKeyword,
+    b"meta:user-defined" => Tag::MetaUserDefined,
 
     // Number/Data style elements
-    b"number:number-style" => OdfTag::NumberNumberStyle,
-    b"number:currency-style" => OdfTag::NumberCurrencyStyle,
-    b"number:percentage-style" => OdfTag::NumberPercentageStyle,
-    b"number:date-style" => OdfTag::NumberDateStyle,
-    b"number:time-style" => OdfTag::NumberTimeStyle,
-    b"number:boolean-style" => OdfTag::NumberBooleanStyle,
-    b"number:text-style" => OdfTag::NumberTextStyle,
-    b"number:number" => OdfTag::NumberNumber,
-    b"number:currency-symbol" => OdfTag::NumberCurrencySymbol,
-    b"number:text" => OdfTag::NumberText,
-    b"number:day" => OdfTag::NumberDay,
-    b"number:month" => OdfTag::NumberMonth,
-    b"number:year" => OdfTag::NumberYear,
-    b"number:hours" => OdfTag::NumberHours,
-    b"number:minutes" => OdfTag::NumberMinutes,
-    b"number:seconds" => OdfTag::NumberSeconds,
+    b"number:number-style" => Tag::NumberNumberStyle,
+    b"number:currency-style" => Tag::NumberCurrencyStyle,
+    b"number:percentage-style" => Tag::NumberPercentageStyle,
+    b"number:date-style" => Tag::NumberDateStyle,
+    b"number:time-style" => Tag::NumberTimeStyle,
+    b"number:boolean-style" => Tag::NumberBooleanStyle,
+    b"number:text-style" => Tag::NumberTextStyle,
+    b"number:number" => Tag::NumberNumber,
+    b"number:currency-symbol" => Tag::NumberCurrencySymbol,
+    b"number:text" => Tag::NumberText,
+    b"number:day" => Tag::NumberDay,
+    b"number:month" => Tag::NumberMonth,
+    b"number:year" => Tag::NumberYear,
+    b"number:hours" => Tag::NumberHours,
+    b"number:minutes" => Tag::NumberMinutes,
+    b"number:seconds" => Tag::NumberSeconds,
 
     // Presentation elements
-    b"presentation:notes" => OdfTag::PresentationNotes,
-    b"presentation:settings" => OdfTag::PresentationSettings,
-    b"presentation:footer" => OdfTag::PresentationFooter,
-    b"presentation:date-time" => OdfTag::PresentationDateTime,
-    b"presentation:header" => OdfTag::PresentationHeader,
+    b"presentation:notes" => Tag::PresentationNotes,
+    b"presentation:settings" => Tag::PresentationSettings,
+    b"presentation:footer" => Tag::PresentationFooter,
+    b"presentation:date-time" => Tag::PresentationDateTime,
+    b"presentation:header" => Tag::PresentationHeader,
 
     // Animation elements
-    b"anim:par" => OdfTag::AnimPar,
-    b"anim:seq" => OdfTag::AnimSeq,
-    b"anim:set" => OdfTag::AnimSet,
-    b"anim:animate" => OdfTag::AnimAnimate,
-    b"anim:animateMotion" => OdfTag::AnimAnimateMotion,
-    b"anim:animateColor" => OdfTag::AnimAnimateColor,
-    b"anim:transitionFilter" => OdfTag::AnimTransFilter,
+    b"anim:par" => Tag::AnimPar,
+    b"anim:seq" => Tag::AnimSeq,
+    b"anim:set" => Tag::AnimSet,
+    b"anim:animate" => Tag::AnimAnimate,
+    b"anim:animateMotion" => Tag::AnimAnimateMotion,
+    b"anim:animateColor" => Tag::AnimAnimateColor,
+    b"anim:transitionFilter" => Tag::AnimTransFilter,
 
     // Dublin Core elements
-    b"dc:title" => OdfTag::DcTitle,
-    b"dc:description" => OdfTag::DcDescription,
-    b"dc:subject" => OdfTag::DcSubject,
-    b"dc:creator" => OdfTag::DcCreator,
-    b"dc:date" => OdfTag::DcDate,
-    b"dc:language" => OdfTag::DcLanguage,
+    b"dc:title" => Tag::DcTitle,
+    b"dc:description" => Tag::DcDescription,
+    b"dc:subject" => Tag::DcSubject,
+    b"dc:creator" => Tag::DcCreator,
+    b"dc:date" => Tag::DcDate,
+    b"dc:language" => Tag::DcLanguage,
 
     // SVG elements
-    b"svg:desc" => OdfTag::SvgDesc,
-    b"svg:title" => OdfTag::SvgTitle,
-    b"svg:linearGradient" => OdfTag::SvgLinearGradient,
-    b"svg:radialGradient" => OdfTag::SvgRadialGradient,
-    b"svg:stop" => OdfTag::SvgStop,
+    b"svg:desc" => Tag::SvgDesc,
+    b"svg:title" => Tag::SvgTitle,
+    b"svg:linearGradient" => Tag::SvgLinearGradient,
+    b"svg:radialGradient" => Tag::SvgRadialGradient,
+    b"svg:stop" => Tag::SvgStop,
 
     // Math elements
-    b"math:math" => OdfTag::MathMath,
+    b"math:math" => Tag::MathMath,
 
     // Script elements
-    b"script:event-listener" => OdfTag::ScriptEventListener,
+    b"script:event-listener" => Tag::ScriptEventListener,
 
     // Config elements
-    b"config:config-item-set" => OdfTag::ConfigConfigItemSet,
-    b"config:config-item" => OdfTag::ConfigConfigItem,
-    b"config:config-item-map-indexed" => OdfTag::ConfigConfigItemMapIndexed,
-    b"config:config-item-map-entry" => OdfTag::ConfigConfigItemMapEntry,
-    b"config:config-item-map-named" => OdfTag::ConfigConfigItemMapNamed,
+    b"config:config-item-set" => Tag::ConfigConfigItemSet,
+    b"config:config-item" => Tag::ConfigConfigItem,
+    b"config:config-item-map-indexed" => Tag::ConfigConfigItemMapIndexed,
+    b"config:config-item-map-entry" => Tag::ConfigConfigItemMapEntry,
+    b"config:config-item-map-named" => Tag::ConfigConfigItemMapNamed,
 };
 
 // ============================================================================
@@ -410,7 +410,7 @@ pub fn has_prefix(tag: &[u8], prefix: &[u8]) -> bool {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::tag_matcher::extract_prefix;
+/// # use litchi_odt::elements::tag_matcher::extract_prefix;
 /// assert_eq!(extract_prefix(b"text:p"), b"text");
 /// assert_eq!(extract_prefix(b"p"), b"");
 /// ```
@@ -431,7 +431,7 @@ pub fn extract_prefix(tag: &[u8]) -> &[u8] {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::tag_matcher::extract_local_name;
+/// # use litchi_odt::elements::tag_matcher::extract_local_name;
 /// assert_eq!(extract_local_name(b"text:p"), b"p");
 /// assert_eq!(extract_local_name(b"p"), b"p");
 /// ```
@@ -448,10 +448,10 @@ pub fn extract_local_name(tag: &[u8]) -> &[u8] {
 // TAG MATCHING API
 // ============================================================================
 
-/// Match a tag to its OdfTag enum variant
+/// Match a tag to its Tag enum variant
 ///
 /// This provides O(1) lookup using compile-time perfect hash function.
-/// For unknown tags, returns `OdfTag::Unknown`.
+/// For unknown tags, returns `Tag::Unknown`.
 ///
 /// # Arguments
 ///
@@ -459,19 +459,19 @@ pub fn extract_local_name(tag: &[u8]) -> &[u8] {
 ///
 /// # Returns
 ///
-/// The corresponding `OdfTag` enum variant
+/// The corresponding `Tag` enum variant
 ///
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::tag_matcher::{match_tag, OdfTag};
-/// assert_eq!(match_tag(b"text:p"), OdfTag::TextP);
-/// assert_eq!(match_tag(b"table:table"), OdfTag::TableTable);
-/// assert_eq!(match_tag(b"unknown:tag"), OdfTag::Unknown);
+/// # use litchi_odt::elements::tag_matcher::{match_tag, Tag};
+/// assert_eq!(match_tag(b"text:p"), Tag::TextP);
+/// assert_eq!(match_tag(b"table:table"), Tag::TableTable);
+/// assert_eq!(match_tag(b"unknown:tag"), Tag::Unknown);
 /// ```
 #[inline(always)]
-pub fn match_tag(tag: &[u8]) -> OdfTag {
-    TAG_MAP.get(tag).copied().unwrap_or(OdfTag::Unknown)
+pub fn match_tag(tag: &[u8]) -> Tag {
+    TAG_MAP.get(tag).copied().unwrap_or(Tag::Unknown)
 }
 
 /// Check if a tag belongs to a specific namespace (fast SIMD-based check)
@@ -488,7 +488,7 @@ pub fn match_tag(tag: &[u8]) -> OdfTag {
 /// # Examples
 ///
 /// ```
-/// # use litchi_odf::elements::tag_matcher::is_namespace;
+/// # use litchi_odt::elements::tag_matcher::is_namespace;
 /// assert!(is_namespace(b"text:p", b"text"));
 /// assert!(is_namespace(b"table:table-row", b"table"));
 /// assert!(!is_namespace(b"text:p", b"table"));
@@ -539,14 +539,14 @@ pub fn is_office_tag(tag: &[u8]) -> bool {
 
 /// Match multiple tags at once (useful for filtering)
 ///
-/// Returns a vector of (index, OdfTag) pairs for all recognized tags.
+/// Returns a vector of (index, Tag) pairs for all recognized tags.
 /// This can be more efficient than matching tags one by one.
-pub fn match_tags_batch(tags: &[&[u8]]) -> Vec<(usize, OdfTag)> {
+pub fn match_tags_batch(tags: &[&[u8]]) -> Vec<(usize, Tag)> {
     tags.iter()
         .enumerate()
         .filter_map(|(idx, tag)| {
             let matched = match_tag(tag);
-            if matched != OdfTag::Unknown {
+            if matched != Tag::Unknown {
                 Some((idx, matched))
             } else {
                 None
@@ -565,11 +565,11 @@ mod tests {
 
     #[test]
     fn test_tag_matching() {
-        assert_eq!(match_tag(b"text:p"), OdfTag::TextP);
-        assert_eq!(match_tag(b"text:h"), OdfTag::TextH);
-        assert_eq!(match_tag(b"table:table"), OdfTag::TableTable);
-        assert_eq!(match_tag(b"table:table-row"), OdfTag::TableTableRow);
-        assert_eq!(match_tag(b"unknown:tag"), OdfTag::Unknown);
+        assert_eq!(match_tag(b"text:p"), Tag::TextP);
+        assert_eq!(match_tag(b"text:h"), Tag::TextH);
+        assert_eq!(match_tag(b"table:table"), Tag::TableTable);
+        assert_eq!(match_tag(b"table:table-row"), Tag::TableTableRow);
+        assert_eq!(match_tag(b"unknown:tag"), Tag::Unknown);
     }
 
     #[test]
@@ -616,9 +616,9 @@ mod tests {
         let matched = match_tags_batch(&tags);
 
         assert_eq!(matched.len(), 3);
-        assert_eq!(matched[0], (0, OdfTag::TextP));
-        assert_eq!(matched[1], (1, OdfTag::TableTable));
-        assert_eq!(matched[2], (3, OdfTag::DrawFrame));
+        assert_eq!(matched[0], (0, Tag::TextP));
+        assert_eq!(matched[1], (1, Tag::TableTable));
+        assert_eq!(matched[2], (3, Tag::DrawFrame));
     }
 
     #[test]

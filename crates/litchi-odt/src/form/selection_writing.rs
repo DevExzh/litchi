@@ -19,7 +19,7 @@ const MAX_CONTROLS: usize = 65_536;
 const MAX_ENTRIES: usize = 65_536;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfListSourceType {
+pub enum ListSourceType {
     Table,
     Query,
     Sql,
@@ -27,7 +27,7 @@ pub enum OdfListSourceType {
     ValueList,
     TableFields,
 }
-impl OdfListSourceType {
+impl ListSourceType {
     fn token(self) -> &'static str {
         match self {
             Self::Table => "table",
@@ -51,11 +51,11 @@ impl OdfListSourceType {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfListLinkageType {
+pub enum ListLinkageType {
     Selection,
     SelectionIndices,
 }
-impl OdfListLinkageType {
+impl ListLinkageType {
     fn token(self) -> &'static str {
         match self {
             Self::Selection => "selection",
@@ -72,11 +72,11 @@ impl OdfListLinkageType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfComboItem {
+pub struct ComboItem {
     pub label: Option<String>,
     pub text: String,
 }
-impl OdfComboItem {
+impl ComboItem {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             label: None,
@@ -99,14 +99,14 @@ impl OdfComboItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfListOption {
+pub struct ListOption {
     pub label: Option<String>,
     pub value: Option<String>,
     pub selected: Option<bool>,
     pub current_selected: Option<bool>,
     pub text: String,
 }
-impl OdfListOption {
+impl ListOption {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             label: None,
@@ -135,7 +135,7 @@ impl OdfListOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfComboboxControl {
+pub struct ComboboxControl {
     pub name: String,
     pub xml_id: String,
     pub value: Option<String>,
@@ -152,13 +152,13 @@ pub struct OdfComboboxControl {
     pub convert_empty_to_null: Option<bool>,
     pub data_field: Option<String>,
     pub list_source: Option<String>,
-    pub list_source_type: Option<OdfListSourceType>,
+    pub list_source_type: Option<ListSourceType>,
     pub linked_cell: Option<String>,
     pub source_cell_range: Option<String>,
     pub auto_complete: Option<bool>,
-    pub items: Vec<OdfComboItem>,
+    pub items: Vec<ComboItem>,
 }
-impl OdfComboboxControl {
+impl ComboboxControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -184,7 +184,7 @@ impl OdfComboboxControl {
             items: Vec::new(),
         }
     }
-    pub fn add_item(&mut self, item: OdfComboItem) -> Result<()> {
+    pub fn add_item(&mut self, item: ComboItem) -> Result<()> {
         validate_entry(item.label.as_deref(), None, &item.text)?;
         if self.items.len() >= MAX_ENTRIES {
             return invalid("too many combobox items");
@@ -198,7 +198,7 @@ impl OdfComboboxControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfListboxControl {
+pub struct ListboxControl {
     pub name: String,
     pub xml_id: String,
     pub disabled: Option<bool>,
@@ -211,14 +211,14 @@ pub struct OdfListboxControl {
     pub bound_column: Option<String>,
     pub data_field: Option<String>,
     pub list_source: Option<String>,
-    pub list_source_type: Option<OdfListSourceType>,
+    pub list_source_type: Option<ListSourceType>,
     pub linked_cell: Option<String>,
-    pub list_linkage_type: Option<OdfListLinkageType>,
+    pub list_linkage_type: Option<ListLinkageType>,
     pub source_cell_range: Option<String>,
     pub multiple: Option<bool>,
-    pub options: Vec<OdfListOption>,
+    pub options: Vec<ListOption>,
 }
-impl OdfListboxControl {
+impl ListboxControl {
     pub fn new(name: impl Into<String>, xml_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -241,7 +241,7 @@ impl OdfListboxControl {
             options: Vec::new(),
         }
     }
-    pub fn add_option(&mut self, option: OdfListOption) -> Result<()> {
+    pub fn add_option(&mut self, option: ListOption) -> Result<()> {
         validate_entry(
             option.label.as_deref(),
             option.value.as_deref(),
@@ -263,21 +263,21 @@ impl OdfListboxControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OdfSelectionControl {
-    Combobox(OdfComboboxControl),
-    Listbox(OdfListboxControl),
+pub enum SelectionControl {
+    Combobox(ComboboxControl),
+    Listbox(ListboxControl),
 }
-impl From<OdfComboboxControl> for OdfSelectionControl {
-    fn from(value: OdfComboboxControl) -> Self {
+impl From<ComboboxControl> for SelectionControl {
+    fn from(value: ComboboxControl) -> Self {
         Self::Combobox(value)
     }
 }
-impl From<OdfListboxControl> for OdfSelectionControl {
-    fn from(value: OdfListboxControl) -> Self {
+impl From<ListboxControl> for SelectionControl {
+    fn from(value: ListboxControl) -> Self {
         Self::Listbox(value)
     }
 }
-impl OdfSelectionControl {
+impl SelectionControl {
     pub fn name(&self) -> &str {
         match self {
             Self::Combobox(v) => &v.name,
@@ -299,12 +299,12 @@ impl OdfSelectionControl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfSelectionForm {
+pub struct SelectionForm {
     pub name: String,
-    pub controls: Vec<OdfSelectionControl>,
+    pub controls: Vec<SelectionControl>,
     pub apply_filter: Option<bool>,
 }
-impl OdfSelectionForm {
+impl SelectionForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -312,7 +312,7 @@ impl OdfSelectionForm {
             apply_filter: None,
         }
     }
-    pub fn add_control(&mut self, control: impl Into<OdfSelectionControl>) -> Result<()> {
+    pub fn add_control(&mut self, control: impl Into<SelectionControl>) -> Result<()> {
         let control = control.into();
         validate_control(&control)?;
         if self.controls.iter().any(|v| v.name() == control.name()) {
@@ -350,13 +350,13 @@ impl OdfSelectionForm {
     }
 }
 
-pub fn selection_controls(xml: &str) -> Result<Vec<OdfSelectionControl>> {
+pub fn selection_controls(xml: &str) -> Result<Vec<SelectionControl>> {
     Ok(scan(xml)?.controls.into_iter().map(|v| v.control).collect())
 }
 pub fn insert_selection_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfSelectionControl,
+    control: &SelectionControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -374,7 +374,7 @@ pub fn insert_selection_control_xml(
 pub fn replace_selection_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfSelectionControl,
+    replacement: &SelectionControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -396,7 +396,7 @@ pub fn remove_selection_control_xml(xml: &str, index: usize) -> Result<String> {
     apply(xml, old.span.clone(), "")
 }
 
-fn combobox_xml(v: &OdfComboboxControl) -> Result<String> {
+fn combobox_xml(v: &ComboboxControl) -> Result<String> {
     validate_combobox(v)?;
     let mut out = format!(
         r#"<form:combobox form:name="{}" xml:id="{}""#,
@@ -442,7 +442,7 @@ fn combobox_xml(v: &OdfComboboxControl) -> Result<String> {
     }
     Ok(out)
 }
-fn listbox_xml(v: &OdfListboxControl) -> Result<String> {
+fn listbox_xml(v: &ListboxControl) -> Result<String> {
     validate_listbox(v)?;
     let mut out = format!(
         r#"<form:listbox form:name="{}" xml:id="{}""#,
@@ -483,13 +483,13 @@ fn listbox_xml(v: &OdfListboxControl) -> Result<String> {
     }
     Ok(out)
 }
-fn validate_control(v: &OdfSelectionControl) -> Result<()> {
+fn validate_control(v: &SelectionControl) -> Result<()> {
     match v {
-        OdfSelectionControl::Combobox(v) => validate_combobox(v),
-        OdfSelectionControl::Listbox(v) => validate_listbox(v),
+        SelectionControl::Combobox(v) => validate_combobox(v),
+        SelectionControl::Listbox(v) => validate_listbox(v),
     }
 }
-fn validate_combobox(v: &OdfComboboxControl) -> Result<()> {
+fn validate_combobox(v: &ComboboxControl) -> Result<()> {
     validate_identity(&v.name, &v.xml_id)?;
     for (label, value) in [
         ("combobox value", v.value.as_deref()),
@@ -504,7 +504,7 @@ fn validate_combobox(v: &OdfComboboxControl) -> Result<()> {
     validate_source(v.list_source.as_deref())?;
     validate_entries(v.items.iter().map(|i| (&i.label, None, &i.text)))
 }
-fn validate_listbox(v: &OdfListboxControl) -> Result<()> {
+fn validate_listbox(v: &ListboxControl) -> Result<()> {
     validate_identity(&v.name, &v.xml_id)?;
     for (label, value) in [
         ("listbox title", v.title.as_deref()),
@@ -591,7 +591,7 @@ struct FormLocation {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfSelectionControl,
+    control: SelectionControl,
 }
 struct Scan {
     forms: Vec<FormLocation>,
@@ -881,7 +881,7 @@ fn parse_control(
     reader: &NsReader<&[u8]>,
     e: &BytesStart<'_>,
     local: &[u8],
-) -> Result<OdfSelectionControl> {
+) -> Result<SelectionControl> {
     let attrs = attributes(reader, e)?;
     validate_allowed(
         &attrs,
@@ -894,7 +894,7 @@ fn parse_control(
     let name = required(&attrs, FORM, "name")?;
     let id = required(&attrs, XML, "id")?;
     if local == b"combobox" {
-        let mut v = OdfComboboxControl::new(name, id);
+        let mut v = ComboboxControl::new(name, id);
         v.value = optional(&attrs, FORM, "value");
         v.current_value = optional(&attrs, FORM, "current-value");
         v.disabled = optional_bool(&attrs, FORM, "disabled")?;
@@ -910,7 +910,7 @@ fn parse_control(
         v.data_field = optional(&attrs, FORM, "data-field");
         v.list_source = optional(&attrs, FORM, "list-source");
         v.list_source_type = optional(&attrs, FORM, "list-source-type")
-            .map(|s| OdfListSourceType::parse(&s))
+            .map(|s| ListSourceType::parse(&s))
             .transpose()?;
         v.linked_cell = optional(&attrs, FORM, "linked-cell");
         v.source_cell_range = optional(&attrs, FORM, "source-cell-range");
@@ -918,7 +918,7 @@ fn parse_control(
         validate_combobox(&v)?;
         Ok(v.into())
     } else {
-        let mut v = OdfListboxControl::new(name, id);
+        let mut v = ListboxControl::new(name, id);
         v.disabled = optional_bool(&attrs, FORM, "disabled")?;
         v.dropdown = optional_bool(&attrs, FORM, "dropdown")?;
         v.printable = optional_bool(&attrs, FORM, "printable")?;
@@ -930,11 +930,11 @@ fn parse_control(
         v.data_field = optional(&attrs, FORM, "data-field");
         v.list_source = optional(&attrs, FORM, "list-source");
         v.list_source_type = optional(&attrs, FORM, "list-source-type")
-            .map(|s| OdfListSourceType::parse(&s))
+            .map(|s| ListSourceType::parse(&s))
             .transpose()?;
         v.linked_cell = optional(&attrs, FORM, "linked-cell");
         v.list_linkage_type = optional(&attrs, FORM, "list-linkage-type")
-            .map(|s| OdfListLinkageType::parse(&s))
+            .map(|s| ListLinkageType::parse(&s))
             .transpose()?;
         v.source_cell_range = optional(&attrs, FORM, "source-cell-range");
         v.multiple = optional_bool(&attrs, FORM, "multiple")?;
@@ -980,21 +980,19 @@ fn finish_entry(controls: &mut [ControlLocation], entry: EntryOpen) -> Result<()
         .get_mut(entry.control)
         .ok_or_else(|| Error::InvalidFormat("selection entry owner is invalid".to_string()))?;
     match (&mut control.control, entry.kind) {
-        (OdfSelectionControl::Combobox(v), EntryKind::Item { label }) => {
-            v.add_item(OdfComboItem {
-                label,
-                text: entry.text,
-            })?
-        },
+        (SelectionControl::Combobox(v), EntryKind::Item { label }) => v.add_item(ComboItem {
+            label,
+            text: entry.text,
+        })?,
         (
-            OdfSelectionControl::Listbox(v),
+            SelectionControl::Listbox(v),
             EntryKind::Option {
                 label,
                 value,
                 selected,
                 current_selected,
             },
-        ) => v.add_option(OdfListOption {
+        ) => v.add_option(ListOption {
             label,
             value,
             selected,
@@ -1269,8 +1267,8 @@ fn bind_fragment(mut v: String) -> String {
 }
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfSelectionControl,
-    current: Option<&OdfSelectionControl>,
+    replacement: &SelectionControl,
+    current: Option<&SelectionControl>,
 ) -> Result<()> {
     for item in &form.controls {
         if item.control.name() == replacement.name()
@@ -1325,25 +1323,25 @@ mod tests {
     const END: &str = "</o:forms></o:text></o:body></o:document-content>";
     #[test]
     fn canonical_controls_and_children_round_trip() {
-        let mut combo = OdfComboboxControl::new("Choice & edit", "combo_1");
+        let mut combo = ComboboxControl::new("Choice & edit", "combo_1");
         combo.value = Some("A < B".into());
         combo.auto_complete = Some(true);
-        let mut item = OdfComboItem::new("alpha & beta");
+        let mut item = ComboItem::new("alpha & beta");
         item.label = Some("Alpha".into());
         combo.add_item(item).unwrap();
-        let mut list = OdfListboxControl::new("Choice", "list_1");
+        let mut list = ListboxControl::new("Choice", "list_1");
         list.multiple = Some(false);
-        let mut option = OdfListOption::new("one");
+        let mut option = ListOption::new("one");
         option.value = Some("1".into());
         option.selected = Some(true);
         list.add_option(option).unwrap();
-        let mut form = OdfSelectionForm::new("Main");
+        let mut form = SelectionForm::new("Main");
         form.add_control(combo).unwrap();
         form.add_control(list).unwrap();
         let xml = format!("{ROOT}{}{END}", form.to_xml_fragment().unwrap());
         let parsed = selection_controls(&xml).unwrap();
         assert_eq!(parsed.len(), 2);
-        let OdfSelectionControl::Combobox(parsed_combo) = &parsed[0] else {
+        let SelectionControl::Combobox(parsed_combo) = &parsed[0] else {
             panic!("expected combobox")
         };
         assert_eq!(parsed_combo.items[0].text, "alpha & beta");
@@ -1353,10 +1351,10 @@ mod tests {
         let xml = format!(
             r#"{ROOT}<f:form f:name="Main"><f:listbox f:name="Old" xml:id="old"><f:properties><f:property f:property-name="Keep" o:value-type="void"/></f:properties><f:option f:label="One" f:selected="true">one</f:option></f:listbox><!--keep--><f:text f:name="Text" xml:id="text"/></f:form>{END}"#
         );
-        let control: OdfSelectionControl = OdfComboboxControl::new("Combo", "combo").into();
+        let control: SelectionControl = ComboboxControl::new("Combo", "combo").into();
         let inserted = insert_selection_control_xml(&xml, 0, &control).unwrap();
         assert!(inserted.contains("<!--keep-->") && inserted.contains("form:combobox"));
-        let replacement: OdfSelectionControl = OdfListboxControl::new("New", "new").into();
+        let replacement: SelectionControl = ListboxControl::new("New", "new").into();
         let replaced = replace_selection_control_xml(&inserted, 0, &replacement).unwrap();
         assert!(replaced.contains("<!--keep-->") && replaced.contains("f:text"));
         let removed = remove_selection_control_xml(&replaced, 1).unwrap();
@@ -1370,11 +1368,7 @@ mod tests {
     }
     #[test]
     fn hostile_input_bounds_events_and_cardinality_are_rejected() {
-        assert!(
-            OdfComboboxControl::new("C", "1bad")
-                .to_xml_fragment()
-                .is_err()
-        );
+        assert!(ComboboxControl::new("C", "1bad").to_xml_fragment().is_err());
         let wrong = format!(
             r#"{ROOT}<f:form f:name="Main"><o:listbox f:name="L" xml:id="l"/></f:form>{END}"#
         );
@@ -1393,14 +1387,14 @@ mod tests {
             r#"{ROOT}<o:p xml:id="same"/><f:form f:name="Main"><f:listbox f:name="L" xml:id="same"/></f:form>{END}"#
         );
         assert!(selection_controls(&duplicate).is_err());
-        let mut list = OdfListboxControl::new("L", "l");
+        let mut list = ListboxControl::new("L", "l");
         for text in ["one", "two"] {
-            let mut o = OdfListOption::new(text);
+            let mut o = ListOption::new(text);
             o.selected = Some(true);
             list.options.push(o);
         }
         assert!(list.to_xml_fragment().is_err());
-        let mut combo = OdfComboboxControl::new("C", "c");
+        let mut combo = ComboboxControl::new("C", "c");
         combo.list_source = Some("x".repeat(MAX_SOURCE + 1));
         assert!(combo.to_xml_fragment().is_err());
     }
@@ -1414,11 +1408,11 @@ mod tests {
             r#"{ROOT}<f:form f:name="Main"><f:listbox f:name="L" xml:id="l"><f:listbox f:name="Nested" xml:id="nested"/></f:listbox></f:form>{END}"#
         );
         assert!(selection_controls(&nested).is_err());
-        let mut list = OdfListboxControl::new("L", "l");
-        let mut first = OdfListOption::new("one");
+        let mut list = ListboxControl::new("L", "l");
+        let mut first = ListOption::new("one");
         first.selected = Some(true);
         list.add_option(first).unwrap();
-        let mut second = OdfListOption::new("two");
+        let mut second = ListOption::new("two");
         second.selected = Some(true);
         assert!(list.add_option(second).is_err());
         assert_eq!(list.options.len(), 1);
@@ -1429,7 +1423,7 @@ mod tests {
             "../../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt"
         );
         let parsed = selection_controls(lo).unwrap();
-        assert!(parsed.iter().any(|v|matches!(v,OdfSelectionControl::Listbox(l)if l.list_source_type==Some(OdfListSourceType::Sql))));
+        assert!(parsed.iter().any(|v|matches!(v,SelectionControl::Listbox(l)if l.list_source_type==Some(ListSourceType::Sql))));
         let producer = format!(
             r#"{ROOT}<f:form f:name="Producers"><f:combobox f:name="odfpy" xml:id="combo" f:dropdown="true"><f:item f:label="A">alpha</f:item></f:combobox><f:listbox f:name="odfdo" xml:id="list" f:multiple="true" f:list-linkage-type="selection-indices"><f:option f:label="A" f:value="1" f:selected="true">alpha</f:option><f:option f:label="B" f:value="2" f:current-selected="true">beta</f:option></f:listbox></f:form>{END}"#
         );
@@ -1438,8 +1432,8 @@ mod tests {
     #[test]
     fn builder_mutable_package_round_trip() {
         use crate::{Document, DocumentBuilder, MutableDocument};
-        let mut form = OdfSelectionForm::new("Main");
-        form.add_control(OdfComboboxControl::new("Combo", "combo"))
+        let mut form = SelectionForm::new("Main");
+        form.add_control(ComboboxControl::new("Combo", "combo"))
             .unwrap();
         let mut builder = DocumentBuilder::new();
         builder.add_selection_form(&form).unwrap();
@@ -1447,9 +1441,9 @@ mod tests {
         let doc = Document::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableDocument::from_document(doc).unwrap();
         assert_eq!(mutable.selection_controls().unwrap().len(), 1);
-        let list: OdfSelectionControl = OdfListboxControl::new("List", "list").into();
+        let list: SelectionControl = ListboxControl::new("List", "list").into();
         mutable.insert_selection_control(0, &list).unwrap();
-        let replacement: OdfSelectionControl = OdfComboboxControl::new("Other", "other").into();
+        let replacement: SelectionControl = ComboboxControl::new("Other", "other").into();
         assert_eq!(
             mutable
                 .replace_selection_control(0, &replacement)

@@ -7,7 +7,7 @@ use quick_xml::NsReader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
-use super::generic_writing::OdfGenericControlMetadata;
+use super::generic_writing::GenericControlMetadata;
 
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -24,14 +24,14 @@ const MAX_CONTROLS: usize = 65_536;
 
 /// The four scalar form controls covered by the ODF numeric-control grammar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OdfTypedValueControlKind {
+pub enum TypedValueControlKind {
     FormattedText,
     Number,
     Date,
     Time,
 }
 
-impl OdfTypedValueControlKind {
+impl TypedValueControlKind {
     const fn local_name(self) -> &'static str {
         match self {
             Self::FormattedText => "formatted-text",
@@ -54,12 +54,12 @@ impl OdfTypedValueControlKind {
 
 /// An exact XML Schema `double` lexical form.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfFormDouble {
+pub struct FormDouble {
     lexical: String,
     numeric: f64,
 }
 
-impl OdfFormDouble {
+impl FormDouble {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         let value = value.as_ref();
         if value.is_empty() || value.len() > 256 || !valid_xsd_double(value) {
@@ -127,9 +127,9 @@ fn valid_xsd_double(value: &str) -> bool {
 
 /// An exact, validated XML Schema `date` lexical form.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfFormDate(String);
+pub struct FormDate(String);
 
-impl OdfFormDate {
+impl FormDate {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         let value = value.as_ref();
         if !valid_xsd_date(value) {
@@ -209,14 +209,14 @@ fn valid_timezone(bytes: &[u8]) -> bool {
 
 /// A kind-specific typed lower or upper bound.
 #[derive(Debug, Clone, PartialEq)]
-pub enum OdfTypedValueBound {
+pub enum TypedValueBound {
     Text(String),
-    Number(OdfFormDouble),
-    Date(OdfFormDate),
-    Time(OdfTypedValueDuration),
+    Number(FormDouble),
+    Date(FormDate),
+    Time(TypedValueDuration),
 }
 
-impl OdfTypedValueBound {
+impl TypedValueBound {
     fn as_str(&self) -> &str {
         match self {
             Self::Text(v) => v,
@@ -228,34 +228,34 @@ impl OdfTypedValueBound {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfTypedValueControl {
-    pub kind: OdfTypedValueControlKind,
+pub struct TypedValueControl {
+    pub kind: TypedValueControlKind,
     pub name: String,
     pub xml_id: String,
-    pub metadata: OdfGenericControlMetadata,
+    pub metadata: GenericControlMetadata,
     pub input_required: Option<bool>,
     pub current_value: Option<String>,
     pub disabled: Option<bool>,
-    pub max_length: Option<OdfTypedValueNonNegativeInteger>,
+    pub max_length: Option<TypedValueNonNegativeInteger>,
     pub printable: Option<bool>,
     pub readonly: Option<bool>,
-    pub tab_index: Option<OdfTypedValueNonNegativeInteger>,
+    pub tab_index: Option<TypedValueNonNegativeInteger>,
     pub tab_stop: Option<bool>,
     pub title: Option<String>,
     pub value: Option<String>,
     pub linked_cell: Option<String>,
     pub repeat: Option<bool>,
-    pub delay_for_repeat: Option<OdfTypedValueDuration>,
+    pub delay_for_repeat: Option<TypedValueDuration>,
     pub spin_button: Option<bool>,
     pub validation: Option<bool>,
-    pub decimal_accuracy: Option<OdfTypedValueNonNegativeInteger>,
-    pub max_value: Option<OdfTypedValueBound>,
-    pub min_value: Option<OdfTypedValueBound>,
+    pub decimal_accuracy: Option<TypedValueNonNegativeInteger>,
+    pub max_value: Option<TypedValueBound>,
+    pub min_value: Option<TypedValueBound>,
 }
 
-impl OdfTypedValueControl {
+impl TypedValueControl {
     pub fn new(
-        kind: OdfTypedValueControlKind,
+        kind: TypedValueControlKind,
         name: impl Into<String>,
         xml_id: impl Into<String>,
     ) -> Self {
@@ -263,7 +263,7 @@ impl OdfTypedValueControl {
             kind,
             name: name.into(),
             xml_id: xml_id.into(),
-            metadata: OdfGenericControlMetadata::default(),
+            metadata: GenericControlMetadata::default(),
             input_required: None,
             current_value: None,
             disabled: None,
@@ -291,13 +291,13 @@ impl OdfTypedValueControl {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OdfTypedValueForm {
+pub struct TypedValueForm {
     pub name: String,
-    pub controls: Vec<OdfTypedValueControl>,
+    pub controls: Vec<TypedValueControl>,
     pub apply_filter: Option<bool>,
 }
 
-impl OdfTypedValueForm {
+impl TypedValueForm {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -306,7 +306,7 @@ impl OdfTypedValueForm {
         }
     }
 
-    pub fn add_control(&mut self, control: OdfTypedValueControl) -> Result<()> {
+    pub fn add_control(&mut self, control: TypedValueControl) -> Result<()> {
         validate_control(&control)?;
         if self
             .controls
@@ -356,7 +356,7 @@ impl OdfTypedValueForm {
     }
 }
 
-pub fn typed_value_controls(xml: &str) -> Result<Vec<OdfTypedValueControl>> {
+pub fn typed_value_controls(xml: &str) -> Result<Vec<TypedValueControl>> {
     Ok(scan(xml)?
         .controls
         .into_iter()
@@ -367,7 +367,7 @@ pub fn typed_value_controls(xml: &str) -> Result<Vec<OdfTypedValueControl>> {
 pub fn insert_typed_value_control_xml(
     xml: &str,
     form_index: usize,
-    control: &OdfTypedValueControl,
+    control: &TypedValueControl,
 ) -> Result<String> {
     validate_control(control)?;
     let scan = scan(xml)?;
@@ -389,7 +389,7 @@ pub fn insert_typed_value_control_xml(
 pub fn replace_typed_value_control_xml(
     xml: &str,
     index: usize,
-    replacement: &OdfTypedValueControl,
+    replacement: &TypedValueControl,
 ) -> Result<String> {
     validate_control(replacement)?;
     let scan = scan(xml)?;
@@ -417,7 +417,7 @@ pub fn remove_typed_value_control_xml(xml: &str, index: usize) -> Result<String>
     apply(xml, old.span.clone(), "")
 }
 
-fn typed_value_xml(value: &OdfTypedValueControl) -> Result<String> {
+fn typed_value_xml(value: &TypedValueControl) -> Result<String> {
     validate_control(value)?;
     let mut out = format!(
         r#"<form:{} form:name="{}" xml:id="{}""#,
@@ -449,7 +449,7 @@ fn typed_value_xml(value: &OdfTypedValueControl) -> Result<String> {
         value
             .max_length
             .as_ref()
-            .map(OdfTypedValueNonNegativeInteger::as_str),
+            .map(TypedValueNonNegativeInteger::as_str),
     );
     push_bool(&mut out, "form:printable", value.printable);
     push_bool(&mut out, "form:readonly", value.readonly);
@@ -459,7 +459,7 @@ fn typed_value_xml(value: &OdfTypedValueControl) -> Result<String> {
         value
             .tab_index
             .as_ref()
-            .map(OdfTypedValueNonNegativeInteger::as_str),
+            .map(TypedValueNonNegativeInteger::as_str),
     );
     push_bool(&mut out, "form:tab-stop", value.tab_stop);
     push_string(&mut out, "form:title", value.title.as_deref());
@@ -472,7 +472,7 @@ fn typed_value_xml(value: &OdfTypedValueControl) -> Result<String> {
         value
             .delay_for_repeat
             .as_ref()
-            .map(OdfTypedValueDuration::as_str),
+            .map(TypedValueDuration::as_str),
     );
     push_bool(&mut out, "form:spin-button", value.spin_button);
     push_bool(&mut out, "form:validation", value.validation);
@@ -482,23 +482,23 @@ fn typed_value_xml(value: &OdfTypedValueControl) -> Result<String> {
         value
             .decimal_accuracy
             .as_ref()
-            .map(OdfTypedValueNonNegativeInteger::as_str),
+            .map(TypedValueNonNegativeInteger::as_str),
     );
     push_string(
         &mut out,
         "form:max-value",
-        value.max_value.as_ref().map(OdfTypedValueBound::as_str),
+        value.max_value.as_ref().map(TypedValueBound::as_str),
     );
     push_string(
         &mut out,
         "form:min-value",
-        value.min_value.as_ref().map(OdfTypedValueBound::as_str),
+        value.min_value.as_ref().map(TypedValueBound::as_str),
     );
     out.push_str("/>");
     Ok(out)
 }
 
-fn validate_control(value: &OdfTypedValueControl) -> Result<()> {
+fn validate_control(value: &TypedValueControl) -> Result<()> {
     validate_name("typed-value control name", &value.name)?;
     validate_xml_id(&value.xml_id)?;
     if let Some(form_id) = value.metadata.form_id.as_deref() {
@@ -528,30 +528,25 @@ fn validate_control(value: &OdfTypedValueControl) -> Result<()> {
     )?;
     validate_bound(value.kind, value.min_value.as_ref())?;
     validate_bound(value.kind, value.max_value.as_ref())?;
-    if value.validation.is_some() && value.kind != OdfTypedValueControlKind::FormattedText {
+    if value.validation.is_some() && value.kind != TypedValueControlKind::FormattedText {
         return invalid("form:validation is only valid on form:formatted-text");
     }
-    if value.decimal_accuracy.is_some() && value.kind != OdfTypedValueControlKind::Number {
+    if value.decimal_accuracy.is_some() && value.kind != TypedValueControlKind::Number {
         return invalid("form:decimal-accuracy is only valid on form:number");
     }
     Ok(())
 }
 
-fn validate_bound(
-    kind: OdfTypedValueControlKind,
-    bound: Option<&OdfTypedValueBound>,
-) -> Result<()> {
+fn validate_bound(kind: TypedValueControlKind, bound: Option<&TypedValueBound>) -> Result<()> {
     let Some(bound) = bound else { return Ok(()) };
     let valid = matches!(
         (kind, bound),
         (
-            OdfTypedValueControlKind::FormattedText,
-            OdfTypedValueBound::Text(_)
-        ) | (
-            OdfTypedValueControlKind::Number,
-            OdfTypedValueBound::Number(_)
-        ) | (OdfTypedValueControlKind::Date, OdfTypedValueBound::Date(_))
-            | (OdfTypedValueControlKind::Time, OdfTypedValueBound::Time(_))
+            TypedValueControlKind::FormattedText,
+            TypedValueBound::Text(_)
+        ) | (TypedValueControlKind::Number, TypedValueBound::Number(_))
+            | (TypedValueControlKind::Date, TypedValueBound::Date(_))
+            | (TypedValueControlKind::Time, TypedValueBound::Time(_))
     );
     if !valid {
         return invalid("typed bound does not match its form control kind");
@@ -559,7 +554,7 @@ fn validate_bound(
     validate_string("typed-value bound", bound.as_str(), MAX_STRING)
 }
 
-fn validate_controls(controls: &[OdfTypedValueControl]) -> Result<()> {
+fn validate_controls(controls: &[TypedValueControl]) -> Result<()> {
     if controls.len() > MAX_CONTROLS {
         return invalid("too many typed-value controls");
     }
@@ -590,7 +585,7 @@ fn validate_controls(controls: &[OdfTypedValueControl]) -> Result<()> {
     Ok(())
 }
 
-fn control_size(value: &OdfTypedValueControl) -> usize {
+fn control_size(value: &TypedValueControl) -> usize {
     [&value.name, &value.xml_id]
         .iter()
         .fold(0usize, |sum, value| sum.saturating_add(value.len()))
@@ -631,7 +626,7 @@ fn control_size(value: &OdfTypedValueControl) -> usize {
 struct ControlLocation {
     span: Range<usize>,
     form: usize,
-    control: OdfTypedValueControl,
+    control: TypedValueControl,
 }
 #[derive(Clone)]
 struct FormLocation {
@@ -711,7 +706,7 @@ fn scan(xml: &str) -> Result<Scan> {
                     });
                     form_stack.push(form.unwrap());
                 } else if namespace.as_deref() == Some(FORM)
-                    && OdfTypedValueControlKind::from_local(&local).is_some()
+                    && TypedValueControlKind::from_local(&local).is_some()
                 {
                     if stack.iter().any(|open| open.control.is_some()) {
                         return invalid("typed-value controls cannot be nested");
@@ -722,7 +717,7 @@ fn scan(xml: &str) -> Result<Scan> {
                     let parsed = parse_control(
                         &reader,
                         element,
-                        OdfTypedValueControlKind::from_local(&local).unwrap(),
+                        TypedValueControlKind::from_local(&local).unwrap(),
                     )?;
                     aggregate = aggregate.saturating_add(control_size(&parsed));
                     if aggregate > MAX_AGGREGATE {
@@ -771,7 +766,7 @@ fn scan(xml: &str) -> Result<Scan> {
                         controls: Vec::new(),
                     });
                 } else if namespace.as_deref() == Some(FORM)
-                    && OdfTypedValueControlKind::from_local(&local).is_some()
+                    && TypedValueControlKind::from_local(&local).is_some()
                 {
                     if stack.iter().any(|open| open.control.is_some()) {
                         return invalid("typed-value controls cannot be nested");
@@ -782,7 +777,7 @@ fn scan(xml: &str) -> Result<Scan> {
                     let parsed = parse_control(
                         &reader,
                         element,
-                        OdfTypedValueControlKind::from_local(&local).unwrap(),
+                        TypedValueControlKind::from_local(&local).unwrap(),
                     )?;
                     aggregate = aggregate.saturating_add(control_size(&parsed));
                     if aggregate > MAX_AGGREGATE {
@@ -876,16 +871,16 @@ fn scan(xml: &str) -> Result<Scan> {
 fn parse_control(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    kind: OdfTypedValueControlKind,
-) -> Result<OdfTypedValueControl> {
+    kind: TypedValueControlKind,
+) -> Result<TypedValueControl> {
     let attrs = attributes(reader, element)?;
     validate_allowed(&attrs, allowed_attributes(kind))?;
-    let mut value = OdfTypedValueControl::new(
+    let mut value = TypedValueControl::new(
         kind,
         required(&attrs, FORM, "name")?,
         required(&attrs, XML, "id")?,
     );
-    value.metadata = OdfGenericControlMetadata {
+    value.metadata = GenericControlMetadata {
         form_id: optional(&attrs, FORM, "id"),
         control_implementation: optional(&attrs, FORM, "control-implementation"),
         xforms_bind: optional(&attrs, XFORMS, "bind"),
@@ -894,13 +889,13 @@ fn parse_control(
     value.current_value = optional(&attrs, FORM, "current-value");
     value.disabled = optional_bool(&attrs, FORM, "disabled")?;
     value.max_length = optional(&attrs, FORM, "max-length")
-        .map(OdfTypedValueNonNegativeInteger::new)
+        .map(TypedValueNonNegativeInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.printable = optional_bool(&attrs, FORM, "printable")?;
     value.readonly = optional_bool(&attrs, FORM, "readonly")?;
     value.tab_index = optional(&attrs, FORM, "tab-index")
-        .map(OdfTypedValueNonNegativeInteger::new)
+        .map(TypedValueNonNegativeInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.tab_stop = optional_bool(&attrs, FORM, "tab-stop")?;
@@ -909,13 +904,13 @@ fn parse_control(
     value.linked_cell = optional(&attrs, FORM, "linked-cell");
     value.repeat = optional_bool(&attrs, FORM, "repeat")?;
     value.delay_for_repeat = optional(&attrs, FORM, "delay-for-repeat")
-        .map(OdfTypedValueDuration::new)
+        .map(TypedValueDuration::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.spin_button = optional_bool(&attrs, FORM, "spin-button")?;
     value.validation = optional_bool(&attrs, FORM, "validation")?;
     value.decimal_accuracy = optional(&attrs, FORM, "decimal-accuracy")
-        .map(OdfTypedValueNonNegativeInteger::new)
+        .map(TypedValueNonNegativeInteger::new)
         .transpose()
         .map_err(Error::InvalidFormat)?;
     value.max_value = optional(&attrs, FORM, "max-value")
@@ -999,27 +994,27 @@ const DATE_TIME_ATTRS: &[(&str, &str)] = &[
     (FORM, "max-value"),
     (FORM, "min-value"),
 ];
-fn allowed_attributes(kind: OdfTypedValueControlKind) -> &'static [(&'static str, &'static str)] {
+fn allowed_attributes(kind: TypedValueControlKind) -> &'static [(&'static str, &'static str)] {
     match kind {
-        OdfTypedValueControlKind::FormattedText => FORMATTED_TEXT_ATTRS,
-        OdfTypedValueControlKind::Number => NUMBER_ATTRS,
-        OdfTypedValueControlKind::Date | OdfTypedValueControlKind::Time => DATE_TIME_ATTRS,
+        TypedValueControlKind::FormattedText => FORMATTED_TEXT_ATTRS,
+        TypedValueControlKind::Number => NUMBER_ATTRS,
+        TypedValueControlKind::Date | TypedValueControlKind::Time => DATE_TIME_ATTRS,
     }
 }
-fn parse_bound(kind: OdfTypedValueControlKind, raw: String) -> Result<OdfTypedValueBound> {
+fn parse_bound(kind: TypedValueControlKind, raw: String) -> Result<TypedValueBound> {
     match kind {
-        OdfTypedValueControlKind::FormattedText => {
+        TypedValueControlKind::FormattedText => {
             validate_string("formatted-text bound", &raw, MAX_STRING)?;
-            Ok(OdfTypedValueBound::Text(raw))
+            Ok(TypedValueBound::Text(raw))
         },
-        OdfTypedValueControlKind::Number => OdfFormDouble::new(raw)
-            .map(OdfTypedValueBound::Number)
+        TypedValueControlKind::Number => FormDouble::new(raw)
+            .map(TypedValueBound::Number)
             .map_err(Error::InvalidFormat),
-        OdfTypedValueControlKind::Date => OdfFormDate::new(raw)
-            .map(OdfTypedValueBound::Date)
+        TypedValueControlKind::Date => FormDate::new(raw)
+            .map(TypedValueBound::Date)
             .map_err(Error::InvalidFormat),
-        OdfTypedValueControlKind::Time => OdfTypedValueDuration::new(raw)
-            .map(OdfTypedValueBound::Time)
+        TypedValueControlKind::Time => TypedValueDuration::new(raw)
+            .map(TypedValueBound::Time)
             .map_err(Error::InvalidFormat),
     }
 }
@@ -1205,8 +1200,8 @@ fn validate_string(label: &str, value: &str, limit: usize) -> Result<()> {
 }
 fn reject_duplicate(
     form: &FormLocation,
-    replacement: &OdfTypedValueControl,
-    current: Option<&OdfTypedValueControl>,
+    replacement: &TypedValueControl,
+    current: Option<&TypedValueControl>,
 ) -> Result<()> {
     for item in &form.controls {
         if current.is_some_and(|value| value.xml_id == item.control.xml_id) {
@@ -1315,9 +1310,9 @@ fn canonical_integer(value: &str) -> std::result::Result<String, String> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfTypedValueNonNegativeInteger(String);
+pub struct TypedValueNonNegativeInteger(String);
 
-impl OdfTypedValueNonNegativeInteger {
+impl TypedValueNonNegativeInteger {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         let value = canonical_integer(value.as_ref())?;
         if value.starts_with('-') {
@@ -1329,12 +1324,12 @@ impl OdfTypedValueNonNegativeInteger {
         &self.0
     }
 }
-impl fmt::Display for OdfTypedValueNonNegativeInteger {
+impl fmt::Display for TypedValueNonNegativeInteger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
-impl FromStr for OdfTypedValueNonNegativeInteger {
+impl FromStr for TypedValueNonNegativeInteger {
     type Err = String;
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         Self::new(value)
@@ -1342,9 +1337,9 @@ impl FromStr for OdfTypedValueNonNegativeInteger {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OdfTypedValueDuration(String);
+pub struct TypedValueDuration(String);
 
-impl OdfTypedValueDuration {
+impl TypedValueDuration {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, String> {
         let value = value.as_ref();
         if !valid_xsd_duration(value) {
@@ -1360,13 +1355,13 @@ impl OdfTypedValueDuration {
     }
 }
 
-impl fmt::Display for OdfTypedValueDuration {
+impl fmt::Display for TypedValueDuration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl FromStr for OdfTypedValueDuration {
+impl FromStr for TypedValueDuration {
     type Err = String;
 
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
@@ -1460,22 +1455,22 @@ mod tests {
         assert_eq!(
             controls.iter().map(|c| c.kind).collect::<Vec<_>>(),
             [
-                OdfTypedValueControlKind::FormattedText,
-                OdfTypedValueControlKind::Number,
-                OdfTypedValueControlKind::Date,
-                OdfTypedValueControlKind::Time,
+                TypedValueControlKind::FormattedText,
+                TypedValueControlKind::Number,
+                TypedValueControlKind::Date,
+                TypedValueControlKind::Time,
             ]
         );
         assert_eq!(controls[0].max_length.as_ref().unwrap().as_str(), "12");
         assert_eq!(controls[1].decimal_accuracy.as_ref().unwrap().as_str(), "2");
         assert!(
-            matches!(controls[1].min_value, Some(OdfTypedValueBound::Number(ref v)) if v.numeric().is_infinite())
+            matches!(controls[1].min_value, Some(TypedValueBound::Number(ref v)) if v.numeric().is_infinite())
         );
         assert!(
-            matches!(controls[2].max_value, Some(OdfTypedValueBound::Date(ref v)) if v.as_str() == "9999-12-31+14:00")
+            matches!(controls[2].max_value, Some(TypedValueBound::Date(ref v)) if v.as_str() == "9999-12-31+14:00")
         );
         assert!(
-            matches!(controls[3].max_value, Some(OdfTypedValueBound::Time(ref v)) if v.as_str() == "PT23H59M59.999S")
+            matches!(controls[3].max_value, Some(TypedValueBound::Time(ref v)) if v.as_str() == "PT23H59M59.999S")
         );
         assert_eq!(
             controls[3].metadata.xforms_bind.as_deref(),
@@ -1498,16 +1493,16 @@ mod tests {
     #[test]
     fn lexical_domains_and_kind_specific_attributes_are_strict() {
         for valid in ["0", "+1.25", "-.5E-2", "INF", "-INF", "NaN"] {
-            assert!(OdfFormDouble::new(valid).is_ok(), "{valid}");
+            assert!(FormDouble::new(valid).is_ok(), "{valid}");
         }
         for invalid in ["", " inf", "Infinity", ".", "1e", "1_0"] {
-            assert!(OdfFormDouble::new(invalid).is_err(), "{invalid}");
+            assert!(FormDouble::new(invalid).is_err(), "{invalid}");
         }
         for valid in ["2024-02-29", "-0001-01-01Z", "2026-07-19+08:00"] {
-            assert!(OdfFormDate::new(valid).is_ok(), "{valid}");
+            assert!(FormDate::new(valid).is_ok(), "{valid}");
         }
         for invalid in ["0000-01-01", "2023-02-29", "2026-13-01", "2026-01-01+14:01"] {
-            assert!(OdfFormDate::new(invalid).is_err(), "{invalid}");
+            assert!(FormDate::new(invalid).is_err(), "{invalid}");
         }
 
         let wrong_number =
@@ -1534,29 +1529,28 @@ mod tests {
             .is_err()
         );
 
-        let mut mismatch = OdfTypedValueControl::new(OdfTypedValueControlKind::Date, "D", "d");
-        mismatch.max_value = Some(OdfTypedValueBound::Number(OdfFormDouble::new("1").unwrap()));
+        let mut mismatch = TypedValueControl::new(TypedValueControlKind::Date, "D", "d");
+        mismatch.max_value = Some(TypedValueBound::Number(FormDouble::new("1").unwrap()));
         assert!(mismatch.to_xml_fragment().is_err());
     }
 
     #[test]
     fn lossless_mutation_builder_and_mutable_facades_round_trip() {
         let xml = document(r#"<form:number form:name="Old" xml:id="old" form:value="7"/>"#);
-        let inserted =
-            OdfTypedValueControl::new(OdfTypedValueControlKind::Date, "Inserted", "inserted");
+        let inserted = TypedValueControl::new(TypedValueControlKind::Date, "Inserted", "inserted");
         let updated = insert_typed_value_control_xml(&xml, 0, &inserted).unwrap();
         assert!(updated.contains("<office:tail/>"));
         let replacement =
-            OdfTypedValueControl::new(OdfTypedValueControlKind::Time, "Replacement", "replacement");
+            TypedValueControl::new(TypedValueControlKind::Time, "Replacement", "replacement");
         let updated = replace_typed_value_control_xml(&updated, 0, &replacement).unwrap();
         assert_eq!(
             typed_value_controls(&remove_typed_value_control_xml(&updated, 1).unwrap()).unwrap(),
             std::slice::from_ref(&replacement)
         );
 
-        let mut form = OdfTypedValueForm::new("TypedValues");
-        form.add_control(OdfTypedValueControl::new(
-            OdfTypedValueControlKind::FormattedText,
+        let mut form = TypedValueForm::new("TypedValues");
+        form.add_control(TypedValueControl::new(
+            TypedValueControlKind::FormattedText,
             "Initial",
             "initial",
         ))

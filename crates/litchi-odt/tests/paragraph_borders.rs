@@ -1,5 +1,5 @@
 use litchi_odt::{
-    DocumentBuilder, FlatOpenDocument, OdfNonNegativeLength, OpenDocumentPackage,
+    DocumentBuilder, FlatOpenDocument, NonNegativeLength, OpenDocumentPackage,
     ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
     ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, TableRowBackgroundColor,
     TableRowBackgroundImage, TableRowBackgroundRepeat, TableRowBackgroundSource, TableShadow,
@@ -40,13 +40,10 @@ fn parses_all_border_attributes() {
             .as_str(),
         "0.01cm"
     );
-    assert_eq!(
-        p.padding,
-        Some(OdfNonNegativeLength::new("0.05cm").unwrap())
-    );
+    assert_eq!(p.padding, Some(NonNegativeLength::new("0.05cm").unwrap()));
     assert_eq!(
         p.padding_left,
-        Some(OdfNonNegativeLength::new("0.199cm").unwrap())
+        Some(NonNegativeLength::new("0.199cm").unwrap())
     );
     assert_eq!(p.shadow.as_ref().unwrap().as_str(), "none");
     assert_eq!(p.background_color.as_ref().unwrap().as_str(), "#FFCC00");
@@ -189,7 +186,7 @@ fn mutation_replaces_inserts_and_removes() {
         "P1",
         Some(ParagraphBorderProperties {
             border: Some(ParagraphBorder::new("none").unwrap()),
-            padding: Some(OdfNonNegativeLength::new("0.1cm").unwrap()),
+            padding: Some(NonNegativeLength::new("0.1cm").unwrap()),
             ..Default::default()
         }),
     )
@@ -276,7 +273,7 @@ fn builder_package_round_trip() {
                 space: ParagraphBorderWidth::new("0.07cm").unwrap(),
                 outer_width: ParagraphBorderWidth::new("0.002cm").unwrap(),
             }),
-            padding: Some(OdfNonNegativeLength::new("0cm").unwrap()),
+            padding: Some(NonNegativeLength::new("0cm").unwrap()),
             background_color: Some(TableRowBackgroundColor::new("transparent").unwrap()),
             ..Default::default()
         }),
