@@ -4384,6 +4384,42 @@ and 1,554 ODF tests across 85 harnesses. The no-default-features
 example targets. Formatting, staged diff checks, and the 35-package crate
 boundary audit remain green.
 
+## DOCX web settings, PPTX tags, XLSX timelines, and ODF graphic-property layering
+
+This slice layers four semantic owners beneath their established
+public paths:
+
+- `litchi-docx::web/{model,codec,package,tests}`;
+- `litchi-pptx::tag/{model,codec,package,tests}` while retaining `tag::raw` and
+  `tag::shape` as focused submodules;
+- `litchi-xlsx::timelines/{model,codec,package,tests}`; and
+- `litchi-odf::graphic_properties/{model,codec,package,tests}`.
+
+Models own contextual values, codecs own bounded XML conversion, package
+layers own OPC/flat-document graph context, and tests remain beside the
+owner. Historical module paths and public declarations remain available via
+compatibility aliases; canonical names do not repeat their enclosing owner
+prefix.
+
+The shared-logic audit reuses existing neutral MCE, XML escaping, GUID, and
+relationship helpers from `litchi-ooxml-common`, `litchi-opc`, and
+`litchi-core`. Web-settings, PresentationML tags, SpreadsheetML timelines,
+and ODF graphic-property vocabularies are not one grammar, so no speculative
+implementation was moved into a common crate. The workspace currently has no
+`litchi-iwa-common` crate; IWA-specific logic remains in `litchi-iwa`.
+
+Checked-in anchors are `[MS-OE376]` §§2.1.444--2.1.462 for Word frameset/web
+settings behavior and §2.1.1170 for PowerPoint programmable tags; `[MS-XLSX]`
+§§2.1.7--2.1.8, 2.3.5, 2.4.49--2.4.58, and 2.6.98--2.6.118 for timeline
+parts, relationships, and complex types. The repository has no checked-in
+ODF specification snapshot, so the ODF change makes no external conformance
+claim beyond its existing parser and fixture coverage.
+
+Verification for this slice passes with `cargo check` and `cargo test` for
+the four affected crates, all features and targets, followed by the
+no-default-features `litchi-ooxml` host suite. Formatting, diff checks, and
+the 35-package crate-boundary audit also pass.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
