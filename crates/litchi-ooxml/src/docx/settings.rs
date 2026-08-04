@@ -18,10 +18,7 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::ops::Range;
-use std::str::FromStr;
 
 const TRANSITIONAL_RELATIONSHIPS_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -80,14 +77,8 @@ impl AttachedTemplate {
 /// ```
 #[derive(Debug, Clone)]
 pub struct DocumentSettings {
-    /// Whether document is protected
-    protected: bool,
-    /// Type of protection
-    protection_type: Option<ProtectionType>,
-    /// Whether to track revisions
-    track_revisions: bool,
-    /// Zoom percentage
-    zoom_percent: Option<u32>,
+    /// Format-owned scalar settings parsed from `settings.xml`.
+    values: OwnedSettings,
     /// Smart-tag type declarations.
     smart_tag_types: Vec<SmartTagType>,
     /// Whether applications should omit embedded smart-tag data when saving.
@@ -96,26 +87,6 @@ pub struct DocumentSettings {
     mail_merge: Option<MailMergeSettings>,
     /// Inert external attached-template reference.
     attached_template: Option<AttachedTemplate>,
-    /// On/off compatibility option flags from `w:compat`.
-    compatibility_options: Vec<CompatibilityOption>,
-    /// `w:compatSetting` triples from `w:compat`.
-    compatibility_settings: Vec<CompatibilitySetting>,
-    /// Document-level footnote properties from `w:footnotePr`.
-    footnote_properties: Option<NoteNumberingProperties>,
-    /// Document-level endnote properties from `w:endnotePr`.
-    endnote_properties: Option<NoteNumberingProperties>,
-    /// Whether applications should recommend write protection (`w:writeProtection`).
-    write_protection: bool,
-    /// Document view mode from `w:view`.
-    view: Option<DocumentView>,
-    /// Proofing completion markers from `w:proofState`.
-    proofing_state: Option<ProofingState>,
-    /// Default tab stop interval in twips from `w:defaultTabStop`.
-    default_tab_stop_twips: Option<u32>,
-    /// Theme font language defaults from `w:themeFontLang`.
-    theme_font_languages: Option<ThemeFontLanguages>,
-    /// Theme color slot remapping from `w:clrSchemeMapping`.
-    color_scheme_mapping: Option<ColorSchemeMapping>,
 }
 
 /// A smart-tag vocabulary declaration from `settings.xml`.
@@ -146,841 +117,55 @@ impl SmartTagType {
     }
 }
 
-/// `w:compatSetting` name identifying the targeted Word compatibility mode.
-pub const COMPATIBILITY_MODE_SETTING_NAME: &str = "compatibilityMode";
-/// `w:compatSetting` URI under which Word stores its compatibility settings.
-pub const COMPATIBILITY_SETTING_URI: &str = "http://schemas.microsoft.com/office/word";
-
-/// Error returned for a token outside the closed WordprocessingML
-/// compatibility-flag domain.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ParseCompatFlagError;
-
-impl Display for ParseCompatFlagError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("invalid WordprocessingML compatibility flag")
-    }
-}
-
-impl Error for ParseCompatFlagError {}
-
-macro_rules! define_compat_flags {
-    ($($variant:ident => $token:literal),+ $(,)?) => {
-        /// A closed `CT_Compat` on/off flag from the Strict or Transitional
-        /// WordprocessingML schema.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[repr(u8)]
-        pub enum CompatFlag {
-            $(
-                #[doc = concat!("`", $token, "`.")]
-                $variant,
-            )+
-        }
-
-        impl CompatFlag {
-            /// Every compatibility flag accepted by either checked-in schema.
-            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
-
-            /// Return the exact WordprocessingML element-local-name token.
-            #[must_use]
-            pub const fn as_str(self) -> &'static str {
-                match self {
-                    $(Self::$variant => $token,)+
-                }
-            }
-        }
-
-        impl FromStr for CompatFlag {
-            type Err = ParseCompatFlagError;
-
-            fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
-                match value {
-                    $($token => Ok(Self::$variant),)+
-                    _ => Err(ParseCompatFlagError),
-                }
-            }
-        }
-
-        impl Display for CompatFlag {
-            fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str(self.as_str())
-            }
-        }
-    };
-}
-
-define_compat_flags! {
-    UseSingleBorderForContiguousCells => "useSingleBorderforContiguousCells",
-    WpJustification => "wpJustification",
-    NoTabHangIndent => "noTabHangInd",
-    NoLeading => "noLeading",
-    SpaceForUnderline => "spaceForUL",
-    NoColumnBalance => "noColumnBalance",
-    BalanceSingleByteDoubleByteWidth => "balanceSingleByteDoubleByteWidth",
-    NoExtraLineSpacing => "noExtraLineSpacing",
-    DoNotLeaveBackslashAlone => "doNotLeaveBackslashAlone",
-    UnderlineTrailingSpace => "ulTrailSpace",
-    DoNotExpandShiftReturn => "doNotExpandShiftReturn",
-    SpacingInWholePoints => "spacingInWholePoints",
-    LineWrapLikeWord6 => "lineWrapLikeWord6",
-    PrintBodyTextBeforeHeader => "printBodyTextBeforeHeader",
-    PrintColorBlack => "printColBlack",
-    WpSpaceWidth => "wpSpaceWidth",
-    ShowBreaksInFrames => "showBreaksInFrames",
-    SubstituteFontBySize => "subFontBySize",
-    SuppressBottomSpacing => "suppressBottomSpacing",
-    SuppressTopSpacing => "suppressTopSpacing",
-    SuppressSpacingAtTopOfPage => "suppressSpacingAtTopOfPage",
-    SuppressTopSpacingWp => "suppressTopSpacingWP",
-    SuppressSpaceBeforeAfterPageBreak => "suppressSpBfAfterPgBrk",
-    SwapBordersFacingPages => "swapBordersFacingPages",
-    ConvertMailMergeEscapes => "convMailMergeEsc",
-    TruncateFontHeightsLikeWp6 => "truncateFontHeightsLikeWP6",
-    MwSmallCaps => "mwSmallCaps",
-    UsePrinterMetrics => "usePrinterMetrics",
-    DoNotSuppressParagraphBorders => "doNotSuppressParagraphBorders",
-    WrapTrailingSpaces => "wrapTrailSpaces",
-    FootnoteLayoutLikeWord8 => "footnoteLayoutLikeWW8",
-    ShapeLayoutLikeWord8 => "shapeLayoutLikeWW8",
-    AlignTablesRowByRow => "alignTablesRowByRow",
-    ForgetLastTabAlignment => "forgetLastTabAlignment",
-    AdjustLineHeightInTable => "adjustLineHeightInTable",
-    AutoSpaceLikeWord95 => "autoSpaceLikeWord95",
-    NoSpaceRaiseLower => "noSpaceRaiseLower",
-    DoNotUseHtmlParagraphAutoSpacing => "doNotUseHTMLParagraphAutoSpacing",
-    LayoutRawTableWidth => "layoutRawTableWidth",
-    LayoutTableRowsApart => "layoutTableRowsApart",
-    UseWord97LineBreakRules => "useWord97LineBreakRules",
-    DoNotBreakWrappedTables => "doNotBreakWrappedTables",
-    DoNotSnapToGridInCell => "doNotSnapToGridInCell",
-    SelectFieldWithFirstOrLastChar => "selectFldWithFirstOrLastChar",
-    ApplyBreakingRules => "applyBreakingRules",
-    DoNotWrapTextWithPunctuation => "doNotWrapTextWithPunct",
-    DoNotUseEastAsianBreakRules => "doNotUseEastAsianBreakRules",
-    UseWord2002TableStyleRules => "useWord2002TableStyleRules",
-    GrowAutoFit => "growAutofit",
-    UseFarEastLayout => "useFELayout",
-    UseNormalStyleForList => "useNormalStyleForList",
-    DoNotUseIndentAsNumberingTabStop => "doNotUseIndentAsNumberingTabStop",
-    UseAlternateKinsokuLineBreakRules => "useAltKinsokuLineBreakRules",
-    AllowSpaceOfSameStyleInTable => "allowSpaceOfSameStyleInTable",
-    DoNotSuppressIndentation => "doNotSuppressIndentation",
-    DoNotAutoFitConstrainedTables => "doNotAutofitConstrainedTables",
-    AutoFitToFirstFixedWidthCell => "autofitToFirstFixedWidthCell",
-    UnderlineTabInNumberedList => "underlineTabInNumList",
-    DisplayHangulFixedWidth => "displayHangulFixedWidth",
-    SplitPageBreakAndParagraphMark => "splitPgBreakAndParaMark",
-    DoNotVerticallyAlignCellWithSpacing => "doNotVertAlignCellWithSp",
-    DoNotBreakConstrainedForcedTable => "doNotBreakConstrainedForcedTable",
-    DoNotVerticallyAlignInTextBox => "doNotVertAlignInTxbx",
-    UseAnsiKerningPairs => "useAnsiKerningPairs",
-    CachedColumnBalance => "cachedColBalance",
-}
-
-impl CompatFlag {
-    const fn is_strict(self) -> bool {
-        matches!(
-            self,
-            Self::SpaceForUnderline
-                | Self::BalanceSingleByteDoubleByteWidth
-                | Self::DoNotLeaveBackslashAlone
-                | Self::UnderlineTrailingSpace
-                | Self::DoNotExpandShiftReturn
-                | Self::AdjustLineHeightInTable
-                | Self::ApplyBreakingRules
-        )
-    }
-}
-
-/// An on/off compatibility option flag from `w:compat` (for example
-/// `w:useFELayout`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CompatibilityOption {
-    flag: CompatFlag,
-    enabled: bool,
-}
-
-impl CompatibilityOption {
-    /// Return the schema-defined flag.
-    #[inline]
-    pub fn flag(&self) -> CompatFlag {
-        self.flag
-    }
-
-    /// Whether the option is enabled.
-    #[inline]
-    pub fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-}
-
-/// A `w:compatSetting` name/URI/value triple from `w:compat`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompatibilitySetting {
-    name: String,
-    uri: String,
-    value: String,
-}
-
-impl CompatibilitySetting {
-    /// Return the setting name (for example `compatibilityMode`).
-    #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Return the URI scoping the setting name.
-    #[inline]
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
-
-    /// Return the raw setting value.
-    #[inline]
-    pub fn value(&self) -> &str {
-        &self.value
-    }
-}
-
-/// Placement of footnote or endnote text (`ST_FtnPos`/`ST_EdnPos`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u8)]
-pub enum NotePosition {
-    /// At the bottom of the page.
-    PageBottom,
-    /// Immediately beneath the page's text.
-    BeneathText,
-    /// At the end of the section.
-    SectionEnd,
-    /// At the end of the document.
-    DocumentEnd,
-}
-
-impl NotePosition {
-    /// Return the exact WordprocessingML token.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PageBottom => "pageBottom",
-            Self::BeneathText => "beneathText",
-            Self::SectionEnd => "sectEnd",
-            Self::DocumentEnd => "docEnd",
-        }
-    }
-
-    const fn valid_for_endnote(self) -> bool {
-        matches!(self, Self::SectionEnd | Self::DocumentEnd)
-    }
-}
-
-/// Error returned for a token outside `ST_FtnPos`/`ST_EdnPos`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ParseNotePositionError;
-
-impl Display for ParseNotePositionError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("invalid WordprocessingML note position")
-    }
-}
-
-impl Error for ParseNotePositionError {}
-
-impl FromStr for NotePosition {
-    type Err = ParseNotePositionError;
-
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
-        match value {
-            "pageBottom" => Ok(Self::PageBottom),
-            "beneathText" => Ok(Self::BeneathText),
-            "sectEnd" => Ok(Self::SectionEnd),
-            "docEnd" => Ok(Self::DocumentEnd),
-            _ => Err(ParseNotePositionError),
-        }
-    }
-}
-
-impl Display for NotePosition {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-/// Numbering restart behavior for footnotes or endnotes (`w:numRestart`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NoteNumberingRestart {
-    /// Numbering continues throughout the document.
-    Continuous,
-    /// Numbering restarts at each section.
-    EachSection,
-    /// Numbering restarts at each page.
-    EachPage,
-}
-
-impl NoteNumberingRestart {
-    fn from_xml(value: &str) -> Result<Self> {
-        match value {
-            "continuous" => Ok(Self::Continuous),
-            "eachSect" => Ok(Self::EachSection),
-            "eachPage" => Ok(Self::EachPage),
-            _ => Err(OoxmlError::InvalidFormat(format!(
-                "invalid note numbering restart value '{value}'"
-            ))),
-        }
-    }
-
-    /// Get the XML value for this restart behavior.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Continuous => "continuous",
-            Self::EachSection => "eachSect",
-            Self::EachPage => "eachPage",
-        }
-    }
-}
-
-/// Document-level footnote or endnote properties from `w:footnotePr` or
-/// `w:endnotePr` in `settings.xml`.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct NoteNumberingProperties {
-    position: Option<NotePosition>,
-    format: Option<NumberFormat>,
-    start: Option<u32>,
-    restart: Option<NoteNumberingRestart>,
-}
-
-impl NoteNumberingProperties {
-    /// Return the note placement, when specified.
-    #[inline]
-    pub fn position(&self) -> Option<NotePosition> {
-        self.position
-    }
-
-    /// Return the numbering format, when specified (defaults to decimal).
-    #[inline]
-    pub fn format(&self) -> Option<NumberFormat> {
-        self.format
-    }
-
-    /// Return the first note number, when specified.
-    #[inline]
-    pub fn start(&self) -> Option<u32> {
-        self.start
-    }
-
-    /// Return the numbering restart behavior, when specified.
-    #[inline]
-    pub fn restart(&self) -> Option<NoteNumberingRestart> {
-        self.restart
-    }
-}
-
-/// Type of document protection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProtectionType {
-    /// No editing allowed
-    ReadOnly,
-    /// Only comments allowed
-    Comments,
-    /// Only tracked changes allowed
-    TrackedChanges,
-    /// Only form fields allowed
-    Forms,
-}
-
-impl ProtectionType {
-    /// Parse protection type from XML value.
-    fn from_xml(s: &str) -> Option<Self> {
-        match s {
-            "readOnly" => Some(Self::ReadOnly),
-            "comments" => Some(Self::Comments),
-            "trackedChanges" => Some(Self::TrackedChanges),
-            "forms" => Some(Self::Forms),
-            _ => None,
-        }
-    }
-
-    /// Get XML value for this protection type.
-    pub const fn to_xml(self) -> &'static str {
-        match self {
-            Self::ReadOnly => "readOnly",
-            Self::Comments => "comments",
-            Self::TrackedChanges => "trackedChanges",
-            Self::Forms => "forms",
-        }
-    }
-}
-
-/// Document view mode from `w:view` (`ST_View`, ECMA-376 section 17.18.102).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocumentView {
-    /// No explicit view is specified.
-    None,
-    /// Print layout view.
-    Print,
-    /// Outline view.
-    Outline,
-    /// Master pages view.
-    MasterPages,
-    /// Normal (draft) view.
-    Normal,
-    /// Web layout view.
-    Web,
-}
-
-impl DocumentView {
-    fn from_xml(value: &str) -> Result<Self> {
-        match value {
-            "none" => Ok(Self::None),
-            "print" => Ok(Self::Print),
-            "outline" => Ok(Self::Outline),
-            "masterPages" => Ok(Self::MasterPages),
-            "normal" => Ok(Self::Normal),
-            "web" => Ok(Self::Web),
-            _ => Err(OoxmlError::InvalidFormat(format!(
-                "invalid document view value '{value}'"
-            ))),
-        }
-    }
-
-    /// Get the XML value for this view mode.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::None => "none",
-            Self::Print => "print",
-            Self::Outline => "outline",
-            Self::MasterPages => "masterPages",
-            Self::Normal => "normal",
-            Self::Web => "web",
-        }
-    }
-}
-
-/// Proofing completion marker (`ST_ProofState`, ECMA-376 section 17.18.67).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProofState {
-    /// Proofing for the region completed without errors.
-    Clean,
-    /// The region changed since proofing last ran.
-    Dirty,
-}
-
-impl ProofState {
-    fn from_xml(value: &str) -> Result<Self> {
-        match value {
-            "clean" => Ok(Self::Clean),
-            "dirty" => Ok(Self::Dirty),
-            _ => Err(OoxmlError::InvalidFormat(format!(
-                "invalid proof state value '{value}'"
-            ))),
-        }
-    }
-
-    /// Get the XML value for this proof state.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Clean => "clean",
-            Self::Dirty => "dirty",
-        }
-    }
-}
-
-/// Proofing completion markers from `w:proofState` (ECMA-376 section
-/// 17.15.1.66).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ProofingState {
-    spelling: Option<ProofState>,
-    grammar: Option<ProofState>,
-}
-
-impl ProofingState {
-    /// Create a proofing state with no markers.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the spelling proofing marker.
-    pub fn set_spelling(&mut self, value: Option<ProofState>) -> &mut Self {
-        self.spelling = value;
-        self
-    }
-
-    /// Set the grammar proofing marker.
-    pub fn set_grammar(&mut self, value: Option<ProofState>) -> &mut Self {
-        self.grammar = value;
-        self
-    }
-
-    /// Return the spelling proofing marker, when specified.
-    #[inline]
-    pub fn spelling(&self) -> Option<ProofState> {
-        self.spelling
-    }
-
-    /// Return the grammar proofing marker, when specified.
-    #[inline]
-    pub fn grammar(&self) -> Option<ProofState> {
-        self.grammar
-    }
-
-    /// Serialize a standalone `w:proofState` fragment.
-    pub fn to_xml(&self, prefix: &str) -> String {
-        let mut xml = format!("<{prefix}:proofState");
-        if let Some(spelling) = self.spelling {
-            xml.push_str(&format!(" {prefix}:spelling=\"{}\"", spelling.as_str()));
-        }
-        if let Some(grammar) = self.grammar {
-            xml.push_str(&format!(" {prefix}:grammar=\"{}\"", grammar.as_str()));
-        }
-        xml.push_str("/>");
-        xml
-    }
-}
-
-/// Maximum accepted length of a `w:themeFontLang` language tag. `ST_Lang`
-/// (ECMA-376 section 17.18.51) is an unbounded string; this bound keeps
-/// hostile documents from forcing unbounded allocations.
-pub const MAX_LANGUAGE_TAG_LENGTH: usize = 255;
-
-fn validate_language_tag(value: &str, description: &str) -> Result<()> {
-    if value.is_empty()
-        || value.len() > MAX_LANGUAGE_TAG_LENGTH
-        || value.chars().any(char::is_control)
-    {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "invalid Word {description} language tag '{value}'"
-        )));
-    }
-    Ok(())
-}
-
-/// Theme font language defaults from `w:themeFontLang` (ECMA-376 section
-/// 17.15.1.91). Each value is an `ST_Lang` BCP 47 tag or LCID string.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ThemeFontLanguages {
-    latin: Option<String>,
-    east_asia: Option<String>,
-    bidi: Option<String>,
-}
-
-impl ThemeFontLanguages {
-    /// Create theme font language defaults with no languages set.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the Latin (`w:val`) theme language.
-    pub fn set_latin(&mut self, value: Option<String>) -> Result<&mut Self> {
-        if let Some(tag) = value.as_deref() {
-            validate_language_tag(tag, "Latin theme font")?;
-        }
-        self.latin = value;
-        Ok(self)
-    }
-
-    /// Set the East Asian (`w:eastAsia`) theme language.
-    pub fn set_east_asia(&mut self, value: Option<String>) -> Result<&mut Self> {
-        if let Some(tag) = value.as_deref() {
-            validate_language_tag(tag, "East Asian theme font")?;
-        }
-        self.east_asia = value;
-        Ok(self)
-    }
-
-    /// Set the complex-script (`w:bidi`) theme language.
-    pub fn set_bidi(&mut self, value: Option<String>) -> Result<&mut Self> {
-        if let Some(tag) = value.as_deref() {
-            validate_language_tag(tag, "complex-script theme font")?;
-        }
-        self.bidi = value;
-        Ok(self)
-    }
-
-    /// Return the Latin theme language, when specified.
-    #[inline]
-    pub fn latin(&self) -> Option<&str> {
-        self.latin.as_deref()
-    }
-
-    /// Return the East Asian theme language, when specified.
-    #[inline]
-    pub fn east_asia(&self) -> Option<&str> {
-        self.east_asia.as_deref()
-    }
-
-    /// Return the complex-script theme language, when specified.
-    #[inline]
-    pub fn bidi(&self) -> Option<&str> {
-        self.bidi.as_deref()
-    }
-
-    /// Serialize a standalone `w:themeFontLang` fragment.
-    pub fn to_xml(&self, prefix: &str) -> String {
-        let mut xml = format!("<{prefix}:themeFontLang");
-        for (name, value) in [
-            ("val", &self.latin),
-            ("eastAsia", &self.east_asia),
-            ("bidi", &self.bidi),
-        ] {
-            if let Some(tag) = value {
-                xml.push_str(&format!(" {prefix}:{name}=\""));
-                escape_attribute(&mut xml, tag);
-                xml.push('"');
-            }
-        }
-        xml.push_str("/>");
-        xml
-    }
-}
-
-/// Theme color slot produced by a `w:clrSchemeMapping` value
-/// (`ST_ColorSchemeIndex`, ECMA-376 section 17.18.11).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ColorSchemeIndex {
-    /// First dark theme color.
-    Dark1,
-    /// First light theme color.
-    Light1,
-    /// Second dark theme color.
-    Dark2,
-    /// Second light theme color.
-    Light2,
-    /// First accent theme color.
-    Accent1,
-    /// Second accent theme color.
-    Accent2,
-    /// Third accent theme color.
-    Accent3,
-    /// Fourth accent theme color.
-    Accent4,
-    /// Fifth accent theme color.
-    Accent5,
-    /// Sixth accent theme color.
-    Accent6,
-    /// Hyperlink theme color.
-    Hyperlink,
-    /// Followed hyperlink theme color.
-    FollowedHyperlink,
-}
-
-impl ColorSchemeIndex {
-    fn from_xml(value: &str) -> Result<Self> {
-        match value {
-            "dark1" => Ok(Self::Dark1),
-            "light1" => Ok(Self::Light1),
-            "dark2" => Ok(Self::Dark2),
-            "light2" => Ok(Self::Light2),
-            "accent1" => Ok(Self::Accent1),
-            "accent2" => Ok(Self::Accent2),
-            "accent3" => Ok(Self::Accent3),
-            "accent4" => Ok(Self::Accent4),
-            "accent5" => Ok(Self::Accent5),
-            "accent6" => Ok(Self::Accent6),
-            "hyperlink" => Ok(Self::Hyperlink),
-            "followedHyperlink" => Ok(Self::FollowedHyperlink),
-            _ => Err(OoxmlError::InvalidFormat(format!(
-                "invalid color scheme index value '{value}'"
-            ))),
-        }
-    }
-
-    /// Get the XML value for this theme color slot.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Dark1 => "dark1",
-            Self::Light1 => "light1",
-            Self::Dark2 => "dark2",
-            Self::Light2 => "light2",
-            Self::Accent1 => "accent1",
-            Self::Accent2 => "accent2",
-            Self::Accent3 => "accent3",
-            Self::Accent4 => "accent4",
-            Self::Accent5 => "accent5",
-            Self::Accent6 => "accent6",
-            Self::Hyperlink => "hyperlink",
-            Self::FollowedHyperlink => "followedHyperlink",
-        }
-    }
-}
-
-/// A remappable theme color slot on `w:clrSchemeMapping` (ECMA-376 section
-/// 17.15.1.21).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ColorSchemeSlot {
-    /// First background color slot (`w:bg1`).
-    Background1,
-    /// First text color slot (`w:t1`).
-    Text1,
-    /// Second background color slot (`w:bg2`).
-    Background2,
-    /// Second text color slot (`w:t2`).
-    Text2,
-    /// First accent color slot (`w:accent1`).
-    Accent1,
-    /// Second accent color slot (`w:accent2`).
-    Accent2,
-    /// Third accent color slot (`w:accent3`).
-    Accent3,
-    /// Fourth accent color slot (`w:accent4`).
-    Accent4,
-    /// Fifth accent color slot (`w:accent5`).
-    Accent5,
-    /// Sixth accent color slot (`w:accent6`).
-    Accent6,
-    /// Hyperlink color slot (`w:hyperlink`).
-    Hyperlink,
-    /// Followed hyperlink color slot (`w:followedHyperlink`).
-    FollowedHyperlink,
-}
-
-impl ColorSchemeSlot {
-    /// Number of remappable color slots.
-    pub const COUNT: usize = 12;
-
-    /// Every slot in schema attribute order.
-    pub const ALL: [Self; Self::COUNT] = [
-        Self::Background1,
-        Self::Text1,
-        Self::Background2,
-        Self::Text2,
-        Self::Accent1,
-        Self::Accent2,
-        Self::Accent3,
-        Self::Accent4,
-        Self::Accent5,
-        Self::Accent6,
-        Self::Hyperlink,
-        Self::FollowedHyperlink,
-    ];
-
-    const fn index(self) -> usize {
-        self as usize
-    }
-
-    /// Get the attribute name carrying this slot on `w:clrSchemeMapping`.
-    pub const fn attribute_name(self) -> &'static str {
-        match self {
-            Self::Background1 => "bg1",
-            Self::Text1 => "t1",
-            Self::Background2 => "bg2",
-            Self::Text2 => "t2",
-            Self::Accent1 => "accent1",
-            Self::Accent2 => "accent2",
-            Self::Accent3 => "accent3",
-            Self::Accent4 => "accent4",
-            Self::Accent5 => "accent5",
-            Self::Accent6 => "accent6",
-            Self::Hyperlink => "hyperlink",
-            Self::FollowedHyperlink => "followedHyperlink",
-        }
-    }
-}
-
-/// Theme color slot remapping from `w:clrSchemeMapping` (ECMA-376 section
-/// 17.15.1.21).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ColorSchemeMapping {
-    slots: [Option<ColorSchemeIndex>; ColorSchemeSlot::COUNT],
-}
-
-impl ColorSchemeMapping {
-    /// Create a mapping with every slot left at its default.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Remap a slot to a theme color index.
-    pub fn set(&mut self, slot: ColorSchemeSlot, index: ColorSchemeIndex) -> &mut Self {
-        self.slots[slot.index()] = Some(index);
-        self
-    }
-
-    /// Restore a slot to its default mapping.
-    pub fn clear(&mut self, slot: ColorSchemeSlot) -> &mut Self {
-        self.slots[slot.index()] = None;
-        self
-    }
-
-    /// Return the theme color index a slot maps to, when remapped.
-    #[inline]
-    pub fn get(&self, slot: ColorSchemeSlot) -> Option<ColorSchemeIndex> {
-        self.slots[slot.index()]
-    }
-
-    /// Whether no slot is remapped.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.slots.iter().all(Option::is_none)
-    }
-
-    /// Iterate the remapped slots in schema attribute order.
-    pub fn iter(&self) -> impl Iterator<Item = (ColorSchemeSlot, ColorSchemeIndex)> + '_ {
-        ColorSchemeSlot::ALL
-            .into_iter()
-            .filter_map(|slot| self.get(slot).map(|index| (slot, index)))
-    }
-
-    /// Serialize a standalone `w:clrSchemeMapping` fragment.
-    pub fn to_xml(&self, prefix: &str) -> String {
-        let mut xml = format!("<{prefix}:clrSchemeMapping");
-        for (slot, index) in self.iter() {
-            xml.push_str(&format!(
-                " {prefix}:{}=\"{}\"",
-                slot.attribute_name(),
-                index.as_str()
-            ));
-        }
-        xml.push_str("/>");
-        xml
-    }
-}
-
+pub use litchi_docx::settings::{
+    COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI, ColorSchemeIndex,
+    ColorSchemeMapping, ColorSchemeSlot, CompatFlag, CompatibilityOption, CompatibilitySetting,
+    DocumentView, MAX_LANGUAGE_TAG_LENGTH, MAX_SETTINGS_XML_BYTES as OWNER_MAX_SETTINGS_XML_BYTES,
+    MAX_SETTINGS_XML_DEPTH as OWNER_MAX_SETTINGS_XML_DEPTH,
+    MAX_SETTINGS_XML_NODES as OWNER_MAX_SETTINGS_XML_NODES, NoteNumberFormat, NoteNumberingRestart,
+    NotePosition, ParseCompatFlagError, ParseNoteNumberFormatError, ParseNotePositionError,
+    ProofState, ProofingState, ProtectionType, ThemeFontLanguages,
+};
+
+/// Historical host spelling retained while note-number formats are owned by
+/// the canonical DOCX settings module.
+pub type NoteNumberingProperties = litchi_docx::settings::NoteNumberingProperties<NumberFormat>;
+
+type OwnedSettings = litchi_docx::settings::Settings<NumberFormat>;
 impl DocumentSettings {
     /// Create a new DocumentSettings with default values.
     pub fn new() -> Self {
         Self {
-            protected: false,
-            protection_type: None,
-            track_revisions: false,
-            zoom_percent: None,
+            values: OwnedSettings::new(),
             smart_tag_types: Vec::new(),
             do_not_embed_smart_tags: false,
             mail_merge: None,
             attached_template: None,
-            compatibility_options: Vec::new(),
-            compatibility_settings: Vec::new(),
-            footnote_properties: None,
-            endnote_properties: None,
-            write_protection: false,
-            view: None,
-            proofing_state: None,
-            default_tab_stop_twips: None,
-            theme_font_languages: None,
-            color_scheme_mapping: None,
         }
     }
 
     /// Check if the document is protected.
     #[inline]
     pub fn is_protected(&self) -> bool {
-        self.protected
+        self.values.is_protected()
     }
 
     /// Get the type of protection applied.
     #[inline]
     pub fn protection_type(&self) -> Option<ProtectionType> {
-        self.protection_type
+        self.values.protection_type()
     }
 
     /// Check if track revisions is enabled.
     #[inline]
     pub fn track_revisions(&self) -> bool {
-        self.track_revisions
+        self.values.track_revisions()
     }
 
     /// Get the zoom percentage.
     #[inline]
     pub fn zoom_percent(&self) -> Option<u32> {
-        self.zoom_percent
+        self.values.zoom_percent()
     }
 
     /// Return the declared smart-tag vocabularies in document order.
@@ -1010,110 +195,83 @@ impl DocumentSettings {
     /// Return the on/off compatibility option flags in document order.
     #[inline]
     pub fn compatibility_options(&self) -> &[CompatibilityOption] {
-        &self.compatibility_options
+        self.values.compatibility_options()
     }
 
     /// Return the `w:compatSetting` triples in document order.
     #[inline]
     pub fn compatibility_settings(&self) -> &[CompatibilitySetting] {
-        &self.compatibility_settings
+        self.values.compatibility_settings()
     }
 
     /// Look up a `w:compatSetting` triple by name and URI.
     pub fn compatibility_setting(&self, name: &str, uri: &str) -> Option<&CompatibilitySetting> {
-        self.compatibility_settings
-            .iter()
-            .find(|setting| setting.name == name && setting.uri == uri)
+        self.values.compatibility_setting(name, uri)
     }
 
     /// Return the Word compatibility mode (`compatibilityMode` value), when
     /// declared — for example `15` targets Word 2013 behavior.
     pub fn compatibility_mode(&self) -> Option<u32> {
-        self.compatibility_setting(COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI)
-            .and_then(|setting| setting.value.parse().ok())
+        self.values.compatibility_mode()
     }
 
     /// Return the document-level footnote properties, if present.
     #[inline]
     pub fn footnote_properties(&self) -> Option<&NoteNumberingProperties> {
-        self.footnote_properties.as_ref()
+        self.values.footnote_properties()
     }
 
     /// Return the document-level endnote properties, if present.
     #[inline]
     pub fn endnote_properties(&self) -> Option<&NoteNumberingProperties> {
-        self.endnote_properties.as_ref()
+        self.values.endnote_properties()
     }
 
     /// Whether applications should recommend write protection for the
     /// document (`w:writeProtection`).
     #[inline]
     pub fn is_write_protected(&self) -> bool {
-        self.write_protection
+        self.values.is_write_protected()
     }
 
     /// Return the document view mode (`w:view`), when specified.
     #[inline]
     pub fn view(&self) -> Option<DocumentView> {
-        self.view
+        self.values.view()
     }
 
     /// Return the proofing completion markers (`w:proofState`), if present.
     #[inline]
     pub fn proofing_state(&self) -> Option<&ProofingState> {
-        self.proofing_state.as_ref()
+        self.values.proofing_state()
     }
 
     /// Return the default tab stop interval in twips (`w:defaultTabStop`),
     /// when specified.
     #[inline]
     pub fn default_tab_stop_twips(&self) -> Option<u32> {
-        self.default_tab_stop_twips
+        self.values.default_tab_stop_twips()
     }
 
     /// Return the theme font language defaults (`w:themeFontLang`), if
     /// present.
     #[inline]
     pub fn theme_font_languages(&self) -> Option<&ThemeFontLanguages> {
-        self.theme_font_languages.as_ref()
+        self.values.theme_font_languages()
     }
 
     /// Return the theme color slot remapping (`w:clrSchemeMapping`), if
     /// present.
     #[inline]
     pub fn color_scheme_mapping(&self) -> Option<&ColorSchemeMapping> {
-        self.color_scheme_mapping.as_ref()
+        self.values.color_scheme_mapping()
     }
 
     /// Serialize the editing view, proofing, and theme default elements
     /// (`w:writeProtection`, `w:view`, `w:proofState`, `w:defaultTabStop`,
     /// `w:themeFontLang`, `w:clrSchemeMapping`) in ECMA-376 schema order.
     pub fn to_editing_settings_xml(&self, prefix: &str) -> String {
-        let mut xml = String::new();
-        if self.write_protection {
-            xml.push_str(&format!("<{prefix}:writeProtection/>"));
-        }
-        if let Some(view) = self.view {
-            xml.push_str(&format!(
-                "<{prefix}:view {prefix}:val=\"{}\"/>",
-                view.as_str()
-            ));
-        }
-        if let Some(state) = &self.proofing_state {
-            xml.push_str(&state.to_xml(prefix));
-        }
-        if let Some(twips) = self.default_tab_stop_twips {
-            xml.push_str(&format!(
-                "<{prefix}:defaultTabStop {prefix}:val=\"{twips}\"/>"
-            ));
-        }
-        if let Some(languages) = &self.theme_font_languages {
-            xml.push_str(&languages.to_xml(prefix));
-        }
-        if let Some(mapping) = &self.color_scheme_mapping {
-            xml.push_str(&mapping.to_xml(prefix));
-        }
-        xml
+        self.values.to_editing_settings_xml(prefix)
     }
 
     /// Extract settings from a settings.xml part.
@@ -1315,7 +473,7 @@ fn begin_settings_group(
             }))
         },
         b"footnotePr" => {
-            if settings.footnote_properties.is_some() {
+            if settings.values.footnote_properties().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate footnotePr settings group".into(),
                 ));
@@ -1325,7 +483,7 @@ fn begin_settings_group(
             )))
         },
         b"endnotePr" => {
-            if settings.endnote_properties.is_some() {
+            if settings.values.endnote_properties().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate endnotePr settings group".into(),
                 ));
@@ -1344,22 +502,24 @@ fn finish_settings_group(settings: &mut DocumentSettings, group: PendingGroup) -
             options,
             settings: triples,
         } => {
-            settings.compatibility_options = options;
-            settings.compatibility_settings = triples;
+            settings.values.set_compatibility_options(options);
+            settings.values.set_compatibility_settings(triples);
         },
         PendingGroup::FootnoteProperties(properties) => {
-            if settings.footnote_properties.replace(properties).is_some() {
+            if settings.values.footnote_properties().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate footnotePr settings group".into(),
                 ));
             }
+            settings.values.set_footnote_properties(Some(properties));
         },
         PendingGroup::EndnoteProperties(properties) => {
-            if settings.endnote_properties.replace(properties).is_some() {
+            if settings.values.endnote_properties().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate endnotePr settings group".into(),
                 ));
             }
+            settings.values.set_endnote_properties(Some(properties));
         },
     }
     Ok(())
@@ -1375,29 +535,11 @@ fn parse_group_child(
     match group {
         PendingGroup::Compatibility { options, settings } => {
             if element.local_name().as_ref() == b"compatSetting" {
-                settings.push(CompatibilitySetting {
-                    name: required_attribute(
-                        element,
-                        b"name",
-                        decoder,
-                        resolver,
-                        "compatSetting name",
-                    )?,
-                    uri: required_attribute(
-                        element,
-                        b"uri",
-                        decoder,
-                        resolver,
-                        "compatSetting URI",
-                    )?,
-                    value: required_attribute(
-                        element,
-                        b"val",
-                        decoder,
-                        resolver,
-                        "compatSetting value",
-                    )?,
-                });
+                settings.push(CompatibilitySetting::new(
+                    required_attribute(element, b"name", decoder, resolver, "compatSetting name")?,
+                    required_attribute(element, b"uri", decoder, resolver, "compatSetting URI")?,
+                    required_attribute(element, b"val", decoder, resolver, "compatSetting value")?,
+                ));
             } else {
                 let local_name = element.local_name();
                 let raw = std::str::from_utf8(local_name.as_ref()).map_err(|_| {
@@ -1411,15 +553,15 @@ fn parse_group_child(
                         "compatibility flag '{raw}' is not valid in Strict WordprocessingML"
                     )));
                 }
-                if options.iter().any(|option| option.flag == flag) {
+                if options.iter().any(|option| option.flag() == flag) {
                     return Err(OoxmlError::InvalidFormat(format!(
                         "duplicate compatibility flag '{raw}'"
                     )));
                 }
-                options.push(CompatibilityOption {
+                options.push(CompatibilityOption::new(
                     flag,
-                    enabled: parse_on_off(element, decoder, resolver)?,
-                });
+                    parse_on_off(element, decoder, resolver)?,
+                ));
             }
         },
         PendingGroup::FootnoteProperties(properties) => {
@@ -1439,57 +581,65 @@ fn parse_note_property_child(
     decoder: Decoder,
     resolver: &NamespaceResolver,
 ) -> Result<()> {
+    let mut position = properties.position();
+    let mut format = properties.format();
+    let mut start = properties.start();
+    let mut restart = properties.restart();
     match element.local_name().as_ref() {
         b"pos" => {
-            if properties.position.is_some() {
+            if position.is_some() {
                 return Err(OoxmlError::InvalidFormat("duplicate note position".into()));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note position")?;
-            let position = value.parse::<NotePosition>().map_err(|_| {
+            let parsed_position = value.parse::<NotePosition>().map_err(|_| {
                 OoxmlError::InvalidFormat(format!("invalid note position '{value}'"))
             })?;
-            if kind == NoteKind::Endnote && !position.valid_for_endnote() {
+            if kind == NoteKind::Endnote && !parsed_position.valid_for_endnote() {
                 return Err(OoxmlError::InvalidFormat(format!(
                     "position '{}' is not valid for an endnote",
-                    position.as_str()
+                    parsed_position.as_str()
                 )));
             }
-            properties.position = Some(position);
+            position = Some(parsed_position);
         },
         b"numFmt" => {
-            if properties.format.is_some() {
+            if format.is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate note numbering format".into(),
                 ));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numFmt")?;
-            properties.format = Some(value.parse().map_err(|_| {
+            format = Some(value.parse().map_err(|_| {
                 OoxmlError::InvalidFormat(format!("invalid note numbering format '{value}'"))
             })?);
         },
         b"numStart" => {
-            if properties.start.is_some() {
+            if start.is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate note numbering start".into(),
                 ));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numStart")?;
-            properties.start = Some(value.parse().map_err(|_| {
+            start = Some(value.parse().map_err(|_| {
                 OoxmlError::InvalidFormat(format!("invalid note numbering start '{value}'"))
             })?);
         },
         b"numRestart" => {
-            if properties.restart.is_some() {
+            if restart.is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate note numbering restart".into(),
                 ));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numRestart")?;
-            properties.restart = Some(NoteNumberingRestart::from_xml(&value)?);
+            restart = Some(
+                NoteNumberingRestart::from_xml(&value)
+                    .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
+            );
         },
         // `w:footnote`/`w:endnote` separator references carry no properties.
         _ => {},
     }
+    *properties = NoteNumberingProperties::from_parts(position, format, start, restart);
     Ok(())
 }
 
@@ -1511,21 +661,26 @@ fn parse_setting(
 ) -> Result<()> {
     match element.local_name().as_ref() {
         b"documentProtection" => {
-            settings.protected = true;
+            settings.values.set_protected(true);
             if let Some(value) = word_attribute_value(element, b"edit", decoder, resolver)? {
-                settings.protection_type = ProtectionType::from_xml(&value);
+                settings
+                    .values
+                    .set_protection_type(ProtectionType::from_xml(&value));
             }
             if let Some(value) = word_attribute_value(element, b"enforcement", decoder, resolver)? {
-                settings.protected = parse_on_off_value(&value)?;
+                settings.values.set_protected(parse_on_off_value(&value)?);
             }
         },
         b"trackRevisions" => {
-            settings.track_revisions = parse_on_off(element, decoder, resolver)?;
+            settings
+                .values
+                .set_track_revisions(parse_on_off(element, decoder, resolver)?);
         },
         b"zoom" => {
             if let Some(value) = word_attribute_value(element, b"percent", decoder, resolver)? {
-                settings.zoom_percent =
-                    atoi_simd::parse::<u32, false, false>(value.as_bytes()).ok();
+                settings
+                    .values
+                    .set_zoom_percent(atoi_simd::parse::<u32, false, false>(value.as_bytes()).ok());
             }
         },
         b"smartTagType" => {
@@ -1587,43 +742,56 @@ fn parse_setting(
                     "duplicate writeProtection setting".into(),
                 ));
             }
-            settings.write_protection = parse_on_off(element, decoder, resolver)?;
+            settings
+                .values
+                .set_write_protected(parse_on_off(element, decoder, resolver)?);
         },
         b"view" => {
-            if settings.view.is_some() {
+            if settings.values.view().is_some() {
                 return Err(OoxmlError::InvalidFormat("duplicate view setting".into()));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "view mode")?;
-            settings.view = Some(DocumentView::from_xml(&value)?);
+            settings.values.set_view(Some(
+                DocumentView::from_xml(&value)
+                    .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
+            ));
         },
         b"proofState" => {
-            if settings.proofing_state.is_some() {
+            if settings.values.proofing_state().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate proofState setting".into(),
                 ));
             }
             let mut state = ProofingState::new();
             if let Some(value) = word_attribute_value(element, b"spelling", decoder, resolver)? {
-                state.set_spelling(Some(ProofState::from_xml(&value)?));
+                state.set_spelling(Some(
+                    ProofState::from_xml(&value)
+                        .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
+                ));
             }
             if let Some(value) = word_attribute_value(element, b"grammar", decoder, resolver)? {
-                state.set_grammar(Some(ProofState::from_xml(&value)?));
+                state.set_grammar(Some(
+                    ProofState::from_xml(&value)
+                        .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
+                ));
             }
-            settings.proofing_state = Some(state);
+            settings.values.set_proofing_state(Some(state));
         },
         b"defaultTabStop" => {
-            if settings.default_tab_stop_twips.is_some() {
+            if settings.values.default_tab_stop_twips().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate defaultTabStop setting".into(),
                 ));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "default tab stop")?;
-            settings.default_tab_stop_twips = Some(value.parse().map_err(|_| {
-                OoxmlError::InvalidFormat(format!("invalid default tab stop '{value}'"))
-            })?);
+            settings
+                .values
+                .set_default_tab_stop_twips(Some(value.parse().map_err(|_| {
+                    OoxmlError::InvalidFormat(format!("invalid default tab stop '{value}'"))
+                })?));
         },
         b"themeFontLang" => {
-            if settings.theme_font_languages.is_some() {
+            if settings.values.theme_font_languages().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate themeFontLang setting".into(),
                 ));
@@ -1638,10 +806,10 @@ fn parse_setting(
             if let Some(value) = word_attribute_value(element, b"bidi", decoder, resolver)? {
                 languages.set_bidi(Some(value))?;
             }
-            settings.theme_font_languages = Some(languages);
+            settings.values.set_theme_font_languages(Some(languages));
         },
         b"clrSchemeMapping" => {
-            if settings.color_scheme_mapping.is_some() {
+            if settings.values.color_scheme_mapping().is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate clrSchemeMapping setting".into(),
                 ));
@@ -1654,10 +822,14 @@ fn parse_setting(
                     decoder,
                     resolver,
                 )? {
-                    mapping.set(slot, ColorSchemeIndex::from_xml(&value)?);
+                    mapping.set(
+                        slot,
+                        ColorSchemeIndex::from_xml(&value)
+                            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
+                    );
                 }
             }
-            settings.color_scheme_mapping = Some(mapping);
+            settings.values.set_color_scheme_mapping(Some(mapping));
         },
         _ => {},
     }

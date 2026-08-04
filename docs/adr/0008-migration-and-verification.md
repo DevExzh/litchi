@@ -3823,6 +3823,49 @@ environment-blocked before compilation because `pkg-config`/fontconfig is
 unavailable. This is functional and boundary evidence; native Office and
 performance evidence remain governed by the evidence levels below.
 
+## DOCX settings, XLSX chartsheets, and XLSB formula owner follow-up
+
+The next concrete-crate migration batch moves three format-owned codec seams
+out of the migration host while retaining package traversal, relationship
+orchestration, and historical error/API paths as explicit adapters:
+
+- WordprocessingML document-settings vocabulary and its bounded XML codec now
+  live in `litchi-docx::settings`. Typed compatibility flags and options, note
+  numbering and placement, protection, view, proofing, theme-font, and
+  color-scheme values are owned by the standalone crate. The OOXML host keeps
+  settings-part orchestration and host-only smart-tag, mail-merge, and
+  attached-template state, and maps owner errors to its historical boundary.
+- SpreadsheetML chartsheet values, conformance-aware XML parsing/writing, and
+  bounded validation now live in `litchi-xlsx::chart_sheet`. The host retains
+  the OPC graph for drawings, charts, images, VML, printer settings, and
+  relationships, with the typed chartsheet codec crossing a narrow adapter.
+- BIFF12 cell-formula buffers, RPN `Ptg` parsing and compilation, checked
+  ranges, and array/shared formula records now live in `litchi-xlsb::formula`.
+  Workbook link/name/table/pivot resolution and worksheet record orchestration
+  remain in `litchi-ooxml`; the host wrapper preserves its `XlsbError` API while
+  delegating binary validation and serialization.
+
+The checked-in specification anchors for settings are `[MS-DOCX]` §§2.2.2 and
+2.3, together with `[MS-OE376]` §§2.1.310--2.1.313, 2.1.403, 2.1.410,
+2.1.435, 2.1.437--2.1.439, 2.1.471, 2.1.572, and 2.1.596. Chartsheet
+parts and their Office relationship/profile variations are pinned to
+`[MS-OE376]` §§2.1.10, 2.1.597, 2.1.639, 2.1.668, 2.1.680, 2.1.682,
+2.1.684, 2.1.690, and 2.1.1126, with the corresponding `[MS-OI29500]`
+chartsheet variations in §§2.1.7 and 2.1.597. Formula wire shapes and token
+families are pinned to `[MS-XLSB]` §§2.2.2, 2.4.6, 2.4.796, 2.5.98.4,
+2.5.98.12, 2.5.98.16, 2.5.98.88--2.5.98.92, and 2.5.98.98.
+
+The owner suites pass 239 DOCX, 349 XLSX, and 21 XLSB unit tests; the XLSB
+integration targets and DOCX doctests also pass. The host package's 1,609
+unit tests pass, along with its integration and doctest targets. Owner
+all-feature all-target strict Clippy, host default all-target strict Clippy,
+formatting, diff, and the crate-boundary audit pass: 35 workspace packages,
+107 internal dependency declarations, and the same 13 explicitly scheduled
+debt edges remain. Host all-features Clippy remains environment-blocked before
+compilation because `pkg-config`/fontconfig is unavailable. This is functional
+and boundary evidence; native Office and performance evidence remain governed
+by the evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

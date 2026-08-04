@@ -10,6 +10,7 @@ pub mod calculation_properties;
 pub mod cell;
 pub mod cell_watches;
 pub mod chain;
+pub mod chart_sheet;
 pub mod color;
 pub mod column;
 pub mod conditional_formatting;
@@ -60,6 +61,13 @@ pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Va
 pub use cell_watches::{
     CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
     parse_worksheet_cell_watches, write_worksheet_cell_watches,
+};
+pub use chart_sheet::{
+    ChartSheet, ChartSheetColor, ChartSheetConformance, ChartSheetCustomView, ChartSheetExtension,
+    ChartSheetExtensionList, ChartSheetHeaderFooter, ChartSheetMargins, ChartSheetPageSetup,
+    ChartSheetProperties, ChartSheetProtection, ChartSheetState, ChartSheetView,
+    ChartSheetWebPublishItem, ChartSheetWebPublishItems, ChartSheetWebSourceType, PageOrientation,
+    parse_chartsheet, validate_chartsheet, write_chartsheet,
 };
 pub use color::{ParseRgbError, Rgb};
 pub use column::{Column, Columns, Width, WidthAt};

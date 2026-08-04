@@ -9,8 +9,18 @@
 
 pub mod calc;
 pub mod date_utils;
+pub mod formula;
 pub mod hyperlinks;
 pub mod merged_cells;
 pub mod raw;
 
 pub use raw::Error;
+
+pub use formula::ptg_types;
+pub use formula::{
+    BinaryOperator, CellParsedFormula, Error as FormulaError, FormulaArrayValue,
+    FormulaExternalTableReference, FormulaGroup, FormulaGroupKind, FormulaMemoryKind,
+    FormulaParser, FormulaRange, FormulaTableColumns, FormulaTableDataType,
+    FormulaTableNamedColumns, FormulaTableReference, FormulaTableRowType, FormulaToken,
+    MAX_CELL_FORMULA_BYTES, Result as FormulaResult, UnaryOperator,
+};
