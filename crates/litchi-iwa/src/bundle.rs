@@ -9,6 +9,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::fs;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -521,7 +522,7 @@ impl Bundle {
         let archives = Self::parse_index_zip(bundle_path, limits)?;
 
         // Parse metadata
-        let metadata = Self::parse_metadata(bundle_path)?;
+        let metadata = Self::parse_metadata(bundle_path, limits)?;
 
         Ok(Self::from_parts(
             bundle_path.to_path_buf(),
@@ -672,7 +673,7 @@ impl Bundle {
     }
 
     /// Parse metadata from Metadata/ directory
-    fn parse_metadata(bundle_path: &Path) -> Result<BundleMetadata> {
+    fn parse_metadata(bundle_path: &Path, limits: BundleLimits) -> Result<BundleMetadata> {
         let metadata_dir = bundle_path.join("Metadata");
         let mut metadata = BundleMetadata::default();
 
@@ -684,15 +685,18 @@ impl Bundle {
         let properties_path = metadata_dir.join("Properties.plist");
         if optional_regular_file(&properties_path, "Properties.plist")? {
             metadata.has_properties = true;
-            if let Ok(value) = Value::from_file(&properties_path) {
-                metadata.properties = Self::parse_plist_value(&value);
+            let bytes = read_bounded_file(&properties_path, limits, "Properties.plist")?;
+            let value = Self::parse_plist_bytes(&bytes, "Properties.plist")?;
+            metadata.properties = Self::parse_plist_value(&value, "Properties.plist")?;
 
-                // Try to detect application from properties
-                if let Some(PropertyValue::String(app_name)) =
-                    metadata.properties.get("Application")
-                {
-                    metadata.detected_application = Some(app_name.clone());
-                }
+            // Try to detect application from properties.
+            if let Some(app_name) = metadata.properties.get("Application") {
+                let PropertyValue::String(app_name) = app_name else {
+                    return Err(Error::InvalidFormat(
+                        "Properties.plist Application must be a string".to_owned(),
+                    ));
+                };
+                metadata.detected_application = Some(app_name.clone());
             }
         }
 
@@ -700,75 +704,131 @@ impl Bundle {
         let build_version_path = metadata_dir.join("BuildVersionHistory.plist");
         if optional_regular_file(&build_version_path, "BuildVersionHistory.plist")? {
             metadata.has_build_version_history = true;
-            if let Ok(value) = Value::from_file(&build_version_path) {
-                metadata.build_versions = Self::parse_build_versions(&value).into_boxed_slice();
-            }
+            let bytes =
+                read_bounded_file(&build_version_path, limits, "BuildVersionHistory.plist")?;
+            let value = Self::parse_plist_bytes(&bytes, "BuildVersionHistory.plist")?;
+            metadata.build_versions =
+                Self::parse_build_versions(&value, "BuildVersionHistory.plist")?.into_boxed_slice();
         }
 
         // Read DocumentIdentifier
         let doc_id_path = metadata_dir.join("DocumentIdentifier");
         if optional_regular_file(&doc_id_path, "DocumentIdentifier")? {
             metadata.has_document_identifier = true;
-            if let Ok(id) = fs::read_to_string(&doc_id_path) {
-                metadata.document_id = Some(id.trim().to_string());
+            let bytes = read_bounded_file(&doc_id_path, limits, "DocumentIdentifier")?;
+            let id = String::from_utf8(bytes).map_err(|error| {
+                Error::InvalidFormat(format!("DocumentIdentifier is not valid UTF-8: {error}"))
+            })?;
+            let id = id.trim();
+            if id.is_empty() {
+                return Err(Error::InvalidFormat(
+                    "DocumentIdentifier must not be empty".to_owned(),
+                ));
             }
+            metadata.document_id = Some(id.to_owned());
         }
 
         Ok(metadata)
     }
 
     /// Parse a plist Value into our PropertyValue structure
-    fn parse_plist_value(value: &Value) -> PropertyMap {
+    fn parse_plist_bytes(bytes: &[u8], label: &str) -> Result<Value> {
+        Value::from_reader(Cursor::new(bytes))
+            .map_err(|error| Error::InvalidFormat(format!("failed to parse {label}: {error}")))
+    }
+
+    /// Parse a plist Value into our PropertyValue structure.
+    fn parse_plist_value(value: &Value, label: &str) -> Result<PropertyMap> {
         match value {
             Value::Dictionary(dict) => dict
                 .iter()
-                .map(|(key, value)| (key.clone(), Self::convert_plist_value(value)))
+                .map(|(key, value)| {
+                    let context = format!("{label}.{key}");
+                    Ok((key.clone(), Self::convert_plist_value(value, &context)?))
+                })
                 .collect(),
-            _ => PropertyMap::default(),
+            _ => Err(Error::InvalidFormat(format!(
+                "{label} must contain a dictionary at its root"
+            ))),
         }
     }
 
-    /// Convert a plist Value to PropertyValue
-    fn convert_plist_value(value: &Value) -> PropertyValue {
+    /// Convert a plist Value to PropertyValue.
+    fn convert_plist_value(value: &Value, context: &str) -> Result<PropertyValue> {
         match value {
-            Value::String(s) => PropertyValue::String(s.clone()),
-            Value::Integer(i) => PropertyValue::Integer(i.as_signed().unwrap_or(0)),
-            Value::Real(r) => PropertyValue::Real(*r),
-            Value::Boolean(b) => PropertyValue::Boolean(*b),
-            Value::Date(d) => PropertyValue::Date(format!("{:?}", d)),
-            Value::Array(arr) => {
-                PropertyValue::Array(arr.iter().map(Self::convert_plist_value).collect())
-            },
-            Value::Dictionary(dict) => PropertyValue::Dictionary(
-                dict.iter()
-                    .map(|(key, value)| (key.clone(), Self::convert_plist_value(value)))
-                    .collect(),
-            ),
-            Value::Data(_) => PropertyValue::String("<binary data>".to_string()),
-            _ => PropertyValue::String("<unknown>".to_string()),
+            Value::String(s) => Ok(PropertyValue::String(s.clone())),
+            Value::Integer(i) => i.as_signed().map(PropertyValue::Integer).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "{context} contains an unsigned integer outside the supported i64 range"
+                ))
+            }),
+            Value::Real(r) => Ok(PropertyValue::Real(*r)),
+            Value::Boolean(b) => Ok(PropertyValue::Boolean(*b)),
+            Value::Date(d) => Ok(PropertyValue::Date(format!("{d:?}"))),
+            Value::Array(arr) => arr
+                .iter()
+                .enumerate()
+                .map(|(index, value)| {
+                    Self::convert_plist_value(value, &format!("{context}[{index}]"))
+                })
+                .collect::<Result<Vec<_>>>()
+                .map(PropertyValue::Array),
+            Value::Dictionary(dict) => dict
+                .iter()
+                .map(|(key, value)| {
+                    let nested_context = format!("{context}.{key}");
+                    Ok((
+                        key.clone(),
+                        Self::convert_plist_value(value, &nested_context)?,
+                    ))
+                })
+                .collect::<Result<PropertyMap>>()
+                .map(PropertyValue::Dictionary),
+            Value::Data(_) => Err(Error::InvalidFormat(format!(
+                "{context} contains unsupported binary data"
+            ))),
+            Value::Uid(_) => Err(Error::InvalidFormat(format!(
+                "{context} contains an unsupported UID"
+            ))),
+            _ => Err(Error::InvalidFormat(format!(
+                "{context} contains an unsupported plist value"
+            ))),
         }
     }
 
-    /// Parse build versions from BuildVersionHistory.plist
-    fn parse_build_versions(value: &Value) -> Vec<String> {
-        let mut versions = Vec::new();
+    /// Parse build versions from BuildVersionHistory.plist.
+    fn parse_build_versions(value: &Value, label: &str) -> Result<Vec<String>> {
+        let Value::Array(arr) = value else {
+            return Err(Error::InvalidFormat(format!(
+                "{label} must contain an array at its root"
+            )));
+        };
 
-        if let Value::Array(arr) = value {
-            for item in arr {
-                if let Value::String(version) = item {
-                    versions.push(version.clone());
-                } else if let Value::Dictionary(dict) = item {
-                    // BuildVersionHistory might be an array of dictionaries with version info
-                    if let Some(Value::String(version)) = dict.get("Version") {
-                        versions.push(version.clone());
-                    } else if let Some(Value::String(build)) = dict.get("Build") {
-                        versions.push(build.clone());
+        arr.iter()
+            .enumerate()
+            .map(|(index, item)| match item {
+                Value::String(version) => Ok(version.clone()),
+                Value::Dictionary(dict) => {
+                    let version = dict
+                        .get("Version")
+                        .or_else(|| dict.get("Build"))
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "{label}[{index}] dictionary has neither Version nor Build"
+                            ))
+                        })?;
+                    match version {
+                        Value::String(version) => Ok(version.clone()),
+                        _ => Err(Error::InvalidFormat(format!(
+                            "{label}[{index}] Version/Build must be a string"
+                        ))),
                     }
-                }
-            }
-        }
-
-        versions
+                },
+                _ => Err(Error::InvalidFormat(format!(
+                    "{label}[{index}] must be a string or dictionary"
+                ))),
+            })
+            .collect()
     }
 
     /// Get a specific archive by name
@@ -1178,9 +1238,20 @@ fn ensure_regular_file(path: &Path, label: &str) -> Result<()> {
 }
 
 fn read_bounded_file(path: &Path, limits: BundleLimits, label: &str) -> Result<Vec<u8>> {
-    let size = fs::metadata(path)?.len();
-    limits.check_input_size(size, label)?;
-    fs::read(path).map_err(Error::Io)
+    let file = fs::File::open(path)?;
+    let declared_size = file.metadata()?.len();
+    limits.check_input_size(declared_size, label)?;
+
+    let max_read = limits
+        .max_input_bytes()
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat(format!("{label} size limit overflow")))?;
+    let mut bytes = Vec::new();
+    file.take(max_read).read_to_end(&mut bytes)?;
+    let actual_size = u64::try_from(bytes.len())
+        .map_err(|_| Error::InvalidFormat(format!("{label} size does not fit u64")))?;
+    limits.check_input_size(actual_size, label)?;
+    Ok(bytes)
 }
 
 fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
@@ -1397,6 +1468,148 @@ mod tests {
         fs::write(file.path(), &bytes)?;
         let error = Bundle::open_with_limits(file.path(), tight_input).unwrap_err();
         assert!(error.to_string().contains("iWork bundle is"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_preserves_valid_values() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+
+        let properties = plist::Dictionary::from_iter([
+            ("Application".to_owned(), Value::String("Pages".to_owned())),
+            ("Revision".to_owned(), Value::Integer(42_i64.into())),
+        ]);
+        write_test_plist(
+            &metadata_dir.join("Properties.plist"),
+            &Value::Dictionary(properties),
+        )?;
+
+        let history = Value::Array(vec![
+            Value::String("14.4.1".to_owned()),
+            Value::Dictionary(plist::Dictionary::from_iter([(
+                "Build".to_owned(),
+                Value::String("7029".to_owned()),
+            )])),
+        ]);
+        write_test_plist(&metadata_dir.join("BuildVersionHistory.plist"), &history)?;
+        fs::write(metadata_dir.join("DocumentIdentifier"), b"document-id\n")?;
+
+        let metadata = Bundle::parse_metadata(temp.path(), BundleLimits::default())?;
+        assert_eq!(metadata.detected_application(), Some("Pages"));
+        assert_eq!(metadata.get_property_int("Revision"), Some(42));
+        assert_eq!(metadata.build_version_history(), ["14.4.1", "7029"]);
+        assert_eq!(metadata.document_identifier(), Some("document-id"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_malformed_plist() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        fs::write(metadata_dir.join("Properties.plist"), b"not a plist")?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("malformed plist was accepted".to_owned()))?;
+        assert!(error.to_string().contains("Properties.plist"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_semantically_invalid_history() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        write_test_plist(
+            &metadata_dir.join("BuildVersionHistory.plist"),
+            &Value::Dictionary(plist::Dictionary::new()),
+        )?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("invalid history was accepted".to_owned()))?;
+        assert!(error.to_string().contains("BuildVersionHistory.plist"));
+        assert!(error.to_string().contains("array"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_invalid_document_identifier_utf8() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        fs::write(metadata_dir.join("DocumentIdentifier"), [0xff_u8, 0xfe])?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("invalid UTF-8 was accepted".to_owned()))?;
+        assert!(error.to_string().contains("DocumentIdentifier"));
+        assert!(error.to_string().contains("UTF-8"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_unsigned_integer_outside_property_range() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        let properties = plist::Dictionary::from_iter([(
+            "TooLarge".to_owned(),
+            Value::Integer(u64::MAX.into()),
+        )]);
+        write_test_plist(
+            &metadata_dir.join("Properties.plist"),
+            &Value::Dictionary(properties),
+        )?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("oversized integer was accepted".to_owned()))?;
+        assert!(error.to_string().contains("TooLarge"));
+        assert!(
+            error
+                .to_string()
+                .contains("outside the supported i64 range")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_bounds_each_metadata_file() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        fs::write(metadata_dir.join("DocumentIdentifier"), [b'x'; 32])?;
+        let limits = BundleLimits::new(
+            8,
+            BundleLimits::MAX_ENTRIES,
+            BundleLimits::MAX_ENTRY_BYTES,
+            BundleLimits::MAX_TOTAL_BYTES,
+            BundleLimits::MAX_IWA_STREAM_BYTES,
+        )?;
+
+        let result = Bundle::parse_metadata(temp.path(), limits);
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("oversized metadata was accepted".to_owned()))?;
+        assert!(error.to_string().contains("DocumentIdentifier"));
+        assert!(error.to_string().contains("8 byte limit"));
+        Ok(())
+    }
+
+    fn write_test_plist(path: &Path, value: &Value) -> crate::Result<()> {
+        let mut bytes = Vec::new();
+        value.to_writer_binary(&mut bytes).map_err(|error| {
+            Error::InvalidFormat(format!("failed to encode test plist: {error}"))
+        })?;
+        fs::write(path, bytes)?;
         Ok(())
     }
 
