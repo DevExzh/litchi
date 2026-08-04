@@ -18,6 +18,7 @@ pub struct Limits {
     max_object_bytes: usize,
     max_message_bytes: usize,
     max_header_bytes: usize,
+    max_metadata_items: usize,
 }
 
 impl Limits {
@@ -35,6 +36,8 @@ impl Limits {
     pub const MAX_MESSAGE_BYTES: usize = 512 * 1024 * 1024;
     /// Hard ceiling for one encoded `TSP.ArchiveInfo` header.
     pub const MAX_HEADER_BYTES: usize = 16 * 1024 * 1024;
+    /// Hard ceiling for repeated metadata items in one object header.
+    pub const MAX_METADATA_ITEMS: usize = 1_000_000;
 
     /// Tighten the aggregate archive-byte budget.
     ///
@@ -130,6 +133,17 @@ impl Limits {
         self.validate()
     }
 
+    /// Tighten the repeated metadata-item budget in one object header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero or exceeds the hard ceiling.
+    pub fn with_metadata_items(mut self, value: usize) -> Result<Self> {
+        check(LimitKind::MetadataItems, value, Self::MAX_METADATA_ITEMS)?;
+        self.max_metadata_items = value;
+        self.validate()
+    }
+
     #[must_use]
     pub const fn max_archive_bytes(self) -> usize {
         self.max_archive_bytes
@@ -165,6 +179,11 @@ impl Limits {
         self.max_header_bytes
     }
 
+    #[must_use]
+    pub const fn max_metadata_items(self) -> usize {
+        self.max_metadata_items
+    }
+
     /// Validate cross-field invariants and the format hard ceilings.
     ///
     /// # Errors
@@ -179,6 +198,7 @@ impl Limits {
             || self.max_object_bytes == 0
             || self.max_message_bytes == 0
             || self.max_header_bytes == 0
+            || self.max_metadata_items == 0
         {
             return Err(Error::invalid_limits("all IWA limits must be non-zero"));
         }
@@ -216,6 +236,7 @@ impl Default for Limits {
             max_object_bytes: Self::MAX_OBJECT_BYTES,
             max_message_bytes: Self::MAX_MESSAGE_BYTES,
             max_header_bytes: Self::MAX_HEADER_BYTES,
+            max_metadata_items: Self::MAX_METADATA_ITEMS,
         }
     }
 }

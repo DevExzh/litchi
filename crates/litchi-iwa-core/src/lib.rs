@@ -7,10 +7,12 @@
 
 #![forbid(unsafe_code)]
 
+pub mod archive;
 mod error;
 mod limits;
 mod snappy;
 
+pub use archive::{Archive, ArchiveInfo, ArchiveObject, MessageInfo, RawMessage};
 pub use error::{Error, LimitKind, Result};
 pub use limits::Limits;
 pub use snappy::{SnappyLimits, SnappyStream};

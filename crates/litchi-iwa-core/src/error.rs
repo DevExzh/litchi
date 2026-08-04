@@ -12,6 +12,7 @@ pub enum LimitKind {
     ObjectBytes,
     MessageBytes,
     HeaderBytes,
+    MetadataItems,
     SnappyChunkBytes,
     SnappyStreamBytes,
     SnappyCompressedChunkBytes,
@@ -29,6 +30,7 @@ impl fmt::Display for LimitKind {
             Self::ObjectBytes => "object bytes",
             Self::MessageBytes => "message bytes",
             Self::HeaderBytes => "header bytes",
+            Self::MetadataItems => "metadata items",
             Self::SnappyChunkBytes => "Snappy decompressed chunk bytes",
             Self::SnappyStreamBytes => "Snappy decompressed stream bytes",
             Self::SnappyCompressedChunkBytes => "Snappy compressed chunk bytes",
@@ -43,17 +45,12 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("invalid IWA archive at byte {offset}: {reason}")]
-    InvalidArchive {
-        offset: usize,
-        reason: &'static str,
-    },
+    InvalidArchive { offset: usize, reason: &'static str },
 
     #[error("invalid IWA limit configuration: {reason}")]
     InvalidLimits { reason: &'static str },
 
-    #[error(
-        "IWA {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
+    #[error("IWA {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     Limit {
         kind: LimitKind,
         observed: usize,
@@ -62,6 +59,9 @@ pub enum Error {
 
     #[error("invalid IWA protobuf header: {0}")]
     Protobuf(#[from] prost::DecodeError),
+
+    #[error("could not encode IWA protobuf header: {0}")]
+    ProtobufEncode(#[from] prost::EncodeError),
 
     #[error("invalid IWA Snappy stream: {message}")]
     Snappy { message: String },

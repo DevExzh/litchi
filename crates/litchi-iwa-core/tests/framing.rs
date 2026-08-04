@@ -1,4 +1,16 @@
-use litchi_iwa_core::{ArchiveLimits, Error, LimitKind, SnappyLimits, SnappyStream};
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Test fixtures intentionally generate byte patterns from bounded counters."
+)]
+#![allow(
+    clippy::shadow_unrelated,
+    reason = "Short-lived error assertions keep each malformed-input case independent."
+)]
+
+use litchi_iwa_core::{
+    Archive, ArchiveLimits, ArchiveObject, Error, LimitKind, RawMessage, SnappyLimits, SnappyStream,
+};
 
 #[test]
 fn round_trip_spans_multiple_frames() -> Result<(), Error> {
@@ -95,4 +107,141 @@ fn malformed_large_length_is_rejected_without_arithmetic_overflow() {
             ..
         })
     ));
+}
+
+#[test]
+fn archive_round_trip_preserves_order_and_payloads() -> Result<(), Error> {
+    let archive = Archive {
+        objects: vec![
+            ArchiveObject::new(
+                17,
+                vec![
+                    RawMessage {
+                        type_: 100,
+                        data: b"first".to_vec(),
+                    },
+                    RawMessage {
+                        type_: 200,
+                        data: (0..300).map(|value| value as u8).collect(),
+                    },
+                ],
+            )?,
+            ArchiveObject::new(
+                23,
+                vec![RawMessage {
+                    type_: 300,
+                    data: b"last".to_vec(),
+                }],
+            )?,
+        ],
+    };
+
+    let encoded = archive.to_bytes()?;
+    let parsed = Archive::parse(&encoded)?;
+    assert_eq!(parsed.to_bytes()?, encoded);
+    assert_eq!(parsed.objects[0].archive_info.identifier, Some(17));
+    assert_eq!(parsed.objects[1].primary_message_type(), Some(300));
+    assert_eq!(parsed.objects[0].messages[1].data.len(), 300);
+    Ok(())
+}
+
+#[test]
+fn archive_rejects_malformed_lengths_and_truncated_payloads() -> Result<(), Error> {
+    let error = Archive::parse(&[0x80]).err();
+    assert!(matches!(
+        error,
+        Some(Error::InvalidArchive {
+            reason: "truncated archive length varint",
+            ..
+        })
+    ));
+
+    let error = Archive::parse(&[0xff; 10]).err();
+    assert!(matches!(
+        error,
+        Some(Error::InvalidArchive {
+            reason: "archive length varint overflow",
+            ..
+        })
+    ));
+
+    let archive = Archive {
+        objects: vec![ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 9,
+                data: b"payload".to_vec(),
+            }],
+        )?],
+    };
+    let mut encoded = archive.to_bytes()?;
+    encoded.pop();
+    let error = Archive::parse(&encoded).err();
+    assert!(matches!(
+        error,
+        Some(Error::InvalidArchive {
+            reason: "truncated message payload",
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn archive_limits_bound_objects_messages_payloads_and_metadata() -> Result<(), Error> {
+    let archive = Archive {
+        objects: vec![ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 9,
+                data: b"payload".to_vec(),
+            }],
+        )?],
+    };
+    let encoded = archive.to_bytes()?;
+
+    let error = ArchiveLimits::default().with_objects(0).err();
+    assert!(matches!(error, Some(Error::InvalidLimits { .. })));
+
+    let error = Archive::parse_with_limits(
+        &encoded,
+        ArchiveLimits::default().with_messages_per_object(1)?,
+    )
+    .err();
+    assert!(error.is_none());
+
+    let error =
+        Archive::parse_with_limits(&encoded, ArchiveLimits::default().with_message_bytes(6)?).err();
+    assert!(matches!(
+        error,
+        Some(Error::Limit {
+            kind: LimitKind::MessageBytes,
+            ..
+        })
+    ));
+
+    let error =
+        Archive::parse_with_limits(&encoded, ArchiveLimits::default().with_metadata_items(3)?)
+            .err();
+    assert!(matches!(
+        error,
+        Some(Error::Limit {
+            kind: LimitKind::MetadataItems,
+            ..
+        })
+    ));
+
+    let error = Archive::parse_with_limits(
+        &encoded,
+        ArchiveLimits::default().with_object_bytes(encoded.len() - 1)?,
+    )
+    .err();
+    assert!(matches!(
+        error,
+        Some(Error::Limit {
+            kind: LimitKind::ObjectBytes,
+            ..
+        })
+    ));
+    Ok(())
 }
