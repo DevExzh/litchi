@@ -1,0 +1,17 @@
+[package]
+name = "litchi-odf-formula"
+description = "Standalone OpenDocument Formula model, codec, and package facade for Litchi."
+version = "0.0.1"
+edition = "2024"
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/DevExzh/litchi"
+rust-version = "1.89"
+
+[dependencies]
+litchi-core = { path = "../litchi-core" }
+litchi-odf-common = { path = "../litchi-odf-common" }
+quick-xml = "0.41"
+
+[lints]
+workspace = true
