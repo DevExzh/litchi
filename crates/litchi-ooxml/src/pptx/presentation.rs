@@ -767,7 +767,7 @@ impl<'a> Presentation<'a> {
     /// Returns None when the presentation does not contain legacy comments.
     /// Comment text and extension payloads remain inert document data.
     pub fn comments(&self) -> Result<Option<crate::pptx::PresentationComments>> {
-        crate::pptx::load_presentation_comments(self.package)
+        Ok(crate::pptx::load_presentation_comments(self.package)?)
     }
 
     /// Load the typed, validated modern comment graph.

@@ -11,6 +11,7 @@ rust-version.workspace = true
 [dependencies]
 bitflags = { workspace = true }
 caseless = { workspace = true }
+chrono = { workspace = true }
 litchi-drawingml = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
