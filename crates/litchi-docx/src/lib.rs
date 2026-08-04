@@ -9,8 +9,10 @@ mod error;
 
 pub mod alt;
 pub mod color;
+pub mod enums;
 pub mod font;
 pub mod glossary;
 pub mod web;
 
+pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use error::{Error, Result};
