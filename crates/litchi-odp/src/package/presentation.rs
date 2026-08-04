@@ -121,6 +121,16 @@ impl Presentation {
         Self::from_bytes(bytes)
     }
 
+    /// Borrow the validated `content.xml` snapshot without reparsing it.
+    pub fn content_xml(&self) -> &str {
+        self.package.content_xml()
+    }
+
+    /// Borrow the optional validated `styles.xml` snapshot without reparsing it.
+    pub fn styles_xml(&self) -> Option<&str> {
+        self.package.styles_xml()
+    }
+
     /// Get the number of slides in the presentation.
     pub fn slide_count(&self) -> Result<usize> {
         let slides = self.slides()?;
