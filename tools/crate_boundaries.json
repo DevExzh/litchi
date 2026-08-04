@@ -82,9 +82,14 @@
     ],
     "litchi-iwa": [
       "litchi-core",
+      "litchi-iwa-core",
       "litchi-iwa-graph",
       "litchi-iwa-protos",
       "soapberry-zip"
+    ],
+    "litchi-iwa-common": [],
+    "litchi-iwa-core": [
+      "litchi-iwa-protos"
     ],
     "litchi-iwa-graph": [],
     "litchi-iwa-protos": [],

@@ -4409,7 +4409,7 @@ targets; the owner suites report 254 DOCX unit tests plus three API targets,
 196 PPTX unit tests plus one API target, 395 XLSX unit tests plus examples,
 and 1,554 ODF tests across 85 harnesses. The no-default-features
 `litchi-ooxml` host suite also passes 1,499 unit tests and its integration and
-example targets. Formatting, staged diff checks, and the 35-package crate
+example targets. Formatting, staged diff checks, and the workspace crate
 boundary audit remain green.
 
 ## DOCX web settings, PPTX tags, XLSX timelines, and ODF graphic-property layering
@@ -4433,8 +4433,10 @@ The shared-logic audit reuses existing neutral MCE, XML escaping, GUID, and
 relationship helpers from `litchi-ooxml-common`, `litchi-opc`, and
 `litchi-core`. Web-settings, PresentationML tags, SpreadsheetML timelines,
 and ODF graphic-property vocabularies are not one grammar, so no speculative
-implementation was moved into a common crate. The workspace currently has no
-`litchi-iwa-common` crate; IWA-specific logic remains in `litchi-iwa`.
+document-model implementation was moved into a common crate. The workspace
+now also contains `litchi-iwa-common`, which owns only dependency-neutral,
+bounded IWA varint and wire primitives; concrete Pages, Numbers, and Keynote
+object-model logic remains in the format crates while the migration proceeds.
 
 Checked-in anchors are `[MS-OE376]` §§2.1.444--2.1.462 for Word frameset/web
 settings behavior and §2.1.1170 for PowerPoint programmable tags; `[MS-XLSX]`
@@ -4446,7 +4448,7 @@ claim beyond its existing parser and fixture coverage.
 Verification for this slice passes with `cargo check` and `cargo test` for
 the four affected crates, all features and targets, followed by the
 no-default-features `litchi-ooxml` host suite. Formatting, diff checks, and
-the 35-package crate-boundary audit also pass.
+the workspace crate-boundary audit also pass.
 
 ## OOXML common relationships, ODF common vocabulary, and owner migration
 
