@@ -35,6 +35,7 @@ Office round trips.
 | [0020](0020-pptx-table-style-ownership.md) | Typed PPTX table-style ownership |
 | [0021](0021-docx-glossary-ownership.md) | Typed DOCX glossary and building-block ownership |
 | [0022](0022-pptx-embedded-font-ownership.md) | Typed PPTX embedded-font ownership |
+| [0023](0023-odf-family-crate-split.md) | Dedicated ODF family crates and umbrella facade |
 
 ## Decision hierarchy
 

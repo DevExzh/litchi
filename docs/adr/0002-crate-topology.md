@@ -54,6 +54,13 @@ contextual module paths. ODF consumers use canonical names such as
 common archive-path or namespace logic and does not retain prefix-expanded
 compatibility aliases.
 
+ADR 0023 records the target ODF family split: independent `litchi-odt`,
+`litchi-ods`, `litchi-odp`, `litchi-odg`, `litchi-odc`, `litchi-odi`,
+`litchi-odm`, `litchi-oth`, and `litchi-odb` owners depend on
+`litchi-odf-common`, while `litchi-odf` becomes only detection and optional
+facade wiring. No family crate depends on the umbrella or on another concrete
+family crate.
+
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
 `plot_area`, `reader`, and `writer`; the public codec verbs are the short
