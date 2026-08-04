@@ -1627,7 +1627,8 @@ paths, so semantic and low-level edits use the same APIs as current documents.
 
 ## Build Requirements
 
-This crate compiles protobuf definitions via `prost-build`. The `protoc` compiler must be available on `PATH`:
+The companion `litchi-iwa-protos` crate compiles the raw protobuf definitions
+via `prost-build`; the `protoc` compiler must be available on `PATH`:
 
 - Debian / Ubuntu: `apt install protobuf-compiler`
 - macOS (Homebrew): `brew install protobuf`

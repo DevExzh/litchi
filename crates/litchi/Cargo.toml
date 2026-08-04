@@ -146,7 +146,7 @@ zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type convers
 zerocopy-derive = "0.8" # Derive macros for zerocopy traits
 
 [build-dependencies]
-# (none) — iwa proto compilation lives in `crates/litchi-iwa/build.rs`.
+# (none) — iwa proto compilation lives in `crates/litchi-iwa-protos/build.rs`.
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }

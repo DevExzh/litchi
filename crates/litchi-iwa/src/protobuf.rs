@@ -7,8 +7,13 @@ use crate::{Error, Result};
 use phf::phf_map;
 use prost::Message;
 
-// Include the generated protobuf definitions from build.rs
-include!(concat!(env!("OUT_DIR"), "/iwa_protos.rs"));
+// Keep the generated schema layer in its own crate. The explicit list makes
+// this compatibility boundary auditable and prevents decoder-only additions
+// from accidentally becoming part of the raw schema crate.
+pub use litchi_iwa_protos::{
+    kn, knsos, tn, tnsos, tp, tpsos, tsa, tsasos, tsce, tsch, tschsos, tsck, tscksos, tsd, tsdsos,
+    tsk, tsp, tss, tsssos, tst, tstsos, tswp, tswpsos,
+};
 
 /// Static decoder function for ArchiveInfo messages
 fn decode_archive_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
