@@ -40,7 +40,6 @@ use crate::protobuf::tst::{
     self, TableDataList, TableDataListSegment, TableModelArchive, Tile, TileRowInfo,
 };
 use crate::protobuf::{tn, tsce, tsd, tsp, tss, tswp};
-use crate::registry::{Application, detect_application_from_document};
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,

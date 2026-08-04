@@ -7,13 +7,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
+use crate::detect::detect_application_from_document;
 use crate::package_metadata::{
     add_component_external_reference, advance_package_save_token_for_components,
     component_identifier_for_entry, next_object_identifier, release_package_identifier_suffix,
     remove_component_external_references_to_object, set_package_last_object_identifier,
 };
 use crate::protobuf::{kn, tn, tp, tsch, tsd, tsk, tsp, tst, tswp};
-use crate::registry::{Application, detect_application_from_document};
+use crate::registry::Application;
 #[cfg(test)]
 use crate::wire::parse_wire_fields;
 use crate::wire::{

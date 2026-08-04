@@ -1,6 +1,8 @@
 //! Sheet, table, cell, formula, and comment model operations.
 
 use super::*;
+use crate::detect::detect_application_from_document;
+use crate::registry::Application;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;

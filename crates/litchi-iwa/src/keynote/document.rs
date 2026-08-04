@@ -8,8 +8,9 @@ use std::sync::Arc;
 use super::show::KeynoteShow;
 use super::slide::KeynoteSlide;
 use crate::bundle::{Bundle, BundleLimits};
+use crate::detect::detect_application_from_document;
 use crate::object_index::ObjectIndex;
-use crate::registry::{Application, detect_application_from_document};
+use crate::registry::Application;
 use crate::text::TextExtractor;
 use crate::{Error, Result};
 
