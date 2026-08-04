@@ -51,10 +51,8 @@ pub use error::{Error, Result};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 pub use media_parts::{
-    MediaBookmark, MediaData, MediaExtensionList, MediaFade, MediaResource, MediaTrim,
-    OfficeMediaExtension, SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
-    SlideMediaPoster, SlideMediaTransform, load_slide_media, parse_slide_media, store_slide_media,
-    write_slide_media_pictures,
+    Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
+    load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
 pub use presentation_properties::{

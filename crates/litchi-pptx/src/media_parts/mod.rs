@@ -1,9 +1,8 @@
 //! Semantic layered owner for PresentationML slide media.
 //!
 //! The model, bounded XML codec, and OPC package graph are kept in separate
-//! layers. The historical module path and names remain available through
-//! compatibility aliases while the canonical declarations use this module's
-//! context.
+//! layers. The canonical declarations use this module's context so callers
+//! can compose the model without redundant format prefixes.
 
 mod codec;
 mod model;
@@ -19,21 +18,6 @@ pub use model::{
     Resource, Transform, Trim,
 };
 pub use package::{load, load as load_slide_media, store, store as store_slide_media};
-
-// Historical names remain aliases, so each value has one canonical declaration.
-pub type SlideMediaConformance = Conformance;
-pub type SlideMediaKind = Kind;
-pub type MediaData = Data;
-pub type MediaResource = Resource;
-pub type SlideMediaPoster = Poster;
-pub type SlideMediaTransform = Transform;
-pub type SlideMediaPicture = Picture;
-pub type SlideMediaList = List;
-pub type MediaTrim = Trim;
-pub type MediaFade = Fade;
-pub type MediaBookmark = Bookmark;
-pub type MediaExtensionList = ExtensionList;
-pub type OfficeMediaExtension = Extension;
 
 // These are crate-private seams shared by the XML and package layers and by
 // the in-module regression tests; they do not expand the external API.
