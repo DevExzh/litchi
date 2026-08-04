@@ -3,7 +3,7 @@
 //! Connection payloads remain inert. This module only validates and mutates
 //! the one relationship graph permitted by MS-XLSB 2.1.7.24.
 
-use super::{XlsbConnections, parse_connections_part};
+use super::{Connections, parse_connections_part};
 use crate::xlsb::connections::write::write_connections_part;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use litchi_opc::constants::content_type;
@@ -30,7 +30,7 @@ fn invalid(detail: impl Into<String>) -> XlsbError {
 pub(crate) fn load_from_workbook(
     package: &OpcPackage,
     workbook_uri: &PackURI,
-) -> XlsbResult<Option<XlsbConnections>> {
+) -> XlsbResult<Option<Connections>> {
     let Some(graph) = discover_graph(package, workbook_uri)? else {
         return Ok(None);
     };
@@ -42,8 +42,8 @@ pub(crate) fn load_from_workbook(
 pub(crate) fn store_on_workbook(
     package: &mut OpcPackage,
     workbook_uri: &PackURI,
-    connections: &XlsbConnections,
-) -> XlsbResult<XlsbConnections> {
+    connections: &Connections,
+) -> XlsbResult<Connections> {
     let payload = write_connections_part(connections)?;
     // Treat the reader as a post-serialization grammar oracle before mutation.
     let canonical_model = parse_connections_part(&payload)?;
@@ -207,8 +207,7 @@ mod tests {
     use super::*;
     use crate::xlsb::XlsbWorkbook;
     use crate::xlsb::connections::{
-        XlsbCommandType, XlsbConnection, XlsbConnectionProperties, XlsbConnectionSourceType,
-        XlsbCredentialMethod, XlsbDbProperties,
+        CommandType, Connection, CredentialMethod, DbProperties, Properties, SourceType,
     };
     use crate::xlsb::merged_cells::MergedCell;
     use crate::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
@@ -222,21 +221,21 @@ mod tests {
         XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap()
     }
 
-    fn connections(id: u32, name: &str) -> XlsbConnections {
-        XlsbConnections {
-            connections: vec![XlsbConnection {
+    fn connections(id: u32, name: &str) -> Connections {
+        Connections {
+            connections: vec![Connection {
                 connection_id: id,
-                source_type: XlsbConnectionSourceType::Odbc,
+                source_type: SourceType::Odbc,
                 name: name.to_string(),
                 refresh_interval_minutes: 15,
-                credential_method: Some(XlsbCredentialMethod::Integrated),
-                properties: XlsbConnectionProperties::Database(XlsbDbProperties {
-                    command_type: XlsbCommandType::Sql,
+                credential_method: Some(CredentialMethod::Integrated),
+                properties: Properties::Database(DbProperties {
+                    command_type: CommandType::Sql,
                     connection_string: "Driver={Generated};Server=example.invalid".to_string(),
                     command: Some("SELECT 1".to_string()),
                     server_command: None,
                 }),
-                ..XlsbConnection::default()
+                ..Connection::default()
             }],
         }
     }

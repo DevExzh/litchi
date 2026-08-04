@@ -61,7 +61,7 @@ pub struct XlsbWorkbook {
     structured_tables: Vec<(usize, crate::xlsb::table::XlsbTable)>,
     chart_sheets: Vec<(usize, crate::xlsb::chartsheet::XlsbChartSheet)>,
     sheet_drawings: Vec<crate::xlsb::drawing::SheetDrawing>,
-    connections: Option<crate::xlsb::connections::XlsbConnections>,
+    connections: Option<crate::xlsb::connections::Connections>,
 }
 
 /// Chart sheet relationship types documented by MS-XLSB 2.1.7.7.
@@ -420,7 +420,7 @@ impl XlsbWorkbook {
     /// These are inert data snapshots: connection strings, commands, URLs,
     /// file paths, and credential metadata are stored verbatim and are never
     /// resolved, contacted, refreshed, or executed.
-    pub fn connections(&self) -> Option<&crate::xlsb::connections::XlsbConnections> {
+    pub fn connections(&self) -> Option<&crate::xlsb::connections::Connections> {
         self.connections.as_ref()
     }
 
@@ -430,7 +430,7 @@ impl XlsbWorkbook {
     /// URLs, paths, and credential metadata are never resolved or executed.
     pub fn set_connections(
         &mut self,
-        connections: crate::xlsb::connections::XlsbConnections,
+        connections: crate::xlsb::connections::Connections,
     ) -> XlsbResult<()> {
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let canonical = crate::xlsb::connections::package::store_on_workbook(

@@ -91,7 +91,7 @@ fn validate_string(value: &str, context: &str, max_utf16_units: usize) -> XlsbRe
 }
 
 /// Validate model invariants shared by parsed-package and new-workbook authors.
-pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<()> {
+pub(crate) fn validate_connections(connections: &Connections) -> XlsbResult<()> {
     if connections.connections.len() > MAX_CONNECTIONS {
         return Err(malformed(
             "ExternalDataConnections",
@@ -143,7 +143,7 @@ pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<
             ));
         }
         match &connection.properties {
-            XlsbConnectionProperties::Database(properties) => {
+            Properties::Database(properties) => {
                 validate_string(
                     &properties.connection_string,
                     "database connection string",
@@ -161,7 +161,7 @@ pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<
                     }
                 }
             },
-            XlsbConnectionProperties::Olap(properties) => {
+            Properties::Olap(properties) => {
                 if let Some(value) = &properties.local_connection_string {
                     validate_string(
                         value,
@@ -170,7 +170,7 @@ pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<
                     )?;
                 }
             },
-            XlsbConnectionProperties::Web(properties) => {
+            Properties::Web(properties) => {
                 for (context, value) in [
                     ("Web connection URL", properties.url.as_deref()),
                     ("Web POST body", properties.web_post.as_deref()),
@@ -181,7 +181,7 @@ pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<
                     }
                 }
             },
-            XlsbConnectionProperties::None => {},
+            Properties::None => {},
         }
         if connection.parameters.len() > MAX_PARAMETERS {
             return Err(malformed(
@@ -203,10 +203,10 @@ pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<
                 )?;
             }
             match &parameter.value {
-                Some(XlsbParameterValue::Text(value)) => {
+                Some(ParameterValue::Text(value)) => {
                     validate_string(value, "connection parameter value", MAX_STRING_UTF16_UNITS)?
                 },
-                Some(XlsbParameterValue::CellFormula(tokens))
+                Some(ParameterValue::CellFormula(tokens))
                     if tokens.len() > MAX_FORMULA_TOKEN_BYTES =>
                 {
                     return Err(malformed(
@@ -224,7 +224,7 @@ pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<
             ));
         }
         for item in &connection.web_tables {
-            if let XlsbWebTableItem::Named(name) = item {
+            if let WebTableItem::Named(name) = item {
                 validate_string(name, "Web table name", MAX_STRING_UTF16_UNITS)?;
             }
         }
@@ -240,13 +240,13 @@ fn write_wide_string(data: &mut Vec<u8>, value: &str) {
 }
 
 /// `BrtBeginExtConnection` payload (MS-XLSB 2.4.80).
-fn ext_connection_payload(connection: &XlsbConnection) -> Vec<u8> {
+fn ext_connection_payload(connection: &Connection) -> Vec<u8> {
     let mut data = Vec::with_capacity(64);
     data.push(connection.refreshed_version);
     data.push(connection.refreshable_min_version);
     data.push(match connection.password_state {
-        Some(XlsbPasswordState::Saved) => 1,
-        Some(XlsbPasswordState::NotSaved) => 2,
+        Some(PasswordState::Saved) => 1,
+        Some(PasswordState::NotSaved) => 2,
         None => 0,
     });
     data.push(0); // reserved1
@@ -291,18 +291,18 @@ fn ext_connection_payload(connection: &XlsbConnection) -> Vec<u8> {
     data.extend_from_slice(&(connection.source_type as u32).to_le_bytes());
     data.extend_from_slice(
         &match connection.reconnection_type {
-            Some(XlsbReconnectionType::AsRequired) => 1u32,
-            Some(XlsbReconnectionType::Always) => 2,
-            Some(XlsbReconnectionType::Never) => 3,
+            Some(ReconnectionType::AsRequired) => 1u32,
+            Some(ReconnectionType::Always) => 2,
+            Some(ReconnectionType::Never) => 3,
             None => 0,
         }
         .to_le_bytes(),
     );
     data.extend_from_slice(&connection.connection_id.to_le_bytes());
     data.push(match connection.credential_method {
-        Some(XlsbCredentialMethod::Integrated) | None => 0,
-        Some(XlsbCredentialMethod::None) => 1,
-        Some(XlsbCredentialMethod::SingleSignOn) => 2,
+        Some(CredentialMethod::Integrated) | None => 0,
+        Some(CredentialMethod::None) => 1,
+        Some(CredentialMethod::SingleSignOn) => 2,
     });
     if let Some(data_file) = &connection.data_file {
         write_wide_string(&mut data, data_file);
@@ -321,7 +321,7 @@ fn ext_connection_payload(connection: &XlsbConnection) -> Vec<u8> {
 }
 
 /// `BrtBeginECDbProps` payload (MS-XLSB 2.4.61).
-fn db_props_payload(props: &XlsbDbProperties) -> Vec<u8> {
+fn db_props_payload(props: &DbProperties) -> Vec<u8> {
     let mut data = Vec::with_capacity(32);
     data.extend_from_slice(&(props.command_type as u32).to_le_bytes());
     let mut flags = 0u8;
@@ -343,7 +343,7 @@ fn db_props_payload(props: &XlsbDbProperties) -> Vec<u8> {
 }
 
 /// `BrtBeginECOlapProps` payload (MS-XLSB 2.4.62).
-fn olap_props_payload(props: &XlsbOlapProperties) -> Vec<u8> {
+fn olap_props_payload(props: &OlapProperties) -> Vec<u8> {
     let mut flags = 0u8;
     if props.local_connection {
         flags |= OLAP_LOCAL_CONNECTION;
@@ -381,7 +381,7 @@ fn olap_props_payload(props: &XlsbOlapProperties) -> Vec<u8> {
 }
 
 /// `BrtBeginECWebProps` payload (MS-XLSB 2.4.71).
-fn web_props_payload(props: &XlsbWebProperties) -> Vec<u8> {
+fn web_props_payload(props: &WebProperties) -> Vec<u8> {
     let mut flags = 0u8;
     if props.source_is_xml {
         flags |= WEB_SOURCE_IS_XML;
@@ -422,10 +422,10 @@ fn web_props_payload(props: &XlsbWebProperties) -> Vec<u8> {
     }
     let mut data = Vec::with_capacity(16);
     data.push(match props.html_format {
-        XlsbHtmlFormat::None => 0,
-        XlsbHtmlFormat::RichText => 1,
-        XlsbHtmlFormat::All => 2,
-        XlsbHtmlFormat::Other(value) => value,
+        HtmlFormat::None => 0,
+        HtmlFormat::RichText => 1,
+        HtmlFormat::All => 2,
+        HtmlFormat::Other(value) => value,
     });
     data.push(flags);
     data.extend_from_slice(&load_flags.to_le_bytes());
@@ -442,16 +442,16 @@ fn web_props_payload(props: &XlsbWebProperties) -> Vec<u8> {
 }
 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
-fn param_payload(parameter: &XlsbConnectionParameter) -> XlsbResult<Vec<u8>> {
+fn param_payload(parameter: &Parameter) -> XlsbResult<Vec<u8>> {
     const CONTEXT: &str = "BrtBeginECParam";
     let (pbt, data_type) = match parameter.parameter_type {
-        XlsbParameterType::Prompt => (PBT_PROMPT, None),
-        XlsbParameterType::Value => {
+        ParameterType::Prompt => (PBT_PROMPT, None),
+        ParameterType::Value => {
             let data_type = match &parameter.value {
-                Some(XlsbParameterValue::Number(_)) => PARAM_DATA_DOUBLE,
-                Some(XlsbParameterValue::Text(_)) => PARAM_DATA_STRING,
-                Some(XlsbParameterValue::Boolean(_)) => PARAM_DATA_BOOLEAN,
-                Some(XlsbParameterValue::CellFormula(_)) => {
+                Some(ParameterValue::Number(_)) => PARAM_DATA_DOUBLE,
+                Some(ParameterValue::Text(_)) => PARAM_DATA_STRING,
+                Some(ParameterValue::Boolean(_)) => PARAM_DATA_BOOLEAN,
+                Some(ParameterValue::CellFormula(_)) => {
                     return Err(malformed(
                         CONTEXT,
                         "cell formula value requires the cell-reference parameter type",
@@ -463,8 +463,8 @@ fn param_payload(parameter: &XlsbConnectionParameter) -> XlsbResult<Vec<u8>> {
             };
             (PBT_VALUE, Some(data_type))
         },
-        XlsbParameterType::CellReference => (PBT_CELL_REFERENCE, Some(0)),
-        XlsbParameterType::Other(value) => (u16::from(value), None),
+        ParameterType::CellReference => (PBT_CELL_REFERENCE, Some(0)),
+        ParameterType::Other(value) => (u16::from(value), None),
     };
     let mut flags = pbt;
     if parameter.auto_refresh {
@@ -479,19 +479,19 @@ fn param_payload(parameter: &XlsbConnectionParameter) -> XlsbResult<Vec<u8>> {
     write_wide_string(&mut data, &parameter.name);
     write_wide_string(&mut data, parameter.prompt.as_deref().unwrap_or(""));
     match &parameter.value {
-        Some(XlsbParameterValue::Number(value)) => data.extend_from_slice(&value.to_le_bytes()),
-        Some(XlsbParameterValue::Text(value)) => write_wide_string(&mut data, value),
-        Some(XlsbParameterValue::Boolean(value)) => {
+        Some(ParameterValue::Number(value)) => data.extend_from_slice(&value.to_le_bytes()),
+        Some(ParameterValue::Text(value)) => write_wide_string(&mut data, value),
+        Some(ParameterValue::Boolean(value)) => {
             data.extend_from_slice(&u32::from(*value).to_le_bytes());
         },
-        Some(XlsbParameterValue::CellFormula(tokens)) => data.extend_from_slice(tokens),
+        Some(ParameterValue::CellFormula(tokens)) => data.extend_from_slice(tokens),
         None => {},
     }
     Ok(data)
 }
 
 /// Serialize the complete External Data Connections part.
-pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResult<Vec<u8>> {
+pub(crate) fn write_connections_part(connections: &Connections) -> XlsbResult<Vec<u8>> {
     validate_connections(connections)?;
     let mut data = Vec::with_capacity(512);
     let mut writer = Writer::new(&mut data);
@@ -508,19 +508,19 @@ pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResul
             &ext_connection_payload(connection),
         )?;
         match &connection.properties {
-            XlsbConnectionProperties::Database(props) => {
+            Properties::Database(props) => {
                 writer.write_record(rt::BEGIN_EC_DB_PROPS, &db_props_payload(props))?;
                 writer.write_record(rt::END_EC_DB_PROPS, &[])?;
             },
-            XlsbConnectionProperties::Olap(props) => {
+            Properties::Olap(props) => {
                 writer.write_record(rt::BEGIN_EC_OLAP_PROPS, &olap_props_payload(props))?;
                 writer.write_record(rt::END_EC_OLAP_PROPS, &[])?;
             },
-            XlsbConnectionProperties::Web(props) => {
+            Properties::Web(props) => {
                 writer.write_record(rt::BEGIN_EC_WEB_PROPS, &web_props_payload(props))?;
                 writer.write_record(rt::END_EC_WEB_PROPS, &[])?;
             },
-            XlsbConnectionProperties::None => {},
+            Properties::None => {},
         }
         if !connection.parameters.is_empty() {
             writer.write_record(rt::BEGIN_EC_PARAMS, &[])?;
@@ -534,13 +534,13 @@ pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResul
             writer.write_record(rt::BEGIN_EC_WP_TABLES, &[])?;
             for item in &connection.web_tables {
                 match item {
-                    XlsbWebTableItem::Missing => writer.write_record(rt::PCDI_MISSING, &[])?,
-                    XlsbWebTableItem::Named(name) => {
+                    WebTableItem::Missing => writer.write_record(rt::PCDI_MISSING, &[])?,
+                    WebTableItem::Named(name) => {
                         let mut payload = Vec::new();
                         write_wide_string(&mut payload, name);
                         writer.write_record(rt::PCDI_STRING, &payload)?;
                     },
-                    XlsbWebTableItem::Index(index) => {
+                    WebTableItem::Index(index) => {
                         writer.write_record(rt::PCDI_INDEX, &index.to_le_bytes())?;
                     },
                 }
@@ -564,12 +564,12 @@ mod tests {
     use super::*;
     use crate::xlsb::connections::parse_connections_part;
 
-    fn sample_connections() -> XlsbConnections {
-        XlsbConnections {
+    fn sample_connections() -> Connections {
+        Connections {
             connections: vec![
-                XlsbConnection {
+                Connection {
                     connection_id: 42,
-                    source_type: XlsbConnectionSourceType::Odbc,
+                    source_type: SourceType::Odbc,
                     name: "Warehouse".to_string(),
                     description: Some("Main warehouse".to_string()),
                     refreshed_version: 7,
@@ -578,26 +578,26 @@ mod tests {
                     maintain: true,
                     background_query: true,
                     save_data: true,
-                    reconnection_type: Some(XlsbReconnectionType::Never),
-                    credential_method: Some(XlsbCredentialMethod::Integrated),
-                    password_state: Some(XlsbPasswordState::NotSaved),
-                    properties: XlsbConnectionProperties::Database(XlsbDbProperties {
-                        command_type: XlsbCommandType::Sql,
+                    reconnection_type: Some(ReconnectionType::Never),
+                    credential_method: Some(CredentialMethod::Integrated),
+                    password_state: Some(PasswordState::NotSaved),
+                    properties: Properties::Database(DbProperties {
+                        command_type: CommandType::Sql,
                         connection_string: "Driver={SQL Server};Server=db".to_string(),
                         command: Some("SELECT * FROM T".to_string()),
                         server_command: None,
                     }),
                     parameters: vec![
-                        XlsbConnectionParameter {
-                            parameter_type: XlsbParameterType::Value,
+                        Parameter {
+                            parameter_type: ParameterType::Value,
                             auto_refresh: true,
                             sql_type: 4,
                             name: "threshold".to_string(),
                             prompt: Some("Enter value".to_string()),
-                            value: Some(XlsbParameterValue::Number(42.5)),
+                            value: Some(ParameterValue::Number(42.5)),
                         },
-                        XlsbConnectionParameter {
-                            parameter_type: XlsbParameterType::Prompt,
+                        Parameter {
+                            parameter_type: ParameterType::Prompt,
                             auto_refresh: false,
                             sql_type: 0,
                             name: "ask".to_string(),
@@ -606,33 +606,33 @@ mod tests {
                         },
                     ],
                     web_tables: Vec::new(),
-                    ..XlsbConnection::default()
+                    ..Connection::default()
                 },
-                XlsbConnection {
+                Connection {
                     connection_id: 9,
-                    source_type: XlsbConnectionSourceType::Web,
+                    source_type: SourceType::Web,
                     name: "Web Query".to_string(),
-                    properties: XlsbConnectionProperties::Web(XlsbWebProperties {
-                        html_format: XlsbHtmlFormat::All,
+                    properties: Properties::Web(WebProperties {
+                        html_format: HtmlFormat::All,
                         source_is_xml: true,
                         consecutive_delimiters: true,
                         url: Some("https://example.test/q".to_string()),
-                        ..XlsbWebProperties::default()
+                        ..WebProperties::default()
                     }),
                     web_tables: vec![
-                        XlsbWebTableItem::Missing,
-                        XlsbWebTableItem::Named("results".to_string()),
-                        XlsbWebTableItem::Index(3),
+                        WebTableItem::Missing,
+                        WebTableItem::Named("results".to_string()),
+                        WebTableItem::Index(3),
                     ],
-                    ..XlsbConnection::default()
+                    ..Connection::default()
                 },
-                XlsbConnection {
+                Connection {
                     connection_id: 7,
-                    source_type: XlsbConnectionSourceType::OleDb,
+                    source_type: SourceType::OleDb,
                     name: "Cube".to_string(),
-                    credential_method: Some(XlsbCredentialMethod::SingleSignOn),
+                    credential_method: Some(CredentialMethod::SingleSignOn),
                     sso_id: Some("sso-app".to_string()),
-                    properties: XlsbConnectionProperties::Olap(XlsbOlapProperties {
+                    properties: Properties::Olap(OlapProperties {
                         local_connection: true,
                         server_format_back: true,
                         server_format_fore: true,
@@ -640,9 +640,9 @@ mod tests {
                         local_connection_string: Some(
                             "Provider=MSOLAP;Data Source=local.cub".to_string(),
                         ),
-                        ..XlsbOlapProperties::default()
+                        ..OlapProperties::default()
                     }),
-                    ..XlsbConnection::default()
+                    ..Connection::default()
                 },
             ],
         }
@@ -659,22 +659,22 @@ mod tests {
 
     #[test]
     fn rejects_unnamed_and_mistyped_parameters() {
-        let mut connections = XlsbConnections::default();
-        connections.connections.push(XlsbConnection::default());
+        let mut connections = Connections::default();
+        connections.connections.push(Connection::default());
         assert!(write_connections_part(&connections).is_err());
 
-        let mut connections = XlsbConnections::default();
-        connections.connections.push(XlsbConnection {
+        let mut connections = Connections::default();
+        connections.connections.push(Connection {
             name: "x".to_string(),
-            parameters: vec![XlsbConnectionParameter {
-                parameter_type: XlsbParameterType::Value,
+            parameters: vec![Parameter {
+                parameter_type: ParameterType::Value,
                 auto_refresh: false,
                 sql_type: 0,
                 name: "p".to_string(),
                 prompt: None,
                 value: None,
             }],
-            ..XlsbConnection::default()
+            ..Connection::default()
         });
         assert!(write_connections_part(&connections).is_err());
     }

@@ -77,13 +77,13 @@ const PARAM_DATA_STRING: u32 = 2;
 const PARAM_DATA_BOOLEAN: u32 = 4;
 
 /// Parse the complete External Data Connections part.
-pub fn parse_connections_part(data: &[u8]) -> XlsbResult<XlsbConnections> {
+pub fn parse_connections_part(data: &[u8]) -> XlsbResult<Connections> {
     const CONTEXT: &str = "ExternalDataConnections";
     let mut walker = RecordWalker::new(data);
     let begin = walker.required_begin(rt::BEGIN_EXT_CONNECTIONS, CONTEXT)?;
     Cursor::new(begin.payload(), "BrtBeginExtConnections").finish()?;
 
-    let mut connections = XlsbConnections::default();
+    let mut connections = Connections::default();
     loop {
         let Some(record) = walker.next()? else {
             return Err(XlsbError::UnexpectedEndOfStream(CONTEXT.to_string()));
@@ -108,25 +108,22 @@ pub fn parse_connections_part(data: &[u8]) -> XlsbResult<XlsbConnections> {
 }
 
 /// Parse one `BrtBeginExtConnection` collection through its end record.
-fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<XlsbConnection> {
+fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
     let mut connection = parse_ext_connection(data)?;
     loop {
         let record = walker.required(CONTEXT)?;
         match record.kind() {
             rt::BEGIN_EC_DB_PROPS => {
-                connection.properties =
-                    XlsbConnectionProperties::Database(parse_db_props(record.payload())?);
+                connection.properties = Properties::Database(parse_db_props(record.payload())?);
                 walker.expect_end(rt::END_EC_DB_PROPS, "BrtBeginECDbProps")?;
             },
             rt::BEGIN_EC_OLAP_PROPS => {
-                connection.properties =
-                    XlsbConnectionProperties::Olap(parse_olap_props(record.payload())?);
+                connection.properties = Properties::Olap(parse_olap_props(record.payload())?);
                 walker.expect_end(rt::END_EC_OLAP_PROPS, "BrtBeginECOlapProps")?;
             },
             rt::BEGIN_EC_WEB_PROPS => {
-                connection.properties =
-                    XlsbConnectionProperties::Web(parse_web_props(record.payload())?);
+                connection.properties = Properties::Web(parse_web_props(record.payload())?);
                 walker.expect_end(rt::END_EC_WEB_PROPS, "BrtBeginECWebProps")?;
             },
             rt::BEGIN_EC_PARAMS => {
@@ -142,7 +139,7 @@ fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Xl
 }
 
 /// `BrtBeginExtConnection` payload (MS-XLSB 2.4.80).
-fn parse_ext_connection(data: &[u8]) -> XlsbResult<XlsbConnection> {
+fn parse_ext_connection(data: &[u8]) -> XlsbResult<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
     let mut cursor = Cursor::new(data, CONTEXT);
     let refreshed_version = cursor.read_u8()?;
@@ -152,29 +149,26 @@ fn parse_ext_connection(data: &[u8]) -> XlsbResult<XlsbConnection> {
     let refresh_interval_minutes = cursor.read_u16()?;
     let flags1 = cursor.read_u16()?;
     let flags2 = cursor.read_u16()?;
-    let source_type = XlsbConnectionSourceType::try_from(cursor.read_u32()?)?;
+    let source_type = SourceType::try_from(cursor.read_u32()?)?;
     let reconnection_type = match cursor.read_u32()? {
-        1 => Some(XlsbReconnectionType::AsRequired),
-        2 => Some(XlsbReconnectionType::Always),
-        3 => Some(XlsbReconnectionType::Never),
+        1 => Some(ReconnectionType::AsRequired),
+        2 => Some(ReconnectionType::Always),
+        3 => Some(ReconnectionType::Never),
         _ => None, // ignored when fAlwaysUseConnectionFile is set
     };
     let connection_id = cursor.read_u32()?;
     // `iCredMethod` and `pc` MUST be ignored when the source is not OLE DB or
     // ODBC (MS-XLSB 2.4.80), so only surface them for database sources.
-    let database_source = matches!(
-        source_type,
-        XlsbConnectionSourceType::OleDb | XlsbConnectionSourceType::Odbc
-    );
+    let database_source = matches!(source_type, SourceType::OleDb | SourceType::Odbc);
     let credential_method = match cursor.read_u8()? {
-        0 if database_source => Some(XlsbCredentialMethod::Integrated),
-        1 if database_source => Some(XlsbCredentialMethod::None),
-        2 if database_source => Some(XlsbCredentialMethod::SingleSignOn),
+        0 if database_source => Some(CredentialMethod::Integrated),
+        1 if database_source => Some(CredentialMethod::None),
+        2 if database_source => Some(CredentialMethod::SingleSignOn),
         _ => None,
     };
     let password_state = match pc {
-        1 if database_source => Some(XlsbPasswordState::Saved),
-        2 if database_source => Some(XlsbPasswordState::NotSaved),
+        1 if database_source => Some(PasswordState::Saved),
+        2 if database_source => Some(PasswordState::NotSaved),
         _ => None,
     };
     let data_file = if flags2 & CONN_LOAD_DATA_FILE != 0 {
@@ -199,7 +193,7 @@ fn parse_ext_connection(data: &[u8]) -> XlsbResult<XlsbConnection> {
         None
     };
     cursor.finish()?;
-    Ok(XlsbConnection {
+    Ok(Connection {
         connection_id,
         source_type,
         name,
@@ -220,16 +214,16 @@ fn parse_ext_connection(data: &[u8]) -> XlsbResult<XlsbConnection> {
         refresh_on_load: flags1 & CONN_REFRESH_ON_LOAD != 0,
         save_data: flags1 & CONN_SAVE_DATA != 0,
         reconnection_type,
-        properties: XlsbConnectionProperties::None,
+        properties: Properties::None,
         parameters: Vec::new(),
         web_tables: Vec::new(),
     })
 }
 
 /// `BrtBeginECDbProps` payload (MS-XLSB 2.4.61).
-fn parse_db_props(data: &[u8]) -> XlsbResult<XlsbDbProperties> {
+fn parse_db_props(data: &[u8]) -> XlsbResult<DbProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECDbProps");
-    let command_type = XlsbCommandType::try_from(cursor.read_u32()?)?;
+    let command_type = CommandType::try_from(cursor.read_u32()?)?;
     let flags = cursor.read_u8()?;
     let connection_string = cursor.read_wide_string()?;
     let command = if flags & DB_LOAD_COMMAND != 0 {
@@ -243,7 +237,7 @@ fn parse_db_props(data: &[u8]) -> XlsbResult<XlsbDbProperties> {
         None
     };
     cursor.finish()?;
-    Ok(XlsbDbProperties {
+    Ok(DbProperties {
         command_type,
         connection_string,
         command,
@@ -252,7 +246,7 @@ fn parse_db_props(data: &[u8]) -> XlsbResult<XlsbDbProperties> {
 }
 
 /// `BrtBeginECOlapProps` payload (MS-XLSB 2.4.62).
-fn parse_olap_props(data: &[u8]) -> XlsbResult<XlsbOlapProperties> {
+fn parse_olap_props(data: &[u8]) -> XlsbResult<OlapProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECOlapProps");
     let flags = cursor.read_u8()?;
     let drillthrough_rows = cursor.read_u32()?;
@@ -263,7 +257,7 @@ fn parse_olap_props(data: &[u8]) -> XlsbResult<XlsbOlapProperties> {
         None
     };
     cursor.finish()?;
-    Ok(XlsbOlapProperties {
+    Ok(OlapProperties {
         local_connection: flags & OLAP_LOCAL_CONNECTION != 0,
         no_refresh_cube: flags & OLAP_NO_REFRESH_CUBE != 0,
         server_format_back: flags & OLAP_SERVER_FORMAT_BACK != 0,
@@ -277,13 +271,13 @@ fn parse_olap_props(data: &[u8]) -> XlsbResult<XlsbOlapProperties> {
 }
 
 /// `BrtBeginECWebProps` payload (MS-XLSB 2.4.71).
-fn parse_web_props(data: &[u8]) -> XlsbResult<XlsbWebProperties> {
+fn parse_web_props(data: &[u8]) -> XlsbResult<WebProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECWebProps");
     let html_format = match cursor.read_u8()? {
-        0 => XlsbHtmlFormat::None,
-        1 => XlsbHtmlFormat::RichText,
-        2 => XlsbHtmlFormat::All,
-        other => XlsbHtmlFormat::Other(other),
+        0 => HtmlFormat::None,
+        1 => HtmlFormat::RichText,
+        2 => HtmlFormat::All,
+        other => HtmlFormat::Other(other),
     };
     let flags = cursor.read_u8()?;
     let load_flags = cursor.read_u16()?;
@@ -303,7 +297,7 @@ fn parse_web_props(data: &[u8]) -> XlsbResult<XlsbWebProperties> {
         None
     };
     cursor.finish()?;
-    Ok(XlsbWebProperties {
+    Ok(WebProperties {
         html_format,
         source_is_xml: flags & WEB_SOURCE_IS_XML != 0,
         import_source_data: flags & WEB_IMPORT_SOURCE_DATA != 0,
@@ -321,7 +315,7 @@ fn parse_web_props(data: &[u8]) -> XlsbResult<XlsbWebProperties> {
 }
 
 /// Parse a `BrtBeginECParams` collection into the connection.
-fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut XlsbConnection) -> XlsbResult<()> {
+fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> XlsbResult<()> {
     const CONTEXT: &str = "BrtBeginECParams";
     loop {
         let record = walker.required(CONTEXT)?;
@@ -340,7 +334,7 @@ fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut XlsbConnection) 
 }
 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
-fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
+fn parse_param(data: &[u8]) -> XlsbResult<Parameter> {
     const CONTEXT: &str = "BrtBeginECParam";
     let mut cursor = Cursor::new(data, CONTEXT);
     let flags = cursor.read_u16()?;
@@ -360,8 +354,8 @@ fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
     };
     let value = match pbt {
         PBT_VALUE => match data_type {
-            Some(PARAM_DATA_DOUBLE) => Some(XlsbParameterValue::Number(cursor.read_f64()?)),
-            Some(PARAM_DATA_STRING) => Some(XlsbParameterValue::Text(cursor.read_wide_string()?)),
+            Some(PARAM_DATA_DOUBLE) => Some(ParameterValue::Number(cursor.read_f64()?)),
+            Some(PARAM_DATA_STRING) => Some(ParameterValue::Text(cursor.read_wide_string()?)),
             Some(PARAM_DATA_BOOLEAN) => {
                 // `boolVal`: a 32-bit MS-XLSB Boolean when it fills the
                 // record, a single byte for short payloads.
@@ -370,7 +364,7 @@ fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
                 } else {
                     u32::from(cursor.read_bool32()?)
                 };
-                Some(XlsbParameterValue::Boolean(boolean != 0))
+                Some(ParameterValue::Boolean(boolean != 0))
             },
             Some(other) => {
                 return Err(malformed(
@@ -383,18 +377,18 @@ fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
         PBT_CELL_REFERENCE => {
             // `fmla` tokens fill the remainder of the record (inert).
             let tokens = cursor.read_bytes(cursor.remaining())?.to_vec();
-            Some(XlsbParameterValue::CellFormula(tokens))
+            Some(ParameterValue::CellFormula(tokens))
         },
         _ => None,
     };
     cursor.finish()?;
     let parameter_type = match pbt {
-        PBT_PROMPT => XlsbParameterType::Prompt,
-        PBT_VALUE => XlsbParameterType::Value,
-        PBT_CELL_REFERENCE => XlsbParameterType::CellReference,
-        other => XlsbParameterType::Other(other as u8),
+        PBT_PROMPT => ParameterType::Prompt,
+        PBT_VALUE => ParameterType::Value,
+        PBT_CELL_REFERENCE => ParameterType::CellReference,
+        other => ParameterType::Other(other as u8),
     };
-    Ok(XlsbConnectionParameter {
+    Ok(Parameter {
         parameter_type,
         auto_refresh: flags & PARAM_AUTO_REFRESH != 0,
         sql_type,
@@ -405,10 +399,7 @@ fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
 }
 
 /// Parse a `BrtBeginEcWpTables` collection into the connection.
-fn parse_web_tables(
-    walker: &mut RecordWalker<'_>,
-    connection: &mut XlsbConnection,
-) -> XlsbResult<()> {
+fn parse_web_tables(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> XlsbResult<()> {
     const CONTEXT: &str = "BrtBeginEcWpTables";
     loop {
         let record = walker.required(CONTEXT)?;
@@ -417,7 +408,7 @@ fn parse_web_tables(
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
-                connection.web_tables.push(XlsbWebTableItem::Missing);
+                connection.web_tables.push(WebTableItem::Missing);
             },
             rt::PCDI_STRING => {
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
@@ -426,7 +417,7 @@ fn parse_web_tables(
                 let mut cursor = Cursor::new(record.payload(), "BrtPCDIString");
                 connection
                     .web_tables
-                    .push(XlsbWebTableItem::Named(cursor.read_wide_string()?));
+                    .push(WebTableItem::Named(cursor.read_wide_string()?));
                 cursor.finish()?;
             },
             rt::PCDI_INDEX => {
@@ -436,7 +427,7 @@ fn parse_web_tables(
                 let mut cursor = Cursor::new(record.payload(), "BrtPCDIIndex");
                 connection
                     .web_tables
-                    .push(XlsbWebTableItem::Index(cursor.read_u32()?));
+                    .push(WebTableItem::Index(cursor.read_u32()?));
                 cursor.finish()?;
             },
             rt::END_EC_WP_TABLES => return Ok(()),

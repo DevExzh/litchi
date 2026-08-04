@@ -174,23 +174,20 @@ fn parses_odbc_connection_with_db_props_and_parameters() {
     assert_eq!(connections.connections.len(), 1);
     let connection = &connections.connections[0];
     assert_eq!(connection.connection_id, 42);
-    assert_eq!(connection.source_type, XlsbConnectionSourceType::Odbc);
+    assert_eq!(connection.source_type, SourceType::Odbc);
     assert_eq!(connection.name, "Warehouse");
     assert_eq!(connection.refresh_interval_minutes, 30);
     assert_eq!(connection.refreshed_version, 7);
     assert_eq!(connection.refreshable_min_version, 5);
-    assert_eq!(
-        connection.reconnection_type,
-        Some(XlsbReconnectionType::Never)
-    );
-    assert_eq!(connection.password_state, Some(XlsbPasswordState::NotSaved));
+    assert_eq!(connection.reconnection_type, Some(ReconnectionType::Never));
+    assert_eq!(connection.password_state, Some(PasswordState::NotSaved));
     assert_eq!(
         connection.credential_method,
-        Some(XlsbCredentialMethod::Integrated)
+        Some(CredentialMethod::Integrated)
     );
     match &connection.properties {
-        XlsbConnectionProperties::Database(db) => {
-            assert_eq!(db.command_type, XlsbCommandType::Sql);
+        Properties::Database(db) => {
+            assert_eq!(db.command_type, CommandType::Sql);
             assert_eq!(db.connection_string, "Driver={SQL Server};Server=db");
             assert_eq!(db.command.as_deref(), Some("SELECT * FROM T"));
             assert_eq!(db.server_command, None);
@@ -200,19 +197,19 @@ fn parses_odbc_connection_with_db_props_and_parameters() {
     assert_eq!(connection.parameters.len(), 4);
     assert_eq!(
         connection.parameters[0].value,
-        Some(XlsbParameterValue::Number(42.5))
+        Some(ParameterValue::Number(42.5))
     );
     assert_eq!(
         connection.parameters[1].value,
-        Some(XlsbParameterValue::Text("Paris".to_string()))
+        Some(ParameterValue::Text("Paris".to_string()))
     );
     assert_eq!(
         connection.parameters[2].value,
-        Some(XlsbParameterValue::Boolean(true))
+        Some(ParameterValue::Boolean(true))
     );
     assert_eq!(
         connection.parameters[3].parameter_type,
-        XlsbParameterType::Prompt
+        ParameterType::Prompt
     );
     assert!(connection.parameters[0].auto_refresh);
     assert!(connections.by_id(42).is_some());
@@ -248,7 +245,7 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
     let connections = parse_connections_part(&full_part(&records)).unwrap();
     assert_eq!(connections.connections.len(), 2);
     match &connections.connections[0].properties {
-        XlsbConnectionProperties::Olap(olap) => {
+        Properties::Olap(olap) => {
             assert!(olap.local_connection);
             assert!(olap.server_format_back);
             assert!(!olap.use_office_lcid);
@@ -261,8 +258,8 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
         other => panic!("expected OLAP properties, got {other:?}"),
     }
     match &connections.connections[1].properties {
-        XlsbConnectionProperties::Web(web) => {
-            assert_eq!(web.html_format, XlsbHtmlFormat::All);
+        Properties::Web(web) => {
+            assert_eq!(web.html_format, HtmlFormat::All);
             assert!(web.source_is_xml);
             assert!(web.consecutive_delimiters);
             assert_eq!(web.url.as_deref(), Some("https://example.test/q"));
@@ -272,9 +269,9 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
     assert_eq!(
         connections.connections[1].web_tables,
         vec![
-            XlsbWebTableItem::Missing,
-            XlsbWebTableItem::Named("results".to_string()),
-            XlsbWebTableItem::Index(3),
+            WebTableItem::Missing,
+            WebTableItem::Named("results".to_string()),
+            WebTableItem::Index(3),
         ]
     );
 }
@@ -302,14 +299,8 @@ fn skips_unknown_records_and_extension_collections() {
     part.push(record(rt::END_EXT_CONNECTIONS, &[]));
     let connections = parse_connections_part(&build(&part)).unwrap();
     assert_eq!(connections.connections.len(), 1);
-    assert_eq!(
-        connections.connections[0].source_type,
-        XlsbConnectionSourceType::Text
-    );
-    assert_eq!(
-        connections.connections[0].properties,
-        XlsbConnectionProperties::None
-    );
+    assert_eq!(connections.connections[0].source_type, SourceType::Text);
+    assert_eq!(connections.connections[0].properties, Properties::None);
 }
 
 #[test]

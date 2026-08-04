@@ -15,9 +15,8 @@ mod tests;
 pub(crate) mod write;
 
 pub use model::{
-    XlsbCommandType, XlsbConnection, XlsbConnectionParameter, XlsbConnectionProperties,
-    XlsbConnectionSourceType, XlsbConnections, XlsbCredentialMethod, XlsbDbProperties,
-    XlsbHtmlFormat, XlsbOlapProperties, XlsbParameterType, XlsbParameterValue, XlsbPasswordState,
-    XlsbReconnectionType, XlsbWebProperties, XlsbWebTableItem,
+    CommandType, Connection, Connections, CredentialMethod, DbProperties, HtmlFormat,
+    OlapProperties, Parameter, ParameterType, ParameterValue, PasswordState, Properties,
+    ReconnectionType, SourceType, WebProperties, WebTableItem,
 };
 pub use parse::parse_connections_part;

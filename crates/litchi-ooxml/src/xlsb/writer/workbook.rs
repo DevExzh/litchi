@@ -56,7 +56,7 @@ pub struct XlsbWorkbookWriter {
     styles: StylesWriter,
     calc: Props,
     is_1904: bool,
-    connections: Option<crate::xlsb::connections::XlsbConnections>,
+    connections: Option<crate::xlsb::connections::Connections>,
     external_links: Vec<crate::xlsb::external_link::Link>,
     pivot_caches: Vec<AuthoredPivotCache>,
     vba: Option<Arc<Vec<u8>>>,
@@ -224,7 +224,7 @@ impl XlsbWorkbookWriter {
     /// and are never resolved, contacted, refreshed, or executed.
     pub fn set_connections(
         &mut self,
-        connections: crate::xlsb::connections::XlsbConnections,
+        connections: crate::xlsb::connections::Connections,
     ) -> XlsbResult<()> {
         crate::xlsb::connections::write::validate_connections(&connections)?;
         self.connections = Some(connections);
@@ -232,7 +232,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// The attached External Data Connections part, when set.
-    pub fn connections(&self) -> Option<&crate::xlsb::connections::XlsbConnections> {
+    pub fn connections(&self) -> Option<&crate::xlsb::connections::Connections> {
         self.connections.as_ref()
     }
 
@@ -1963,34 +1963,34 @@ mod tests {
     fn connections_round_trip_through_save_and_read() {
         use crate::xlsb::connections::*;
 
-        let connections = XlsbConnections {
+        let connections = Connections {
             connections: vec![
-                XlsbConnection {
+                Connection {
                     connection_id: 42,
-                    source_type: XlsbConnectionSourceType::Odbc,
+                    source_type: SourceType::Odbc,
                     name: "Warehouse".to_string(),
                     refresh_interval_minutes: 30,
                     background_query: true,
-                    credential_method: Some(XlsbCredentialMethod::Integrated),
-                    properties: XlsbConnectionProperties::Database(XlsbDbProperties {
-                        command_type: XlsbCommandType::Sql,
+                    credential_method: Some(CredentialMethod::Integrated),
+                    properties: Properties::Database(DbProperties {
+                        command_type: CommandType::Sql,
                         connection_string: "Driver={SQL Server};Server=db".to_string(),
                         command: Some("SELECT * FROM T".to_string()),
                         server_command: None,
                     }),
-                    ..XlsbConnection::default()
+                    ..Connection::default()
                 },
-                XlsbConnection {
+                Connection {
                     connection_id: 9,
-                    source_type: XlsbConnectionSourceType::Web,
+                    source_type: SourceType::Web,
                     name: "Web Query".to_string(),
-                    properties: XlsbConnectionProperties::Web(XlsbWebProperties {
-                        html_format: XlsbHtmlFormat::All,
+                    properties: Properties::Web(WebProperties {
+                        html_format: HtmlFormat::All,
                         url: Some("https://example.test/q".to_string()),
-                        ..XlsbWebProperties::default()
+                        ..WebProperties::default()
                     }),
-                    web_tables: vec![XlsbWebTableItem::Index(1)],
-                    ..XlsbConnection::default()
+                    web_tables: vec![WebTableItem::Index(1)],
+                    ..Connection::default()
                 },
             ],
         };
@@ -2001,28 +2001,28 @@ mod tests {
         // Validation: zero id, duplicate id, duplicate name (case-insensitive).
         assert!(
             workbook
-                .set_connections(XlsbConnections {
-                    connections: vec![XlsbConnection {
+                .set_connections(Connections {
+                    connections: vec![Connection {
                         connection_id: 0,
                         name: "bad".to_string(),
-                        ..XlsbConnection::default()
+                        ..Connection::default()
                     }],
                 })
                 .is_err()
         );
         assert!(
             workbook
-                .set_connections(XlsbConnections {
+                .set_connections(Connections {
                     connections: vec![
-                        XlsbConnection {
+                        Connection {
                             connection_id: 5,
                             name: "a".to_string(),
-                            ..XlsbConnection::default()
+                            ..Connection::default()
                         },
-                        XlsbConnection {
+                        Connection {
                             connection_id: 5,
                             name: "b".to_string(),
-                            ..XlsbConnection::default()
+                            ..Connection::default()
                         },
                     ],
                 })
@@ -2030,17 +2030,17 @@ mod tests {
         );
         assert!(
             workbook
-                .set_connections(XlsbConnections {
+                .set_connections(Connections {
                     connections: vec![
-                        XlsbConnection {
+                        Connection {
                             connection_id: 5,
                             name: "Dup".to_string(),
-                            ..XlsbConnection::default()
+                            ..Connection::default()
                         },
-                        XlsbConnection {
+                        Connection {
                             connection_id: 6,
                             name: "dup".to_string(),
-                            ..XlsbConnection::default()
+                            ..Connection::default()
                         },
                     ],
                 })

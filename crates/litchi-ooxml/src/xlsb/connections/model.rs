@@ -8,7 +8,7 @@
 /// `DBType` (MS-XLSB 2.5.31): the data source type of a connection.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
-pub enum XlsbConnectionSourceType {
+pub enum SourceType {
     /// ODBC data source (`DBTODBC`).
     #[default]
     Odbc = 1,
@@ -32,7 +32,7 @@ pub enum XlsbConnectionSourceType {
     TextDataModel = 0x67,
 }
 
-impl TryFrom<u32> for XlsbConnectionSourceType {
+impl TryFrom<u32> for SourceType {
     type Error = crate::xlsb::error::XlsbError;
 
     fn try_from(value: u32) -> Result<Self, crate::xlsb::error::XlsbError> {
@@ -60,7 +60,7 @@ impl TryFrom<u32> for XlsbConnectionSourceType {
 /// `CmdType` (MS-XLSB 2.5.21): the meaning of the database command.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
-pub enum XlsbCommandType {
+pub enum CommandType {
     /// No command specified (`CMDNULL`).
     #[default]
     None = 0,
@@ -76,7 +76,7 @@ pub enum XlsbCommandType {
     SpList = 5,
 }
 
-impl TryFrom<u32> for XlsbCommandType {
+impl TryFrom<u32> for CommandType {
     type Error = crate::xlsb::error::XlsbError;
 
     fn try_from(value: u32) -> Result<Self, crate::xlsb::error::XlsbError> {
@@ -100,7 +100,7 @@ impl TryFrom<u32> for XlsbCommandType {
 /// Whether the password is saved in the connection string (`pc` field).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum XlsbPasswordState {
+pub enum PasswordState {
     /// The password is saved in the connection string.
     Saved = 1,
     /// The password is not saved in the connection string.
@@ -110,7 +110,7 @@ pub enum XlsbPasswordState {
 /// The authentication method for a database connection (`iCredMethod`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum XlsbCredentialMethod {
+pub enum CredentialMethod {
     /// Integrated authentication.
     Integrated = 0,
     /// No credentials.
@@ -123,7 +123,7 @@ pub enum XlsbCredentialMethod {
 /// (`irecontype`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
-pub enum XlsbReconnectionType {
+pub enum ReconnectionType {
     /// Retrieve updated information only after a refresh failure.
     AsRequired = 1,
     /// Always retrieve updated information from the connection file.
@@ -136,7 +136,7 @@ pub enum XlsbReconnectionType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 #[derive(Default)]
-pub enum XlsbHtmlFormat {
+pub enum HtmlFormat {
     /// No formatting is imported.
     #[default]
     None = 0,
@@ -150,9 +150,9 @@ pub enum XlsbHtmlFormat {
 
 /// Database command properties (`BrtBeginECDbProps`, MS-XLSB 2.4.61).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsbDbProperties {
+pub struct DbProperties {
     /// The database command type.
-    pub command_type: XlsbCommandType,
+    pub command_type: CommandType,
     /// The connection string (inert).
     pub connection_string: String,
     /// The database command, when stored (inert).
@@ -163,7 +163,7 @@ pub struct XlsbDbProperties {
 
 /// OLAP connection properties (`BrtBeginECOlapProps`, MS-XLSB 2.4.62).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsbOlapProperties {
+pub struct OlapProperties {
     /// Whether data is retrieved from a local cube file.
     pub local_connection: bool,
     /// Whether the provider is requested not to rebuild the local cube file.
@@ -186,9 +186,9 @@ pub struct XlsbOlapProperties {
 
 /// Web connection properties (`BrtBeginECWebProps`, MS-XLSB 2.4.71).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsbWebProperties {
+pub struct WebProperties {
     /// How HTML formatting is imported.
-    pub html_format: XlsbHtmlFormat,
+    pub html_format: HtmlFormat,
     /// The source is XML rather than an HTML table.
     pub source_is_xml: bool,
     /// Data is imported from the URL rather than the table.
@@ -217,13 +217,13 @@ pub struct XlsbWebProperties {
 
 /// The source-specific property block of a connection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum XlsbConnectionProperties {
+pub enum Properties {
     /// ODBC or OLE DB command properties.
-    Database(XlsbDbProperties),
+    Database(DbProperties),
     /// OLAP connection properties.
-    Olap(XlsbOlapProperties),
+    Olap(OlapProperties),
     /// Web connection properties.
-    Web(XlsbWebProperties),
+    Web(WebProperties),
     /// No property block was stored (other or deleted connection kinds).
     #[default]
     None,
@@ -231,7 +231,7 @@ pub enum XlsbConnectionProperties {
 
 /// The type of a connection parameter (`pbt`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum XlsbParameterType {
+pub enum ParameterType {
     /// The user is prompted for the value.
     #[default]
     Prompt,
@@ -245,7 +245,7 @@ pub enum XlsbParameterType {
 
 /// A stored parameter value.
 #[derive(Debug, Clone, PartialEq)]
-pub enum XlsbParameterValue {
+pub enum ParameterValue {
     /// A numeric value (`xnumVal`).
     Number(f64),
     /// A string value (`stVal`).
@@ -258,9 +258,9 @@ pub enum XlsbParameterValue {
 
 /// One connection parameter (`BrtBeginECParam`, MS-XLSB 2.4.63).
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct XlsbConnectionParameter {
+pub struct Parameter {
     /// The parameter type.
-    pub parameter_type: XlsbParameterType,
+    pub parameter_type: ParameterType,
     /// Whether data refreshes when the parameter cell changes.
     pub auto_refresh: bool,
     /// The SQL data type of the parameter (`TypeSql`, MS-XLSB 2.5.152).
@@ -270,12 +270,12 @@ pub struct XlsbConnectionParameter {
     /// The prompt string, when stored.
     pub prompt: Option<String>,
     /// The stored value.
-    pub value: Option<XlsbParameterValue>,
+    pub value: Option<ParameterValue>,
 }
 
 /// One Web query table reference (`BrtBeginEcWpTables` items).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsbWebTableItem {
+pub enum WebTableItem {
     /// An HTML table by index (`BrtPCDIIndex`).
     Index(u32),
     /// An HTML table by `id` attribute (`BrtPCDIString`).
@@ -286,11 +286,11 @@ pub enum XlsbWebTableItem {
 
 /// One external connection (`BrtBeginExtConnection`, MS-XLSB 2.4.80).
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct XlsbConnection {
+pub struct Connection {
     /// The unique connection identifier (`dwConnID`).
     pub connection_id: u32,
     /// The data source type (`idbtype`).
-    pub source_type: XlsbConnectionSourceType,
+    pub source_type: SourceType,
     /// The connection name.
     pub name: String,
     /// The description, when stored.
@@ -302,9 +302,9 @@ pub struct XlsbConnection {
     /// The single sign-on application identifier, when stored.
     pub sso_id: Option<String>,
     /// The authentication method, when applicable.
-    pub credential_method: Option<XlsbCredentialMethod>,
+    pub credential_method: Option<CredentialMethod>,
     /// Whether the password is saved in the connection string, when applicable.
-    pub password_state: Option<XlsbPasswordState>,
+    pub password_state: Option<PasswordState>,
     /// The data functionality level last refreshed with.
     pub refreshed_version: u8,
     /// The minimum data functionality level required to refresh.
@@ -326,32 +326,32 @@ pub struct XlsbConnection {
     /// Whether retrieved data is saved within the workbook.
     pub save_data: bool,
     /// When connection information is retrieved from the connection file.
-    pub reconnection_type: Option<XlsbReconnectionType>,
+    pub reconnection_type: Option<ReconnectionType>,
     /// The source-specific property block.
-    pub properties: XlsbConnectionProperties,
+    pub properties: Properties,
     /// Connection parameters.
-    pub parameters: Vec<XlsbConnectionParameter>,
+    pub parameters: Vec<Parameter>,
     /// Web query table references.
-    pub web_tables: Vec<XlsbWebTableItem>,
+    pub web_tables: Vec<WebTableItem>,
 }
 
 /// The parsed External Data Connections part.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct XlsbConnections {
+pub struct Connections {
     /// The declared external connections, in part order.
-    pub connections: Vec<XlsbConnection>,
+    pub connections: Vec<Connection>,
 }
 
-impl XlsbConnections {
+impl Connections {
     /// Find a connection by its unique identifier (`dwConnID`).
-    pub fn by_id(&self, connection_id: u32) -> Option<&XlsbConnection> {
+    pub fn by_id(&self, connection_id: u32) -> Option<&Connection> {
         self.connections
             .iter()
             .find(|connection| connection.connection_id == connection_id)
     }
 
     /// Find a connection by its workbook-unique name.
-    pub fn by_name(&self, name: &str) -> Option<&XlsbConnection> {
+    pub fn by_name(&self, name: &str) -> Option<&Connection> {
         self.connections
             .iter()
             .find(|connection| connection.name == name)
