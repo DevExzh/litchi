@@ -1,7 +1,5 @@
 //! Semantic SpreadsheetML data-validation declarations.
 ///
-/// The surrounding module supplies the contextual owner name; historical
-/// DataValidation* and ParsedDataValidation* names remain aliases in mod.rs.
 use super::codec::{
     invalid, parse_sqref, validate_collection, validate_optional_text, validate_rule, validate_text,
 };

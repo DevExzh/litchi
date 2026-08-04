@@ -1,8 +1,8 @@
 use crate::xlsx::cell::Cell;
 use crate::xlsx::conditional_formatting::{IconSet, Operator};
 use crate::xlsx::data_validation::{
-    DataValidationCollection, DataValidationConformance, validate_data_validation_collections,
-    write_data_validation_core, write_data_validation_extensions,
+    Collection, Conformance, validate_data_validation_collections, write_data_validation_core,
+    write_data_validation_extensions,
 };
 use crate::xlsx::page_setup::{Fit, Setup};
 use crate::xlsx::sheet_protection::{
@@ -419,7 +419,7 @@ pub struct MutableWorksheet {
     /// Data validation rules
     validations: Vec<DataValidation>,
     /// Complete typed core and Office 2010 validation collections.
-    typed_data_validations: Option<Vec<DataValidationCollection>>,
+    typed_data_validations: Option<Vec<Collection>>,
     /// Column widths (col -> width in characters)
     column_widths: HashMap<u32, f64>,
     /// Hidden columns
@@ -905,7 +905,7 @@ impl MutableWorksheet {
     /// Replace validations with complete typed core/x14 collections.
     pub fn set_data_validation_collections(
         &mut self,
-        collections: Vec<DataValidationCollection>,
+        collections: Vec<Collection>,
     ) -> SheetResult<()> {
         validate_data_validation_collections(&collections)?;
         self.validations.clear();
@@ -914,7 +914,7 @@ impl MutableWorksheet {
         Ok(())
     }
 
-    pub fn data_validation_collections(&self) -> Option<&[DataValidationCollection]> {
+    pub fn data_validation_collections(&self) -> Option<&[Collection]> {
         self.typed_data_validations.as_deref()
     }
 
@@ -2826,7 +2826,7 @@ impl MutableWorksheet {
         if let Some(collections) = self.typed_data_validations.as_ref() {
             xml.push_str(&write_data_validation_core(
                 collections,
-                DataValidationConformance::Transitional,
+                Conformance::Transitional,
             )?);
         } else if !self.validations.is_empty() {
             self.write_data_validations(&mut xml)?;
@@ -2887,7 +2887,7 @@ impl MutableWorksheet {
         if let Some(collections) = self.typed_data_validations.as_ref() {
             xml.push_str(&write_data_validation_extensions(
                 collections,
-                DataValidationConformance::Transitional,
+                Conformance::Transitional,
             )?);
         }
         xml.push_str(&write_worksheet_protection_extensions(

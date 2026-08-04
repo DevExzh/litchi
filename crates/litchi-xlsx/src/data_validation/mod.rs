@@ -2,7 +2,7 @@
 ///
 /// The owner is layered by responsibility: semantic declarations in
 /// model, bounded XML/MCE conversion in codec, and worksheet replacement/transaction
-/// operations in package. Historical prefixed names remain aliases below.
+/// operations in package.
 mod codec;
 mod model;
 mod package;
@@ -17,19 +17,6 @@ pub use model::{
     ValidationErrorStyle, ValidationImeMode, ValidationOperator, ValidationType,
 };
 pub use package::replace_data_validation_collections;
-
-pub type DataValidationCollection = Collection;
-pub type DataValidationConformance = Conformance;
-pub type DataValidationFormula = Formula;
-pub type DataValidationRange = Range;
-pub type DataValidationSource = Source;
-pub type DataValidationSqref = Sqref;
-pub type ParsedDataValidation = Validation;
-pub type ParsedDataValidationErrorStyle = ValidationErrorStyle;
-pub type ParsedDataValidationImeMode = ValidationImeMode;
-pub type ParsedDataValidationOperator = ValidationOperator;
-pub type ParsedDataValidationType = ValidationType;
-pub type ValidationListSource = ListSource;
 
 pub(crate) const CORE_URI: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub(crate) const STRICT_URI: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";

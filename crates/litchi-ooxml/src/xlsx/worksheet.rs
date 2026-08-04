@@ -23,10 +23,7 @@ use super::conditional_formatting::{
     DifferentialFormatRef, ExtensionAssociation, parse_conditional_formattings,
 };
 use super::data_consolidation::{WorksheetDataConsolidation, parse_worksheet_data_consolidation};
-use super::data_validation::{
-    DataValidationCollection as ParsedDataValidationCollection, ParsedDataValidation,
-    parse_data_validation_collections,
-};
+use super::data_validation::{Collection, Validation, parse_data_validation_collections};
 use super::drawing::parse_drawing_xml;
 use super::format::{CellFill, CellFont, CellFormat};
 use super::header_footer::{Settings, parse_worksheet_header_footer};
@@ -208,7 +205,7 @@ pub struct Worksheet<'a> {
     columns: HashMap<u32, ColumnInfo>,
     /// Row information by row number
     rows: HashMap<u32, RowInfo>,
-    data_validation_collections: Vec<ParsedDataValidationCollection>,
+    data_validation_collections: Vec<Collection>,
     /// Complete conditional-formatting containers and rules.
     conditional_formattings: Vec<ParsedConditionalFormatting>,
     /// Auto-filter
@@ -2082,7 +2079,7 @@ impl<'a> Worksheet<'a> {
     // ===== Data Validation =====
 
     /// Complete core and Office 2010 data-validation collections in document order.
-    pub fn data_validation_collections(&self) -> &[ParsedDataValidationCollection] {
+    pub fn data_validation_collections(&self) -> &[Collection] {
         &self.data_validation_collections
     }
 
@@ -2090,7 +2087,7 @@ impl<'a> Worksheet<'a> {
     ///
     /// Fixed properties such as validation kind, operator, error style, and IME
     /// mode are exposed as enums; no raw schema tokens escape this API.
-    pub fn data_validations(&self) -> impl Iterator<Item = &ParsedDataValidation> {
+    pub fn data_validations(&self) -> impl Iterator<Item = &Validation> {
         self.data_validation_collections
             .iter()
             .flat_map(|collection| collection.validations())

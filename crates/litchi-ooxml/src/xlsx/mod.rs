@@ -131,12 +131,10 @@ pub use data_consolidation::{
     parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
 };
 pub use data_validation::{
-    DataValidationCollection, DataValidationConformance, DataValidationFormula,
-    DataValidationRange, DataValidationSource, DataValidationSqref, ParsedDataValidation,
-    ParsedDataValidationErrorStyle, ParsedDataValidationImeMode, ParsedDataValidationOperator,
-    ParsedDataValidationType, ValidationListSource, parse_data_validation_collections,
-    replace_data_validation_collections, validate_data_validation_collections,
-    write_data_validation_collections,
+    Collection, Conformance, Formula, ListSource, Range, Source, Sqref, Validation,
+    ValidationErrorStyle, ValidationImeMode, ValidationOperator, ValidationType,
+    parse_data_validation_collections, replace_data_validation_collections,
+    validate_data_validation_collections, write_data_validation_collections,
 };
 pub use external_links::{
     ExternalCell, ExternalCellType, ExternalDdeItem, ExternalDdeLink, ExternalDdeValue,

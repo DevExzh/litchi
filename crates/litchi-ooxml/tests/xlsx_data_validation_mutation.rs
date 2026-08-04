@@ -1,7 +1,6 @@
 use litchi_ooxml::xlsx::{
-    DataValidationCollection, DataValidationFormula, DataValidationSource, DataValidationSqref,
-    ParsedDataValidation, ParsedDataValidationOperator, ParsedDataValidationType,
-    ValidationListSource, Workbook, WorksheetProtection, parse_data_validation_collections,
+    Collection, Formula, ListSource, Source, Sqref, Validation, ValidationOperator, ValidationType,
+    Workbook, WorksheetProtection, parse_data_validation_collections,
 };
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
@@ -24,47 +23,42 @@ fn seed_package(path: &std::path::Path, worksheet_xml: &str) {
     package.save(path).unwrap();
 }
 
-fn typed_collections() -> Vec<DataValidationCollection> {
-    let mut core = ParsedDataValidation::new(
-        DataValidationSource::Core,
-        ParsedDataValidationType::Whole,
-        DataValidationSqref::parse("A1:B2 C3").unwrap(),
+fn typed_collections() -> Vec<Collection> {
+    let mut core = Validation::new(
+        Source::Core,
+        ValidationType::Whole,
+        Sqref::parse("A1:B2 C3").unwrap(),
     );
-    core.set_operator(ParsedDataValidationOperator::Between);
-    core.set_formula1(Some(ValidationListSource::Formula(
-        DataValidationFormula::new("1").unwrap(),
-    )))
-    .unwrap();
-    core.set_formula2(Some(DataValidationFormula::new("10").unwrap()))
+    core.set_operator(ValidationOperator::Between);
+    core.set_formula1(Some(ListSource::Formula(Formula::new("1").unwrap())))
+        .unwrap();
+    core.set_formula2(Some(Formula::new("10").unwrap()))
         .unwrap();
     core.set_show_error_message(true);
     core.set_error_title(Some("Bounds".to_string())).unwrap();
     core.set_error(Some("Choose 1 through 10".to_string()))
         .unwrap();
 
-    let mut modern = ParsedDataValidation::new(
-        DataValidationSource::Office2010,
-        ParsedDataValidationType::List,
-        DataValidationSqref::parse("$D$4:$D$8")
+    let mut modern = Validation::new(
+        Source::Office2010,
+        ValidationType::List,
+        Sqref::parse("$D$4:$D$8")
             .unwrap()
             .with_office2010_flags(true, false, true, true)
             .unwrap(),
     );
     modern
-        .set_formula1(Some(ValidationListSource::QuotedList(
-            "Red,Green,Blue".to_string(),
-        )))
+        .set_formula1(Some(ListSource::QuotedList("Red,Green,Blue".to_string())))
         .unwrap();
     modern
         .set_uid(Some("{11111111-2222-3333-4444-555555555555}".to_string()))
         .unwrap();
 
-    let mut core_collection =
-        DataValidationCollection::new(DataValidationSource::Core, vec![core]).unwrap();
+    let mut core_collection = Collection::new(Source::Core, vec![core]).unwrap();
     core_collection.set_window(Some(12), Some(34)).unwrap();
     vec![
         core_collection,
-        DataValidationCollection::new(DataValidationSource::Office2010, vec![modern]).unwrap(),
+        Collection::new(Source::Office2010, vec![modern]).unwrap(),
     ]
 }
 
@@ -167,14 +161,14 @@ fn rejects_spoofed_namespace_and_constraints_without_queuing_changes() {
             .blob(),
         xml.as_bytes()
     );
-    assert!(DataValidationSqref::parse("XFE1").is_err());
-    let mut rule = ParsedDataValidation::new(
-        DataValidationSource::Core,
-        ParsedDataValidationType::None,
-        DataValidationSqref::parse("A1").unwrap(),
+    assert!(Sqref::parse("XFE1").is_err());
+    let mut rule = Validation::new(
+        Source::Core,
+        ValidationType::None,
+        Sqref::parse("A1").unwrap(),
     );
     assert!(rule.set_prompt(Some("x".repeat(256))).is_err());
-    let collection = DataValidationCollection::new(DataValidationSource::Core, vec![rule]).unwrap();
+    let collection = Collection::new(Source::Core, vec![rule]).unwrap();
     assert!(
         litchi_ooxml::xlsx::validate_data_validation_collections(
             &[collection.clone(), collection,]

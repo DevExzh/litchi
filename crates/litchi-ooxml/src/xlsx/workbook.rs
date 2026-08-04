@@ -17,8 +17,8 @@ use crate::xlsx::calculation_properties::{
 };
 use crate::xlsx::chart::chart_external_data_content_type;
 use crate::xlsx::data_validation::{
-    DataValidationCollection, parse_data_validation_collections,
-    replace_data_validation_collections, validate_data_validation_collections,
+    Collection, parse_data_validation_collections, replace_data_validation_collections,
+    validate_data_validation_collections,
 };
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
@@ -218,7 +218,7 @@ pub struct Workbook {
     external_links: Vec<ExternalLinkEntry>,
     defined_names: Vec<NamedRange>,
     worksheet_protection_mutations: HashMap<usize, WorksheetProtectionMetadata>,
-    worksheet_data_validation_mutations: HashMap<usize, Vec<DataValidationCollection>>,
+    worksheet_data_validation_mutations: HashMap<usize, Vec<Collection>>,
     worksheet_web_binding_mutations: HashMap<usize, Bindings>,
     /// Encryption profile of the opened outer package.
     #[cfg(feature = "encryption")]
@@ -238,7 +238,7 @@ struct WriteRollbackGuard<'a> {
     package_before: OpcPackage,
     reload_caches: bool,
     worksheet_protection_mutations_before: HashMap<usize, WorksheetProtectionMetadata>,
-    worksheet_data_validation_mutations_before: HashMap<usize, Vec<DataValidationCollection>>,
+    worksheet_data_validation_mutations_before: HashMap<usize, Vec<Collection>>,
     worksheet_web_binding_mutations_before: HashMap<usize, Bindings>,
     committed: bool,
 }
@@ -1949,7 +1949,7 @@ impl Workbook {
     pub fn worksheet_data_validation_collections(
         &self,
         index: usize,
-    ) -> SheetResult<Vec<DataValidationCollection>> {
+    ) -> SheetResult<Vec<Collection>> {
         if let Some(value) = self.worksheet_data_validation_mutations.get(&index) {
             return Ok(value.clone());
         }
@@ -1972,7 +1972,7 @@ impl Workbook {
     pub fn replace_worksheet_data_validations(
         &mut self,
         index: usize,
-        collections: Vec<DataValidationCollection>,
+        collections: Vec<Collection>,
     ) -> SheetResult<()> {
         validate_data_validation_collections(&collections)?;
         let info = self
@@ -1994,7 +1994,7 @@ impl Workbook {
         update: F,
     ) -> SheetResult<()>
     where
-        F: FnOnce(&mut Vec<DataValidationCollection>),
+        F: FnOnce(&mut Vec<Collection>),
     {
         let mut candidate = self.worksheet_data_validation_collections(index)?;
         update(&mut candidate);
@@ -6441,11 +6441,11 @@ mod tests {
         assert_eq!(validation.sqref().ranges()[0].as_str(), "E1:E2");
         assert_eq!(
             validation.operator(),
-            crate::xlsx::ParsedDataValidationOperator::Between
+            crate::xlsx::ValidationOperator::Between
         );
         assert!(matches!(
             validation.formula1(),
-            Some(crate::xlsx::ValidationListSource::Formula(value)) if value.as_str() == "1"
+            Some(crate::xlsx::ListSource::Formula(value)) if value.as_str() == "1"
         ));
         assert_eq!(
             validation.formula2().map(|value| value.as_str()),
