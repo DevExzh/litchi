@@ -2,17 +2,17 @@ use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, Setting, load_slide_action_settings};
 use crate::pptx::controls::{ControlLoadLimits, PptxSlideControl, load_slide_controls};
 use crate::pptx::handout::HandoutMaster;
-use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
+use crate::pptx::ink::{Annotation, InkLoadLimits, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, Trace, load_slide_laser_traces};
 use crate::pptx::namespace::is_presentationml_name;
-use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
+use crate::pptx::ole::{Object, OleLoadLimits, load_slide_ole_objects};
 use crate::pptx::package::STALE_NOTES_REASON;
 use crate::pptx::parts::{
     NotesSize, PresentationCustomerDataList, PresentationDefaultTextStyle,
     PresentationKinsokuSettings, PresentationMetadata, PresentationModificationVerifier,
     PresentationPart, PresentationPhotoAlbum, SlideMasterPart, SlidePart, SlideSize,
 };
-use crate::pptx::show_events::{PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events};
+use crate::pptx::show_events::{Event, ShowEventLoadLimits, load_slide_show_events};
 use crate::pptx::slide::{Slide, SlideMaster};
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
@@ -22,7 +22,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::Part;
 /// Main presentation object - the high-level API for working with presentations.
-use quick_xml::events::Event;
+use quick_xml::events::Event as XmlEvent;
 use quick_xml::reader::NsReader;
 
 const STRICT_SLIDE_RELATIONSHIP_TYPE: &str =
@@ -90,7 +90,7 @@ fn validate_handout_master_root(xml: &[u8]) -> Result<()> {
             .read_resolved_event()
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
         match event {
-            Event::Start(element) | Event::Empty(element) => {
+            XmlEvent::Start(element) | XmlEvent::Empty(element) => {
                 if is_presentationml_name(&namespace, element.name(), b"handoutMaster") {
                     return Ok(());
                 }
@@ -98,7 +98,7 @@ fn validate_handout_master_root(xml: &[u8]) -> Result<()> {
                     "handout-master part must have a PresentationML handoutMaster root".to_string(),
                 ));
             },
-            Event::Eof => {
+            XmlEvent::Eof => {
                 return Err(OoxmlError::InvalidFormat(
                     "handout-master part is missing its PresentationML root".to_string(),
                 ));
@@ -966,7 +966,7 @@ impl<'a> Presentation<'a> {
     /// Results retain slide and OPC relationship identity together with
     /// bounded stored-trace counts. Ink is never rendered, recognized,
     /// interpreted, or executed.
-    pub fn ink_annotations(&self) -> Result<Vec<PptxInkAnnotation>> {
+    pub fn ink_annotations(&self) -> Result<Vec<Annotation>> {
         let mut annotations = Vec::new();
         let mut limits = InkLoadLimits::default();
 
@@ -1005,7 +1005,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Event records remain inert historical metadata. This never replays
     /// triggers, seeks media, opens targets, or changes slide-show state.
-    pub fn show_events(&self) -> Result<Vec<PptxSlideShowEvent>> {
+    pub fn show_events(&self) -> Result<Vec<Event>> {
         let mut events = Vec::new();
         let mut limits = ShowEventLoadLimits::default();
 
@@ -1045,7 +1045,7 @@ impl<'a> Presentation<'a> {
     ///
     /// This never parses, opens, activates, renders, or executes an embedded
     /// object or package payload.
-    pub fn ole_objects(&self) -> Result<Vec<PptxOleObject>> {
+    pub fn ole_objects(&self) -> Result<Vec<Object>> {
         let mut objects = Vec::new();
         let mut limits = OleLoadLimits::default();
 
@@ -1274,7 +1274,7 @@ impl<'a> Presentation<'a> {
                 .read_resolved_event()
                 .map_err(|error| OoxmlError::Xml(error.to_string()))?;
             match event {
-                Event::Start(element) | Event::Empty(element)
+                XmlEvent::Start(element) | XmlEvent::Empty(element)
                     if is_drawingml_name(&namespace, element.name(), b"hlinkClick") =>
                 {
                     let action = unqualified_attribute_value(&element, b"action", decoder)?;
@@ -1288,7 +1288,7 @@ impl<'a> Presentation<'a> {
                         hyperlinks.push(Hyperlink::from_xml(&action, tooltip)?);
                     }
                 },
-                Event::Eof => break,
+                XmlEvent::Eof => break,
                 _ => {},
             }
         }

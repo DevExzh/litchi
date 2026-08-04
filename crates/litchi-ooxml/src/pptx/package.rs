@@ -3,7 +3,7 @@ use crate::encryption::{Limits, Mode};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::{PptxChart, Presentation};
-use crate::pptx::show_events::PptxSlideShowEvent;
+use crate::pptx::show_events::Event;
 use crate::pptx::slide::Key as SlideKey;
 use crate::pptx::vba_project::{
     VbaProject, discover_vba_project, remove_vba_project as clear_presentation_vba,
@@ -656,7 +656,7 @@ impl Package {
     /// Discover inert InkML annotation content parts on presentation slides.
     ///
     /// Ink payloads are never rendered, recognized, interpreted, or executed.
-    pub fn ink_annotations(&self) -> Result<Vec<crate::pptx::PptxInkAnnotation>> {
+    pub fn ink_annotations(&self) -> Result<Vec<crate::pptx::Annotation>> {
         self.presentation()?.ink_annotations()
     }
 
@@ -709,7 +709,7 @@ impl Package {
     ///
     /// Event records are returned as inert historical metadata only. This
     /// never replays triggers, seeks media, opens targets, or changes slide-show state.
-    pub fn show_events(&self) -> Result<Vec<PptxSlideShowEvent>> {
+    pub fn show_events(&self) -> Result<Vec<Event>> {
         self.presentation()?.show_events()
     }
 
@@ -724,7 +724,7 @@ impl Package {
     pub fn add_slide_show_events(
         &mut self,
         slide_name: &PackURI,
-        events: &[crate::pptx::PptxSlideShowEventDraft],
+        events: &[crate::pptx::EventDraft],
     ) -> Result<()> {
         self.edit_canonical(
             "add_slide_show_events",
@@ -744,7 +744,7 @@ impl Package {
     ///
     /// This never parses, opens, activates, renders, or executes an embedded
     /// object or package payload.
-    pub fn ole_objects(&self) -> Result<Vec<crate::pptx::PptxOleObject>> {
+    pub fn ole_objects(&self) -> Result<Vec<crate::pptx::Object>> {
         self.presentation()?.ole_objects()
     }
 
@@ -1523,7 +1523,7 @@ impl Package {
     pub fn add_ole_object(
         &mut self,
         slide_part_name: &str,
-        kind: crate::pptx::ole::PptxOlePayloadKind,
+        kind: crate::pptx::ole::PayloadKind,
         prog_id: Option<&str>,
         name: Option<&str>,
         frame: crate::pptx::ole_object::OleObjectFrame,
@@ -2974,7 +2974,7 @@ mod tests {
         assert!(matches!(
             package.add_ole_object(
                 slide.as_str(),
-                crate::pptx::ole::PptxOlePayloadKind::OleObject,
+                crate::pptx::ole::PayloadKind::OleObject,
                 None,
                 None,
                 crate::pptx::ole_object::OleObjectFrame::new(0, 0, 1, 1),
@@ -2997,7 +2997,7 @@ mod tests {
         package
             .add_ole_object(
                 "/ppt/slides/slide1.xml",
-                crate::pptx::ole::PptxOlePayloadKind::Package,
+                crate::pptx::ole::PayloadKind::Package,
                 None,
                 None,
                 crate::pptx::ole_object::OleObjectFrame::new(0, 0, 1, 1),

@@ -33,7 +33,7 @@ const MAX_RELATIONSHIP_ID_BYTES: usize = 1_024;
 /// This exposes only package identity and structural counts. It does not
 /// expose trace geometry or attempt handwriting recognition or rendering.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxInkAnnotation {
+pub struct Annotation {
     slide_index: usize,
     content_part_index: usize,
     relationship_id: String,
@@ -42,7 +42,7 @@ pub struct PptxInkAnnotation {
     trace_group_count: usize,
 }
 
-impl PptxInkAnnotation {
+impl Annotation {
     /// Return the zero-based index of the slide that owns this annotation.
     #[inline]
     pub fn slide_index(&self) -> usize {
@@ -97,7 +97,7 @@ pub(crate) fn load_slide_ink_annotations(
     slide_index: usize,
     slide: &dyn Part,
     limits: &mut InkLoadLimits,
-) -> Result<Vec<PptxInkAnnotation>> {
+) -> Result<Vec<Annotation>> {
     if slide.content_type() != ct::PML_SLIDE {
         return Err(invalid(
             "Ink content-part discovery requires a PresentationML slide part",
@@ -135,7 +135,7 @@ pub(crate) fn load_slide_ink_annotations(
 
         limits.add_annotation(part.blob().len())?;
         let summary = inspect_inkml(part.blob())?;
-        annotations.push(PptxInkAnnotation {
+        annotations.push(Annotation {
             slide_index,
             content_part_index,
             relationship_id,

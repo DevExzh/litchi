@@ -12,7 +12,7 @@ use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
 use litchi_pptx::time::{Offset, ParseError as TimeParseError};
 use quick_xml::encoding::Decoder;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::{BytesStart, Event as XmlEvent};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
@@ -29,7 +29,7 @@ const MAX_XML_DEPTH: usize = 128;
 
 /// A trigger type recorded by a PowerPoint slide show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PptxSlideShowTrigger {
+pub enum Trigger {
     /// Office extension accepted by PowerPoint 2007 through 2007 SP2; see
     /// `[MS-OE376]` section 2.1.1237.
     None,
@@ -48,8 +48,8 @@ pub enum PptxSlideShowTrigger {
 
 /// The recorded action represented by a PowerPoint slide-show event.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PptxSlideShowEventKind {
-    Trigger(PptxSlideShowTrigger),
+pub enum EventKind {
+    Trigger(Trigger),
     Play,
     Stop,
     Pause,
@@ -64,15 +64,15 @@ pub enum PptxSlideShowEventKind {
 
 /// A bounded, inert event record persisted for a PowerPoint slide show.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxSlideShowEvent {
+pub struct Event {
     slide_index: usize,
     event_index: usize,
-    kind: PptxSlideShowEventKind,
+    kind: EventKind,
     time: Offset,
     object_id: u32,
 }
 
-impl PptxSlideShowEvent {
+impl Event {
     /// Return the zero-based index of the slide that owns this event.
     #[inline]
     pub fn slide_index(&self) -> usize {
@@ -87,7 +87,7 @@ impl PptxSlideShowEvent {
 
     /// Return the recorded event kind.
     #[inline]
-    pub fn kind(&self) -> &PptxSlideShowEventKind {
+    pub fn kind(&self) -> &EventKind {
         &self.kind
     }
 
@@ -107,7 +107,7 @@ impl PptxSlideShowEvent {
     #[inline]
     pub fn seek_time(&self) -> Option<&Offset> {
         match &self.kind {
-            PptxSlideShowEventKind::Seek { at } => Some(at),
+            EventKind::Seek { at } => Some(at),
             _ => None,
         }
     }
@@ -145,7 +145,7 @@ pub(crate) fn load_slide_show_events(
     slide_index: usize,
     slide: &dyn Part,
     limits: &mut ShowEventLoadLimits,
-) -> Result<Vec<PptxSlideShowEvent>> {
+) -> Result<Vec<Event>> {
     if slide.content_type() != ct::PML_SLIDE {
         return Err(invalid(
             "slide-show event discovery requires a PresentationML slide part",
@@ -186,7 +186,7 @@ fn scan_slide_show_events(
     slide_index: usize,
     xml_bytes: &[u8],
     limits: &mut ShowEventLoadLimits,
-) -> Result<Vec<PptxSlideShowEvent>> {
+) -> Result<Vec<Event>> {
     if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
         return Err(limit("slide XML bytes"));
     }
@@ -219,7 +219,7 @@ fn scan_slide_show_events(
         let (namespace, event) = resolver.resolve_event(event);
 
         match event {
-            Event::Start(element) => {
+            XmlEvent::Start(element) => {
                 increment_nodes(&mut nodes)?;
                 let depth = stack
                     .len()
@@ -246,7 +246,7 @@ fn scan_slide_show_events(
                 }
                 stack.push(kind);
             },
-            Event::Empty(element) => {
+            XmlEvent::Empty(element) => {
                 increment_nodes(&mut nodes)?;
                 let depth = stack
                     .len()
@@ -273,7 +273,7 @@ fn scan_slide_show_events(
                     closed_root = true;
                 }
             },
-            Event::End(element) => {
+            XmlEvent::End(element) => {
                 let kind = stack
                     .pop()
                     .ok_or_else(|| invalid("invalid slide XML nesting"))?;
@@ -282,30 +282,30 @@ fn scan_slide_show_events(
                     closed_root = true;
                 }
             },
-            Event::Text(text)
+            XmlEvent::Text(text)
                 if stack.last().copied().is_some_and(ElementKind::is_known)
                     && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
             {
                 return Err(invalid("slide-show event markup cannot contain text"));
             },
-            Event::CData(text)
+            XmlEvent::CData(text)
                 if stack.last().copied().is_some_and(ElementKind::is_known)
                     && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
             {
                 return Err(invalid("slide-show event markup cannot contain text"));
             },
-            Event::GeneralRef(_) if stack.last().copied().is_some_and(ElementKind::is_known) => {
+            XmlEvent::GeneralRef(_) if stack.last().copied().is_some_and(ElementKind::is_known) => {
                 return Err(invalid(
                     "slide-show event markup cannot contain entity references",
                 ));
             },
-            Event::DocType(_) => return Err(invalid("slide XML must not contain a DTD")),
-            Event::PI(_) => {
+            XmlEvent::DocType(_) => return Err(invalid("slide XML must not contain a DTD")),
+            XmlEvent::PI(_) => {
                 return Err(invalid(
                     "slide XML must not contain a processing instruction",
                 ));
             },
-            Event::Eof => {
+            XmlEvent::Eof => {
                 if !stack.is_empty() || !saw_root || !closed_root {
                     return Err(invalid("unterminated or missing PresentationML slide root"));
                 }
@@ -328,7 +328,7 @@ fn classify_element(
     root_seen: bool,
     empty: bool,
     slide_index: usize,
-    events: &mut Vec<PptxSlideShowEvent>,
+    events: &mut Vec<Event>,
     limits: &mut ShowEventLoadLimits,
 ) -> Result<ElementKind> {
     if depth == 1 {
@@ -462,25 +462,25 @@ fn parse_show_event(
     event_index: usize,
     element: &BytesStart<'_>,
     decoder: Decoder,
-) -> Result<PptxSlideShowEvent> {
+) -> Result<Event> {
     let time = parse_time_offset(required_attribute(element, b"time", decoder)?)?;
     let object_id = parse_object_id(required_attribute(element, b"objId", decoder)?)?;
     let kind = match element.local_name().as_ref() {
-        b"triggerEvt" => PptxSlideShowEventKind::Trigger(parse_trigger(required_attribute(
+        b"triggerEvt" => EventKind::Trigger(parse_trigger(required_attribute(
             element, b"type", decoder,
         )?)?),
-        b"playEvt" => PptxSlideShowEventKind::Play,
-        b"stopEvt" => PptxSlideShowEventKind::Stop,
-        b"pauseEvt" => PptxSlideShowEventKind::Pause,
-        b"resumeEvt" => PptxSlideShowEventKind::Resume,
+        b"playEvt" => EventKind::Play,
+        b"stopEvt" => EventKind::Stop,
+        b"pauseEvt" => EventKind::Pause,
+        b"resumeEvt" => EventKind::Resume,
         b"seekEvt" => {
             let at = parse_time_offset(required_attribute(element, b"seek", decoder)?)?;
-            PptxSlideShowEventKind::Seek { at }
+            EventKind::Seek { at }
         },
-        b"nullEvt" => PptxSlideShowEventKind::Null,
+        b"nullEvt" => EventKind::Null,
         _ => return Err(invalid("unsupported slide-show event element")),
     };
-    Ok(PptxSlideShowEvent {
+    Ok(Event {
         slide_index,
         event_index,
         kind,
@@ -506,20 +506,20 @@ fn parse_object_id(value: String) -> Result<u32> {
         .map_err(|_| invalid("slide-show event object ID must be an unsigned 32-bit integer"))
 }
 
-fn parse_trigger(value: String) -> Result<PptxSlideShowTrigger> {
+fn parse_trigger(value: String) -> Result<Trigger> {
     match value.as_str() {
-        "none" => Ok(PptxSlideShowTrigger::None),
-        "onBegin" => Ok(PptxSlideShowTrigger::OnBegin),
-        "onEnd" => Ok(PptxSlideShowTrigger::OnEnd),
-        "begin" => Ok(PptxSlideShowTrigger::Begin),
-        "end" => Ok(PptxSlideShowTrigger::End),
-        "onClick" => Ok(PptxSlideShowTrigger::OnClick),
-        "onDblClick" => Ok(PptxSlideShowTrigger::OnDoubleClick),
-        "onMouseOver" => Ok(PptxSlideShowTrigger::OnMouseOver),
-        "onMouseOut" => Ok(PptxSlideShowTrigger::OnMouseOut),
-        "onNext" => Ok(PptxSlideShowTrigger::OnNext),
-        "onPrev" => Ok(PptxSlideShowTrigger::OnPrevious),
-        "onStopAudio" => Ok(PptxSlideShowTrigger::OnStopAudio),
+        "none" => Ok(Trigger::None),
+        "onBegin" => Ok(Trigger::OnBegin),
+        "onEnd" => Ok(Trigger::OnEnd),
+        "begin" => Ok(Trigger::Begin),
+        "end" => Ok(Trigger::End),
+        "onClick" => Ok(Trigger::OnClick),
+        "onDblClick" => Ok(Trigger::OnDoubleClick),
+        "onMouseOver" => Ok(Trigger::OnMouseOver),
+        "onMouseOut" => Ok(Trigger::OnMouseOut),
+        "onNext" => Ok(Trigger::OnNext),
+        "onPrev" => Ok(Trigger::OnPrevious),
+        "onStopAudio" => Ok(Trigger::OnStopAudio),
         _ => Err(invalid(format!(
             "unsupported slide-show trigger type '{value}'"
         ))),
@@ -556,16 +556,16 @@ fn limit(what: &str) -> OoxmlError {
 
 /// A slide-show event ready for storage onto a slide.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxSlideShowEventDraft {
-    kind: PptxSlideShowEventKind,
+pub struct EventDraft {
+    kind: EventKind,
     time: Offset,
     object_id: u32,
 }
 
-impl PptxSlideShowEventDraft {
+impl EventDraft {
     /// Create an event from its complete, typed action state.
     #[must_use]
-    pub fn new(kind: PptxSlideShowEventKind, time: Offset, object_id: u32) -> Self {
+    pub fn new(kind: EventKind, time: Offset, object_id: u32) -> Self {
         Self {
             kind,
             time,
@@ -575,52 +575,48 @@ impl PptxSlideShowEventDraft {
 
     /// Create a trigger event.
     #[must_use]
-    pub fn trigger(trigger: PptxSlideShowTrigger, time: Offset, object_id: u32) -> Self {
-        Self::new(PptxSlideShowEventKind::Trigger(trigger), time, object_id)
+    pub fn trigger(trigger: Trigger, time: Offset, object_id: u32) -> Self {
+        Self::new(EventKind::Trigger(trigger), time, object_id)
     }
 
     /// Create a play event.
     #[must_use]
     pub fn play(time: Offset, object_id: u32) -> Self {
-        Self::new(PptxSlideShowEventKind::Play, time, object_id)
+        Self::new(EventKind::Play, time, object_id)
     }
 
     /// Create a stop event.
     #[must_use]
     pub fn stop(time: Offset, object_id: u32) -> Self {
-        Self::new(PptxSlideShowEventKind::Stop, time, object_id)
+        Self::new(EventKind::Stop, time, object_id)
     }
 
     /// Create a pause event.
     #[must_use]
     pub fn pause(time: Offset, object_id: u32) -> Self {
-        Self::new(PptxSlideShowEventKind::Pause, time, object_id)
+        Self::new(EventKind::Pause, time, object_id)
     }
 
     /// Create a resume event.
     #[must_use]
     pub fn resume(time: Offset, object_id: u32) -> Self {
-        Self::new(PptxSlideShowEventKind::Resume, time, object_id)
+        Self::new(EventKind::Resume, time, object_id)
     }
 
     /// Create a seek event with a media-stream offset.
     #[must_use]
     pub fn seek(time: Offset, object_id: u32, seek_time: Offset) -> Self {
-        Self::new(
-            PptxSlideShowEventKind::Seek { at: seek_time },
-            time,
-            object_id,
-        )
+        Self::new(EventKind::Seek { at: seek_time }, time, object_id)
     }
 
     /// Create a reserved null event.
     #[must_use]
     pub fn null(time: Offset, object_id: u32) -> Self {
-        Self::new(PptxSlideShowEventKind::Null, time, object_id)
+        Self::new(EventKind::Null, time, object_id)
     }
 
     /// Return the recorded event kind.
-    pub fn kind(&self) -> &PptxSlideShowEventKind {
+    pub fn kind(&self) -> &EventKind {
         &self.kind
     }
 
@@ -637,38 +633,38 @@ impl PptxSlideShowEventDraft {
     /// Return the exact normalized media-stream offset for a seek event.
     pub fn seek_time(&self) -> Option<&Offset> {
         match &self.kind {
-            PptxSlideShowEventKind::Seek { at } => Some(at),
+            EventKind::Seek { at } => Some(at),
             _ => None,
         }
     }
 
     fn element_name(&self) -> &'static str {
         match &self.kind {
-            PptxSlideShowEventKind::Trigger(_) => "triggerEvt",
-            PptxSlideShowEventKind::Play => "playEvt",
-            PptxSlideShowEventKind::Stop => "stopEvt",
-            PptxSlideShowEventKind::Pause => "pauseEvt",
-            PptxSlideShowEventKind::Resume => "resumeEvt",
-            PptxSlideShowEventKind::Seek { .. } => "seekEvt",
-            PptxSlideShowEventKind::Null => "nullEvt",
+            EventKind::Trigger(_) => "triggerEvt",
+            EventKind::Play => "playEvt",
+            EventKind::Stop => "stopEvt",
+            EventKind::Pause => "pauseEvt",
+            EventKind::Resume => "resumeEvt",
+            EventKind::Seek { .. } => "seekEvt",
+            EventKind::Null => "nullEvt",
         }
     }
 }
 
-fn trigger_token(trigger: PptxSlideShowTrigger) -> &'static str {
+fn trigger_token(trigger: Trigger) -> &'static str {
     match trigger {
-        PptxSlideShowTrigger::None => "none",
-        PptxSlideShowTrigger::OnBegin => "onBegin",
-        PptxSlideShowTrigger::OnEnd => "onEnd",
-        PptxSlideShowTrigger::Begin => "begin",
-        PptxSlideShowTrigger::End => "end",
-        PptxSlideShowTrigger::OnClick => "onClick",
-        PptxSlideShowTrigger::OnDoubleClick => "onDblClick",
-        PptxSlideShowTrigger::OnMouseOver => "onMouseOver",
-        PptxSlideShowTrigger::OnMouseOut => "onMouseOut",
-        PptxSlideShowTrigger::OnNext => "onNext",
-        PptxSlideShowTrigger::OnPrevious => "onPrev",
-        PptxSlideShowTrigger::OnStopAudio => "onStopAudio",
+        Trigger::None => "none",
+        Trigger::OnBegin => "onBegin",
+        Trigger::OnEnd => "onEnd",
+        Trigger::Begin => "begin",
+        Trigger::End => "end",
+        Trigger::OnClick => "onClick",
+        Trigger::OnDoubleClick => "onDblClick",
+        Trigger::OnMouseOver => "onMouseOver",
+        Trigger::OnMouseOut => "onMouseOut",
+        Trigger::OnNext => "onNext",
+        Trigger::OnPrevious => "onPrev",
+        Trigger::OnStopAudio => "onStopAudio",
     }
 }
 
@@ -684,7 +680,7 @@ fn trigger_token(trigger: PptxSlideShowTrigger) -> &'static str {
 pub fn store_slide_show_events(
     package: &mut litchi_opc::OpcPackage,
     slide_name: &litchi_opc::PackURI,
-    events: &[PptxSlideShowEventDraft],
+    events: &[EventDraft],
 ) -> Result<()> {
     if events.is_empty() {
         return Err(invalid(
@@ -717,7 +713,7 @@ pub fn store_slide_show_events(
     for event in events {
         fragment.push_str("<p14:");
         fragment.push_str(event.element_name());
-        if let PptxSlideShowEventKind::Trigger(trigger) = &event.kind {
+        if let EventKind::Trigger(trigger) = &event.kind {
             fragment.push_str(" type=\"");
             fragment.push_str(trigger_token(*trigger));
             fragment.push('"');
@@ -727,7 +723,7 @@ pub fn store_slide_show_events(
         fragment.push_str("\" objId=\"");
         fragment.push_str(&event.object_id.to_string());
         fragment.push('"');
-        if let PptxSlideShowEventKind::Seek { at: seek_time } = &event.kind {
+        if let EventKind::Seek { at: seek_time } = &event.kind {
             fragment.push_str(" seek=\"");
             fragment.push_str(seek_time.as_str());
             fragment.push('"');
@@ -768,23 +764,20 @@ mod tests {
         assert_eq!(events.len(), 3);
         assert_eq!(events[0].slide_index(), 4);
         assert_eq!(events[0].event_index(), 0);
-        assert_eq!(
-            events[0].kind(),
-            &PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
-        );
+        assert_eq!(events[0].kind(), &EventKind::Trigger(Trigger::OnClick));
         assert_eq!(events[0].time(), &Offset::parse("1.5s").unwrap());
         assert_eq!(events[0].object_id(), 6);
         assert_eq!(events[0].seek_time(), None);
         assert!(matches!(
             events[1].kind(),
-            PptxSlideShowEventKind::Seek { at }
+            EventKind::Seek { at }
                 if at == &Offset::parse("10.379s").unwrap()
         ));
         assert_eq!(
             events[1].seek_time(),
             Some(&Offset::parse("10.379s").unwrap())
         );
-        assert_eq!(events[2].kind(), &PptxSlideShowEventKind::Null);
+        assert_eq!(events[2].kind(), &EventKind::Null);
     }
 
     #[test]
@@ -806,10 +799,7 @@ mod tests {
         let events =
             scan_slide_show_events(0, accepted.as_bytes(), &mut ShowEventLoadLimits::default())
                 .unwrap();
-        assert_eq!(
-            events[0].kind(),
-            &PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::None)
-        );
+        assert_eq!(events[0].kind(), &EventKind::Trigger(Trigger::None));
 
         let rejected = accepted.replace("type=\"none\"", "type=\"onMediaBookmark\"");
         assert!(
@@ -832,16 +822,12 @@ mod tests {
         (package, name)
     }
 
-    fn sample_events() -> Vec<PptxSlideShowEventDraft> {
+    fn sample_events() -> Vec<EventDraft> {
         vec![
-            PptxSlideShowEventDraft::trigger(
-                PptxSlideShowTrigger::OnClick,
-                Offset::parse("1.5s").unwrap(),
-                6,
-            ),
-            PptxSlideShowEventDraft::play(Offset::secs(2), 4),
-            PptxSlideShowEventDraft::seek(Offset::ms(2500), 4, Offset::parse("10.379s").unwrap()),
-            PptxSlideShowEventDraft::null(Offset::ms(3), 5),
+            EventDraft::trigger(Trigger::OnClick, Offset::parse("1.5s").unwrap(), 6),
+            EventDraft::play(Offset::secs(2), 4),
+            EventDraft::seek(Offset::ms(2500), 4, Offset::parse("10.379s").unwrap()),
+            EventDraft::null(Offset::ms(3), 5),
         ]
     }
 
@@ -855,23 +841,20 @@ mod tests {
         let discovered =
             load_slide_show_events(0, slide, &mut ShowEventLoadLimits::default()).unwrap();
         assert_eq!(discovered.len(), events.len());
-        assert_eq!(
-            discovered[0].kind(),
-            &PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
-        );
+        assert_eq!(discovered[0].kind(), &EventKind::Trigger(Trigger::OnClick));
         assert_eq!(discovered[0].time(), &Offset::ms(1500));
         assert_eq!(discovered[0].object_id(), 6);
-        assert_eq!(discovered[1].kind(), &PptxSlideShowEventKind::Play);
+        assert_eq!(discovered[1].kind(), &EventKind::Play);
         assert!(matches!(
             discovered[2].kind(),
-            PptxSlideShowEventKind::Seek { at }
+            EventKind::Seek { at }
                 if at == &Offset::parse("10.379s").unwrap()
         ));
         assert_eq!(
             discovered[2].seek_time(),
             Some(&Offset::parse("10.379s").unwrap())
         );
-        assert_eq!(discovered[3].kind(), &PptxSlideShowEventKind::Null);
+        assert_eq!(discovered[3].kind(), &EventKind::Null);
 
         // A second storage on the same slide is rejected (no replacement).
         assert!(store_slide_show_events(&mut package, &slide_name, &events).is_err());
@@ -902,15 +885,12 @@ mod tests {
         assert!(store_slide_show_events(&mut package, &slide_name, &[]).is_err());
         // Seek owns its offset in the action variant; non-seek actions cannot
         // carry one in memory or emit one during serialization.
-        let seek = PptxSlideShowEventDraft::seek(Offset::secs(1), 1, Offset::ms(250));
+        let seek = EventDraft::seek(Offset::secs(1), 1, Offset::ms(250));
         assert!(matches!(
             seek.kind(),
-            PptxSlideShowEventKind::Seek { at } if at == &Offset::ms(250)
+            EventKind::Seek { at } if at == &Offset::ms(250)
         ));
-        assert_eq!(
-            PptxSlideShowEventDraft::play(Offset::secs(1), 1).seek_time(),
-            None
-        );
+        assert_eq!(EventDraft::play(Offset::secs(1), 1).seek_time(), None);
         assert!(Offset::parse("1..2s").is_err());
         assert!(Offset::parse("bad!!").is_err());
         // Non-slide part.

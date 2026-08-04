@@ -26,7 +26,7 @@ const OLE_GRAPHIC_DATA_URI: &str = "http://schemas.openxmlformats.org/presentati
 
 /// Whether an OLE object shape stores an embedded object or a declared link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PptxOleObjectMode {
+pub enum Mode {
     /// The shape contains a p:embed element.
     Embedded,
     /// The shape contains a p:link element.
@@ -35,7 +35,7 @@ pub enum PptxOleObjectMode {
 
 /// The declared OPC payload family for an OLE object shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PptxOlePayloadKind {
+pub enum PayloadKind {
     /// An OOXML Embedded Object part.
     OleObject,
     /// An OOXML Embedded Package part.
@@ -44,7 +44,7 @@ pub enum PptxOlePayloadKind {
 
 /// An inert target declared by an OLE object shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PptxOleObjectTarget {
+pub enum Target {
     /// An internal OPC payload part.
     Internal {
         /// Absolute package part name.
@@ -63,7 +63,7 @@ pub enum PptxOleObjectTarget {
     },
 }
 
-impl PptxOleObjectTarget {
+impl Target {
     /// Return the declared relationship type URI.
     #[inline]
     pub fn relationship_type(&self) -> &str {
@@ -107,7 +107,7 @@ impl PptxOleObjectTarget {
 
 /// A bounded, inert inventory record for one PowerPoint OLE object shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxOleObject {
+pub struct Object {
     slide_index: usize,
     object_index: usize,
     shape_id: Option<u32>,
@@ -118,14 +118,14 @@ pub struct PptxOleObject {
     show_as_icon: Option<bool>,
     preview_width: Option<u32>,
     preview_height: Option<u32>,
-    mode: PptxOleObjectMode,
+    mode: Mode,
     relationship_id: Option<String>,
-    payload_kind: Option<PptxOlePayloadKind>,
-    target: Option<PptxOleObjectTarget>,
+    payload_kind: Option<PayloadKind>,
+    target: Option<Target>,
     preview_relationship_id: Option<String>,
 }
 
-impl PptxOleObject {
+impl Object {
     /// Return the zero-based index of the slide that owns this object.
     #[inline]
     pub fn slide_index(&self) -> usize {
@@ -188,7 +188,7 @@ impl PptxOleObject {
 
     /// Return whether the shape uses p:embed or p:link.
     #[inline]
-    pub fn mode(&self) -> PptxOleObjectMode {
+    pub fn mode(&self) -> Mode {
         self.mode
     }
 
@@ -200,13 +200,13 @@ impl PptxOleObject {
 
     /// Return the payload family inferred from the declared relationship type.
     #[inline]
-    pub fn payload_kind(&self) -> Option<PptxOlePayloadKind> {
+    pub fn payload_kind(&self) -> Option<PayloadKind> {
         self.payload_kind
     }
 
     /// Return the declared payload target, when a relationship ID is present.
     #[inline]
-    pub fn target(&self) -> Option<&PptxOleObjectTarget> {
+    pub fn target(&self) -> Option<&Target> {
         self.target.as_ref()
     }
 
@@ -249,7 +249,7 @@ struct OpenOleObject {
     preview_width: Option<u32>,
     preview_height: Option<u32>,
     relationship_id: Option<String>,
-    mode: Option<PptxOleObjectMode>,
+    mode: Option<Mode>,
     pic_depth: Option<usize>,
     preview_relationship_id: Option<String>,
 }
@@ -263,7 +263,7 @@ struct ParsedOleObject {
     show_as_icon: Option<bool>,
     preview_width: Option<u32>,
     preview_height: Option<u32>,
-    mode: PptxOleObjectMode,
+    mode: Mode,
     relationship_id: Option<String>,
     preview_relationship_id: Option<String>,
 }
@@ -274,7 +274,7 @@ pub(crate) fn load_slide_ole_objects(
     slide_index: usize,
     slide: &dyn Part,
     limits: &mut OleLoadLimits,
-) -> Result<Vec<PptxOleObject>> {
+) -> Result<Vec<Object>> {
     if slide.content_type() != ct::PML_SLIDE {
         return Err(invalid(
             "OLE-object discovery requires a PresentationML slide part",
@@ -294,7 +294,7 @@ pub(crate) fn load_slide_ole_objects(
                 },
                 None => (None, None),
             };
-            Ok(PptxOleObject {
+            Ok(Object {
                 slide_index,
                 object_index,
                 shape_id: parsed.shape_id,
@@ -541,9 +541,9 @@ fn inspect_start(
     };
     if depth == object.depth + 1 {
         if is_presentationml_name(namespace, element.name(), b"embed") {
-            set_mode(object, PptxOleObjectMode::Embedded)?;
+            set_mode(object, Mode::Embedded)?;
         } else if is_presentationml_name(namespace, element.name(), b"link") {
-            set_mode(object, PptxOleObjectMode::Linked)?;
+            set_mode(object, Mode::Linked)?;
         } else if is_presentationml_name(namespace, element.name(), b"pic")
             && object.pic_depth.replace(depth).is_some()
         {
@@ -675,7 +675,7 @@ fn parse_open_ole_object(
     })
 }
 
-fn set_mode(object: &mut OpenOleObject, mode: PptxOleObjectMode) -> Result<()> {
+fn set_mode(object: &mut OpenOleObject, mode: Mode) -> Result<()> {
     if object.mode.replace(mode).is_some() {
         return Err(invalid("OLE object has multiple embed or link elements"));
     }
@@ -737,7 +737,7 @@ fn resolve_target(
     slide_index: usize,
     slide: &dyn Part,
     relationship_id: &str,
-) -> Result<(PptxOlePayloadKind, PptxOleObjectTarget)> {
+) -> Result<(PayloadKind, Target)> {
     let relationship = slide.rels().get(relationship_id).ok_or_else(|| {
         OoxmlError::InvalidRelationship(format!(
             "slide {slide_index} OLE object references missing relationship '{relationship_id}'"
@@ -760,7 +760,7 @@ fn resolve_target(
         bounded(&target, "external OLE target")?;
         return Ok((
             payload_kind,
-            PptxOleObjectTarget::External {
+            Target::External {
                 target,
                 relationship_type,
             },
@@ -787,7 +787,7 @@ fn resolve_target(
     }
     Ok((
         payload_kind,
-        PptxOleObjectTarget::Internal {
+        Target::Internal {
             part_name,
             content_type: part.content_type().to_string(),
             relationship_type,
@@ -795,18 +795,18 @@ fn resolve_target(
     ))
 }
 
-fn payload_kind(relationship_type: &str) -> Option<PptxOlePayloadKind> {
+fn payload_kind(relationship_type: &str) -> Option<PayloadKind> {
     match relationship_type {
-        rt::OLE_OBJECT | rt::STRICT_OLE_OBJECT => Some(PptxOlePayloadKind::OleObject),
-        rt::PACKAGE | rt::STRICT_PACKAGE => Some(PptxOlePayloadKind::Package),
+        rt::OLE_OBJECT | rt::STRICT_OLE_OBJECT => Some(PayloadKind::OleObject),
+        rt::PACKAGE | rt::STRICT_PACKAGE => Some(PayloadKind::Package),
         _ => None,
     }
 }
 
-fn expected_content_type(kind: PptxOlePayloadKind) -> &'static str {
+fn expected_content_type(kind: PayloadKind) -> &'static str {
     match kind {
-        PptxOlePayloadKind::OleObject => ct::OFC_OLE_OBJECT,
-        PptxOlePayloadKind::Package => ct::OFC_PACKAGE,
+        PayloadKind::OleObject => ct::OFC_OLE_OBJECT,
+        PayloadKind::Package => ct::OFC_PACKAGE,
     }
 }
 

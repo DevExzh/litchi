@@ -1,4 +1,5 @@
-use litchi_ooxml::pptx::{Package, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind};
+use litchi_ooxml::pptx::Package;
+use litchi_ooxml::pptx::ole::{Mode, PayloadKind, Target};
 use litchi_ooxml::{OoxmlError, PackURI};
 use litchi_opc::constants::{
     content_type::{OFC_OLE_OBJECT, OFC_PACKAGE},
@@ -28,13 +29,13 @@ fn package_inventory_reports_local_ole_objects() {
     assert_eq!(workbook.show_as_icon(), Some(true));
     assert_eq!(workbook.preview_width(), Some(914_400));
     assert_eq!(workbook.preview_height(), Some(457_200));
-    assert_eq!(workbook.mode(), PptxOleObjectMode::Embedded);
+    assert_eq!(workbook.mode(), Mode::Embedded);
     assert_eq!(workbook.relationship_id(), Some("rIdOle"));
-    assert_eq!(workbook.payload_kind(), Some(PptxOlePayloadKind::OleObject));
+    assert_eq!(workbook.payload_kind(), Some(PayloadKind::OleObject));
     assert_eq!(workbook.preview_relationship_id(), Some("rIdPreview"));
     assert!(matches!(
         workbook.target(),
-        Some(PptxOleObjectTarget::Internal {
+        Some(Target::Internal {
             part_name,
             content_type,
             relationship_type,
@@ -45,14 +46,11 @@ fn package_inventory_reports_local_ole_objects() {
 
     let package_object = &objects[1];
     assert_eq!(package_object.object_index(), 1);
-    assert_eq!(package_object.mode(), PptxOleObjectMode::Embedded);
-    assert_eq!(
-        package_object.payload_kind(),
-        Some(PptxOlePayloadKind::Package)
-    );
+    assert_eq!(package_object.mode(), Mode::Embedded);
+    assert_eq!(package_object.payload_kind(), Some(PayloadKind::Package));
     assert!(matches!(
         package_object.target(),
-        Some(PptxOleObjectTarget::Internal {
+        Some(Target::Internal {
             part_name,
             content_type,
             relationship_type,
@@ -63,11 +61,11 @@ fn package_inventory_reports_local_ole_objects() {
 
     let linked = &objects[2];
     assert_eq!(linked.object_index(), 2);
-    assert_eq!(linked.mode(), PptxOleObjectMode::Linked);
-    assert_eq!(linked.payload_kind(), Some(PptxOlePayloadKind::OleObject));
+    assert_eq!(linked.mode(), Mode::Linked);
+    assert_eq!(linked.payload_kind(), Some(PayloadKind::OleObject));
     assert!(matches!(
         linked.target(),
-        Some(PptxOleObjectTarget::External {
+        Some(Target::External {
             target,
             relationship_type,
         }) if target == "https://example.invalid/linked-document"

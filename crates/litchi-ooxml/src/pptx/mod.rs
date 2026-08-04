@@ -130,9 +130,7 @@ pub use extended_guides::{
 pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
-pub use ink::{
-    INK_CONTENT_TYPE, PptxInkAnnotation, StoredInkAnnotation, store_slide_ink_annotation,
-};
+pub use ink::{Annotation, INK_CONTENT_TYPE, StoredInkAnnotation, store_slide_ink_annotation};
 pub use litchi_drawingml::coord;
 pub use litchi_pptx::actions::{Jump, Kind, Setting, Target, Trigger};
 pub(crate) mod slide_patch;
@@ -152,7 +150,7 @@ pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
     load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
-pub use ole::{PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind};
+pub use ole::{Mode, Object, PayloadKind};
 pub use ole_object::{AuthoredOleObject, OleObjectFrame, add_ole_object};
 pub use package::Package;
 pub use parts::{
@@ -219,8 +217,7 @@ pub use revision_information::{
 };
 pub use sections::{Section, SectionList};
 pub use show_events::{
-    PptxSlideShowEvent, PptxSlideShowEventDraft, PptxSlideShowEventKind, PptxSlideShowTrigger,
-    SHOW_EVENT_EXTENSION_URI, store_slide_show_events,
+    Event, EventDraft, EventKind, SHOW_EVENT_EXTENSION_URI, store_slide_show_events,
 };
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use slide_sync::{

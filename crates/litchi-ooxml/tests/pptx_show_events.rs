@@ -1,6 +1,5 @@
-use litchi_ooxml::pptx::{
-    Package, PptxSlideShowEventKind, PptxSlideShowTrigger, SHOW_EVENT_EXTENSION_URI, time::Offset,
-};
+use litchi_ooxml::pptx::show_events::{EventKind, SHOW_EVENT_EXTENSION_URI, Trigger};
+use litchi_ooxml::pptx::{Package, time::Offset};
 use litchi_ooxml::{OoxmlError, PackURI};
 use tempfile::NamedTempFile;
 
@@ -17,26 +16,23 @@ fn package_inventory_reports_local_show_events() {
     let trigger = &events[0];
     assert_eq!(trigger.slide_index(), 0);
     assert_eq!(trigger.event_index(), 0);
-    assert_eq!(
-        trigger.kind(),
-        &PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
-    );
+    assert_eq!(trigger.kind(), &EventKind::Trigger(Trigger::OnClick));
     assert_eq!(trigger.time(), &Offset::ms(6950));
     assert_eq!(trigger.object_id(), 6);
     assert_eq!(trigger.seek_time(), None);
 
-    assert_eq!(events[1].kind(), &PptxSlideShowEventKind::Play);
-    assert_eq!(events[2].kind(), &PptxSlideShowEventKind::Pause);
+    assert_eq!(events[1].kind(), &EventKind::Play);
+    assert_eq!(events[2].kind(), &EventKind::Pause);
     assert!(matches!(
         events[3].kind(),
-        PptxSlideShowEventKind::Seek { at } if at == &Offset::ms(10379)
+        EventKind::Seek { at } if at == &Offset::ms(10379)
     ));
     assert_eq!(events[3].time(), &Offset::ms(38839));
     assert_eq!(events[3].object_id(), 4);
     assert_eq!(events[3].seek_time(), Some(&Offset::ms(10379)));
-    assert_eq!(events[4].kind(), &PptxSlideShowEventKind::Resume);
-    assert_eq!(events[5].kind(), &PptxSlideShowEventKind::Stop);
-    assert_eq!(events[6].kind(), &PptxSlideShowEventKind::Null);
+    assert_eq!(events[4].kind(), &EventKind::Resume);
+    assert_eq!(events[5].kind(), &EventKind::Stop);
+    assert_eq!(events[6].kind(), &EventKind::Null);
     assert_eq!(events[6].time(), &Offset::ms(50000));
 
     assert_eq!(

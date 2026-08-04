@@ -17,9 +17,7 @@
 //! or executed.
 
 use crate::error::{OoxmlError, Result};
-use crate::pptx::ole::{
-    OleLoadLimits, PptxOleObjectMode, PptxOlePayloadKind, load_slide_ole_objects,
-};
+use crate::pptx::ole::{Mode, OleLoadLimits, PayloadKind, load_slide_ole_objects};
 use litchi_core::xml::escape_xml;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -109,7 +107,7 @@ pub struct AuthoredOleObject {
 pub fn add_ole_object(
     package: &mut OpcPackage,
     slide_part_name: &str,
-    kind: PptxOlePayloadKind,
+    kind: PayloadKind,
     prog_id: Option<&str>,
     name: Option<&str>,
     frame: OleObjectFrame,
@@ -182,17 +180,17 @@ pub fn add_ole_object(
     })
 }
 
-fn relationship_type(kind: PptxOlePayloadKind) -> &'static str {
+fn relationship_type(kind: PayloadKind) -> &'static str {
     match kind {
-        PptxOlePayloadKind::OleObject => rt::OLE_OBJECT,
-        PptxOlePayloadKind::Package => rt::PACKAGE,
+        PayloadKind::OleObject => rt::OLE_OBJECT,
+        PayloadKind::Package => rt::PACKAGE,
     }
 }
 
-fn content_type(kind: PptxOlePayloadKind) -> &'static str {
+fn content_type(kind: PayloadKind) -> &'static str {
     match kind {
-        PptxOlePayloadKind::OleObject => ct::OFC_OLE_OBJECT,
-        PptxOlePayloadKind::Package => ct::OFC_PACKAGE,
+        PayloadKind::OleObject => ct::OFC_OLE_OBJECT,
+        PayloadKind::Package => ct::OFC_PACKAGE,
     }
 }
 
@@ -204,7 +202,7 @@ fn verify_authored_object(
     shape_id: u32,
     prog_id: Option<&str>,
     relationship_id: &str,
-    kind: PptxOlePayloadKind,
+    kind: PayloadKind,
     embedding_uri: &PackURI,
 ) -> Result<()> {
     let slide_part = package.get_part(slide_uri)?;
@@ -215,7 +213,7 @@ fn verify_authored_object(
         .find(|object| object.shape_id() == Some(shape_id))
         .ok_or_else(|| invalid("read-side OLE inventory lost the authored object"))?;
     if object.program_id() != prog_id
-        || object.mode() != PptxOleObjectMode::Embedded
+        || object.mode() != Mode::Embedded
         || object.relationship_id() != Some(relationship_id)
         || object.payload_kind() != Some(kind)
         || object.target().and_then(|target| target.part_name()) != Some(embedding_uri)
@@ -510,8 +508,8 @@ fn invalidate_signatures(package: &mut OpcPackage) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pptx::ole::PptxOleObjectTarget;
-    use crate::pptx::{Package, PptxOleObjectMode as Mode, PptxOlePayloadKind as Kind};
+    use crate::pptx::Package;
+    use crate::pptx::ole::{Mode, PayloadKind, Target};
     use litchi_opc::PackageWriter;
     use litchi_opc::part::Part;
     use std::io::Cursor;
@@ -585,7 +583,7 @@ mod tests {
         let authored = package
             .add_ole_object(
                 &slides[0],
-                Kind::OleObject,
+                PayloadKind::OleObject,
                 Some("Acme.Document.1"),
                 Some("Quarterly & Numbers"),
                 sample_frame(),
@@ -609,8 +607,8 @@ mod tests {
             object.relationship_id(),
             Some(authored.relationship_id.as_str())
         );
-        assert_eq!(object.payload_kind(), Some(Kind::OleObject));
-        let PptxOleObjectTarget::Internal {
+        assert_eq!(object.payload_kind(), Some(PayloadKind::OleObject));
+        let Target::Internal {
             part_name,
             content_type: target_content_type,
             relationship_type: target_relationship_type,
@@ -637,7 +635,7 @@ mod tests {
         let first = package
             .add_ole_object(
                 &slides[0],
-                Kind::OleObject,
+                PayloadKind::OleObject,
                 Some("Acme.Chart"),
                 None,
                 sample_frame(),
@@ -647,7 +645,7 @@ mod tests {
         let second = package
             .add_ole_object(
                 &slides[0],
-                Kind::Package,
+                PayloadKind::Package,
                 Some("Package"),
                 None,
                 sample_frame(),
@@ -657,7 +655,7 @@ mod tests {
         let third = package
             .add_ole_object(
                 &slides[1],
-                Kind::OleObject,
+                PayloadKind::OleObject,
                 None,
                 None,
                 sample_frame(),
@@ -692,7 +690,7 @@ mod tests {
         assert_eq!(one.program_id(), Some("Acme.Chart"));
         let two = by_part("/ppt/embeddings/oleObject2.bin");
         assert_eq!(two.slide_index(), 0);
-        assert_eq!(two.payload_kind(), Some(Kind::Package));
+        assert_eq!(two.payload_kind(), Some(PayloadKind::Package));
         assert_eq!(two.target().unwrap().content_type(), Some(ct::OFC_PACKAGE));
         let three = by_part("/ppt/embeddings/oleObject3.bin");
         assert_eq!(three.slide_index(), 1);
@@ -707,7 +705,7 @@ mod tests {
         let authored = package
             .add_ole_object(
                 &slides[0],
-                Kind::OleObject,
+                PayloadKind::OleObject,
                 Some("Acme.Doc"),
                 None,
                 sample_frame(),
@@ -747,7 +745,7 @@ mod tests {
                 package
                     .add_ole_object(
                         &slides[0],
-                        Kind::OleObject,
+                        PayloadKind::OleObject,
                         Some(bad),
                         None,
                         sample_frame(),
@@ -764,7 +762,7 @@ mod tests {
             package
                 .add_ole_object(
                     &slides[0],
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     Some(&long),
                     None,
                     sample_frame(),
@@ -775,7 +773,14 @@ mod tests {
         // Empty and oversize payloads are rejected.
         assert!(
             package
-                .add_ole_object(&slides[0], Kind::OleObject, None, None, sample_frame(), &[])
+                .add_ole_object(
+                    &slides[0],
+                    PayloadKind::OleObject,
+                    None,
+                    None,
+                    sample_frame(),
+                    &[]
+                )
                 .is_err()
         );
         let oversize = vec![0u8; MAX_OLE_PAYLOAD_BYTES + 1];
@@ -783,7 +788,7 @@ mod tests {
             package
                 .add_ole_object(
                     &slides[0],
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     None,
                     None,
                     sample_frame(),
@@ -796,7 +801,7 @@ mod tests {
             package
                 .add_ole_object(
                     &slides[0],
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     None,
                     None,
                     OleObjectFrame::new(0, 0, 0, 10),
@@ -809,7 +814,7 @@ mod tests {
             package
                 .add_ole_object(
                     &slides[0],
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     None,
                     Some(""),
                     sample_frame(),
@@ -821,7 +826,7 @@ mod tests {
             package
                 .add_ole_object(
                     &slides[0],
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     None,
                     Some(&"n".repeat(257)),
                     sample_frame(),
@@ -834,7 +839,7 @@ mod tests {
             package
                 .add_ole_object(
                     "/ppt/slides/slide99.xml",
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     None,
                     None,
                     sample_frame(),
@@ -846,7 +851,7 @@ mod tests {
             package
                 .add_ole_object(
                     "/ppt/presentation.xml",
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     None,
                     None,
                     sample_frame(),
@@ -866,7 +871,7 @@ mod tests {
             package
                 .add_ole_object(
                     &slides[0],
-                    Kind::OleObject,
+                    PayloadKind::OleObject,
                     Some("Acme.Document.1"),
                     Some("Same"),
                     sample_frame(),
@@ -876,7 +881,7 @@ mod tests {
             package
                 .add_ole_object(
                     &slides[0],
-                    Kind::Package,
+                    PayloadKind::Package,
                     Some("Package"),
                     None,
                     sample_frame(),
