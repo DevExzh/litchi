@@ -183,7 +183,7 @@ fn updated_package_revision(package: &IWorkPackage, version_uuid: &str) -> Resul
         },
     )?;
     archive.validate()?;
-    SnappyStream::compress(&archive.to_bytes()?)
+    Ok(SnappyStream::compress(&archive.to_bytes()?)?)
 }
 
 fn generate_uuid_string() -> String {

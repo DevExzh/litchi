@@ -168,10 +168,10 @@ impl BundleLimits {
 
     pub(crate) fn snappy_limits(self) -> Result<SnappyLimits> {
         let max_stream_bytes = self.effective_archive_limits()?.max_archive_bytes();
-        SnappyLimits::new(
+        Ok(SnappyLimits::new(
             max_stream_bytes.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
             max_stream_bytes,
-        )
+        )?)
     }
 
     pub(crate) fn check_input_size(self, size: u64, label: &str) -> Result<()> {
@@ -1463,7 +1463,17 @@ mod tests {
         let byte_limits = IwaArchiveLimits::default().with_archive_bytes(1)?;
         let limits = BundleLimits::default().with_archive_limits(byte_limits)?;
         let error = Bundle::from_archive_bytes_with_limits(&bytes, limits).unwrap_err();
-        assert!(error.to_string().contains("Snappy block expands"));
+        assert!(matches!(
+            error,
+            Error::IwaCore(core)
+                if matches!(
+                    core.as_ref(),
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                        ..
+                    }
+                )
+        ));
         Ok(())
     }
 
@@ -1519,7 +1529,17 @@ mod tests {
             8,
         )?;
         let error = Bundle::from_bytes_with_limits(&bytes, tight_stream).unwrap_err();
-        assert!(error.to_string().contains("Snappy block expands"));
+        assert!(matches!(
+            error,
+            Error::IwaCore(core)
+                if matches!(
+                    core.as_ref(),
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                        ..
+                    }
+                )
+        ));
 
         let tight_input = BundleLimits::new(
             (bytes.len() - 1) as u64,

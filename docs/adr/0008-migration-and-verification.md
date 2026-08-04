@@ -4439,6 +4439,13 @@ IWA varint and wire primitives plus format-independent table-cell vocabulary;
 it owns no strokes, appearance, archive/protobuf codecs, package identifiers,
 or concrete object-model state. Concrete Pages, Numbers, and Keynote
 object-model logic remains in the format crates while the migration proceeds.
+The physical IWA substrate is also now owned by its leaf crates:
+`litchi-iwa-protos` owns generated raw schemas and `litchi-iwa-core` owns
+bounded archive framing plus checksum-free Snappy compression/decompression.
+The facade's former duplicate Snappy implementation was deleted; concrete
+readers pass compressed slices to the core and borrow decoded bytes through
+`as_bytes()`. Application message decoding and package topology remain in
+`litchi-iwa`.
 The migration exit for this family is deletion of the duplicate facade-local
 `wire.rs` and `varint.rs` kernels, with no public compatibility shim. Until
 all callers have moved, focused owner adapters may remain private, but they
@@ -5747,7 +5754,7 @@ build-animation, and transition values. The old implementations were removed
 from the monolith; only private, non-public type adapters remain where a
 concurrent reader migration still refers to the legacy local spelling. No
 archive, protobuf, or application decoder was moved into these value crates.
-The adapters and the three corresponding `litchi-iwa` dependency edges are
+The adapters and the four corresponding `litchi-iwa` dependency edges are
 staged ownership work, not compatibility API; their exit is to move the owning
 readers before deleting the adapters. The Numbers value slice now owns
 `litchi-numbers::cell::{Value, Type, Update}` and leaves only a monolith-local
@@ -5755,13 +5762,17 @@ private adapter for the remaining reader/editor migration. The BNC wire slice
 now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
 CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
 the monolith retains only a private module alias plus its archive/protobuf
-callers. Its 19 leaf tests, 1,509 IWA tests, boundary check, and native Numbers
+callers. Its 19 leaf tests, 1,497 IWA tests, boundary check, and native Numbers
 open/edit/save/reopen smoke cover the extraction. The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain
 concrete IWA types, and the former Numbers-owned enum and compatibility path
 were removed. This ownership change has no intentional wire-format change.
-Next, extract Numbers table/sheet/formula values and then migrate the
+The physical IWA substrate slice is complete as well: raw schemas remain in
+`litchi-iwa-protos`, bounded archive and Snappy framing remain in
+`litchi-iwa-core`, the facade owns no duplicate Snappy codec, and its callers
+use the allocation-conscious slice API. The core framing suite has 17 passing
+tests. Next, extract Numbers table/sheet/formula values and then migrate the
 Pages/Keynote reader boundaries.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was

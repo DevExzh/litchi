@@ -803,11 +803,12 @@ impl IWorkPackage {
                 "package entry {normalized} is a legacy operation log, not an IWA object archive"
             )));
         }
-        let stream = SnappyStream::decompress_with_limits(
-            &mut std::io::Cursor::new(compressed),
-            self.limits.snappy_limits()?,
-        )?;
-        Ok(Archive::parse_with_limits(stream.data(), archive_limits)?)
+        let stream =
+            SnappyStream::decompress_with_limits(compressed, self.limits.snappy_limits()?)?;
+        Ok(Archive::parse_with_limits(
+            stream.as_bytes(),
+            archive_limits,
+        )?)
     }
 
     /// Serialize and replace a parsed `.iwa` package member.
@@ -1401,7 +1402,17 @@ mod tests {
         assert_eq!(package.limits(), stream_limits);
         assert_eq!(package.snapshot().limits(), stream_limits);
         let error = package.archive("Index/Document.iwa").unwrap_err();
-        assert!(error.to_string().contains("Snappy block expands"));
+        assert!(matches!(
+            error,
+            Error::IwaCore(core)
+                if matches!(
+                    core.as_ref(),
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                        ..
+                    }
+                )
+        ));
         let error = package
             .replace_archive("Index/Other.iwa", &archive())
             .unwrap_err();
@@ -1434,7 +1445,17 @@ mod tests {
         let package_limits = PackageLimits::default().with_archive_limits(byte_limits)?;
         let package = IWorkPackage::from_bytes_with_limits(&bytes, package_limits)?;
         let error = package.archive("Index/Document.iwa").unwrap_err();
-        assert!(error.to_string().contains("Snappy block expands"));
+        assert!(matches!(
+            error,
+            Error::IwaCore(core)
+                if matches!(
+                    core.as_ref(),
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                        ..
+                    }
+                )
+        ));
         Ok(())
     }
 

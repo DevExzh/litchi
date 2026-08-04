@@ -6,7 +6,6 @@
 //! Uses soapberry-zip for high-performance ZIP reading.
 
 use std::collections::HashMap;
-use std::io::Cursor;
 
 use soapberry_zip::office::ArchiveReader;
 
@@ -113,13 +112,12 @@ fn parse_direct_iwa_files(
             }
 
             // Decompress IWA file
-            let mut cursor = Cursor::new(&compressed_data);
             let decompressed =
-                SnappyStream::decompress_with_limits(&mut cursor, limits.snappy_limits()?)?;
+                SnappyStream::decompress_with_limits(&compressed_data, limits.snappy_limits()?)?;
 
             // Parse archive
             let iwa_archive = Archive::parse_with_limits(
-                decompressed.data(),
+                decompressed.as_bytes(),
                 limits.effective_archive_limits()?,
             )?;
             archives.insert(name.to_string(), iwa_archive);

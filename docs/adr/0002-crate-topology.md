@@ -79,6 +79,14 @@ selector is removed rather than retained as a compatibility alias, and the
 Numbers, Pages, and Keynote border APIs now take this canonical selector
 directly.
 
+The physical IWA substrate is layered beneath the application crate:
+`litchi-iwa-protos` owns the generated raw schemas, and `litchi-iwa-core`
+depends on it for bounded archive framing and checksum-free Snappy encoding.
+`litchi-iwa` consumes the core's typed, slice-based codec directly; its former
+633-line duplicate Snappy implementation is gone. The core layer does not open
+packages, resolve application message IDs, or own document topology, while the
+facade retains those application-level responsibilities.
+
 The first extracted semantic value layer is `litchi-iwa-text`, which owns only
 the allocation-bearing rich-text values shared by the format leaves. It has no
 archive, protobuf, or application dependency. `litchi-pages` owns the concise
@@ -88,8 +96,8 @@ The existing `litchi-iwa` package reader temporarily consumes these leaf values
 through private migration adapters. The direct edges are present in the
 canonical boundary graph because the adapters are already dependency-safe;
 their removal is a staged ownership exit, not a public compatibility layer.
-Numbers remains the next format-leaf migration, with no peer dependency between
-the three concrete crates.
+The Numbers migration continues with table, formula, and sheet ownership, with
+no peer dependency between the three concrete crates.
 
 The Numbers migration now begins with `litchi-numbers::cell`, whose concise
 `Value`, `Type`, and `Update` vocabulary is dependency-free. The IWA reader

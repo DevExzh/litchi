@@ -10,7 +10,7 @@ use crate::snappy::SnappyStream;
 use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
 use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
 use std::fs::{self, File};
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024 * 1024;
@@ -150,11 +150,11 @@ impl Limits {
     }
 
     fn snappy_limits(self) -> crate::Result<crate::snappy::SnappyLimits> {
-        crate::snappy::SnappyLimits::new(
+        Ok(crate::snappy::SnappyLimits::new(
             self.max_iwa_stream_size
                 .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
             self.max_iwa_stream_size,
-        )
+        )?)
     }
 }
 
@@ -396,9 +396,8 @@ fn read_varint(payload: &[u8], position: &mut usize) -> Option<u64> {
 }
 
 fn root_format(data: &[u8], limits: Limits) -> crate::Result<Option<Format>> {
-    let stream =
-        SnappyStream::decompress_with_limits(&mut Cursor::new(data), limits.snappy_limits()?)?;
-    let archive = Archive::parse(stream.data())?;
+    let stream = SnappyStream::decompress_with_limits(data, limits.snappy_limits()?)?;
+    let archive = Archive::parse(stream.as_bytes())?;
     let mut detected = None;
 
     for application in archive
