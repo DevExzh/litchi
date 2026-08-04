@@ -1,27 +1,19 @@
-//! Threaded comments module for XLSX files.
+//! OPC/package adapter for the canonical XLSX threaded-comments owner.
 //!
-//! This module provides structures and functions for reading and writing
-//! threaded comments (modern Excel comment threads) in XLSX workbooks.
-//!
-//! Threaded comments are a modern feature introduced in Office 365 that
-//! support conversation threads, @mentions, and richer collaboration features.
+//! Semantic values and the bounded XML codec live in
+//! [`litchi_xlsx::threaded_comments`]. This host module only resolves OPC
+//! relationships, applies MCE preprocessing, and performs package CRUD.
 
-pub mod package;
-pub mod person;
-pub mod reader;
-pub mod writer;
+mod package;
+pub(crate) mod reader;
 
-pub use package::{
-    ThreadedCommentGraph, WorkbookPersonPart, WorksheetThreadedCommentPart, add_threaded_comment,
-    add_threaded_comment_person, add_threaded_comment_reply, find_threaded_comment,
-    find_threaded_comment_person, load_threaded_comment_graph, remove_threaded_comment,
-    remove_threaded_comment_person, reorder_threaded_comment_persons, reorder_threaded_comments,
-    replace_threaded_comment, replace_threaded_comment_person, update_threaded_comment,
-    update_threaded_comment_person, validate_threaded_comment_graph,
+pub use litchi_xlsx::threaded_comments::{
+    Comment, Comments, Graph, Mention, People, Person, SheetPart, WorkbookPart,
 };
-pub use person::{Mention, Person, PersonList};
-pub use reader::{read_persons, read_threaded_comments};
-pub use writer::{write_persons, write_threaded_comments};
-
-pub use litchi_xlsx::threaded_comments::Comment as ThreadedComment;
-pub use litchi_xlsx::threaded_comments::Comments as ThreadedComments;
+pub use package::{
+    add_threaded_comment, add_threaded_comment_person, add_threaded_comment_reply,
+    find_threaded_comment, find_threaded_comment_person, load_threaded_comment_graph,
+    remove_threaded_comment, remove_threaded_comment_person, reorder_threaded_comment_persons,
+    reorder_threaded_comments, replace_threaded_comment, replace_threaded_comment_person,
+    update_threaded_comment, update_threaded_comment_person,
+};

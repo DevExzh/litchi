@@ -1,13 +1,14 @@
 use litchi_ooxml::xlsx::{
-    Mention, Person, ThreadedComment, add_threaded_comment, add_threaded_comment_person,
-    add_threaded_comment_reply, find_threaded_comment, find_threaded_comment_person,
-    load_threaded_comment_graph, remove_threaded_comment, remove_threaded_comment_person,
-    reorder_threaded_comment_persons, reorder_threaded_comments, replace_threaded_comment,
-    replace_threaded_comment_person, update_threaded_comment, update_threaded_comment_person,
+    add_threaded_comment, add_threaded_comment_person, add_threaded_comment_reply,
+    find_threaded_comment, find_threaded_comment_person, load_threaded_comment_graph,
+    remove_threaded_comment, remove_threaded_comment_person, reorder_threaded_comment_persons,
+    reorder_threaded_comments, replace_threaded_comment, replace_threaded_comment_person,
+    update_threaded_comment, update_threaded_comment_person,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_xlsx::threaded_comments::{Comment, Mention, Person};
 
 const PERSON_A: &str = "{11111111-1111-4111-8111-111111111111}";
 const PERSON_B: &str = "{22222222-2222-4222-8222-222222222222}";
@@ -71,8 +72,8 @@ fn person(id: &str, name: &str) -> Person {
     }
 }
 
-fn root(id: &str, person_id: &str, cell_ref: &str, text: &str) -> ThreadedComment {
-    ThreadedComment {
+fn root(id: &str, person_id: &str, cell_ref: &str, text: &str) -> Comment {
+    Comment {
         cell_ref: Some(cell_ref.into()),
         id: id.into(),
         parent_id: None,
@@ -84,8 +85,8 @@ fn root(id: &str, person_id: &str, cell_ref: &str, text: &str) -> ThreadedCommen
     }
 }
 
-fn reply(id: &str, person_id: &str, text: &str) -> ThreadedComment {
-    ThreadedComment {
+fn reply(id: &str, person_id: &str, text: &str) -> Comment {
+    Comment {
         cell_ref: None,
         id: id.into(),
         parent_id: None,

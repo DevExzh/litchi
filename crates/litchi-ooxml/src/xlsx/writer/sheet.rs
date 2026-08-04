@@ -24,6 +24,7 @@ use litchi_core::{id::generate_guid_braced, xml::escape::escape_xml};
 use litchi_drawingml::blip::write_embed_id;
 use litchi_drawingml::ext::write_creation_id;
 use litchi_drawingml::fill::write_stretch_rect;
+use litchi_xlsx::threaded_comments::Comment;
 use std::collections::HashMap;
 use std::fmt::{self, Write as FmtWrite};
 use std::str::FromStr;
@@ -481,7 +482,7 @@ pub struct MutableWorksheet {
     /// Tables in this worksheet
     tables: Vec<Table>,
     /// Threaded comments for this worksheet
-    threaded_comments: Vec<crate::xlsx::ThreadedComment>,
+    threaded_comments: Vec<Comment>,
     /// Whether the worksheet has been modified
     modified: bool,
 }
@@ -1249,12 +1250,12 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ooxml::xlsx::{Workbook, ThreadedComment};
+    /// use litchi_ooxml::xlsx::{Workbook, threaded_comments::Comment};
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
     ///
-    /// let comment = ThreadedComment {
+    /// let comment = Comment {
     ///     cell_ref: Some("A1".to_string()),
     ///     id: "{22222222-2222-2222-2222-222222222222}".to_string(),
     ///     person_id: "{11111111-1111-1111-1111-111111111111}".to_string(),
@@ -1266,13 +1267,13 @@ impl MutableWorksheet {
     /// wb.save("output.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn add_threaded_comment(&mut self, comment: crate::xlsx::ThreadedComment) {
+    pub fn add_threaded_comment(&mut self, comment: Comment) {
         self.threaded_comments.push(comment);
         self.modified = true;
     }
 
     /// Get all threaded comments in the worksheet.
-    pub fn threaded_comments(&self) -> &[crate::xlsx::ThreadedComment] {
+    pub fn threaded_comments(&self) -> &[Comment] {
         &self.threaded_comments
     }
 

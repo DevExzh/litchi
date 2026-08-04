@@ -4,12 +4,12 @@ use litchi_core::sheet::Result as SheetResult;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Relationships};
 
-use super::ThreadedComments;
-use super::person::PersonList;
-use litchi_xlsx::threaded_comments::MAX_PART_BYTES;
+use litchi_xlsx::threaded_comments::{
+    Comments, MAX_PART_BYTES, People, parse_comments, parse_persons,
+};
 
 /// Read the person list related to the workbook's actual main-document part.
-pub fn read_persons(package: &OpcPackage) -> SheetResult<Option<PersonList>> {
+pub(crate) fn read_persons(package: &OpcPackage) -> SheetResult<Option<People>> {
     let workbook_part = package.main_document_part()?;
     let Some(persons_uri) = related_part_uri(workbook_part.rels(), rt::PERSONS, "people")? else {
         return Ok(None);
@@ -21,14 +21,14 @@ pub fn read_persons(package: &OpcPackage) -> SheetResult<Option<PersonList>> {
     }
     let bytes = litchi_ooxml_common::mce::process_part(persons_part)?;
     let xml = std::str::from_utf8(bytes.as_ref())?;
-    Ok(Some(litchi_xlsx::threaded_comments::parse_persons(xml)?))
+    Ok(Some(parse_persons(xml)?))
 }
 
 /// Read the threaded-comments part related to a worksheet.
-pub fn read_threaded_comments(
+pub(crate) fn read_threaded_comments(
     package: &OpcPackage,
     worksheet_uri: &PackURI,
-) -> SheetResult<Option<ThreadedComments>> {
+) -> SheetResult<Option<Comments>> {
     let worksheet_part = package.get_part(worksheet_uri)?;
     let Some(comments_uri) = related_part_uri(
         worksheet_part.rels(),
@@ -49,7 +49,7 @@ pub fn read_threaded_comments(
     }
     let bytes = litchi_ooxml_common::mce::process_part(comments_part)?;
     let xml = std::str::from_utf8(bytes.as_ref())?;
-    Ok(Some(litchi_xlsx::threaded_comments::parse_comments(xml)?))
+    Ok(Some(parse_comments(xml)?))
 }
 
 fn related_part_uri(

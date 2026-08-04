@@ -65,6 +65,7 @@ use litchi_ooxml_common::web;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsx::chain::{self, Chain, Conformance as ChainConformance};
 use litchi_xlsx::raw::web as raw_web;
+use litchi_xlsx::threaded_comments::{Comment, Comments, People, write_comments, write_persons};
 use litchi_xlsx::web::{Bindings, Refs};
 use std::collections::{HashMap, HashSet};
 use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
@@ -2081,8 +2082,8 @@ impl Workbook {
     ///
     /// Persons are used in threaded comments to identify comment authors.
     /// Returns `None` if no person list is present in the workbook.
-    pub fn persons(&self) -> SheetResult<Option<crate::xlsx::PersonList>> {
-        crate::xlsx::read_persons(self.package())
+    pub fn persons(&self) -> SheetResult<Option<People>> {
+        crate::xlsx::threaded_comments::reader::read_persons(self.package())
     }
 
     /// Read threaded comments for a specific worksheet by index.
@@ -2094,17 +2095,17 @@ impl Workbook {
     /// * `sheet_index` - Zero-based worksheet index
     ///
     /// Returns `None` if the worksheet has no threaded comments.
-    pub fn threaded_comments(
-        &self,
-        sheet_index: usize,
-    ) -> SheetResult<Option<crate::xlsx::ThreadedComments>> {
+    pub fn threaded_comments(&self, sheet_index: usize) -> SheetResult<Option<Comments>> {
         let ws_info = self
             .worksheets
             .get(sheet_index)
             .ok_or("Worksheet index out of bounds")?;
 
         let worksheet_uri = self.worksheet_part_uri(ws_info)?;
-        let comments = crate::xlsx::read_threaded_comments(self.package(), &worksheet_uri)?;
+        let comments = crate::xlsx::threaded_comments::reader::read_threaded_comments(
+            self.package(),
+            &worksheet_uri,
+        )?;
         if let Some(comments) = comments.as_ref() {
             let people = self.persons()?;
             validate_threaded_comment_people(comments.comments.iter(), people.as_ref())?;
@@ -2118,10 +2119,7 @@ impl Workbook {
     /// * `sheet_name` - Name of the worksheet
     ///
     /// Returns `None` if the worksheet has no threaded comments.
-    pub fn threaded_comments_by_name(
-        &self,
-        sheet_name: &str,
-    ) -> SheetResult<Option<crate::xlsx::ThreadedComments>> {
+    pub fn threaded_comments_by_name(&self, sheet_name: &str) -> SheetResult<Option<Comments>> {
         let sheet_index = self
             .worksheets
             .iter()
@@ -2441,10 +2439,10 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ooxml::xlsx::{Workbook, Person, PersonList};
+    /// use litchi_ooxml::xlsx::{threaded_comments::{People, Person}, Workbook};
     ///
     /// let mut wb = Workbook::create()?;
-    /// let mut person_list = PersonList::default();
+    /// let mut person_list = People::default();
     /// person_list.persons.push(Person {
     ///     display_name: "John Doe".to_string(),
     ///     id: "{11111111-2222-3333-4444-555555555555}".to_string(),
@@ -2454,7 +2452,7 @@ impl Workbook {
     /// wb.set_person_list(person_list);
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn set_person_list(&mut self, person_list: crate::xlsx::PersonList) {
+    pub fn set_person_list(&mut self, person_list: People) {
         if self.mutable_data.is_none() {
             self.mutable_data = Some(MutableWorkbookData::new());
         }
@@ -3078,7 +3076,7 @@ impl Workbook {
     }
 
     /// Generate bridge comments.xml for threaded comments backwards compatibility.
-    fn generate_bridge_comments_xml(threaded_comments: &crate::xlsx::ThreadedComments) -> String {
+    fn generate_bridge_comments_xml(threaded_comments: &Comments) -> String {
         use litchi_core::xml::escape::escape_xml;
         use std::collections::HashMap;
 
@@ -3090,8 +3088,7 @@ impl Workbook {
         // Build author list and comment grouping
         let mut authors = Vec::new();
         let mut author_map: HashMap<String, usize> = HashMap::new();
-        let mut comments_by_cell: HashMap<String, Vec<&crate::xlsx::ThreadedComment>> =
-            HashMap::new();
+        let mut comments_by_cell: HashMap<String, Vec<&Comment>> = HashMap::new();
 
         // Group comments by cell
         for comment in &threaded_comments.comments {
@@ -3413,7 +3410,7 @@ impl Workbook {
         if let Some(person_list) = data.person_list.as_ref()
             && !person_list.persons.is_empty()
         {
-            let persons_xml = crate::xlsx::write_persons(person_list)?;
+            let persons_xml = write_persons(person_list)?;
             let persons_uri = PackURI::new("/xl/persons/person.xml")?;
             let persons_part = BlobPart::new(
                 persons_uri,
@@ -3493,10 +3490,10 @@ impl Workbook {
 
             // Generate and add threaded comments if present
             if !ws.threaded_comments().is_empty() {
-                let threaded_comments = crate::xlsx::ThreadedComments {
+                let threaded_comments = Comments {
                     comments: ws.threaded_comments().to_vec(),
                 };
-                let tc_xml = crate::xlsx::write_threaded_comments(&threaded_comments)?;
+                let tc_xml = write_comments(&threaded_comments)?;
                 let tc_uri = PackURI::new(format!(
                     "/xl/threadedComments/threadedComment{}.xml",
                     ws.sheet_id()
@@ -4758,8 +4755,8 @@ fn validate_workbook_tables(data: &MutableWorkbookData) -> SheetResult<()> {
 }
 
 fn validate_threaded_comment_people<'a>(
-    comments: impl IntoIterator<Item = &'a crate::xlsx::ThreadedComment>,
-    person_list: Option<&crate::xlsx::PersonList>,
+    comments: impl IntoIterator<Item = &'a Comment>,
+    person_list: Option<&People>,
 ) -> SheetResult<()> {
     use std::collections::HashSet;
 
@@ -4809,11 +4806,13 @@ mod tests {
     use litchi_xlsx::web::{Binding as SheetBinding, Bindings};
     use std::panic::{AssertUnwindSafe, catch_unwind};
 
+    use litchi_xlsx::threaded_comments::{Comment, Mention, People, Person};
+
     use crate::xlsx::{
         ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
         ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
-        ChartUserShapesRelationshipTarget, Mention, Person, PersonList, ProtectionPasswordVerifier,
-        StrongProtectionPasswordVerifier, Table, TableColumn, ThreadedComment, WorksheetChart,
+        ChartUserShapesRelationshipTarget, ProtectionPasswordVerifier,
+        StrongProtectionPasswordVerifier, Table, TableColumn, WorksheetChart,
     };
 
     #[test]
@@ -5990,13 +5989,13 @@ mod tests {
     fn validates_threaded_comment_people_references() {
         let person_id = "{11111111-1111-1111-1111-111111111111}";
         let missing_id = "{22222222-2222-2222-2222-222222222222}";
-        let people = PersonList {
+        let people = People {
             persons: vec![Person {
                 id: person_id.into(),
                 ..Default::default()
             }],
         };
-        let comment = ThreadedComment {
+        let comment = Comment {
             id: "{33333333-3333-3333-3333-333333333333}".into(),
             person_id: person_id.into(),
             mentions: vec![Mention {

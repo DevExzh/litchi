@@ -14,6 +14,7 @@ use super::styles::StylesBuilder;
 use crate::xlsx::ProtectionPasswordVerifier;
 pub use crate::xlsx::workbook_protection::WorkbookProtectionMetadata as WorkbookProtection;
 use crate::xlsx::workbook_protection::write_workbook_protection;
+use litchi_xlsx::threaded_comments::People;
 
 /// Type alias for cell position to style index mapping.
 type CellStyleMap = HashMap<(u32, u32), usize>;
@@ -373,7 +374,7 @@ pub struct MutableWorkbookData {
     pub modified: bool,
     pub pivot_tables: Vec<WritablePivotTable>,
     /// Person list for threaded comments
-    pub person_list: Option<crate::xlsx::PersonList>,
+    pub person_list: Option<People>,
     /// Chart sheets authored in this workbook, in insertion order
     pub chart_sheets: Vec<super::chart_sheet::MutableChartSheet>,
     /// Sheet slots in workbook order, interleaving worksheets and

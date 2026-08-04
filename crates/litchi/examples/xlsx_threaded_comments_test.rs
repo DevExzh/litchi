@@ -9,7 +9,10 @@
 //! # -> threaded_comments_examples/comments_with_threads.xlsx
 //! ```
 
-use litchi::ooxml::xlsx::{Mention, Person, PersonList, ThreadedComment, Workbook};
+use litchi::ooxml::xlsx::{
+    Workbook,
+    threaded_comments::{Comment, Mention, People, Person},
+};
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -40,7 +43,7 @@ fn generate_basic_example(path: &Path) -> ExampleResult<()> {
     let mut wb = Workbook::create()?;
 
     // Create person list for comment authors
-    let mut person_list = PersonList::default();
+    let mut person_list = People::default();
     person_list.persons.push(Person {
         display_name: "John Smith".to_string(),
         id: "{11111111-2222-3333-4444-555555555555}".to_string(),
@@ -80,7 +83,7 @@ fn generate_basic_example(path: &Path) -> ExampleResult<()> {
     sheet.set_cell_value(4, 4, "Low");
 
     // Add threaded comments to specific cells
-    let comment1 = ThreadedComment {
+    let comment1 = Comment {
         cell_ref: Some("B2".to_string()),
         id: "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}".to_string(),
         person_id: "{11111111-2222-3333-4444-555555555555}".to_string(),
@@ -91,7 +94,7 @@ fn generate_basic_example(path: &Path) -> ExampleResult<()> {
         mentions: Vec::new(),
     };
 
-    let comment2 = ThreadedComment {
+    let comment2 = Comment {
         cell_ref: Some("B3".to_string()),
         id: "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}".to_string(),
         person_id: "{22222222-3333-4444-5555-666666666666}".to_string(),
@@ -102,7 +105,7 @@ fn generate_basic_example(path: &Path) -> ExampleResult<()> {
         mentions: Vec::new(),
     };
 
-    let comment3 = ThreadedComment {
+    let comment3 = Comment {
         cell_ref: Some("B4".to_string()),
         id: "{C3D4E5F6-A7B8-9012-CDEF-123456789012}".to_string(),
         person_id: "{11111111-2222-3333-4444-555555555555}".to_string(),
@@ -126,7 +129,7 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     let mut wb = Workbook::create()?;
 
     // Create person list for comment authors
-    let mut person_list = PersonList::default();
+    let mut person_list = People::default();
     person_list.persons.push(Person {
         display_name: "John Smith".to_string(),
         id: "{11111111-2222-3333-4444-555555555555}".to_string(),
@@ -164,7 +167,7 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     sheet.set_cell_value(3, 3, "2024-02-15");
 
     // Create a conversation thread with replies
-    let main_comment = ThreadedComment {
+    let main_comment = Comment {
         cell_ref: Some("A2".to_string()),
         id: "{D4E5F6A7-A8B9-0123-DEFA-234567890123}".to_string(),
         person_id: "{33333333-4444-5555-6666-777777777777}".to_string(),
@@ -176,7 +179,7 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     };
 
     // Reply to the main comment
-    let reply1 = ThreadedComment {
+    let reply1 = Comment {
         cell_ref: Some("A2".to_string()),
         id: "{E5F6A7B8-A9B0-1234-EFAB-345678901234}".to_string(),
         person_id: "{11111111-2222-3333-4444-555555555555}".to_string(),
@@ -188,7 +191,7 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     };
 
     // Another reply with @mention
-    let reply2 = ThreadedComment {
+    let reply2 = Comment {
         cell_ref: Some("A2".to_string()),
         id: "{F6A7B8C9-A0B1-2345-FABC-456789012345}".to_string(),
         person_id: "{22222222-3333-4444-5555-666666666666}".to_string(),
@@ -205,7 +208,7 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     };
 
     // Resolved comment on another cell
-    let resolved_comment = ThreadedComment {
+    let resolved_comment = Comment {
         cell_ref: Some("A3".to_string()),
         id: "{A7B8C9D0-A1B2-3456-ABCD-567890123456}".to_string(),
         person_id: "{11111111-2222-3333-4444-555555555555}".to_string(),

@@ -339,16 +339,14 @@ pub use writer::{
     WorkbookProtection, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec,
     XlsxGroupSpec, XlsxShapeSpec,
 };
-// Re-export threaded comments types
+// Re-export host package CRUD; semantic values remain under the canonical
+// `xlsx::threaded_comments` owner facade.
 pub use threaded_comments::{
-    Mention, Person, PersonList, ThreadedComment, ThreadedCommentGraph, ThreadedComments,
-    WorkbookPersonPart, WorksheetThreadedCommentPart, add_threaded_comment,
-    add_threaded_comment_person, add_threaded_comment_reply, find_threaded_comment,
-    find_threaded_comment_person, load_threaded_comment_graph, read_persons,
-    read_threaded_comments, remove_threaded_comment, remove_threaded_comment_person,
-    reorder_threaded_comment_persons, reorder_threaded_comments, replace_threaded_comment,
-    replace_threaded_comment_person, update_threaded_comment, update_threaded_comment_person,
-    validate_threaded_comment_graph, write_persons, write_threaded_comments,
+    add_threaded_comment, add_threaded_comment_person, add_threaded_comment_reply,
+    find_threaded_comment, find_threaded_comment_person, load_threaded_comment_graph,
+    remove_threaded_comment, remove_threaded_comment_person, reorder_threaded_comment_persons,
+    reorder_threaded_comments, replace_threaded_comment, replace_threaded_comment_person,
+    update_threaded_comment, update_threaded_comment_person,
 };
 pub mod timelines;
 pub use timelines::{

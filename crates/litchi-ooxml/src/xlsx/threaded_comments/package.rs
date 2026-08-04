@@ -7,24 +7,18 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
-use super::{
-    Person, PersonList, ThreadedComment, ThreadedComments, read_persons, read_threaded_comments,
-    write_persons, write_threaded_comments,
+use super::reader::{read_persons, read_threaded_comments};
+use litchi_xlsx::threaded_comments::{
+    Comment, Comments, Graph, People, Person, SheetPart, WorkbookPart, validate_graph,
+    write_comments, write_persons,
 };
 
-/// Historical host name for the package-neutral workbook part.
-pub type WorkbookPersonPart = litchi_xlsx::threaded_comments::WorkbookPart;
-/// Historical host name for the package-neutral worksheet part.
-pub type WorksheetThreadedCommentPart = litchi_xlsx::threaded_comments::SheetPart;
-/// Historical host name for the package-neutral graph.
-pub type ThreadedCommentGraph = litchi_xlsx::threaded_comments::Graph;
-
 /// Load and cross-validate all persons and worksheet comment threads.
-pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<ThreadedCommentGraph> {
+pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<Graph> {
     let workbook = package.main_document_part()?;
     let persons_relationship = one_internal_relationship(workbook, rt::PERSONS, "persons")?;
     let persons = match (persons_relationship, read_persons(package)?) {
-        (Some((relationship_id, part_name)), Some(persons)) => Some(WorkbookPersonPart {
+        (Some((relationship_id, part_name)), Some(persons)) => Some(WorkbookPart {
             relationship_id,
             part_name: part_name.to_string(),
             persons,
@@ -52,7 +46,7 @@ pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<Threaded
         };
         let comments = read_threaded_comments(package, &worksheet_name)?
             .ok_or("inconsistent threaded-comments relationship graph")?;
-        worksheets.push(WorksheetThreadedCommentPart {
+        worksheets.push(SheetPart {
             worksheet_part_name: worksheet_name.to_string(),
             relationship_id,
             part_name: part_name.to_string(),
@@ -60,11 +54,11 @@ pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<Threaded
         });
     }
     worksheets.sort_by(|left, right| left.worksheet_part_name.cmp(&right.worksheet_part_name));
-    let graph = ThreadedCommentGraph {
+    let graph = Graph {
         persons,
         worksheets,
     };
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     Ok(graph)
 }
 
@@ -85,7 +79,7 @@ pub fn find_threaded_comment_person(
 pub fn add_threaded_comment_person(
     package: &mut OpcPackage,
     person: Person,
-) -> SheetResult<WorkbookPersonPart> {
+) -> SheetResult<WorkbookPart> {
     let mut graph = load_threaded_comment_graph(package)?;
     if graph.persons.as_ref().is_some_and(|part| {
         part.persons
@@ -98,7 +92,7 @@ pub fn add_threaded_comment_person(
     if let Some(mut part) = graph.persons.take() {
         part.persons.persons.push(person);
         graph.persons = Some(part.clone());
-        validate_threaded_comment_graph(&graph)?;
+        validate_graph(&graph)?;
         commit_person_part(package, &part)?;
         return Ok(part);
     }
@@ -106,15 +100,15 @@ pub fn add_threaded_comment_person(
     let workbook_name = package.main_document_part()?.partname().clone();
     let part_name = next_person_part_name(package)?;
     let relationship_id = next_relationship_id(package.get_part(&workbook_name)?, "rIdPersons")?;
-    let part = WorkbookPersonPart {
+    let part = WorkbookPart {
         relationship_id: relationship_id.clone(),
         part_name: part_name.to_string(),
-        persons: PersonList {
+        persons: People {
             persons: vec![person],
         },
     };
     graph.persons = Some(part.clone());
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     let xml = write_persons(&part.persons)?.into_bytes();
     package.try_add_part(Box::new(BlobPart::new(
         part_name.clone(),
@@ -159,7 +153,7 @@ where
         return Err("threaded-comment person update cannot change its ID".into());
     }
     graph.persons = Some(part.clone());
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     commit_person_part(package, &part)?;
     Ok(true)
 }
@@ -205,13 +199,13 @@ pub fn remove_threaded_comment_person(
     part.persons.persons.remove(index);
     if !part.persons.persons.is_empty() {
         graph.persons = Some(part.clone());
-        validate_threaded_comment_graph(&graph)?;
+        validate_graph(&graph)?;
         commit_person_part(package, &part)?;
         return Ok(true);
     }
 
     graph.persons = None;
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     let workbook_name = package.main_document_part()?.partname().clone();
     let part_name = PackURI::new(&part.part_name)?;
     package
@@ -244,7 +238,7 @@ pub fn reorder_threaded_comment_persons(
     )?;
     part.persons.persons = ordered.clone();
     graph.persons = Some(part.clone());
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     commit_person_part(package, &part)?;
     Ok(ordered)
 }
@@ -254,7 +248,7 @@ pub fn find_threaded_comment(
     worksheet_part_name: &PackURI,
     cell_ref: &str,
     comment_id: &str,
-) -> SheetResult<Option<ThreadedComment>> {
+) -> SheetResult<Option<Comment>> {
     let graph = load_threaded_comment_graph(package)?;
     let Some(sheet) = graph
         .worksheets
@@ -278,8 +272,8 @@ pub fn find_threaded_comment(
 pub fn add_threaded_comment(
     package: &mut OpcPackage,
     worksheet_part_name: &PackURI,
-    comment: ThreadedComment,
-) -> SheetResult<WorksheetThreadedCommentPart> {
+    comment: Comment,
+) -> SheetResult<SheetPart> {
     let mut graph = load_threaded_comment_graph(package)?;
     if graph.worksheets.iter().any(|sheet| {
         sheet
@@ -296,7 +290,7 @@ pub fn add_threaded_comment(
         .position(|sheet| sheet.worksheet_part_name == worksheet_part_name.to_string())
     {
         graph.worksheets[index].comments.comments.push(comment);
-        validate_threaded_comment_graph(&graph)?;
+        validate_graph(&graph)?;
         let part = graph.worksheets[index].clone();
         commit_comment_part(package, &part)?;
         return Ok(part);
@@ -308,17 +302,17 @@ pub fn add_threaded_comment(
         package.get_part(worksheet_part_name)?,
         "rIdThreadedComments",
     )?;
-    let part = WorksheetThreadedCommentPart {
+    let part = SheetPart {
         worksheet_part_name: worksheet_part_name.to_string(),
         relationship_id: relationship_id.clone(),
         part_name: part_name.to_string(),
-        comments: ThreadedComments {
+        comments: Comments {
             comments: vec![comment],
         },
     };
     graph.worksheets.push(part.clone());
-    validate_threaded_comment_graph(&graph)?;
-    let xml = write_threaded_comments(&part.comments)?.into_bytes();
+    validate_graph(&graph)?;
+    let xml = write_comments(&part.comments)?.into_bytes();
     package.try_add_part(Box::new(BlobPart::new(
         part_name.clone(),
         ct::SML_THREADED_COMMENTS.into(),
@@ -342,8 +336,8 @@ pub fn add_threaded_comment_reply(
     worksheet_part_name: &PackURI,
     cell_ref: &str,
     parent_id: &str,
-    mut reply: ThreadedComment,
-) -> SheetResult<WorksheetThreadedCommentPart> {
+    mut reply: Comment,
+) -> SheetResult<SheetPart> {
     let parent = find_threaded_comment(package, worksheet_part_name, cell_ref, parent_id)?
         .ok_or("threaded-comment parent was not found at the requested cell")?;
     if parent.parent_id.is_some() {
@@ -362,7 +356,7 @@ pub fn update_threaded_comment<F>(
     update: F,
 ) -> SheetResult<bool>
 where
-    F: FnOnce(&mut ThreadedComment),
+    F: FnOnce(&mut Comment),
 {
     let mut graph = load_threaded_comment_graph(package)?;
     let Some(sheet_index) = graph
@@ -388,7 +382,7 @@ where
     if graph.worksheets[sheet_index].comments.comments[comment_index].id != comment_id {
         return Err("threaded-comment update cannot change its ID".into());
     }
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     let part = graph.worksheets[sheet_index].clone();
     commit_comment_part(package, &part)?;
     Ok(true)
@@ -399,7 +393,7 @@ pub fn replace_threaded_comment(
     worksheet_part_name: &PackURI,
     cell_ref: &str,
     comment_id: &str,
-    replacement: ThreadedComment,
+    replacement: Comment,
 ) -> SheetResult<bool> {
     if replacement.id != comment_id {
         return Err("replacement threaded-comment ID must match".into());
@@ -452,14 +446,14 @@ pub fn remove_threaded_comment(
         .comments
         .remove(comment_index);
     if !graph.worksheets[sheet_index].comments.comments.is_empty() {
-        validate_threaded_comment_graph(&graph)?;
+        validate_graph(&graph)?;
         let part = graph.worksheets[sheet_index].clone();
         commit_comment_part(package, &part)?;
         return Ok(true);
     }
 
     let part = graph.worksheets.remove(sheet_index);
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     let part_name = PackURI::new(&part.part_name)?;
     package
         .get_part_mut(worksheet_part_name)?
@@ -476,7 +470,7 @@ pub fn reorder_threaded_comments(
     package: &mut OpcPackage,
     worksheet_part_name: &PackURI,
     ordered_comment_ids: &[String],
-) -> SheetResult<Vec<ThreadedComment>> {
+) -> SheetResult<Vec<Comment>> {
     let mut graph = load_threaded_comment_graph(package)?;
     let Some(sheet_index) = graph
         .worksheets
@@ -495,17 +489,13 @@ pub fn reorder_threaded_comments(
         "threaded comment",
     )?;
     graph.worksheets[sheet_index].comments.comments = ordered.clone();
-    validate_threaded_comment_graph(&graph)?;
+    validate_graph(&graph)?;
     let part = graph.worksheets[sheet_index].clone();
     commit_comment_part(package, &part)?;
     Ok(ordered)
 }
 
-pub fn validate_threaded_comment_graph(graph: &ThreadedCommentGraph) -> SheetResult<()> {
-    litchi_xlsx::threaded_comments::validate_graph(graph)
-}
-
-fn commit_person_part(package: &mut OpcPackage, part: &WorkbookPersonPart) -> SheetResult<()> {
+fn commit_person_part(package: &mut OpcPackage, part: &WorkbookPart) -> SheetResult<()> {
     let xml = write_persons(&part.persons)?.into_bytes();
     let part_name = PackURI::new(&part.part_name)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
@@ -513,11 +503,8 @@ fn commit_person_part(package: &mut OpcPackage, part: &WorkbookPersonPart) -> Sh
     Ok(())
 }
 
-fn commit_comment_part(
-    package: &mut OpcPackage,
-    part: &WorksheetThreadedCommentPart,
-) -> SheetResult<()> {
-    let xml = write_threaded_comments(&part.comments)?.into_bytes();
+fn commit_comment_part(package: &mut OpcPackage, part: &SheetPart) -> SheetResult<()> {
+    let xml = write_comments(&part.comments)?.into_bytes();
     let part_name = PackURI::new(&part.part_name)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
     package.unsign();
@@ -548,10 +535,7 @@ fn one_internal_relationship(
     )))
 }
 
-fn resolved_cell_ref<'a>(
-    comments: &'a ThreadedComments,
-    comment: &'a ThreadedComment,
-) -> Option<&'a str> {
+fn resolved_cell_ref<'a>(comments: &'a Comments, comment: &'a Comment) -> Option<&'a str> {
     if let Some(cell_ref) = comment.cell_ref.as_deref() {
         return Some(cell_ref);
     }

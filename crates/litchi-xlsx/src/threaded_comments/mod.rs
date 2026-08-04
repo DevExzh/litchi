@@ -6,6 +6,9 @@
 mod codec;
 mod model;
 
+#[cfg(test)]
+mod tests;
+
 pub use codec::{
     parse_comments, parse_persons, validate_comments, validate_graph, validate_guid,
     validate_people, validate_timestamp, write_comments, write_persons,
