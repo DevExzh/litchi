@@ -352,19 +352,19 @@ impl Spreadsheet {
         crate::form::parse_form_parts(&parts)
     }
 
-    pub fn rdf_graphs(&self) -> Result<Vec<crate::Graph>> {
+    pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
         crate::rdf::graphs(&self.package)
     }
     pub fn add_rdf_graph(
         &mut self,
         preferred_path: Option<&str>,
-        triples: &[crate::Triple],
+        triples: &[crate::rdf::Triple],
     ) -> Result<String> {
         let (bytes, path) = crate::rdf::add_graph(&self.package, preferred_path, triples)?;
         *self = Self::from_bytes(bytes)?;
         Ok(path)
     }
-    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::Triple]) -> Result<()> {
+    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
         let bytes = crate::rdf::replace_graph(&self.package, path, triples)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
@@ -374,7 +374,7 @@ impl Spreadsheet {
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
-    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::Triple) -> Result<usize> {
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<usize> {
         let index = self
             .rdf_graphs()?
             .into_iter()
@@ -390,7 +390,7 @@ impl Spreadsheet {
         &mut self,
         path: &str,
         index: usize,
-        triple: &crate::Triple,
+        triple: &crate::rdf::Triple,
     ) -> Result<()> {
         let bytes = crate::rdf::replace_triple(&self.package, path, index, triple)?;
         *self = Self::from_bytes(bytes)?;

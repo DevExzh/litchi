@@ -14,7 +14,10 @@
       "litchi-iwa",
       "litchi-markdown",
       "litchi-odf",
+      "litchi-odp",
       "litchi-odraw",
+      "litchi-ods",
+      "litchi-odt",
       "litchi-ooxml-common",
       "litchi-ppt",
       "litchi-pptx",
@@ -74,17 +77,33 @@
       "litchi-core"
     ],
     "litchi-odf": [
-      "litchi-core",
       "litchi-eval",
       "litchi-odf-common",
-      "soapberry-zip",
-      "xml-minifier"
+      "litchi-odp",
+      "litchi-ods",
+      "litchi-odt"
     ],
     "litchi-odf-common": [
       "litchi-core",
       "soapberry-zip"
     ],
+    "litchi-odp": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
     "litchi-odraw": [],
+    "litchi-ods": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odt": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
     "litchi-ograph": [
       "litchi-cfb",
       "litchi-core"
@@ -270,7 +289,10 @@
     "litchi-drawingml",
     "litchi-eval",
     "litchi-odf-common",
+    "litchi-odp",
     "litchi-odraw",
+    "litchi-ods",
+    "litchi-odt",
     "litchi-ograph",
     "litchi-ole-common",
     "litchi-ooxml-common",

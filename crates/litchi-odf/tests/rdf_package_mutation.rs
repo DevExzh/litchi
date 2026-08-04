@@ -1,6 +1,6 @@
 use litchi_odf::{
-    Document, Object, OwnedPackage, PackageWriter, Presentation, Spreadsheet, Subject, Triple,
-    constants,
+    Document, OwnedPackage, PackageWriter, Presentation, Spreadsheet, constants,
+    rdf::{Object, Subject, Triple},
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
