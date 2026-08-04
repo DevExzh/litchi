@@ -11,6 +11,7 @@ pub mod cell_watches;
 pub mod chain;
 pub mod column;
 pub mod connections;
+pub mod data_consolidation;
 pub mod data_validation;
 mod error;
 pub mod formula;
@@ -20,6 +21,7 @@ pub mod merge;
 mod outline;
 pub mod outline_properties;
 pub mod page_margins;
+pub mod page_setup;
 pub mod phonetic_properties;
 pub mod print_options;
 pub mod raw;
@@ -46,6 +48,12 @@ pub use cell_watches::{
     parse_worksheet_cell_watches, write_worksheet_cell_watches,
 };
 pub use column::{Column, Columns, Width, WidthAt};
+pub use data_consolidation::{
+    WorksheetDataConsolidation, WorksheetDataConsolidationConformance,
+    WorksheetDataConsolidationFunction, WorksheetDataConsolidationRangeReference,
+    WorksheetDataReference, WorksheetDataReferenceSource, WorksheetDataReferences,
+    parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
+};
 pub use data_validation::{
     DataValidationCollection, DataValidationConformance, DataValidationFormula,
     DataValidationRange, DataValidationSource, DataValidationSqref, ParsedDataValidation,
@@ -70,6 +78,11 @@ pub use litchi_sheet::{
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
+pub use page_setup::{
+    Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, LexicalError, Measure, Order, Orientation,
+    Paper, RangeError, RelId, Scale, Setup, Unit, parse_worksheet_page_setup,
+    parse_worksheet_page_setup_relationship_id,
+};
 pub use phonetic_properties::{
     WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
     parse_worksheet_phonetic_properties,

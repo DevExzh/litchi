@@ -3712,6 +3712,39 @@ compilation because `pkg-config`/fontconfig is unavailable. This is functional
 and boundary evidence; native Office and performance evidence remain governed
 by the evidence levels below.
 
+## PPTX properties and XLSX worksheet-settings owner follow-up
+
+The next concrete-crate migration batch closes four additional codec seams
+while retaining the historical `litchi-ooxml` module paths as thin adapters:
+
+- PresentationML presentation properties, typed print/web/show values, and
+  inert extension payloads now live in `litchi-pptx::presentation_properties`.
+- PresentationML view, pane, guide, splitter, and slide-list values now live
+  in `litchi-pptx::view_properties`. Presentation/package relationship
+  traversal remains in the OOXML host and crosses the typed PPTX error
+  boundary.
+- SpreadsheetML `dataConsolidate`, `dataRefs`, and `dataRef` values now live in
+  `litchi-xlsx::data_consolidation`, including checked A1 references, source
+  relationship identifiers, bounded counts, and deterministic serialization.
+- SpreadsheetML worksheet `pageSetup` values now live in
+  `litchi-xlsx::page_setup`; printer-settings relationship projection remains
+  in the host printer-settings adapter while the owner validates the typed
+  relationship identifier.
+
+The codec choices were checked against the checked-in `[MS-OE376]` 2.1.24
+(Part 1 §13.3.7 presentation properties), 2.1.1148 (Part 4 §4.3.2.6 normal
+view properties), and 2.1.666--2.1.667 (Part 4 §3.3.1.60--61 page margins and
+page setup) references, the `[MS-OI29500]` 2.1.612 (Part 1 §18.3.1.29
+`dataConsolidate`) and 2.1.637--2.1.638 page-settings references, and the
+checked-in `[MS-PPTX]` presentation-properties extension structures. Owner
+tests pass: 171 PPTX and 311 XLSX unit tests. The full host package suite also
+passes 1,671 unit tests plus its integration and doctest targets. Owner
+all-features Clippy, host default all-target Clippy, boundary, and formatting
+checks pass. Host all-features Clippy remains environment-blocked before
+compilation because `pkg-config`/fontconfig is unavailable. This is functional
+and boundary evidence; native Office and performance evidence remain governed
+by the evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

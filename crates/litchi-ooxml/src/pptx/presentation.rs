@@ -1097,7 +1097,7 @@ impl<'a> Presentation<'a> {
     /// alter the application's display state or follow outline-slide targets.
     pub fn view_properties(&self) -> Result<Option<crate::pptx::view_properties::ViewProperties>> {
         crate::pptx::view_properties::load_from_package(self.package)
-            .map_err(OoxmlError::from)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
     /// Load the presentation's typed, bounded table-style catalog.
@@ -1113,7 +1113,7 @@ impl<'a> Presentation<'a> {
         &self,
     ) -> Result<Option<crate::pptx::presentation_properties::PresentationProperties>> {
         crate::pptx::presentation_properties::load_from_package(self.package)
-            .map_err(OoxmlError::from)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
     /// Load the PowerPoint Revision Information part, if present.

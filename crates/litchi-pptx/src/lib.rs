@@ -22,11 +22,13 @@ pub mod format;
 pub mod hyperlinks;
 pub mod laser;
 pub mod notes;
+pub mod presentation_properties;
 pub mod shape;
 pub mod table;
 pub mod tag;
 pub mod time;
 pub mod transition;
+pub mod view_properties;
 
 pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
@@ -44,3 +46,14 @@ pub use comments::{
 pub use error::{Error, Result};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
+pub use presentation_properties::{
+    BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget, OpaquePresentationExtension,
+    PresentationColor, PresentationProperties, PresentationPropertyExtension, PrintColorMode,
+    PrintOutput, PrintProperties, ShowMode, ShowProperties, SlideSelection, SlideShowExtension,
+    WebColor, WebProperties, WebScreenSize, load_from_package as load_presentation_properties,
+};
+pub use view_properties::{
+    CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
+    OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
+    ViewKind, ViewProperties, load_from_package as load_view_properties,
+};

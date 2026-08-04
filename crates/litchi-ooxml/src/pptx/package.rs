@@ -986,7 +986,7 @@ impl Package {
     /// alter the application's display state or follow outline-slide targets.
     pub fn view_properties(&self) -> Result<Option<crate::pptx::view_properties::ViewProperties>> {
         crate::pptx::view_properties::load_from_package(&self.opc)
-            .map_err(OoxmlError::from)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
     /// Load typed presentation settings, if the package contains them.
@@ -996,7 +996,8 @@ impl Package {
     pub fn presentation_properties(
         &self,
     ) -> Result<Option<crate::pptx::presentation_properties::PresentationProperties>> {
-        crate::pptx::presentation_properties::load_from_package(&self.opc).map_err(OoxmlError::from)
+        crate::pptx::presentation_properties::load_from_package(&self.opc)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
     /// Load the presentation's typed embedded-font collection.
