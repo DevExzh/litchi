@@ -22,6 +22,7 @@ pub mod data_validation;
 mod error;
 pub mod external_links;
 pub mod formula;
+pub mod header_footer;
 pub mod ignored_errors;
 pub mod layout;
 pub mod merge;
@@ -124,6 +125,9 @@ pub use external_links::{
     load_external_link,
 };
 pub use formula::Formula;
+pub use header_footer::{
+    HeaderFooterSectionKind, HeaderFooterText, WorksheetHeaderFooter, parse_worksheet_header_footer,
+};
 pub use ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,

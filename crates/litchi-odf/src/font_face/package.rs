@@ -12,13 +12,13 @@ use litchi_core::{Error, Result};
 use quick_xml::{events::Event, reader::NsReader};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FontFaceDeclarationsPart {
+enum Part {
     Content,
     Styles,
     Flat,
 }
 
-impl FontFaceDeclarationsPart {
+impl Part {
     fn root_local(self) -> &'static [u8] {
         match self {
             Self::Content => b"document-content",
@@ -42,24 +42,21 @@ struct XmlSpan {
     end: usize,
 }
 
-struct FontFaceDeclarationsLocation {
+struct Location {
     target: Option<XmlSpan>,
     insertion: usize,
 }
 
-fn parse_font_face_declarations_in_part(
-    xml: &str,
-    part: FontFaceDeclarationsPart,
-) -> Result<Option<Faces>> {
+fn parse_font_face_declarations_in_part(xml: &str, part: Part) -> Result<Option<Faces>> {
     Ok(locate_font_face_declarations(xml, part)?.0)
 }
 
 pub(crate) fn parse_content_font_face_declarations(xml: &str) -> Result<Option<Faces>> {
-    parse_font_face_declarations_in_part(xml, FontFaceDeclarationsPart::Content)
+    parse_font_face_declarations_in_part(xml, Part::Content)
 }
 
 pub(crate) fn parse_styles_font_face_declarations(xml: &str) -> Result<Option<Faces>> {
-    parse_font_face_declarations_in_part(xml, FontFaceDeclarationsPart::Styles)
+    parse_font_face_declarations_in_part(xml, Part::Styles)
 }
 
 /// Insert or replace content-part font-face declarations without rewriting
@@ -68,7 +65,7 @@ pub(crate) fn set_content_font_face_declarations_xml(
     xml: &str,
     declarations: &Faces,
 ) -> Result<(String, Option<Faces>)> {
-    set_font_face_declarations_xml(xml, declarations, FontFaceDeclarationsPart::Content)
+    set_font_face_declarations_xml(xml, declarations, Part::Content)
 }
 
 /// Insert or replace styles-part font-face declarations without rewriting
@@ -77,7 +74,7 @@ pub(crate) fn set_styles_font_face_declarations_xml(
     xml: &str,
     declarations: &Faces,
 ) -> Result<(String, Option<Faces>)> {
-    set_font_face_declarations_xml(xml, declarations, FontFaceDeclarationsPart::Styles)
+    set_font_face_declarations_xml(xml, declarations, Part::Styles)
 }
 
 /// Remove content-part font-face declarations without rewriting unrelated
@@ -85,7 +82,7 @@ pub(crate) fn set_styles_font_face_declarations_xml(
 pub(crate) fn remove_content_font_face_declarations_xml(
     xml: &str,
 ) -> Result<(String, Option<Faces>)> {
-    remove_font_face_declarations_xml(xml, FontFaceDeclarationsPart::Content)
+    remove_font_face_declarations_xml(xml, Part::Content)
 }
 
 /// Remove styles-part font-face declarations without rewriting unrelated
@@ -93,13 +90,13 @@ pub(crate) fn remove_content_font_face_declarations_xml(
 pub(crate) fn remove_styles_font_face_declarations_xml(
     xml: &str,
 ) -> Result<(String, Option<Faces>)> {
-    remove_font_face_declarations_xml(xml, FontFaceDeclarationsPart::Styles)
+    remove_font_face_declarations_xml(xml, Part::Styles)
 }
 
 fn set_font_face_declarations_xml(
     xml: &str,
     declarations: &Faces,
-    part: FontFaceDeclarationsPart,
+    part: Part,
 ) -> Result<(String, Option<Faces>)> {
     declarations.validate()?;
     let (old, location) = locate_font_face_declarations(xml, part)?;
@@ -113,10 +110,7 @@ fn set_font_face_declarations_xml(
     Ok((updated, old))
 }
 
-fn remove_font_face_declarations_xml(
-    xml: &str,
-    part: FontFaceDeclarationsPart,
-) -> Result<(String, Option<Faces>)> {
+fn remove_font_face_declarations_xml(xml: &str, part: Part) -> Result<(String, Option<Faces>)> {
     let (old, location) = locate_font_face_declarations(xml, part)?;
     let Some(target) = location.target else {
         return Ok((xml.to_owned(), old));
@@ -126,10 +120,7 @@ fn remove_font_face_declarations_xml(
     Ok((updated, old))
 }
 
-fn locate_font_face_declarations(
-    xml: &str,
-    part: FontFaceDeclarationsPart,
-) -> Result<(Option<Faces>, FontFaceDeclarationsLocation)> {
+fn locate_font_face_declarations(xml: &str, part: Part) -> Result<(Option<Faces>, Location)> {
     let declarations = parse_font_face_declarations(xml)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().trim_text(false);
@@ -173,7 +164,7 @@ fn locate_font_face_declarations(
                             return invalid("ODF XML contains duplicate office:font-face-decls");
                         }
                         open_target = Some((depth, start));
-                    } else if part == FontFaceDeclarationsPart::Content
+                    } else if part == Part::Content
                         && namespace == NamespaceKind::Office
                         && local == b"scripts"
                     {
@@ -202,7 +193,7 @@ fn locate_font_face_declarations(
                     }
                     target = Some(XmlSpan { start, end });
                 } else if depth == 2
-                    && part == FontFaceDeclarationsPart::Content
+                    && part == Part::Content
                     && namespace == NamespaceKind::Office
                     && local == b"scripts"
                 {
@@ -240,17 +231,14 @@ fn locate_font_face_declarations(
         ));
     }
     let insertion = match part {
-        FontFaceDeclarationsPart::Content => scripts_end.unwrap_or_else(|| {
+        Part::Content => scripts_end.unwrap_or_else(|| {
             root_open_end.expect("non-empty document root has an opening event")
         }),
-        FontFaceDeclarationsPart::Styles | FontFaceDeclarationsPart::Flat => {
+        Part::Styles | Part::Flat => {
             root_open_end.expect("non-empty document root has an opening event")
         },
     };
-    Ok((
-        declarations,
-        FontFaceDeclarationsLocation { target, insertion },
-    ))
+    Ok((declarations, Location { target, insertion }))
 }
 
 fn event_start(xml: &str, end: usize) -> Result<usize> {
@@ -301,6 +289,6 @@ impl FlatOpenDocument {
     /// Font resource links are retained as inert metadata only. This method
     /// does not fetch a URI, load a font, or inspect embedded font data.
     pub fn font_face_declarations(&self) -> Result<Option<Faces>> {
-        parse_font_face_declarations_in_part(self.xml(), FontFaceDeclarationsPart::Flat)
+        parse_font_face_declarations_in_part(self.xml(), Part::Flat)
     }
 }
