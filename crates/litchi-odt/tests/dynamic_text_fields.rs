@@ -2,7 +2,7 @@ use litchi_odt::elements::field::{
     CalculatedFieldValue, CrossReferenceFormat, DocumentStatisticKind, DropDownLabel,
     DynamicTextField, FieldValueType, FormulaFieldDisplay, MeasureKind, NoteReferenceClass,
     NoteReferenceFormat, PlaceholderType, SequenceNumberFormat, SequenceReferenceFormat,
-    StatisticNumberFormat, UserFieldDisplay, VariableSetDisplay,
+    UserFieldDisplay, VariableSetDisplay,
 };
 use litchi_odt::{Document, DocumentBuilder, MutableDocument};
 mod support;
@@ -1046,8 +1046,8 @@ fn document_statistics_round_trip_all_seven_kinds_and_numbering_modes() {
     for (index, kind) in kinds.into_iter().enumerate() {
         let number_format = match index % 3 {
             0 => None,
-            1 => Some(StatisticNumberFormat::new("I", None).unwrap()),
-            _ => Some(StatisticNumberFormat::new("A", Some(true)).unwrap()),
+            1 => Some(SequenceNumberFormat::new("I", None).unwrap()),
+            _ => Some(SequenceNumberFormat::new("A", Some(true)).unwrap()),
         };
         let field = DynamicTextField::DocumentStatistic {
             kind,
@@ -1070,7 +1070,7 @@ fn document_statistics_parse_style_aliases_and_support_mutation() {
     );
     let replacement = DynamicTextField::DocumentStatistic {
         kind: DocumentStatisticKind::Page,
-        number_format: Some(StatisticNumberFormat::new("1", None).unwrap()),
+        number_format: Some(SequenceNumberFormat::new("1", None).unwrap()),
         display_text: "12".to_string(),
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();

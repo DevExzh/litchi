@@ -284,15 +284,6 @@ pub struct SequenceNumberFormat {
     letter_sync: Option<bool>,
 }
 
-/// Common numbering metadata used by document statistic fields.
-pub type StatisticNumberFormat = SequenceNumberFormat;
-
-/// Numbering metadata used by `text:page-number`.
-pub type PageNumberFormat = SequenceNumberFormat;
-
-/// Numbering metadata used by `text:page-variable-get`.
-pub type PageVariableNumberFormat = SequenceNumberFormat;
-
 /// Page selected by an ODF page-number field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PageSelection {
@@ -1621,12 +1612,12 @@ pub enum DynamicTextField {
     },
     DocumentStatistic {
         kind: DocumentStatisticKind,
-        number_format: Option<StatisticNumberFormat>,
+        number_format: Option<SequenceNumberFormat>,
         display_text: String,
     },
     /// Current, previous, or next page number with inert cached presentation.
     PageNumber {
-        number_format: Option<PageNumberFormat>,
+        number_format: Option<SequenceNumberFormat>,
         fixed: Option<bool>,
         page_adjust: Option<i64>,
         select_page: Option<PageSelection>,
@@ -1662,7 +1653,7 @@ pub enum DynamicTextField {
     },
     /// Display the current alternative page-variable value.
     PageVariableGet {
-        number_format: Option<PageVariableNumberFormat>,
+        number_format: Option<SequenceNumberFormat>,
         display_text: String,
     },
     /// Cached filename presentation; never reads a host path or document location.
@@ -7671,7 +7662,7 @@ mod fixed_page_date_time_tests {
     fn fixed_page_date_time_round_trips_every_standard_field() {
         let fields = vec![
             DynamicTextField::PageNumber {
-                number_format: Some(PageNumberFormat::new("A", Some(true)).unwrap()),
+                number_format: Some(SequenceNumberFormat::new("A", Some(true)).unwrap()),
                 fixed: Some(false),
                 page_adjust: Some(-2),
                 select_page: Some(PageSelection::Previous),
@@ -7812,7 +7803,7 @@ mod page_variable_family_tests {
                 display_text: "inert setter cache & <safe>".to_string(),
             },
             DynamicTextField::PageVariableGet {
-                number_format: Some(PageVariableNumberFormat::new("A", Some(true)).unwrap()),
+                number_format: Some(SequenceNumberFormat::new("A", Some(true)).unwrap()),
                 display_text: "cached A & <not calculated>".to_string(),
             },
         ];

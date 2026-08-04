@@ -684,7 +684,7 @@ mod fixed_page_date_time_mutation_tests {
 #[cfg(test)]
 mod page_variable_family_mutation_tests {
     use super::*;
-    use crate::elements::field::{DynamicTextField, PageVariableNumberFormat};
+    use crate::elements::field::{DynamicTextField, SequenceNumberFormat};
 
     const XML: &str = r#"<o:document-content
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -695,7 +695,7 @@ mod page_variable_family_mutation_tests {
     #[test]
     fn page_variable_family_mutation_inserts_replaces_removes_and_checks_bounds() {
         let getter = DynamicTextField::PageVariableGet {
-            number_format: Some(PageVariableNumberFormat::new("1", None).unwrap()),
+            number_format: Some(SequenceNumberFormat::new("1", None).unwrap()),
             display_text: "12".to_string(),
         };
         let replaced = replace_dynamic_text_field_xml(XML, 0, &getter).unwrap();
