@@ -190,7 +190,7 @@ pub use chartsheet::{
     XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
     XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView, parse_chart_sheet_part,
 };
-pub use data_validation::{DataValidation, DataValidationRecordKind, DataValidationSettings};
+pub use data_validation::{DataValidationRecordKind, DataValidationSettings, Validation};
 pub use drawing::{
     CHART_GRAPHIC_DATA_URI, XlsbDrawing, XlsbDrawingAnchor, XlsbDrawingAnchorKind,
     XlsbDrawingCellMarker, XlsbDrawingEmuPoint, XlsbDrawingEmuSize, XlsbDrawingGraphicFrame,

@@ -1,25 +1,17 @@
-//! Compatibility adapter for the owner XLSB styles model and codec.
+//! OOXML-facing adapter for the owner XLSB styles model and codec.
 //!
 //! The package-neutral values and Brt* parsing live in litchi_xlsb. This
-//! module retains the historical host aggregate and converts only the
-//! host-owned alignment and border representations.
+//! module adds the host-owned alignment and border representations around the
+//! canonical style values.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::styles::{
     Alignment, Border, BorderSide, BorderStyle, HorizontalAlignment, VerticalAlignment,
 };
+pub use litchi_xlsb::styles::{Fill, Font, NumberFormat};
 use std::collections::HashMap;
 
-/// Font information retained at the historical host path.
-pub type Font = litchi_xlsb::styles::Font;
-
-/// Fill information retained at the historical host path.
-pub type Fill = litchi_xlsb::styles::Fill;
-
-/// Number format information retained at the historical host path.
-pub type NumberFormat = litchi_xlsb::styles::NumberFormat;
-
-/// Cell format with the legacy host alignment representation.
+/// Cell format with the host alignment representation.
 #[derive(Debug, Clone, Default)]
 pub struct CellFormat {
     pub font_id: u32,
@@ -29,7 +21,7 @@ pub struct CellFormat {
     pub alignment: Option<Alignment>,
 }
 
-/// Historical host-facing styles table.
+/// XLSB styles table.
 #[derive(Debug, Clone)]
 pub struct StylesTable {
     pub fonts: Vec<Font>,

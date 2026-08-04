@@ -1,7 +1,7 @@
 //! Mutable XLSB worksheet for CRUD operations
 
 use crate::xlsb::comments::Comment;
-use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
+use crate::xlsb::data_validation::{DataValidationSettings, Validation};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaCompiler, FormulaConverter, FormulaGroup,
@@ -130,7 +130,7 @@ pub struct MutableXlsbWorksheet {
     /// Optional freeze panes configuration.
     freeze_panes: Option<FreezePanes>,
     /// Data validation rules.
-    data_validations: Vec<DataValidation>,
+    data_validations: Vec<Validation>,
     data_validation_settings: DataValidationSettings,
     data_validation14_settings: DataValidationSettings,
     /// Conditional formatting rules.
@@ -1358,19 +1358,19 @@ impl MutableXlsbWorksheet {
     ///
     /// ```ignore
     /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
-    /// use litchi_ooxml::xlsb::data_validation::DataValidation;
+    /// use litchi_ooxml::xlsb::data_validation::Validation;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
-    /// let mut dv = DataValidation::new(3, "A1:A10".to_string()); // list
+    /// let mut dv = Validation::new(3, "A1:A10".to_string()); // list
     /// dv.formula1 = Some("Yes,No".to_string());
     /// sheet.add_data_validation(dv);
     /// ```
-    pub fn add_data_validation(&mut self, dv: DataValidation) {
+    pub fn add_data_validation(&mut self, dv: Validation) {
         self.data_validations.push(dv);
     }
 
     /// Get all data validations.
-    pub fn data_validations(&self) -> &[DataValidation] {
+    pub fn data_validations(&self) -> &[Validation] {
         &self.data_validations
     }
 
@@ -2512,7 +2512,7 @@ impl MutableXlsbWorksheet {
 mod tests {
     use super::*;
     use crate::xlsb::comments::Comment;
-    use crate::xlsb::data_validation::DataValidation;
+    use crate::xlsb::data_validation::Validation;
     use crate::xlsb::hyperlinks::Hyperlink;
     use crate::xlsb::merged_cells::MergedCell;
     use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
@@ -2764,7 +2764,7 @@ mod tests {
     #[test]
     fn test_add_data_validation() {
         let mut sheet = MutableXlsbWorksheet::new("Sheet1");
-        let dv = DataValidation::new(3, "A1:A10".to_string());
+        let dv = Validation::new(3, "A1:A10".to_string());
         sheet.add_data_validation(dv);
 
         assert_eq!(sheet.data_validations().len(), 1);

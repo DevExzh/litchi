@@ -30,7 +30,7 @@
 //! | 20-23 | Operator        |
 
 use crate::xlsb::data_validation::{
-    DataValidation, DataValidationRecordKind, DataValidationSettings, validate_dval_list_formula,
+    DataValidationRecordKind, DataValidationSettings, Validation, validate_dval_list_formula,
 };
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{CellParsedFormula, FormulaCompiler};
@@ -42,7 +42,7 @@ use std::io::Write;
 /// Write classic and Office 2013 validation collections as required.
 pub fn write_data_validations<W: Write>(
     writer: &mut Writer<W>,
-    validations: &[DataValidation],
+    validations: &[Validation],
     classic_settings: DataValidationSettings,
     extension14_settings: DataValidationSettings,
 ) -> XlsbResult<()> {
@@ -70,7 +70,7 @@ pub fn write_data_validations<W: Write>(
 
 fn write_classic_collection<W: Write>(
     writer: &mut Writer<W>,
-    validations: &[&DataValidation],
+    validations: &[&Validation],
     settings: DataValidationSettings,
 ) -> XlsbResult<()> {
     if validations.is_empty() {
@@ -109,7 +109,7 @@ fn write_classic_collection<W: Write>(
 
 fn write_extension14_collection<W: Write>(
     writer: &mut Writer<W>,
-    validations: &[&DataValidation],
+    validations: &[&Validation],
     settings: DataValidationSettings,
 ) -> XlsbResult<()> {
     if validations.is_empty() {
@@ -133,8 +133,8 @@ fn write_extension14_collection<W: Write>(
     Ok(())
 }
 
-/// Serialize a single [`DataValidation`] into the `BrtDVal` binary payload.
-fn serialize_data_validation(dv: &DataValidation) -> XlsbResult<Vec<u8>> {
+/// Serialize a single [`Validation`] into the `BrtDVal` binary payload.
+fn serialize_data_validation(dv: &Validation) -> XlsbResult<Vec<u8>> {
     let mut buf = Vec::with_capacity(128);
 
     // --- flags (u32) ---
@@ -269,7 +269,7 @@ fn write_biff12_formula(
     Ok(())
 }
 
-fn serialize_extension14_validation(dv: &DataValidation) -> XlsbResult<Vec<u8>> {
+fn serialize_extension14_validation(dv: &Validation) -> XlsbResult<Vec<u8>> {
     let ranges = parse_range_list(&dv.cell_ranges)?;
     let formula1 = compile_formula(
         dv.formula1_binary.as_ref(),
@@ -328,7 +328,7 @@ fn compile_formula(
     }
 }
 
-fn common_flags(dv: &DataValidation) -> u32 {
+fn common_flags(dv: &Validation) -> u32 {
     let mut flags = u32::from(dv.validation_type) | (u32::from(dv.error_style) << 4);
     if dv.string_list {
         flags |= 0x80;
@@ -368,7 +368,7 @@ fn compile_string_list(text: &str) -> XlsbResult<CellParsedFormula> {
     })
 }
 
-fn validate_rule(dv: &DataValidation) -> XlsbResult<()> {
+fn validate_rule(dv: &Validation) -> XlsbResult<()> {
     if dv.validation_type > 7 {
         return Err(invalid(format!(
             "validation type {} exceeds 7",
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_serialize_list_validation() {
-        let dv = DataValidation {
+        let dv = Validation {
             validation_type: 3, // list
             operator: 0,
             formula1: Some("Item1,Item2,Item3".to_string()),
@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn test_serialize_whole_number_validation() {
-        let dv = DataValidation {
+        let dv = Validation {
             validation_type: 1, // whole number
             operator: 2,        // greater than
             formula1: Some("10".to_string()),
@@ -600,7 +600,7 @@ mod tests {
 
     #[test]
     fn test_serialize_decimal_validation() {
-        let dv = DataValidation {
+        let dv = Validation {
             validation_type: 2, // decimal
             operator: 4,        // between
             formula1: Some("0.0".to_string()),
@@ -631,7 +631,7 @@ mod tests {
 
     #[test]
     fn test_serialize_date_validation() {
-        let dv = DataValidation {
+        let dv = Validation {
             validation_type: 4, // date
             operator: 3,        // less than
             formula1: Some("2024-01-01".to_string()),
@@ -663,7 +663,7 @@ mod tests {
     fn test_write_data_validations_empty() {
         let mut buffer = Vec::new();
         let mut writer = Writer::new(&mut buffer);
-        let validations: Vec<DataValidation> = vec![];
+        let validations: Vec<Validation> = vec![];
 
         let result = write_data_validations(
             &mut writer,
@@ -679,7 +679,7 @@ mod tests {
     fn test_write_data_validations_single() {
         let mut buffer = Vec::new();
         let mut writer = Writer::new(&mut buffer);
-        let validations = vec![DataValidation {
+        let validations = vec![Validation {
             validation_type: 3, // list
             operator: 0,
             formula1: Some("Yes,No".to_string()),
@@ -787,7 +787,7 @@ mod tests {
 
     #[test]
     fn classic_payload_parses_with_binary_formula_and_nullable_strings() {
-        let mut rule = DataValidation::new(1, "A1:A4 C1".to_string());
+        let mut rule = Validation::new(1, "A1:A4 C1".to_string());
         rule.operator = 0;
         rule.formula1 = Some("1".to_string());
         rule.formula2 = Some("4".to_string());
@@ -796,7 +796,7 @@ mod tests {
         validate_rule(&rule).unwrap();
         let payload = serialize_data_validation(&rule).unwrap();
         let parsed =
-            DataValidation::parse_classic(&payload, None, &FormulaResolutionContext::default())
+            Validation::parse_classic(&payload, None, &FormulaResolutionContext::default())
                 .unwrap();
 
         assert_eq!(parsed.cell_ranges, "A1:A4 C1");
@@ -810,14 +810,13 @@ mod tests {
 
     #[test]
     fn extension14_payload_parses_frt_ranges_and_formulas() {
-        let mut rule = DataValidation::new(7, "B2:B12 D2:D12".to_string());
+        let mut rule = Validation::new(7, "B2:B12 D2:D12".to_string());
         rule.formula1 = Some("B2>0".to_string());
         rule.record_kind = DataValidationRecordKind::Extension14;
         validate_rule(&rule).unwrap();
         let payload = serialize_extension14_validation(&rule).unwrap();
         let parsed =
-            DataValidation::parse_extension14(&payload, &FormulaResolutionContext::default())
-                .unwrap();
+            Validation::parse_extension14(&payload, &FormulaResolutionContext::default()).unwrap();
 
         assert_eq!(parsed.record_kind, DataValidationRecordKind::Extension14);
         assert_eq!(parsed.cell_ranges, "B2:B12 D2:D12");
@@ -828,7 +827,7 @@ mod tests {
         let mut malformed = payload;
         malformed[4..8].copy_from_slice(&2u32.to_le_bytes());
         assert!(
-            DataValidation::parse_extension14(&malformed, &FormulaResolutionContext::default())
+            Validation::parse_extension14(&malformed, &FormulaResolutionContext::default())
                 .is_err()
         );
     }
@@ -848,15 +847,15 @@ mod tests {
     #[test]
     fn long_lists_require_and_roundtrip_through_dval_list() {
         let long_list = "x".repeat(256);
-        let mut inline = DataValidation::new(3, "A1".to_string());
+        let mut inline = Validation::new(3, "A1".to_string());
         inline.formula1 = Some(long_list.clone());
         assert!(serialize_data_validation(&inline).is_err());
 
-        let mut override_rule = DataValidation::new(3, "A1".to_string());
+        let mut override_rule = Validation::new(3, "A1".to_string());
         override_rule.list_formula = Some(long_list.clone());
         validate_rule(&override_rule).unwrap();
         let payload = serialize_data_validation(&override_rule).unwrap();
-        let parsed = DataValidation::parse_classic(
+        let parsed = Validation::parse_classic(
             &payload,
             Some(long_list.clone()),
             &FormulaResolutionContext::default(),

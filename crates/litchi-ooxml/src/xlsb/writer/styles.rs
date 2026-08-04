@@ -171,7 +171,7 @@ impl StylesWriter {
     fn write_default_fonts<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         // For now we always serialize at least one default font. Additional
         // fonts added through `add_font` are serialized using a simplified
-        // BrtFont layout compatible with SheetJS and Excel.
+        // BrtFont layout used by SheetJS and Excel.
         let mut count_data = Vec::new();
         let mut temp_writer = Writer::new(&mut count_data);
         let font_count = if self.fonts.is_empty() {
@@ -470,8 +470,8 @@ impl StylesWriter {
         Ok(())
     }
 
-    /// Helper to write a BrtFont payload compatible with the simplified Font
-    /// structure used by this crate. This closely follows SheetJS'
+    /// Helper to write a BrtFont payload for the simplified Font structure
+    /// used by this crate. This closely follows SheetJS'
     /// `write_BrtFont` implementation.
     fn write_font_record<W: Write>(writer: &mut Writer<W>, font: &Font) -> XlsbResult<()> {
         let height = (font.size * 20.0).round();

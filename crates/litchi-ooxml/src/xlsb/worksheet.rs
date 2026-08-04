@@ -2,7 +2,7 @@
 
 use crate::xlsb::cell::XlsbCell;
 use crate::xlsb::comments::Comment;
-use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
+use crate::xlsb::data_validation::{DataValidationSettings, Validation};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::sheet_view::SheetView;
@@ -129,7 +129,7 @@ pub struct XlsbWorksheet {
     auto_filter: Option<XlsbAutoFilter>,
     sheet_protection: Option<XlsbSheetProtection>,
     strong_sheet_protection: Option<XlsbStrongProtection>,
-    data_validations: Vec<DataValidation>,
+    data_validations: Vec<Validation>,
     data_validation_settings: Option<DataValidationSettings>,
     data_validation14_settings: Option<DataValidationSettings>,
     conditional_formattings: Vec<Formatting>,
@@ -214,7 +214,7 @@ impl XlsbWorksheet {
         &mut self,
         settings: Option<DataValidationSettings>,
         extension14_settings: Option<DataValidationSettings>,
-        validations: Vec<DataValidation>,
+        validations: Vec<Validation>,
     ) {
         self.data_validation_settings = settings;
         self.data_validation14_settings = extension14_settings;
@@ -274,7 +274,7 @@ impl XlsbWorksheet {
     }
 
     /// Worksheet data-validation rules in stream order.
-    pub fn data_validations(&self) -> &[DataValidation] {
+    pub fn data_validations(&self) -> &[Validation] {
         &self.data_validations
     }
 

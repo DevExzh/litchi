@@ -1,9 +1,8 @@
-//! Compatibility adapter for the canonical XLSB data-validation codec.
+//! OOXML-facing adapter for the canonical XLSB data-validation codec.
 //!
 //! `litchi_xlsb` owns the bounded `BrtDVal`/`BrtDVal14` record grammar and
-//! formula-preserving semantic model. The OOXML host retains the historical
-//! error surface and the worksheet/package orchestration that consumes these
-//! records.
+//! formula-preserving semantic model. The OOXML host supplies its formula
+//! representation, error surface, and worksheet/package orchestration.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::CellParsedFormula;
@@ -12,9 +11,8 @@ use litchi_xlsb::data_validation as owner;
 
 pub use owner::{DataValidationRecordKind, DataValidationSettings};
 
-/// Historical host spelling with the host formula wrapper retained in the
-/// binary-formula fields.
-pub type DataValidation = owner::DataValidation<CellParsedFormula>;
+/// Validation rule bound to the OOXML host formula representation.
+pub type Validation = owner::DataValidation<CellParsedFormula>;
 
 impl owner::FormulaBinary for CellParsedFormula {
     fn from_parts(rgce: Vec<u8>, rgcb: Vec<u8>) -> Self {

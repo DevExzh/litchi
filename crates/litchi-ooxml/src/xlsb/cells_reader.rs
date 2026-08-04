@@ -2,7 +2,7 @@
 
 use crate::xlsb::cell::{CellHeader, XlsbCell};
 use crate::xlsb::data_validation::{
-    DataValidation, DataValidationSettings, parse_collection_settings, parse_dval_list,
+    DataValidationSettings, Validation, parse_collection_settings, parse_dval_list,
 };
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{CellParsedFormula, FormulaGroup, FormulaResolutionContext, GroupKind};
@@ -122,7 +122,7 @@ where
     /// ISO strong password-verifier metadata.
     pub strong_sheet_protection: Option<XlsbStrongProtection>,
     /// Classic worksheet data-validation rules.
-    pub data_validations: Vec<DataValidation>,
+    pub data_validations: Vec<Validation>,
     /// UI settings from the classic validation collection.
     pub data_validation_settings: Option<DataValidationSettings>,
     /// UI settings from the Office 2013 validation collection.
@@ -1083,7 +1083,7 @@ where
                     pending_list = Some(parse_dval_list(&self.buf)?);
                 },
                 kind::D_VAL => {
-                    let rule = DataValidation::parse_classic(
+                    let rule = Validation::parse_classic(
                         &self.buf,
                         pending_list.take(),
                         self.formula_context,
@@ -1130,12 +1130,10 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::D_VAL14 => self
-                    .data_validations
-                    .push(DataValidation::parse_extension14(
-                        &self.buf,
-                        self.formula_context,
-                    )?),
+                kind::D_VAL14 => self.data_validations.push(Validation::parse_extension14(
+                    &self.buf,
+                    self.formula_context,
+                )?),
                 kind::END_D_VALS14 => {
                     if !self.buf.is_empty() {
                         return Err(XlsbError::InvalidLength {
