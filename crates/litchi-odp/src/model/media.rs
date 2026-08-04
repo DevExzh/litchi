@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 /// XLink `show` behavior stored on a presentation media plugin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MediaShow {
+pub enum Show {
     /// Open in a new presentation context.
     New,
     /// Replace the current context.
@@ -18,7 +18,7 @@ pub enum MediaShow {
     None,
 }
 
-impl MediaShow {
+impl Show {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "new" => Ok(Self::New),
@@ -45,7 +45,7 @@ impl MediaShow {
 
 /// XLink `actuate` behavior stored on a presentation media plugin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MediaActuate {
+pub enum Actuate {
     /// Load the media with its containing document.
     OnLoad,
     /// Load the media only when requested.
@@ -56,7 +56,7 @@ pub enum MediaActuate {
     None,
 }
 
-impl MediaActuate {
+impl Actuate {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "onLoad" => Ok(Self::OnLoad),
@@ -81,12 +81,12 @@ impl MediaActuate {
 
 /// An inert name/value parameter belonging to a media plugin.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MediaParameter {
+pub struct Parameter {
     name: String,
     value: String,
 }
 
-impl MediaParameter {
+impl Parameter {
     /// Create a plugin parameter.
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
         let name = name.into();
@@ -112,16 +112,16 @@ impl MediaParameter {
 /// This type records package-local or external audio/video links. Litchi does
 /// not load external URLs, play media, or interpret plugin parameters.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MediaReference {
+pub struct Reference {
     href: String,
     mime_type: Option<String>,
-    show: Option<MediaShow>,
-    actuate: Option<MediaActuate>,
+    show: Option<Show>,
+    actuate: Option<Actuate>,
     xml_id: Option<String>,
-    parameters: Vec<MediaParameter>,
+    parameters: Vec<Parameter>,
 }
 
-impl MediaReference {
+impl Reference {
     /// Create the minimal schema-valid plugin reference.
     ///
     /// The serialized XLink type is always `simple`, as required by ODF.
@@ -191,22 +191,22 @@ impl MediaReference {
     }
 
     /// Return the optional XLink show behavior.
-    pub fn show(&self) -> Option<MediaShow> {
+    pub fn show(&self) -> Option<Show> {
         self.show
     }
 
     /// Set or remove the XLink show behavior.
-    pub fn set_show(&mut self, show: Option<MediaShow>) {
+    pub fn set_show(&mut self, show: Option<Show>) {
         self.show = show;
     }
 
     /// Return the optional XLink activation behavior.
-    pub fn actuate(&self) -> Option<MediaActuate> {
+    pub fn actuate(&self) -> Option<Actuate> {
         self.actuate
     }
 
     /// Set or remove the XLink activation behavior.
-    pub fn set_actuate(&mut self, actuate: Option<MediaActuate>) {
+    pub fn set_actuate(&mut self, actuate: Option<Actuate>) {
         self.actuate = actuate;
     }
 
@@ -229,17 +229,17 @@ impl MediaReference {
     }
 
     /// Return the inert plugin parameters.
-    pub fn parameters(&self) -> &[MediaParameter] {
+    pub fn parameters(&self) -> &[Parameter] {
         &self.parameters
     }
 
     /// Return mutable plugin parameters.
-    pub fn parameters_mut(&mut self) -> &mut Vec<MediaParameter> {
+    pub fn parameters_mut(&mut self) -> &mut Vec<Parameter> {
         &mut self.parameters
     }
 
     /// Add an inert plugin parameter.
-    pub fn add_parameter(&mut self, parameter: MediaParameter) -> Result<()> {
+    pub fn add_parameter(&mut self, parameter: Parameter) -> Result<()> {
         if self.parameters.len() >= 1024 {
             return Err(Error::InvalidFormat(
                 "ODP media plugin exceeds 1024 parameters".to_string(),
@@ -322,7 +322,7 @@ pub(crate) fn embed_media(
     path: impl Into<String>,
     bytes: impl Into<Vec<u8>>,
     media_type: impl Into<String>,
-) -> Result<MediaReference> {
+) -> Result<Reference> {
     let path = path.into();
     let media_type = media_type.into();
     validate_package_media_path(&path)?;
@@ -337,10 +337,10 @@ pub(crate) fn embed_media(
             "duplicate embedded ODP media path '{path}'"
         )));
     }
-    let mut reference = MediaReference::new(path.clone())?;
+    let mut reference = Reference::new(path.clone())?;
     reference.set_mime_type(media_type.clone())?;
-    reference.set_show(Some(MediaShow::Embed));
-    reference.set_actuate(Some(MediaActuate::OnLoad));
+    reference.set_show(Some(Show::Embed));
+    reference.set_actuate(Some(Actuate::OnLoad));
     files.insert(
         path,
         EmbeddedMedia {
@@ -474,13 +474,13 @@ mod tests {
 
     #[test]
     fn writes_escaped_inert_plugin_metadata() {
-        let mut media = MediaReference::new("https://example.test/a?x=1&y=2").unwrap();
+        let mut media = Reference::new("https://example.test/a?x=1&y=2").unwrap();
         media.set_mime_type("video/mp4; codecs=avc1").unwrap();
-        media.set_show(Some(MediaShow::New));
-        media.set_actuate(Some(MediaActuate::OnRequest));
+        media.set_show(Some(Show::New));
+        media.set_actuate(Some(Actuate::OnRequest));
         media.set_xml_id("video_1").unwrap();
         media
-            .add_parameter(MediaParameter::new("caption", "A < B").unwrap())
+            .add_parameter(Parameter::new("caption", "A < B").unwrap())
             .unwrap();
         let mut xml = String::new();
         media.write_xml(&mut xml).unwrap();
@@ -493,9 +493,7 @@ mod tests {
     #[test]
     fn recognizes_only_safe_package_relative_targets() {
         assert_eq!(
-            MediaReference::new("./Media/clip.ogg")
-                .unwrap()
-                .package_path(),
+            Reference::new("./Media/clip.ogg").unwrap().package_path(),
             Some("Media/clip.ogg")
         );
         for href in [
@@ -505,16 +503,16 @@ mod tests {
             "Media/../clip.ogg",
             "Media/clip.ogg#part",
         ] {
-            assert_eq!(MediaReference::new(href).unwrap().package_path(), None);
+            assert_eq!(Reference::new(href).unwrap().package_path(), None);
         }
     }
 
     #[test]
     fn validates_names_values_and_media_types() {
-        assert!(MediaReference::new("").is_err());
-        let mut media = MediaReference::new("Media/a.ogg").unwrap();
+        assert!(Reference::new("").is_err());
+        let mut media = Reference::new("Media/a.ogg").unwrap();
         assert!(media.set_xml_id("1-invalid").is_err());
         assert!(media.set_mime_type("not a media type").is_err());
-        assert!(MediaParameter::new("bad\0name", "value").is_err());
+        assert!(Parameter::new("bad\0name", "value").is_err());
     }
 }

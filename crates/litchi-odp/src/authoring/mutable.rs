@@ -8,7 +8,7 @@ use crate::animation::validate_animation_roots;
 use crate::codec::content_source::ContentSource;
 use crate::legacy_animation::validate_legacy_animation_root;
 use crate::media::{EmbeddedMedia, embed_media, validate_package_media_path};
-use crate::{MediaReference, Presentation, Shape, Slide};
+use crate::{Reference, Presentation, Shape, Slide};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -353,7 +353,7 @@ impl MutablePresentation {
         path: impl Into<String>,
         bytes: impl Into<Vec<u8>>,
         media_type: impl Into<String>,
-    ) -> Result<MediaReference> {
+    ) -> Result<Reference> {
         let path = path.into();
         validate_package_media_path(&path)?;
         if let Some(package) = &self.source_package
@@ -1161,7 +1161,7 @@ impl Default for MutablePresentation {
 mod tests {
     use super::*;
     use crate::{
-        AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
+        Attribute, Namespace, Kind, Node,
         DrawingHyperlink, LegacyAnimationKind, LegacyAnimationNode, Action,
         Builder, EventListener, ScriptEventListener, ShapeEventListener,
     };
@@ -1364,41 +1364,41 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_presentation_round_trip_animation_trees() {
-        let mut parameter = AnimationNode::new(AnimationKind::Parameter);
+        let mut parameter = Node::new(Kind::Parameter);
         parameter.set_attribute(
-            AnimationAttribute::new(
-                AnimationAttributeNamespace::Animation,
+            Attribute::new(
+                Namespace::Animation,
                 "name",
                 "destination",
             )
             .unwrap(),
         );
         parameter.set_attribute(
-            AnimationAttribute::new(AnimationAttributeNamespace::Animation, "value", "2 & next")
+            Attribute::new(Namespace::Animation, "value", "2 & next")
                 .unwrap(),
         );
-        let mut command = AnimationNode::new(AnimationKind::Command);
+        let mut command = Node::new(Kind::Command);
         command.set_attribute(
-            AnimationAttribute::new(AnimationAttributeNamespace::Animation, "command", "show")
+            Attribute::new(Namespace::Animation, "command", "show")
                 .unwrap(),
         );
         command.add_child(parameter).unwrap();
 
-        let mut root = AnimationNode::new(AnimationKind::Sequence);
+        let mut root = Node::new(Kind::Sequence);
         root.set_attribute(
-            AnimationAttribute::new(AnimationAttributeNamespace::Smil, "begin", "slide.begin")
+            Attribute::new(Namespace::Smil, "begin", "slide.begin")
                 .unwrap(),
         );
         root.set_attribute(
-            AnimationAttribute::new(
-                AnimationAttributeNamespace::Other("urn:example:timing".to_string()),
+            Attribute::new(
+                Namespace::Other("urn:example:timing".to_string()),
                 "mode",
                 "author-defined",
             )
             .unwrap(),
         );
         root.add_child(command).unwrap();
-        root.add_child(AnimationNode::new(AnimationKind::TransitionFilter))
+        root.add_child(Node::new(Kind::TransitionFilter))
             .unwrap();
 
         let slide = Slide {
@@ -1431,21 +1431,21 @@ mod tests {
 
     #[test]
     fn rejects_invalid_mutated_animation_trees_and_xml_characters() {
-        let mut leaf = AnimationNode::new(AnimationKind::Animate);
+        let mut leaf = Node::new(Kind::Animate);
         leaf.children_mut()
-            .push(AnimationNode::new(AnimationKind::Set));
+            .push(Node::new(Kind::Set));
         let mut presentation = MutablePresentation::new();
         presentation.add_slide("Invalid", "").unwrap();
         presentation.slides_mut()[0].animations.push(leaf);
         assert!(presentation.to_bytes().is_err());
 
         assert!(
-            AnimationAttribute::new(AnimationAttributeNamespace::Smil, "begin", "bad\0value")
+            Attribute::new(Namespace::Smil, "begin", "bad\0value")
                 .is_err()
         );
         assert!(
-            AnimationAttribute::new(
-                AnimationAttributeNamespace::Other(
+            Attribute::new(
+                Namespace::Other(
                     "http://www.w3.org/XML/1998/namespace".to_string()
                 ),
                 "id",
@@ -1518,29 +1518,29 @@ mod tests {
     #[test]
     fn builder_and_mutable_round_trip_legacy_presentation_effects() {
         let attr =
-            |namespace, name, value| AnimationAttribute::new(namespace, name, value).unwrap();
+            |namespace, name, value| Attribute::new(namespace, name, value).unwrap();
         let mut sound = LegacyAnimationNode::new(LegacyAnimationKind::Sound);
         sound.set_attribute(attr(
-            AnimationAttributeNamespace::Xlink,
+            Namespace::Xlink,
             "href",
             "Sounds/chime.ogg",
         ));
-        sound.set_attribute(attr(AnimationAttributeNamespace::Xlink, "type", "simple"));
+        sound.set_attribute(attr(Namespace::Xlink, "type", "simple"));
         let mut show = LegacyAnimationNode::new(LegacyAnimationKind::ShowShape);
         show.set_attribute(attr(
-            AnimationAttributeNamespace::Draw,
+            Namespace::Draw,
             "shape-id",
             "shape1",
         ));
         show.set_attribute(attr(
-            AnimationAttributeNamespace::Presentation,
+            Namespace::Presentation,
             "effect",
             "fade",
         ));
         show.add_child(sound).unwrap();
         let mut root = LegacyAnimationNode::new(LegacyAnimationKind::Animations);
         root.set_attribute(attr(
-            AnimationAttributeNamespace::Other("urn:example:legacy-effects".to_string()),
+            Namespace::Other("urn:example:legacy-effects".to_string()),
             "mode",
             "preserve",
         ));

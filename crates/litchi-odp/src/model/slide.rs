@@ -1,8 +1,7 @@
 //! Slide and shape structures for ODP presentations.
 
 use super::{
-    AnimationNode, DrawingHyperlink, LegacyAnimationNode, MediaReference, ShapeEventListener,
-    SlideTransition,
+    DrawingHyperlink, LegacyAnimationNode, Node, Reference, ShapeEventListener, SlideTransition,
 };
 use crate::action::validate_event_listeners;
 use litchi_core::Result;
@@ -23,7 +22,7 @@ pub struct Slide {
     /// Optional slide transition and automatic-advance properties.
     pub transition: Option<SlideTransition>,
     /// Inert ODF animation and timing trees attached to the slide.
-    pub animations: Vec<AnimationNode>,
+    pub animations: Vec<Node>,
     /// Optional legacy `presentation:animations` effect tree.
     pub legacy_animation: Option<LegacyAnimationNode>,
     /// Shapes on the slide
@@ -105,17 +104,17 @@ impl Slide {
     }
 
     /// Return the slide's inert animation and timing trees.
-    pub fn animations(&self) -> &[AnimationNode] {
+    pub fn animations(&self) -> &[Node] {
         &self.animations
     }
 
     /// Return mutable animation and timing trees.
-    pub fn animations_mut(&mut self) -> &mut Vec<AnimationNode> {
+    pub fn animations_mut(&mut self) -> &mut Vec<Node> {
         &mut self.animations
     }
 
     /// Add a schema-defined animation root to the slide.
-    pub fn add_animation(&mut self, animation: AnimationNode) -> Result<()> {
+    pub fn add_animation(&mut self, animation: Node) -> Result<()> {
         if !animation.kind().allowed_at_page_root() {
             return Err(litchi_core::Error::InvalidFormat(
                 "anim:param is only valid below anim:command".to_string(),
@@ -443,7 +442,7 @@ pub struct Shape {
     /// Image source referenced by `draw:image`, when this is a picture shape.
     pub image_href: Option<String>,
     /// Inert audio/video plugin referenced by this frame.
-    pub media: Option<MediaReference>,
+    pub media: Option<Reference>,
     /// Optional hyperlink wrapping this shape.
     pub hyperlink: Option<DrawingHyperlink>,
     /// Inert event listeners attached directly to this shape.
@@ -574,12 +573,12 @@ impl Shape {
     }
 
     /// Return the inert audio/video plugin referenced by this shape.
-    pub fn media(&self) -> Option<&MediaReference> {
+    pub fn media(&self) -> Option<&Reference> {
         self.media.as_ref()
     }
 
     /// Attach an inert audio/video plugin and mark this shape as a graphic frame.
-    pub fn with_media(mut self, media: MediaReference) -> Self {
+    pub fn with_media(mut self, media: Reference) -> Self {
         self.shape_type = litchi_core::ShapeType::GraphicFrame;
         self.image_href = None;
         self.media = Some(media);

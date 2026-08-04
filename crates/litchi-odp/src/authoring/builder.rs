@@ -2,7 +2,7 @@
 //!
 //! This module provides a builder pattern for creating new ODP presentations from scratch.
 
-use crate::MediaReference;
+use crate::Reference;
 use crate::Slide;
 use crate::core::{PackageWriter, Structure};
 use crate::model::action::write_event_listeners;
@@ -485,7 +485,7 @@ impl Builder {
         path: impl Into<String>,
         bytes: impl Into<Vec<u8>>,
         media_type: impl Into<String>,
-    ) -> Result<MediaReference> {
+    ) -> Result<Reference> {
         embed_media(&mut self.media_files, path, bytes, media_type)
     }
 
@@ -1255,9 +1255,9 @@ mod tests {
     use super::*;
     use crate::core::OwnedPackage;
     use crate::{
-        Action, DrawingHyperlink, Effect, EventListener, HyperlinkShow, MediaParameter,
-        Presentation, ScriptEventListener, Shape, ShapeEventListener, TransitionDirection,
-        TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+        Action, DrawingHyperlink, Effect, EventListener, HyperlinkShow, Parameter, Presentation,
+        ScriptEventListener, Shape, ShapeEventListener, TransitionDirection, TransitionSound,
+        TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
     };
     use litchi_core::ShapeType;
 
@@ -1501,7 +1501,7 @@ mod tests {
             .embed_media("Media/demo.mp4", VIDEO, "video/mp4")
             .unwrap();
         media
-            .add_parameter(MediaParameter::new("autoplay", "false").unwrap())
+            .add_parameter(Parameter::new("autoplay", "false").unwrap())
             .unwrap();
         media.set_xml_id("demoVideo").unwrap();
         let shape = Shape::new().with_media(media.clone());

@@ -3,18 +3,17 @@
 use crate::model::animation::ANIMATION_NAMESPACE;
 use crate::model::legacy_animation::validate_legacy_animation_root;
 use crate::model::{
-    Action, AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind, Effect,
-    EffectDirection, EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind,
-    EventListener, HyperlinkShow, LegacyAnimationKind, LegacyAnimationNode, MediaActuate,
-    MediaParameter, MediaReference, MediaShow, ScriptEventListener, Shape, ShapeEventListener,
-    Slide, SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow,
-    TransitionSpeed, TransitionStyle, TransitionType,
+    Action, Actuate, Attribute, DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink,
+    DrawingShapeKind, Effect, EffectDirection, EnhancedGeometry, EnhancedGeometryChild,
+    EnhancedGeometryChildKind, EventListener, HyperlinkShow, Kind, LegacyAnimationKind,
+    LegacyAnimationNode, Namespace, Node, Parameter, Reference, ScriptEventListener, Shape,
+    ShapeEventListener, Show, Slide, SlideTransition, TransitionDirection, TransitionSound,
+    TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace as XmlNamespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
@@ -103,7 +102,7 @@ enum Element {
     TextSpace,
     TextTab,
     TextLineBreak,
-    Animation(AnimationKind),
+    Animation(Kind),
     UnknownAnimation,
     LegacyAnimation(LegacyAnimationKind),
     Other,
@@ -137,7 +136,7 @@ struct ShapeBuilder {
     presentation_placeholder: Option<bool>,
     presentation_user_transformed: Option<bool>,
     image_href: Option<String>,
-    media: Option<MediaReference>,
+    media: Option<Reference>,
     hyperlink: Option<DrawingHyperlink>,
     event_listeners: Vec<ShapeEventListener>,
     event_listeners_seen: bool,
@@ -257,7 +256,7 @@ impl ShapeBuilder {
 
 impl Parser {
     fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-        matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
+        matches!(namespace, ResolveResult::Bound(XmlNamespace(value)) if *value == expected)
     }
 
     /// Rewinds the running element depth for a subtree consumed in place.
@@ -273,7 +272,7 @@ impl Parser {
 
     fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Element {
         if Self::is_namespace(namespace, ANIMATION_NAMESPACE_BYTES) {
-            AnimationKind::from_local_name(local_name)
+            Kind::from_local_name(local_name)
                 .map(Element::Animation)
                 .unwrap_or(Element::UnknownAnimation)
         } else if Self::is_namespace(namespace, DRAW_NAMESPACE) {
@@ -478,7 +477,7 @@ impl Parser {
     fn animation_attributes(
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,
-    ) -> Result<Vec<AnimationAttribute>> {
+    ) -> Result<Vec<Attribute>> {
         if element.attributes().count() > 256 {
             return Err(Error::InvalidFormat(
                 "ODP animation node exceeds 256 attributes".to_string(),
@@ -496,7 +495,7 @@ impl Parser {
             let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
             let namespace_uri = match namespace {
                 ResolveResult::Unbound => None,
-                ResolveResult::Bound(Namespace(uri)) => {
+                ResolveResult::Bound(XmlNamespace(uri)) => {
                     Some(std::str::from_utf8(uri).map_err(|_| {
                         Error::InvalidFormat("non-UTF-8 animation namespace URI".to_string())
                     })?)
@@ -513,7 +512,7 @@ impl Parser {
                     Error::InvalidFormat("non-UTF-8 animation attribute name".to_string())
                 })?
                 .to_string();
-            let namespace = AnimationAttributeNamespace::from_uri(namespace_uri);
+            let namespace = Namespace::from_uri(namespace_uri);
             if !expanded_names.insert((namespace.clone(), local_name.clone())) {
                 return Err(Error::InvalidFormat(format!(
                     "duplicate animation attribute '{local_name}'"
@@ -530,9 +529,7 @@ impl Parser {
                     "ODP animation attribute exceeds 1 MiB".to_string(),
                 ));
             }
-            attributes.push(AnimationAttribute::from_parsed(
-                namespace, local_name, value,
-            )?);
+            attributes.push(Attribute::from_parsed(namespace, local_name, value)?);
         }
         Ok(attributes)
     }
@@ -540,10 +537,10 @@ impl Parser {
     fn parse_animation_node(
         reader: &mut NsReader<&[u8]>,
         start: &BytesStart<'_>,
-        kind: AnimationKind,
+        kind: Kind,
         depth: usize,
         node_count: &mut usize,
-    ) -> Result<AnimationNode> {
+    ) -> Result<Node> {
         if depth > 128 {
             return Err(Error::InvalidFormat(
                 "ODP animation nesting exceeds 128 levels".to_string(),
@@ -572,8 +569,7 @@ impl Parser {
                             kind.local_name()
                         )));
                     }
-                    let Some(child_kind) =
-                        AnimationKind::from_local_name(child.local_name().as_ref())
+                    let Some(child_kind) = Kind::from_local_name(child.local_name().as_ref())
                     else {
                         return Err(Error::InvalidFormat(format!(
                             "unknown ODF animation element '{}'",
@@ -596,7 +592,7 @@ impl Parser {
                                 "ODP animation tree exceeds 65536 nodes".to_string(),
                             ));
                         }
-                        AnimationNode::from_parsed(
+                        Node::from_parsed(
                             child_kind,
                             Self::animation_attributes(reader, child)?,
                             Vec::new(),
@@ -621,7 +617,7 @@ impl Parser {
                             kind.local_name()
                         )));
                     }
-                    return Ok(AnimationNode::from_parsed(kind, attributes, children));
+                    return Ok(Node::from_parsed(kind, attributes, children));
                 },
                 Event::Text(ref text) => {
                     let text = Self::decode_text(text)?;
@@ -1009,10 +1005,7 @@ impl Parser {
         }
     }
 
-    fn media_reference(
-        reader: &NsReader<&[u8]>,
-        element: &BytesStart<'_>,
-    ) -> Result<MediaReference> {
+    fn media_reference(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Reference> {
         let href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?.ok_or_else(|| {
             Error::InvalidFormat("draw:plugin is missing required xlink:href".to_string())
         })?;
@@ -1025,15 +1018,15 @@ impl Parser {
                 "draw:plugin xlink:type must be 'simple', found '{link_type}'"
             )));
         }
-        let mut media = MediaReference::new(href)?;
+        let mut media = Reference::new(href)?;
         if let Some(mime_type) = Self::get_attr(reader, element, DRAW_NAMESPACE, b"mime-type")? {
             media.set_mime_type(mime_type)?;
         }
         if let Some(show) = Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")? {
-            media.set_show(Some(MediaShow::parse(&show)?));
+            media.set_show(Some(Show::parse(&show)?));
         }
         if let Some(actuate) = Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")? {
-            media.set_actuate(Some(MediaActuate::parse(&actuate)?));
+            media.set_actuate(Some(Actuate::parse(&actuate)?));
         }
         if let Some(xml_id) = Self::get_attr(reader, element, XML_NAMESPACE, b"id")? {
             media.set_xml_id(xml_id)?;
@@ -1041,10 +1034,7 @@ impl Parser {
         Ok(media)
     }
 
-    fn media_parameter(
-        reader: &NsReader<&[u8]>,
-        element: &BytesStart<'_>,
-    ) -> Result<MediaParameter> {
+    fn media_parameter(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Parameter> {
         let name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"name")?.ok_or_else(|| {
             Error::InvalidFormat("draw:param is missing required draw:name".to_string())
         })?;
@@ -1052,7 +1042,7 @@ impl Parser {
             Self::get_attr(reader, element, DRAW_NAMESPACE, b"value")?.ok_or_else(|| {
                 Error::InvalidFormat("draw:param is missing required draw:value".to_string())
             })?;
-        MediaParameter::new(name, value)
+        Parameter::new(name, value)
     }
 
     fn required_attr(
@@ -2514,7 +2504,7 @@ impl Parser {
                                     "ODP animation tree exceeds 65536 nodes".to_string(),
                                 ));
                             }
-                            current_animations.push(AnimationNode::from_parsed(
+                            current_animations.push(Node::from_parsed(
                                 kind,
                                 Self::animation_attributes(&reader, element)?,
                                 Vec::new(),
@@ -3406,32 +3396,32 @@ mod tests {
         assert_eq!(slides.len(), 1);
         assert_eq!(slides[0].animations.len(), 1);
         let root = &slides[0].animations[0];
-        assert_eq!(root.kind(), AnimationKind::Parallel);
+        assert_eq!(root.kind(), Kind::Parallel);
         assert_eq!(root.children().len(), 11);
         assert_eq!(
-            root.attribute(&AnimationAttributeNamespace::Smil, "begin"),
+            root.attribute(&Namespace::Smil, "begin"),
             Some("slide.begin+1s")
         );
         assert_eq!(
             root.attribute(
-                &AnimationAttributeNamespace::Other("urn:example:animation-extension".to_string()),
+                &Namespace::Other("urn:example:animation-extension".to_string()),
                 "flag"
             ),
             Some("keep & roundtrip")
         );
-        assert_eq!(root.children()[0].kind(), AnimationKind::Animate);
-        assert_eq!(root.children()[4].kind(), AnimationKind::Audio);
+        assert_eq!(root.children()[0].kind(), Kind::Animate);
+        assert_eq!(root.children()[4].kind(), Kind::Audio);
         let command = &root.children()[5];
-        assert_eq!(command.kind(), AnimationKind::Command);
-        assert_eq!(command.children()[0].kind(), AnimationKind::Parameter);
+        assert_eq!(command.kind(), Kind::Command);
+        assert_eq!(command.children()[0].kind(), Kind::Parameter);
         assert_eq!(
-            command.children()[0].attribute(&AnimationAttributeNamespace::Animation, "value"),
+            command.children()[0].attribute(&Namespace::Animation, "value"),
             Some("2")
         );
-        assert_eq!(root.children()[6].children()[0].kind(), AnimationKind::Set);
+        assert_eq!(root.children()[6].children()[0].kind(), Kind::Set);
         assert_eq!(
             root.children()[8].children()[0].kind(),
-            AnimationKind::TransitionFilter
+            Kind::TransitionFilter
         );
     }
 
@@ -3475,8 +3465,8 @@ mod tests {
         let media = shape.media().unwrap();
         assert_eq!(media.href(), "Media/a&b.mp4");
         assert_eq!(media.mime_type(), Some("video/mp4"));
-        assert_eq!(media.show(), Some(MediaShow::Embed));
-        assert_eq!(media.actuate(), Some(MediaActuate::OnRequest));
+        assert_eq!(media.show(), Some(Show::Embed));
+        assert_eq!(media.actuate(), Some(Actuate::OnRequest));
         assert_eq!(media.xml_id(), Some("movie1"));
         assert_eq!(media.parameters().len(), 2);
         assert_eq!(media.parameters()[0].name(), "autoplay");
@@ -3567,10 +3557,7 @@ mod tests {
         let root = slides[0].legacy_animation().unwrap();
         assert_eq!(root.kind(), LegacyAnimationKind::Animations);
         assert_eq!(
-            root.attribute(
-                &AnimationAttributeNamespace::Other("urn:example:effects".to_string()),
-                "mode"
-            ),
+            root.attribute(&Namespace::Other("urn:example:effects".to_string()), "mode"),
             Some("legacy")
         );
         let group = &root.children()[0];
@@ -3578,13 +3565,10 @@ mod tests {
         assert_eq!(group.children().len(), 4);
         let show = &group.children()[0];
         assert_eq!(show.kind(), LegacyAnimationKind::ShowShape);
-        assert_eq!(
-            show.attribute(&AnimationAttributeNamespace::Draw, "shape-id"),
-            Some("shape1")
-        );
+        assert_eq!(show.attribute(&Namespace::Draw, "shape-id"), Some("shape1"));
         assert_eq!(show.children()[0].kind(), LegacyAnimationKind::Sound);
         assert_eq!(
-            show.children()[0].attribute(&AnimationAttributeNamespace::Xlink, "href"),
+            show.children()[0].attribute(&Namespace::Xlink, "href"),
             Some("Sounds/a&b.ogg")
         );
     }

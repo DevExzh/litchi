@@ -14,7 +14,7 @@ pub(crate) const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
 /// One of the animation elements defined by ODF 1.3, Part 3, section 10.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AnimationKind {
+pub enum Kind {
     /// Animate an attribute value.
     Animate,
     /// Animate a color value.
@@ -41,7 +41,7 @@ pub enum AnimationKind {
     TransitionFilter,
 }
 
-impl AnimationKind {
+impl Kind {
     pub(crate) fn from_local_name(name: &[u8]) -> Option<Self> {
         match name {
             b"animate" => Some(Self::Animate),
@@ -96,7 +96,7 @@ impl AnimationKind {
 /// `svg`, `xlink`, and `xml`. Foreign namespaces are retained by URI and are
 /// assigned deterministic prefixes when a mutable presentation is saved.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AnimationAttributeNamespace {
+pub enum Namespace {
     /// No namespace.
     None,
     /// The ODF animation namespace.
@@ -117,7 +117,7 @@ pub enum AnimationAttributeNamespace {
     Other(String),
 }
 
-impl AnimationAttributeNamespace {
+impl Namespace {
     pub(crate) fn from_uri(uri: Option<&str>) -> Self {
         match uri {
             None => Self::None,
@@ -158,18 +158,18 @@ impl AnimationAttributeNamespace {
     }
 }
 
-/// An expanded-name attribute attached to an [`AnimationNode`].
+/// An expanded-name attribute attached to an [`Node`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AnimationAttribute {
-    namespace: AnimationAttributeNamespace,
+pub struct Attribute {
+    namespace: Namespace,
     local_name: String,
     value: String,
 }
 
-impl AnimationAttribute {
+impl Attribute {
     /// Create an animation attribute.
     pub fn new(
-        namespace: AnimationAttributeNamespace,
+        namespace: Namespace,
         local_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Result<Self> {
@@ -186,7 +186,7 @@ impl AnimationAttribute {
     }
 
     /// Return the attribute namespace.
-    pub fn namespace(&self) -> &AnimationAttributeNamespace {
+    pub fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
@@ -209,7 +209,7 @@ impl AnimationAttribute {
     }
 
     pub(crate) fn from_parsed(
-        namespace: AnimationAttributeNamespace,
+        namespace: Namespace,
         local_name: String,
         value: String,
     ) -> Result<Self> {
@@ -223,15 +223,15 @@ impl AnimationAttribute {
 /// command metadata. It deliberately provides no playback or command-execution
 /// behavior.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AnimationNode {
-    kind: AnimationKind,
-    attributes: Vec<AnimationAttribute>,
-    children: Vec<AnimationNode>,
+pub struct Node {
+    kind: Kind,
+    attributes: Vec<Attribute>,
+    children: Vec<Node>,
 }
 
-impl AnimationNode {
+impl Node {
     /// Create an empty animation node.
-    pub fn new(kind: AnimationKind) -> Self {
+    pub fn new(kind: Kind) -> Self {
         Self {
             kind,
             attributes: Vec::new(),
@@ -240,22 +240,22 @@ impl AnimationNode {
     }
 
     /// Return the schema-defined node kind.
-    pub fn kind(&self) -> AnimationKind {
+    pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Return the node's expanded-name attributes.
-    pub fn attributes(&self) -> &[AnimationAttribute] {
+    pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
 
     /// Return mutable attributes.
-    pub fn attributes_mut(&mut self) -> &mut Vec<AnimationAttribute> {
+    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
         &mut self.attributes
     }
 
     /// Add or replace an attribute with the same expanded name.
-    pub fn set_attribute(&mut self, attribute: AnimationAttribute) {
+    pub fn set_attribute(&mut self, attribute: Attribute) {
         if let Some(existing) = self.attributes.iter_mut().find(|existing| {
             existing.namespace == attribute.namespace && existing.local_name == attribute.local_name
         }) {
@@ -266,11 +266,7 @@ impl AnimationNode {
     }
 
     /// Find an attribute by expanded name.
-    pub fn attribute(
-        &self,
-        namespace: &AnimationAttributeNamespace,
-        local_name: &str,
-    ) -> Option<&str> {
+    pub fn attribute(&self, namespace: &Namespace, local_name: &str) -> Option<&str> {
         self.attributes
             .iter()
             .find(|attribute| {
@@ -280,7 +276,7 @@ impl AnimationNode {
     }
 
     /// Return the schema-defined child nodes.
-    pub fn children(&self) -> &[AnimationNode] {
+    pub fn children(&self) -> &[Node] {
         &self.children
     }
 
@@ -288,12 +284,12 @@ impl AnimationNode {
     ///
     /// The tree is validated before serialization, so invalid child relations
     /// introduced through this method cause saving to return an error.
-    pub fn children_mut(&mut self) -> &mut Vec<AnimationNode> {
+    pub fn children_mut(&mut self) -> &mut Vec<Node> {
         &mut self.children
     }
 
     /// Add a child if this node kind permits it under the ODF schema.
-    pub fn add_child(&mut self, child: AnimationNode) -> Result<()> {
+    pub fn add_child(&mut self, child: Node) -> Result<()> {
         if !self.kind.allows_child(child.kind) {
             return Err(Error::InvalidFormat(format!(
                 "anim:{} cannot contain anim:{}",
@@ -305,11 +301,7 @@ impl AnimationNode {
         Ok(())
     }
 
-    pub(crate) fn from_parsed(
-        kind: AnimationKind,
-        attributes: Vec<AnimationAttribute>,
-        children: Vec<Self>,
-    ) -> Self {
+    pub(crate) fn from_parsed(kind: Kind, attributes: Vec<Attribute>, children: Vec<Self>) -> Self {
         Self {
             kind,
             attributes,
@@ -364,7 +356,7 @@ impl AnimationNode {
 
     pub(crate) fn collect_extension_namespaces(&self, uris: &mut BTreeSet<String>) {
         for attribute in &self.attributes {
-            if let AnimationAttributeNamespace::Other(uri) = &attribute.namespace {
+            if let Namespace::Other(uri) = &attribute.namespace {
                 uris.insert(uri.clone());
             }
         }
@@ -406,7 +398,7 @@ impl AnimationNode {
     }
 }
 
-pub(crate) fn validate_animation_roots(roots: &[AnimationNode]) -> Result<()> {
+pub(crate) fn validate_animation_roots(roots: &[Node]) -> Result<()> {
     let mut node_count = 0;
     for root in roots {
         if !root.kind.allowed_at_page_root() {
@@ -444,8 +436,8 @@ fn validate_ncname(name: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_attribute_namespace(namespace: &AnimationAttributeNamespace) -> Result<()> {
-    if let AnimationAttributeNamespace::Other(uri) = namespace {
+fn validate_attribute_namespace(namespace: &Namespace) -> Result<()> {
+    if let Namespace::Other(uri) = namespace {
         if uri.is_empty() {
             return Err(Error::InvalidFormat(
                 "animation extension namespace URI cannot be empty".to_string(),

@@ -1,6 +1,6 @@
 //! Legacy `presentation:animations` effect trees.
 
-use super::{AnimationAttribute, AnimationAttributeNamespace};
+use super::{Attribute, Namespace};
 use litchi_core::{Error, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -73,7 +73,7 @@ impl LegacyAnimationKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyAnimationNode {
     kind: LegacyAnimationKind,
-    attributes: Vec<AnimationAttribute>,
+    attributes: Vec<Attribute>,
     children: Vec<LegacyAnimationNode>,
 }
 
@@ -93,17 +93,17 @@ impl LegacyAnimationNode {
     }
 
     /// Return the expanded-name attributes.
-    pub fn attributes(&self) -> &[AnimationAttribute] {
+    pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
 
     /// Return mutable attributes.
-    pub fn attributes_mut(&mut self) -> &mut Vec<AnimationAttribute> {
+    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
         &mut self.attributes
     }
 
     /// Add or replace an expanded-name attribute.
-    pub fn set_attribute(&mut self, attribute: AnimationAttribute) {
+    pub fn set_attribute(&mut self, attribute: Attribute) {
         if let Some(existing) = self.attributes.iter_mut().find(|existing| {
             existing.namespace() == attribute.namespace()
                 && existing.local_name() == attribute.local_name()
@@ -115,17 +115,13 @@ impl LegacyAnimationNode {
     }
 
     /// Find an attribute by expanded name.
-    pub fn attribute(
-        &self,
-        namespace: &AnimationAttributeNamespace,
-        local_name: &str,
-    ) -> Option<&str> {
+    pub fn attribute(&self, namespace: &Namespace, local_name: &str) -> Option<&str> {
         self.attributes
             .iter()
             .find(|attribute| {
                 attribute.namespace() == namespace && attribute.local_name() == local_name
             })
-            .map(AnimationAttribute::value)
+            .map(Attribute::value)
     }
 
     /// Return child effects.
@@ -149,7 +145,7 @@ impl LegacyAnimationNode {
 
     pub(crate) fn from_parsed(
         kind: LegacyAnimationKind,
-        attributes: Vec<AnimationAttribute>,
+        attributes: Vec<Attribute>,
         children: Vec<Self>,
     ) -> Self {
         Self {
@@ -161,7 +157,7 @@ impl LegacyAnimationNode {
 
     pub(crate) fn collect_extension_namespaces(&self, uris: &mut BTreeSet<String>) {
         for attribute in &self.attributes {
-            if let AnimationAttributeNamespace::Other(uri) = attribute.namespace() {
+            if let Namespace::Other(uri) = attribute.namespace() {
                 uris.insert(uri.clone());
             }
         }
@@ -205,7 +201,7 @@ impl LegacyAnimationNode {
     }
 
     fn validate_required_attributes(&self) -> Result<()> {
-        let draw = &AnimationAttributeNamespace::Draw;
+        let draw = &Namespace::Draw;
         match self.kind {
             LegacyAnimationKind::Dim => {
                 self.require(draw, "shape-id")?;
@@ -219,8 +215,8 @@ impl LegacyAnimationNode {
                 self.require(draw, "shape-id")?;
             },
             LegacyAnimationKind::Sound => {
-                self.require(&AnimationAttributeNamespace::Xlink, "href")?;
-                let link_type = self.require(&AnimationAttributeNamespace::Xlink, "type")?;
+                self.require(&Namespace::Xlink, "href")?;
+                let link_type = self.require(&Namespace::Xlink, "type")?;
                 if link_type != "simple" {
                     return Err(Error::InvalidFormat(
                         "presentation:sound xlink:type must be 'simple'".to_string(),
@@ -232,7 +228,7 @@ impl LegacyAnimationNode {
         Ok(())
     }
 
-    fn require(&self, namespace: &AnimationAttributeNamespace, local_name: &str) -> Result<&str> {
+    fn require(&self, namespace: &Namespace, local_name: &str) -> Result<&str> {
         self.attribute(namespace, local_name).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "presentation:{} is missing required attribute '{local_name}'",

@@ -13,15 +13,13 @@ pub use action::{
     Action, DrawingHyperlink, Effect, EffectDirection, EventListener, HyperlinkShow,
     ScriptEventListener, ShapeEventListener,
 };
-pub use animation::{
-    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-};
+pub use animation::{Attribute, Kind, Namespace, Node};
 pub use declaration::{
     DateTimeDeclaration, DateTimeSource, DeclarationBinding, DeclarationTarget, Declarations,
     TextDeclaration, parse as parse_declarations,
 };
 pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
-pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
+pub use media::{Actuate, Parameter, Reference, Show};
 pub use page_layout::{
     Layouts, Measure, PageLayout, Placeholder, PlaceholderClass, Unit, parse as parse_page_layouts,
     remove_xml as remove_page_layout_xml, set_xml as set_page_layout_xml,

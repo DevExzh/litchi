@@ -3,7 +3,7 @@
 use crate::codec::Parser;
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use crate::model::{
-    Declarations, Layouts, MediaReference, PageMetadataCollection, Settings, Slide, declaration,
+    Declarations, Layouts, PageMetadataCollection, Reference, Settings, Slide, declaration,
     page_layout, page_metadata, settings,
 };
 use litchi_core::{Error, Metadata, Result};
@@ -214,7 +214,7 @@ impl Presentation {
     ///
     /// Returns `None` for external links, fragment links, unsafe paths, and
     /// package-relative references whose payload is absent.
-    pub fn media_data(&self, media: &MediaReference) -> Result<Option<Vec<u8>>> {
+    pub fn media_data(&self, media: &Reference) -> Result<Option<Vec<u8>>> {
         let Some(path) = media.package_path() else {
             return Ok(None);
         };
