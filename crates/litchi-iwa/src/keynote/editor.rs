@@ -3,6 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
+use std::rc::Rc;
 
 use prost::Message;
 
@@ -73,6 +74,12 @@ const SWOOSH_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.BLTSwoosh";
 const TRACE_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.Trace";
 const DRAWABLE_DUPLICATE_OFFSET: f32 = 10.0;
 const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
+// These caches are deliberately operation-scoped.  Keeping only the compact
+// slide ownership data lets `slide_text_storages` reuse the decode performed
+// by `slides` without retaining decoded protobufs on a mutable editor.
+const MAX_OPERATION_CACHED_SLIDES: usize = 128;
+const MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE: usize = 512;
+const MAX_OPERATION_CACHED_DRAWABLE_STORAGES: usize = 1_024;
 
 /// Writable text targets resolved from one slide in presentation order.
 #[derive(Debug, Clone, PartialEq)]
@@ -959,6 +966,95 @@ pub struct KeynoteBuildInfo {
     pub chunks: Vec<KeynoteBuildChunkInfo>,
 }
 
+#[derive(Debug)]
+struct CachedSlideGraph {
+    title_placeholder: Option<u64>,
+    body_placeholder: Option<u64>,
+    owned_drawables: Box<[u64]>,
+}
+
+impl CachedSlideGraph {
+    fn from_archive(slide: &kn::SlideArchive) -> Self {
+        Self {
+            title_placeholder: slide
+                .title_placeholder
+                .as_ref()
+                .map(|reference| reference.identifier),
+            body_placeholder: slide
+                .body_placeholder
+                .as_ref()
+                .map(|reference| reference.identifier),
+            owned_drawables: slide
+                .owned_drawables
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect(),
+        }
+    }
+
+    fn fits_cache_budget(&self) -> bool {
+        self.owned_drawables.len() <= MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE
+    }
+}
+
+/// Decode state shared by the reads that make up one editor operation.
+///
+/// The cache owns no mutable package state and is never stored on
+/// [`KeynoteEditor`]. Dropping this value at the end of the operation is the
+/// invalidation boundary for all entries, including after a staged mutation.
+struct KeynoteOperation {
+    graph: ObjectGraph,
+    slide_cache: HashMap<u64, Rc<CachedSlideGraph>>,
+    drawable_storage_cache: HashMap<u64, Option<u64>>,
+}
+
+impl KeynoteOperation {
+    fn new(package: &IWorkPackage) -> Result<Self> {
+        Ok(Self {
+            graph: ObjectGraph::read(package)?,
+            slide_cache: HashMap::with_capacity(MAX_OPERATION_CACHED_SLIDES),
+            drawable_storage_cache: HashMap::with_capacity(MAX_OPERATION_CACHED_DRAWABLE_STORAGES),
+        })
+    }
+
+    fn decode_slide(&self, identifier: u64) -> Result<kn::SlideArchive> {
+        self.graph.decode(identifier, "KN.SlideArchive")
+    }
+
+    fn remember_slide(&mut self, identifier: u64, slide: &kn::SlideArchive) {
+        if self.slide_cache.len() >= MAX_OPERATION_CACHED_SLIDES
+            || slide.owned_drawables.len() > MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE
+        {
+            return;
+        }
+        self.slide_cache
+            .insert(identifier, Rc::new(CachedSlideGraph::from_archive(slide)));
+    }
+
+    fn slide(&mut self, identifier: u64) -> Result<Rc<CachedSlideGraph>> {
+        if let Some(slide) = self.slide_cache.get(&identifier) {
+            return Ok(Rc::clone(slide));
+        }
+        let slide = self.decode_slide(identifier)?;
+        let cached = Rc::new(CachedSlideGraph::from_archive(&slide));
+        if self.slide_cache.len() < MAX_OPERATION_CACHED_SLIDES && cached.fits_cache_budget() {
+            self.slide_cache.insert(identifier, Rc::clone(&cached));
+        }
+        Ok(cached)
+    }
+
+    fn drawable_storage(&mut self, identifier: u64) -> Result<Option<u64>> {
+        if let Some(storage) = self.drawable_storage_cache.get(&identifier) {
+            return Ok(*storage);
+        }
+        let storage = self.graph.drawable_storage(identifier)?;
+        if self.drawable_storage_cache.len() < MAX_OPERATION_CACHED_DRAWABLE_STORAGES {
+            self.drawable_storage_cache.insert(identifier, storage);
+        }
+        Ok(storage)
+    }
+}
+
 /// Transactional editor for a Keynote package.
 #[derive(Debug, Clone)]
 pub struct KeynoteEditor {
@@ -983,31 +1079,45 @@ impl KeynoteEditor {
     }
 
     pub fn slides(&self) -> Result<Vec<KeynoteSlideInfo>> {
-        let graph = ObjectGraph::read(self.text.package())?;
-        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
-        let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
+        let mut operation = KeynoteOperation::new(self.package())?;
+        self.slides_with_operation(&mut operation)
+    }
+
+    fn slides_with_operation(
+        &self,
+        operation: &mut KeynoteOperation,
+    ) -> Result<Vec<KeynoteSlideInfo>> {
+        let document: kn::DocumentArchive = operation.graph.decode(1, "KN.DocumentArchive")?;
+        let show: kn::ShowArchive = operation
+            .graph
+            .decode(document.show.identifier, "KN.ShowArchive")?;
 
         let mut slides = Vec::with_capacity(show.slide_tree.slides.len());
         let mut layout_catalog = None;
         for (index, node_reference) in show.slide_tree.slides.into_iter().enumerate() {
-            let node: kn::SlideNodeArchive =
-                graph.decode(node_reference.identifier, "KN.SlideNodeArchive")?;
+            let node: kn::SlideNodeArchive = operation
+                .graph
+                .decode(node_reference.identifier, "KN.SlideNodeArchive")?;
             let slide_reference = node.slide.ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Keynote slide node {} has no slide reference",
                     node_reference.identifier
                 ))
             })?;
-            let slide: kn::SlideArchive =
-                graph.decode(slide_reference.identifier, "KN.SlideArchive")?;
+            let slide = operation.decode_slide(slide_reference.identifier)?;
+            operation.remember_slide(slide_reference.identifier, &slide);
             let layout = match slide.template_slide.as_ref() {
                 Some(template_slide) => {
                     let catalog = match layout_catalog.as_ref() {
                         Some(catalog) => catalog,
                         None => {
-                            let theme = graph.decode(show.theme.identifier, "KN.ThemeArchive")?;
-                            layout_catalog
-                                .insert(slide_create::layout::LayoutCatalog::read(&graph, &theme)?)
+                            let theme = operation
+                                .graph
+                                .decode(show.theme.identifier, "KN.ThemeArchive")?;
+                            layout_catalog.insert(slide_create::layout::LayoutCatalog::read(
+                                &operation.graph,
+                                &theme,
+                            )?)
                         },
                     };
                     Some(catalog.current(template_slide.identifier)?)
@@ -1040,34 +1150,38 @@ impl KeynoteEditor {
                 .transpose()?;
             let title_storage_id = slide
                 .title_placeholder
-                .map(|reference| graph.drawable_storage(reference.identifier))
+                .map(|reference| operation.drawable_storage(reference.identifier))
                 .transpose()?
                 .flatten();
             let body_storage_id = slide
                 .body_placeholder
-                .map(|reference| graph.drawable_storage(reference.identifier))
+                .map(|reference| operation.drawable_storage(reference.identifier))
                 .transpose()?
                 .flatten();
             let title = title_storage_id
-                .map(|identifier| graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier))
                 .transpose()?;
             let body = body_storage_id
-                .map(|identifier| graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier))
                 .transpose()?;
             let notes_storage_id = slide
                 .note
                 .map(|reference| {
-                    graph
+                    operation
+                        .graph
                         .decode::<kn::NoteArchive>(reference.identifier, "KN.NoteArchive")
                         .map(|note| note.contained_storage.identifier)
                 })
                 .transpose()?;
             let notes = notes_storage_id
-                .map(|identifier| graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier))
                 .transpose()?;
             let transition = if slide.transition.attributes.animation_attributes.is_some() {
-                let original =
-                    graph.message_data_type(slide_reference.identifier, 5, "KN.SlideArchive")?;
+                let original = operation.graph.message_data_type(
+                    slide_reference.identifier,
+                    5,
+                    "KN.SlideArchive",
+                )?;
                 let transition =
                     transition_settings_from_wire(original, &slide.transition.attributes)?;
                 validate_transition_wire(original, &slide.transition.attributes)?;
@@ -1104,35 +1218,28 @@ impl KeynoteEditor {
     /// [`KeynoteSlideInfo`] because they are owned by `KN.NoteArchive` rather
     /// than a drawable.
     pub fn slide_text_storages(&self, slide_index: usize) -> Result<Vec<KeynoteSlideTextInfo>> {
-        let slides = self.slides()?;
+        let mut operation = KeynoteOperation::new(self.package())?;
+        let slides = self.slides_with_operation(&mut operation)?;
         slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
                 "Keynote slide index {slide_index} is out of range for {} slides",
                 slides.len()
             ))
         })?;
-        let graph = ObjectGraph::read(self.package())?;
         let mut storage_owners = HashMap::<u64, (usize, u64)>::new();
         let mut result = Vec::new();
         for (owner_slide_index, owner) in slides.iter().enumerate() {
-            let slide: kn::SlideArchive = graph.decode(owner.slide_id, "KN.SlideArchive")?;
-            let title = slide
-                .title_placeholder
-                .as_ref()
-                .map(|reference| reference.identifier);
-            let body = slide
-                .body_placeholder
-                .as_ref()
-                .map(|reference| reference.identifier);
+            let slide = operation.slide(owner.slide_id)?;
+            let title = slide.title_placeholder;
+            let body = slide.body_placeholder;
             let mut seen_drawables = HashSet::with_capacity(slide.owned_drawables.len());
-            for reference in &slide.owned_drawables {
-                let drawable_id = reference.identifier;
+            for &drawable_id in &slide.owned_drawables {
                 if !seen_drawables.insert(drawable_id) {
                     return Err(Error::InvalidFormat(format!(
                         "Keynote slide {owner_slide_index} repeats owned drawable {drawable_id}"
                     )));
                 }
-                let Some(storage_id) = graph.drawable_storage(drawable_id)? else {
+                let Some(storage_id) = operation.drawable_storage(drawable_id)? else {
                     continue;
                 };
                 if let Some((previous_slide, previous_drawable)) =
@@ -1155,7 +1262,7 @@ impl KeynoteEditor {
                 } else if body == Some(drawable_id) {
                     KeynoteSlideTextRole::Body
                 } else {
-                    let shape: tswp::ShapeInfoArchive = graph.decode_type(
+                    let shape: tswp::ShapeInfoArchive = operation.graph.decode_type(
                         drawable_id,
                         SHAPE_INFO_MESSAGE_TYPE,
                         "TSWP.ShapeInfoArchive",
@@ -5021,5 +5128,7 @@ pub use transition::{
 };
 pub use transition_effect::KeynoteTransitionEffect;
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};
+#[cfg(test)]
+mod operation_cache_tests;
 #[cfg(test)]
 mod tests;
