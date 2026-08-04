@@ -13,7 +13,7 @@ mod database_range;
 mod detective;
 mod hyperlink;
 mod label_range;
-mod named_expression;
+pub(crate) mod named_expression;
 mod protection;
 mod source;
 mod sparkline;

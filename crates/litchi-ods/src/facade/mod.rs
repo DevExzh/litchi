@@ -4,20 +4,34 @@ use litchi_core::Result;
 use std::path::Path;
 
 pub use crate::authoring::{MutableSpreadsheet, SpreadsheetBuilder};
+pub use crate::model::{
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage,
+};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
     package: crate::package::SpreadsheetPackage,
+    named_definitions: Vec<NamedDefinition>,
 }
 
 impl Spreadsheet {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::SpreadsheetPackage::open(path).map(|package| Self { package })
+        let package = crate::package::SpreadsheetPackage::open(path)?;
+        Self::from_package(package)
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::SpreadsheetPackage::from_bytes(bytes).map(|package| Self { package })
+        let package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        Self::from_package(package)
+    }
+
+    fn from_package(package: crate::package::SpreadsheetPackage) -> Result<Self> {
+        let named_definitions = package.named_definitions()?;
+        Ok(Self {
+            package,
+            named_definitions,
+        })
     }
 
     pub fn content_xml(&self) -> &str {
@@ -30,6 +44,74 @@ impl Spreadsheet {
 
     pub fn into_bytes(self) -> Vec<u8> {
         self.package.into_bytes()
+    }
+
+    /// Return all global and sheet-local named definitions in document order.
+    pub fn named_definitions(&self) -> &[NamedDefinition] {
+        &self.named_definitions
+    }
+
+    /// Return named ranges in their document order.
+    pub fn named_ranges(&self) -> impl Iterator<Item = &NamedRange> {
+        self.named_definitions
+            .iter()
+            .filter_map(|definition| match definition {
+                NamedDefinition::Range(range) => Some(range),
+                NamedDefinition::Expression(_) => None,
+            })
+    }
+
+    /// Return named expressions in their document order.
+    pub fn named_expressions(&self) -> impl Iterator<Item = &NamedExpression> {
+        self.named_definitions
+            .iter()
+            .filter_map(|definition| match definition {
+                NamedDefinition::Range(_) => None,
+                NamedDefinition::Expression(expression) => Some(expression),
+            })
+    }
+
+    /// Find a named range by its exact name and visibility scope.
+    pub fn named_range(&self, name: &str, scope: &NamedDefinitionScope) -> Option<&NamedRange> {
+        self.named_ranges()
+            .find(|range| range.name == name && &range.scope == scope)
+    }
+
+    /// Find a named expression by its exact name and visibility scope.
+    pub fn named_expression(
+        &self,
+        name: &str,
+        scope: &NamedDefinitionScope,
+    ) -> Option<&NamedExpression> {
+        self.named_expressions()
+            .find(|expression| expression.name == name && &expression.scope == scope)
+    }
+
+    /// Atomically append a validated named range.
+    pub fn add_named_range(&mut self, range: NamedRange) -> Result<()> {
+        self.add_named_definition(range.into())
+    }
+
+    /// Atomically append a validated named expression.
+    pub fn add_named_expression(&mut self, expression: NamedExpression) -> Result<()> {
+        self.add_named_definition(expression.into())
+    }
+
+    /// Atomically append a validated named definition while preserving catalog order.
+    pub fn add_named_definition(&mut self, definition: NamedDefinition) -> Result<()> {
+        let mut candidate = self.named_definitions.clone();
+        candidate.push(definition);
+        self.set_named_definitions(candidate)
+    }
+
+    /// Atomically replace the complete ordered named-definition catalog.
+    pub fn set_named_definitions(&mut self, definitions: Vec<NamedDefinition>) -> Result<()> {
+        let updated =
+            crate::codec::named_expression::replace(self.package.content_xml(), &definitions)?;
+        let package = self.package.replace_content_xml(&updated)?;
+        self.package = package;
+        self.named_definitions = definitions;
+        Ok(())
     }
 
     /// Read all inert RDF metadata graphs in package order.
