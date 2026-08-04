@@ -4,7 +4,7 @@
 //! resolution, and record validation remain in `codec.rs`; worksheet/package
 //! traversal remains in the host.
 
-use crate::formula::CellParsedFormula;
+use crate::formula::ParsedFormula;
 
 /// Conditional formatting rule type (CFType per MS-XLSB 2.5.18)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,7 +62,7 @@ pub struct Value {
     /// Whether threshold comparison is greater-than-or-equal.
     pub greater_than_or_equal: bool,
     /// Original binary formula including ancillary data.
-    pub formula_binary: Option<CellParsedFormula>,
+    pub formula_binary: Option<ParsedFormula>,
 }
 
 /// Lossless XLSB color used by conditional formatting visualizations.

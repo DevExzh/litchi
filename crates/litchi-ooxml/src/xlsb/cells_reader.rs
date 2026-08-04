@@ -5,9 +5,7 @@ use crate::xlsb::data_validation::{
     DataValidation, DataValidationSettings, parse_collection_settings, parse_dval_list,
 };
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::formula::{
-    CellParsedFormula, FormulaGroup, FormulaGroupKind, FormulaResolutionContext,
-};
+use crate::xlsb::formula::{CellParsedFormula, FormulaGroup, FormulaResolutionContext, GroupKind};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::Stream;
@@ -711,14 +709,14 @@ where
                 ));
             }
             match group.kind {
-                FormulaGroupKind::Array if group.range.top_left() != position => {
+                GroupKind::Array if group.range.top_left() != position => {
                     return Err(XlsbError::InvalidFormula(format!(
                         "BrtArrFmla range {} is not anchored at {}",
                         group.range.to_a1(),
                         crate::xlsb::utils::cell_reference(position.0, position.1)
                     )));
                 },
-                FormulaGroupKind::Shared if group.range.top_left() != position => {
+                GroupKind::Shared if group.range.top_left() != position => {
                     return Err(XlsbError::InvalidFormula(format!(
                         "BrtShrFmla range {} is not anchored at {}",
                         group.range.to_a1(),

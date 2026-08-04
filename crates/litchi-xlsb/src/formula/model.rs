@@ -1,7 +1,6 @@
 //! Semantic XLSB formula and Ptg models.
 //!
-//! The names in this module are contextual to `formula`; the historical
-//! `Formula*` spellings at the bottom are compatibility aliases only.
+//! The names in this module are contextual to `formula`.
 
 use super::{Error, Result};
 
@@ -151,7 +150,7 @@ fn parse_cell_reference(value: &str) -> Result<(u32, u32)> {
     Ok((row_index - 1, column_index - 1))
 }
 
-/// Binary representation of a cell formula (`CellParsedFormula`).
+/// Binary representation of a cell formula.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedFormula {
     pub rgce: Vec<u8>,
@@ -411,19 +410,3 @@ pub mod ptg_types {
     pub const EPTG_LIST: u8 = 0x19;
     pub const EPTG_SX_NAME: u8 = 0x1D;
 }
-
-// Historical owner names remain source-compatible aliases, not duplicate
-// model declarations. The host adapter intentionally continues to use them.
-pub type FormulaRange = Range;
-pub type CellParsedFormula = ParsedFormula;
-pub type FormulaArrayValue = ArrayValue;
-pub type FormulaMemoryKind = MemoryKind;
-pub type FormulaTableRowType = TableRowType;
-pub type FormulaTableColumns = TableColumns;
-pub type FormulaTableDataType = TableDataType;
-pub type FormulaTableNamedColumns = TableNamedColumns;
-pub type FormulaExternalTableReference = ExternalTableReference;
-pub type FormulaTableReference = TableReference;
-pub type FormulaGroupKind = GroupKind;
-pub type FormulaGroup = Group;
-pub type FormulaToken = Token;

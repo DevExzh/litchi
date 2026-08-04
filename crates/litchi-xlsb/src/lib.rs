@@ -30,12 +30,8 @@ pub use data_validation::{
 };
 pub use formula::ptg_types;
 pub use formula::{
-    ArrayValue, BinaryOperator, CellParsedFormula, Compiler, Error as FormulaError,
-    ExternalTableReference, FormulaArrayValue, FormulaConverter, FormulaExternalTableReference,
-    FormulaGroup, FormulaGroupKind, FormulaMemoryKind, FormulaParser, FormulaRange,
-    FormulaResolution, FormulaTableColumns, FormulaTableDataType, FormulaTableNamedColumns,
-    FormulaTableReference, FormulaTableRowType, FormulaToken, Group, GroupKind,
-    MAX_CELL_FORMULA_BYTES, MemoryKind, ParsedFormula, Parser, Range, Resolution,
-    Result as FormulaResult, TableColumns, TableDataType, TableNamedColumns, TableReference,
-    TableRowType, Token, UnaryOperator,
+    ArrayValue, BinaryOperator, Compiler, Error as FormulaError, ExternalTableReference,
+    FormulaConverter, FormulaParser, FormulaResolution, Group, GroupKind, MAX_CELL_FORMULA_BYTES,
+    MemoryKind, ParsedFormula, Parser, Range, Resolution, Result as FormulaResult, TableColumns,
+    TableDataType, TableNamedColumns, TableReference, TableRowType, Token, UnaryOperator,
 };

@@ -34,7 +34,7 @@ fn read_f64_le_at(data: &[u8], offset: usize) -> Result<f64> {
 }
 
 impl ParsedFormula {
-    /// Parse a `CellParsedFormula`, returning the structure and bytes consumed.
+    /// Parse a `ParsedFormula`, returning the structure and bytes consumed.
     pub fn parse(data: &[u8]) -> Result<(Self, usize)> {
         if data.len() < 4 {
             return Err(Error::InvalidLength {
@@ -157,8 +157,8 @@ impl Group {
                 data[16] & !1
             )));
         }
-        let range = FormulaRange::parse_binary(data)?;
-        let (formula, consumed) = CellParsedFormula::parse(&data[17..])?;
+        let range = Range::parse_binary(data)?;
+        let (formula, consumed) = ParsedFormula::parse(&data[17..])?;
         if 17 + consumed != data.len() {
             return Err(Error::InvalidFormula(format!(
                 "BrtArrFmla has {} trailing bytes",
@@ -166,7 +166,7 @@ impl Group {
             )));
         }
         Ok(Self {
-            kind: FormulaGroupKind::Array,
+            kind: GroupKind::Array,
             range,
             formula,
             always_calculate: data[16] & 1 != 0,
@@ -180,8 +180,8 @@ impl Group {
                 found: data.len(),
             });
         }
-        let range = FormulaRange::parse_binary(data)?;
-        let (formula, consumed) = CellParsedFormula::parse(&data[16..])?;
+        let range = Range::parse_binary(data)?;
+        let (formula, consumed) = ParsedFormula::parse(&data[16..])?;
         if 16 + consumed != data.len() {
             return Err(Error::InvalidFormula(format!(
                 "BrtShrFmla has {} trailing bytes",
@@ -189,7 +189,7 @@ impl Group {
             )));
         }
         Ok(Self {
-            kind: FormulaGroupKind::Shared,
+            kind: GroupKind::Shared,
             range,
             formula,
             always_calculate: false,
@@ -199,10 +199,10 @@ impl Group {
     pub fn to_record_data(&self) -> Result<Vec<u8>> {
         self.range.validate()?;
         let formula = self.formula.to_bytes()?;
-        let flag_len = usize::from(self.kind == FormulaGroupKind::Array);
+        let flag_len = usize::from(self.kind == GroupKind::Array);
         let mut data = Vec::with_capacity(16 + flag_len + formula.len());
         data.extend_from_slice(&self.range.to_binary());
-        if self.kind == FormulaGroupKind::Array {
+        if self.kind == GroupKind::Array {
             data.push(u8::from(self.always_calculate));
         }
         data.extend_from_slice(&formula);
@@ -257,9 +257,9 @@ impl TableReference {
         }
 
         let mut flags = match self.data_type {
-            FormulaTableDataType::Reference => 0,
-            FormulaTableDataType::Value => 1 << 10,
-            FormulaTableDataType::Array => 2 << 10,
+            TableDataType::Reference => 0,
+            TableDataType::Value => 1 << 10,
+            TableDataType::Array => 2 << 10,
         };
         if self.square_bracket_space {
             flags |= 0x0080;
@@ -284,8 +284,8 @@ impl TableReference {
             }
             flags |= u16::from(table_row_type_raw(row_type)) << 2;
             match columns {
-                FormulaTableColumns::All => (list_index, 0, 0),
-                FormulaTableColumns::One(column) => {
+                TableColumns::All => (list_index, 0, 0),
+                TableColumns::One(column) => {
                     if column >= 16_384 {
                         return Err(Error::InvalidFormula(
                             "PtgList column is outside worksheet bounds".to_string(),
@@ -294,7 +294,7 @@ impl TableReference {
                     flags |= 1;
                     (list_index, column, column)
                 },
-                FormulaTableColumns::Range { first, last } => {
+                TableColumns::Range { first, last } => {
                     if first > last || last >= 16_384 {
                         return Err(Error::InvalidFormula(
                             "PtgList column range is invalid".to_string(),
@@ -323,26 +323,26 @@ impl TableReference {
     }
 }
 
-fn write_extra_list(reference: &FormulaExternalTableReference) -> Result<Vec<u8>> {
+fn write_extra_list(reference: &ExternalTableReference) -> Result<Vec<u8>> {
     let table_units = reference.table.encode_utf16().count();
     if table_units == 0 || table_units >= 256 {
         return Err(Error::InvalidFormula(format!(
             "PtgExtraList table length {table_units} is outside 1..=255"
         )));
     }
-    let has_columns = !matches!(reference.columns, FormulaTableNamedColumns::All);
+    let has_columns = !matches!(reference.columns, TableNamedColumns::All);
     let mut extra = Vec::new();
     extra.push(u8::from(has_columns));
     extra.extend_from_slice(&u16::from(table_row_type_raw(reference.row_type)).to_le_bytes());
     extra.extend_from_slice(&(table_units as u16).to_le_bytes());
     push_formula_utf16(&mut extra, &reference.table);
     match &reference.columns {
-        FormulaTableNamedColumns::All => {},
-        FormulaTableNamedColumns::One(name) => {
+        TableNamedColumns::All => {},
+        TableNamedColumns::One(name) => {
             extra.extend([0, 0, 1]);
             write_sxos(&mut extra, false, name)?;
         },
-        FormulaTableNamedColumns::Range { first, last } => {
+        TableNamedColumns::Range { first, last } => {
             extra.extend([0, 0, 2]);
             write_sxos(&mut extra, true, first)?;
             write_sxos(&mut extra, false, last)?;
@@ -443,7 +443,7 @@ impl<'a> Parser<'a> {
     /// Parse the formula into tokens
     ///
     /// Returns a vector of formula tokens in RPN order.
-    pub fn parse(&mut self) -> Result<Vec<FormulaToken>> {
+    pub fn parse(&mut self) -> Result<Vec<Token>> {
         let mut tokens = Vec::new();
         let mut boundaries = Vec::new();
 
@@ -483,7 +483,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a single token
-    fn parse_token(&mut self) -> Result<FormulaToken> {
+    fn parse_token(&mut self) -> Result<Token> {
         if self.offset >= self.data.len() {
             return Err(Error::InvalidFormula(
                 "unexpected end of formula token stream".to_string(),
@@ -496,27 +496,27 @@ impl<'a> Parser<'a> {
         use ptg_types::*;
 
         match ptg_type {
-            PTG_ADD => Ok(FormulaToken::BinaryOp(BinaryOperator::Add)),
-            PTG_SUB => Ok(FormulaToken::BinaryOp(BinaryOperator::Subtract)),
-            PTG_MUL => Ok(FormulaToken::BinaryOp(BinaryOperator::Multiply)),
-            PTG_DIV => Ok(FormulaToken::BinaryOp(BinaryOperator::Divide)),
-            PTG_POWER => Ok(FormulaToken::BinaryOp(BinaryOperator::Power)),
-            PTG_CONCAT => Ok(FormulaToken::BinaryOp(BinaryOperator::Concat)),
-            PTG_LT => Ok(FormulaToken::BinaryOp(BinaryOperator::LessThan)),
-            PTG_LE => Ok(FormulaToken::BinaryOp(BinaryOperator::LessEqual)),
-            PTG_EQ => Ok(FormulaToken::BinaryOp(BinaryOperator::Equal)),
-            PTG_GE => Ok(FormulaToken::BinaryOp(BinaryOperator::GreaterEqual)),
-            PTG_GT => Ok(FormulaToken::BinaryOp(BinaryOperator::GreaterThan)),
-            PTG_NE => Ok(FormulaToken::BinaryOp(BinaryOperator::NotEqual)),
-            PTG_ISECT => Ok(FormulaToken::BinaryOp(BinaryOperator::Intersection)),
-            PTG_UNION => Ok(FormulaToken::BinaryOp(BinaryOperator::Union)),
-            PTG_RANGE => Ok(FormulaToken::BinaryOp(BinaryOperator::Range)),
+            PTG_ADD => Ok(Token::BinaryOp(BinaryOperator::Add)),
+            PTG_SUB => Ok(Token::BinaryOp(BinaryOperator::Subtract)),
+            PTG_MUL => Ok(Token::BinaryOp(BinaryOperator::Multiply)),
+            PTG_DIV => Ok(Token::BinaryOp(BinaryOperator::Divide)),
+            PTG_POWER => Ok(Token::BinaryOp(BinaryOperator::Power)),
+            PTG_CONCAT => Ok(Token::BinaryOp(BinaryOperator::Concat)),
+            PTG_LT => Ok(Token::BinaryOp(BinaryOperator::LessThan)),
+            PTG_LE => Ok(Token::BinaryOp(BinaryOperator::LessEqual)),
+            PTG_EQ => Ok(Token::BinaryOp(BinaryOperator::Equal)),
+            PTG_GE => Ok(Token::BinaryOp(BinaryOperator::GreaterEqual)),
+            PTG_GT => Ok(Token::BinaryOp(BinaryOperator::GreaterThan)),
+            PTG_NE => Ok(Token::BinaryOp(BinaryOperator::NotEqual)),
+            PTG_ISECT => Ok(Token::BinaryOp(BinaryOperator::Intersection)),
+            PTG_UNION => Ok(Token::BinaryOp(BinaryOperator::Union)),
+            PTG_RANGE => Ok(Token::BinaryOp(BinaryOperator::Range)),
 
-            PTG_UPLUS => Ok(FormulaToken::UnaryOp(UnaryOperator::Plus)),
-            PTG_UMINUS => Ok(FormulaToken::UnaryOp(UnaryOperator::Minus)),
-            PTG_PERCENT => Ok(FormulaToken::UnaryOp(UnaryOperator::Percent)),
-            PTG_PAREN => Ok(FormulaToken::Parenthesis),
-            PTG_MISSING_ARG => Ok(FormulaToken::MissingArg),
+            PTG_UPLUS => Ok(Token::UnaryOp(UnaryOperator::Plus)),
+            PTG_UMINUS => Ok(Token::UnaryOp(UnaryOperator::Minus)),
+            PTG_PERCENT => Ok(Token::UnaryOp(UnaryOperator::Percent)),
+            PTG_PAREN => Ok(Token::Parenthesis),
+            PTG_MISSING_ARG => Ok(Token::MissingArg),
             PTG_EXTENDED => self.parse_extended(),
             PTG_ATTR => self.parse_attr(),
 
@@ -538,20 +538,20 @@ impl<'a> Parser<'a> {
                 0x1A => self.parse_ref_3d(),
                 0x1B => self.parse_area_3d(),
                 0x00 => self.parse_array(),
-                0x06 => self.parse_memory(FormulaMemoryKind::Area),
-                0x07 => self.parse_memory(FormulaMemoryKind::Error(0)),
-                0x08 => self.parse_memory(FormulaMemoryKind::NoMemory),
-                0x09 => self.parse_memory(FormulaMemoryKind::Function),
+                0x06 => self.parse_memory(MemoryKind::Area),
+                0x07 => self.parse_memory(MemoryKind::Error(0)),
+                0x08 => self.parse_memory(MemoryKind::NoMemory),
+                0x09 => self.parse_memory(MemoryKind::Function),
                 0x01 => self.parse_func(),
                 0x02 => self.parse_func_var(),
                 0x03 => self.parse_name(),
                 0x19 => self.parse_name_x(),
-                _ => Ok(FormulaToken::Unknown(ptg_type)),
+                _ => Ok(Token::Unknown(ptg_type)),
             },
 
             _ => {
                 // Unknown token type
-                Ok(FormulaToken::Unknown(ptg_type))
+                Ok(Token::Unknown(ptg_type))
             },
         }
     }
@@ -579,28 +579,28 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse integer constant
-    fn parse_int(&mut self) -> Result<FormulaToken> {
+    fn parse_int(&mut self) -> Result<Token> {
         self.require(2, "PtgInt")?;
 
         let value = read_u16_le_at(self.data, self.offset)?;
         self.offset += 2;
 
-        Ok(FormulaToken::Int(value))
+        Ok(Token::Int(value))
     }
 
     /// Parse floating point constant
-    fn parse_num(&mut self) -> Result<FormulaToken> {
+    fn parse_num(&mut self) -> Result<Token> {
         self.require(8, "PtgNum")?;
 
         let value = read_f64_le_at(self.data, self.offset)?;
         self.offset += 8;
         validate_xnum(value, "PtgNum")?;
 
-        Ok(FormulaToken::Number(value))
+        Ok(Token::Number(value))
     }
 
     /// Parse string constant
-    fn parse_str(&mut self) -> Result<FormulaToken> {
+    fn parse_str(&mut self) -> Result<Token> {
         self.require(2, "PtgStr length")?;
         let len = read_u16_le_at(self.data, self.offset)? as usize;
         self.offset += 2;
@@ -616,11 +616,11 @@ impl<'a> Parser<'a> {
             .map_err(|_| Error::Encoding("invalid UTF-16 in PtgStr".to_string()))?;
         self.offset += byte_len;
 
-        Ok(FormulaToken::String(string))
+        Ok(Token::String(string))
     }
 
     /// Parse boolean constant
-    fn parse_bool(&mut self) -> Result<FormulaToken> {
+    fn parse_bool(&mut self) -> Result<Token> {
         self.require(1, "PtgBool")?;
 
         let raw = self.data[self.offset];
@@ -631,11 +631,11 @@ impl<'a> Parser<'a> {
             )));
         }
 
-        Ok(FormulaToken::Bool(raw != 0))
+        Ok(Token::Bool(raw != 0))
     }
 
     /// Parse error constant
-    fn parse_err(&mut self) -> Result<FormulaToken> {
+    fn parse_err(&mut self) -> Result<Token> {
         self.require(1, "PtgErr")?;
 
         let error_code = self.data[self.offset];
@@ -646,11 +646,11 @@ impl<'a> Parser<'a> {
             )));
         }
 
-        Ok(FormulaToken::Error(error_code))
+        Ok(Token::Error(error_code))
     }
 
     /// Parse the selector-specific payload of the `PtgAttr` token family.
-    fn parse_attr(&mut self) -> Result<FormulaToken> {
+    fn parse_attr(&mut self) -> Result<Token> {
         self.require(1, "PtgAttr selector")?;
         let selector = self.data[self.offset];
         self.offset += 1;
@@ -689,7 +689,7 @@ impl<'a> Parser<'a> {
                 }
                 self.control_flow_targets.push(target);
             }
-            return Ok(FormulaToken::Attribute(selector));
+            return Ok(Token::Attribute(selector));
         }
 
         match selector {
@@ -718,13 +718,13 @@ impl<'a> Parser<'a> {
                 }
                 if selector == 0x10 {
                     // PtgAttrSum is semantically SUM(expression).
-                    Ok(FormulaToken::Function {
+                    Ok(Token::Function {
                         index: 4,
                         arg_count: 1,
                         is_command: false,
                     })
                 } else {
-                    Ok(FormulaToken::Attribute(selector))
+                    Ok(Token::Attribute(selector))
                 }
             },
             _ => Err(Error::InvalidFormula(format!(
@@ -733,7 +733,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_extended(&mut self) -> Result<FormulaToken> {
+    fn parse_extended(&mut self) -> Result<Token> {
         self.require(1, "extended Ptg selector")?;
         let selector = self.data[self.offset];
         self.offset += 1;
@@ -743,7 +743,7 @@ impl<'a> Parser<'a> {
                 self.require(4, "PtgSxName")?;
                 let index = read_u32_le_at(self.data, self.offset)?;
                 self.offset += 4;
-                Ok(FormulaToken::PivotName(index))
+                Ok(Token::PivotName(index))
             },
             _ => Err(Error::InvalidFormula(format!(
                 "unknown extended Ptg selector 0x{selector:02X}"
@@ -751,7 +751,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_list(&mut self) -> Result<FormulaToken> {
+    fn parse_list(&mut self) -> Result<Token> {
         self.require(12, "PtgList")?;
         let sheet_index = read_u16_le_at(self.data, self.offset)?;
         let flags = read_u16_le_at(self.data, self.offset + 2)?;
@@ -767,9 +767,9 @@ impl<'a> Parser<'a> {
             )));
         }
         let data_type = match (flags >> 10) & 0x03 {
-            0 => FormulaTableDataType::Reference,
-            1 => FormulaTableDataType::Value,
-            2 => FormulaTableDataType::Array,
+            0 => TableDataType::Reference,
+            1 => TableDataType::Value,
+            2 => TableDataType::Array,
             _ => {
                 return Err(Error::InvalidFormula(
                     "PtgList has reserved data type 3".to_string(),
@@ -788,14 +788,14 @@ impl<'a> Parser<'a> {
             }
             let row_type = parse_table_row_type(((flags >> 2) & 0x1F) as u8)?;
             let columns = match flags & 0x03 {
-                0 => FormulaTableColumns::All,
+                0 => TableColumns::All,
                 1 => {
                     if col_first >= 16_384 {
                         return Err(Error::InvalidFormula(
                             "PtgList first column is outside worksheet bounds".to_string(),
                         ));
                     }
-                    FormulaTableColumns::One(col_first)
+                    TableColumns::One(col_first)
                 },
                 2 => {
                     if col_first > col_last || col_last >= 16_384 {
@@ -803,7 +803,7 @@ impl<'a> Parser<'a> {
                             "PtgList column range is invalid".to_string(),
                         ));
                     }
-                    FormulaTableColumns::Range {
+                    TableColumns::Range {
                         first: col_first,
                         last: col_last,
                     }
@@ -821,7 +821,7 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        Ok(FormulaToken::TableReference(FormulaTableReference {
+        Ok(Token::TableReference(TableReference {
             sheet_index,
             row_type,
             columns,
@@ -834,7 +834,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    fn parse_extra_list(&mut self) -> Result<FormulaExternalTableReference> {
+    fn parse_extra_list(&mut self) -> Result<ExternalTableReference> {
         self.require_extra(5, "PtgExtraList header")?;
         let has_columns = match self.extra[self.extra_offset] {
             0 => false,
@@ -878,15 +878,15 @@ impl<'a> Parser<'a> {
             }
             let first = self.parse_sxos(count == 2, "SxSu first column")?;
             if count == 1 {
-                FormulaTableNamedColumns::One(first)
+                TableNamedColumns::One(first)
             } else {
                 let last = self.parse_sxos(false, "SxSu last column")?;
-                FormulaTableNamedColumns::Range { first, last }
+                TableNamedColumns::Range { first, last }
             }
         } else {
-            FormulaTableNamedColumns::All
+            TableNamedColumns::All
         };
-        Ok(FormulaExternalTableReference {
+        Ok(ExternalTableReference {
             table,
             row_type,
             columns,
@@ -952,7 +952,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_array(&mut self) -> Result<FormulaToken> {
+    fn parse_array(&mut self) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 || !matches!(token & 0x60, 0x40 | 0x60) {
             return Err(Error::InvalidFormula(format!(
@@ -993,7 +993,7 @@ impl<'a> Parser<'a> {
                     let value = read_f64_le_at(self.extra, self.extra_offset)?;
                     self.extra_offset += 8;
                     validate_xnum(value, "SerNum")?;
-                    FormulaArrayValue::Number(value)
+                    ArrayValue::Number(value)
                 },
                 0x01 => {
                     self.require_extra(2, "SerStr length")?;
@@ -1015,7 +1015,7 @@ impl<'a> Parser<'a> {
                         .collect::<std::result::Result<String, _>>()
                         .map_err(|_| Error::Encoding("invalid UTF-16 in SerStr".to_string()))?;
                     self.extra_offset += byte_len;
-                    FormulaArrayValue::String(value)
+                    ArrayValue::String(value)
                 },
                 0x02 => {
                     self.require_extra(1, "SerBool")?;
@@ -1026,7 +1026,7 @@ impl<'a> Parser<'a> {
                             "invalid SerBool value {value}"
                         )));
                     }
-                    FormulaArrayValue::Bool(value != 0)
+                    ArrayValue::Bool(value != 0)
                 },
                 0x04 => {
                     self.require_extra(4, "SerErr")?;
@@ -1045,7 +1045,7 @@ impl<'a> Parser<'a> {
                         ));
                     }
                     self.extra_offset += 4;
-                    FormulaArrayValue::Error(error)
+                    ArrayValue::Error(error)
                 },
                 _ => {
                     return Err(Error::InvalidFormula(format!(
@@ -1055,10 +1055,10 @@ impl<'a> Parser<'a> {
             };
             values.push(value);
         }
-        Ok(FormulaToken::Array { rows, cols, values })
+        Ok(Token::Array { rows, cols, values })
     }
 
-    fn parse_memory(&mut self, mut kind: FormulaMemoryKind) -> Result<FormulaToken> {
+    fn parse_memory(&mut self, mut kind: MemoryKind) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
             return Err(Error::InvalidFormula(format!(
@@ -1066,19 +1066,19 @@ impl<'a> Parser<'a> {
             )));
         }
         let (payload_len, cce_offset) = match kind {
-            FormulaMemoryKind::Function => (2, 0),
-            FormulaMemoryKind::Area | FormulaMemoryKind::NoMemory => (6, 4),
-            FormulaMemoryKind::Error(_) => (6, 4),
+            MemoryKind::Function => (2, 0),
+            MemoryKind::Area | MemoryKind::NoMemory => (6, 4),
+            MemoryKind::Error(_) => (6, 4),
         };
         self.require(payload_len, "memory token")?;
-        if matches!(kind, FormulaMemoryKind::Error(_)) {
+        if matches!(kind, MemoryKind::Error(_)) {
             let error = self.data[self.offset];
             if !matches!(error, 0x00 | 0x07 | 0x0F | 0x17 | 0x1D | 0x24 | 0x2A | 0x2B) {
                 return Err(Error::InvalidFormula(format!(
                     "invalid PtgMemErr code 0x{error:02X}"
                 )));
             }
-            kind = FormulaMemoryKind::Error(error);
+            kind = MemoryKind::Error(error);
         }
         let expression_bytes = read_u16_le_at(self.data, self.offset + cce_offset)?;
         self.offset += payload_len;
@@ -1097,7 +1097,7 @@ impl<'a> Parser<'a> {
             .push(self.offset + usize::from(expression_bytes));
 
         let mut cached_ranges = Vec::new();
-        if kind == FormulaMemoryKind::Area {
+        if kind == MemoryKind::Area {
             self.require_extra(4, "PtgExtraMem count")?;
             let count = usize::try_from(read_u32_le_at(self.extra, self.extra_offset)?)
                 .map_err(|_| Error::InvalidFormula("PtgExtraMem is too large".to_string()))?;
@@ -1119,12 +1119,12 @@ impl<'a> Parser<'a> {
                 self.extra_offset += 16;
                 let invalid = range == [1_048_575, 1_048_575, 16_383, 16_383];
                 if !invalid {
-                    FormulaRange::new(range[0], range[1], range[2], range[3])?;
+                    Range::new(range[0], range[1], range[2], range[3])?;
                 }
                 cached_ranges.push(range);
             }
         }
-        Ok(FormulaToken::Memory {
+        Ok(Token::Memory {
             kind,
             expression_bytes,
             cached_ranges,
@@ -1132,7 +1132,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse cell reference
-    fn parse_ref(&mut self, offset_reference: bool) -> Result<FormulaToken> {
+    fn parse_ref(&mut self, offset_reference: bool) -> Result<Token> {
         self.validate_classed_token("PtgRef")?;
         self.require(6, "PtgRef")?;
 
@@ -1151,7 +1151,7 @@ impl<'a> Parser<'a> {
             offset_reference,
         )?;
 
-        Ok(FormulaToken::CellRef {
+        Ok(Token::CellRef {
             row,
             col,
             row_relative,
@@ -1160,7 +1160,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse area reference
-    fn parse_area(&mut self, offset_reference: bool) -> Result<FormulaToken> {
+    fn parse_area(&mut self, offset_reference: bool) -> Result<Token> {
         self.validate_classed_token("PtgArea")?;
         self.require(12, "PtgArea")?;
 
@@ -1188,9 +1188,9 @@ impl<'a> Parser<'a> {
             col_last_relative,
             offset_reference,
         )?;
-        FormulaRange::new(row_first, row_last, col_first, col_last)?;
+        Range::new(row_first, row_last, col_first, col_last)?;
 
-        Ok(FormulaToken::AreaRef {
+        Ok(Token::AreaRef {
             row_first,
             row_last,
             col_first,
@@ -1202,7 +1202,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_reference_error(&mut self, is_area: bool, is_3d: bool) -> Result<FormulaToken> {
+    fn parse_reference_error(&mut self, is_area: bool, is_3d: bool) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
             return Err(Error::InvalidFormula(format!(
@@ -1220,13 +1220,13 @@ impl<'a> Parser<'a> {
         let unused_len = if is_area { 12 } else { 6 };
         self.require(unused_len, "reference-error payload")?;
         self.offset += unused_len;
-        Ok(FormulaToken::ReferenceError {
+        Ok(Token::ReferenceError {
             is_area,
             sheet_index,
         })
     }
 
-    fn parse_ref_3d(&mut self) -> Result<FormulaToken> {
+    fn parse_ref_3d(&mut self) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
             return Err(Error::InvalidFormula(format!(
@@ -1244,7 +1244,7 @@ impl<'a> Parser<'a> {
                 "PtgRef3d coordinate ({row}, {col}) is outside the worksheet"
             )));
         }
-        Ok(FormulaToken::CellRef3d {
+        Ok(Token::CellRef3d {
             sheet_index,
             row,
             col,
@@ -1253,7 +1253,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_area_3d(&mut self) -> Result<FormulaToken> {
+    fn parse_area_3d(&mut self) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
             return Err(Error::InvalidFormula(format!(
@@ -1269,8 +1269,8 @@ impl<'a> Parser<'a> {
         self.offset += 14;
         let col_first = u32::from(col_first_data & 0x3FFF);
         let col_last = u32::from(col_last_data & 0x3FFF);
-        FormulaRange::new(row_first, row_last, col_first, col_last)?;
-        Ok(FormulaToken::AreaRef3d {
+        Range::new(row_first, row_last, col_first, col_last)?;
+        Ok(Token::AreaRef3d {
             sheet_index,
             row_first,
             row_last,
@@ -1329,7 +1329,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse function with fixed arguments
-    fn parse_func(&mut self) -> Result<FormulaToken> {
+    fn parse_func(&mut self) -> Result<Token> {
         self.validate_classed_token("PtgFunc")?;
         self.require(2, "PtgFunc")?;
 
@@ -1338,7 +1338,7 @@ impl<'a> Parser<'a> {
 
         let arg_count = Self::get_function_arg_count(index)?;
 
-        Ok(FormulaToken::Function {
+        Ok(Token::Function {
             index,
             arg_count,
             is_command: false,
@@ -1346,7 +1346,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse function with variable arguments
-    fn parse_func_var(&mut self) -> Result<FormulaToken> {
+    fn parse_func_var(&mut self) -> Result<Token> {
         self.validate_classed_token("PtgFuncVar")?;
         self.require(3, "PtgFuncVar")?;
 
@@ -1371,7 +1371,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(FormulaToken::Function {
+        Ok(Token::Function {
             index,
             arg_count,
             is_command,
@@ -1379,7 +1379,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse defined name reference
-    fn parse_name(&mut self) -> Result<FormulaToken> {
+    fn parse_name(&mut self) -> Result<Token> {
         self.validate_classed_token("PtgName")?;
         self.require(4, "PtgName")?;
 
@@ -1391,10 +1391,10 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        Ok(FormulaToken::Name(name_index))
+        Ok(Token::Name(name_index))
     }
 
-    fn parse_name_x(&mut self) -> Result<FormulaToken> {
+    fn parse_name_x(&mut self) -> Result<Token> {
         self.validate_classed_token("PtgNameX")?;
         self.require(6, "PtgNameX")?;
         let sheet_index = read_u16_le_at(self.data, self.offset)?;
@@ -1405,7 +1405,7 @@ impl<'a> Parser<'a> {
                 "PtgNameX name index is one-based and cannot be zero".to_string(),
             ));
         }
-        Ok(FormulaToken::ExternalName {
+        Ok(Token::ExternalName {
             sheet_index,
             name_index,
         })
@@ -1436,7 +1436,7 @@ pub trait Resolution {
     fn sheet_prefix(&self, index: u16) -> Result<String>;
     fn defined_name(&self, index: u32) -> Result<String>;
     fn external_name(&self, sheet_index: u16, name_index: u32) -> Result<String>;
-    fn table_reference(&self, reference: &FormulaTableReference) -> Result<String>;
+    fn table_reference(&self, reference: &TableReference) -> Result<String>;
     fn pivot_name(&self, index: u32) -> Result<String>;
 }
 
@@ -1451,36 +1451,36 @@ impl Compiler {
     /// Convert formula tokens to string representation
     ///
     /// Uses RPN to infix conversion with proper operator precedence.
-    pub fn tokens_to_string(tokens: &[FormulaToken]) -> String {
+    pub fn tokens_to_string(tokens: &[Token]) -> String {
         Self::try_tokens_to_string(tokens).unwrap_or_default()
     }
 
     /// Convert tokens to text, rejecting token streams that cannot be
     /// represented faithfully by this converter.
-    pub fn try_tokens_to_string(tokens: &[FormulaToken]) -> Result<String> {
+    pub fn try_tokens_to_string(tokens: &[Token]) -> Result<String> {
         Self::try_tokens_to_string_with_optional_context(tokens, None)
     }
 
     /// Convert formula tokens using workbook extern-sheet and name metadata.
     pub fn try_tokens_to_string_with_resolution(
-        tokens: &[FormulaToken],
+        tokens: &[Token],
         context: &dyn FormulaResolution,
     ) -> Result<String> {
         Self::try_tokens_to_string_with_optional_context(tokens, Some(context))
     }
 
     fn try_tokens_to_string_with_optional_context(
-        tokens: &[FormulaToken],
+        tokens: &[Token],
         context: Option<&dyn FormulaResolution>,
     ) -> Result<String> {
         let mut stack: Vec<String> = Vec::new();
 
         for token in tokens {
             match token {
-                FormulaToken::Number(n) => stack.push(format!("{}", n)),
-                FormulaToken::Int(i) => stack.push(format!("{}", i)),
-                FormulaToken::MissingArg => stack.push(String::new()),
-                FormulaToken::Parenthesis => {
+                Token::Number(n) => stack.push(format!("{}", n)),
+                Token::Int(i) => stack.push(format!("{}", i)),
+                Token::MissingArg => stack.push(String::new()),
+                Token::Parenthesis => {
                     let Some(expression) = stack.pop() else {
                         return Err(Error::InvalidFormula(
                             "PtgParen has no preceding expression".to_string(),
@@ -1488,8 +1488,8 @@ impl Compiler {
                     };
                     stack.push(format!("({expression})"));
                 },
-                FormulaToken::Attribute(_) => {},
-                FormulaToken::Array { rows, cols, values } => {
+                Token::Attribute(_) => {},
+                Token::Array { rows, cols, values } => {
                     let expected = usize::try_from(u64::from(*rows) * u64::from(*cols))
                         .map_err(|_| Error::InvalidFormula("array is too large".to_string()))?;
                     if values.len() != expected {
@@ -1513,18 +1513,18 @@ impl Compiler {
                                         Error::InvalidFormula("array index overflow".to_string())
                                     })?;
                             match &values[index] {
-                                FormulaArrayValue::Number(value) => {
+                                ArrayValue::Number(value) => {
                                     text.push_str(&value.to_string());
                                 },
-                                FormulaArrayValue::String(value) => {
+                                ArrayValue::String(value) => {
                                     text.push('"');
                                     text.push_str(&value.replace('"', "\"\""));
                                     text.push('"');
                                 },
-                                FormulaArrayValue::Bool(value) => {
+                                ArrayValue::Bool(value) => {
                                     text.push_str(if *value { "TRUE" } else { "FALSE" });
                                 },
-                                FormulaArrayValue::Error(error) => {
+                                ArrayValue::Error(error) => {
                                     text.push_str(&Self::error_to_string(*error));
                                 },
                             }
@@ -1533,15 +1533,15 @@ impl Compiler {
                     text.push('}');
                     stack.push(text);
                 },
-                FormulaToken::Memory { .. } => {},
-                FormulaToken::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
-                FormulaToken::Bool(b) => stack.push(if *b {
+                Token::Memory { .. } => {},
+                Token::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
+                Token::Bool(b) => stack.push(if *b {
                     "TRUE".to_string()
                 } else {
                     "FALSE".to_string()
                 }),
-                FormulaToken::Error(e) => stack.push(Self::error_to_string(*e)),
-                FormulaToken::CellRef {
+                Token::Error(e) => stack.push(Self::error_to_string(*e)),
+                Token::CellRef {
                     row,
                     col,
                     row_relative,
@@ -1556,7 +1556,7 @@ impl Compiler {
                         col_prefix, col_str, row_prefix, row_str
                     ));
                 },
-                FormulaToken::AreaRef {
+                Token::AreaRef {
                     row_first,
                     col_first,
                     row_last,
@@ -1580,7 +1580,7 @@ impl Compiler {
                     );
                     stack.push(format!("{}:{}", first, last));
                 },
-                FormulaToken::CellRef3d {
+                Token::CellRef3d {
                     sheet_index,
                     row,
                     col,
@@ -1597,7 +1597,7 @@ impl Compiler {
                         Self::format_reference(*row, *col, *row_relative, *col_relative);
                     stack.push(format!("{prefix}!{reference}"));
                 },
-                FormulaToken::AreaRef3d {
+                Token::AreaRef3d {
                     sheet_index,
                     row_first,
                     row_last,
@@ -1628,8 +1628,8 @@ impl Compiler {
                     );
                     stack.push(format!("{prefix}!{first}:{last}"));
                 },
-                FormulaToken::ReferenceError { .. } => stack.push("#REF!".to_string()),
-                FormulaToken::BinaryOp(op) => {
+                Token::ReferenceError { .. } => stack.push("#REF!".to_string()),
+                Token::BinaryOp(op) => {
                     if stack.len() < 2 {
                         return Err(Error::InvalidFormula(
                             "binary operator has fewer than two operands".to_string(),
@@ -1640,7 +1640,7 @@ impl Compiler {
                     let op_str = Self::binary_op_to_string(*op);
                     stack.push(format!("({}{}{})", left, op_str, right));
                 },
-                FormulaToken::UnaryOp(op) => {
+                Token::UnaryOp(op) => {
                     let Some(operand) = stack.pop() else {
                         return Err(Error::InvalidFormula(
                             "unary operator has no operand".to_string(),
@@ -1652,7 +1652,7 @@ impl Compiler {
                         UnaryOperator::Percent => stack.push(format!("({}%)", operand)),
                     }
                 },
-                FormulaToken::Function {
+                Token::Function {
                     index,
                     arg_count,
                     is_command,
@@ -1681,7 +1681,7 @@ impl Compiler {
                     }
                     stack.push(format!("{}({})", func_name, args.join(",")));
                 },
-                FormulaToken::Name(idx) => {
+                Token::Name(idx) => {
                     let context = context.ok_or_else(|| {
                         Error::UnsupportedFeature(format!(
                             "XLSB defined name index {idx} requires workbook name resolution"
@@ -1689,7 +1689,7 @@ impl Compiler {
                     })?;
                     stack.push(context.defined_name(*idx)?);
                 },
-                FormulaToken::ExternalName {
+                Token::ExternalName {
                     sheet_index,
                     name_index,
                 } => {
@@ -1700,10 +1700,10 @@ impl Compiler {
                     })?;
                     stack.push(context.external_name(*sheet_index, *name_index)?);
                 },
-                FormulaToken::TableReference(reference) if reference.invalid => {
+                Token::TableReference(reference) if reference.invalid => {
                     stack.push("#REF!".to_string())
                 },
-                FormulaToken::TableReference(reference) => {
+                Token::TableReference(reference) => {
                     let context = context.ok_or_else(|| {
                         Error::UnsupportedFeature(format!(
                             "structured table reference on Xti {} requires table-definition resolution",
@@ -1712,7 +1712,7 @@ impl Compiler {
                     })?;
                     stack.push(context.table_reference(reference)?);
                 },
-                FormulaToken::PivotName(index) => {
+                Token::PivotName(index) => {
                     let context = context.ok_or_else(|| {
                         Error::InvalidFormula(
                             "PtgSxName requires pivot-cache calculated-name metadata".to_string(),
@@ -1720,7 +1720,7 @@ impl Compiler {
                     })?;
                     stack.push(context.pivot_name(*index)?);
                 },
-                FormulaToken::Unknown(t) => {
+                Token::Unknown(t) => {
                     return Err(Error::UnsupportedFeature(format!(
                         "XLSB formula token 0x{t:02X}"
                     )));
@@ -1785,32 +1785,32 @@ impl Compiler {
     }
 }
 
-fn parse_table_row_type(value: u8) -> Result<FormulaTableRowType> {
+fn parse_table_row_type(value: u8) -> Result<TableRowType> {
     match value {
-        0x00 => Ok(FormulaTableRowType::Data),
-        0x01 => Ok(FormulaTableRowType::All),
-        0x02 => Ok(FormulaTableRowType::Headers),
-        0x04 => Ok(FormulaTableRowType::DataAlternate),
-        0x06 => Ok(FormulaTableRowType::DataAndHeaders),
-        0x08 => Ok(FormulaTableRowType::Totals),
-        0x0C => Ok(FormulaTableRowType::DataAndTotals),
-        0x10 => Ok(FormulaTableRowType::Current),
+        0x00 => Ok(TableRowType::Data),
+        0x01 => Ok(TableRowType::All),
+        0x02 => Ok(TableRowType::Headers),
+        0x04 => Ok(TableRowType::DataAlternate),
+        0x06 => Ok(TableRowType::DataAndHeaders),
+        0x08 => Ok(TableRowType::Totals),
+        0x0C => Ok(TableRowType::DataAndTotals),
+        0x10 => Ok(TableRowType::Current),
         _ => Err(Error::InvalidFormula(format!(
             "invalid PtgRowType 0x{value:02X}"
         ))),
     }
 }
 
-fn table_row_type_raw(value: FormulaTableRowType) -> u8 {
+fn table_row_type_raw(value: TableRowType) -> u8 {
     match value {
-        FormulaTableRowType::Data => 0x00,
-        FormulaTableRowType::All => 0x01,
-        FormulaTableRowType::Headers => 0x02,
-        FormulaTableRowType::DataAlternate => 0x04,
-        FormulaTableRowType::DataAndHeaders => 0x06,
-        FormulaTableRowType::Totals => 0x08,
-        FormulaTableRowType::DataAndTotals => 0x0C,
-        FormulaTableRowType::Current => 0x10,
+        TableRowType::Data => 0x00,
+        TableRowType::All => 0x01,
+        TableRowType::Headers => 0x02,
+        TableRowType::DataAlternate => 0x04,
+        TableRowType::DataAndHeaders => 0x06,
+        TableRowType::Totals => 0x08,
+        TableRowType::DataAndTotals => 0x0C,
+        TableRowType::Current => 0x10,
     }
 }
 
@@ -1892,12 +1892,12 @@ mod tests {
     #[test]
     fn parses_and_serializes_cell_formula_lengths() {
         // [MS-XLSB] 2.5.98.4: cce, rgce, cb, and rgbExtra.
-        let formula = CellParsedFormula {
+        let formula = ParsedFormula {
             rgce: vec![ptg_types::PTG_INT, 42, 0],
             rgcb: vec![0xAA, 0xBB],
         };
         let encoded = formula.to_bytes().unwrap();
-        let (decoded, consumed) = CellParsedFormula::parse(&encoded).unwrap();
+        let (decoded, consumed) = ParsedFormula::parse(&encoded).unwrap();
         assert_eq!(consumed, encoded.len());
         assert_eq!(decoded, formula);
     }
@@ -1910,23 +1910,23 @@ mod tests {
         data.extend_from_slice(&[0x7F, 0x7E]);
         let mut parser = FormulaParser::new(&data);
         let tokens = parser.parse().unwrap();
-        assert!(matches!(tokens[0], FormulaToken::Bool(true)));
-        assert!(matches!(tokens[1], FormulaToken::Number(value) if value == 42.5));
-        assert!(matches!(tokens[2], FormulaToken::Unknown(0x7F)));
-        assert!(matches!(tokens[3], FormulaToken::Unknown(0x7E)));
+        assert!(matches!(tokens[0], Token::Bool(true)));
+        assert!(matches!(tokens[1], Token::Number(value) if value == 42.5));
+        assert!(matches!(tokens[2], Token::Unknown(0x7F)));
+        assert!(matches!(tokens[3], Token::Unknown(0x7E)));
     }
 
     #[test]
     fn parses_and_rejects_grouped_formula_records_without_unbounded_allocations() {
-        let formula = CellParsedFormula::exp(3, 4).unwrap();
-        let group = FormulaGroup {
-            kind: FormulaGroupKind::Array,
-            range: FormulaRange::new(3, 3, 4, 4).unwrap(),
+        let formula = ParsedFormula::exp(3, 4).unwrap();
+        let group = Group {
+            kind: GroupKind::Array,
+            range: Range::new(3, 3, 4, 4).unwrap(),
             formula,
             always_calculate: true,
         };
         let data = group.to_record_data().unwrap();
-        assert_eq!(FormulaGroup::parse_array(&data).unwrap(), group);
+        assert_eq!(Group::parse_array(&data).unwrap(), group);
 
         let mut oversized = vec![0u8; MAX_CELL_FORMULA_BYTES + 1 + 8];
         oversized[..4].copy_from_slice(
@@ -1935,20 +1935,20 @@ mod tests {
                 .to_le_bytes(),
         );
         assert!(matches!(
-            CellParsedFormula::parse(&oversized),
+            ParsedFormula::parse(&oversized),
             Err(Error::InvalidFormula(message)) if message.contains("exceeds")
         ));
     }
 
     #[test]
     fn extended_table_token_round_trips() {
-        let token = FormulaToken::TableReference(FormulaTableReference {
+        let token = Token::TableReference(TableReference {
             sheet_index: 2,
-            row_type: Some(FormulaTableRowType::Data),
-            columns: Some(FormulaTableColumns::One(1)),
+            row_type: Some(TableRowType::Data),
+            columns: Some(TableColumns::One(1)),
             square_bracket_space: false,
             comma_space: true,
-            data_type: FormulaTableDataType::Reference,
+            data_type: TableDataType::Reference,
             invalid: false,
             list_index: Some(7),
             external: None,

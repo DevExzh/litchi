@@ -2,7 +2,7 @@
 
 use super::model::{Definition, validate_name};
 use super::{Error, Result};
-use crate::formula::{CellParsedFormula, ptg_types};
+use crate::formula::{ParsedFormula, ptg_types};
 use crate::raw::{Cursor, Limits};
 
 /// Maximum bytes accepted for one `BrtName` payload.
@@ -85,7 +85,7 @@ pub fn parse(data: &[u8]) -> Result<Definition> {
 
     let formula_start = cursor.position();
     let (parsed_formula, formula_bytes) =
-        CellParsedFormula::parse(&data[formula_start..]).map_err(Error::from)?;
+        ParsedFormula::parse(&data[formula_start..]).map_err(Error::from)?;
     cursor.skip(formula_bytes)?;
 
     let comment = cursor.read_nullable_wide_string()?;

@@ -1,5 +1,5 @@
 use super::{Definition, area3d_formula, validate_name};
-use crate::formula::{CellParsedFormula, ptg_types};
+use crate::formula::{ParsedFormula, ptg_types};
 
 fn name_record(flags: u32, ch_key: u8, name: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -12,7 +12,7 @@ fn name_record(flags: u32, ch_key: u8, name: &str) -> Vec<u8> {
         data.extend_from_slice(&code_unit.to_le_bytes());
     }
     data.extend_from_slice(
-        &CellParsedFormula {
+        &ParsedFormula {
             rgce: vec![ptg_types::PTG_INT, 1, 0],
             rgcb: Vec::new(),
         }

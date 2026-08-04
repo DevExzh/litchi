@@ -1,8 +1,8 @@
 //! Cell representation for XLSB files
 
 use crate::xlsb::formula::{
-    CellParsedFormula, FormulaConverter, FormulaGroup, FormulaGroupKind, FormulaParser,
-    FormulaResolutionContext,
+    CellParsedFormula, FormulaConverter, FormulaGroup, FormulaParser, FormulaResolutionContext,
+    GroupKind,
 };
 use crate::xlsb::records::CellRecord;
 use crate::xlsb::shared_strings::SharedString;
@@ -123,10 +123,10 @@ impl XlsbCell {
         formula_context: &FormulaResolutionContext,
     ) -> Self {
         let tokens = match group.kind {
-            FormulaGroupKind::Array => {
+            GroupKind::Array => {
                 FormulaParser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()
             },
-            FormulaGroupKind::Shared => FormulaParser::with_base_cell_and_extra(
+            GroupKind::Shared => FormulaParser::with_base_cell_and_extra(
                 &group.formula.rgce,
                 &group.formula.rgcb,
                 row,
@@ -134,7 +134,7 @@ impl XlsbCell {
             )
             .parse(),
         };
-        let is_array = group.kind == FormulaGroupKind::Array;
+        let is_array = group.kind == GroupKind::Array;
         let value = tokens
             .and_then(|tokens| {
                 FormulaConverter::try_tokens_to_string_with_context(&tokens, formula_context)
@@ -195,7 +195,7 @@ impl XlsbCell {
     pub fn is_shared_formula(&self) -> bool {
         self.formula_group
             .as_ref()
-            .is_some_and(|group| group.kind == FormulaGroupKind::Shared)
+            .is_some_and(|group| group.kind == GroupKind::Shared)
     }
 
     /// Array/shared formula range in A1 notation.

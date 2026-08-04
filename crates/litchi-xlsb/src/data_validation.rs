@@ -6,7 +6,7 @@
 //! through the owner crate's [`crate::formula::FormulaResolution`] trait.
 
 use crate::formula::{
-    CellParsedFormula, FormulaConverter, FormulaParser, FormulaResolution, MAX_CELL_FORMULA_BYTES,
+    FormulaConverter, FormulaParser, FormulaResolution, MAX_CELL_FORMULA_BYTES, ParsedFormula,
 };
 use std::io;
 use thiserror::Error;
@@ -29,7 +29,7 @@ pub trait FormulaBinary: Clone + PartialEq + Eq {
     fn rgcb(&self) -> &[u8];
 }
 
-impl FormulaBinary for CellParsedFormula {
+impl FormulaBinary for ParsedFormula {
     fn from_parts(rgce: Vec<u8>, rgcb: Vec<u8>) -> Self {
         Self { rgce, rgcb }
     }
@@ -102,7 +102,7 @@ pub enum DataValidationRecordKind {
 ///
 /// Represents data validation constraints on a cell or range.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataValidation<F = CellParsedFormula>
+pub struct DataValidation<F = ParsedFormula>
 where
     F: FormulaBinary,
 {
@@ -746,7 +746,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_new() {
-        let dv = DataValidation::<CellParsedFormula>::new(3, "A1:A10".to_string());
+        let dv = DataValidation::<ParsedFormula>::new(3, "A1:A10".to_string());
         assert_eq!(dv.validation_type, 3);
         assert_eq!(dv.cell_ranges, "A1:A10");
         // Check defaults
@@ -766,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_whole_number() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(1, "B1:B20".to_string()); // whole number
+        let mut dv = DataValidation::<ParsedFormula>::new(1, "B1:B20".to_string()); // whole number
         dv.operator = 2; // greater than
         dv.formula1 = Some("10".to_string());
         dv.allow_blank = false;
@@ -779,7 +779,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_decimal() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(2, "C1:C10".to_string()); // decimal
+        let mut dv = DataValidation::<ParsedFormula>::new(2, "C1:C10".to_string()); // decimal
         dv.operator = 0; // between
         dv.formula1 = Some("0".to_string());
         dv.formula2 = Some("100".to_string());
@@ -792,7 +792,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_list() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(3, "D1:D10".to_string()); // list
+        let mut dv = DataValidation::<ParsedFormula>::new(3, "D1:D10".to_string()); // list
         dv.formula1 = Some("Yes,No,Maybe".to_string());
         dv.show_dropdown = true;
 
@@ -803,7 +803,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_date() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(4, "E1:E10".to_string()); // date
+        let mut dv = DataValidation::<ParsedFormula>::new(4, "E1:E10".to_string()); // date
         dv.operator = 4; // greater than
         dv.formula1 = Some("2024-01-01".to_string());
 
@@ -813,7 +813,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_time() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(5, "F1:F10".to_string()); // time
+        let mut dv = DataValidation::<ParsedFormula>::new(5, "F1:F10".to_string()); // time
         dv.operator = 5; // less than
         dv.formula1 = Some("12:00".to_string());
 
@@ -823,7 +823,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_text_length() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(6, "G1:G10".to_string()); // text length
+        let mut dv = DataValidation::<ParsedFormula>::new(6, "G1:G10".to_string()); // text length
         dv.operator = 6; // greater than or equal
         dv.formula1 = Some("5".to_string());
 
@@ -833,7 +833,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_custom() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(7, "H1:H10".to_string()); // custom
+        let mut dv = DataValidation::<ParsedFormula>::new(7, "H1:H10".to_string()); // custom
         dv.formula1 = Some("=A1>0".to_string());
 
         assert_eq!(dv.validation_type, 7);
@@ -842,7 +842,7 @@ mod tests {
 
     #[test]
     fn test_data_validation_with_messages() {
-        let mut dv = DataValidation::<CellParsedFormula>::new(1, "I1:I10".to_string());
+        let mut dv = DataValidation::<ParsedFormula>::new(1, "I1:I10".to_string());
         dv.show_input_message = true;
         dv.input_title = Some("Enter value".to_string());
         dv.input_text = Some("Please enter a number greater than 10".to_string());
@@ -868,13 +868,13 @@ mod tests {
 
     #[test]
     fn test_data_validation_multiple_ranges() {
-        let dv = DataValidation::<CellParsedFormula>::new(3, "A1:A10,C1:C10,E1:E10".to_string());
+        let dv = DataValidation::<ParsedFormula>::new(3, "A1:A10,C1:C10,E1:E10".to_string());
         assert_eq!(dv.cell_ranges, "A1:A10,C1:C10,E1:E10");
     }
 
     #[test]
     fn test_data_validation_clone() {
-        let dv = DataValidation::<CellParsedFormula>::new(3, "A1:A10".to_string());
+        let dv = DataValidation::<ParsedFormula>::new(3, "A1:A10".to_string());
         let cloned = dv.clone();
         assert_eq!(cloned.validation_type, dv.validation_type);
         assert_eq!(cloned.cell_ranges, dv.cell_ranges);

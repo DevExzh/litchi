@@ -5,7 +5,7 @@ use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaCompiler, FormulaConverter, FormulaGroup,
-    FormulaGroupKind, FormulaParser, FormulaRange,
+    FormulaParser, FormulaRange, GroupKind,
 };
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
@@ -297,8 +297,8 @@ impl MutableXlsbWorksheet {
                 continue;
             };
             let formula = match group.kind {
-                FormulaGroupKind::Array => FormulaCompiler::compile_with_context(source, context)?,
-                FormulaGroupKind::Shared => FormulaCompiler::compile_shared_with_context(
+                GroupKind::Array => FormulaCompiler::compile_with_context(source, context)?,
+                GroupKind::Shared => FormulaCompiler::compile_shared_with_context(
                     source,
                     group.range.row_first,
                     group.range.col_first,
@@ -622,7 +622,7 @@ impl MutableXlsbWorksheet {
             Err(error) => return Err(error),
         };
         let group = FormulaGroup {
-            kind: FormulaGroupKind::Array,
+            kind: GroupKind::Array,
             range,
             formula: definition,
             always_calculate: true,
@@ -654,7 +654,7 @@ impl MutableXlsbWorksheet {
             Err(error) => return Err(error),
         };
         let group = FormulaGroup {
-            kind: FormulaGroupKind::Shared,
+            kind: GroupKind::Shared,
             range,
             formula: definition,
             always_calculate: false,
@@ -695,7 +695,7 @@ impl MutableXlsbWorksheet {
             let replaced = self.formula_groups.remove(index);
             self.formula_group_sources
                 .remove(&replaced.range.top_left());
-            if replaced.kind == FormulaGroupKind::Array {
+            if replaced.kind == GroupKind::Array {
                 self.normalize_array_formula_ranges(&[replaced.range.to_a1()]);
             }
         }
@@ -714,11 +714,11 @@ impl MutableXlsbWorksheet {
                 let style = self.cells.get(&(row, col)).map_or(0, |cell| cell.style);
                 let decoded = || -> XlsbResult<String> {
                     let tokens = match group.kind {
-                        FormulaGroupKind::Array => {
+                        GroupKind::Array => {
                             FormulaParser::with_extra(&group.formula.rgce, &group.formula.rgcb)
                                 .parse()?
                         },
-                        FormulaGroupKind::Shared => FormulaParser::with_base_cell_and_extra(
+                        GroupKind::Shared => FormulaParser::with_base_cell_and_extra(
                             &group.formula.rgce,
                             &group.formula.rgcb,
                             row,
@@ -729,15 +729,15 @@ impl MutableXlsbWorksheet {
                     FormulaConverter::try_tokens_to_string(&tokens)
                 };
                 let formula = match (group.kind, anchor_formula) {
-                    (FormulaGroupKind::Array, Some(formula)) => formula.to_string(),
-                    (FormulaGroupKind::Shared, _) => decoded().or_else(|error| {
+                    (GroupKind::Array, Some(formula)) => formula.to_string(),
+                    (GroupKind::Shared, _) => decoded().or_else(|error| {
                         if anchor_formula.is_none() {
                             Ok(String::new())
                         } else {
                             Err(error)
                         }
                     })?,
-                    (FormulaGroupKind::Array, None) => decoded().unwrap_or_default(),
+                    (GroupKind::Array, None) => decoded().unwrap_or_default(),
                 };
                 self.cells.insert(
                     (row, col),
@@ -745,8 +745,8 @@ impl MutableXlsbWorksheet {
                         value: CellValue::Formula {
                             formula,
                             cached_value,
-                            is_array: group.kind == FormulaGroupKind::Array,
-                            array_range: (group.kind == FormulaGroupKind::Array)
+                            is_array: group.kind == GroupKind::Array,
+                            array_range: (group.kind == GroupKind::Array)
                                 .then(|| range_text.clone()),
                         },
                         style,
@@ -772,7 +772,7 @@ impl MutableXlsbWorksheet {
         let removed_array_ranges: Vec<String> = self
             .formula_groups
             .iter()
-            .filter(|group| group.kind == FormulaGroupKind::Array && group.range.contains(row, col))
+            .filter(|group| group.kind == GroupKind::Array && group.range.contains(row, col))
             .map(|group| group.range.to_a1())
             .collect();
         self.formula_groups
@@ -1905,12 +1905,12 @@ impl MutableXlsbWorksheet {
             }
             if groups
                 .iter()
-                .any(|group| group.kind == FormulaGroupKind::Array && group.range == range)
+                .any(|group| group.kind == GroupKind::Array && group.range == range)
             {
                 continue;
             }
             groups.push(FormulaGroup {
-                kind: FormulaGroupKind::Array,
+                kind: GroupKind::Array,
                 range,
                 formula: if let Some(formula) = &cell.formula_binary {
                     formula.clone()
@@ -1989,8 +1989,8 @@ impl MutableXlsbWorksheet {
 
         if group.range.top_left() == (row, col) {
             let record_type = match group.kind {
-                FormulaGroupKind::Array => kind::ARR_FMLA,
-                FormulaGroupKind::Shared => kind::SHR_FMLA,
+                GroupKind::Array => kind::ARR_FMLA,
+                GroupKind::Shared => kind::SHR_FMLA,
             };
             writer.write_record(record_type, &group.to_record_data()?)?;
         }
@@ -3046,7 +3046,7 @@ mod tests {
         use std::io::Cursor;
 
         let group = FormulaGroup {
-            kind: FormulaGroupKind::Array,
+            kind: GroupKind::Array,
             range: FormulaRange::new(8, 8, 2, 2).unwrap(),
             formula: CellParsedFormula {
                 rgce: vec![0x23, 0x02, 0x00, 0x00, 0x00, 0x42, 0x01, 0xFF, 0x00],

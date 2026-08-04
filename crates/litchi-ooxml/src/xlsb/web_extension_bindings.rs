@@ -4,7 +4,7 @@ use litchi_ooxml_common::web;
 use std::collections::HashSet;
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::formula::{CellParsedFormula, FormulaParser, FormulaToken};
+use crate::xlsb::formula::{CellParsedFormula, FormulaParser, Token};
 use crate::xlsb::frt::{parse_formula_header, serialize_formula_header};
 use litchi_xlsb::raw::{Records, Writer, kind};
 
@@ -280,7 +280,7 @@ fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensio
         )
     })?;
     match token {
-        FormulaToken::CellRef3d {
+        Token::CellRef3d {
             sheet_index,
             row,
             col,
@@ -292,7 +292,7 @@ fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensio
             first_column: col,
             last_column: col,
         }),
-        FormulaToken::AreaRef3d {
+        Token::AreaRef3d {
             sheet_index,
             row_first,
             row_last,
@@ -306,12 +306,12 @@ fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensio
             first_column: col_first,
             last_column: col_last,
         }),
-        FormulaToken::CellRef { .. }
-        | FormulaToken::AreaRef { .. }
-        | FormulaToken::ReferenceError { .. } => Err(invalid(
-            "BrtWebExtension",
-            "local and invalid reference tokens are forbidden",
-        )),
+        Token::CellRef { .. } | Token::AreaRef { .. } | Token::ReferenceError { .. } => {
+            Err(invalid(
+                "BrtWebExtension",
+                "local and invalid reference tokens are forbidden",
+            ))
+        },
         _ => Err(invalid(
             "BrtWebExtension",
             "binding formula root is not a 3D reference",

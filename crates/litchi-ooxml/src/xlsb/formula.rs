@@ -31,10 +31,9 @@ use litchi_xlsb::named_ranges::validate_name;
 
 pub use litchi_xlsb::formula::ptg_types;
 pub use litchi_xlsb::formula::{
-    BinaryOperator, FormulaArrayValue, FormulaExternalTableReference, FormulaGroupKind,
-    FormulaMemoryKind, FormulaTableColumns, FormulaTableDataType, FormulaTableNamedColumns,
-    FormulaTableReference, FormulaTableRowType, FormulaToken, MAX_CELL_FORMULA_BYTES,
-    UnaryOperator,
+    ArrayValue, BinaryOperator, ExternalTableReference, GroupKind, MAX_CELL_FORMULA_BYTES,
+    MemoryKind, TableColumns, TableDataType, TableNamedColumns, TableReference, TableRowType,
+    Token, UnaryOperator,
 };
 
 /// Compatibility parser whose historical methods continue to return the host
@@ -70,7 +69,7 @@ impl<'a> FormulaParser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> XlsbResult<Vec<FormulaToken>> {
+    pub fn parse(&mut self) -> XlsbResult<Vec<Token>> {
         self.inner.parse().map_err(Into::into)
     }
 }
@@ -107,7 +106,7 @@ pub struct FormulaRange {
 }
 
 impl FormulaRange {
-    fn from_owner(range: litchi_xlsb::formula::FormulaRange) -> Self {
+    fn from_owner(range: litchi_xlsb::formula::Range) -> Self {
         Self {
             row_first: range.row_first,
             row_last: range.row_last,
@@ -116,8 +115,8 @@ impl FormulaRange {
         }
     }
 
-    fn into_owner(self) -> litchi_xlsb::formula::FormulaRange {
-        litchi_xlsb::formula::FormulaRange {
+    fn into_owner(self) -> litchi_xlsb::formula::Range {
+        litchi_xlsb::formula::Range {
             row_first: self.row_first,
             row_last: self.row_last,
             col_first: self.col_first,
@@ -126,19 +125,19 @@ impl FormulaRange {
     }
 
     pub fn new(row_first: u32, row_last: u32, col_first: u32, col_last: u32) -> XlsbResult<Self> {
-        litchi_xlsb::formula::FormulaRange::new(row_first, row_last, col_first, col_last)
+        litchi_xlsb::formula::Range::new(row_first, row_last, col_first, col_last)
             .map(Self::from_owner)
             .map_err(XlsbError::from)
     }
 
     pub fn parse_a1(value: &str) -> XlsbResult<Self> {
-        litchi_xlsb::formula::FormulaRange::parse_a1(value)
+        litchi_xlsb::formula::Range::parse_a1(value)
             .map(Self::from_owner)
             .map_err(XlsbError::from)
     }
 
     pub fn parse_binary(data: &[u8]) -> XlsbResult<Self> {
-        litchi_xlsb::formula::FormulaRange::parse_binary(data)
+        litchi_xlsb::formula::Range::parse_binary(data)
             .map(Self::from_owner)
             .map_err(XlsbError::from)
     }
@@ -168,28 +167,28 @@ pub struct CellParsedFormula {
 }
 
 impl CellParsedFormula {
-    fn from_owner(formula: litchi_xlsb::formula::CellParsedFormula) -> Self {
+    fn from_owner(formula: litchi_xlsb::formula::ParsedFormula) -> Self {
         Self {
             rgce: formula.rgce,
             rgcb: formula.rgcb,
         }
     }
 
-    pub(crate) fn into_owner(self) -> litchi_xlsb::formula::CellParsedFormula {
-        litchi_xlsb::formula::CellParsedFormula {
+    pub(crate) fn into_owner(self) -> litchi_xlsb::formula::ParsedFormula {
+        litchi_xlsb::formula::ParsedFormula {
             rgce: self.rgce,
             rgcb: self.rgcb,
         }
     }
 
     pub fn parse(data: &[u8]) -> XlsbResult<(Self, usize)> {
-        litchi_xlsb::formula::CellParsedFormula::parse(data)
+        litchi_xlsb::formula::ParsedFormula::parse(data)
             .map(|(formula, consumed)| (Self::from_owner(formula), consumed))
             .map_err(XlsbError::from)
     }
 
     pub fn to_bytes(&self) -> XlsbResult<Vec<u8>> {
-        litchi_xlsb::formula::CellParsedFormula {
+        litchi_xlsb::formula::ParsedFormula {
             rgce: self.rgce.clone(),
             rgcb: self.rgcb.clone(),
         }
@@ -198,13 +197,13 @@ impl CellParsedFormula {
     }
 
     pub fn exp(row: u32, col: u32) -> XlsbResult<Self> {
-        litchi_xlsb::formula::CellParsedFormula::exp(row, col)
+        litchi_xlsb::formula::ParsedFormula::exp(row, col)
             .map(Self::from_owner)
             .map_err(XlsbError::from)
     }
 
     pub fn exp_cell(&self) -> XlsbResult<Option<(u32, u32)>> {
-        litchi_xlsb::formula::CellParsedFormula {
+        litchi_xlsb::formula::ParsedFormula {
             rgce: self.rgce.clone(),
             rgcb: self.rgcb.clone(),
         }
@@ -216,14 +215,14 @@ impl CellParsedFormula {
 /// Parsed `BrtArrFmla` or `BrtShrFmla` definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormulaGroup {
-    pub kind: FormulaGroupKind,
+    pub kind: GroupKind,
     pub range: FormulaRange,
     pub formula: CellParsedFormula,
     pub always_calculate: bool,
 }
 
 impl FormulaGroup {
-    fn from_owner(group: litchi_xlsb::formula::FormulaGroup) -> Self {
+    fn from_owner(group: litchi_xlsb::formula::Group) -> Self {
         Self {
             kind: group.kind,
             range: FormulaRange::from_owner(group.range),
@@ -233,19 +232,19 @@ impl FormulaGroup {
     }
 
     pub fn parse_array(data: &[u8]) -> XlsbResult<Self> {
-        litchi_xlsb::formula::FormulaGroup::parse_array(data)
+        litchi_xlsb::formula::Group::parse_array(data)
             .map(Self::from_owner)
             .map_err(XlsbError::from)
     }
 
     pub fn parse_shared(data: &[u8]) -> XlsbResult<Self> {
-        litchi_xlsb::formula::FormulaGroup::parse_shared(data)
+        litchi_xlsb::formula::Group::parse_shared(data)
             .map(Self::from_owner)
             .map_err(XlsbError::from)
     }
 
     pub fn to_record_data(&self) -> XlsbResult<Vec<u8>> {
-        litchi_xlsb::formula::FormulaGroup {
+        litchi_xlsb::formula::Group {
             kind: self.kind,
             range: self.range.into_owner(),
             formula: self.formula.clone().into_owner(),
@@ -705,7 +704,7 @@ impl FormulaResolutionContext {
         self.resolve_sheet_prefix(index)
     }
 
-    fn resolve_table_reference(&self, reference: &FormulaTableReference) -> XlsbResult<String> {
+    fn resolve_table_reference(&self, reference: &TableReference) -> XlsbResult<String> {
         if let Some(external) = &reference.external {
             if reference.row_type.is_some()
                 || reference.columns.is_some()
@@ -761,8 +760,8 @@ impl FormulaResolutionContext {
             )));
         }
         let named_columns = match columns {
-            FormulaTableColumns::All => FormulaTableNamedColumns::All,
-            FormulaTableColumns::One(index) => {
+            TableColumns::All => TableNamedColumns::All,
+            TableColumns::One(index) => {
                 let name = table.columns.get(usize::from(index)).ok_or_else(|| {
                     XlsbError::InvalidFormula(format!(
                         "structured-reference column {index} exceeds {} columns in table {:?}",
@@ -770,9 +769,9 @@ impl FormulaResolutionContext {
                         table.display_name
                     ))
                 })?;
-                FormulaTableNamedColumns::One(name.clone())
+                TableNamedColumns::One(name.clone())
             },
-            FormulaTableColumns::Range { first, last } => {
+            TableColumns::Range { first, last } => {
                 let first_name = table.columns.get(usize::from(first)).ok_or_else(|| {
                     XlsbError::InvalidFormula(format!(
                         "structured-reference first column {first} exceeds {} columns",
@@ -785,7 +784,7 @@ impl FormulaResolutionContext {
                         table.columns.len()
                     ))
                 })?;
-                FormulaTableNamedColumns::Range {
+                TableNamedColumns::Range {
                     first: first_name.clone(),
                     last: last_name.clone(),
                 }
@@ -1056,7 +1055,7 @@ impl litchi_xlsb::formula::FormulaResolution for FormulaResolutionContext {
 
     fn table_reference(
         &self,
-        reference: &litchi_xlsb::formula::FormulaTableReference,
+        reference: &litchi_xlsb::formula::TableReference,
     ) -> litchi_xlsb::formula::Result<String> {
         owner_formula_resolution(self.resolve_table_reference(reference))
     }
@@ -1196,11 +1195,11 @@ fn validate_table_column_name(name: &str, index: usize) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_named_table_columns(columns: &FormulaTableNamedColumns) -> XlsbResult<()> {
+fn validate_named_table_columns(columns: &TableNamedColumns) -> XlsbResult<()> {
     match columns {
-        FormulaTableNamedColumns::All => Ok(()),
-        FormulaTableNamedColumns::One(name) => validate_table_column_name(name, 0),
-        FormulaTableNamedColumns::Range { first, last } => {
+        TableNamedColumns::All => Ok(()),
+        TableNamedColumns::One(name) => validate_table_column_name(name, 0),
+        TableNamedColumns::Range { first, last } => {
             validate_table_column_name(first, 0)?;
             validate_table_column_name(last, 1)
         },
@@ -1220,35 +1219,35 @@ fn escape_structured_column(name: &str) -> String {
 
 fn format_structured_reference(
     table: &str,
-    row_type: FormulaTableRowType,
-    columns: &FormulaTableNamedColumns,
+    row_type: TableRowType,
+    columns: &TableNamedColumns,
     square_bracket_space: bool,
     comma_space: bool,
 ) -> String {
     let mut items = Vec::new();
     match row_type {
-        FormulaTableRowType::Data => {},
-        FormulaTableRowType::All => items.push("[#All]".to_string()),
-        FormulaTableRowType::Headers => items.push("[#Headers]".to_string()),
-        FormulaTableRowType::DataAlternate => items.push("[#Data]".to_string()),
-        FormulaTableRowType::DataAndHeaders => {
+        TableRowType::Data => {},
+        TableRowType::All => items.push("[#All]".to_string()),
+        TableRowType::Headers => items.push("[#Headers]".to_string()),
+        TableRowType::DataAlternate => items.push("[#Data]".to_string()),
+        TableRowType::DataAndHeaders => {
             items.push("[#Headers]".to_string());
             items.push("[#Data]".to_string());
         },
-        FormulaTableRowType::Totals => items.push("[#Totals]".to_string()),
-        FormulaTableRowType::DataAndTotals => {
+        TableRowType::Totals => items.push("[#Totals]".to_string()),
+        TableRowType::DataAndTotals => {
             items.push("[#Data]".to_string());
             items.push("[#Totals]".to_string());
         },
-        FormulaTableRowType::Current => items.push("[#This Row]".to_string()),
+        TableRowType::Current => items.push("[#This Row]".to_string()),
     }
-    let has_range = matches!(columns, FormulaTableNamedColumns::Range { .. });
+    let has_range = matches!(columns, TableNamedColumns::Range { .. });
     match columns {
-        FormulaTableNamedColumns::All => {},
-        FormulaTableNamedColumns::One(name) => {
+        TableNamedColumns::All => {},
+        TableNamedColumns::One(name) => {
             items.push(format!("[{}]", escape_structured_column(name)));
         },
-        FormulaTableNamedColumns::Range { first, last } => {
+        TableNamedColumns::Range { first, last } => {
             items.push(format!(
                 "[{}]:[{}]",
                 escape_structured_column(first),
@@ -1284,36 +1283,36 @@ impl FormulaConverter {
     /// Convert formula tokens to string representation
     ///
     /// Uses RPN to infix conversion with proper operator precedence.
-    pub fn tokens_to_string(tokens: &[FormulaToken]) -> String {
+    pub fn tokens_to_string(tokens: &[Token]) -> String {
         Self::try_tokens_to_string(tokens).unwrap_or_default()
     }
 
     /// Convert tokens to text, rejecting token streams that cannot be
     /// represented faithfully by this converter.
-    pub fn try_tokens_to_string(tokens: &[FormulaToken]) -> XlsbResult<String> {
+    pub fn try_tokens_to_string(tokens: &[Token]) -> XlsbResult<String> {
         Self::try_tokens_to_string_with_optional_context(tokens, None)
     }
 
     /// Convert formula tokens using workbook extern-sheet and name metadata.
     pub fn try_tokens_to_string_with_context(
-        tokens: &[FormulaToken],
+        tokens: &[Token],
         context: &FormulaResolutionContext,
     ) -> XlsbResult<String> {
         Self::try_tokens_to_string_with_optional_context(tokens, Some(context))
     }
 
     fn try_tokens_to_string_with_optional_context(
-        tokens: &[FormulaToken],
+        tokens: &[Token],
         context: Option<&FormulaResolutionContext>,
     ) -> XlsbResult<String> {
         let mut stack: Vec<String> = Vec::new();
 
         for token in tokens {
             match token {
-                FormulaToken::Number(n) => stack.push(format!("{}", n)),
-                FormulaToken::Int(i) => stack.push(format!("{}", i)),
-                FormulaToken::MissingArg => stack.push(String::new()),
-                FormulaToken::Parenthesis => {
+                Token::Number(n) => stack.push(format!("{}", n)),
+                Token::Int(i) => stack.push(format!("{}", i)),
+                Token::MissingArg => stack.push(String::new()),
+                Token::Parenthesis => {
                     let Some(expression) = stack.pop() else {
                         return Err(XlsbError::InvalidFormula(
                             "PtgParen has no preceding expression".to_string(),
@@ -1321,8 +1320,8 @@ impl FormulaConverter {
                     };
                     stack.push(format!("({expression})"));
                 },
-                FormulaToken::Attribute(_) => {},
-                FormulaToken::Array { rows, cols, values } => {
+                Token::Attribute(_) => {},
+                Token::Array { rows, cols, values } => {
                     let expected = usize::try_from(u64::from(*rows) * u64::from(*cols))
                         .map_err(|_| XlsbError::InvalidFormula("array is too large".to_string()))?;
                     if values.len() != expected {
@@ -1348,18 +1347,18 @@ impl FormulaConverter {
                                         )
                                     })?;
                             match &values[index] {
-                                FormulaArrayValue::Number(value) => {
+                                ArrayValue::Number(value) => {
                                     text.push_str(&value.to_string());
                                 },
-                                FormulaArrayValue::String(value) => {
+                                ArrayValue::String(value) => {
                                     text.push('"');
                                     text.push_str(&value.replace('"', "\"\""));
                                     text.push('"');
                                 },
-                                FormulaArrayValue::Bool(value) => {
+                                ArrayValue::Bool(value) => {
                                     text.push_str(if *value { "TRUE" } else { "FALSE" });
                                 },
-                                FormulaArrayValue::Error(error) => {
+                                ArrayValue::Error(error) => {
                                     text.push_str(&Self::error_to_string(*error));
                                 },
                             }
@@ -1368,15 +1367,15 @@ impl FormulaConverter {
                     text.push('}');
                     stack.push(text);
                 },
-                FormulaToken::Memory { .. } => {},
-                FormulaToken::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
-                FormulaToken::Bool(b) => stack.push(if *b {
+                Token::Memory { .. } => {},
+                Token::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
+                Token::Bool(b) => stack.push(if *b {
                     "TRUE".to_string()
                 } else {
                     "FALSE".to_string()
                 }),
-                FormulaToken::Error(e) => stack.push(Self::error_to_string(*e)),
-                FormulaToken::CellRef {
+                Token::Error(e) => stack.push(Self::error_to_string(*e)),
+                Token::CellRef {
                     row,
                     col,
                     row_relative,
@@ -1391,7 +1390,7 @@ impl FormulaConverter {
                         col_prefix, col_str, row_prefix, row_str
                     ));
                 },
-                FormulaToken::AreaRef {
+                Token::AreaRef {
                     row_first,
                     col_first,
                     row_last,
@@ -1415,7 +1414,7 @@ impl FormulaConverter {
                     );
                     stack.push(format!("{}:{}", first, last));
                 },
-                FormulaToken::CellRef3d {
+                Token::CellRef3d {
                     sheet_index,
                     row,
                     col,
@@ -1432,7 +1431,7 @@ impl FormulaConverter {
                         Self::format_reference(*row, *col, *row_relative, *col_relative);
                     stack.push(format!("{prefix}!{reference}"));
                 },
-                FormulaToken::AreaRef3d {
+                Token::AreaRef3d {
                     sheet_index,
                     row_first,
                     row_last,
@@ -1463,8 +1462,8 @@ impl FormulaConverter {
                     );
                     stack.push(format!("{prefix}!{first}:{last}"));
                 },
-                FormulaToken::ReferenceError { .. } => stack.push("#REF!".to_string()),
-                FormulaToken::BinaryOp(op) => {
+                Token::ReferenceError { .. } => stack.push("#REF!".to_string()),
+                Token::BinaryOp(op) => {
                     if stack.len() < 2 {
                         return Err(XlsbError::InvalidFormula(
                             "binary operator has fewer than two operands".to_string(),
@@ -1475,7 +1474,7 @@ impl FormulaConverter {
                     let op_str = Self::binary_op_to_string(*op);
                     stack.push(format!("({}{}{})", left, op_str, right));
                 },
-                FormulaToken::UnaryOp(op) => {
+                Token::UnaryOp(op) => {
                     let Some(operand) = stack.pop() else {
                         return Err(XlsbError::InvalidFormula(
                             "unary operator has no operand".to_string(),
@@ -1487,7 +1486,7 @@ impl FormulaConverter {
                         UnaryOperator::Percent => stack.push(format!("({}%)", operand)),
                     }
                 },
-                FormulaToken::Function {
+                Token::Function {
                     index,
                     arg_count,
                     is_command,
@@ -1516,7 +1515,7 @@ impl FormulaConverter {
                     }
                     stack.push(format!("{}({})", func_name, args.join(",")));
                 },
-                FormulaToken::Name(idx) => {
+                Token::Name(idx) => {
                     let context = context.ok_or_else(|| {
                         XlsbError::UnsupportedFeature(format!(
                             "XLSB defined name index {idx} requires workbook name resolution"
@@ -1533,7 +1532,7 @@ impl FormulaConverter {
                     })?;
                     stack.push(name.clone());
                 },
-                FormulaToken::ExternalName {
+                Token::ExternalName {
                     sheet_index,
                     name_index,
                 } => {
@@ -1544,10 +1543,10 @@ impl FormulaConverter {
                     })?;
                     stack.push(context.resolve_external_name(*sheet_index, *name_index)?);
                 },
-                FormulaToken::TableReference(reference) if reference.invalid => {
+                Token::TableReference(reference) if reference.invalid => {
                     stack.push("#REF!".to_string())
                 },
-                FormulaToken::TableReference(reference) => {
+                Token::TableReference(reference) => {
                     let context = context.ok_or_else(|| {
                         XlsbError::UnsupportedFeature(format!(
                             "structured table reference on Xti {} requires table-definition resolution",
@@ -1556,7 +1555,7 @@ impl FormulaConverter {
                     })?;
                     stack.push(context.resolve_table_reference(reference)?);
                 },
-                FormulaToken::PivotName(index) => {
+                Token::PivotName(index) => {
                     let context = context.ok_or_else(|| {
                         XlsbError::InvalidFormula(
                             "PtgSxName requires pivot-cache calculated-name metadata".to_string(),
@@ -1564,7 +1563,7 @@ impl FormulaConverter {
                     })?;
                     stack.push(context.resolve_pivot_name(*index)?);
                 },
-                FormulaToken::Unknown(t) => {
+                Token::Unknown(t) => {
                     return Err(XlsbError::UnsupportedFeature(format!(
                         "XLSB formula token 0x{t:02X}"
                     )));
@@ -1734,14 +1733,14 @@ enum CompileExpr {
     Array {
         rows: u32,
         cols: u32,
-        values: Vec<FormulaArrayValue>,
+        values: Vec<ArrayValue>,
     },
     Ref(A1Reference),
     Area(A1Reference, A1Reference),
     Ref3d(u16, A1Reference),
     Area3d(u16, A1Reference, A1Reference),
     Name(u32),
-    TableReference(FormulaTableReference),
+    TableReference(TableReference),
     Unary(UnaryOperator, Box<CompileExpr>),
     Binary(BinaryOperator, Box<CompileExpr>, Box<CompileExpr>),
     Function(BuiltinFunction, Vec<CompileExpr>),
@@ -1749,8 +1748,8 @@ enum CompileExpr {
 
 #[derive(Debug)]
 struct ParsedStructuredReference {
-    row_type: FormulaTableRowType,
-    columns: FormulaTableNamedColumns,
+    row_type: TableRowType,
+    columns: TableNamedColumns,
     square_bracket_space: bool,
     comma_space: bool,
 }
@@ -1995,8 +1994,8 @@ impl<'a> FormulaCompiler<'a> {
                         self.parse_structured_reference()?
                     } else {
                         ParsedStructuredReference {
-                            row_type: FormulaTableRowType::Data,
-                            columns: FormulaTableNamedColumns::All,
+                            row_type: TableRowType::Data,
+                            columns: TableNamedColumns::All,
                             square_bracket_space: false,
                             comma_space: false,
                         }
@@ -2245,7 +2244,7 @@ impl<'a> FormulaCompiler<'a> {
     fn classify_structured_reference(
         items: Vec<StructuredReferenceItem>,
         separators: &[char],
-    ) -> XlsbResult<(FormulaTableRowType, FormulaTableNamedColumns)> {
+    ) -> XlsbResult<(TableRowType, TableNamedColumns)> {
         if separators.len() + 1 != items.len() {
             return Err(XlsbError::InvalidFormula(
                 "structured-reference separator count is invalid".to_string(),
@@ -2259,15 +2258,15 @@ impl<'a> FormulaCompiler<'a> {
             let row = if item.first_character_escaped {
                 None
             } else if item.text.eq_ignore_ascii_case("#All") {
-                Some(FormulaTableRowType::All)
+                Some(TableRowType::All)
             } else if item.text.eq_ignore_ascii_case("#Data") {
-                Some(FormulaTableRowType::DataAlternate)
+                Some(TableRowType::DataAlternate)
             } else if item.text.eq_ignore_ascii_case("#Headers") {
-                Some(FormulaTableRowType::Headers)
+                Some(TableRowType::Headers)
             } else if item.text.eq_ignore_ascii_case("#Totals") {
-                Some(FormulaTableRowType::Totals)
+                Some(TableRowType::Totals)
             } else if item.text.eq_ignore_ascii_case("#This Row") {
-                Some(FormulaTableRowType::Current)
+                Some(TableRowType::Current)
             } else {
                 None
             };
@@ -2286,7 +2285,7 @@ impl<'a> FormulaCompiler<'a> {
                         "invalid or duplicate current-row structured reference".to_string(),
                     ));
                 }
-                rows.push(FormulaTableRowType::Current);
+                rows.push(TableRowType::Current);
                 columns.push(column);
                 item_is_column.push(true);
             } else {
@@ -2320,16 +2319,10 @@ impl<'a> FormulaCompiler<'a> {
         }
 
         let row_type = match rows.as_slice() {
-            [] => FormulaTableRowType::Data,
+            [] => TableRowType::Data,
             [row] => *row,
-            [
-                FormulaTableRowType::Headers,
-                FormulaTableRowType::DataAlternate,
-            ] => FormulaTableRowType::DataAndHeaders,
-            [
-                FormulaTableRowType::DataAlternate,
-                FormulaTableRowType::Totals,
-            ] => FormulaTableRowType::DataAndTotals,
+            [TableRowType::Headers, TableRowType::DataAlternate] => TableRowType::DataAndHeaders,
+            [TableRowType::DataAlternate, TableRowType::Totals] => TableRowType::DataAndTotals,
             _ => {
                 return Err(XlsbError::InvalidFormula(
                     "structured-reference row union cannot fit one PtgList".to_string(),
@@ -2337,9 +2330,9 @@ impl<'a> FormulaCompiler<'a> {
             },
         };
         let columns = match columns.as_slice() {
-            [] => FormulaTableNamedColumns::All,
-            [column] if colon.is_none() => FormulaTableNamedColumns::One(column.clone()),
-            [first, last] if colon.is_some() => FormulaTableNamedColumns::Range {
+            [] => TableNamedColumns::All,
+            [column] if colon.is_none() => TableNamedColumns::One(column.clone()),
+            [first, last] if colon.is_some() => TableNamedColumns::Range {
                 first: first.clone(),
                 last: last.clone(),
             },
@@ -2370,8 +2363,8 @@ impl<'a> FormulaCompiler<'a> {
         self.compile_resident_table_reference(
             table_name,
             ParsedStructuredReference {
-                row_type: FormulaTableRowType::Data,
-                columns: FormulaTableNamedColumns::All,
+                row_type: TableRowType::Data,
+                columns: TableNamedColumns::All,
                 square_bracket_space: false,
                 comma_space: false,
             },
@@ -2413,11 +2406,11 @@ impl<'a> FormulaCompiler<'a> {
             )));
         }
         let columns = match selection.columns {
-            FormulaTableNamedColumns::All => FormulaTableColumns::All,
-            FormulaTableNamedColumns::One(name) => {
-                FormulaTableColumns::One(Self::resolve_table_column(table, &name)?)
+            TableNamedColumns::All => TableColumns::All,
+            TableNamedColumns::One(name) => {
+                TableColumns::One(Self::resolve_table_column(table, &name)?)
             },
-            FormulaTableNamedColumns::Range { first, last } => {
+            TableNamedColumns::Range { first, last } => {
                 let first = Self::resolve_table_column(table, &first)?;
                 let last = Self::resolve_table_column(table, &last)?;
                 if first > last {
@@ -2425,7 +2418,7 @@ impl<'a> FormulaCompiler<'a> {
                         "structured-reference column range is reversed".to_string(),
                     ));
                 }
-                FormulaTableColumns::Range { first, last }
+                TableColumns::Range { first, last }
             },
         };
         let sheet_index = u16::try_from(current_sheet)
@@ -2436,13 +2429,13 @@ impl<'a> FormulaCompiler<'a> {
                     "table worksheet cannot be represented in the extern-sheet table".to_string(),
                 )
             })?;
-        Ok(CompileExpr::TableReference(FormulaTableReference {
+        Ok(CompileExpr::TableReference(TableReference {
             sheet_index,
             row_type: Some(selection.row_type),
             columns: Some(columns),
             square_bracket_space: selection.square_bracket_space,
             comma_space: selection.comma_space,
-            data_type: FormulaTableDataType::Reference,
+            data_type: TableDataType::Reference,
             invalid: false,
             list_index: Some(table.table_id()),
             external: None,
@@ -2479,16 +2472,16 @@ impl<'a> FormulaCompiler<'a> {
     ) -> XlsbResult<CompileExpr> {
         validate_table_name(&table)?;
         let sheet_index = self.resolve_external_table_xti(qualifier)?;
-        Ok(CompileExpr::TableReference(FormulaTableReference {
+        Ok(CompileExpr::TableReference(TableReference {
             sheet_index,
             row_type: None,
             columns: None,
             square_bracket_space: selection.square_bracket_space,
             comma_space: selection.comma_space,
-            data_type: FormulaTableDataType::Reference,
+            data_type: TableDataType::Reference,
             invalid: false,
             list_index: None,
-            external: Some(FormulaExternalTableReference {
+            external: Some(ExternalTableReference {
                 table,
                 row_type: selection.row_type,
                 columns: selection.columns,
@@ -2605,7 +2598,7 @@ impl<'a> FormulaCompiler<'a> {
                 return Err(self.error("array rows cannot be empty"));
             }
             let value = if self.peek_char() == Some('"') {
-                FormulaArrayValue::String(self.parse_string()?)
+                ArrayValue::String(self.parse_string()?)
             } else if self.peek_char() == Some('#') {
                 let start = self.offset;
                 while self
@@ -2616,19 +2609,19 @@ impl<'a> FormulaCompiler<'a> {
                 }
                 let error = formula_error_code(&self.input[start..self.offset])
                     .ok_or_else(|| self.error("unknown array error literal"))?;
-                FormulaArrayValue::Error(error)
+                ArrayValue::Error(error)
             } else if self.input[self.offset..]
                 .get(..4)
                 .is_some_and(|value| value.eq_ignore_ascii_case("TRUE"))
             {
                 self.offset += 4;
-                FormulaArrayValue::Bool(true)
+                ArrayValue::Bool(true)
             } else if self.input[self.offset..]
                 .get(..5)
                 .is_some_and(|value| value.eq_ignore_ascii_case("FALSE"))
             {
                 self.offset += 5;
-                FormulaArrayValue::Bool(false)
+                ArrayValue::Bool(false)
             } else {
                 let negative = self.consume("-");
                 if !negative {
@@ -2638,7 +2631,7 @@ impl<'a> FormulaCompiler<'a> {
                 if negative {
                     number = -number;
                 }
-                FormulaArrayValue::Number(number)
+                ArrayValue::Number(number)
             };
             values.push(value);
             current_cols = current_cols.checked_add(1).ok_or_else(|| {
@@ -2960,11 +2953,11 @@ impl<'a> FormulaCompiler<'a> {
                 extra.extend_from_slice(&cols.to_le_bytes());
                 for value in values {
                     match value {
-                        FormulaArrayValue::Number(value) => {
+                        ArrayValue::Number(value) => {
                             extra.push(0x00);
                             extra.extend_from_slice(&value.to_le_bytes());
                         },
-                        FormulaArrayValue::String(value) => {
+                        ArrayValue::String(value) => {
                             let utf16: Vec<u16> = value.encode_utf16().collect();
                             extra.push(0x01);
                             extra.extend_from_slice(&(utf16.len() as u16).to_le_bytes());
@@ -2972,10 +2965,10 @@ impl<'a> FormulaCompiler<'a> {
                                 extra.extend_from_slice(&unit.to_le_bytes());
                             }
                         },
-                        FormulaArrayValue::Bool(value) => {
+                        ArrayValue::Bool(value) => {
                             extra.extend_from_slice(&[0x02, u8::from(*value)]);
                         },
-                        FormulaArrayValue::Error(error) => {
+                        ArrayValue::Error(error) => {
                             extra.extend_from_slice(&[0x04, *error, 0, 0, 0]);
                         },
                     }
@@ -3362,7 +3355,7 @@ mod tests {
         let tokens = parser.parse().unwrap();
         assert_eq!(tokens.len(), 1);
         match &tokens[0] {
-            FormulaToken::BinaryOp(BinaryOperator::Add) => {},
+            Token::BinaryOp(BinaryOperator::Add) => {},
             _ => panic!("Expected Add operator"),
         }
     }
@@ -3375,7 +3368,7 @@ mod tests {
         let tokens = parser.parse().unwrap();
         assert_eq!(tokens.len(), 1);
         match &tokens[0] {
-            FormulaToken::Number(n) if (*n - 42.5).abs() < 0.001 => {},
+            Token::Number(n) if (*n - 42.5).abs() < 0.001 => {},
             _ => panic!("Expected number 42.5"),
         }
     }
@@ -3383,9 +3376,9 @@ mod tests {
     #[test]
     fn test_formula_converter() {
         let tokens = vec![
-            FormulaToken::Number(1.0),
-            FormulaToken::Number(2.0),
-            FormulaToken::BinaryOp(BinaryOperator::Add),
+            Token::Number(1.0),
+            Token::Number(2.0),
+            Token::BinaryOp(BinaryOperator::Add),
         ];
         let formula = FormulaConverter::tokens_to_string(&tokens);
         assert_eq!(formula, "(1+2)");
@@ -3677,28 +3670,28 @@ mod tests {
         let cases = [
             (
                 vec![0x4A, 1, 2, 3, 4, 5, 6],
-                FormulaToken::ReferenceError {
+                Token::ReferenceError {
                     is_area: false,
                     sheet_index: None,
                 },
             ),
             (
                 vec![0x4B, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                FormulaToken::ReferenceError {
+                Token::ReferenceError {
                     is_area: true,
                     sheet_index: None,
                 },
             ),
             (
                 vec![0x5C, 0x34, 0x12, 1, 2, 3, 4, 5, 6],
-                FormulaToken::ReferenceError {
+                Token::ReferenceError {
                     is_area: false,
                     sheet_index: Some(0x1234),
                 },
             ),
             (
                 vec![0x7D, 0x78, 0x56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                FormulaToken::ReferenceError {
+                Token::ReferenceError {
                     is_area: true,
                     sheet_index: Some(0x5678),
                 },
@@ -3963,7 +3956,7 @@ mod tests {
         let attr_choose = [ptg_types::PTG_ATTR, 0x04, 0x00, 0x00, 0x02, 0x00];
         assert_eq!(
             FormulaParser::new(&attr_choose).parse().unwrap(),
-            vec![FormulaToken::Attribute(0x04)]
+            vec![Token::Attribute(0x04)]
         );
 
         assert!(matches!(
@@ -3988,14 +3981,14 @@ mod tests {
         let tokens = FormulaParser::with_extra(&rgce, &rgcb).parse().unwrap();
         assert_eq!(
             tokens,
-            vec![FormulaToken::Array {
+            vec![Token::Array {
                 rows: 2,
                 cols: 2,
                 values: vec![
-                    FormulaArrayValue::Number(1.0),
-                    FormulaArrayValue::String("x".to_string()),
-                    FormulaArrayValue::Bool(true),
-                    FormulaArrayValue::Error(0x07),
+                    ArrayValue::Number(1.0),
+                    ArrayValue::String("x".to_string()),
+                    ArrayValue::Bool(true),
+                    ArrayValue::Error(0x07),
                 ],
             }]
         );
@@ -4079,8 +4072,8 @@ mod tests {
         let tokens = FormulaParser::with_extra(&rgce, &rgcb).parse().unwrap();
         assert!(matches!(
             &tokens[0],
-            FormulaToken::Memory {
-                kind: FormulaMemoryKind::Area,
+            Token::Memory {
+                kind: MemoryKind::Area,
                 expression_bytes: 15,
                 cached_ranges,
             } if cached_ranges == &vec![[0, 1, 0, 1]]
@@ -4140,7 +4133,7 @@ mod tests {
             0x00, 0x00, 0x00,
         ];
         let group = FormulaGroup::parse_shared(&bytes).unwrap();
-        assert_eq!(group.kind, FormulaGroupKind::Shared);
+        assert_eq!(group.kind, GroupKind::Shared);
         assert_eq!(group.range.to_a1(), "C3:C10");
         assert_eq!(group.to_record_data().unwrap(), bytes);
 
@@ -4163,7 +4156,7 @@ mod tests {
             0xFF, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
         let group = FormulaGroup::parse_array(&bytes).unwrap();
-        assert_eq!(group.kind, FormulaGroupKind::Array);
+        assert_eq!(group.kind, GroupKind::Array);
         assert_eq!(group.range.to_a1(), "C9:C9");
         assert!(group.always_calculate);
         assert_eq!(group.to_record_data().unwrap(), bytes);
@@ -4181,7 +4174,7 @@ mod tests {
         ));
 
         let mut array = FormulaGroup {
-            kind: FormulaGroupKind::Array,
+            kind: GroupKind::Array,
             range: FormulaRange::new(0, 0, 0, 0).unwrap(),
             formula: FormulaCompiler::compile("1+1").unwrap(),
             always_calculate: false,
@@ -4236,17 +4229,14 @@ mod tests {
         assert!(matches!(error, XlsbError::InvalidFormula(_)));
     }
 
-    fn resident_table_reference(
-        row_type: FormulaTableRowType,
-        columns: FormulaTableColumns,
-    ) -> FormulaToken {
-        FormulaToken::TableReference(FormulaTableReference {
+    fn resident_table_reference(row_type: TableRowType, columns: TableColumns) -> Token {
+        Token::TableReference(TableReference {
             sheet_index: 0,
             row_type: Some(row_type),
             columns: Some(columns),
             square_bracket_space: false,
             comma_space: false,
-            data_type: FormulaTableDataType::Reference,
+            data_type: TableDataType::Reference,
             invalid: false,
             list_index: Some(7),
             external: None,
@@ -4290,22 +4280,16 @@ mod tests {
     fn resolves_resident_structured_references_faithfully() {
         let context = table_context();
         for (row_type, expected) in [
-            (FormulaTableRowType::Data, "Sales"),
-            (FormulaTableRowType::All, "Sales[#All]"),
-            (FormulaTableRowType::Headers, "Sales[#Headers]"),
-            (FormulaTableRowType::DataAlternate, "Sales[#Data]"),
-            (
-                FormulaTableRowType::DataAndHeaders,
-                "Sales[[#Headers],[#Data]]",
-            ),
-            (FormulaTableRowType::Totals, "Sales[#Totals]"),
-            (
-                FormulaTableRowType::DataAndTotals,
-                "Sales[[#Data],[#Totals]]",
-            ),
-            (FormulaTableRowType::Current, "Sales[#This Row]"),
+            (TableRowType::Data, "Sales"),
+            (TableRowType::All, "Sales[#All]"),
+            (TableRowType::Headers, "Sales[#Headers]"),
+            (TableRowType::DataAlternate, "Sales[#Data]"),
+            (TableRowType::DataAndHeaders, "Sales[[#Headers],[#Data]]"),
+            (TableRowType::Totals, "Sales[#Totals]"),
+            (TableRowType::DataAndTotals, "Sales[[#Data],[#Totals]]"),
+            (TableRowType::Current, "Sales[#This Row]"),
         ] {
-            let token = resident_table_reference(row_type, FormulaTableColumns::All);
+            let token = resident_table_reference(row_type, TableColumns::All);
             assert_eq!(
                 FormulaConverter::try_tokens_to_string_with_context(&[token], &context).unwrap(),
                 expected
@@ -4313,17 +4297,16 @@ mod tests {
         }
 
         let token = resident_table_reference(
-            FormulaTableRowType::Current,
-            FormulaTableColumns::Range { first: 1, last: 2 },
+            TableRowType::Current,
+            TableColumns::Range { first: 1, last: 2 },
         );
         assert_eq!(
             FormulaConverter::try_tokens_to_string_with_context(&[token], &context).unwrap(),
             "Sales[[#This Row],[Price']Gross]:['@Tag]]"
         );
 
-        let mut spaced =
-            resident_table_reference(FormulaTableRowType::Current, FormulaTableColumns::One(0));
-        let FormulaToken::TableReference(reference) = &mut spaced else {
+        let mut spaced = resident_table_reference(TableRowType::Current, TableColumns::One(0));
+        let Token::TableReference(reference) = &mut spaced else {
             unreachable!()
         };
         reference.square_bracket_space = true;
@@ -4357,19 +4340,19 @@ mod tests {
             active_pivot_scope: None,
             current_sheet: None,
         };
-        let token = FormulaToken::TableReference(FormulaTableReference {
+        let token = Token::TableReference(TableReference {
             sheet_index: 0,
             row_type: None,
             columns: None,
             square_bracket_space: false,
             comma_space: false,
-            data_type: FormulaTableDataType::Reference,
+            data_type: TableDataType::Reference,
             invalid: false,
             list_index: None,
-            external: Some(FormulaExternalTableReference {
+            external: Some(ExternalTableReference {
                 table: "Remote".to_string(),
-                row_type: FormulaTableRowType::Totals,
-                columns: FormulaTableNamedColumns::One("Amount".to_string()),
+                row_type: TableRowType::Totals,
+                columns: TableNamedColumns::One("Amount".to_string()),
             }),
         });
         assert_eq!(
@@ -4387,8 +4370,7 @@ mod tests {
             FormulaTableDefinition::try_new(1, 0, "Sales", vec!["A".into(), "a".into()]).is_err()
         );
 
-        let token =
-            resident_table_reference(FormulaTableRowType::Data, FormulaTableColumns::One(3));
+        let token = resident_table_reference(TableRowType::Data, TableColumns::One(3));
         assert!(FormulaConverter::try_tokens_to_string(std::slice::from_ref(&token)).is_err());
         assert!(
             FormulaConverter::try_tokens_to_string_with_context(&[token], &table_context())
@@ -4400,8 +4382,8 @@ mod tests {
         assert!(
             FormulaConverter::try_tokens_to_string_with_context(
                 &[resident_table_reference(
-                    FormulaTableRowType::Data,
-                    FormulaTableColumns::All,
+                    TableRowType::Data,
+                    TableColumns::All,
                 )],
                 &missing,
             )
@@ -4417,8 +4399,8 @@ mod tests {
         assert!(
             FormulaConverter::try_tokens_to_string_with_context(
                 &[resident_table_reference(
-                    FormulaTableRowType::Data,
-                    FormulaTableColumns::All,
+                    TableRowType::Data,
+                    TableColumns::All,
                 )],
                 &ambiguous,
             )
@@ -4435,8 +4417,8 @@ mod tests {
         assert!(
             FormulaConverter::try_tokens_to_string_with_context(
                 &[resident_table_reference(
-                    FormulaTableRowType::Data,
-                    FormulaTableColumns::All,
+                    TableRowType::Data,
+                    TableColumns::All,
                 )],
                 &wrong_sheet,
             )
@@ -4539,10 +4521,7 @@ mod structured_reference_compiler_tests {
                     .unwrap(),
                 source
             );
-            assert!(matches!(
-                tokens.as_slice(),
-                [FormulaToken::TableReference(_)]
-            ));
+            assert!(matches!(tokens.as_slice(), [Token::TableReference(_)]));
         }
     }
 
@@ -4665,10 +4644,7 @@ mod pivot_name_resolution_tests {
     }
 
     fn render(index: u32, context: &FormulaResolutionContext) -> XlsbResult<String> {
-        FormulaConverter::try_tokens_to_string_with_context(
-            &[FormulaToken::PivotName(index)],
-            context,
-        )
+        FormulaConverter::try_tokens_to_string_with_context(&[Token::PivotName(index)], context)
     }
 
     #[test]
@@ -4685,7 +4661,7 @@ mod pivot_name_resolution_tests {
 
     #[test]
     fn rejects_missing_ambiguous_cross_sheet_and_out_of_range_pivot_metadata() {
-        assert!(FormulaConverter::try_tokens_to_string(&[FormulaToken::PivotName(0)]).is_err());
+        assert!(FormulaConverter::try_tokens_to_string(&[Token::PivotName(0)]).is_err());
 
         let mut context = pivot_context();
         assert!(render(7, &context).is_err());

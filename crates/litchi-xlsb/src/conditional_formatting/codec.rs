@@ -5,8 +5,8 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::formula::{
-    CellParsedFormula, FormulaArrayValue, FormulaConverter, FormulaParser, FormulaResolution,
-    MAX_CELL_FORMULA_BYTES,
+    ArrayValue, FormulaConverter, FormulaParser, FormulaResolution, MAX_CELL_FORMULA_BYTES,
+    ParsedFormula,
 };
 use crate::raw::{Writer, kind};
 use std::collections::{HashMap, HashSet};
@@ -65,7 +65,7 @@ impl FormulaResolution for EmptyFormulaResolution {
 
     fn table_reference(
         &self,
-        _reference: &crate::formula::FormulaTableReference,
+        _reference: &crate::formula::TableReference,
     ) -> crate::formula::Result<String> {
         Err(crate::formula::Error::InvalidFormula(
             "formula references unresolved table".to_string(),
@@ -88,7 +88,7 @@ impl FormulaResolution for EmptyFormulaResolution {
 struct FormulaCompiler;
 
 impl FormulaCompiler {
-    fn compile(input: &str) -> Result<CellParsedFormula> {
+    fn compile(input: &str) -> Result<ParsedFormula> {
         let input = input.strip_prefix('=').unwrap_or(input).trim();
         if input.is_empty() {
             return Err(Error::InvalidFormula(
@@ -104,7 +104,7 @@ impl FormulaCompiler {
                 rgce.len()
             )));
         }
-        Ok(CellParsedFormula { rgce, rgcb })
+        Ok(ParsedFormula { rgce, rgcb })
     }
 }
 
@@ -283,7 +283,7 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
     rgcb.extend_from_slice(&column_count.to_le_bytes());
     for value in values {
         match value {
-            FormulaArrayValue::Number(value) => {
+            ArrayValue::Number(value) => {
                 if !value.is_finite() {
                     return Err(Error::InvalidFormula(
                         "conditional-format array number is not finite".to_string(),
@@ -292,7 +292,7 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
                 rgcb.push(0);
                 rgcb.extend_from_slice(&value.to_le_bytes());
             },
-            FormulaArrayValue::String(value) => {
+            ArrayValue::String(value) => {
                 let units = u16::try_from(value.encode_utf16().count()).map_err(|_| {
                     Error::InvalidFormula("conditional-format array string is too long".to_string())
                 })?;
@@ -300,27 +300,27 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
                 rgcb.extend_from_slice(&units.to_le_bytes());
                 rgcb.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
             },
-            FormulaArrayValue::Bool(value) => rgcb.extend([2, u8::from(value)]),
-            FormulaArrayValue::Error(value) => rgcb.extend([4, value, 0, 0, 0]),
+            ArrayValue::Bool(value) => rgcb.extend([2, u8::from(value)]),
+            ArrayValue::Error(value) => rgcb.extend([4, value, 0, 0, 0]),
         }
     }
     Ok(())
 }
 
-fn parse_formula_array_value(input: &str) -> Result<FormulaArrayValue> {
+fn parse_formula_array_value(input: &str) -> Result<ArrayValue> {
     if let Some(value) = parse_formula_string(input)? {
-        return Ok(FormulaArrayValue::String(value));
+        return Ok(ArrayValue::String(value));
     }
     if input.eq_ignore_ascii_case("TRUE") || input.eq_ignore_ascii_case("FALSE") {
-        return Ok(FormulaArrayValue::Bool(input.eq_ignore_ascii_case("TRUE")));
+        return Ok(ArrayValue::Bool(input.eq_ignore_ascii_case("TRUE")));
     }
     if let Some(error) = formula_error_code(input) {
-        return Ok(FormulaArrayValue::Error(error));
+        return Ok(ArrayValue::Error(error));
     }
     let value = input.parse::<f64>().map_err(|_| {
         Error::InvalidFormula(format!("invalid conditional-format array value {input:?}"))
     })?;
-    Ok(FormulaArrayValue::Number(value))
+    Ok(ArrayValue::Number(value))
 }
 
 fn parse_formula_string(input: &str) -> Result<Option<String>> {
@@ -690,7 +690,7 @@ fn parse_formula_header(
     data: &[u8],
     record: &'static str,
     maximum_formulas: usize,
-) -> Result<(Vec<CellParsedFormula>, usize)> {
+) -> Result<(Vec<ParsedFormula>, usize)> {
     let mut cursor = FrtCursor::new(data, record);
     let flags = cursor.read_u32()?;
     if flags & !0x04 != 0 {
@@ -723,7 +723,7 @@ fn parse_formula_header(
 }
 
 fn serialize_formula_header(
-    formulas: &[CellParsedFormula],
+    formulas: &[ParsedFormula],
     maximum_formulas: usize,
 ) -> Result<Vec<u8>> {
     if formulas.len() > maximum_formulas {
@@ -811,7 +811,7 @@ impl<'a> FrtCursor<'a> {
         self.data.len().saturating_sub(self.offset)
     }
 
-    fn read_formula(&mut self) -> Result<CellParsedFormula> {
+    fn read_formula(&mut self) -> Result<ParsedFormula> {
         let flags = self.read_u32()?;
         if flags != 2 {
             return Err(invalid(
@@ -828,7 +828,7 @@ impl<'a> FrtCursor<'a> {
                 "FRT formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
             )));
         }
-        Ok(CellParsedFormula {
+        Ok(ParsedFormula {
             rgce: self.take(cce)?.to_vec(),
             rgcb: self.take(cb)?.to_vec(),
         })
@@ -1022,7 +1022,7 @@ impl Value {
 
     fn serialize_extension14_with(
         &self,
-        formula_binary: Option<&CellParsedFormula>,
+        formula_binary: Option<&ParsedFormula>,
         numeric_value: f64,
         save_greater_than_or_equal: bool,
     ) -> Result<Vec<u8>> {
@@ -1437,7 +1437,7 @@ impl Rule {
                 "non-text template has a string parameter",
             ));
         }
-        let mut formula_slots: [Option<CellParsedFormula>; 3] = [None, None, None];
+        let mut formula_slots: [Option<ParsedFormula>; 3] = [None, None, None];
         for (index, size) in declared.into_iter().enumerate() {
             if size == 0 {
                 continue;
@@ -1599,7 +1599,7 @@ impl Rule {
             ));
         }
 
-        let mut formula_slots: [Option<CellParsedFormula>; 3] = [None, None, None];
+        let mut formula_slots: [Option<ParsedFormula>; 3] = [None, None, None];
         let mut formula_iter = formulas.into_iter();
         for (index, declared_size) in declared.into_iter().enumerate() {
             if declared_size == 0 {
@@ -1731,7 +1731,7 @@ impl Rule {
 
         let formulas = effective_rule_formulas(self)?;
         validate_formula_count(self.rule_type, self.template, parameter, formulas.len())?;
-        let mut slots: [Option<&CellParsedFormula>; 3] = [None, None, None];
+        let mut slots: [Option<&ParsedFormula>; 3] = [None, None, None];
         let start = if visual { 2 } else { 0 };
         for (index, formula) in formulas.iter().enumerate() {
             slots[start + index] = Some(formula);
@@ -1935,7 +1935,7 @@ fn validate_formula_slots(
     rule_type: RuleType,
     template: u32,
     parameter: u32,
-    slots: &[Option<CellParsedFormula>; 3],
+    slots: &[Option<ParsedFormula>; 3],
 ) -> Result<()> {
     let expected = if rule_type == RuleType::CellIs {
         [true, matches!(parameter, 1 | 2), false]
@@ -2008,7 +2008,7 @@ fn validate_parameter_and_flags(
 }
 
 fn render_formula(
-    formula: &CellParsedFormula,
+    formula: &ParsedFormula,
     base: (u32, u32),
     context: &impl FormulaResolution,
 ) -> Result<String> {
@@ -2048,7 +2048,7 @@ fn effective_rule_parameter(rule: &Rule) -> Result<u32> {
     Ok(parameter)
 }
 
-fn effective_rule_formulas(rule: &Rule) -> Result<Vec<CellParsedFormula>> {
+fn effective_rule_formulas(rule: &Rule) -> Result<Vec<ParsedFormula>> {
     if !rule.formulas.is_empty() {
         if !rule.formula_extras.is_empty() && rule.formula_extras.len() != rule.formulas.len() {
             return Err(Error::InvalidFormula(
@@ -2066,7 +2066,7 @@ fn effective_rule_formulas(rule: &Rule) -> Result<Vec<CellParsedFormula>> {
                         rgce.len()
                     )));
                 }
-                Ok(CellParsedFormula {
+                Ok(ParsedFormula {
                     rgce: rgce.clone(),
                     rgcb: rule.formula_extras.get(index).cloned().unwrap_or_default(),
                 })
@@ -2218,7 +2218,7 @@ impl<'a> CfCursor<'a> {
             .map_err(|error| Error::Encoding(format!("invalid UTF-16: {error}")))
     }
 
-    fn read_formula(&mut self) -> Result<CellParsedFormula> {
+    fn read_formula(&mut self) -> Result<ParsedFormula> {
         let cce = self.read_u32()? as usize;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
             return Err(Error::InvalidFormula(format!(
@@ -2228,7 +2228,7 @@ impl<'a> CfCursor<'a> {
         let rgce = self.take(cce)?.to_vec();
         let cb = self.read_u32()? as usize;
         let rgcb = self.take(cb)?.to_vec();
-        Ok(CellParsedFormula { rgce, rgcb })
+        Ok(ParsedFormula { rgce, rgcb })
     }
 
     fn read_ranges(&mut self, minimum: usize, maximum: usize) -> Result<Vec<(u32, u32, u32, u32)>> {
@@ -3045,7 +3045,7 @@ fn serialize_cf_rule(rule: &Rule) -> Result<Vec<u8>> {
     let formulas = effective_formulas(rule)?;
     validate_formula_count(rule.rule_type, rule.template, parameter, formulas.len())?;
 
-    let mut slots: [Option<&CellParsedFormula>; 3] = [None, None, None];
+    let mut slots: [Option<&ParsedFormula>; 3] = [None, None, None];
     let start = if matches!(
         rule.rule_type,
         RuleType::ColorScale | RuleType::DataBar | RuleType::IconSet
@@ -3229,7 +3229,7 @@ fn effective_parameter(rule: &Rule) -> Result<u32> {
     Ok(parameter)
 }
 
-fn effective_formulas(rule: &Rule) -> Result<Vec<CellParsedFormula>> {
+fn effective_formulas(rule: &Rule) -> Result<Vec<ParsedFormula>> {
     if !rule.formulas.is_empty() {
         if !rule.formula_extras.is_empty() && rule.formula_extras.len() != rule.formulas.len() {
             return Err(Error::InvalidFormula(
@@ -3247,7 +3247,7 @@ fn effective_formulas(rule: &Rule) -> Result<Vec<CellParsedFormula>> {
                         rgce.len()
                     )));
                 }
-                Ok(CellParsedFormula {
+                Ok(ParsedFormula {
                     rgce: rgce.clone(),
                     rgcb: rule.formula_extras.get(index).cloned().unwrap_or_default(),
                 })
@@ -3637,7 +3637,7 @@ fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) ->
     Ok(())
 }
 
-fn effective_cfvo_formula(cfvo: &Value) -> Result<Option<CellParsedFormula>> {
+fn effective_cfvo_formula(cfvo: &Value) -> Result<Option<ParsedFormula>> {
     if let Some(formula) = &cfvo.formula_binary {
         return Ok(Some(formula.clone()));
     }
@@ -3688,7 +3688,7 @@ mod tests {
     use super::{Bar, Bar14, IconSet, RuleMetadata, Scale};
     use crate::raw::Records;
 
-    fn compiled(text: &str) -> CellParsedFormula {
+    fn compiled(text: &str) -> ParsedFormula {
         FormulaCompiler::compile(text).unwrap()
     }
 
