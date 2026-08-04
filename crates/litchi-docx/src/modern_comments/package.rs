@@ -300,6 +300,7 @@ fn invalid<T>(message: String) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::super::model::*;
+    use super::super::*;
     use super::*;
     use litchi_opc::part::BlobPart;
 
@@ -516,6 +517,7 @@ mod tests {
 mod reaction_extension_list_tests {
     use super::super::codec::REACTIONS_EXTENSION_URI;
     use super::super::model::*;
+    use super::super::*;
     use super::*;
 
     fn comments_with_reaction(reaction_body: &str) -> String {

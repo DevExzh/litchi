@@ -137,17 +137,3 @@ pub struct RelationshipIds {
     pub comments_extensible: Option<String>,
     pub people: Option<String>,
 }
-
-// Historical names remain aliases, so there is one model implementation.
-pub type ModernCommentConformance = Conformance;
-pub type CommentExtension = Extended;
-pub type CommentIdMapping = IdMapping;
-pub type CommentReactionUser = ReactionUser;
-pub type CommentReactionInfo = ReactionInfo;
-pub type CommentReaction = Reaction;
-pub type ModernCommentExtension = Extension;
-pub type ModernCommentExtensionList = ExtensionList;
-pub type ExtensibleComment = Comment;
-pub type PresenceInfo = Presence;
-pub type ModernCommentMetadata = Metadata;
-pub type ModernCommentRelationshipIds = RelationshipIds;
