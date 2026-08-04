@@ -63,7 +63,7 @@ fn legacy_comment_adapter_rejects_external_comment_relationships() {
 
     assert!(matches!(
         package.presentation().unwrap().get_comments(),
-        Err(OoxmlError::InvalidFormat(message))
+        Err(OoxmlError::Pptx(litchi_pptx::Error::Invalid(message)))
             if message.contains("cannot be external")
     ));
 }
