@@ -352,7 +352,7 @@ pub fn load_pivot_charts(package: &OpcPackage) -> Result<Vec<SheetPivotCharts>> 
     let mut output = Vec::new();
     for sheet in &sheets {
         let Some((part_name, sheet_kind, charts)) =
-            load_sheet_pivot_charts(package, workbook_part, sheet, &tables)?
+            load_pivot_charts_for_sheet(package, workbook_part, sheet, &tables)?
         else {
             continue;
         };
@@ -378,7 +378,7 @@ pub fn load_sheet_pivot_charts(package: &OpcPackage, sheet_name: &str) -> Result
         .iter()
         .find(|sheet| sheet.name == sheet_name)
         .ok_or_else(|| invalid(format!("worksheet '{sheet_name}' not found")))?;
-    let Some((_, _, charts)) = load_sheet_pivot_charts(package, workbook_part, sheet, &tables)?
+    let Some((_, _, charts)) = load_pivot_charts_for_sheet(package, workbook_part, sheet, &tables)?
     else {
         return Ok(Vec::new());
     };
@@ -780,7 +780,7 @@ fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<WorksheetInfo>> {
         .sheets)
 }
 
-fn load_sheet_pivot_charts(
+fn load_pivot_charts_for_sheet(
     package: &OpcPackage,
     workbook_part: &dyn Part,
     sheet: &WorksheetInfo,

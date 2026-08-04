@@ -164,10 +164,6 @@ pub use litchi_xlsx::phonetic_properties::{
     PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
 pub use litchi_xlsx::print_options::{PrintOptions, parse_print_options};
-pub use litchi_xlsx::sheet_calculation_properties::{
-    WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
-    parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
-};
 pub use litchi_xlsx::web;
 pub use named_sheet_view::{
     load_worksheet_named_sheet_views, parse_named_sheet_views, remove_worksheet_named_sheet_views,

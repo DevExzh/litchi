@@ -37,7 +37,7 @@ use super::sheet_calculation_properties::{
 use super::sheet_format::{
     WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
 };
-use super::sheet_properties::{WorksheetSheetProperties, parse_worksheet_sheet_properties};
+use super::sheet_properties::{SheetProperties, parse_sheet_properties};
 use super::sheet_protection::{
     WorksheetProtectedRange, WorksheetProtection, WorksheetProtectionMetadata,
     parse_worksheet_protection,
@@ -234,7 +234,7 @@ pub struct Worksheet<'a> {
     /// Effective worksheet outline and summary-placement policy.
     outline_properties: Option<OutlineProperties>,
     /// Complete worksheet-level properties from `sheetPr`.
-    sheet_properties: Option<WorksheetSheetProperties>,
+    sheet_properties: Option<SheetProperties>,
     /// Default East Asian phonetic text formatting.
     phonetic_properties: Option<PhoneticProperties>,
     /// Data consolidation function, labels, linking, and source references.
@@ -417,12 +417,12 @@ impl<'a> Worksheet<'a> {
         let sheet_calculation_properties =
             parse_worksheet_sheet_calculation_properties(sheet_data.as_bytes())?;
         let scenarios = parse_worksheet_scenarios(sheet_data.as_bytes())?;
-        let sheet_properties = parse_worksheet_sheet_properties(sheet_data.as_bytes())?;
+        let sheet_properties = parse_sheet_properties(sheet_data.as_bytes())?;
         let phonetic_properties = parse_phonetic_properties(sheet_data.as_bytes())?;
         let data_consolidation = parse_worksheet_data_consolidation(sheet_data.as_bytes())?;
         let outline_properties = sheet_properties
             .as_ref()
-            .and_then(WorksheetSheetProperties::outline_properties)
+            .and_then(SheetProperties::outline_properties)
             .copied();
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
@@ -2016,7 +2016,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Complete immutable worksheet-level properties, when `sheetPr` is present.
-    pub fn sheet_properties(&self) -> Option<&WorksheetSheetProperties> {
+    pub fn sheet_properties(&self) -> Option<&SheetProperties> {
         self.sheet_properties.as_ref()
     }
 
