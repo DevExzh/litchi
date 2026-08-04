@@ -473,9 +473,9 @@ impl ObjectIndex {
             )));
         };
 
-        let object = indexed_object(archive, entry, object_id);
+        let object = indexed_object(archive, entry, object_id)?;
 
-        Ok(object.map(|object| ResolvedObjectRef {
+        Ok(Some(ResolvedObjectRef {
             id: object_id,
             archive_info: &object.archive_info,
             messages: &object.messages,
@@ -617,9 +617,7 @@ impl ObjectIndex {
                     let Some(entry) = self.entry(object_id) else {
                         continue;
                     };
-                    let Some(object) = indexed_object(archive, entry, object_id) else {
-                        continue;
-                    };
+                    let object = indexed_object(archive, entry, object_id)?;
                     let resolved = ResolvedObjectRef {
                         id: object_id,
                         archive_info: &object.archive_info,
@@ -742,24 +740,37 @@ impl ObjectIndex {
 }
 
 /// Resolve an indexed object by its source position, validating the identity
-/// before returning it. A linear identity fallback keeps the public resolver
-/// correct when an index is intentionally used with a separately ordered
-/// snapshot of the same archive.
+/// before returning it.
+///
+/// The parsed archive position is the index's authoritative lookup key. A
+/// separately reordered or truncated archive is a stale snapshot, not a
+/// reason to perform an unbounded linear scan, so it fails closed with a
+/// contextual archive error.
 fn indexed_object<'a>(
     archive: &'a Archive,
     entry: &ObjectIndexEntry,
     object_id: ObjectId,
-) -> Option<&'a ArchiveObject> {
-    archive
-        .objects
-        .get(entry.object_position)
-        .filter(|object| object.archive_info.identifier == Some(object_id.get()))
-        .or_else(|| {
-            archive
-                .objects
-                .iter()
-                .find(|object| object.archive_info.identifier == Some(object_id.get()))
-        })
+) -> Result<&'a ArchiveObject> {
+    let object = archive.objects.get(entry.object_position).ok_or_else(|| {
+        Error::Archive(format!(
+            "object {} in archive {} has stale source position {}",
+            object_id.get(),
+            entry.fragment_name,
+            entry.object_position
+        ))
+    })?;
+
+    if object.archive_info.identifier != Some(object_id.get()) {
+        return Err(Error::Archive(format!(
+            "object {} in archive {} has stale source position {} (found identifier {:?})",
+            object_id.get(),
+            entry.fragment_name,
+            entry.object_position,
+            object.archive_info.identifier
+        )));
+    }
+
+    Ok(object)
 }
 
 /// Statistics about the object index
@@ -955,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn indexed_object_positions_validate_and_fallback_for_reordered_archives() {
+    fn indexed_object_positions_fail_closed_for_stale_archives() {
         let object = |identifier| {
             ArchiveObject::new(
                 identifier,
@@ -985,13 +996,61 @@ mod tests {
         let reordered = Archive {
             objects: vec![object(20), object(10)],
         };
-        assert_eq!(
-            indexed_object(&reordered, entry, object_id)
+        let error = indexed_object(&reordered, entry, object_id).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Archive(message) if message.contains("stale source position")
+        ));
+
+        let truncated = Archive {
+            objects: vec![object(10)],
+        };
+        let object_id = ObjectId::try_from(20).unwrap();
+        let entry = index.entry(object_id).unwrap();
+        let error = indexed_object(&truncated, entry, object_id).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Archive(message) if message.contains("stale source position")
+        ));
+    }
+
+    #[test]
+    fn indexed_object_reads_scale_without_linear_rescans() {
+        const OBJECT_COUNT: u64 = 4096;
+
+        let objects = (1..=OBJECT_COUNT)
+            .map(|identifier| {
+                ArchiveObject::new(
+                    identifier,
+                    vec![RawMessage {
+                        type_: 42,
+                        data: Vec::new(),
+                    }],
+                )
                 .unwrap()
-                .archive_info
-                .identifier,
-            Some(10)
-        );
+            })
+            .collect();
+        let archive = Archive { objects };
+        let mut index = ObjectIndex::new();
+        index
+            .parse_archive("Index/Benchmark.iwa", &archive)
+            .unwrap();
+
+        // Benchmark-shaped consumption: resolve the whole ordered catalog
+        // through borrowed references without collecting a second object list.
+        let (count, last_id) = index
+            .iter_entries()
+            .try_fold((0usize, 0u64), |(count, previous_id), entry| {
+                let object = indexed_object(&archive, entry, entry.id())?;
+                let id = entry.id().get();
+                assert!(id > previous_id);
+                assert_eq!(object.archive_info.identifier, Some(id));
+                Ok((count + 1, id))
+            })
+            .unwrap();
+
+        assert_eq!(count, OBJECT_COUNT as usize);
+        assert_eq!(last_id, OBJECT_COUNT);
     }
 
     #[test]
