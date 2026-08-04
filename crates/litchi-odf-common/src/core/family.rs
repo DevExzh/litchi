@@ -146,3 +146,64 @@ impl FamilyPackage {
         self.archive.into_inner()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{FamilyPackage, OwnedPackage};
+    use std::io::{Cursor, Write};
+
+    const MIMETYPE: &str = "application/vnd.oasis.opendocument.presentation";
+    const CONTENT: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#;
+
+    fn package() -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("mimetype", options).unwrap();
+        zip.write_all(MIMETYPE.as_bytes()).unwrap();
+        zip.start_file("META-INF/manifest.xml", options).unwrap();
+        zip.write_all(
+            format!(
+                r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="{MIMETYPE}"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/><m:file-entry m:full-path="styles.xml" m:media-type="text/xml"/></m:manifest>"#
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        zip.start_file("content.xml", options).unwrap();
+        zip.write_all(CONTENT.as_bytes()).unwrap();
+        zip.start_file("styles.xml", options).unwrap();
+        zip.write_all(b"<office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"/>")
+            .unwrap();
+        zip.finish().unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn validates_and_reuses_shared_package_state() {
+        let bytes = package();
+        let value =
+            FamilyPackage::from_bytes(bytes.clone(), MIMETYPE, "<office:presentation", "ODP")
+                .unwrap();
+        assert_eq!(value.content_xml(), CONTENT);
+        assert!(value.styles_xml().is_some());
+        assert_eq!(value.as_bytes(), bytes.as_slice());
+        assert!(value.files().unwrap().contains(&"content.xml".to_string()));
+
+        let owned = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let adopted =
+            FamilyPackage::from_owned_package(owned, MIMETYPE, "<office:presentation", "ODP")
+                .unwrap();
+        assert_eq!(adopted.as_bytes(), bytes.as_slice());
+    }
+
+    #[test]
+    fn rejects_wrong_mime_and_body_marker() {
+        let bytes = package();
+        assert!(
+            FamilyPackage::from_bytes(bytes.clone(), "text/plain", "<office:presentation", "ODP")
+                .is_err()
+        );
+        assert!(FamilyPackage::from_bytes(bytes, MIMETYPE, "<office:text", "ODP").is_err());
+    }
+}
