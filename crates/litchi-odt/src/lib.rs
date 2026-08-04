@@ -254,9 +254,7 @@ pub use form::{
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 #[allow(unused_imports, reason = "ODT facade exposes graphic style semantics")]
 pub use graphic_properties::{
-    GraphicProperty, GraphicPropertyChild, GraphicPropertyChildKind, GraphicPropertyKind,
-    GraphicPropertyNamespace, GraphicPropertyValue, GraphicStyleProperties,
-    GraphicStylePropertiesSet, GraphicStyleRecord, parse_graphic_style_properties,
+    Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,
     set_graphic_style_properties_xml,
 };
 #[allow(
