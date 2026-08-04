@@ -339,8 +339,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .flat_map(|field| data[field.start..field.end].iter().copied())
+            .filter(|field| field.number() == number)
+            .flat_map(|field| data[field.start()..field.end()].iter().copied())
             .collect()
     }
 }

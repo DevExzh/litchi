@@ -581,7 +581,7 @@ fn strict_optional_length_delimited<'a>(
     context: &str,
 ) -> Result<Option<&'a [u8]>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -590,17 +590,17 @@ fn strict_optional_length_delimited<'a>(
             "singular {context} number-format field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "{context} number-format field {field_number} is not length-delimited"
         )));
     }
-    Ok(Some(&data[field.payload_start..field.end]))
+    Ok(Some(&data[field.payload_start()..field.end()]))
 }
 
 fn strict_optional_varint(data: &[u8], field_number: u32, context: &str) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -609,19 +609,19 @@ fn strict_optional_varint(data: &[u8], field_number: u32, context: &str) -> Resu
             "singular {context} number-format field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "{context} number-format field {field_number} is not a varint"
         )));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!(
                     "{context} number-format field {field_number} is invalid: {error}"
                 ))
             })?;
-    if consumed != field.end - field.key_end
+    if consumed != field.end() - field.key_end()
         || litchi_iwa_common::varint::encoded_len(value) != consumed
     {
         return Err(Error::InvalidFormat(format!(

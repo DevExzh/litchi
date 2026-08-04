@@ -122,7 +122,7 @@ fn read_optional_native_shape(extension: &[u8]) -> Result<Option<u64>> {
     let fields = parse_wire_fields(extension)?;
     let mut matches = fields
         .iter()
-        .filter(|field| field.number == RADAR_RADIUS_GRIDLINE_CURVE_FIELD);
+        .filter(|field| field.number() == RADAR_RADIUS_GRIDLINE_CURVE_FIELD);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -131,16 +131,16 @@ fn read_optional_native_shape(extension: &[u8]) -> Result<Option<u64>> {
             "radar grid-shape field {RADAR_RADIUS_GRIDLINE_CURVE_FIELD} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "radar grid-shape field {RADAR_RADIUS_GRIDLINE_CURVE_FIELD} is not a varint"
         )));
     }
     let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
-        &extension[field.payload_start..field.end],
+        &extension[field.payload_start()..field.end()],
     )
     .map_err(|error| Error::InvalidFormat(format!("invalid radar grid-shape value: {error}")))?;
-    if field.payload_start + length != field.end {
+    if field.payload_start() + length != field.end() {
         return Err(Error::InvalidFormat(
             "radar grid-shape varint has trailing bytes".to_owned(),
         ));
@@ -309,6 +309,6 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == field_number)
+            .any(|field| field.number() == field_number)
     }
 }

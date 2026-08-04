@@ -146,7 +146,7 @@ mod tests {
                 parse_wire_fields(extension)
                     .unwrap()
                     .iter()
-                    .filter(|wire| wire.number == field)
+                    .filter(|wire| wire.number() == field)
                     .count(),
                 1
             );
@@ -201,7 +201,7 @@ mod tests {
             parse_wire_fields(extension)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNKNOWN_FIELD)
+                .any(|field| field.number() == UNKNOWN_FIELD)
         );
     }
 

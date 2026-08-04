@@ -3647,14 +3647,14 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
         crate::wire::parse_wire_fields(sidecar)
             .unwrap()
             .iter()
-            .any(|field| field.number == 99)
+            .any(|field| field.number() == 99)
     );
     let layer = &archive.object(50).unwrap().messages[0].data;
     assert!(
         crate::wire::parse_wire_fields(layer)
             .unwrap()
             .iter()
-            .any(|field| field.number == 98)
+            .any(|field| field.number() == 98)
     );
     let runs = crate::wire::repeated_length_delimited_payloads(layer, 2).unwrap();
     assert_eq!(runs.len(), 1);
@@ -3662,7 +3662,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
         crate::wire::parse_wire_fields(runs[0])
             .unwrap()
             .iter()
-            .any(|field| field.number == 97)
+            .any(|field| field.number() == 97)
     );
 }
 
@@ -3759,7 +3759,7 @@ fn table_row_insertion_splits_crossing_stroke_runs_without_normalizing_unknown_f
             crate::wire::parse_wire_fields(run)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 99)
+                .any(|field| field.number() == 99)
         );
     }
 }
@@ -6783,14 +6783,14 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
             crate::wire::parse_wire_fields(data)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 99)
+                .any(|field| field.number() == 99)
         );
         for run in crate::wire::repeated_length_delimited_payloads(data, 2).unwrap() {
             assert!(
                 crate::wire::parse_wire_fields(run)
                     .unwrap()
                     .iter()
-                    .any(|field| field.number == 98)
+                    .any(|field| field.number() == 98)
             );
         }
     }

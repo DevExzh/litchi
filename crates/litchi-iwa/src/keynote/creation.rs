@@ -680,7 +680,7 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
     let common_field = common_fields.first().ok_or_else(|| {
         crate::Error::InvalidFormat("generated Keynote theme wrapper is empty".to_owned())
     })?;
-    let common_payload = &common_theme[common_field.payload_start..common_field.end];
+    let common_payload = &common_theme[common_field.payload_start()..common_field.end()];
     let theme = kn::ThemeArchive {
         super_: tss::ThemeArchive::default(),
         templates: vec![reference(TEMPLATE_NODE)],

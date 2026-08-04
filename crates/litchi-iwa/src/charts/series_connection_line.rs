@@ -262,7 +262,7 @@ fn strict_optional_enum(data: &[u8], field_number: u32) -> Result<Option<i32>> {
 
 fn strict_optional_varint(data: &[u8], field_number: u32, label: &str) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -271,19 +271,19 @@ fn strict_optional_varint(data: &[u8], field_number: u32, label: &str) -> Result
             "singular chart series connection-line {label} field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart series connection-line {label} field {field_number} is not a varint"
         )));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!(
                     "chart series connection-line {label} field {field_number} is invalid: {error}"
                 ))
             })?;
-    if consumed != field.end - field.key_end {
+    if consumed != field.end() - field.key_end() {
         return Err(Error::InvalidFormat(format!(
             "chart series connection-line {label} field {field_number} has trailing bytes"
         )));
@@ -462,8 +462,8 @@ mod tests {
             parse_wire_fields(data)
                 .unwrap()
                 .into_iter()
-                .find(|field| field.number == number)
-                .map(|field| data[field.start..field.end].to_vec())
+                .find(|field| field.number() == number)
+                .map(|field| data[field.start()..field.end()].to_vec())
         };
         assert_eq!(
             field(patched, UNKNOWN_OUTER_FIELD),

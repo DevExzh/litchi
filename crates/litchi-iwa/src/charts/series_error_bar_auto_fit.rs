@@ -163,7 +163,7 @@ fn patch_auto_fit(data: &[u8], expected: ChartSeriesErrorBarAutoFit) -> Result<V
 
 fn strict_optional_i32(data: &[u8], field_number: u32) -> Result<Option<i32>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -172,13 +172,13 @@ fn strict_optional_i32(data: &[u8], field_number: u32) -> Result<Option<i32>> {
             "singular chart series style field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart series style field {field_number} is not a varint"
         )));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!(
                     "chart series style field {field_number} is invalid: {error}"
@@ -186,7 +186,7 @@ fn strict_optional_i32(data: &[u8], field_number: u32) -> Result<Option<i32>> {
             })?;
     let decoded = value as i32;
     let encoded = decoded as i64 as u64;
-    if consumed != field.end - field.key_end
+    if consumed != field.end() - field.key_end()
         || litchi_iwa_common::varint::encoded_len(value) != consumed
         || (encoded != value && value > i32::MAX as u64)
     {

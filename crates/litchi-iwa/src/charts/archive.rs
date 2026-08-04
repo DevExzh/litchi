@@ -111,7 +111,7 @@ impl IWorkChartArchive {
                     .position(|field| {
                         parse_wire_fields(field)
                             .ok()
-                            .and_then(|fields| fields.first().map(|field| field.number))
+                            .and_then(|fields| fields.first().map(|field| field.number()))
                             .is_some_and(|number| number > CHART_REFERENCE_LINES_EXTENSION_FIELD)
                     })
                     .unwrap_or(self.chart_opaque_fields.len());
@@ -224,8 +224,8 @@ impl IWorkChartArchive {
         let chart_opaque_fields = if let Some(chart_data) = chart_data {
             parse_wire_fields(chart_data)?
                 .into_iter()
-                .filter(|field| !CHART_BASE_FIELDS.contains(&field.number))
-                .map(|field| chart_data[field.start..field.end].to_vec())
+                .filter(|field| !CHART_BASE_FIELDS.contains(&field.number()))
+                .map(|field| chart_data[field.start()..field.end()].to_vec())
                 .collect()
         } else {
             Vec::new()
@@ -233,9 +233,9 @@ impl IWorkChartArchive {
         let opaque_fields = fields
             .iter()
             .filter(|field| {
-                field.number != DRAWABLE_SUPER_FIELD && field.number != CHART_EXTENSION_FIELD
+                field.number() != DRAWABLE_SUPER_FIELD && field.number() != CHART_EXTENSION_FIELD
             })
-            .map(|field| data[field.start..field.end].to_vec())
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect();
 
         Ok(Self {
@@ -283,7 +283,7 @@ fn unique_opaque_field_index(fields: &[Vec<u8>], field_number: u32) -> Result<Op
                 "stored chart extension is not exactly one wire field".to_owned(),
             ));
         };
-        if field.number != field_number {
+        if field.number() != field_number {
             continue;
         }
         if result.replace(index).is_some() {
@@ -425,7 +425,7 @@ fn collect_sparse_references(
 }
 
 fn unique_field(fields: &[WireField], field_number: u32) -> Result<Option<&WireField>> {
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let first = matches.next();
     if matches.next().is_some() {
         return Err(Error::InvalidFormat(format!(
@@ -436,13 +436,13 @@ fn unique_field(fields: &[WireField], field_number: u32) -> Result<Option<&WireF
 }
 
 fn length_delimited_payload<'a>(data: &'a [u8], field: &WireField) -> Result<&'a [u8]> {
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart drawable field {} is not length-delimited",
-            field.number
+            field.number()
         )));
     }
-    Ok(&data[field.payload_start..field.end])
+    Ok(&data[field.payload_start()..field.end()])
 }
 
 #[cfg(test)]

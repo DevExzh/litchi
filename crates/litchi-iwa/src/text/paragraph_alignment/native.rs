@@ -1654,12 +1654,12 @@ fn known_property_count(data: &[u8]) -> Result<u32> {
     let has_character = |numbers: &[u32]| {
         character_fields
             .iter()
-            .any(|field| numbers.contains(&field.number))
+            .any(|field| numbers.contains(&field.number()))
     };
     let has_paragraph = |numbers: &[u32]| {
         paragraph_fields
             .iter()
-            .any(|field| numbers.contains(&field.number))
+            .any(|field| numbers.contains(&field.number()))
     };
     let character_groups: &[&[u32]] = &[
         &[CHARACTER_BOLD_FIELD],
@@ -2381,7 +2381,7 @@ fn line_spacing_from_archive(spacing: &tswp::LineSpacingArchive) -> Result<Parag
 fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
     let mut actual = parse_wire_fields(data)?
         .into_iter()
-        .map(|field| field.number)
+        .map(|field| field.number())
         .collect::<Vec<_>>();
     let mut expected = expected.to_vec();
     actual.sort_unstable();
@@ -2392,14 +2392,14 @@ fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
 fn has_canonical_bool_field(data: &[u8], number: u32) -> Result<bool> {
     let fields = parse_wire_fields(data)?
         .into_iter()
-        .filter(|field| field.number == number)
+        .filter(|field| field.number() == number)
         .collect::<Vec<_>>();
     let [field] = fields.as_slice() else {
         return Ok(false);
     };
-    Ok(field.wire_type == 0
+    Ok(field.wire_type() == 0
         && matches!(
-            &data[field.key_end..field.end],
+            &data[field.key_end()..field.end()],
             [PROTOBUF_FALSE_BYTE] | [PROTOBUF_TRUE_BYTE]
         ))
 }

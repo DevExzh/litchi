@@ -217,7 +217,7 @@ fn patch_location(
 
 fn strict_optional_location(data: &[u8], field_number: u32) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -226,19 +226,19 @@ fn strict_optional_location(data: &[u8], field_number: u32) -> Result<Option<u64
             "singular chart series value-label location field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart series value-label location field {field_number} is not a varint"
         )));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!(
                     "chart series value-label location field {field_number} is invalid: {error}"
                 ))
             })?;
-    if consumed != field.end - field.key_end
+    if consumed != field.end() - field.key_end()
         || litchi_iwa_common::varint::encoded_len(value) != consumed
     {
         return Err(Error::InvalidFormat(format!(
@@ -325,7 +325,7 @@ mod tests {
         )
         .unwrap();
         let fields = parse_wire_fields(&patched).unwrap();
-        assert!(fields.iter().any(|field| field.number == 4_096));
+        assert!(fields.iter().any(|field| field.number() == 4_096));
         let extension = generated_chart_series_style_extension(&patched)
             .unwrap()
             .unwrap();
@@ -333,7 +333,7 @@ mod tests {
             parse_wire_fields(extension)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 4_097)
+                .any(|field| field.number() == 4_097)
         );
     }
 

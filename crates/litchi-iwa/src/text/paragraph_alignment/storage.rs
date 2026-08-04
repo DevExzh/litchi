@@ -266,7 +266,7 @@ fn required_varint(data: &[u8], field_number: u32, context: &str) -> Result<u64>
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number && field.wire_type == 0)
+        .filter(|field| field.number() == field_number && field.wire_type() == 0)
         .collect::<Vec<_>>();
     let [field] = matches.as_slice() else {
         return Err(Error::InvalidFormat(format!(
@@ -274,9 +274,9 @@ fn required_varint(data: &[u8], field_number: u32, context: &str) -> Result<u64>
         )));
     };
     let (value, length) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| Error::InvalidFormat(format!("invalid {context}: {error}")))?;
-    if field.key_end + length != field.end {
+    if field.key_end() + length != field.end() {
         return Err(Error::InvalidFormat(format!(
             "{context} has trailing varint bytes"
         )));

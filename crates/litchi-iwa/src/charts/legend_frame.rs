@@ -292,7 +292,7 @@ fn strict_optional_payload<'a>(
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number)
+        .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();
     if matches.len() > 1 {
         return Err(Error::InvalidFormat(format!(
@@ -303,26 +303,26 @@ fn strict_optional_payload<'a>(
     let Some(field) = matches.first() else {
         return Ok(None);
     };
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "{label} field must be length-delimited"
         )));
     }
-    Ok(Some(&data[field.payload_start..field.end]))
+    Ok(Some(&data[field.payload_start()..field.end()]))
 }
 
 fn strict_required_fixed32(data: &[u8], field_number: u32, label: &str) -> Result<()> {
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number)
+        .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();
     if matches.len() != 1 {
         return Err(Error::InvalidFormat(format!(
             "{label} field must occur exactly once"
         )));
     }
-    if matches[0].wire_type != 5 {
+    if matches[0].wire_type() != 5 {
         return Err(Error::InvalidFormat(format!(
             "{label} field must be fixed32"
         )));

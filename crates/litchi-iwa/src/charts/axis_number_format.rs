@@ -162,7 +162,7 @@ mod tests {
                 parse_wire_fields(extension)
                     .unwrap()
                     .iter()
-                    .filter(|wire| wire.number == field)
+                    .filter(|wire| wire.number() == field)
                     .count(),
                 1
             );
@@ -188,13 +188,13 @@ mod tests {
         let legacy = parse_wire_fields(extension)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == AXIS_NUMBER_FORMAT_FIELDS.legacy)
+            .find(|field| field.number() == AXIS_NUMBER_FORMAT_FIELDS.legacy)
             .unwrap();
         let mut duplicate_extension = extension.to_vec();
         append_length_delimited_field(
             &mut duplicate_extension,
             AXIS_NUMBER_FORMAT_FIELDS.legacy,
-            &extension[legacy.payload_start..legacy.end],
+            &extension[legacy.payload_start()..legacy.end()],
         )
         .unwrap();
         let duplicate = patch_length_delimited_field(

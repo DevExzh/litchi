@@ -556,7 +556,7 @@ fn strict_optional_string(data: &[u8], field_number: u32) -> Result<Option<Strin
 
 fn strict_optional_bytes(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -565,17 +565,17 @@ fn strict_optional_bytes(data: &[u8], field_number: u32) -> Result<Option<&[u8]>
             "singular chart series trendline field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart series trendline field {field_number} is not length-delimited"
         )));
     }
-    Ok(Some(&data[field.payload_start..field.end]))
+    Ok(Some(&data[field.payload_start()..field.end()]))
 }
 
 fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -584,19 +584,19 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "singular chart series trendline field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart series trendline field {field_number} is not a varint"
         )));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!(
                     "chart series trendline field {field_number} is invalid: {error}"
                 ))
             })?;
-    if consumed != field.end - field.key_end {
+    if consumed != field.end() - field.key_end() {
         return Err(Error::InvalidFormat(format!(
             "chart series trendline field {field_number} has trailing bytes"
         )));
@@ -691,13 +691,13 @@ mod tests {
             parse_wire_fields(&patched)
                 .unwrap()
                 .iter()
-                .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-                .map(|field| &patched[field.start..field.end]),
+                .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+                .map(|field| &patched[field.start()..field.end()]),
             parse_wire_fields(&original)
                 .unwrap()
                 .iter()
-                .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-                .map(|field| &original[field.start..field.end])
+                .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+                .map(|field| &original[field.start()..field.end()])
         );
         let extension = generated_chart_series_non_style_extension(&patched)
             .unwrap()

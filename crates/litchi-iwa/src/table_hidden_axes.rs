@@ -1056,10 +1056,10 @@ fn validate_singular_field(
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number)
+        .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();
     if matches.len() != usize::from(expected_present)
-        || matches.iter().any(|field| field.wire_type != 2)
+        || matches.iter().any(|field| field.wire_type() != 2)
     {
         return Err(Error::InvalidFormat(format!(
             "iWork table {label} is missing, duplicated, or malformed"

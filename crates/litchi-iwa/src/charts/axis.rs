@@ -713,7 +713,7 @@ pub(crate) fn generated_axis_non_style_extension(data: &[u8]) -> Result<Option<&
     let fields = parse_wire_fields(data)?;
     let mut extensions = fields
         .iter()
-        .filter(|field| field.number == GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD);
+        .filter(|field| field.number() == GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD);
     let Some(extension) = extensions.next() else {
         return Ok(None);
     };
@@ -722,12 +722,12 @@ pub(crate) fn generated_axis_non_style_extension(data: &[u8]) -> Result<Option<&
             "chart axis non-style extension {GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD} occurs more than once"
         )));
     }
-    if extension.wire_type != 2 {
+    if extension.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart axis non-style extension {GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD} is not length-delimited"
         )));
     }
-    Ok(Some(&data[extension.payload_start..extension.end]))
+    Ok(Some(&data[extension.payload_start()..extension.end()]))
 }
 
 #[cfg(test)]
@@ -966,8 +966,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

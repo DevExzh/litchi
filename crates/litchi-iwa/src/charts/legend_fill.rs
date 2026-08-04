@@ -240,13 +240,13 @@ mod tests {
             parse_wire_fields(&colored)
                 .unwrap()
                 .iter()
-                .any(|field| { field.number == UNMAPPED_OUTER_FIELD && field.wire_type == 0 })
+                .any(|field| { field.number() == UNMAPPED_OUTER_FIELD && field.wire_type() == 0 })
         );
         assert!(
             parse_wire_fields(generated_after)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNMAPPED_GENERATED_FIELD && field.wire_type == 0)
+                .any(|field| field.number() == UNMAPPED_GENERATED_FIELD && field.wire_type() == 0)
         );
 
         let no_fill = patch_legend_fill(&colored, &ChartLegendFill::Fill(ShapeFill::None)).unwrap();

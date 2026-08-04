@@ -184,13 +184,13 @@ pub(super) fn replace_soundtrack_message(
 fn validate_show_soundtrack_wire(data: &[u8], expected: bool) -> Result<()> {
     let mut count = 0usize;
     for field in parse_wire_fields(data)? {
-        if field.number != SHOW_SOUNDTRACK_FIELD {
+        if field.number() != SHOW_SOUNDTRACK_FIELD {
             continue;
         }
-        if field.wire_type != LENGTH_DELIMITED_WIRE_TYPE {
+        if field.wire_type() != LENGTH_DELIMITED_WIRE_TYPE {
             return Err(Error::InvalidFormat(format!(
                 "Keynote show soundtrack field uses wire type {}, not {LENGTH_DELIMITED_WIRE_TYPE}",
-                field.wire_type
+                field.wire_type()
             )));
         }
         count += 1;
@@ -207,16 +207,16 @@ fn validate_soundtrack_wire(data: &[u8]) -> Result<()> {
     let mut volume_count = 0usize;
     let mut mode_count = 0usize;
     for field in parse_wire_fields(data)? {
-        let (name, expected_wire, count) = match field.number {
+        let (name, expected_wire, count) = match field.number() {
             VOLUME_FIELD => ("volume", FIXED64_WIRE_TYPE, Some(&mut volume_count)),
             MODE_FIELD => ("mode", VARINT_WIRE_TYPE, Some(&mut mode_count)),
             MEDIA_FIELD => ("media", LENGTH_DELIMITED_WIRE_TYPE, None),
             _ => continue,
         };
-        if field.wire_type != expected_wire {
+        if field.wire_type() != expected_wire {
             return Err(Error::InvalidFormat(format!(
                 "Keynote soundtrack {name} field uses wire type {}, not {expected_wire}",
-                field.wire_type
+                field.wire_type()
             )));
         }
         if let Some(count) = count {

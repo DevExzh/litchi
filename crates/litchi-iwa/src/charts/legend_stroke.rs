@@ -210,13 +210,13 @@ mod tests {
             parse_wire_fields(&stroked)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNMAPPED_OUTER_FIELD && field.wire_type == 0)
+                .any(|field| field.number() == UNMAPPED_OUTER_FIELD && field.wire_type() == 0)
         );
         assert!(
             parse_wire_fields(generated_after)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNMAPPED_GENERATED_FIELD && field.wire_type == 0)
+                .any(|field| field.number() == UNMAPPED_GENERATED_FIELD && field.wire_type() == 0)
         );
 
         let empty = patch_legend_stroke(&stroked, ChartLegendStroke::NoStroke).unwrap();

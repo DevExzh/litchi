@@ -4454,11 +4454,19 @@ wire errors untyped by accident.
 The varint portion of this exit is now complete: every facade caller imports
 `litchi-iwa-common::varint`, the duplicate `litchi-iwa::varint` module is gone,
 and the common bounded decoder/error type is the sole owner. The remaining
-facade-local physical kernel is `wire.rs`; its parser and patch helpers are the
-next low-level ownership slice. Canonical chart readers use the common
-`encoded_len` check instead of allocating temporary varint vectors, and the
-reference-line reader decodes directly from its borrowed payload while mapping
-malformed values to the typed format error.
+facade-local file is `wire.rs`, now only a private callback/error adapter. Its
+parser returns `litchi_iwa_common::wire::WireField` directly, so the facade no
+longer copies parsed fields into a second vector; all consumers use the common
+typed accessors. Scalar, nested, repeated, and append mutation paths delegate
+to the bounded common kernel, including its typed limit/allocation errors.
+The adapter retains only callbacks whose closures still return the facade
+error type and a small removal seam; those callbacks use the common parser,
+fallible reservations, and nesting/output limits. Moving those callbacks to a
+generic common error boundary is the final deletion step for this file.
+Canonical chart readers use the common `encoded_len` check instead of
+allocating temporary varint vectors, and the reference-line reader decodes
+directly from its borrowed payload while mapping malformed values to the typed
+format error.
 
 Checked-in anchors are `[MS-OE376]` §§2.1.444--2.1.462 for Word frameset/web
 settings behavior and §2.1.1170 for PowerPoint programmable tags; `[MS-XLSX]`
@@ -5782,8 +5790,11 @@ The physical IWA substrate slice is complete as well: raw schemas remain in
 use the allocation-conscious slice API. The core framing suite has 17 passing
 tests. The facade varint exit is now complete too: `varint.rs` was deleted,
 all callers use the common bounded implementation, and the IWA suite still
-passes 1,494 tests. Next, extract the remaining wire helpers, then Numbers
-table/sheet/formula values and the Pages/Keynote reader boundaries.
+passes 1,494 tests. The facade `WireField` representation and direct wire
+mutation exit is complete without a compatibility shim; only the callback
+error boundary remains before `wire.rs` itself can be deleted. Next, finish
+that callback extraction, then harden and extract Numbers table/sheet/formula
+values and the Pages/Keynote reader boundaries.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains

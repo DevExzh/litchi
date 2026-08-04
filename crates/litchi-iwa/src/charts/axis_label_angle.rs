@@ -178,7 +178,7 @@ const fn label_angle_field(axis: ChartAxis) -> u32 {
 
 fn strict_optional_fixed32(data: &[u8], field_number: u32) -> Result<Option<u32>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -187,12 +187,12 @@ fn strict_optional_fixed32(data: &[u8], field_number: u32) -> Result<Option<u32>
             "singular chart axis label-angle field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 5 {
+    if field.wire_type() != 5 {
         return Err(Error::InvalidFormat(format!(
             "chart axis label-angle field {field_number} is not fixed32"
         )));
     }
-    let bytes: [u8; 4] = data[field.payload_start..field.end]
+    let bytes: [u8; 4] = data[field.payload_start()..field.end()]
         .try_into()
         .map_err(|_| Error::InvalidFormat("truncated chart axis label angle".to_owned()))?;
     Ok(Some(u32::from_le_bytes(bytes)))

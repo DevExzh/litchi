@@ -2624,9 +2624,9 @@ fn required_u32_varint(data: &[u8], field_number: u32) -> Result<u32> {
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number)
+        .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();
-    if matches.len() != 1 || matches[0].wire_type != 0 {
+    if matches.len() != 1 || matches[0].wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "required protobuf varint field {field_number} occurs {} times or has the wrong wire type",
             matches.len()
@@ -2634,9 +2634,9 @@ fn required_u32_varint(data: &[u8], field_number: u32) -> Result<u32> {
     }
     let field = matches[0];
     let (value, length) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| Error::InvalidFormat(format!("invalid protobuf varint: {error}")))?;
-    if field.key_end + length != field.end {
+    if field.key_end() + length != field.end() {
         return Err(Error::InvalidFormat(
             "protobuf varint field has trailing bytes".to_owned(),
         ));

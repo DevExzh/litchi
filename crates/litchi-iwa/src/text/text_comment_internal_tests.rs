@@ -121,7 +121,7 @@ fn unknown_annotation_and_comment_fields_survive_updates() {
         parse_wire_fields(table)
             .unwrap()
             .iter()
-            .any(|field| field.number == 99)
+            .any(|field| field.number() == 99)
     );
     assert!(
         repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)
@@ -130,14 +130,14 @@ fn unknown_annotation_and_comment_fields_survive_updates() {
             .any(|entry| parse_wire_fields(entry)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 77))
+                .any(|field| field.number() == 77))
     );
     for (object_id, field) in [(comment.id.object_id(), 88), (comment_storage_id, 89)] {
         assert!(
             parse_wire_fields(&archive.object(object_id).unwrap().messages[0].data)
                 .unwrap()
                 .iter()
-                .any(|wire| wire.number == field)
+                .any(|wire| wire.number() == field)
         );
     }
 }
@@ -264,7 +264,7 @@ fn reply_updates_preserve_unknown_fields_and_identity() {
         )
         .unwrap()
         .iter()
-        .any(|field| field.number == 97)
+        .any(|field| field.number() == 97)
     );
 
     editor

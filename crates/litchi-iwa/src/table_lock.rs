@@ -168,7 +168,7 @@ fn raw_table_lock_state(data: &[u8]) -> Result<Option<bool>> {
     let drawable = singular_field(&fields, TABLE_DRAWABLE_SUPER_FIELD, "table drawable super")?;
     require_wire_type(drawable, 2, "table drawable super")?;
     strict_optional_bool(
-        &data[drawable.payload_start..drawable.end],
+        &data[drawable.payload_start()..drawable.end()],
         DRAWABLE_LOCKED_FIELD,
         "table lock",
     )
@@ -210,7 +210,7 @@ fn table_message(
 
 fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<Option<bool>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -221,9 +221,9 @@ fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<O
     }
     require_wire_type(field, 0, label)?;
     let (value, length) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.payload_start..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.payload_start()..field.end()])
             .map_err(|error| Error::InvalidFormat(format!("invalid {label}: {error}")))?;
-    if field.payload_start + length != field.end {
+    if field.payload_start() + length != field.end() {
         return Err(Error::InvalidFormat(format!(
             "{label} contains trailing bytes"
         )));
@@ -242,7 +242,7 @@ fn singular_field<'a>(
     field_number: u32,
     label: &str,
 ) -> Result<&'a crate::wire::WireField> {
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Err(Error::InvalidFormat(format!(
             "{label} must occur exactly once, found none"
@@ -257,10 +257,10 @@ fn singular_field<'a>(
 }
 
 fn require_wire_type(field: &crate::wire::WireField, expected: u8, label: &str) -> Result<()> {
-    if field.wire_type != expected {
+    if field.wire_type() != expected {
         return Err(Error::InvalidFormat(format!(
             "{label} has wire type {}, expected {expected}",
-            field.wire_type
+            field.wire_type()
         )));
     }
     Ok(())

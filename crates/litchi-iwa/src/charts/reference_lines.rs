@@ -1158,7 +1158,7 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
 
 fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -1167,12 +1167,12 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "singular chart reference-line field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart reference-line field {field_number} is not a varint"
         )));
     }
-    let payload = &data[field.payload_start..field.end];
+    let payload = &data[field.payload_start()..field.end()];
     let (value, consumed) =
         litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
             Error::InvalidFormat(format!(
@@ -1189,7 +1189,7 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
 
 fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -1198,12 +1198,12 @@ fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8
             "singular chart reference-line field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart reference-line field {field_number} is not length-delimited"
         )));
     }
-    Ok(Some(&data[field.payload_start..field.end]))
+    Ok(Some(&data[field.payload_start()..field.end()]))
 }
 
 fn raw_i32(value: u64) -> Result<i32> {

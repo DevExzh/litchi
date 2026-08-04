@@ -305,7 +305,7 @@ fn patch_category_label_style(
 
 fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -314,17 +314,17 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "singular chart category-label field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart category-label field {field_number} is not a varint"
         )));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.payload_start..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.payload_start()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!("invalid category-label value: {error}"))
             })?;
-    if field.payload_start + consumed != field.end {
+    if field.payload_start() + consumed != field.end() {
         return Err(Error::InvalidFormat(
             "chart category-label varint has trailing bytes".to_owned(),
         ));

@@ -138,7 +138,7 @@ fn strict_optional_visibility(data: &[u8]) -> Result<Option<ChartPieLeaderLineVi
     let fields = parse_wire_fields(data)?;
     let mut matches = fields
         .iter()
-        .filter(|field| field.number == PIE_LEADER_LINE_VISIBILITY_FIELD);
+        .filter(|field| field.number() == PIE_LEADER_LINE_VISIBILITY_FIELD);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -147,19 +147,19 @@ fn strict_optional_visibility(data: &[u8]) -> Result<Option<ChartPieLeaderLineVi
             "singular chart pie leader-line visibility occurs more than once".to_owned(),
         ));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(
             "chart pie leader-line visibility is not a varint".to_owned(),
         ));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!(
                     "chart pie leader-line visibility is invalid: {error}"
                 ))
             })?;
-    if field.key_end + consumed != field.end {
+    if field.key_end() + consumed != field.end() {
         return Err(Error::InvalidFormat(
             "chart pie leader-line visibility is not canonical".to_owned(),
         ));
@@ -240,7 +240,7 @@ mod tests {
         assert!(
             hidden_outer
                 .iter()
-                .any(|field| field.number == UNMAPPED_OUTER_FIELD)
+                .any(|field| field.number() == UNMAPPED_OUTER_FIELD)
         );
         let hidden_extension = generated_chart_series_non_style_extension(&hidden)
             .unwrap()
@@ -249,7 +249,7 @@ mod tests {
         assert!(
             hidden_generated
                 .iter()
-                .any(|field| field.number == UNMAPPED_GENERATED_FIELD)
+                .any(|field| field.number() == UNMAPPED_GENERATED_FIELD)
         );
 
         let restored = patch_series_non_style_leader_line_visibility(

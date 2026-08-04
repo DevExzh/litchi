@@ -128,10 +128,10 @@ fn sheet_wire_payload(data: &[u8], message_type: u32) -> Result<&[u8]> {
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == 1 && field.wire_type == 2)
+        .filter(|field| field.number() == 1 && field.wire_type() == 2)
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [field] => Ok(&data[field.payload_start..field.end]),
+        [field] => Ok(&data[field.payload_start()..field.end()]),
         _ => Err(Error::InvalidFormat(format!(
             "Numbers form sheet must contain exactly one nested sheet payload, found {}",
             matches.len()

@@ -1529,14 +1529,14 @@ fn native_paragraph_flow_rejects_noncanonical_boolean_wire() {
     let paragraph = crate::wire::parse_wire_fields(&data)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == PARAGRAPH_PROPERTIES_FIELD)
+        .find(|field| field.number() == PARAGRAPH_PROPERTIES_FIELD)
         .unwrap();
-    let hyphenate = crate::wire::parse_wire_fields(&data[paragraph.payload_start..paragraph.end])
+    let hyphenate = crate::wire::parse_wire_fields(&data[paragraph.payload_start()..paragraph.end()])
         .unwrap()
         .into_iter()
-        .find(|field| field.number == HYPHENATE_FIELD)
+        .find(|field| field.number() == HYPHENATE_FIELD)
         .unwrap();
-    data[paragraph.payload_start + hyphenate.payload_start] = NONCANONICAL_TRUE;
+    data[paragraph.payload_start() + hyphenate.payload_start()] = NONCANONICAL_TRUE;
     let archive = tswp::ParagraphStyleArchive::decode(data.as_slice()).unwrap();
     assert!(native::direct_overrides(&archive, &data).unwrap().is_none());
 }

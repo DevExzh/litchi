@@ -100,21 +100,21 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
         parse_wire_fields(table)
             .unwrap()
             .iter()
-            .any(|field| field.number == 99)
+            .any(|field| field.number() == 99)
     );
     let object = archive.object(attachment.id.object_id()).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
             .iter()
-            .any(|field| field.number == 88)
+            .any(|field| field.number() == 88)
     );
     let textual = repeated_length_delimited_payloads(&object.messages[0].data, 1).unwrap()[0];
     assert!(
         parse_wire_fields(textual)
             .unwrap()
             .iter()
-            .any(|field| field.number == 77)
+            .any(|field| field.number() == 77)
     );
 }
 

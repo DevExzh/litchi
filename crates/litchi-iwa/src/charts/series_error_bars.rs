@@ -670,12 +670,12 @@ fn strict_optional_fixed32(data: &[u8], field_number: u32) -> Result<Option<u32>
     let Some(field) = field else {
         return Ok(None);
     };
-    if field.wire_type != 5 {
+    if field.wire_type() != 5 {
         return Err(Error::InvalidFormat(format!(
             "chart series error-bar field {field_number} is not fixed32"
         )));
     }
-    let bytes: [u8; 4] = data[field.payload_start..field.end]
+    let bytes: [u8; 4] = data[field.payload_start()..field.end()]
         .try_into()
         .map_err(|_| Error::InvalidFormat("truncated chart error-bar fixed32".to_owned()))?;
     Ok(Some(u32::from_le_bytes(bytes)))
@@ -686,12 +686,12 @@ fn strict_optional_bytes(data: &[u8], field_number: u32) -> Result<Option<&[u8]>
     let Some(field) = field else {
         return Ok(None);
     };
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart series error-bar field {field_number} is not length-delimited"
         )));
     }
-    Ok(Some(&data[field.payload_start..field.end]))
+    Ok(Some(&data[field.payload_start()..field.end()]))
 }
 
 fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>> {
@@ -699,19 +699,19 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
     let Some(field) = field else {
         return Ok(None);
     };
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart series error-bar field {field_number} is not a varint"
         )));
     }
     let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
             .map_err(|error| {
                 Error::InvalidFormat(format!(
                     "chart series error-bar field {field_number} is invalid: {error}"
                 ))
             })?;
-    if consumed != field.end - field.key_end
+    if consumed != field.end() - field.key_end()
         || litchi_iwa_common::varint::encoded_len(value) != consumed
     {
         return Err(Error::InvalidFormat(format!(
@@ -725,7 +725,7 @@ fn strict_optional_field(data: &[u8], field_number: u32) -> Result<Option<crate:
     let fields = parse_wire_fields(data)?;
     let mut matches = fields
         .into_iter()
-        .filter(|field| field.number == field_number);
+        .filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };

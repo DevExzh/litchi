@@ -474,13 +474,13 @@ mod tests {
         let original_outer = parse_wire_fields(original)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-            .map(|field| original[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+            .map(|field| original[field.start()..field.end()].to_vec());
         let patched_outer = parse_wire_fields(patched)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-            .map(|field| patched[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+            .map(|field| patched[field.start()..field.end()].to_vec());
         assert_eq!(patched_outer, original_outer);
         let original_generated = generated_chart_series_style_extension(original)
             .unwrap()
@@ -491,13 +491,13 @@ mod tests {
         let original_unknown = parse_wire_fields(original_generated)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-            .map(|field| original_generated[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+            .map(|field| original_generated[field.start()..field.end()].to_vec());
         let patched_unknown = parse_wire_fields(patched_generated)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-            .map(|field| patched_generated[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+            .map(|field| patched_generated[field.start()..field.end()].to_vec());
         assert_eq!(patched_unknown, original_unknown);
     }
 

@@ -249,6 +249,6 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == field_number)
+            .any(|field| field.number() == field_number)
     }
 }

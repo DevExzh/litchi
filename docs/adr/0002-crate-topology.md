@@ -86,7 +86,10 @@ depends on it for bounded archive framing and checksum-free Snappy encoding.
 633-line duplicate Snappy implementation and 172-line varint kernel are gone.
 The core layer does not open packages, resolve application message IDs, or own
 document topology, while the facade retains those application-level
-responsibilities.
+responsibilities. The common wire crate is also the sole owner of parsed
+`WireField` values and bounded scalar/repeated mutation; the facade's private
+`wire.rs` is only a temporary callback/error adapter and does not copy parsed
+fields or maintain a second wire representation.
 
 The first extracted semantic value layer is `litchi-iwa-text`, which owns only
 the allocation-bearing rich-text values shared by the format leaves. It has no

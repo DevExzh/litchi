@@ -466,7 +466,7 @@ mod tests {
             parse_wire_fields(&patched)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 4_096)
+                .any(|field| field.number() == 4_096)
         );
         let extension = generated_chart_series_non_style_extension(&patched)
             .unwrap()
@@ -475,7 +475,7 @@ mod tests {
             parse_wire_fields(extension)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 4_097)
+                .any(|field| field.number() == 4_097)
         );
     }
 

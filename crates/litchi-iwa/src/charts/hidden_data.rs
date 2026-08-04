@@ -117,7 +117,7 @@ fn strict_optional_skip_hidden_data(data: &[u8]) -> Result<Option<bool>> {
     let fields = parse_wire_fields(data)?;
     let mut matches = fields
         .iter()
-        .filter(|field| field.number == CHART_SKIP_HIDDEN_DATA_FIELD);
+        .filter(|field| field.number() == CHART_SKIP_HIDDEN_DATA_FIELD);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -126,20 +126,20 @@ fn strict_optional_skip_hidden_data(data: &[u8]) -> Result<Option<bool>> {
             "singular chart skip-hidden-data field {CHART_SKIP_HIDDEN_DATA_FIELD} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart skip-hidden-data field {CHART_SKIP_HIDDEN_DATA_FIELD} is not a varint"
         )));
     }
     let (value, consumed) = litchi_iwa_common::varint::decode_varint_from_bytes(
-        &data[field.key_end..field.end],
+        &data[field.key_end()..field.end()],
     )
     .map_err(|error| {
         Error::InvalidFormat(format!(
             "chart skip-hidden-data field {CHART_SKIP_HIDDEN_DATA_FIELD} is invalid: {error}"
         ))
     })?;
-    if consumed != 1 || consumed != field.end - field.key_end || value > 1 {
+    if consumed != 1 || consumed != field.end() - field.key_end() || value > 1 {
         return Err(Error::InvalidFormat(format!(
             "chart skip-hidden-data field {CHART_SKIP_HIDDEN_DATA_FIELD} is not a canonical boolean"
         )));
@@ -275,8 +275,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

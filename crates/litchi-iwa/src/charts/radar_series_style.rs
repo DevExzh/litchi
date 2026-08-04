@@ -267,10 +267,10 @@ fn read_local_fill_uses_stroke(data: &[u8]) -> Result<Option<bool>> {
         return Ok(None);
     };
     let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
-        &extension[field.key_end..field.end],
+        &extension[field.key_end()..field.end()],
     )
     .map_err(|error| Error::InvalidFormat(format!("invalid Radar style boolean: {error}")))?;
-    if field.key_end + length != field.end || value > 1 {
+    if field.key_end() + length != field.end() || value > 1 {
         return Err(Error::InvalidFormat(format!(
             "native Radar style boolean must be zero or one, not {value}"
         )));
@@ -286,7 +286,7 @@ fn read_local_alpha_multiplier(data: &[u8]) -> Result<Option<f32>> {
     else {
         return Ok(None);
     };
-    let bytes: [u8; 4] = extension[field.payload_start..field.end]
+    let bytes: [u8; 4] = extension[field.payload_start()..field.end()]
         .try_into()
         .map_err(|_| Error::InvalidFormat("truncated Radar alpha multiplier".to_owned()))?;
     Ok(Some(f32::from_le_bytes(bytes)))
@@ -305,7 +305,7 @@ fn singular_field(
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .into_iter()
-        .filter(|field| field.number == number)
+        .filter(|field| field.number() == number)
         .collect::<Vec<_>>();
     let [field] = matches.as_slice() else {
         if matches.is_empty() {
@@ -315,10 +315,10 @@ fn singular_field(
             "Radar series-style field {number} occurs more than once"
         )));
     };
-    if field.wire_type != wire_type {
+    if field.wire_type() != wire_type {
         return Err(Error::InvalidFormat(format!(
             "Radar series-style field {number} has wire type {}, not {wire_type}",
-            field.wire_type
+            field.wire_type()
         )));
     }
     Ok(Some(*field))
@@ -515,6 +515,6 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == number)
+            .any(|field| field.number() == number)
     }
 }

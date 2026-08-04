@@ -3103,16 +3103,16 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
         let source_field = crate::wire::parse_wire_fields(source)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == 99)
+            .find(|field| field.number() == 99)
             .unwrap();
         let cloned_field = crate::wire::parse_wire_fields(cloned)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == 99)
+            .find(|field| field.number() == 99)
             .unwrap();
         assert_eq!(
-            &source[source_field.start..source_field.end],
-            &cloned[cloned_field.start..cloned_field.end]
+            &source[source_field.start()..source_field.end()],
+            &cloned[cloned_field.start()..cloned_field.end()]
         );
     }
     editor
@@ -5469,16 +5469,16 @@ fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
     let source_unknown = crate::wire::parse_wire_fields(source_node)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == 99)
+        .find(|field| field.number() == 99)
         .unwrap();
     let cloned_unknown = crate::wire::parse_wire_fields(cloned_node)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == 99)
+        .find(|field| field.number() == 99)
         .unwrap();
     assert_eq!(
-        &source_node[source_unknown.start..source_unknown.end],
-        &cloned_node[cloned_unknown.start..cloned_unknown.end]
+        &source_node[source_unknown.start()..source_unknown.end()],
+        &cloned_node[cloned_unknown.start()..cloned_unknown.end()]
     );
     let reversed_node = remap_reference_paths(
         cloned_node,

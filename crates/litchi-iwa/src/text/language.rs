@@ -465,14 +465,14 @@ mod tests {
             parse_wire_fields(tables[0])
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 99)
+                .any(|field| field.number() == 99)
         );
         let entries = repeated_length_delimited_payloads(tables[0], TABLE_ENTRIES_FIELD).unwrap();
         assert!(
             parse_wire_fields(entries[0])
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 77)
+                .any(|field| field.number() == 77)
         );
     }
 

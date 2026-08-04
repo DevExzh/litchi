@@ -417,8 +417,8 @@ mod tests {
             parse_wire_fields(data)
                 .unwrap()
                 .into_iter()
-                .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-                .map(|field| data[field.start..field.end].to_vec())
+                .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+                .map(|field| data[field.start()..field.end()].to_vec())
         };
         assert_eq!(outer(patched), outer(original));
         let original_generated = generated_chart_series_style_extension(original)
@@ -431,8 +431,8 @@ mod tests {
             parse_wire_fields(data)
                 .unwrap()
                 .into_iter()
-                .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-                .map(|field| data[field.start..field.end].to_vec())
+                .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+                .map(|field| data[field.start()..field.end()].to_vec())
         };
         assert_eq!(generated(patched_generated), generated(original_generated));
     }

@@ -252,7 +252,7 @@ fn entry_has_parallel_data(
     Ok(entry.second != 0
         || parse_wire_fields(raw)?.iter().any(|field| {
             !matches!(
-                field.number,
+                field.number(),
                 CHARACTER_INDEX_FIELD | ENTRY_START_NUMBER_FIELD | PARALLEL_VALUE_FIELD
             )
         }))

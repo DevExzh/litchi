@@ -167,7 +167,7 @@ mod tests {
                 parse_wire_fields(extension)
                     .unwrap()
                     .iter()
-                    .filter(|wire| wire.number == field)
+                    .filter(|wire| wire.number() == field)
                     .count(),
                 1
             );
@@ -193,10 +193,10 @@ mod tests {
         let unknown = parse_wire_fields(extension)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_FIELD)
+            .find(|field| field.number() == UNKNOWN_FIELD)
             .unwrap();
         assert_eq!(
-            &extension[unknown.key_end..unknown.end],
+            &extension[unknown.key_end()..unknown.end()],
             litchi_iwa_common::varint::encode_varint(73)
         );
     }

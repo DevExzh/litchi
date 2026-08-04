@@ -222,7 +222,7 @@ pub(crate) fn direct_shape_style_overrides(
 fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
     let mut actual = parse_wire_fields(data)?
         .into_iter()
-        .map(|field| field.number)
+        .map(|field| field.number())
         .collect::<Vec<_>>();
     let mut expected = expected.to_vec();
     actual.sort_unstable();

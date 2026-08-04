@@ -97,25 +97,25 @@ fn unknown_table_entry_and_bookmark_fields_survive_updates() {
         parse_wire_fields(table)
             .unwrap()
             .iter()
-            .any(|field| field.number == 99)
+            .any(|field| field.number() == 99)
     );
     let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD).unwrap();
     assert!(
         parse_wire_fields(entries[1])
             .unwrap()
             .iter()
-            .any(|field| field.number == 77)
+            .any(|field| field.number() == 77)
             || parse_wire_fields(entries[0])
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 77)
+                .any(|field| field.number() == 77)
     );
     let object = archive.object(bookmark.id.object_id()).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
             .iter()
-            .any(|field| field.number == 88)
+            .any(|field| field.number() == 88)
     );
 }
 

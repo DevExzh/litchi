@@ -347,7 +347,7 @@ pub(crate) fn generated_chart_series_style_extension(data: &[u8]) -> Result<Opti
     let fields = parse_wire_fields(data)?;
     let extensions = fields
         .iter()
-        .filter(|field| field.number == GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD)
+        .filter(|field| field.number() == GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD)
         .collect::<Vec<_>>();
     let [extension] = extensions.as_slice() else {
         if extensions.is_empty() {
@@ -357,10 +357,10 @@ pub(crate) fn generated_chart_series_style_extension(data: &[u8]) -> Result<Opti
             "chart series-style extension {GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD} occurs more than once"
         )));
     };
-    if extension.wire_type != 2 {
+    if extension.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart series-style extension {GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD} is not length-delimited"
         )));
     }
-    Ok(Some(&data[extension.payload_start..extension.end]))
+    Ok(Some(&data[extension.payload_start()..extension.end()]))
 }
