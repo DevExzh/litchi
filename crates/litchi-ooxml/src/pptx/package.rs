@@ -682,7 +682,7 @@ impl Package {
     ///
     /// Trace points are returned as inert stored data and are never replayed,
     /// rendered, interpolated, modified, or executed.
-    pub fn laser_traces(&self) -> Result<Vec<crate::pptx::PptxLaserTrace>> {
+    pub fn laser_traces(&self) -> Result<Vec<crate::pptx::Trace>> {
         self.presentation()?.laser_traces()
     }
 
@@ -698,7 +698,7 @@ impl Package {
     pub fn add_laser_trace(
         &mut self,
         slide_name: &PackURI,
-        points: &[crate::pptx::PptxLaserTracePoint],
+        points: &[crate::pptx::TracePoint],
     ) -> Result<()> {
         self.edit_canonical("add_laser_trace", STALE_SLIDE_GRAPH_REASON, |package| {
             crate::pptx::store_slide_laser_trace(package, slide_name, points)

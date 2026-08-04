@@ -75,13 +75,13 @@ impl Conformance {
 /// Coordinates are exact `a:ST_Coordinate` values relative to the slide's
 /// top-left corner.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxLaserTracePoint {
+pub struct TracePoint {
     time: Offset,
     x: Coordinate,
     y: Coordinate,
 }
 
-impl PptxLaserTracePoint {
+impl TracePoint {
     /// Return the exact normalized time offset relative to the slide timeline.
     #[inline]
     pub fn time(&self) -> &Offset {
@@ -103,13 +103,13 @@ impl PptxLaserTracePoint {
 
 /// A bounded, inert laser-pointer trace recorded for a presentation slide.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxLaserTrace {
+pub struct Trace {
     slide_index: usize,
     trace_index: usize,
-    points: Vec<PptxLaserTracePoint>,
+    points: Vec<TracePoint>,
 }
 
-impl PptxLaserTrace {
+impl Trace {
     /// Return the zero-based index of the slide that owns this trace.
     #[inline]
     pub fn slide_index(&self) -> usize {
@@ -124,7 +124,7 @@ impl PptxLaserTrace {
 
     /// Return the stored trace points in source order.
     #[inline]
-    pub fn points(&self) -> &[PptxLaserTracePoint] {
+    pub fn points(&self) -> &[TracePoint] {
         &self.points
     }
 
@@ -163,16 +163,12 @@ impl ElementKind {
 }
 
 /// Read bounded, inert laser-pointer traces from one PresentationML slide.
-pub fn read(slide_index: usize, xml_bytes: &[u8]) -> Result<Vec<PptxLaserTrace>> {
+pub fn read(slide_index: usize, xml_bytes: &[u8]) -> Result<Vec<Trace>> {
     read_with(slide_index, xml_bytes, &mut Limits::default())
 }
 
 /// Read one slide while accumulating resource use in limits.
-pub fn read_with(
-    slide_index: usize,
-    xml_bytes: &[u8],
-    limits: &mut Limits,
-) -> Result<Vec<PptxLaserTrace>> {
+pub fn read_with(slide_index: usize, xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Trace>> {
     limits.add_slide_xml(xml_bytes.len())?;
     scan_slide_laser_traces(slide_index, xml_bytes, limits)
 }
@@ -219,7 +215,7 @@ fn scan_slide_laser_traces(
     slide_index: usize,
     xml_bytes: &[u8],
     limits: &mut Limits,
-) -> Result<Vec<PptxLaserTrace>> {
+) -> Result<Vec<Trace>> {
     if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
         return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
     }
@@ -368,7 +364,7 @@ fn classify_element(
     depth: usize,
     root_seen: bool,
     empty: bool,
-    active_trace: &mut Option<Vec<PptxLaserTracePoint>>,
+    active_trace: &mut Option<Vec<TracePoint>>,
     limits: &mut Limits,
 ) -> Result<ElementKind> {
     if depth == 1 {
@@ -457,8 +453,8 @@ fn finish_element(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
     slide_index: usize,
-    traces: &mut Vec<PptxLaserTrace>,
-    active_trace: &mut Option<Vec<PptxLaserTracePoint>>,
+    traces: &mut Vec<Trace>,
+    active_trace: &mut Option<Vec<TracePoint>>,
 ) -> Result<()> {
     match kind {
         ElementKind::Root if !is_presentationml_name(namespace, name, b"sld") => Err(invalid(
@@ -483,13 +479,13 @@ fn finish_element(
 
 fn finish_trace(
     slide_index: usize,
-    traces: &mut Vec<PptxLaserTrace>,
-    active_trace: &mut Option<Vec<PptxLaserTracePoint>>,
+    traces: &mut Vec<Trace>,
+    active_trace: &mut Option<Vec<TracePoint>>,
 ) -> Result<()> {
     let points = active_trace
         .take()
         .ok_or_else(|| invalid("laser trace has no active point list"))?;
-    traces.push(PptxLaserTrace {
+    traces.push(Trace {
         slide_index,
         trace_index: traces.len(),
         points,
@@ -530,11 +526,11 @@ fn is_p14_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]
         )
 }
 
-fn parse_trace_point(element: &BytesStart<'_>, decoder: Decoder) -> Result<PptxLaserTracePoint> {
+fn parse_trace_point(element: &BytesStart<'_>, decoder: Decoder) -> Result<TracePoint> {
     let time = parse_time_offset(required_attribute(element, b"t", decoder)?)?;
     let x = parse_coordinate(required_attribute(element, b"x", decoder)?, "x")?;
     let y = parse_coordinate(required_attribute(element, b"y", decoder)?, "y")?;
-    Ok(PptxLaserTracePoint { time, x, y })
+    Ok(TracePoint { time, x, y })
 }
 
 fn required_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<String> {
@@ -586,7 +582,7 @@ fn limit(resource: &'static str, limit: usize) -> Error {
     Error::Limit { resource, limit }
 }
 
-impl PptxLaserTracePoint {
+impl TracePoint {
     /// Create a trace point from exact, checked time and coordinate values.
     pub fn new(time: Offset, x: Coordinate, y: Coordinate) -> Self {
         Self { time, x, y }
@@ -594,7 +590,7 @@ impl PptxLaserTracePoint {
 }
 
 /// Check the bounded authoring domain for a laser trace.
-pub fn validate(points: &[PptxLaserTracePoint]) -> Result<()> {
+pub fn validate(points: &[TracePoint]) -> Result<()> {
     if points.is_empty() {
         return Err(invalid("laser trace requires at least one point"));
     }
@@ -605,18 +601,14 @@ pub fn validate(points: &[PptxLaserTracePoint]) -> Result<()> {
 }
 
 /// Serialize one laser-pointer trace extension fragment.
-pub fn write(points: &[PptxLaserTracePoint], conformance: Conformance) -> Result<String> {
+pub fn write(points: &[TracePoint], conformance: Conformance) -> Result<String> {
     let mut xml = String::new();
     write_to(points, conformance, &mut xml)?;
     Ok(xml)
 }
 
 /// Append one laser-pointer trace extension fragment to an existing buffer.
-pub fn write_to(
-    points: &[PptxLaserTracePoint],
-    conformance: Conformance,
-    xml: &mut String,
-) -> Result<()> {
+pub fn write_to(points: &[TracePoint], conformance: Conformance, xml: &mut String) -> Result<()> {
     validate(points)?;
     let capacity = points
         .len()
@@ -696,7 +688,7 @@ mod tests {
 
     #[test]
     fn writer_preserves_the_selected_presentation_dialect() {
-        let point = PptxLaserTracePoint::new(
+        let point = TracePoint::new(
             Offset::ZERO,
             Coordinate::emu(914_400).unwrap(),
             Coordinate::emu(457_200).unwrap(),

@@ -6,7 +6,7 @@ use litchi_opc::part::Part;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::laser::{self, Conformance};
 
-pub use litchi_pptx::laser::{LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint};
+pub use litchi_pptx::laser::{LASER_TRACE_EXTENSION_URI, Trace, TracePoint};
 
 pub(crate) type LaserLoadLimits = litchi_pptx::laser::Limits;
 
@@ -15,7 +15,7 @@ pub(crate) fn load_slide_laser_traces(
     slide_index: usize,
     slide: &dyn Part,
     limits: &mut LaserLoadLimits,
-) -> Result<Vec<PptxLaserTrace>> {
+) -> Result<Vec<Trace>> {
     if slide.content_type() != ct::PML_SLIDE {
         return Err(invalid(
             "laser-trace discovery requires a PresentationML slide part",
@@ -29,7 +29,7 @@ pub(crate) fn load_slide_laser_traces(
 pub fn store_slide_laser_trace(
     package: &mut OpcPackage,
     slide_name: &PackURI,
-    points: &[PptxLaserTracePoint],
+    points: &[TracePoint],
 ) -> Result<()> {
     laser::validate(points)?;
     let slide = package.get_part(slide_name)?;
@@ -86,14 +86,14 @@ mod tests {
         (package, name)
     }
 
-    fn sample_points() -> Vec<PptxLaserTracePoint> {
+    fn sample_points() -> Vec<TracePoint> {
         vec![
-            PptxLaserTracePoint::new(
+            TracePoint::new(
                 Offset::ZERO,
                 Coordinate::emu(914_400).unwrap(),
                 Coordinate::emu(457_200).unwrap(),
             ),
-            PptxLaserTracePoint::new(
+            TracePoint::new(
                 Offset::ms(2500),
                 Coordinate::parse("1.25cm").unwrap(),
                 Coordinate::from(34),

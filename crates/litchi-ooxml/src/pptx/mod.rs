@@ -142,7 +142,7 @@ pub(crate) mod slide_patch;
 pub use laser::store_slide_laser_trace;
 pub use litchi_opc::FontEmbedding;
 pub use litchi_pptx::font;
-pub use litchi_pptx::laser::{LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint};
+pub use litchi_pptx::laser::{LASER_TRACE_EXTENSION_URI, Trace, TracePoint};
 pub use litchi_pptx::tag;
 pub use litchi_pptx::time;
 pub use master_layout::{

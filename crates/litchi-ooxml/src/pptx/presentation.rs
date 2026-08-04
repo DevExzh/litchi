@@ -3,7 +3,7 @@ use crate::pptx::actions::{ActionLoadLimits, Setting, load_slide_action_settings
 use crate::pptx::controls::{ControlLoadLimits, PptxSlideControl, load_slide_controls};
 use crate::pptx::handout::HandoutMaster;
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
-use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
+use crate::pptx::laser::{LaserLoadLimits, Trace, load_slide_laser_traces};
 use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::package::STALE_NOTES_REASON;
@@ -986,7 +986,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Trace points are retained as bounded inert data. They are never
     /// replayed, rendered, interpolated, modified, or executed.
-    pub fn laser_traces(&self) -> Result<Vec<PptxLaserTrace>> {
+    pub fn laser_traces(&self) -> Result<Vec<Trace>> {
         let mut traces = Vec::new();
         let mut limits = LaserLoadLimits::default();
 
