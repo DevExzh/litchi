@@ -196,12 +196,10 @@ pub use sheet_properties::{
     parse_sheet_properties,
 };
 pub use sheet_protection::{
-    ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeReference,
-    ProtectionRangeReferenceKind, ProtectionRangeSqref, StrongProtectionPasswordVerifier,
-    WorksheetProtectedRange, WorksheetProtectedRangeCollection, WorksheetProtection,
-    WorksheetProtectionConformance, WorksheetProtectionMetadata, parse_worksheet_protection,
-    replace_worksheet_protection, validate_worksheet_protection_metadata,
-    write_worksheet_protection,
+    Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
+    ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
+    ProtectionRangeSqref, StrongProtectionPasswordVerifier, parse_protection, replace_protection,
+    validate_metadata, write_protection,
 };
 pub use sheet_view::parse_worksheet_views;
 pub use slicer_cache::{
@@ -283,7 +281,7 @@ pub use writer::{
     DrawingObjectSpec, FreezePanes, GroupSpec, HeaderFooter, Hyperlink as WriterHyperlink, Image,
     MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
     PageBreak as WriterPageBreak, PageSetupProperties as WriterPageSetupProperties, RichTextRun,
-    ShapeSpec, SheetProtection, StylesBuilder, WorkbookProtection,
+    ShapeSpec, StylesBuilder, WorkbookProtection,
 };
 // Re-export host package CRUD; semantic values remain under the canonical
 // `xlsx::threaded_comments` owner facade.

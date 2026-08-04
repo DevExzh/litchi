@@ -1,8 +1,7 @@
 use litchi_ooxml::xlsx::{
-    ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeSqref,
-    StrongProtectionPasswordVerifier, Workbook, WorksheetProtectedRange,
-    WorksheetProtectedRangeCollection, WorksheetProtection, WorksheetProtectionMetadata,
-    parse_worksheet_protection,
+    Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
+    ProtectionPasswordVerifier, ProtectionRangeSqref, StrongProtectionPasswordVerifier, Workbook,
+    parse_protection,
 };
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
@@ -25,8 +24,8 @@ fn seed_package(path: &std::path::Path, worksheet_xml: &str) {
     package.save(path).unwrap();
 }
 
-fn typed_metadata() -> WorksheetProtectionMetadata {
-    let mut protection = WorksheetProtection::new();
+fn typed_metadata() -> Metadata {
+    let mut protection = Protection::new();
     protection.set_sheet_locked(true);
     protection.set_objects_locked(true);
     protection
@@ -36,7 +35,7 @@ fn typed_metadata() -> WorksheetProtectionMetadata {
         )))
         .unwrap();
 
-    let mut core = WorksheetProtectedRange::new(
+    let mut core = ProtectedRange::new(
         ProtectedRangeSource::Core,
         "Editable",
         ProtectionRangeSqref::parse("A1:B2 C:C").unwrap(),
@@ -44,19 +43,18 @@ fn typed_metadata() -> WorksheetProtectionMetadata {
     .unwrap();
     core.set_verifier(Some(ProtectionPasswordVerifier::Legacy(0x00AF)))
         .unwrap();
-    let x14 = WorksheetProtectedRange::new(
+    let x14 = ProtectedRange::new(
         ProtectedRangeSource::Office2010,
         "Modern",
         ProtectionRangeSqref::parse("$D$4:$E$8").unwrap(),
     )
     .unwrap();
-    let mut metadata = WorksheetProtectionMetadata::new();
+    let mut metadata = Metadata::new();
     metadata.set_sheet_protection(Some(protection)).unwrap();
     metadata
         .set_protected_range_collections(vec![
-            WorksheetProtectedRangeCollection::new(ProtectedRangeSource::Core, vec![core]).unwrap(),
-            WorksheetProtectedRangeCollection::new(ProtectedRangeSource::Office2010, vec![x14])
-                .unwrap(),
+            ProtectedRangeCollection::new(ProtectedRangeSource::Core, vec![core]).unwrap(),
+            ProtectedRangeCollection::new(ProtectedRangeSource::Office2010, vec![x14]).unwrap(),
         ])
         .unwrap();
     metadata
@@ -95,7 +93,7 @@ fn mutates_existing_package_without_rebuilding_unrelated_xml_or_relationships() 
         first_part.rels().get("rId9").unwrap().target_ref(),
         "https://example.test/preserved"
     );
-    let parsed = parse_worksheet_protection(first_part.blob()).unwrap();
+    let parsed = parse_protection(first_part.blob()).unwrap();
     assert!(parsed.sheet_protection().unwrap().sheet_locked());
     assert_eq!(parsed.protected_ranges().count(), 2);
 }
@@ -151,18 +149,15 @@ fn rejects_spoofed_namespaces_and_invalid_replacements_atomically() {
         xml.as_bytes()
     );
 
-    let range = WorksheetProtectedRange::new(
+    let range = ProtectedRange::new(
         ProtectedRangeSource::Core,
         "Same",
         ProtectionRangeSqref::parse("A1").unwrap(),
     )
     .unwrap();
     assert!(
-        WorksheetProtectedRangeCollection::new(
-            ProtectedRangeSource::Core,
-            vec![range.clone(), range],
-        )
-        .is_err()
+        ProtectedRangeCollection::new(ProtectedRangeSource::Core, vec![range.clone(), range],)
+            .is_err()
     );
 }
 
@@ -183,7 +178,7 @@ fn failed_package_save_restores_the_original_blob_and_can_be_retried() {
     workbook.save(&output).unwrap();
     let package = OpcPackage::open(&output).unwrap();
     assert!(
-        parse_worksheet_protection(
+        parse_protection(
             package
                 .get_part(&PackURI::new(SHEET).unwrap())
                 .unwrap()

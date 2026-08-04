@@ -6,9 +6,8 @@ use crate::xlsx::data_validation::{
 };
 use crate::xlsx::page_setup::{Fit, Setup};
 use crate::xlsx::sheet_protection::{
-    ProtectionPasswordVerifier, Protection, Conformance as ProtectionConformance,
-    Metadata, write_core,
-    write_extensions,
+    Conformance as ProtectionConformance, Metadata, Protection, ProtectionPasswordVerifier,
+    write_core, write_extensions,
 };
 use crate::xlsx::sort::{SortCondition, SortState};
 use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
@@ -2396,10 +2395,7 @@ impl MutableWorksheet {
         self.modified = true;
     }
 
-    pub fn set_protection_metadata(
-        &mut self,
-        metadata: Metadata,
-    ) -> SheetResult<()> {
+    pub fn set_protection_metadata(&mut self, metadata: Metadata) -> SheetResult<()> {
         crate::xlsx::sheet_protection::validate_metadata(&metadata)?;
         self.protection = metadata;
         self.modified = true;

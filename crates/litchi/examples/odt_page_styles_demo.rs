@@ -3,9 +3,9 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::Metadata;
 #[cfg(feature = "odf")]
-use litchi::odf::odt::elements::text::Paragraph;
-#[cfg(feature = "odf")]
 use litchi::odf::odt::Builder;
+#[cfg(feature = "odf")]
+use litchi::odf::odt::elements::text::Paragraph;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {

@@ -29,8 +29,7 @@ use crate::xlsx::named_sheet_view::{
     store_worksheet_named_sheet_views,
 };
 use crate::xlsx::sheet_protection::{
-    ProtectedRangeCollection, Protection, Metadata,
-    parse_protection, replace_protection,
+    Metadata, ProtectedRangeCollection, Protection, parse_protection, replace_protection,
     validate_metadata,
 };
 use crate::xlsx::styles::Rgb;
@@ -1865,10 +1864,7 @@ impl Workbook {
     }
 
     /// Return typed protection metadata, including any queued mutation.
-    pub fn worksheet_protection_metadata(
-        &self,
-        index: usize,
-    ) -> SheetResult<Metadata> {
+    pub fn worksheet_protection_metadata(&self, index: usize) -> SheetResult<Metadata> {
         if let Some(value) = self.worksheet_protection_mutations.get(&index) {
             return Ok(value.clone());
         }

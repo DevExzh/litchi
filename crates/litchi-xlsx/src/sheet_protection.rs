@@ -36,12 +36,12 @@ const MAX_COLUMN: u32 = 16_384;
 
 /// SpreadsheetML namespace form used by the deterministic writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetProtectionConformance {
+pub enum Conformance {
     Transitional,
     Strict,
 }
 
-impl WorksheetProtectionConformance {
+impl Conformance {
     fn namespace(self) -> &'static str {
         match self {
             Self::Transitional => CORE_NAMESPACE,
@@ -110,7 +110,7 @@ impl StrongProtectionPasswordVerifier {
 
 /// Effective operation locks from a worksheet `sheetProtection` element.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetProtection {
+pub struct Protection {
     verifier: Option<ProtectionPasswordVerifier>,
     sheet: bool,
     objects: bool,
@@ -130,7 +130,7 @@ pub struct WorksheetProtection {
     select_unlocked_cells: bool,
 }
 
-impl WorksheetProtection {
+impl Protection {
     pub fn new() -> Self {
         Self::default()
     }
@@ -245,7 +245,7 @@ impl WorksheetProtection {
     }
 }
 
-impl Default for WorksheetProtection {
+impl Default for Protection {
     fn default() -> Self {
         Self {
             verifier: None,
@@ -326,7 +326,7 @@ impl ProtectionRangeSqref {
 
 /// A single editable range associated with worksheet protection.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetProtectedRange {
+pub struct ProtectedRange {
     source: ProtectedRangeSource,
     name: String,
     sqref: ProtectionRangeSqref,
@@ -334,7 +334,7 @@ pub struct WorksheetProtectedRange {
     security_descriptor: Option<String>,
 }
 
-impl WorksheetProtectedRange {
+impl ProtectedRange {
     pub fn new(
         source: ProtectedRangeSource,
         name: impl Into<String>,
@@ -387,13 +387,13 @@ impl WorksheetProtectedRange {
 
 /// A protected-range container in worksheet document order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetProtectedRangeCollection {
+pub struct ProtectedRangeCollection {
     source: ProtectedRangeSource,
-    ranges: Vec<WorksheetProtectedRange>,
+    ranges: Vec<ProtectedRange>,
 }
 
-impl WorksheetProtectedRangeCollection {
-    pub fn new(source: ProtectedRangeSource, ranges: Vec<WorksheetProtectedRange>) -> Result<Self> {
+impl ProtectedRangeCollection {
+    pub fn new(source: ProtectedRangeSource, ranges: Vec<ProtectedRange>) -> Result<Self> {
         let value = Self { source, ranges };
         validate_collection(&value)?;
         Ok(value)
@@ -402,36 +402,36 @@ impl WorksheetProtectedRangeCollection {
     pub fn source(&self) -> ProtectedRangeSource {
         self.source
     }
-    pub fn ranges(&self) -> &[WorksheetProtectedRange] {
+    pub fn ranges(&self) -> &[ProtectedRange] {
         &self.ranges
     }
 }
 
 /// Complete worksheet protection metadata.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorksheetProtectionMetadata {
-    sheet_protection: Option<WorksheetProtection>,
-    protected_range_collections: Vec<WorksheetProtectedRangeCollection>,
+pub struct Metadata {
+    sheet_protection: Option<Protection>,
+    protected_range_collections: Vec<ProtectedRangeCollection>,
 }
 
-impl WorksheetProtectionMetadata {
+impl Metadata {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn sheet_protection(&self) -> Option<&WorksheetProtection> {
+    pub fn sheet_protection(&self) -> Option<&Protection> {
         self.sheet_protection.as_ref()
     }
-    pub fn protected_range_collections(&self) -> &[WorksheetProtectedRangeCollection] {
+    pub fn protected_range_collections(&self) -> &[ProtectedRangeCollection] {
         &self.protected_range_collections
     }
-    pub fn protected_ranges(&self) -> impl Iterator<Item = &WorksheetProtectedRange> {
+    pub fn protected_ranges(&self) -> impl Iterator<Item = &ProtectedRange> {
         self.protected_range_collections
             .iter()
             .flat_map(|collection| collection.ranges.iter())
     }
 
-    pub fn set_sheet_protection(&mut self, value: Option<WorksheetProtection>) -> Result<()> {
+    pub fn set_sheet_protection(&mut self, value: Option<Protection>) -> Result<()> {
         if let Some(value) = value.as_ref() {
             validate_sheet_protection(value)?;
         }
@@ -441,13 +441,13 @@ impl WorksheetProtectionMetadata {
 
     pub fn set_protected_range_collections(
         &mut self,
-        value: Vec<WorksheetProtectedRangeCollection>,
+        value: Vec<ProtectedRangeCollection>,
     ) -> Result<()> {
         let candidate = Self {
             sheet_protection: self.sheet_protection.clone(),
             protected_range_collections: value,
         };
-        validate_worksheet_protection_metadata(&candidate)?;
+        validate_metadata(&candidate)?;
         self.protected_range_collections = candidate.protected_range_collections;
         Ok(())
     }
@@ -479,7 +479,7 @@ struct PendingRange {
 }
 
 /// Parse protection metadata from a complete worksheet XML part.
-pub fn parse_worksheet_protection(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
+pub fn parse_protection(xml: &[u8]) -> Result<Metadata> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
@@ -495,16 +495,16 @@ pub fn parse_worksheet_protection(xml: &[u8]) -> Result<WorksheetProtectionMetad
     parse_selected(validated.xml.as_ref())
 }
 
-fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
+fn parse_selected(xml: &[u8]) -> Result<Metadata> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
-    let mut metadata = WorksheetProtectionMetadata::default();
+    let mut metadata = Metadata::default();
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
     let mut extension_depth = None;
-    let mut core_collection: Option<(usize, Vec<WorksheetProtectedRange>)> = None;
-    let mut x14_collection: Option<(usize, Vec<WorksheetProtectedRange>)> = None;
+    let mut core_collection: Option<(usize, Vec<ProtectedRange>)> = None;
+    let mut x14_collection: Option<(usize, Vec<ProtectedRange>)> = None;
     let mut pending: Option<(usize, PendingRange)> = None;
     let mut sqref_text: Option<(usize, String)> = None;
     let mut sheet_protection_depth = None;
@@ -714,7 +714,7 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                     }
                     metadata
                         .protected_range_collections
-                        .push(WorksheetProtectedRangeCollection {
+                        .push(ProtectedRangeCollection {
                             source: ProtectedRangeSource::Core,
                             ranges,
                         });
@@ -730,7 +730,7 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                     }
                     metadata
                         .protected_range_collections
-                        .push(WorksheetProtectedRangeCollection {
+                        .push(ProtectedRangeCollection {
                             source: ProtectedRangeSource::Office2010,
                             ranges,
                         });
@@ -784,8 +784,8 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
 fn collection_source(
     element_depth: usize,
     namespace: &ResolveResult<'_>,
-    core: &Option<(usize, Vec<WorksheetProtectedRange>)>,
-    x14: &Option<(usize, Vec<WorksheetProtectedRange>)>,
+    core: &Option<(usize, Vec<ProtectedRange>)>,
+    x14: &Option<(usize, Vec<ProtectedRange>)>,
 ) -> Result<ProtectedRangeSource> {
     if core
         .as_ref()
@@ -805,9 +805,9 @@ fn collection_source(
 }
 
 fn push_range(
-    range: WorksheetProtectedRange,
-    core: &mut Option<(usize, Vec<WorksheetProtectedRange>)>,
-    x14: &mut Option<(usize, Vec<WorksheetProtectedRange>)>,
+    range: ProtectedRange,
+    core: &mut Option<(usize, Vec<ProtectedRange>)>,
+    x14: &mut Option<(usize, Vec<ProtectedRange>)>,
 ) -> Result<()> {
     let ranges = match range.source {
         ProtectedRangeSource::Core => {
@@ -834,8 +834,8 @@ fn parse_sheet_protection(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<WorksheetProtection> {
-    let mut value = WorksheetProtection::default();
+) -> Result<Protection> {
+    let mut value = Protection::default();
     let mut credential = RawCredential::default();
     let mut seen = HashSet::new();
     for attr in element.attributes() {
@@ -950,11 +950,11 @@ fn parse_pending_range(
     })
 }
 
-fn finish_range(range: PendingRange) -> Result<WorksheetProtectedRange> {
+fn finish_range(range: PendingRange) -> Result<ProtectedRange> {
     let sqref = range
         .sqref
         .ok_or_else(|| invalid("protectedRange is missing sqref"))?;
-    Ok(WorksheetProtectedRange {
+    Ok(ProtectedRange {
         source: range.source,
         name: range.name,
         sqref: parse_sqref(&sqref)?,
@@ -1145,24 +1145,15 @@ fn parse_row(value: &str) -> Result<u32> {
 /// Writes canonical worksheet protection fragments in worksheet schema order.
 ///
 /// Verifiers are serialized as inert metadata; this function never computes or checks a password.
-pub fn write_worksheet_protection(
-    metadata: &WorksheetProtectionMetadata,
-    conformance: WorksheetProtectionConformance,
-) -> Result<String> {
-    validate_worksheet_protection_metadata(metadata)?;
-    let mut xml = write_worksheet_protection_core(metadata, conformance)?;
-    xml.push_str(&write_worksheet_protection_extensions(
-        metadata,
-        conformance,
-    )?);
+pub fn write_protection(metadata: &Metadata, conformance: Conformance) -> Result<String> {
+    validate_metadata(metadata)?;
+    let mut xml = write_core(metadata, conformance)?;
+    xml.push_str(&write_extensions(metadata, conformance)?);
     Ok(xml)
 }
 
-pub fn write_worksheet_protection_core(
-    metadata: &WorksheetProtectionMetadata,
-    conformance: WorksheetProtectionConformance,
-) -> Result<String> {
-    validate_worksheet_protection_metadata(metadata)?;
+pub fn write_core(metadata: &Metadata, conformance: Conformance) -> Result<String> {
+    validate_metadata(metadata)?;
     let mut xml = String::new();
     if let Some(protection) = &metadata.sheet_protection {
         write!(
@@ -1226,11 +1217,8 @@ pub fn write_worksheet_protection_core(
     Ok(xml)
 }
 
-pub fn write_worksheet_protection_extensions(
-    metadata: &WorksheetProtectionMetadata,
-    conformance: WorksheetProtectionConformance,
-) -> Result<String> {
-    validate_worksheet_protection_metadata(metadata)?;
+pub fn write_extensions(metadata: &Metadata, conformance: Conformance) -> Result<String> {
+    validate_metadata(metadata)?;
     let mut xml = String::new();
     let office2010 = metadata
         .protected_range_collections
@@ -1256,9 +1244,7 @@ pub fn write_worksheet_protection_extensions(
     Ok(xml)
 }
 
-pub fn validate_worksheet_protection_metadata(
-    metadata: &WorksheetProtectionMetadata,
-) -> Result<()> {
+pub fn validate_metadata(metadata: &Metadata) -> Result<()> {
     if let Some(protection) = metadata.sheet_protection.as_ref() {
         validate_sheet_protection(protection)?;
     }
@@ -1281,7 +1267,7 @@ pub fn validate_worksheet_protection_metadata(
     Ok(())
 }
 
-fn validate_sheet_protection(value: &WorksheetProtection) -> Result<()> {
+fn validate_sheet_protection(value: &Protection) -> Result<()> {
     if let Some(ProtectionPasswordVerifier::Strong(value)) = value.verifier.as_ref() {
         validate_strong_verifier(value)?;
     }
@@ -1303,7 +1289,7 @@ fn validate_strong_verifier(value: &StrongProtectionPasswordVerifier) -> Result<
     Ok(())
 }
 
-fn validate_collection(value: &WorksheetProtectedRangeCollection) -> Result<()> {
+fn validate_collection(value: &ProtectedRangeCollection) -> Result<()> {
     if value.ranges.is_empty() || value.ranges.len() > MAX_RANGES {
         return Err(invalid("protectedRanges has an invalid range count"));
     }
@@ -1325,7 +1311,7 @@ fn validate_collection(value: &WorksheetProtectedRangeCollection) -> Result<()> 
     Ok(())
 }
 
-fn validate_range(value: &WorksheetProtectedRange) -> Result<()> {
+fn validate_range(value: &ProtectedRange) -> Result<()> {
     bounded_nonempty(&value.name, "protectedRange name")?;
     validate_xml_text(&value.name, "protectedRange name")?;
     parse_sqref(&value.sqref.raw)?;
@@ -1351,7 +1337,7 @@ fn validate_xml_text(value: &str, field: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_core_range(xml: &mut String, range: &WorksheetProtectedRange) -> Result<()> {
+fn write_core_range(xml: &mut String, range: &ProtectedRange) -> Result<()> {
     if range.source != ProtectedRangeSource::Core {
         return Err(invalid("non-core range in core collection"));
     }
@@ -1398,7 +1384,7 @@ fn write_nondefault_bool(xml: &mut String, name: &str, value: bool, default: boo
 
 #[derive(Debug)]
 struct ProtectionXmlScan {
-    conformance: WorksheetProtectionConformance,
+    conformance: Conformance,
     sheet_data_end: usize,
     worksheet_close: usize,
     direct_ranges: Vec<Range<usize>>,
@@ -1408,12 +1394,9 @@ struct ProtectionXmlScan {
 }
 
 /// Replace worksheet protection XML without rebuilding any unrelated worksheet content.
-pub fn replace_worksheet_protection(
-    worksheet_xml: &[u8],
-    metadata: &WorksheetProtectionMetadata,
-) -> Result<Vec<u8>> {
-    let parsed = parse_worksheet_protection(worksheet_xml)?;
-    validate_worksheet_protection_metadata(metadata)?;
+pub fn replace_protection(worksheet_xml: &[u8], metadata: &Metadata) -> Result<Vec<u8>> {
+    let parsed = parse_protection(worksheet_xml)?;
+    validate_metadata(metadata)?;
     let scan = scan_protection_xml(worksheet_xml)?;
     let parsed_x14 = parsed
         .protected_range_collections
@@ -1432,8 +1415,8 @@ pub fn replace_worksheet_protection(
         ));
     }
 
-    let direct = write_worksheet_protection_core(metadata, scan.conformance)?;
-    let extensions = write_worksheet_protection_extensions(metadata, scan.conformance)?;
+    let direct = write_core(metadata, scan.conformance)?;
+    let extensions = write_extensions(metadata, scan.conformance)?;
     let mut edits: Vec<(Range<usize>, Vec<u8>)> = scan
         .direct_ranges
         .iter()
@@ -1479,7 +1462,7 @@ fn extension_inner(fragment: &str) -> Result<String> {
     Ok(fragment[start..end].to_string())
 }
 
-fn extension_wrapper(inner: &str, conformance: WorksheetProtectionConformance) -> String {
+fn extension_wrapper(inner: &str, conformance: Conformance) -> String {
     format!(
         "<ext xmlns=\"{}\" uri=\"{}\">{inner}</ext>",
         conformance.namespace(),
@@ -1500,7 +1483,7 @@ fn apply_xml_edits(xml: &[u8], mut edits: Vec<(Range<usize>, Vec<u8>)>) -> Resul
         cursor = range.end;
     }
     output.extend_from_slice(&xml[cursor..]);
-    parse_worksheet_protection(&output)?;
+    parse_protection(&output)?;
     Ok(output)
 }
 
@@ -1536,10 +1519,10 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
                 if depth == 1 && local.as_ref() == b"worksheet" {
                     conformance = match namespace {
                         ResolveResult::Bound(value) if value.as_ref() == CORE => {
-                            Some(WorksheetProtectionConformance::Transitional)
+                            Some(Conformance::Transitional)
                         },
                         ResolveResult::Bound(value) if value.as_ref() == STRICT => {
-                            Some(WorksheetProtectionConformance::Strict)
+                            Some(Conformance::Strict)
                         },
                         _ => None,
                     };
@@ -1699,8 +1682,8 @@ fn attribute(
 
 fn direct_collection_child(
     element_depth: usize,
-    core: &Option<(usize, Vec<WorksheetProtectedRange>)>,
-    x14: &Option<(usize, Vec<WorksheetProtectedRange>)>,
+    core: &Option<(usize, Vec<ProtectedRange>)>,
+    x14: &Option<(usize, Vec<ProtectedRange>)>,
 ) -> bool {
     core.as_ref()
         .is_some_and(|(depth, _)| element_depth == *depth + 1)
@@ -1847,8 +1830,8 @@ mod tests {
     const START: &str =
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
 
-    fn parse(body: &str) -> Result<WorksheetProtectionMetadata> {
-        parse_worksheet_protection(format!("{START}{body}</worksheet>").as_bytes())
+    fn parse(body: &str) -> Result<Metadata> {
+        parse_protection(format!("{START}{body}</worksheet>").as_bytes())
     }
 
     #[test]
@@ -1898,7 +1881,7 @@ mod tests {
     #[test]
     fn parses_x14_extension_range() {
         let xml = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main" mc:Ignorable="x14 xm"><extLst><ext uri="{FC87AEE6-9EDD-4A0A-B7FB-166176984837}"><x14:protectedRanges><x14:protectedRange name="Range1" password="1234"><xm:sqref>$B$2:$C$4</xm:sqref></x14:protectedRange></x14:protectedRanges></ext></extLst></worksheet>"#;
-        let metadata = parse_worksheet_protection(xml).unwrap();
+        let metadata = parse_protection(xml).unwrap();
         let collection = &metadata.protected_range_collections()[0];
         assert_eq!(collection.source(), ProtectedRangeSource::Office2010);
         assert_eq!(
@@ -1933,9 +1916,8 @@ mod tests {
             std::str::from_utf8(XM).unwrap(),
             PROTECTED_RANGES_EXTENSION_URI
         );
-        let metadata = parse_worksheet_protection(source.as_bytes()).unwrap();
-        let fragment =
-            write_worksheet_protection(&metadata, WorksheetProtectionConformance::Strict).unwrap();
+        let metadata = parse_protection(source.as_bytes()).unwrap();
+        let fragment = write_protection(&metadata, Conformance::Strict).unwrap();
         assert!(fragment.contains("password=\"00AF\""));
         assert!(fragment.contains("sqref=\"A1 C:C\""));
         assert!(fragment.contains("<x14:protectedRanges"));
@@ -1943,9 +1925,9 @@ mod tests {
             r#"<worksheet xmlns="{}">{fragment}</worksheet>"#,
             std::str::from_utf8(STRICT).unwrap()
         );
-        let reparsed = parse_worksheet_protection(wrapped.as_bytes()).unwrap();
+        let reparsed = parse_protection(wrapped.as_bytes()).unwrap();
         assert_eq!(
-            write_worksheet_protection(&reparsed, WorksheetProtectionConformance::Strict).unwrap(),
+            write_protection(&reparsed, Conformance::Strict).unwrap(),
             fragment
         );
     }
@@ -1969,11 +1951,11 @@ mod tests {
             r#"<worksheet xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test" mc:Ignorable="x"><sheetProtection x:future="1"/></worksheet>"#,
             std::str::from_utf8(CORE).unwrap()
         );
-        assert!(parse_worksheet_protection(ignored.as_bytes()).is_ok());
+        assert!(parse_protection(ignored.as_bytes()).is_ok());
         let preserved = format!(
             r#"<worksheet xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test" mc:Ignorable="x" mc:PreserveAttributes="x:*"><sheetProtection x:future="1"/></worksheet>"#,
             std::str::from_utf8(CORE).unwrap()
         );
-        assert!(parse_worksheet_protection(preserved.as_bytes()).is_err());
+        assert!(parse_protection(preserved.as_bytes()).is_err());
     }
 }

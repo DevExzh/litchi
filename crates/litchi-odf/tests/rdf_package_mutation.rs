@@ -1,5 +1,8 @@
-use litchi_odf_common::{constants, rdf::{Object, Subject, Triple}};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+use litchi_odf_common::{
+    constants,
+    rdf::{Object, Subject, Triple},
+};
 use litchi_odp::Presentation;
 use litchi_ods::Spreadsheet;
 use litchi_odt::Document;

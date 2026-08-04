@@ -1,6 +1,6 @@
 use litchi_ooxml::xlsx::{
-    Collection, Formula, ListSource, Source, Sqref, Validation, ValidationOperator, ValidationType,
-    Workbook, WorksheetProtection, parse_data_validation_collections,
+    Collection, Formula, ListSource, Protection, Source, Sqref, Validation, ValidationOperator,
+    ValidationType, Workbook, parse_data_validation_collections,
 };
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
@@ -75,7 +75,7 @@ fn mutates_packaged_core_and_x14_without_rebuilding_unrelated_content() {
     workbook
         .replace_worksheet_data_validations(0, typed_collections())
         .unwrap();
-    let mut protection = WorksheetProtection::new();
+    let mut protection = Protection::new();
     protection.set_sheet_locked(true);
     workbook.set_sheet_protection(0, protection).unwrap();
     workbook.save(&output).unwrap();

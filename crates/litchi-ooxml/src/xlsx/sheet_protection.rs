@@ -10,8 +10,8 @@ mod tests {
     const START: &str =
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
 
-    fn parse(body: &str) -> litchi_xlsx::Result<WorksheetProtectionMetadata> {
-        parse_worksheet_protection(format!("{START}{body}</worksheet>").as_bytes())
+    fn parse(body: &str) -> litchi_xlsx::Result<Metadata> {
+        parse_protection(format!("{START}{body}</worksheet>").as_bytes())
     }
 
     #[test]
@@ -64,9 +64,7 @@ mod tests {
         inspect(&root.join("test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx"), "rId2", 1, false);
 
         let metadata = parse(r#"<sheetData/><sheetProtection password="CC3D" sheet="1"/><protectedRanges><protectedRange name="Editable" sqref="A1:B2"/></protectedRanges>"#).unwrap();
-        let fragment =
-            write_worksheet_protection(&metadata, WorksheetProtectionConformance::Transitional)
-                .unwrap();
+        let fragment = write_protection(&metadata, Conformance::Transitional).unwrap();
         let sheet = format!(
             r#"<?xml version="1.0"?><worksheet xmlns="{}"><sheetData/>{fragment}</worksheet>"#,
             std::str::from_utf8(CORE).unwrap()

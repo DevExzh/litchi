@@ -80,7 +80,7 @@ pkg.save("output.pptx")?;
 #[cfg(feature = "odf")]
 {
     use litchi::odf;
-    let odt = odf::Document::open("document.odt")?;
+    let odt = odf::odt::Document::open("document.odt")?;
     let text = odt.text()?;
 }
 

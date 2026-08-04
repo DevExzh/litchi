@@ -19,12 +19,12 @@ const MAX_DEPTH: usize = 256;
 
 /// Namespace form used when serializing a `sheetCalcPr` fragment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetSheetCalculationPropertiesConformance {
+pub enum Conformance {
     Transitional,
     Strict,
 }
 
-impl WorksheetSheetCalculationPropertiesConformance {
+impl Conformance {
     fn main_namespace(self) -> &'static str {
         match self {
             Self::Transitional => TRANSITIONAL_MAIN,
@@ -35,11 +35,11 @@ impl WorksheetSheetCalculationPropertiesConformance {
 
 /// Immutable worksheet `sheetCalcPr` settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct WorksheetSheetCalculationProperties {
+pub struct Properties {
     full_calc_on_load: bool,
 }
 
-impl WorksheetSheetCalculationProperties {
+impl Properties {
     pub fn new(full_calc_on_load: bool) -> Self {
         Self { full_calc_on_load }
     }
@@ -65,9 +65,7 @@ enum NamespaceKind {
 }
 
 /// Parses the direct worksheet `sheetCalcPr` child after applying shared MCE processing.
-pub fn parse_worksheet_sheet_calculation_properties(
-    xml: &[u8],
-) -> Result<Option<WorksheetSheetCalculationProperties>> {
+pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
     let source = std::str::from_utf8(xml)
         .map_err(|error| invalid(format!("worksheet XML is not UTF-8: {error}")))?;
     let processed = process_str(source)?;
@@ -76,7 +74,7 @@ pub fn parse_worksheet_sheet_calculation_properties(
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut scopes = Vec::new();
-    let mut properties: Option<WorksheetSheetCalculationProperties> = None;
+    let mut properties: Option<Properties> = None;
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
@@ -225,7 +223,7 @@ fn begin_element(
     element: &BytesStart<'_>,
     namespace: NamespaceKind,
     parent: Option<Scope>,
-    properties: &mut Option<WorksheetSheetCalculationProperties>,
+    properties: &mut Option<Properties>,
 ) -> Result<Scope> {
     let local = element.local_name();
     let local = local.as_ref();
@@ -260,7 +258,7 @@ fn begin_element(
 fn parse_sheet_calc_pr_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<WorksheetSheetCalculationProperties> {
+) -> Result<Properties> {
     let mut full_calc_on_load = None;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute
@@ -286,16 +284,13 @@ fn parse_sheet_calc_pr_attributes(
             _ => return Err(invalid("sheetCalcPr fullCalcOnLoad must be an XML boolean")),
         });
     }
-    Ok(WorksheetSheetCalculationProperties {
+    Ok(Properties {
         full_calc_on_load: full_calc_on_load.unwrap_or(false),
     })
 }
 
 /// Serializes one canonical, namespace-complete `sheetCalcPr` fragment.
-pub fn write_worksheet_sheet_calculation_properties(
-    value: &WorksheetSheetCalculationProperties,
-    conformance: WorksheetSheetCalculationPropertiesConformance,
-) -> String {
+pub fn write(value: &Properties, conformance: Conformance) -> String {
     let mut xml = String::with_capacity(64 + conformance.main_namespace().len());
     xml.push_str("<sheetCalcPr xmlns=\"");
     xml.push_str(conformance.main_namespace());
@@ -336,39 +331,33 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetSheetCalculationProperties>> {
-        parse_worksheet_sheet_calculation_properties(
-            format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
-        )
+    fn parse_child(child: &str) -> Result<Option<Properties>> {
+        parse(format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes())
     }
 
     #[test]
     fn parses_full_calc_on_load_and_default() {
         let empty = format!(r#"<worksheet xmlns="{NS}"/>"#);
+        assert!(parse(empty.as_bytes()).unwrap().is_none());
         assert!(
-            parse_worksheet_sheet_calculation_properties(empty.as_bytes())
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            parse(r#"<sheetCalcPr fullCalcOnLoad="1"/>"#)
+            parse_child(r#"<sheetCalcPr fullCalcOnLoad="1"/>"#)
                 .unwrap()
                 .unwrap()
                 .full_calc_on_load()
         );
         assert!(
-            !parse(r#"<sheetCalcPr fullCalcOnLoad="false"/>"#)
+            !parse_child(r#"<sheetCalcPr fullCalcOnLoad="false"/>"#)
                 .unwrap()
                 .unwrap()
                 .full_calc_on_load()
         );
         assert!(
-            !parse("<sheetCalcPr/>")
+            !parse_child("<sheetCalcPr/>")
                 .unwrap()
                 .unwrap()
                 .full_calc_on_load()
         );
-        assert!(parse("<sheetData/>").unwrap().is_none());
+        assert!(parse_child("<sheetData/>").unwrap().is_none());
     }
 
     #[test]
@@ -377,12 +366,7 @@ mod tests {
             r#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main">"#,
             r#"<sheetCalcPr fullCalcOnLoad="true"/></worksheet>"#,
         );
-        assert!(
-            parse_worksheet_sheet_calculation_properties(xml.as_bytes())
-                .unwrap()
-                .unwrap()
-                .full_calc_on_load()
-        );
+        assert!(parse(xml.as_bytes()).unwrap().unwrap().full_calc_on_load());
     }
 
     #[test]
@@ -392,9 +376,12 @@ mod tests {
             r#"<sheetCalcPr mystery="1"/>"#,
             r#"<sheetCalcPr fullCalcOnLoad="1" fullCalcOnLoad="0"/>"#,
         ] {
-            assert!(parse(child).is_err(), "expected rejection for {child}");
+            assert!(
+                parse_child(child).is_err(),
+                "expected rejection for {child}"
+            );
         }
-        assert!(parse("<sheetCalcPr/><sheetCalcPr/>").is_err());
+        assert!(parse_child("<sheetCalcPr/><sheetCalcPr/>").is_err());
     }
 
     #[test]
@@ -404,16 +391,19 @@ mod tests {
             "<sheetCalcPr>unexpected</sheetCalcPr>",
             "<sheetCalcPr><![CDATA[unexpected]]></sheetCalcPr>",
         ] {
-            assert!(parse(child).is_err(), "expected rejection for {child}");
+            assert!(
+                parse_child(child).is_err(),
+                "expected rejection for {child}"
+            );
         }
 
         let mismatched_end = format!(r#"<worksheet xmlns="{NS}"><sheetCalcPr/></wrong>"#,);
-        assert!(parse_worksheet_sheet_calculation_properties(mismatched_end.as_bytes()).is_err());
+        assert!(parse(mismatched_end.as_bytes()).is_err());
 
         let multiple_roots = format!(
             r#"<worksheet xmlns="{NS}"><sheetData/></worksheet><worksheet xmlns="{NS}"><sheetData/></worksheet>"#,
         );
-        assert!(parse_worksheet_sheet_calculation_properties(multiple_roots.as_bytes()).is_err());
+        assert!(parse(multiple_roots.as_bytes()).is_err());
     }
 
     #[test]
@@ -423,24 +413,16 @@ mod tests {
         xml.push_str(&"</extension>".repeat(MAX_DEPTH));
         xml.push_str("</worksheet>");
 
-        assert!(parse_worksheet_sheet_calculation_properties(xml.as_bytes()).is_err());
+        assert!(parse(xml.as_bytes()).is_err());
     }
 
     #[test]
     fn write_round_trips_through_the_reader() {
-        for expected in [
-            WorksheetSheetCalculationProperties::new(true),
-            WorksheetSheetCalculationProperties::new(false),
-        ] {
-            for conformance in [
-                WorksheetSheetCalculationPropertiesConformance::Transitional,
-                WorksheetSheetCalculationPropertiesConformance::Strict,
-            ] {
-                let fragment = write_worksheet_sheet_calculation_properties(&expected, conformance);
+        for expected in [Properties::new(true), Properties::new(false)] {
+            for conformance in [Conformance::Transitional, Conformance::Strict] {
+                let fragment = write(&expected, conformance);
                 let document = format!(r#"<worksheet xmlns="{NS}">{fragment}</worksheet>"#);
-                let parsed = parse_worksheet_sheet_calculation_properties(document.as_bytes())
-                    .unwrap()
-                    .unwrap();
+                let parsed = parse(document.as_bytes()).unwrap().unwrap();
                 assert_eq!(parsed, expected);
             }
         }
@@ -456,9 +438,7 @@ mod tests {
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .unwrap();
-        let value = parse_worksheet_sheet_calculation_properties(part.blob())
-            .unwrap()
-            .unwrap();
+        let value = parse(part.blob()).unwrap().unwrap();
         assert!(value.full_calc_on_load());
     }
 }

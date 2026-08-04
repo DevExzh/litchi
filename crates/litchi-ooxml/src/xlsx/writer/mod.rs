@@ -11,7 +11,6 @@ pub mod workbook;
 // Re-export main types
 pub use crate::xlsx::conditional_formatting::{IconSet, Operator};
 pub use crate::xlsx::shapes::Geometry;
-pub use crate::xlsx::sheet_protection::WorksheetProtection as SheetProtection;
 pub use chart_sheet::MutableChartSheet;
 pub use shape::{ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, GroupSpec, ShapeSpec};
 pub use sheet::{

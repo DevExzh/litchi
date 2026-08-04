@@ -31,17 +31,11 @@ use super::parsers::worksheet_parser;
 use super::query_table::{
     QUERY_TABLE_CONTENT_TYPE, WorksheetTable, is_query_table_relationship_type, parse_query_table,
 };
-use super::sheet_calculation_properties::{
-    WorksheetSheetCalculationProperties, parse_worksheet_sheet_calculation_properties,
-};
 use super::sheet_format::{
     WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
 };
 use super::sheet_properties::{SheetProperties, parse_sheet_properties};
-use super::sheet_protection::{
-    WorksheetProtectedRange, WorksheetProtection, WorksheetProtectionMetadata,
-    parse_worksheet_protection,
-};
+use super::sheet_protection::{Metadata, ProtectedRange, Protection, parse_protection};
 use super::sheet_view::{self, parse_worksheet_views};
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
@@ -64,6 +58,7 @@ use litchi_xlsx::phonetic_properties::{PhoneticProperties, parse_phonetic_proper
 use litchi_xlsx::print_options::{PrintOptions, parse_print_options};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::scenarios::{Scenarios, parse_worksheet_scenarios};
+use litchi_xlsx::sheet_calculation_properties::{Properties as SheetCalculationProperties, parse};
 use litchi_xlsx::web::Bindings;
 
 /// Information about a worksheet
@@ -212,7 +207,7 @@ pub struct Worksheet<'a> {
     /// Static Named Sheet Views part associated with this worksheet.
     named_sheet_views: Option<named_sheet_view::Views>,
     /// Static worksheet protection and editable-range metadata.
-    protection_metadata: WorksheetProtectionMetadata,
+    protection_metadata: Metadata,
     /// Static worksheet header/footer settings.
     header_footer: Option<Settings>,
     /// Static worksheet page margins.
@@ -228,7 +223,7 @@ pub struct Worksheet<'a> {
     /// Watch-window cell references tracked by the worksheet.
     cell_watches: Option<CellWatches>,
     /// Worksheet-level calculation properties from `sheetCalcPr`.
-    sheet_calculation_properties: Option<WorksheetSheetCalculationProperties>,
+    sheet_calculation_properties: Option<SheetCalculationProperties>,
     /// Worksheet what-if scenario collection.
     scenarios: Option<Scenarios>,
     /// Effective worksheet outline and summary-placement policy.
@@ -273,7 +268,7 @@ impl<'a> Worksheet<'a> {
             sheet_views: Vec::new(),
             sheet_view_collection: None,
             named_sheet_views: None,
-            protection_metadata: WorksheetProtectionMetadata::default(),
+            protection_metadata: Metadata::default(),
             header_footer: None,
             page_margins: None,
             print_options: None,
@@ -405,7 +400,7 @@ impl<'a> Worksheet<'a> {
         let data_validation_collections = parse_data_validation_collections(sheet_data.as_bytes())?;
         let auto_filter_definition = parse_auto_filter(sheet_data.as_bytes())?;
         let sheet_view_collection = parse_worksheet_views(sheet_data.as_bytes())?;
-        let protection_metadata = parse_worksheet_protection(sheet_data.as_bytes())?;
+        let protection_metadata = parse_protection(sheet_data.as_bytes())?;
         let header_footer = parse_worksheet_header_footer(sheet_data.as_bytes())?;
         let page_margins = parse_page_margins(sheet_data.as_bytes())?;
         let print_options = parse_print_options(sheet_data.as_bytes())?;
@@ -414,8 +409,7 @@ impl<'a> Worksheet<'a> {
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
         let cell_watches = parse_cell_watches(sheet_data.as_bytes())?;
-        let sheet_calculation_properties =
-            parse_worksheet_sheet_calculation_properties(sheet_data.as_bytes())?;
+        let sheet_calculation_properties = parse(sheet_data.as_bytes())?;
         let scenarios = parse_worksheet_scenarios(sheet_data.as_bytes())?;
         let sheet_properties = parse_sheet_properties(sheet_data.as_bytes())?;
         let phonetic_properties = parse_phonetic_properties(sheet_data.as_bytes())?;
@@ -1997,7 +1991,7 @@ impl<'a> Worksheet<'a> {
     // ===== Sheet Calculation Properties =====
 
     /// Worksheet-level calculation properties, when `sheetCalcPr` is present.
-    pub fn sheet_calculation_properties(&self) -> Option<&WorksheetSheetCalculationProperties> {
+    pub fn sheet_calculation_properties(&self) -> Option<&SheetCalculationProperties> {
         self.sheet_calculation_properties.as_ref()
     }
 
@@ -2054,17 +2048,17 @@ impl<'a> Worksheet<'a> {
     // ===== Worksheet Protection =====
 
     /// Complete worksheet protection metadata.
-    pub fn protection_metadata(&self) -> &WorksheetProtectionMetadata {
+    pub fn protection_metadata(&self) -> &Metadata {
         &self.protection_metadata
     }
 
     /// Effective core worksheet protection options, when present.
-    pub fn sheet_protection(&self) -> Option<&WorksheetProtection> {
+    pub fn sheet_protection(&self) -> Option<&Protection> {
         self.protection_metadata.sheet_protection()
     }
 
     /// Protected ranges from core and Office 2010 collections in document order.
-    pub fn protected_ranges(&self) -> impl Iterator<Item = &WorksheetProtectedRange> {
+    pub fn protected_ranges(&self) -> impl Iterator<Item = &ProtectedRange> {
         self.protection_metadata.protected_ranges()
     }
 
