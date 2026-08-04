@@ -24,7 +24,7 @@ use super::super::file::OleError;
 /// - Efficiently packs FAT sector IDs into DIFAT sectors
 /// - Uses zero-copy where possible
 #[derive(Debug)]
-pub struct DifatBuilder {
+pub(super) struct DifatBuilder {
     /// FAT sector IDs beyond the first 109
     fat_sector_ids: Vec<u32>,
     /// Sector size (512 or 4096 bytes)
@@ -38,7 +38,7 @@ impl DifatBuilder {
     /// # Arguments
     ///
     /// * `sector_size` - Sector size in bytes (512 or 4096)
-    pub fn new(sector_size: usize) -> Result<Self, OleError> {
+    pub(super) fn new(sector_size: usize) -> Result<Self, OleError> {
         if !matches!(sector_size, 512 | 4096) {
             return Err(OleError::InvalidData(format!(
                 "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
@@ -58,7 +58,7 @@ impl DifatBuilder {
     ///
     /// The first 109 IDs will be skipped (they go in the header),
     /// and the rest will be stored in DIFAT sectors.
-    pub fn set_fat_sectors(&mut self, fat_sectors: &[u32]) -> Result<(), OleError> {
+    pub(super) fn set_fat_sectors(&mut self, fat_sectors: &[u32]) -> Result<(), OleError> {
         let overflow = fat_sectors.get(109..).unwrap_or_default();
         let mut ids = Vec::new();
         ids.try_reserve_exact(overflow.len())
@@ -78,7 +78,7 @@ impl DifatBuilder {
     /// # Returns
     ///
     /// * `u32` - Number of DIFAT sectors required
-    pub fn calculate_difat_sector_count(&self) -> Result<u32, OleError> {
+    pub(super) fn calculate_difat_sector_count(&self) -> Result<u32, OleError> {
         if self.fat_sector_ids.is_empty() {
             return Ok(0);
         }
@@ -107,7 +107,7 @@ impl DifatBuilder {
     /// - FAT sector IDs (as many as will fit)
     /// - Next DIFAT sector ID (or ENDOFCHAIN for last)
     /// - Padding with FREESECT
-    pub fn generate_difat_sectors(
+    pub(super) fn generate_difat_sectors(
         &self,
         first_difat_sector: u32,
     ) -> Result<Vec<Vec<u8>>, OleError> {
@@ -157,7 +157,7 @@ impl DifatBuilder {
     }
 
     /// Check if DIFAT is needed (more than 109 FAT sectors)
-    pub fn is_needed(&self) -> bool {
+    pub(super) fn is_needed(&self) -> bool {
         !self.fat_sector_ids.is_empty()
     }
 }

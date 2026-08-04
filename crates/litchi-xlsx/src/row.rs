@@ -16,7 +16,7 @@ pub struct Height(u64);
 
 impl Height {
     /// Validate Excel's finite `0..=409` point row-height domain.
-    pub const fn new(value: f64) -> std::result::Result<Self, HeightError> {
+    pub const fn new(value: f64) -> Result<Self, HeightError> {
         if !(value >= 0.0 && value <= 409.0) {
             return Err(HeightError { value });
         }
@@ -56,7 +56,7 @@ pub enum HeightAt {
 
 impl HeightAt {
     /// Resolve this input into a checked height.
-    pub const fn resolve(self) -> std::result::Result<Height, HeightError> {
+    pub const fn resolve(self) -> Result<Height, HeightError> {
         match self {
             Self::Checked(height) => Ok(height),
             Self::Value(value) => Height::new(value),
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn heights_are_const_checked_before_entering_row_state() {
-        const VALID: std::result::Result<Height, HeightError> = Height::new(30.0);
+        const VALID: Result<Height, HeightError> = Height::new(30.0);
         assert_eq!(VALID.map(Height::get), Ok(30.0));
         assert_eq!(HeightAt::from(24).resolve().map(Height::get), Ok(24.0));
         assert_eq!(Height::new(-0.0).map(Height::get), Ok(0.0));

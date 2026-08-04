@@ -108,7 +108,7 @@ impl Error for ParseMultiLevelError {}
 impl FromStr for MultiLevel {
     type Err = ParseMultiLevelError;
 
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "singleLevel" => Ok(Self::Single),
             "multilevel" => Ok(Self::Multi),
@@ -207,7 +207,7 @@ pub enum Format {
 impl FromStr for Format {
     type Err = ParseFormatError;
 
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         Ok(match value {
             "decimal" => Self::Decimal,
             "upperRoman" => Self::UpperRoman,

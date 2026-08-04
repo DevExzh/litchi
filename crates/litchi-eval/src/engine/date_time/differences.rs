@@ -195,7 +195,7 @@ pub(crate) async fn eval_datedif(
     Ok(CellValue::Float(value))
 }
 
-fn days360_us(start: chrono::NaiveDate, end: chrono::NaiveDate) -> i64 {
+fn days360_us(start: NaiveDate, end: NaiveDate) -> i64 {
     let sy = start.year();
     let sm = start.month() as i32;
     let mut sd = adjust_day_us(start);
@@ -229,7 +229,7 @@ fn days360_us(start: chrono::NaiveDate, end: chrono::NaiveDate) -> i64 {
     ((ey - sy) * 360 + (em - sm) * 30 + (ed - sd)) as i64
 }
 
-fn days360_european(start: chrono::NaiveDate, end: chrono::NaiveDate) -> i64 {
+fn days360_european(start: NaiveDate, end: NaiveDate) -> i64 {
     let mut sd = start.day() as i32;
     let mut ed = end.day() as i32;
 
@@ -245,12 +245,12 @@ fn days360_european(start: chrono::NaiveDate, end: chrono::NaiveDate) -> i64 {
         + (ed - sd)) as i64
 }
 
-fn adjust_day_us(date: chrono::NaiveDate) -> i32 {
+fn adjust_day_us(date: NaiveDate) -> i32 {
     let day = date.day() as i32;
     if is_last_day_of_month(date) { 30 } else { day }
 }
 
-fn is_last_day_of_month(date: chrono::NaiveDate) -> bool {
+fn is_last_day_of_month(date: NaiveDate) -> bool {
     if let Some(last) = last_day_of_month(date) {
         last.day() == date.day()
     } else {

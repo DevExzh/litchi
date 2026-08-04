@@ -356,6 +356,7 @@ token_enum! {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use std::mem::size_of;
 
     fn assert_closed_round_trip<T>(all: &[T], expected_len: usize, domain: &'static str)
     where
@@ -394,8 +395,8 @@ mod tests {
 
     #[test]
     fn domains_are_compact_and_allocation_free() {
-        assert_eq!(std::mem::size_of::<Preset>(), 1);
-        assert_eq!(std::mem::size_of::<TextPreset>(), 1);
-        assert_eq!(std::mem::size_of::<TokenError>(), 1);
+        assert_eq!(size_of::<Preset>(), 1);
+        assert_eq!(size_of::<TextPreset>(), 1);
+        assert_eq!(size_of::<TokenError>(), 1);
     }
 }

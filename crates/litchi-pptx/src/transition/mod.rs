@@ -36,6 +36,7 @@ pub use writer::{write, write_to};
 mod tests {
     use super::*;
     use crate::Error;
+    use std::mem::size_of;
 
     const STANDARD_COVER: &[u8] =
         include_bytes!("../../../../test-data/ooxml/pptx/transitions/standard_cover.xml");
@@ -65,7 +66,7 @@ mod tests {
         assert_eq!(value.speed(), Speed::Fast);
         assert_eq!(value.after(), Some(after));
         assert!(
-            std::mem::size_of::<Transition>() <= 64,
+            size_of::<Transition>() <= 64,
             "the common transition value should fit in one cache line"
         );
     }

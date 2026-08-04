@@ -685,11 +685,7 @@ mod tests {
             let xml = Props::new().revision(value).xml().unwrap();
             assert!(xml.contains("<cp:revision>"));
             assert_eq!(
-                super::super::read::decode(&xml)
-                    .unwrap()
-                    .0
-                    .revision
-                    .as_deref(),
+                read::decode(&xml).unwrap().0.revision.as_deref(),
                 Some(value)
             );
         }
@@ -717,7 +713,7 @@ mod tests {
         };
         let maximum_xml = Props::new().keywords(maximum).xml().unwrap();
         assert_eq!(
-            super::super::read::decode(&maximum_xml)
+            read::decode(&maximum_xml)
                 .unwrap()
                 .0
                 .keywords

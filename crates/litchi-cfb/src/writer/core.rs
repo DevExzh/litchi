@@ -747,7 +747,7 @@ impl OleWriter {
     /// writer.save("output.ole")?;
     /// # Ok::<(), litchi_cfb::OleError>(())
     /// ```
-    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), OleError> {
+    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<(), OleError> {
         self.save_with_parent_sync(path, sync_parent)
     }
 
@@ -1161,7 +1161,7 @@ mod tests {
             .expect("move stream payload");
         assert_eq!(writer.streams[0].1.as_ptr(), pointer);
 
-        let mut output = std::io::Cursor::new(Vec::new());
+        let mut output = io::Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("write owned stream");
         assert_eq!(writer.streams[0].1.as_ptr(), pointer);
     }
@@ -1170,7 +1170,7 @@ mod tests {
     fn serialization_normalizes_the_sink_position() {
         let mut writer = OleWriter::new();
         writer.create_stream(&["Test"], b"payload").unwrap();
-        let mut output = std::io::Cursor::new(Vec::new());
+        let mut output = io::Cursor::new(Vec::new());
         output.set_position(17);
 
         writer.write_to(&mut output).unwrap();
@@ -1186,7 +1186,7 @@ mod tests {
             TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         let original = b"keep this destination intact";
-        std::fs::write(&destination, original).unwrap();
+        fs::write(&destination, original).unwrap();
 
         let mut writer = OleWriter::new();
         // Bypass the public path validation to exercise a serialization error
@@ -1195,13 +1195,13 @@ mod tests {
 
         let error = writer.save(&destination).unwrap_err();
         assert!(error.to_string().contains("stream path must not be empty"));
-        assert_eq!(std::fs::read(&destination).unwrap(), original);
+        assert_eq!(fs::read(&destination).unwrap(), original);
 
         let temporary_prefix = format!(
             ".{}.litchi-cfb-",
             destination.file_name().unwrap().to_string_lossy()
         );
-        let temporary_exists = std::fs::read_dir(destination.parent().unwrap())
+        let temporary_exists = fs::read_dir(destination.parent().unwrap())
             .unwrap()
             .filter_map(Result::ok)
             .any(|entry| {
@@ -1212,7 +1212,7 @@ mod tests {
             });
         assert!(!temporary_exists);
 
-        std::fs::remove_file(destination).unwrap();
+        fs::remove_file(destination).unwrap();
     }
 
     #[test]
@@ -1222,9 +1222,9 @@ mod tests {
             std::process::id(),
             TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
-        std::fs::create_dir(&directory).unwrap();
+        fs::create_dir(&directory).unwrap();
         let destination = directory.join("document.ole");
-        std::fs::write(&destination, b"old destination").unwrap();
+        fs::write(&destination, b"old destination").unwrap();
 
         let mut writer = OleWriter::new();
         writer
@@ -1243,10 +1243,10 @@ mod tests {
             Err(OleError::Committed { source })
                 if source.kind() == ErrorKind::PermissionDenied
         ));
-        assert_ne!(std::fs::read(&destination).unwrap(), b"old destination");
-        assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+        assert_ne!(fs::read(&destination).unwrap(), b"old destination");
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
 
-        std::fs::remove_dir_all(directory).unwrap();
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

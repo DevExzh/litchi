@@ -159,7 +159,7 @@ pub enum MceError {
         source: TryReserveError,
     },
 }
-type R<T> = std::result::Result<T, MceError>;
+type R<T> = Result<T, MceError>;
 
 const ACTIVE_MARKER_TEMPLATE: &[u8; 38] = b"litchi-mce-active-0000000000000000-00:";
 const ACTIVE_MARKER_HASH_START: usize = 18;
@@ -1410,7 +1410,7 @@ mod fixture_tests {
             &MceLimits::default(),
         )
         .unwrap();
-        let xml = std::str::from_utf8(output.xml.as_ref()).unwrap();
+        let xml = str::from_utf8(output.xml.as_ref()).unwrap();
         assert!(!xml.contains("mc:AlternateContent"));
         assert!(!xml.contains("hs:extension"));
         assert!(output.report.selected_fallbacks > 10);
@@ -1431,7 +1431,7 @@ mod fixture_tests {
             &MceLimits::default(),
         )
         .unwrap();
-        let xml = std::str::from_utf8(output.xml.as_ref()).unwrap();
+        let xml = str::from_utf8(output.xml.as_ref()).unwrap();
         assert!(!xml.contains("mc:AlternateContent"));
         assert!(!xml.contains("a14:m"));
         assert!(xml.contains("a:blipFill"));

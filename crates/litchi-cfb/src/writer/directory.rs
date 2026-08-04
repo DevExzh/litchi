@@ -79,23 +79,23 @@ fn directory_name_data(name: &str) -> Result<(SmallVec<[u16; 32]>, SmallVec<[u16
 
 /// Directory entry builder
 #[derive(Debug, Clone)]
-pub struct DirectoryEntryBuilder {
+struct DirectoryEntryBuilder {
     /// Entry name
-    pub name: String,
+    name: String,
     /// Entry type (STGTY_STORAGE, STGTY_STREAM, etc.)
-    pub entry_type: u8,
+    entry_type: u8,
     /// Starting sector
-    pub start_sector: u32,
+    start_sector: u32,
     /// Stream size
-    pub size: u64,
+    size: u64,
     /// Left sibling SID
-    pub sid_left: u32,
+    sid_left: u32,
     /// Right sibling SID
-    pub sid_right: u32,
+    sid_right: u32,
     /// Child SID
-    pub sid_child: u32,
+    sid_child: u32,
     /// CLSID (Class ID) - 16 bytes, optional
-    pub clsid: Option<[u8; 16]>,
+    clsid: Option<[u8; 16]>,
     name_utf16: SmallVec<[u16; 32]>,
     comparison_name: SmallVec<[u16; 32]>,
     node_color: NodeColor,
@@ -104,7 +104,7 @@ pub struct DirectoryEntryBuilder {
 #[allow(dead_code)] // These methods are part of the public API for future use
 impl DirectoryEntryBuilder {
     /// Create a new root entry
-    pub fn root(start_sector: u32, size: u64) -> Self {
+    fn root(start_sector: u32, size: u64) -> Self {
         let name = "Root Entry".to_string();
         let name_utf16 = "Root Entry".encode_utf16().collect();
         let comparison_name = "ROOT ENTRY".encode_utf16().collect();
@@ -140,12 +140,12 @@ impl DirectoryEntryBuilder {
     /// let mut root = DirectoryEntryBuilder::root();
     /// root.set_clsid(word_clsid);
     /// ```
-    pub fn set_clsid(&mut self, clsid: [u8; 16]) {
+    fn set_clsid(&mut self, clsid: [u8; 16]) {
         self.clsid = Some(clsid);
     }
 
     /// Create a new stream entry
-    pub fn stream(name: String, start_sector: u32, size: u64) -> Result<Self, OleError> {
+    fn stream(name: String, start_sector: u32, size: u64) -> Result<Self, OleError> {
         let (name_utf16, comparison_name) = directory_name_data(&name)?;
         Ok(Self {
             name,
@@ -163,7 +163,7 @@ impl DirectoryEntryBuilder {
     }
 
     /// Create a new storage entry
-    pub fn storage(name: String) -> Result<Self, OleError> {
+    fn storage(name: String) -> Result<Self, OleError> {
         let (name_utf16, comparison_name) = directory_name_data(&name)?;
         Ok(Self {
             name,
@@ -181,7 +181,7 @@ impl DirectoryEntryBuilder {
     }
 
     /// Write this entry to bytes (128 bytes per OLE2 spec)
-    pub fn to_bytes(&self) -> Result<[u8; DIRENTRY_SIZE], OleError> {
+    fn to_bytes(&self) -> Result<[u8; DIRENTRY_SIZE], OleError> {
         let (name_utf16, comparison_name) = directory_name_data(&self.name)?;
         if name_utf16 != self.name_utf16 || comparison_name != self.comparison_name {
             return Err(OleError::InvalidData(
@@ -239,7 +239,7 @@ impl DirectoryEntryBuilder {
 ///
 /// Builds a directory tree from streams and storages, organizing them
 /// as a simple list (not a true red-black tree for simplicity).
-pub struct DirectoryBuilder {
+pub(crate) struct DirectoryBuilder {
     /// List of directory entries; index is the SID
     entries: Vec<DirectoryEntryBuilder>,
     /// Map from full path components to SID for storage nodes
@@ -251,7 +251,7 @@ pub struct DirectoryBuilder {
 #[allow(dead_code)] // These methods are part of the public API for future use
 impl DirectoryBuilder {
     /// Create a new directory builder with root entry
-    pub fn new(ministream_start: u32, ministream_size: u64) -> Self {
+    pub(crate) fn new(ministream_start: u32, ministream_size: u64) -> Self {
         let root = DirectoryEntryBuilder::root(ministream_start, ministream_size);
         let mut path_to_sid = HashMap::new();
         path_to_sid.insert(Vec::new(), 0);
@@ -269,14 +269,18 @@ impl DirectoryBuilder {
     /// # Arguments
     ///
     /// * `clsid` - 16-byte CLSID
-    pub fn set_root_clsid(&mut self, clsid: [u8; 16]) {
+    pub(crate) fn set_root_clsid(&mut self, clsid: [u8; 16]) {
         if !self.entries.is_empty() {
             self.entries[0].set_clsid(clsid);
         }
     }
 
     /// Set the CLSID for an existing storage path.
-    pub fn set_storage_clsid(&mut self, path: &[String], clsid: [u8; 16]) -> Result<(), OleError> {
+    pub(crate) fn set_storage_clsid(
+        &mut self,
+        path: &[String],
+        clsid: [u8; 16],
+    ) -> Result<(), OleError> {
         let sid = self.path_to_sid.get(path).copied().ok_or_else(|| {
             OleError::InvalidData(format!("CFB storage path {path:?} does not exist"))
         })?;
@@ -286,7 +290,7 @@ impl DirectoryBuilder {
 
     /// Ensure a storage path exists, creating missing storages.
     /// Returns the SID of the storage at the given path.
-    pub fn add_storage_path(&mut self, path: &[String]) -> Result<u32, OleError> {
+    pub(crate) fn add_storage_path(&mut self, path: &[String]) -> Result<u32, OleError> {
         // parent path accumulates
         let mut current_path: Vec<String> = Vec::new();
         let mut parent_sid = 0u32;
@@ -319,7 +323,7 @@ impl DirectoryBuilder {
     }
 
     /// Add a stream at the given full path (parent storages will be created automatically)
-    pub fn add_stream_path(
+    pub(crate) fn add_stream_path(
         &mut self,
         full_path: &[String],
         start_sector: u32,
@@ -352,7 +356,7 @@ impl DirectoryBuilder {
     }
 
     /// Add a stream to the root directory (compat wrapper)
-    pub fn add_stream(
+    pub(crate) fn add_stream(
         &mut self,
         name: String,
         start_sector: u32,
@@ -371,7 +375,7 @@ impl DirectoryBuilder {
     /// # Returns
     ///
     /// * `u32` - SID of the added storage
-    pub fn add_storage(&mut self, name: String) -> Result<u32, OleError> {
+    pub(crate) fn add_storage(&mut self, name: String) -> Result<u32, OleError> {
         let entry = DirectoryEntryBuilder::storage(name)?;
         self.ensure_unique_child(0, &entry)?;
         let sid = u32::try_from(self.entries.len()).map_err(|_| {
@@ -388,9 +392,9 @@ impl DirectoryBuilder {
     /// # Returns
     ///
     /// * `Vec<u8>` - Concatenated directory entries (128 bytes each)
-    pub fn generate_directory_stream(&mut self) -> Result<Vec<u8>, OleError> {
+    pub(crate) fn generate_directory_stream(&mut self) -> Result<Vec<u8>, OleError> {
         // Prepare all fallible serialization work before linking the sibling
-        // trees.  A name can be mutated through the public `name` field after
+        // trees.  A name can be mutated through the builder's `name` field after
         // construction; `to_bytes` rejects that stale cached state.  Keeping
         // this validation (and the output allocation) ahead of tree mutation
         // makes serialization-preparation failures leave the builder unchanged.
@@ -700,7 +704,7 @@ impl DirectoryBuilder {
     }
 
     /// Get the number of directory entries
-    pub fn entry_count(&self) -> usize {
+    pub(crate) fn entry_count(&self) -> usize {
         self.entries.len()
     }
 }

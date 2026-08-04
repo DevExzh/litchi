@@ -20,7 +20,7 @@ pub struct Height(NonZeroU64);
 
 impl Height {
     /// Validate a finite, non-negative default row height.
-    pub const fn new(value: f64) -> std::result::Result<Self, HeightError> {
+    pub const fn new(value: f64) -> Result<Self, HeightError> {
         if !(value >= 0.0 && value.is_finite()) {
             return Err(HeightError { value });
         }
@@ -66,7 +66,7 @@ pub enum HeightAt {
 
 impl HeightAt {
     /// Resolve this input into a checked height.
-    pub const fn resolve(self) -> std::result::Result<Height, HeightError> {
+    pub const fn resolve(self) -> Result<Height, HeightError> {
         match self {
             Self::Checked(value) => Ok(value),
             Self::Value(value) => Height::new(value),
@@ -96,7 +96,7 @@ pub struct Width(NonZeroU64);
 
 impl Width {
     /// Validate Office's finite `0..65536` default-column-width domain.
-    pub const fn new(value: f64) -> std::result::Result<Self, WidthError> {
+    pub const fn new(value: f64) -> Result<Self, WidthError> {
         if !(value >= 0.0 && value < 65_536.0) {
             return Err(WidthError { value });
         }
@@ -142,7 +142,7 @@ pub enum WidthAt {
 
 impl WidthAt {
     /// Resolve this input into a checked width.
-    pub const fn resolve(self) -> std::result::Result<Width, WidthError> {
+    pub const fn resolve(self) -> Result<Width, WidthError> {
         match self {
             Self::Checked(value) => Ok(value),
             Self::Value(value) => Width::new(value),
@@ -168,7 +168,7 @@ pub struct Descent(NonZeroU64);
 
 impl Descent {
     /// Validate a finite, non-negative typographic descent.
-    pub const fn new(value: f64) -> std::result::Result<Self, DescentError> {
+    pub const fn new(value: f64) -> Result<Self, DescentError> {
         if !(value >= 0.0 && value.is_finite()) {
             return Err(DescentError { value });
         }
@@ -214,7 +214,7 @@ pub enum DescentAt {
 
 impl DescentAt {
     /// Resolve this input into a checked descent.
-    pub const fn resolve(self) -> std::result::Result<Descent, DescentError> {
+    pub const fn resolve(self) -> Result<Descent, DescentError> {
         match self {
             Self::Checked(value) => Ok(value),
             Self::Value(value) => Descent::new(value),
@@ -373,12 +373,13 @@ impl Defaults {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn numeric_domains_are_const_checked_and_normalize_negative_zero() {
-        const HEIGHT: std::result::Result<Height, HeightError> = Height::new(15.0);
-        const WIDTH: std::result::Result<Width, WidthError> = Width::new(65_535.5);
-        const DESCENT: std::result::Result<Descent, DescentError> = Descent::new(0.25);
+        const HEIGHT: Result<Height, HeightError> = Height::new(15.0);
+        const WIDTH: Result<Width, WidthError> = Width::new(65_535.5);
+        const DESCENT: Result<Descent, DescentError> = Descent::new(0.25);
         assert_eq!(HEIGHT.map(Height::get), Ok(15.0));
         assert_eq!(WIDTH.map(Width::get), Ok(65_535.5));
         assert_eq!(DESCENT.map(Descent::get), Ok(0.25));
@@ -389,9 +390,9 @@ mod tests {
         assert!(Width::new(65_536.0).is_err());
         assert!(Width::new(f64::INFINITY).is_err());
         assert!(Descent::new(-0.1).is_err());
-        assert_eq!(std::mem::size_of::<Option<Height>>(), 8);
-        assert_eq!(std::mem::size_of::<Option<Width>>(), 8);
-        assert_eq!(std::mem::size_of::<Option<Descent>>(), 8);
+        assert_eq!(size_of::<Option<Height>>(), 8);
+        assert_eq!(size_of::<Option<Width>>(), 8);
+        assert_eq!(size_of::<Option<Descent>>(), 8);
     }
 
     #[test]

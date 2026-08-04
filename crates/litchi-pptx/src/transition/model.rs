@@ -18,7 +18,7 @@ pub struct Ms(u32);
 
 impl Ms {
     /// Creates a checked millisecond value.
-    pub const fn new(value: u32) -> std::result::Result<Self, TimeError> {
+    pub const fn new(value: u32) -> Result<Self, TimeError> {
         if value <= MAX_MS {
             Ok(Self(value))
         } else {
@@ -40,7 +40,7 @@ impl Ms {
 impl TryFrom<u32> for Ms {
     type Error = TimeError;
 
-    fn try_from(value: u32) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
         Self::new(value)
     }
 }

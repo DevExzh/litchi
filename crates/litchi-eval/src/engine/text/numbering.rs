@@ -185,7 +185,7 @@ pub(crate) async fn eval_roman(
         ));
     }
     let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let num = match crate::engine::to_number(&val) {
+    let num = match to_number(&val) {
         Some(n) => n.trunc() as i64,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };

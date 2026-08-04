@@ -28,7 +28,7 @@ const MINI_STREAM_CUTOFF: usize = 4096;
 /// - Uses efficient mini sector chain building
 /// - Tracks ministream size for efficient writing
 #[derive(Debug)]
-pub struct MiniFatBuilder {
+pub(super) struct MiniFatBuilder {
     /// The MiniFAT table (maps mini sector ID to next mini sector in chain)
     minifat: Vec<u32>,
     /// Next available mini sector
@@ -46,7 +46,7 @@ impl MiniFatBuilder {
     /// # Arguments
     ///
     /// * `mini_sector_size` - Size of each mini sector in bytes (typically 64)
-    pub fn new(mini_sector_size: usize) -> Self {
+    pub(super) fn new(mini_sector_size: usize) -> Self {
         Self {
             minifat: Vec::new(),
             next_mini_sector: 0,
@@ -68,7 +68,7 @@ impl MiniFatBuilder {
     /// # Performance
     ///
     /// This method pre-allocates all MiniFAT entries and ministream space needed.
-    pub fn allocate_mini_chain(&mut self, data: &[u8]) -> Result<u32, OleError> {
+    pub(super) fn allocate_mini_chain(&mut self, data: &[u8]) -> Result<u32, OleError> {
         if data.is_empty() {
             return Ok(ENDOFCHAIN);
         }
@@ -156,12 +156,12 @@ impl MiniFatBuilder {
     ///
     /// This data should be written to regular sectors and referenced
     /// from the root entry.
-    pub fn ministream_data(&self) -> &[u8] {
+    pub(super) fn ministream_data(&self) -> &[u8] {
         &self.ministream_data
     }
 
     /// Get the ministream size
-    pub fn ministream_size(&self) -> Result<u64, OleError> {
+    pub(super) fn ministream_size(&self) -> Result<u64, OleError> {
         u64::try_from(self.ministream_data.len())
             .map_err(|_| OleError::InvalidData("CFB ministream size does not fit u64".to_string()))
     }
@@ -175,7 +175,10 @@ impl MiniFatBuilder {
     /// # Returns
     ///
     /// * `Vec<Vec<u8>>` - Vector of MiniFAT sectors
-    pub fn generate_minifat_sectors(&self, sector_size: usize) -> Result<Vec<Vec<u8>>, OleError> {
+    pub(super) fn generate_minifat_sectors(
+        &self,
+        sector_size: usize,
+    ) -> Result<Vec<Vec<u8>>, OleError> {
         if !matches!(sector_size, 512 | 4096) {
             return Err(OleError::InvalidData(format!(
                 "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
@@ -212,17 +215,17 @@ impl MiniFatBuilder {
     }
 
     /// Get the number of mini sectors allocated
-    pub fn mini_sector_count(&self) -> u32 {
+    pub(super) fn mini_sector_count(&self) -> u32 {
         self.next_mini_sector
     }
 
     /// Check if MiniFAT has any allocations
-    pub fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.minifat.is_empty()
     }
 
     /// Get the MiniFAT table
-    pub fn minifat(&self) -> &[u32] {
+    pub(super) fn minifat(&self) -> &[u32] {
         &self.minifat
     }
 }

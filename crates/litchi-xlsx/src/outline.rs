@@ -12,7 +12,7 @@ impl Outline {
     pub const NONE: Self = Self(0);
 
     /// Validate one outline level.
-    pub const fn new(value: u8) -> std::result::Result<Self, OutlineError> {
+    pub const fn new(value: u8) -> Result<Self, OutlineError> {
         if value <= 7 {
             Ok(Self(value))
         } else {
@@ -54,7 +54,7 @@ pub enum OutlineAt {
 
 impl OutlineAt {
     /// Resolve this input into a checked outline level.
-    pub const fn resolve(self) -> std::result::Result<Outline, OutlineError> {
+    pub const fn resolve(self) -> Result<Outline, OutlineError> {
         match self {
             Self::Checked(level) => Ok(level),
             Self::Level(value) if value < 0 || value > 7 => Err(OutlineError { value }),
@@ -93,8 +93,8 @@ mod tests {
 
     #[test]
     fn outline_is_const_checked_for_rows_and_columns() {
-        const VALID: std::result::Result<Outline, OutlineError> = OutlineAt::Level(7).resolve();
-        const INVALID: std::result::Result<Outline, OutlineError> = OutlineAt::Level(8).resolve();
+        const VALID: Result<Outline, OutlineError> = OutlineAt::Level(7).resolve();
+        const INVALID: Result<Outline, OutlineError> = OutlineAt::Level(8).resolve();
         assert_eq!(VALID.map(Outline::get), Ok(7));
         assert_eq!(INVALID.unwrap_err().value(), 8);
     }

@@ -7,7 +7,7 @@ use super::super::consts::*;
 use super::super::file::OleError;
 
 /// OLE2 header builder
-pub struct HeaderBuilder {
+pub(super) struct HeaderBuilder {
     /// Sector size (512 or 4096)
     sector_size: usize,
     /// First sector of directory stream
@@ -34,7 +34,7 @@ impl HeaderBuilder {
     /// # Arguments
     ///
     /// * `sector_size` - Sector size (512 or 4096 bytes)
-    pub fn new(sector_size: usize) -> Result<Self, OleError> {
+    pub(super) fn new(sector_size: usize) -> Result<Self, OleError> {
         if !matches!(sector_size, 512 | 4096) {
             return Err(OleError::InvalidData(format!(
                 "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
@@ -54,24 +54,24 @@ impl HeaderBuilder {
     }
 
     /// Set the first directory sector
-    pub fn set_first_dir_sector(&mut self, sector: u32) {
+    pub(super) fn set_first_dir_sector(&mut self, sector: u32) {
         self.first_dir_sector = sector;
     }
 
     /// Set MiniFAT information
-    pub fn set_minifat(&mut self, first_sector: u32, num_sectors: u32) {
+    pub(super) fn set_minifat(&mut self, first_sector: u32, num_sectors: u32) {
         self.first_minifat_sector = first_sector;
         self.num_minifat_sectors = num_sectors;
     }
 
     /// Set number of directory sectors (csectDir)
     /// For 512-byte sectors, this must be set to 0.
-    pub fn set_num_dir_sectors(&mut self, num: u32) {
+    pub(super) fn set_num_dir_sectors(&mut self, num: u32) {
         self.num_dir_sectors = if self.sector_size == 512 { 0 } else { num };
     }
 
     /// Set DIFAT information
-    pub fn set_difat(&mut self, first_sector: u32, num_sectors: u32) {
+    pub(super) fn set_difat(&mut self, first_sector: u32, num_sectors: u32) {
         self.first_difat_sector = first_sector;
         self.num_difat_sectors = num_sectors;
     }
@@ -79,7 +79,7 @@ impl HeaderBuilder {
     /// Add FAT sectors to the header
     ///
     /// The first 109 FAT sector IDs are stored in the header.
-    pub fn set_fat_sectors(&mut self, sectors: &[u32]) -> Result<(), OleError> {
+    pub(super) fn set_fat_sectors(&mut self, sectors: &[u32]) -> Result<(), OleError> {
         let count = u32::try_from(sectors.len())
             .map_err(|_| OleError::InvalidData("too many CFB FAT sectors".to_string()))?;
         let header_count = sectors.len().min(109);
@@ -94,7 +94,7 @@ impl HeaderBuilder {
     }
 
     /// Generate the OLE2 header block
-    pub fn generate(&self) -> Result<Vec<u8>, OleError> {
+    pub(super) fn generate(&self) -> Result<Vec<u8>, OleError> {
         // The on-disk header data is 512 bytes, but for DLL version 4 (4096-byte sectors)
         // the first big block spans 4096 bytes. We return a buffer of sector_size bytes
         // with the 512-byte header populated and the rest zero-filled.

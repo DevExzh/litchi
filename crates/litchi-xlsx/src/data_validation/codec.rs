@@ -1,5 +1,14 @@
-//! Typed SpreadsheetML data-validation model and XML codec.
+//! Bounded SpreadsheetML data-validation parsing and serialization.
 
+use super::model::{
+    Collection, Conformance, Formula, ListSource, Range, Source, Sqref, Validation,
+    ValidationErrorStyle, ValidationImeMode, ValidationOperator, ValidationType,
+};
+use super::{
+    CORE, EXTENSION_URI, MAX_ATTRIBUTE_BYTES, MAX_CAPTURED_COLLECTIONS, MAX_DEPTH, MAX_EVENTS,
+    MAX_FORMULA_BYTES, MAX_FRAGMENT_BYTES, MAX_NODES, MAX_REFERENCES, MAX_RETAINED_BYTES,
+    MAX_VALIDATIONS, MAX_XML_BYTES, STRICT, X12AC, X12AC_URI, X14, X14_URI, XM, XM_URI, XR, XR_URI,
+};
 use crate::error::{Error, Result};
 use litchi_core::xml::escape::escape_xml;
 use litchi_ooxml_common::custom_xml::valid_guid;
@@ -12,552 +21,10 @@ use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::{HashSet, TryReserveError};
 use std::fmt;
-use std::ops::Range;
-
-const CORE_URI: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT_URI: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
-const X14_URI: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
-const XM_URI: &str = "http://schemas.microsoft.com/office/excel/2006/main";
-const X12AC_URI: &str = "http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac";
-const XR_URI: &str = "http://schemas.microsoft.com/office/spreadsheetml/2014/revision";
-const CORE: &[u8] = CORE_URI.as_bytes();
-const STRICT: &[u8] = STRICT_URI.as_bytes();
-const X14: &[u8] = X14_URI.as_bytes();
-const XM: &[u8] = XM_URI.as_bytes();
-const X12AC: &[u8] = X12AC_URI.as_bytes();
-const XR: &[u8] = XR_URI.as_bytes();
-const EXTENSION_URI: &str = "{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}";
-const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
-const MAX_DEPTH: usize = 128;
-const MAX_EVENTS: usize = 1_000_000;
-const MAX_NODES: usize = 1_000_000;
-const MAX_CAPTURED_COLLECTIONS: usize = 1_024;
-const MAX_VALIDATIONS: usize = 65_534;
-const MAX_REFERENCES: usize = 32_767;
-const MAX_FRAGMENT_BYTES: usize = 8 * 1024 * 1024;
-const MAX_FORMULA_BYTES: usize = 1024 * 1024;
-const MAX_ATTRIBUTE_BYTES: usize = MAX_FORMULA_BYTES;
-const MAX_RETAINED_BYTES: usize = 16 * 1024 * 1024;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DataValidationConformance {
-    Transitional,
-    Strict,
-}
-
-impl DataValidationConformance {
-    fn namespace(self) -> &'static str {
-        match self {
-            Self::Transitional => CORE_URI,
-            Self::Strict => STRICT_URI,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DataValidationSource {
-    Core,
-    Office2010,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParsedDataValidationType {
-    None,
-    Whole,
-    Decimal,
-    List,
-    Date,
-    Time,
-    TextLength,
-    Custom,
-}
-
-impl ParsedDataValidationType {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "none" => Ok(Self::None),
-            "whole" => Ok(Self::Whole),
-            "decimal" => Ok(Self::Decimal),
-            "list" => Ok(Self::List),
-            "date" => Ok(Self::Date),
-            "time" => Ok(Self::Time),
-            "textLength" => Ok(Self::TextLength),
-            "custom" => Ok(Self::Custom),
-            _ => Err(invalid(format!("invalid data-validation type '{value}'"))),
-        }
-    }
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::None => "none",
-            Self::Whole => "whole",
-            Self::Decimal => "decimal",
-            Self::List => "list",
-            Self::Date => "date",
-            Self::Time => "time",
-            Self::TextLength => "textLength",
-            Self::Custom => "custom",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParsedDataValidationOperator {
-    Between,
-    NotBetween,
-    Equal,
-    NotEqual,
-    LessThan,
-    LessThanOrEqual,
-    GreaterThan,
-    GreaterThanOrEqual,
-}
-
-impl ParsedDataValidationOperator {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "between" => Ok(Self::Between),
-            "notBetween" => Ok(Self::NotBetween),
-            "equal" => Ok(Self::Equal),
-            "notEqual" => Ok(Self::NotEqual),
-            "lessThan" => Ok(Self::LessThan),
-            "lessThanOrEqual" => Ok(Self::LessThanOrEqual),
-            "greaterThan" => Ok(Self::GreaterThan),
-            "greaterThanOrEqual" => Ok(Self::GreaterThanOrEqual),
-            _ => Err(invalid(format!(
-                "invalid data-validation operator '{value}'"
-            ))),
-        }
-    }
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Between => "between",
-            Self::NotBetween => "notBetween",
-            Self::Equal => "equal",
-            Self::NotEqual => "notEqual",
-            Self::LessThan => "lessThan",
-            Self::LessThanOrEqual => "lessThanOrEqual",
-            Self::GreaterThan => "greaterThan",
-            Self::GreaterThanOrEqual => "greaterThanOrEqual",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParsedDataValidationErrorStyle {
-    Stop,
-    Warning,
-    Information,
-}
-
-impl ParsedDataValidationErrorStyle {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "stop" => Ok(Self::Stop),
-            "warning" => Ok(Self::Warning),
-            "information" => Ok(Self::Information),
-            _ => Err(invalid(format!(
-                "invalid data-validation errorStyle '{value}'"
-            ))),
-        }
-    }
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Stop => "stop",
-            Self::Warning => "warning",
-            Self::Information => "information",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParsedDataValidationImeMode {
-    NoControl,
-    Off,
-    On,
-    Disabled,
-    Hiragana,
-    FullKatakana,
-    HalfKatakana,
-    FullAlpha,
-    HalfAlpha,
-    FullHangul,
-    HalfHangul,
-}
-
-impl ParsedDataValidationImeMode {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "noControl" => Ok(Self::NoControl),
-            "off" => Ok(Self::Off),
-            "on" => Ok(Self::On),
-            "disabled" => Ok(Self::Disabled),
-            "hiragana" => Ok(Self::Hiragana),
-            "fullKatakana" => Ok(Self::FullKatakana),
-            "halfKatakana" => Ok(Self::HalfKatakana),
-            "fullAlpha" => Ok(Self::FullAlpha),
-            "halfAlpha" => Ok(Self::HalfAlpha),
-            "fullHangul" => Ok(Self::FullHangul),
-            "halfHangul" => Ok(Self::HalfHangul),
-            _ => Err(invalid(format!(
-                "invalid data-validation imeMode '{value}'"
-            ))),
-        }
-    }
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::NoControl => "noControl",
-            Self::Off => "off",
-            Self::On => "on",
-            Self::Disabled => "disabled",
-            Self::Hiragana => "hiragana",
-            Self::FullKatakana => "fullKatakana",
-            Self::HalfKatakana => "halfKatakana",
-            Self::FullAlpha => "fullAlpha",
-            Self::HalfAlpha => "halfAlpha",
-            Self::FullHangul => "fullHangul",
-            Self::HalfHangul => "halfHangul",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataValidationRange(String);
-impl DataValidationRange {
-    pub fn parse(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        let sqref = parse_sqref(&value, false, false, false, false)?;
-        if sqref.ranges.len() != 1 {
-            return Err(invalid("data-validation range must contain one reference"));
-        }
-        sqref
-            .ranges
-            .into_iter()
-            .next()
-            .ok_or_else(|| invalid("data-validation range is empty"))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataValidationFormula(String);
-impl DataValidationFormula {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_text(&value, MAX_FORMULA_BYTES, "data-validation formula")?;
-        Ok(Self(value))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ValidationListSource {
-    Formula(DataValidationFormula),
-    QuotedList(String),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataValidationSqref {
-    ranges: Vec<DataValidationRange>,
-    edited: bool,
-    split: bool,
-    adjusted: bool,
-    adjust: bool,
-}
-impl DataValidationSqref {
-    pub fn parse(value: impl AsRef<str>) -> Result<Self> {
-        parse_sqref(value.as_ref(), false, false, false, false)
-    }
-
-    pub fn with_office2010_flags(
-        mut self,
-        edited: bool,
-        split: bool,
-        adjusted: bool,
-        adjust: bool,
-    ) -> Result<Self> {
-        if adjusted && !adjust {
-            return Err(invalid("sqref adjusted requires adjust"));
-        }
-        self.edited = edited;
-        self.split = split;
-        self.adjusted = adjusted;
-        self.adjust = adjust;
-        Ok(self)
-    }
-
-    pub fn ranges(&self) -> &[DataValidationRange] {
-        &self.ranges
-    }
-    pub fn edited(&self) -> bool {
-        self.edited
-    }
-    pub fn split(&self) -> bool {
-        self.split
-    }
-    pub fn adjusted(&self) -> bool {
-        self.adjusted
-    }
-    pub fn adjust(&self) -> bool {
-        self.adjust
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParsedDataValidation {
-    source: DataValidationSource,
-    validation_type: ParsedDataValidationType,
-    operator: ParsedDataValidationOperator,
-    error_style: ParsedDataValidationErrorStyle,
-    ime_mode: ParsedDataValidationImeMode,
-    allow_blank: bool,
-    show_drop_down: bool,
-    show_input_message: bool,
-    show_error_message: bool,
-    error_title: Option<String>,
-    error: Option<String>,
-    prompt_title: Option<String>,
-    prompt: Option<String>,
-    formula1: Option<ValidationListSource>,
-    formula2: Option<DataValidationFormula>,
-    sqref: DataValidationSqref,
-    uid: Option<String>,
-}
-
-impl ParsedDataValidation {
-    pub fn new(
-        source: DataValidationSource,
-        validation_type: ParsedDataValidationType,
-        sqref: DataValidationSqref,
-    ) -> Self {
-        Self {
-            source,
-            validation_type,
-            operator: ParsedDataValidationOperator::Between,
-            error_style: ParsedDataValidationErrorStyle::Stop,
-            ime_mode: ParsedDataValidationImeMode::NoControl,
-            allow_blank: false,
-            show_drop_down: false,
-            show_input_message: false,
-            show_error_message: false,
-            error_title: None,
-            error: None,
-            prompt_title: None,
-            prompt: None,
-            formula1: None,
-            formula2: None,
-            sqref,
-            uid: None,
-        }
-    }
-
-    pub fn set_operator(&mut self, value: ParsedDataValidationOperator) {
-        self.operator = value;
-    }
-    pub fn set_error_style(&mut self, value: ParsedDataValidationErrorStyle) {
-        self.error_style = value;
-    }
-    pub fn set_ime_mode(&mut self, value: ParsedDataValidationImeMode) {
-        self.ime_mode = value;
-    }
-    pub fn set_allow_blank(&mut self, value: bool) {
-        self.allow_blank = value;
-    }
-    pub fn set_show_drop_down(&mut self, value: bool) {
-        self.show_drop_down = value;
-    }
-    pub fn set_show_input_message(&mut self, value: bool) {
-        self.show_input_message = value;
-    }
-    pub fn set_show_error_message(&mut self, value: bool) {
-        self.show_error_message = value;
-    }
-
-    pub fn set_error_title(&mut self, value: Option<String>) -> Result<()> {
-        validate_optional_text(value.as_deref(), 32, "errorTitle")?;
-        self.error_title = value;
-        Ok(())
-    }
-    pub fn set_error(&mut self, value: Option<String>) -> Result<()> {
-        validate_optional_text(value.as_deref(), 224, "error")?;
-        self.error = value;
-        Ok(())
-    }
-    pub fn set_prompt_title(&mut self, value: Option<String>) -> Result<()> {
-        validate_optional_text(value.as_deref(), 32, "promptTitle")?;
-        self.prompt_title = value;
-        Ok(())
-    }
-    pub fn set_prompt(&mut self, value: Option<String>) -> Result<()> {
-        validate_optional_text(value.as_deref(), 255, "prompt")?;
-        self.prompt = value;
-        Ok(())
-    }
-    pub fn set_formula1(&mut self, value: Option<ValidationListSource>) -> Result<()> {
-        if let Some(ValidationListSource::Formula(value)) = value.as_ref() {
-            validate_text(&value.0, MAX_FORMULA_BYTES, "formula1")?;
-        }
-        if let Some(ValidationListSource::QuotedList(value)) = value.as_ref() {
-            validate_text(value, MAX_FORMULA_BYTES, "quoted validation list")?;
-            if self.source != DataValidationSource::Office2010 {
-                return Err(invalid(
-                    "quoted-list source requires Office 2010 data validation",
-                ));
-            }
-        }
-        self.formula1 = value;
-        Ok(())
-    }
-    pub fn set_formula2(&mut self, value: Option<DataValidationFormula>) -> Result<()> {
-        if let Some(value) = value.as_ref() {
-            validate_text(&value.0, MAX_FORMULA_BYTES, "formula2")?;
-        }
-        self.formula2 = value;
-        Ok(())
-    }
-    pub fn set_uid(&mut self, value: Option<String>) -> Result<()> {
-        if value.as_deref().is_some_and(|value| !valid_guid(value)) {
-            return Err(invalid("invalid data-validation uid"));
-        }
-        self.uid = value;
-        Ok(())
-    }
-    pub fn validate(&self) -> Result<()> {
-        validate_rule(self)
-    }
-
-    pub fn source(&self) -> DataValidationSource {
-        self.source
-    }
-    pub fn validation_type(&self) -> ParsedDataValidationType {
-        self.validation_type
-    }
-    pub fn operator(&self) -> ParsedDataValidationOperator {
-        self.operator
-    }
-    pub fn error_style(&self) -> ParsedDataValidationErrorStyle {
-        self.error_style
-    }
-    pub fn ime_mode(&self) -> ParsedDataValidationImeMode {
-        self.ime_mode
-    }
-    pub fn allow_blank(&self) -> bool {
-        self.allow_blank
-    }
-    pub fn show_drop_down(&self) -> bool {
-        self.show_drop_down
-    }
-    pub fn show_input_message(&self) -> bool {
-        self.show_input_message
-    }
-    pub fn show_error_message(&self) -> bool {
-        self.show_error_message
-    }
-    pub fn error_title(&self) -> Option<&str> {
-        self.error_title.as_deref()
-    }
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
-    pub fn prompt_title(&self) -> Option<&str> {
-        self.prompt_title.as_deref()
-    }
-    pub fn prompt(&self) -> Option<&str> {
-        self.prompt.as_deref()
-    }
-    pub fn formula1(&self) -> Option<&ValidationListSource> {
-        self.formula1.as_ref()
-    }
-    pub fn formula2(&self) -> Option<&DataValidationFormula> {
-        self.formula2.as_ref()
-    }
-    pub fn sqref(&self) -> &DataValidationSqref {
-        &self.sqref
-    }
-    pub fn uid(&self) -> Option<&str> {
-        self.uid.as_deref()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataValidationCollection {
-    source: DataValidationSource,
-    disable_prompts: bool,
-    x_window: Option<u32>,
-    y_window: Option<u32>,
-    declared_count: Option<u32>,
-    validations: Vec<ParsedDataValidation>,
-}
-impl DataValidationCollection {
-    pub fn new(
-        source: DataValidationSource,
-        validations: Vec<ParsedDataValidation>,
-    ) -> Result<Self> {
-        let value = Self {
-            source,
-            disable_prompts: false,
-            x_window: None,
-            y_window: None,
-            declared_count: Some(validations.len() as u32),
-            validations,
-        };
-        validate_collection(&value)?;
-        Ok(value)
-    }
-
-    pub fn set_disable_prompts(&mut self, value: bool) {
-        self.disable_prompts = value;
-    }
-    pub fn set_window(&mut self, x: Option<u32>, y: Option<u32>) -> Result<()> {
-        if x.is_some_and(|value| value > 65_535) || y.is_some_and(|value| value > 65_535) {
-            return Err(invalid("dataValidations window coordinate exceeds 65535"));
-        }
-        self.x_window = x;
-        self.y_window = y;
-        Ok(())
-    }
-    pub fn set_validations(&mut self, validations: Vec<ParsedDataValidation>) -> Result<()> {
-        let candidate = Self {
-            source: self.source,
-            disable_prompts: self.disable_prompts,
-            x_window: self.x_window,
-            y_window: self.y_window,
-            declared_count: Some(validations.len() as u32),
-            validations,
-        };
-        validate_collection(&candidate)?;
-        *self = candidate;
-        Ok(())
-    }
-
-    pub fn source(&self) -> DataValidationSource {
-        self.source
-    }
-    pub fn disable_prompts(&self) -> bool {
-        self.disable_prompts
-    }
-    pub fn x_window(&self) -> Option<u32> {
-        self.x_window
-    }
-    pub fn y_window(&self) -> Option<u32> {
-        self.y_window
-    }
-    pub fn declared_count(&self) -> Option<u32> {
-        self.declared_count
-    }
-    pub fn validations(&self) -> &[ParsedDataValidation] {
-        &self.validations
-    }
-}
 
 #[derive(Debug)]
 struct Captured {
-    source: DataValidationSource,
+    source: Source,
     prefix: Vec<u8>,
     bytes: Vec<u8>,
 }
@@ -566,7 +33,11 @@ fn allocation(resource: &'static str, source: TryReserveError) -> Error {
     Error::Allocation { resource, source }
 }
 
-fn reserve_vec<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> Result<()> {
+pub(crate) fn reserve_vec<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<()> {
     values
         .try_reserve_exact(additional)
         .map_err(|source| allocation(resource, source))
@@ -593,14 +64,14 @@ fn append_limited_text(
 }
 
 /// A fallible, bounded formatter used by the XML writer.
-struct BoundedXml {
+pub(crate) struct BoundedXml {
     value: String,
     allocation: Option<TryReserveError>,
     exceeded: bool,
 }
 
 impl BoundedXml {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             value: String::new(),
             allocation: None,
@@ -608,7 +79,7 @@ impl BoundedXml {
         }
     }
 
-    fn write_arguments(&mut self, arguments: fmt::Arguments<'_>) -> Result<()> {
+    pub(crate) fn write_arguments(&mut self, arguments: fmt::Arguments<'_>) -> Result<()> {
         if fmt::write(self, arguments).is_ok() {
             return Ok(());
         }
@@ -622,11 +93,11 @@ impl BoundedXml {
         }
     }
 
-    fn push_str(&mut self, value: &str) -> Result<()> {
+    pub(crate) fn push_str(&mut self, value: &str) -> Result<()> {
         self.write_arguments(format_args!("{value}"))
     }
 
-    fn finish(self) -> String {
+    pub(crate) fn finish(self) -> String {
         self.value
     }
 }
@@ -651,7 +122,7 @@ impl fmt::Write for BoundedXml {
     }
 }
 
-fn append_bounded_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+pub(crate) fn append_bounded_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
     let length = output
         .len()
         .checked_add(bytes.len())
@@ -690,7 +161,7 @@ fn retain_capture(
     Ok(())
 }
 
-pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<DataValidationCollection>> {
+pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<Collection>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("data-validation worksheet XML is too large"));
     }
@@ -738,7 +209,7 @@ pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<DataValidatio
 }
 
 /// In-flight capture state for a single `dataValidation` element.
-type CaptureState = Option<(usize, DataValidationSource, Vec<u8>, Writer<Vec<u8>>)>;
+type CaptureState = Option<(usize, Source, Vec<u8>, Writer<Vec<u8>>)>;
 
 fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
     let mut reader = NsReader::from_reader(xml);
@@ -832,7 +303,7 @@ fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                 if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
                     return Err(invalid("dataValidations fragment is too large"));
                 }
-                capture = Some((1, DataValidationSource::Core, prefix, writer));
+                capture = Some((1, Source::Core, prefix, writer));
             },
             Event::Start(element)
                 if element.local_name().as_ref() == b"dataValidations"
@@ -848,7 +319,7 @@ fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                 if writer.get_ref().len() > MAX_FRAGMENT_BYTES {
                     return Err(invalid("dataValidations fragment is too large"));
                 }
-                capture = Some((1, DataValidationSource::Office2010, prefix, writer));
+                capture = Some((1, Source::Office2010, prefix, writer));
             },
             Event::Empty(element)
                 if element.local_name().as_ref() == b"dataValidations"
@@ -867,7 +338,7 @@ fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                     &mut values,
                     &mut retained,
                     Captured {
-                        source: DataValidationSource::Core,
+                        source: Source::Core,
                         prefix,
                         bytes: writer.into_inner(),
                     },
@@ -964,7 +435,7 @@ fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
     Ok(values)
 }
 
-fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
+fn parse_collection(fragment: &Captured) -> Result<Collection> {
     let wrapped = wrap(&fragment.prefix, &fragment.bytes)?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
     reader.config_mut().trim_text(false);
@@ -1149,7 +620,7 @@ fn parse_collection(fragment: &Captured) -> Result<DataValidationCollection> {
     if expected.is_some_and(|v| v as usize != validations.len()) {
         return Err(invalid("dataValidations count does not match its children"));
     }
-    Ok(DataValidationCollection {
+    Ok(Collection {
         source: fragment.source,
         disable_prompts: disable,
         x_window,
@@ -1169,44 +640,29 @@ enum TextTarget {
 
 fn text_target_matches(
     target: TextTarget,
-    source: DataValidationSource,
+    source: Source,
     namespace: &ResolveResult<'_>,
     local: &[u8],
 ) -> bool {
     match target {
         TextTarget::Formula1 => {
-            (source == DataValidationSource::Core
-                && local == b"formula1"
-                && source_ns(source, namespace))
-                || (source == DataValidationSource::Office2010
-                    && local == b"f"
-                    && exact(namespace, XM))
+            (source == Source::Core && local == b"formula1" && source_ns(source, namespace))
+                || (source == Source::Office2010 && local == b"f" && exact(namespace, XM))
         },
         TextTarget::Formula2 => {
-            (source == DataValidationSource::Core
-                && local == b"formula2"
-                && source_ns(source, namespace))
-                || (source == DataValidationSource::Office2010
-                    && local == b"f"
-                    && exact(namespace, XM))
+            (source == Source::Core && local == b"formula2" && source_ns(source, namespace))
+                || (source == Source::Office2010 && local == b"f" && exact(namespace, XM))
         },
         TextTarget::Sqref => local == b"sqref" && exact(namespace, XM),
         TextTarget::List => local == b"list" && exact(namespace, X12AC),
     }
 }
 
-fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataValidation> {
+fn parse_rule(raw: &[u8], source: Source) -> Result<Validation> {
     if raw.len() > MAX_FRAGMENT_BYTES {
         return Err(invalid("dataValidation rule is too large"));
     }
-    let wrapped = wrap(
-        if source == DataValidationSource::Core {
-            b""
-        } else {
-            b"x14"
-        },
-        raw,
-    )?;
+    let wrapped = wrap(if source == Source::Core { b"" } else { b"x14" }, raw)?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -1214,10 +670,10 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
     let mut rule_depth = None;
     let mut closed = false;
     let mut order = 0u8;
-    let mut kind = ParsedDataValidationType::None;
-    let mut operator = ParsedDataValidationOperator::Between;
-    let mut error_style = ParsedDataValidationErrorStyle::Stop;
-    let mut ime = ParsedDataValidationImeMode::NoControl;
+    let mut kind = ValidationType::None;
+    let mut operator = ValidationOperator::Between;
+    let mut error_style = ValidationErrorStyle::Stop;
+    let mut ime = ValidationImeMode::NoControl;
     let mut allow_blank = false;
     let mut show_drop_down = false;
     let mut show_input = false;
@@ -1225,9 +681,9 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
     let (mut error_title, mut error, mut prompt_title, mut prompt, mut uid) =
         (None, None, None, None, None);
     let (mut formula1, mut formula2, mut sqref): (
-        Option<ValidationListSource>,
-        Option<DataValidationFormula>,
-        Option<DataValidationSqref>,
+        Option<ListSource>,
+        Option<Formula>,
+        Option<Sqref>,
     ) = (None, None, None);
     let mut wrapper: Option<(u8, usize, bool)> = None;
     let mut text: Option<(usize, TextTarget, String)> = None;
@@ -1272,22 +728,22 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                         .checked_add(1)
                         .ok_or_else(|| invalid("dataValidation nesting overflow"))?;
                     rule_depth = Some(depth);
-                    kind = ParsedDataValidationType::parse(
+                    kind = ValidationType::parse(
                         optional_attr(&element, b"type", decoder)?
                             .as_deref()
                             .unwrap_or("none"),
                     )?;
-                    operator = ParsedDataValidationOperator::parse(
+                    operator = ValidationOperator::parse(
                         optional_attr(&element, b"operator", decoder)?
                             .as_deref()
                             .unwrap_or("between"),
                     )?;
-                    error_style = ParsedDataValidationErrorStyle::parse(
+                    error_style = ValidationErrorStyle::parse(
                         optional_attr(&element, b"errorStyle", decoder)?
                             .as_deref()
                             .unwrap_or("stop"),
                     )?;
-                    ime = ParsedDataValidationImeMode::parse(
+                    ime = ValidationImeMode::parse(
                         optional_attr(&element, b"imeMode", decoder)?
                             .as_deref()
                             .unwrap_or("noControl"),
@@ -1304,7 +760,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     prompt_title = bounded_attr(&element, b"promptTitle", decoder, 32)?;
                     prompt = bounded_attr(&element, b"prompt", decoder, 255)?;
                     uid = uid_attr(&element, decoder, &resolver)?;
-                    if source == DataValidationSource::Core {
+                    if source == Source::Core {
                         sqref = Some(parse_sqref(
                             &required_attr(&element, b"sqref", decoder)?,
                             false,
@@ -1333,7 +789,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                         return Err(invalid("dataValidation nesting is too deep"));
                     }
                     depth = target_depth;
-                    if source == DataValidationSource::Core {
+                    if source == Source::Core {
                         text = Some((
                             depth,
                             if number == 1 {
@@ -1344,7 +800,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                             String::new(),
                         ));
                     }
-                } else if source == DataValidationSource::Office2010
+                } else if source == Source::Office2010
                     && wrapper.is_some()
                     && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, XM)
@@ -1364,7 +820,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                         TextTarget::Formula2
                     };
                     text = Some((depth, target, String::new()));
-                } else if source == DataValidationSource::Office2010
+                } else if source == Source::Office2010
                     && wrapper.is_some()
                     && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, X12AC)
@@ -1382,7 +838,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     wrapper_state.2 = true;
                     depth += 1;
                     text = Some((depth, TextTarget::List, String::new()));
-                } else if source == DataValidationSource::Office2010
+                } else if source == Source::Office2010
                     && rule_depth == Some(depth)
                     && exact(&namespace, XM)
                     && local.as_ref() == b"sqref"
@@ -1452,7 +908,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     return Err(invalid("content follows dataValidation"));
                 }
                 let local = element.local_name();
-                if source == DataValidationSource::Core
+                if source == Source::Core
                     && rule_depth == Some(depth)
                     && spreadsheet(&namespace)
                     && matches!(local.as_ref(), b"formula1" | b"formula2")
@@ -1464,20 +920,15 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     order = number;
                     if number == 1 {
                         if formula1
-                            .replace(ValidationListSource::Formula(DataValidationFormula(
-                                String::new(),
-                            )))
+                            .replace(ListSource::Formula(Formula(String::new())))
                             .is_some()
                         {
                             return Err(invalid("duplicate formula1"));
                         }
-                    } else if formula2
-                        .replace(DataValidationFormula(String::new()))
-                        .is_some()
-                    {
+                    } else if formula2.replace(Formula(String::new())).is_some() {
                         return Err(invalid("duplicate formula2"));
                     }
-                } else if source == DataValidationSource::Office2010
+                } else if source == Source::Office2010
                     && wrapper.is_some()
                     && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, XM)
@@ -1493,20 +944,15 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     wrapper_state.2 = true;
                     if number == 1 {
                         if formula1
-                            .replace(ValidationListSource::Formula(DataValidationFormula(
-                                String::new(),
-                            )))
+                            .replace(ListSource::Formula(Formula(String::new())))
                             .is_some()
                         {
                             return Err(invalid("duplicate formula1"));
                         }
-                    } else if formula2
-                        .replace(DataValidationFormula(String::new()))
-                        .is_some()
-                    {
+                    } else if formula2.replace(Formula(String::new())).is_some() {
                         return Err(invalid("duplicate formula2"));
                     }
-                } else if source == DataValidationSource::Office2010
+                } else if source == Source::Office2010
                     && wrapper.is_some()
                     && rule_depth.is_some_and(|value| depth == value + 1)
                     && exact(&namespace, X12AC)
@@ -1520,12 +966,12 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     }
                     wrapper_state.2 = true;
                     if formula1
-                        .replace(ValidationListSource::QuotedList(String::new()))
+                        .replace(ListSource::QuotedList(String::new()))
                         .is_some()
                     {
                         return Err(invalid("duplicate formula1 source"));
                     }
-                } else if source == DataValidationSource::Office2010
+                } else if source == Source::Office2010
                     && rule_depth == Some(depth)
                     && exact(&namespace, XM)
                     && local.as_ref() == b"sqref"
@@ -1554,20 +1000,19 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                             if formula1.is_some() {
                                 return Err(invalid("duplicate formula1"));
                             }
-                            formula1 =
-                                Some(ValidationListSource::Formula(DataValidationFormula(value)));
+                            formula1 = Some(ListSource::Formula(Formula(value)));
                         },
                         TextTarget::Formula2 => {
                             if formula2.is_some() {
                                 return Err(invalid("duplicate formula2"));
                             }
-                            formula2 = Some(DataValidationFormula(value));
+                            formula2 = Some(Formula(value));
                         },
                         TextTarget::List => {
                             if formula1.is_some() {
                                 return Err(invalid("duplicate formula1 source"));
                             }
-                            formula1 = Some(ValidationListSource::QuotedList(value));
+                            formula1 = Some(ListSource::QuotedList(value));
                         },
                         TextTarget::Sqref => {
                             let (flags, value) = decode_flags(&value)?;
@@ -1590,7 +1035,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     if !source_ns(source, &namespace) || element.local_name().as_ref() != expected {
                         return Err(invalid("invalid data-validation wrapper closing element"));
                     }
-                    if source == DataValidationSource::Office2010 && !seen {
+                    if source == Source::Office2010 && !seen {
                         return Err(invalid(
                             "x14 formula wrapper must contain exactly one value",
                         ));
@@ -1623,7 +1068,7 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
     }
     let sqref = sqref.ok_or_else(|| invalid("dataValidation is missing sqref"))?;
     validate_formula_cardinality(kind, operator, &formula1, &formula2)?;
-    Ok(ParsedDataValidation {
+    Ok(Validation {
         source,
         validation_type: kind,
         operator,
@@ -1645,18 +1090,18 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
 }
 
 fn validate_formula_cardinality(
-    kind: ParsedDataValidationType,
-    operator: ParsedDataValidationOperator,
-    f1: &Option<ValidationListSource>,
-    f2: &Option<DataValidationFormula>,
+    kind: ValidationType,
+    operator: ValidationOperator,
+    f1: &Option<ListSource>,
+    f2: &Option<Formula>,
 ) -> Result<()> {
     match kind {
-        ParsedDataValidationType::None => {
+        ValidationType::None => {
             if f1.is_some() || f2.is_some() {
                 return Err(invalid("type none must not contain formulas"));
             }
         },
-        ParsedDataValidationType::List | ParsedDataValidationType::Custom => {
+        ValidationType::List | ValidationType::Custom => {
             if f1.is_none() || f2.is_some() {
                 return Err(invalid(
                     "list/custom validation requires exactly formula1 or a quoted list",
@@ -1665,7 +1110,7 @@ fn validate_formula_cardinality(
         },
         _ if matches!(
             operator,
-            ParsedDataValidationOperator::Between | ParsedDataValidationOperator::NotBetween
+            ValidationOperator::Between | ValidationOperator::NotBetween
         ) =>
         {
             if f1.is_none() || f2.is_none() {
@@ -1681,7 +1126,7 @@ fn validate_formula_cardinality(
     Ok(())
 }
 
-pub fn validate_data_validation_collections(values: &[DataValidationCollection]) -> Result<()> {
+pub fn validate_data_validation_collections(values: &[Collection]) -> Result<()> {
     let mut sources = HashSet::new();
     let mut count = 0usize;
     for collection in values {
@@ -1699,7 +1144,7 @@ pub fn validate_data_validation_collections(values: &[DataValidationCollection])
     Ok(())
 }
 
-fn validate_collection(value: &DataValidationCollection) -> Result<()> {
+pub(crate) fn validate_collection(value: &Collection) -> Result<()> {
     if value.validations.is_empty() || value.validations.len() > MAX_VALIDATIONS {
         return Err(invalid("dataValidations has an invalid rule count"));
     }
@@ -1717,7 +1162,7 @@ fn validate_collection(value: &DataValidationCollection) -> Result<()> {
     Ok(())
 }
 
-fn validate_rule(value: &ParsedDataValidation) -> Result<()> {
+pub(crate) fn validate_rule(value: &Validation) -> Result<()> {
     validate_formula_cardinality(
         value.validation_type,
         value.operator,
@@ -1731,7 +1176,7 @@ fn validate_rule(value: &ParsedDataValidation) -> Result<()> {
     if value.uid.as_deref().is_some_and(|uid| !valid_guid(uid)) {
         return Err(invalid("invalid data-validation uid"));
     }
-    if value.source == DataValidationSource::Core
+    if value.source == Source::Core
         && (value.sqref.edited || value.sqref.split || value.sqref.adjusted || value.sqref.adjust)
     {
         return Err(invalid(
@@ -1746,11 +1191,9 @@ fn validate_rule(value: &ParsedDataValidation) -> Result<()> {
         value.sqref.adjust,
     )?;
     match value.formula1.as_ref() {
-        Some(ValidationListSource::Formula(value)) => {
-            validate_text(&value.0, MAX_FORMULA_BYTES, "formula1")?
-        },
-        Some(ValidationListSource::QuotedList(list)) => {
-            if value.source != DataValidationSource::Office2010 {
+        Some(ListSource::Formula(value)) => validate_text(&value.0, MAX_FORMULA_BYTES, "formula1")?,
+        Some(ListSource::QuotedList(list)) => {
+            if value.source != Source::Office2010 {
                 return Err(invalid(
                     "quoted-list source requires Office 2010 data validation",
                 ));
@@ -1765,7 +1208,7 @@ fn validate_rule(value: &ParsedDataValidation) -> Result<()> {
     Ok(())
 }
 
-fn validate_optional_text(value: Option<&str>, max: usize, field: &str) -> Result<()> {
+pub(crate) fn validate_optional_text(value: Option<&str>, max: usize, field: &str) -> Result<()> {
     if let Some(value) = value {
         if value.chars().count() > max {
             return Err(invalid(format!("{field} exceeds {max} characters")));
@@ -1775,7 +1218,7 @@ fn validate_optional_text(value: Option<&str>, max: usize, field: &str) -> Resul
     Ok(())
 }
 
-fn validate_text(value: &str, max_bytes: usize, field: &str) -> Result<()> {
+pub(crate) fn validate_text(value: &str, max_bytes: usize, field: &str) -> Result<()> {
     if value.len() > max_bytes {
         return Err(invalid(format!("{field} is too large")));
     }
@@ -1794,7 +1237,7 @@ fn validate_xml_chars(value: &str, field: &str) -> Result<()> {
     Ok(())
 }
 
-fn sqref_text(value: &DataValidationSqref) -> Result<String> {
+fn sqref_text(value: &Sqref) -> Result<String> {
     let mut text = String::new();
     for (index, range) in value.ranges.iter().enumerate() {
         if index != 0 {
@@ -1810,13 +1253,13 @@ fn sqref_text(value: &DataValidationSqref) -> Result<String> {
     Ok(text)
 }
 
-fn parse_sqref(
+pub(crate) fn parse_sqref(
     value: &str,
     edited: bool,
     split: bool,
     adjusted: bool,
     adjust: bool,
-) -> Result<DataValidationSqref> {
+) -> Result<Sqref> {
     if value.len() > MAX_FRAGMENT_BYTES {
         return Err(invalid("data-validation sqref is too large"));
     }
@@ -1837,12 +1280,12 @@ fn parse_sqref(
             return Err(invalid(format!("invalid data-validation range '{item}'")));
         }
         reserve_vec(&mut ranges, 1, "data-validation references")?;
-        ranges.push(DataValidationRange(item.to_owned()));
+        ranges.push(Range(item.to_owned()));
     }
     if ranges.is_empty() {
         return Err(invalid("data-validation sqref is empty"));
     }
-    Ok(DataValidationSqref {
+    Ok(Sqref {
         ranges,
         edited,
         split,
@@ -1942,7 +1385,7 @@ fn uid_attr(
     }
     Ok(result)
 }
-fn optional_attr(
+pub(crate) fn optional_attr(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: Decoder,
@@ -2048,29 +1491,29 @@ fn prefix(name: &[u8]) -> Result<Vec<u8>> {
     value.extend_from_slice(&name[..index]);
     Ok(value)
 }
-fn source_ns(source: DataValidationSource, ns: &ResolveResult<'_>) -> bool {
+fn source_ns(source: Source, ns: &ResolveResult<'_>) -> bool {
     match source {
-        DataValidationSource::Core => spreadsheet(ns),
-        DataValidationSource::Office2010 => exact(ns, X14),
+        Source::Core => spreadsheet(ns),
+        Source::Office2010 => exact(ns, X14),
     }
 }
-fn spreadsheet(ns: &ResolveResult<'_>) -> bool {
+pub(crate) fn spreadsheet(ns: &ResolveResult<'_>) -> bool {
     exact(ns, CORE) || exact(ns, STRICT)
 }
-fn exact(ns: &ResolveResult<'_>, expected: &[u8]) -> bool {
+pub(crate) fn exact(ns: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(ns,ResolveResult::Bound(value)if value.as_ref()==expected)
 }
-fn xml_error(error: impl std::fmt::Display) -> Error {
+pub(crate) fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
-fn invalid(message: impl Into<String>) -> Error {
+pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
 /// Write canonical core and Office 2010 data-validation fragments.
 pub fn write_data_validation_collections(
-    values: &[DataValidationCollection],
-    conformance: DataValidationConformance,
+    values: &[Collection],
+    conformance: Conformance,
 ) -> Result<String> {
     let core = write_data_validation_core(values, conformance)?;
     let extensions = write_data_validation_extensions(values, conformance)?;
@@ -2081,14 +1524,14 @@ pub fn write_data_validation_collections(
 }
 
 pub fn write_data_validation_core(
-    values: &[DataValidationCollection],
-    conformance: DataValidationConformance,
+    values: &[Collection],
+    conformance: Conformance,
 ) -> Result<String> {
     validate_data_validation_collections(values)?;
     let mut xml = BoundedXml::new();
     if let Some(collection) = values
         .iter()
-        .find(|collection| collection.source == DataValidationSource::Core)
+        .find(|collection| collection.source == Source::Core)
     {
         xml.write_arguments(format_args!(
             "<dataValidations xmlns=\"{}\" xmlns:xr=\"{}\"",
@@ -2106,14 +1549,14 @@ pub fn write_data_validation_core(
 }
 
 pub fn write_data_validation_extensions(
-    values: &[DataValidationCollection],
-    conformance: DataValidationConformance,
+    values: &[Collection],
+    conformance: Conformance,
 ) -> Result<String> {
     validate_data_validation_collections(values)?;
     let mut xml = BoundedXml::new();
     if let Some(collection) = values
         .iter()
-        .find(|collection| collection.source == DataValidationSource::Office2010)
+        .find(|collection| collection.source == Source::Office2010)
     {
         xml.write_arguments(format_args!(
             "<extLst xmlns=\"{}\"><ext uri=\"{}\"><x14:dataValidations xmlns:x14=\"{}\" xmlns:xm=\"{}\" xmlns:x12ac=\"{}\" xmlns:xr=\"{}\"",
@@ -2134,10 +1577,7 @@ pub fn write_data_validation_extensions(
     Ok(xml.finish())
 }
 
-fn write_collection_attributes(
-    xml: &mut BoundedXml,
-    value: &DataValidationCollection,
-) -> Result<()> {
+fn write_collection_attributes(xml: &mut BoundedXml, value: &Collection) -> Result<()> {
     if value.disable_prompts {
         xml.push_str(" disablePrompts=\"1\"")?;
     }
@@ -2151,27 +1591,27 @@ fn write_collection_attributes(
     Ok(())
 }
 
-fn write_rule(xml: &mut BoundedXml, value: &ParsedDataValidation) -> Result<()> {
+fn write_rule(xml: &mut BoundedXml, value: &Validation) -> Result<()> {
     validate_rule(value)?;
-    let prefix = if value.source == DataValidationSource::Office2010 {
+    let prefix = if value.source == Source::Office2010 {
         "x14:"
     } else {
         ""
     };
     xml.write_arguments(format_args!("<{prefix}dataValidation"))?;
-    if value.validation_type != ParsedDataValidationType::None {
+    if value.validation_type != ValidationType::None {
         xml.write_arguments(format_args!(" type=\"{}\"", value.validation_type.as_str()))?;
     }
-    if value.operator != ParsedDataValidationOperator::Between {
+    if value.operator != ValidationOperator::Between {
         xml.write_arguments(format_args!(" operator=\"{}\"", value.operator.as_str()))?;
     }
-    if value.error_style != ParsedDataValidationErrorStyle::Stop {
+    if value.error_style != ValidationErrorStyle::Stop {
         xml.write_arguments(format_args!(
             " errorStyle=\"{}\"",
             value.error_style.as_str()
         ))?;
     }
-    if value.ime_mode != ParsedDataValidationImeMode::NoControl {
+    if value.ime_mode != ValidationImeMode::NoControl {
         xml.write_arguments(format_args!(" imeMode=\"{}\"", value.ime_mode.as_str()))?;
     }
     for (name, enabled) in [
@@ -2197,7 +1637,7 @@ fn write_rule(xml: &mut BoundedXml, value: &ParsedDataValidation) -> Result<()> 
     if let Some(uid) = value.uid.as_deref() {
         xml.write_arguments(format_args!(" xr:uid=\"{}\"", escape_xml(uid)))?;
     }
-    if value.source == DataValidationSource::Core {
+    if value.source == Source::Core {
         let sqref = sqref_text(&value.sqref)?;
         xml.write_arguments(format_args!(" sqref=\"{}\"", escape_xml(&sqref)))?;
     }
@@ -2206,7 +1646,7 @@ fn write_rule(xml: &mut BoundedXml, value: &ParsedDataValidation) -> Result<()> 
     if let Some(formula) = value.formula2.as_ref() {
         write_formula_source(xml, prefix, 2, FormulaSource::Formula(&formula.0))?;
     }
-    if value.source == DataValidationSource::Office2010 {
+    if value.source == Source::Office2010 {
         xml.push_str("<xm:sqref")?;
         for (name, enabled) in [
             ("edited", value.sqref.edited),
@@ -2234,14 +1674,14 @@ fn write_formula(
     xml: &mut BoundedXml,
     prefix: &str,
     number: u8,
-    value: Option<&ValidationListSource>,
+    value: Option<&ListSource>,
 ) -> Result<()> {
     let Some(value) = value else {
         return Ok(());
     };
     let source = match value {
-        ValidationListSource::Formula(value) => FormulaSource::Formula(&value.0),
-        ValidationListSource::QuotedList(value) => FormulaSource::QuotedList(value),
+        ListSource::Formula(value) => FormulaSource::Formula(&value.0),
+        ListSource::QuotedList(value) => FormulaSource::QuotedList(value),
     };
     write_formula_source(xml, prefix, number, source)
 }
@@ -2276,409 +1716,14 @@ fn write_formula_source(
     Ok(())
 }
 
-#[derive(Debug)]
-struct DataValidationXmlScan {
-    conformance: DataValidationConformance,
-    worksheet_close: usize,
-    core_insert: usize,
-    core_ranges: Vec<Range<usize>>,
-    x14_ranges: Vec<Range<usize>>,
-    matching_ext_close: Option<usize>,
-    ext_lst_close: Option<usize>,
-}
-
-/// Replace data-validation XML while preserving every unrelated worksheet byte.
-pub fn replace_data_validation_collections(
-    worksheet_xml: &[u8],
-    values: &[DataValidationCollection],
-) -> Result<Vec<u8>> {
-    let parsed = parse_data_validation_collections(worksheet_xml)?;
-    validate_data_validation_collections(&parsed)?;
-    validate_data_validation_collections(values)?;
-    let scan = scan_data_validation_xml(worksheet_xml)?;
-    let parsed_core = parsed
-        .iter()
-        .any(|value| value.source == DataValidationSource::Core);
-    let parsed_x14 = parsed
-        .iter()
-        .any(|value| value.source == DataValidationSource::Office2010);
-    if parsed_core == scan.core_ranges.is_empty() || parsed_x14 == scan.x14_ranges.is_empty() {
-        return Err(invalid(
-            "data validations selected through MCE cannot be mutated byte-exactly",
-        ));
-    }
-    let core = write_data_validation_core(values, scan.conformance)?;
-    let extensions = write_data_validation_extensions(values, scan.conformance)?;
-    let edit_count = scan
-        .core_ranges
-        .len()
-        .checked_add(scan.x14_ranges.len())
-        .ok_or_else(|| invalid("data-validation edit count overflow"))?;
-    let mut edits = Vec::new();
-    reserve_vec(&mut edits, edit_count, "data-validation edits")?;
-    edits.extend(
-        scan.core_ranges
-            .iter()
-            .chain(scan.x14_ranges.iter())
-            .cloned()
-            .map(|range| (range, Vec::new())),
-    );
-    if !core.is_empty() {
-        if let Some(range) = scan.core_ranges.first() {
-            let Some(edit) = edits.iter_mut().find(|(candidate, _)| candidate == range) else {
-                return Err(invalid("missing core data-validation edit"));
-            };
-            edit.1 = core.into_bytes();
-        } else {
-            reserve_vec(&mut edits, 1, "data-validation edits")?;
-            edits.push((scan.core_insert..scan.core_insert, core.into_bytes()));
-        }
-    }
-    if !extensions.is_empty() {
-        let inner = data_validation_extension_inner(&extensions)?;
-        if let Some(range) = scan.x14_ranges.first() {
-            let Some(edit) = edits.iter_mut().find(|(candidate, _)| candidate == range) else {
-                return Err(invalid("missing Office 2010 data-validation edit"));
-            };
-            edit.1 = inner.into_bytes();
-        } else if let Some(position) = scan.matching_ext_close {
-            reserve_vec(&mut edits, 1, "data-validation edits")?;
-            edits.push((position..position, inner.into_bytes()));
-        } else if let Some(position) = scan.ext_lst_close {
-            reserve_vec(&mut edits, 1, "data-validation edits")?;
-            edits.push((
-                position..position,
-                data_validation_extension_wrapper(&inner, scan.conformance)?.into_bytes(),
-            ));
-        } else {
-            reserve_vec(&mut edits, 1, "data-validation edits")?;
-            edits.push((
-                scan.worksheet_close..scan.worksheet_close,
-                extensions.into_bytes(),
-            ));
-        }
-    }
-    apply_data_validation_edits(worksheet_xml, edits)
-}
-
-fn data_validation_extension_inner(fragment: &str) -> Result<String> {
-    let start = fragment
-        .find("<x14:dataValidations")
-        .ok_or_else(|| invalid("invalid generated data-validation extension"))?;
-    let end = fragment
-        .rfind("</x14:dataValidations>")
-        .ok_or_else(|| invalid("invalid generated data-validation extension"))?
-        + "</x14:dataValidations>".len();
-    Ok(fragment[start..end].to_string())
-}
-
-fn data_validation_extension_wrapper(
-    inner: &str,
-    conformance: DataValidationConformance,
-) -> Result<String> {
-    let mut wrapper = BoundedXml::new();
-    wrapper.write_arguments(format_args!(
-        "<ext xmlns=\"{}\" uri=\"{}\">{inner}</ext>",
-        conformance.namespace(),
-        EXTENSION_URI
-    ))?;
-    Ok(wrapper.finish())
-}
-
-fn apply_data_validation_edits(
-    xml: &[u8],
-    mut edits: Vec<(Range<usize>, Vec<u8>)>,
-) -> Result<Vec<u8>> {
-    edits.sort_by_key(|(range, _)| (range.start, range.end));
-    let mut output = Vec::new();
-    reserve_vec(&mut output, xml.len(), "data-validation XML output")?;
-    let mut cursor = 0usize;
-    for (range, replacement) in edits {
-        if range.start < cursor || range.end < range.start || range.end > xml.len() {
-            return Err(invalid("overlapping data-validation XML edits"));
-        }
-        append_bounded_bytes(&mut output, &xml[cursor..range.start])?;
-        append_bounded_bytes(&mut output, &replacement)?;
-        cursor = range.end;
-    }
-    append_bounded_bytes(&mut output, &xml[cursor..])?;
-    let reparsed = parse_data_validation_collections(&output)?;
-    validate_data_validation_collections(&reparsed)?;
-    Ok(output)
-}
-
-fn push_scan_range(ranges: &mut Vec<Range<usize>>, range: Range<usize>) -> Result<()> {
-    if ranges.len() >= MAX_CAPTURED_COLLECTIONS {
-        return Err(invalid("too many physical data-validation collections"));
-    }
-    reserve_vec(ranges, 1, "data-validation scan ranges")?;
-    ranges.push(range);
-    Ok(())
-}
-
-fn scan_data_validation_xml(xml: &[u8]) -> Result<DataValidationXmlScan> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(invalid("data-validation worksheet XML is too large"));
-    }
-    let mut reader = NsReader::from_reader(xml);
-    reader.config_mut().trim_text(false);
-    reader.config_mut().check_end_names = true;
-    let mut depth = 0usize;
-    let mut previous = 0usize;
-    let mut conformance = None;
-    let mut worksheet_close = None;
-    let mut core_insert = None;
-    let mut core_start = None;
-    let mut core_ranges = Vec::new();
-    let mut x14_start = None;
-    let mut x14_ranges = Vec::new();
-    let mut matching_ext_depth = None;
-    let mut matching_ext_close = None;
-    let mut ext_lst_depth = None;
-    let mut ext_lst_close = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut events = 0usize;
-    let mut nodes = 0usize;
-    loop {
-        events = events
-            .checked_add(1)
-            .ok_or_else(|| invalid("data-validation worksheet event count overflow"))?;
-        if events > MAX_EVENTS {
-            return Err(invalid("data-validation worksheet exceeds event limit"));
-        }
-        let start = previous;
-        let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("data-validation XML offset overflow"))?;
-        previous = end;
-        let decoder = reader.decoder();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
-        if matches!(&event, Event::Eof) {
-            break;
-        }
-        if matches!(&event, Event::Start(_) | Event::Empty(_) | Event::End(_)) {
-            nodes = nodes
-                .checked_add(1)
-                .ok_or_else(|| invalid("data-validation worksheet node count overflow"))?;
-            if nodes > MAX_NODES {
-                return Err(invalid("data-validation worksheet exceeds node limit"));
-            }
-        }
-        match event {
-            Event::Start(element) => {
-                if root_closed {
-                    return Err(invalid("worksheet XML contains content after root"));
-                }
-                if depth == 0 && root_seen {
-                    return Err(invalid("worksheet XML contains multiple roots"));
-                }
-                if depth >= MAX_DEPTH {
-                    return Err(invalid("worksheet XML nesting is too deep"));
-                }
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
-                let local = element.local_name();
-                if depth == 1 {
-                    conformance = match namespace {
-                        ResolveResult::Bound(value) if value.as_ref() == CORE => {
-                            Some(DataValidationConformance::Transitional)
-                        },
-                        ResolveResult::Bound(value) if value.as_ref() == STRICT => {
-                            Some(DataValidationConformance::Strict)
-                        },
-                        _ => None,
-                    };
-                    if conformance.is_none() || local.as_ref() != b"worksheet" {
-                        return Err(invalid("invalid worksheet namespace"));
-                    }
-                    root_seen = true;
-                } else if depth == 2 {
-                    if local.as_ref() == b"dataValidations" && !spreadsheet(&namespace) {
-                        return Err(invalid("spoofed dataValidations element namespace"));
-                    }
-                    if spreadsheet(&namespace) {
-                        if local.as_ref() == b"dataValidations" {
-                            if core_start.is_some() {
-                                return Err(invalid("duplicate core dataValidations element"));
-                            }
-                            core_start = Some((depth, start));
-                        } else if core_insert.is_none() && validation_schema_after(local.as_ref()) {
-                            core_insert = Some(start);
-                        }
-                        if local.as_ref() == b"extLst" {
-                            ext_lst_depth = Some(depth);
-                        }
-                    }
-                }
-                if spreadsheet(&namespace)
-                    && local.as_ref() == b"ext"
-                    && optional_attr(&element, b"uri", decoder)?.as_deref() == Some(EXTENSION_URI)
-                {
-                    if matching_ext_depth.is_some() {
-                        return Err(invalid("nested data-validation extension"));
-                    }
-                    matching_ext_depth = Some(depth);
-                }
-                if local.as_ref() == b"dataValidations" && matching_ext_depth.is_some() {
-                    if !exact(&namespace, X14) {
-                        return Err(invalid("spoofed x14 dataValidations element namespace"));
-                    }
-                    if x14_start.is_some() {
-                        return Err(invalid("duplicate Office 2010 dataValidations element"));
-                    }
-                    x14_start = Some((depth, start));
-                }
-            },
-            Event::Empty(element) => {
-                if root_closed || depth == 0 {
-                    return Err(invalid("worksheet XML contains an element outside root"));
-                }
-                let local = element.local_name();
-                let element_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
-                if element_depth > MAX_DEPTH {
-                    return Err(invalid("worksheet XML nesting is too deep"));
-                }
-                if element_depth == 2 {
-                    if local.as_ref() == b"dataValidations" && !spreadsheet(&namespace) {
-                        return Err(invalid("spoofed dataValidations element namespace"));
-                    }
-                    if spreadsheet(&namespace) && local.as_ref() == b"dataValidations" {
-                        if core_start.is_some() {
-                            return Err(invalid("duplicate core dataValidations element"));
-                        }
-                        push_scan_range(&mut core_ranges, start..end)?;
-                    } else if spreadsheet(&namespace)
-                        && core_insert.is_none()
-                        && validation_schema_after(local.as_ref())
-                    {
-                        core_insert = Some(start);
-                    }
-                }
-                if local.as_ref() == b"dataValidations" && matching_ext_depth.is_some() {
-                    if !exact(&namespace, X14) {
-                        return Err(invalid("spoofed x14 dataValidations element namespace"));
-                    }
-                    push_scan_range(&mut x14_ranges, start..end)?;
-                }
-            },
-            Event::End(element) => {
-                if depth == 0 {
-                    return Err(invalid("unexpected worksheet closing element"));
-                }
-                if core_start.is_some_and(|(element_depth, _)| element_depth == depth) {
-                    let Some((_, range_start)) = core_start.take() else {
-                        return Err(invalid("missing core data-validation scan state"));
-                    };
-                    push_scan_range(&mut core_ranges, range_start..end)?;
-                }
-                if x14_start.is_some_and(|(element_depth, _)| element_depth == depth) {
-                    let Some((_, range_start)) = x14_start.take() else {
-                        return Err(invalid("missing Office 2010 data-validation scan state"));
-                    };
-                    push_scan_range(&mut x14_ranges, range_start..end)?;
-                }
-                if matching_ext_depth == Some(depth) {
-                    matching_ext_close = Some(start);
-                    matching_ext_depth = None;
-                }
-                if ext_lst_depth == Some(depth) {
-                    ext_lst_close = Some(start);
-                    ext_lst_depth = None;
-                }
-                if depth == 1 && element.local_name().as_ref() == b"worksheet" {
-                    if !spreadsheet(&namespace) {
-                        return Err(invalid("invalid worksheet closing namespace"));
-                    }
-                    root_closed = true;
-                    worksheet_close = Some(start);
-                } else if depth == 1 {
-                    return Err(invalid("invalid worksheet closing element"));
-                }
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or_else(|| invalid("worksheet XML nesting underflow"))?;
-            },
-            Event::Text(value) => {
-                if (!root_seen || root_closed)
-                    && !value.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
-                    return Err(invalid("worksheet XML text is outside root"));
-                }
-                if depth == 1 && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
-                    return Err(invalid("worksheet cannot contain direct text"));
-                }
-            },
-            Event::CData(_) => {
-                return Err(invalid("worksheet XML contains unexpected CDATA"));
-            },
-            Event::GeneralRef(reference) => {
-                decode_xml_reference(&reference)?;
-            },
-            Event::Decl(_) => {
-                if root_seen || declaration_seen {
-                    return Err(invalid("invalid worksheet XML declaration position"));
-                }
-                declaration_seen = true;
-            },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("DTD and processing instructions are rejected"));
-            },
-            Event::Comment(_) => {},
-            Event::Eof => break,
-        }
-    }
-    if !root_seen || !root_closed || depth != 0 || core_start.is_some() || x14_start.is_some() {
-        return Err(invalid("incomplete worksheet data-validation XML"));
-    }
-    let worksheet_close = worksheet_close.ok_or_else(|| invalid("worksheet is not closed"))?;
-    Ok(DataValidationXmlScan {
-        conformance: conformance.ok_or_else(|| invalid("invalid worksheet namespace"))?,
-        worksheet_close,
-        core_insert: core_insert.unwrap_or(worksheet_close),
-        core_ranges,
-        x14_ranges,
-        matching_ext_close,
-        ext_lst_close,
-    })
-}
-
-fn validation_schema_after(local: &[u8]) -> bool {
-    matches!(
-        local,
-        b"hyperlinks"
-            | b"printOptions"
-            | b"pageMargins"
-            | b"pageSetup"
-            | b"headerFooter"
-            | b"rowBreaks"
-            | b"colBreaks"
-            | b"customProperties"
-            | b"cellWatches"
-            | b"ignoredErrors"
-            | b"smartTags"
-            | b"drawing"
-            | b"legacyDrawing"
-            | b"legacyDrawingHF"
-            | b"picture"
-            | b"oleObjects"
-            | b"controls"
-            | b"webPublishItems"
-            | b"tableParts"
-            | b"extLst"
-    )
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        Collection, ListSource, MAX_FORMULA_BYTES, MAX_REFERENCES, Source, ValidationType,
+        parse_data_validation_collections,
+    };
     use litchi_opc::PackURI;
-    fn sheet(relative: &str, index: u32) -> Vec<DataValidationCollection> {
+    fn sheet(relative: &str, index: u32) -> Vec<Collection> {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
             .unwrap_or_else(|e| panic!("open {relative}: {e}"));
@@ -2689,7 +1734,7 @@ mod tests {
         parse_data_validation_collections(&bytes)
             .unwrap_or_else(|e| panic!("parse {relative}: {e}"))
     }
-    fn count(values: &[DataValidationCollection]) -> usize {
+    fn count(values: &[Collection]) -> usize {
         values.iter().map(|v| v.validations.len()).sum()
     }
 
@@ -2732,19 +1777,19 @@ mod tests {
             parsed.push(values);
         }
         let extension = &parsed[5][0].validations[0];
-        assert_eq!(extension.source, DataValidationSource::Office2010);
+        assert_eq!(extension.source, Source::Office2010);
         assert_eq!(extension.sqref.ranges[0].as_str(), "F6");
         assert!(
-            matches!(&extension.formula1,Some(ValidationListSource::Formula(v))if v.as_str()=="[2]Tabelle1!#REF!")
+            matches!(&extension.formula1,Some(ListSource::Formula(v))if v.as_str()=="[2]Tabelle1!#REF!")
         );
         let text = &parsed[4][0].validations[0];
-        assert_eq!(text.validation_type, ParsedDataValidationType::TextLength);
+        assert_eq!(text.validation_type, ValidationType::TextLength);
         assert_eq!(
             text.uid.as_deref(),
             Some("{3FE27F7A-BE41-432D-B94C-05DA7B860A0B}")
         );
         assert!(
-            matches!(&parsed[0][0].validations[0].formula1,Some(ValidationListSource::Formula(v))if v.as_str().len()>255)
+            matches!(&parsed[0][0].validations[0].formula1,Some(ListSource::Formula(v))if v.as_str().len()>255)
         );
     }
 
@@ -2756,7 +1801,7 @@ mod tests {
         assert!(values[1].disable_prompts);
         assert_eq!(values[1].x_window, Some(2));
         assert!(
-            matches!(&values[1].validations[0].formula1,Some(ValidationListSource::QuotedList(v))if v=="\"a,b\"")
+            matches!(&values[1].validations[0].formula1,Some(ListSource::QuotedList(v))if v=="\"a,b\"")
         );
         assert_eq!(values[1].validations[0].sqref.ranges.len(), 2);
     }

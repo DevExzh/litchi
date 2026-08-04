@@ -1342,7 +1342,7 @@ fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn xml_error(error: impl std::fmt::Display) -> Error {
+fn xml_error(error: impl Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
 

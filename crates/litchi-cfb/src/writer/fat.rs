@@ -26,7 +26,7 @@ use super::super::file::OleError;
 /// - Uses efficient sector chain building with minimal branching
 /// - Tracks allocated sectors for validation
 #[derive(Debug)]
-pub struct FatBuilder {
+pub(super) struct FatBuilder {
     /// The FAT table (maps sector ID to next sector in chain)
     fat: Vec<u32>,
     /// Next available sector
@@ -42,7 +42,7 @@ impl FatBuilder {
     /// # Arguments
     ///
     /// * `sector_size` - Size of each sector in bytes (512 or 4096)
-    pub fn new_with_size(sector_size: usize) -> Result<Self, OleError> {
+    pub(super) fn new_with_size(sector_size: usize) -> Result<Self, OleError> {
         if !matches!(sector_size, 512 | 4096) {
             return Err(OleError::InvalidData(format!(
                 "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
@@ -60,7 +60,7 @@ impl FatBuilder {
     }
 
     /// Create a new FAT builder with default 512-byte sectors
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::with_valid_sector_size(512)
     }
 
@@ -78,7 +78,7 @@ impl FatBuilder {
     ///
     /// This method pre-allocates all FAT entries needed for the chain,
     /// avoiding repeated vector resizing.
-    pub fn allocate_chain(&mut self, size: usize) -> Result<u32, OleError> {
+    pub(super) fn allocate_chain(&mut self, size: usize) -> Result<u32, OleError> {
         if size == 0 {
             return Ok(ENDOFCHAIN);
         }
@@ -117,7 +117,7 @@ impl FatBuilder {
     /// # Returns
     ///
     /// * `u32` - The allocated sector ID
-    pub fn allocate_sector(&mut self) -> Result<u32, OleError> {
+    pub(super) fn allocate_sector(&mut self) -> Result<u32, OleError> {
         self.allocate_chain(self.sector_size)
     }
 
@@ -130,7 +130,7 @@ impl FatBuilder {
     ///
     /// * `count` - Number of sectors to reserve
     /// * `marker` - The FAT marker to use for these sectors (e.g. `FATSECT`, `DIFSECT`)
-    pub fn allocate_special(&mut self, count: u32, marker: u32) -> Result<u32, OleError> {
+    pub(super) fn allocate_special(&mut self, count: u32, marker: u32) -> Result<u32, OleError> {
         if count == 0 {
             return Ok(ENDOFCHAIN);
         }
@@ -163,7 +163,7 @@ impl FatBuilder {
     /// Mark a range of sectors as FAT sectors
     ///
     /// FAT sectors are marked with special value FATSECT in the FAT itself.
-    pub fn mark_fat_sectors(&mut self, start: u32, count: u32) -> Result<(), OleError> {
+    pub(super) fn mark_fat_sectors(&mut self, start: u32, count: u32) -> Result<(), OleError> {
         if start != self.next_sector {
             return Err(OleError::InvalidData(
                 "CFB FAT sectors must begin at the next free sector".to_string(),
@@ -174,12 +174,12 @@ impl FatBuilder {
     }
 
     /// Get the FAT table
-    pub fn fat(&self) -> &[u32] {
+    pub(super) fn fat(&self) -> &[u32] {
         &self.fat
     }
 
     /// Get the total number of sectors allocated
-    pub fn total_sectors(&self) -> u32 {
+    pub(super) fn total_sectors(&self) -> u32 {
         self.next_sector
     }
 
@@ -192,7 +192,7 @@ impl FatBuilder {
     /// # Performance
     ///
     /// Uses pre-allocated buffers and efficient byte copying to minimize allocations.
-    pub fn generate_fat_sectors(&self) -> Result<Vec<Vec<u8>>, OleError> {
+    pub(super) fn generate_fat_sectors(&self) -> Result<Vec<Vec<u8>>, OleError> {
         let entries_per_sector = self.sector_size / 4;
         let num_fat_sectors = self.fat.len().div_ceil(entries_per_sector);
 
@@ -222,7 +222,7 @@ impl FatBuilder {
     /// # Returns
     ///
     /// * `usize` - Number of FAT sectors needed
-    pub fn calculate_fat_sector_count(&self) -> usize {
+    pub(super) fn calculate_fat_sector_count(&self) -> usize {
         let entries_per_sector = self.sector_size / 4;
         self.fat.len().div_ceil(entries_per_sector)
     }
@@ -235,7 +235,7 @@ impl FatBuilder {
     /// # Returns
     ///
     /// * `Result<(), OleError>` - Ok if valid, Err with description if invalid
-    pub fn validate(&self) -> Result<(), OleError> {
+    pub(super) fn validate(&self) -> Result<(), OleError> {
         for (current, &next) in self.fat.iter().enumerate() {
             match next {
                 ENDOFCHAIN | FREESECT | FATSECT | DIFSECT => {},
@@ -266,7 +266,7 @@ impl FatBuilder {
     }
 
     /// Get sector size
-    pub fn sector_size(&self) -> usize {
+    pub(super) fn sector_size(&self) -> usize {
         self.sector_size
     }
 }

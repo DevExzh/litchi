@@ -537,7 +537,7 @@ impl Sheet {
         }
         self.data.web_bindings.get_or_try_init(|| {
             let part = self.owner.package.get_part(&self.data.part_uri)?;
-            crate::raw::web::read(part.blob())
+            raw::web::read(part.blob())
         })
     }
 
@@ -975,11 +975,12 @@ mod tests {
     use super::*;
     use crate::cell::Value;
     use crate::formula::Cache;
+    use std::mem::size_of;
 
     #[derive(Default)]
     struct WriteOnly(Vec<u8>);
 
-    impl std::io::Write for WriteOnly {
+    impl Write for WriteOnly {
         fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
             self.0.extend_from_slice(bytes);
             Ok(bytes.len())
@@ -1074,9 +1075,9 @@ mod tests {
             clone.active_sheet().map(|sheet| sheet.name().to_owned()),
             Some("Sheet1".into())
         );
-        assert!(std::mem::size_of::<Workbook>() <= 2 * std::mem::size_of::<usize>());
-        assert!(std::mem::size_of::<Style>() <= 2 * std::mem::size_of::<usize>());
-        assert!(std::mem::size_of::<Styles>() <= 2 * std::mem::size_of::<usize>());
+        assert!(size_of::<Workbook>() <= 2 * size_of::<usize>());
+        assert!(size_of::<Style>() <= 2 * size_of::<usize>());
+        assert!(size_of::<Styles>() <= 2 * size_of::<usize>());
     }
 
     #[test]

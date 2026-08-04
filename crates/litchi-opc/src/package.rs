@@ -245,7 +245,8 @@ impl OpcPackage {
     /// * `partname` - The PackURI of the part to retrieve
     pub fn get_part(&self, partname: &PackURI) -> Result<&dyn Part> {
         if let Some(part) = self.parts.get(partname) {
-            return Ok(&**part as &dyn Part);
+            let part: &dyn Part = &**part;
+            return Ok(part);
         }
         self.find_case_insensitive(partname)
             .map(|(_, part)| part)
@@ -269,7 +270,10 @@ impl OpcPackage {
         self.parts
             .iter()
             .find(|(name, _)| name.as_str().eq_ignore_ascii_case(wanted))
-            .map(|(name, part)| (name, &**part as &dyn Part))
+            .map(|(name, part)| {
+                let part: &dyn Part = &**part;
+                (name, part)
+            })
     }
 
     /// Get a mutable reference to a part by its partname.
@@ -286,7 +290,10 @@ impl OpcPackage {
         };
         self.parts
             .get_mut(&key)
-            .map(|b| &mut **b as &mut dyn Part)
+            .map(|b| {
+                let part: &mut dyn Part = &mut **b;
+                part
+            })
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
     }
 
@@ -334,7 +341,10 @@ impl OpcPackage {
 
     /// Get an iterator over all parts in the package.
     pub fn iter_parts(&self) -> impl Iterator<Item = &dyn Part> {
-        self.parts.values().map(|b| &**b as &dyn Part)
+        self.parts.values().map(|b| {
+            let part: &dyn Part = &**b;
+            part
+        })
     }
 
     /// Get the number of parts in the package.

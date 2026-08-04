@@ -1983,7 +1983,7 @@ fn make_node(
             return Err(invalid("duplicate XML attribute"));
         }
         let v = a
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, d)
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
             .map_err(xml_error)?
             .into_owned();
         bounded(&v)?;
@@ -2535,7 +2535,7 @@ fn validate_attr_name(value: &str) -> Result<()> {
         Ok(())
     }
 }
-fn xml_error(e: impl std::fmt::Display) -> Error {
+fn xml_error(e: impl fmt::Display) -> Error {
     Error::Xml(e.to_string())
 }
 fn invalid(e: impl Into<String>) -> Error {
@@ -2545,6 +2545,7 @@ fn invalid(e: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     const KEY: FontKey = FontKey::new([
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
@@ -2671,7 +2672,7 @@ mod tests {
         assert_eq!(editable.bits(), 0x0108);
         assert!(License::new(0x0006).is_err());
         assert!(License::new(0x8000).is_err());
-        assert_eq!(std::mem::size_of::<License>(), std::mem::size_of::<u16>());
+        assert_eq!(size_of::<License>(), size_of::<u16>());
     }
 
     #[test]

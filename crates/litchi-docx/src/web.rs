@@ -3699,7 +3699,7 @@ fn required_relationship_id(
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         let is_relationship = matches!(
             namespace,
-            ResolveResult::Bound(quick_xml::name::Namespace(namespace))
+            ResolveResult::Bound(Namespace(namespace))
                 if namespace == RELATIONSHIPS || namespace == STRICT_RELATIONSHIPS
         );
         if !is_relationship {
@@ -3712,7 +3712,7 @@ fn required_relationship_id(
         }
         value = Some(
             attribute
-                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                 .map_err(|error| Error::Xml(error.to_string()))?
                 .into_owned(),
         );

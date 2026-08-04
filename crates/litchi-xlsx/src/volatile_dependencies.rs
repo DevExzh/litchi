@@ -723,7 +723,7 @@ fn start(
     stack: &mut Vec<Context>,
     types: &mut Vec<TypeBuilder>,
     extension_seen: bool,
-    ns: &ResolveResult,
+    ns: &ResolveResult<'_>,
     e: BytesStart<'static>,
     decoder: Decoder,
 ) -> Result<()> {
@@ -815,7 +815,7 @@ fn empty(
     stack: &[Context],
     types: &mut [TypeBuilder],
     extension: &mut Option<Vec<u8>>,
-    ns: &ResolveResult,
+    ns: &ResolveResult<'_>,
     e: BytesStart<'static>,
     decoder: Decoder,
 ) -> Result<()> {
@@ -984,7 +984,7 @@ fn validate_document(d: &VolatileDependencies) -> Result<()> {
     Ok(())
 }
 
-fn name(ns: &ResolveResult, e: &BytesStart<'_>, local: &[u8]) -> bool {
+fn name(ns: &ResolveResult<'_>, e: &BytesStart<'_>, local: &[u8]) -> bool {
     let namespace_matches = match ns {
         ResolveResult::Bound(Namespace(v)) => {
             let bytes: &[u8] = v;

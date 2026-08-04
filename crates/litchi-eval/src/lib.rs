@@ -360,7 +360,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         );
     }
 
-    pub fn define_table(&mut self, config: TableConfig) {
+    pub fn define_table(&mut self, config: TableConfig<'_>) {
         let mut header_map = HashMap::new();
         for (i, h) in config.headers.iter().enumerate() {
             let col = config.start_col + i as u32;

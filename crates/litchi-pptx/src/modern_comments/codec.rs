@@ -992,7 +992,7 @@ mod comments {
         invalid(format!("{label} exceeds implementation limit"))
     }
 
-    impl super::super::List {
+    impl List {
         pub fn parse(xml: &[u8]) -> Result<Self> {
             parse_comment_list(xml)
         }
@@ -1578,7 +1578,7 @@ mod authors {
         invalid(format!("{label} exceeds implementation limit"))
     }
 
-    impl super::super::Authors {
+    impl Authors {
         pub fn parse(xml: &[u8]) -> Result<Self> {
             parse_author_list(xml)
         }

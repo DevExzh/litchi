@@ -640,7 +640,7 @@ fn handle_start(
     schemas: &mut Vec<SchemaBuilder>,
     maps: &mut Vec<MapBuilder>,
     root_bindings: &[(String, String)],
-    ns: &ResolveResult,
+    ns: &ResolveResult<'_>,
     e: BytesStart<'static>,
     decoder: Decoder,
     capture: &mut Option<Capture>,
@@ -708,7 +708,7 @@ fn handle_empty(
     schemas: &mut Vec<SchemaBuilder>,
     maps: &mut Vec<MapBuilder>,
     root_bindings: &[(String, String)],
-    ns: &ResolveResult,
+    ns: &ResolveResult<'_>,
     e: BytesStart<'static>,
     decoder: Decoder,
 ) -> Result<()> {
@@ -982,14 +982,14 @@ fn validate_opaque(xml: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn root_name(ns: &ResolveResult, e: &BytesStart<'_>, local: &[u8]) -> bool {
+fn root_name(ns: &ResolveResult<'_>, e: &BytesStart<'_>, local: &[u8]) -> bool {
     namespace_matches(ns) && e.local_name().as_ref() == local
 }
-fn core_name(ns: &ResolveResult, e: &BytesStart<'_>, local: &[u8]) -> bool {
+fn core_name(ns: &ResolveResult<'_>, e: &BytesStart<'_>, local: &[u8]) -> bool {
     (namespace_matches(ns) || matches!(ns, ResolveResult::Unbound))
         && e.local_name().as_ref() == local
 }
-fn namespace_matches(ns: &ResolveResult) -> bool {
+fn namespace_matches(ns: &ResolveResult<'_>) -> bool {
     match ns {
         ResolveResult::Bound(Namespace(v)) => {
             let bytes: &[u8] = v;

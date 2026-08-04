@@ -302,7 +302,7 @@ fn parse_processed_defaults(
                 return Err(invalid("worksheet sheetFormatPr cannot contain CDATA"));
             },
             Event::GeneralRef(value) => {
-                litchi_ooxml_common::xml::decode_xml_reference(&value)?;
+                decode_xml_reference(&value)?;
                 if stack.last() == Some(&Context::SheetFormat) {
                     return Err(invalid(
                         "worksheet sheetFormatPr cannot contain character references",

@@ -6,7 +6,7 @@ use std::io::{self, Read};
 use super::{Error, Result, Stage};
 
 /// Largest value representable by the four-byte BIFF12 record-size field.
-pub const MAX_WIRE_PAYLOAD: usize = 0x0fff_ffff;
+pub(super) const MAX_WIRE_PAYLOAD: usize = 0x0fff_ffff;
 
 /// Finite resource limits for one raw operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

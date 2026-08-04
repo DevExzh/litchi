@@ -701,9 +701,8 @@ mod tests {
             Coordinate::emu(914_400).unwrap(),
             Coordinate::emu(457_200).unwrap(),
         );
-        let transitional =
-            crate::laser::write(std::slice::from_ref(&point), Conformance::Transitional).unwrap();
-        let strict = crate::laser::write(&[point], Conformance::Strict).unwrap();
+        let transitional = write(std::slice::from_ref(&point), Conformance::Transitional).unwrap();
+        let strict = write(&[point], Conformance::Strict).unwrap();
 
         assert!(transitional.contains(PRESENTATIONML_NAMESPACE));
         assert!(strict.contains(STRICT_PRESENTATIONML_NAMESPACE));

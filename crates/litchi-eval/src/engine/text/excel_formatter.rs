@@ -1,27 +1,27 @@
 // Ported from calamine (MIT License)
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CellFormat {
+pub(crate) enum CellFormat {
     Other,
     DateTime,
     TimeDelta,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ExcelDateTimeType {
+pub(crate) enum ExcelDateTimeType {
     DateTime,
     TimeDelta,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ExcelDateTime {
-    pub value: f64,
-    pub datetime_type: ExcelDateTimeType,
-    pub is_1904: bool,
+pub(crate) struct ExcelDateTime {
+    pub(crate) value: f64,
+    pub(crate) datetime_type: ExcelDateTimeType,
+    pub(crate) is_1904: bool,
 }
 
 impl ExcelDateTime {
-    pub fn new(value: f64, datetime_type: ExcelDateTimeType, is_1904: bool) -> Self {
+    pub(crate) fn new(value: f64, datetime_type: ExcelDateTimeType, is_1904: bool) -> Self {
         ExcelDateTime {
             value,
             datetime_type,
@@ -29,7 +29,7 @@ impl ExcelDateTime {
         }
     }
 
-    pub fn to_ymd_hms_milli(self) -> (u16, u8, u8, u8, u8, u8, u16) {
+    pub(crate) fn to_ymd_hms_milli(self) -> (u16, u8, u8, u8, u8, u8, u16) {
         let mut months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
         let mut days = self.value.floor() as u64;
 
@@ -127,13 +127,13 @@ impl ExcelDateTime {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)]
-pub enum FormattedData {
+pub(crate) enum FormattedData {
     Int(i64),
     Float(f64),
     DateTime(ExcelDateTime),
 }
 
-pub fn detect_custom_number_format(format: &str) -> CellFormat {
+pub(crate) fn detect_custom_number_format(format: &str) -> CellFormat {
     let mut escaped = false;
     let mut is_quote = false;
     let mut brackets = 0u8;
@@ -168,7 +168,11 @@ pub fn detect_custom_number_format(format: &str) -> CellFormat {
     CellFormat::Other
 }
 
-pub fn format_excel_f64(value: f64, format: Option<&CellFormat>, is_1904: bool) -> FormattedData {
+pub(crate) fn format_excel_f64(
+    value: f64,
+    format: Option<&CellFormat>,
+    is_1904: bool,
+) -> FormattedData {
     match format {
         Some(CellFormat::DateTime) => FormattedData::DateTime(ExcelDateTime::new(
             value,

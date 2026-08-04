@@ -34,7 +34,7 @@ macro_rules! register_functions {
 
         pub(crate) static FUNCTION_MAP: phf::Map<&'static str, DispatchFn> = phf_map! {
             $(
-                $( $name => $wrapper as DispatchFn, )+
+                $( $name => $wrapper, )+
             )+
         };
     };

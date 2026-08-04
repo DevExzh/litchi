@@ -1736,10 +1736,7 @@ impl AnimationSequence {
     /// Unlike the XML-only parser, this resolves chart, SmartArt, and OLE relationship IDs,
     /// requires internal existing target parts with matching relationship/content types, and
     /// never reads or executes embedded target bytes.
-    pub fn from_package_slide(
-        package: &litchi_opc::OpcPackage,
-        slide_part_name: &litchi_opc::PackURI,
-    ) -> Result<Self> {
+    pub fn from_package_slide(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Self> {
         parse_package_slide(package, slide_part_name)
     }
 
@@ -3132,7 +3129,7 @@ impl TimingParser {
     fn end(
         &mut self,
         namespace: &ResolveResult<'_>,
-        name: quick_xml::name::QName<'_>,
+        name: QName<'_>,
         depth: usize,
         event_end: usize,
     ) -> Result<()> {
@@ -4266,7 +4263,7 @@ fn check_xml_size(size: usize) -> Result<()> {
 
 fn is_namespace_name(
     namespace: &ResolveResult<'_>,
-    name: quick_xml::name::QName<'_>,
+    name: QName<'_>,
     expected_namespace: &[u8],
     expected_local_name: &[u8],
 ) -> bool {
@@ -4274,20 +4271,12 @@ fn is_namespace_name(
         && name.local_name().as_ref() == expected_local_name
 }
 
-fn is_drawingml_name(
-    namespace: &ResolveResult<'_>,
-    name: quick_xml::name::QName<'_>,
-    local: &[u8],
-) -> bool {
+fn is_drawingml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
     is_namespace_name(namespace, name, DRAWINGML_NS, local)
         || is_namespace_name(namespace, name, DRAWINGML_STRICT_NS, local)
 }
 
-fn is_chartml_name(
-    namespace: &ResolveResult<'_>,
-    name: quick_xml::name::QName<'_>,
-    local: &[u8],
-) -> bool {
+fn is_chartml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
     is_namespace_name(namespace, name, CHART_NS, local)
         || is_namespace_name(namespace, name, CHART_STRICT_NS, local)
 }

@@ -6197,7 +6197,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
 }
 
 #[inline]
-fn parse_grouping(e: &BytesStart) -> Result<BarGrouping> {
+fn parse_grouping(e: &BytesStart<'_>) -> Result<BarGrouping> {
     if let Some(val) = get_attr(e, b"val") {
         Ok(match val.as_slice() {
             b"standard" => BarGrouping::Standard,
@@ -6212,7 +6212,7 @@ fn parse_grouping(e: &BytesStart) -> Result<BarGrouping> {
 }
 
 #[inline]
-fn parse_axis_position(e: &BytesStart) -> Result<AxisPosition> {
+fn parse_axis_position(e: &BytesStart<'_>) -> Result<AxisPosition> {
     if let Some(val) = get_attr(e, b"val") {
         Ok(match val.as_slice() {
             b"b" => AxisPosition::Bottom,
@@ -6375,7 +6375,7 @@ fn parse_number_format(
 }
 
 #[inline]
-fn parse_display_blanks(e: &BytesStart) -> crate::Result<DisplayBlanks> {
+fn parse_display_blanks(e: &BytesStart<'_>) -> Result<DisplayBlanks> {
     if let Some(val) = get_attr(e, b"val") {
         Ok(match val.as_slice() {
             b"gap" => DisplayBlanks::Gap,
@@ -6389,7 +6389,7 @@ fn parse_display_blanks(e: &BytesStart) -> crate::Result<DisplayBlanks> {
 }
 
 #[inline]
-fn parse_bool_attr(e: &BytesStart) -> crate::Result<bool> {
+fn parse_bool_attr(e: &BytesStart<'_>) -> Result<bool> {
     if let Some(val) = get_attr(e, b"val") {
         parse_bool_value(&val, "chart boolean")
     } else {
@@ -6589,7 +6589,7 @@ fn missing_attribute(description: &str) -> Error {
 }
 
 #[inline]
-fn get_attr(e: &BytesStart, name: &[u8]) -> Option<Vec<u8>> {
+fn get_attr(e: &BytesStart<'_>, name: &[u8]) -> Option<Vec<u8>> {
     e.attributes()
         .filter_map(|a| a.ok())
         .find(|a| a.key.as_ref() == name)

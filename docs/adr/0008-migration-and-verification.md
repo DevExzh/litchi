@@ -4306,6 +4306,46 @@ kind, and cached error values. The focused `litchi-xlsb` all-target suite passes
 remain valid. Full all-features host verification remains subject to the
 existing environment's missing `pkg-config`/fontconfig dependency.
 
+## DOCX glossary, PPTX media, XLSX validation, and ODF data-style layering
+
+Four remaining large owners are now semantically layered under their existing
+public module paths:
+
+- `litchi-docx::glossary/{model,codec,package,graph,tests}`;
+- `litchi-pptx::media_parts/{model,codec,package,tests}`;
+- `litchi-xlsx::data_validation/{model,codec,package}`; and
+- `litchi-odf::data_styles/{model,tokens,codec,package,tests}`.
+
+Models use contextual names (`Entry`, `Picture`, `Validation`, `Style`, and
+their related values); former repeated format/module prefixes remain only as
+compatibility aliases where the old public API requires them. Parsing,
+validation, serialization, package ownership, and graph/opaque-payload
+handling are now separate layers.
+
+The cross-format audit found no new semantic implementation that is both
+correctly shared and format-neutral. Existing common helpers remain the
+single owners for bounded XML escaping and scanning, MCE preprocessing,
+relationship inventories, GUID validation, and opaque payload handling in
+`litchi-ooxml-common`, `litchi-ole-common`, and the neutral core. Format
+specific media, glossary, validation, and number-style grammars stay in their
+own crates; no speculative common abstraction was introduced.
+
+Checked-in Microsoft anchors are `[MS-OE376]` §§2.1.314--2.1.316,
+`[MS-PPTX]` §§2.1.1, 2.2.4, 2.3.1.18, and 2.3.3.11--2.3.3.18, and
+`[MS-XLSX]` §§2.4.5, 2.4.7, 2.6.3--2.6.5, and 2.7.2. The repository does
+not currently contain a checked-in ODF specification snapshot, so the ODF
+layering change makes no external conformance claim beyond its existing
+parser and regression fixtures.
+
+Focused verification passes with the workspace compiler lints enabled:
+254 DOCX unit tests plus three API targets, 196 PPTX unit tests plus one API
+target, 395 XLSX unit tests and all examples, and 1,141 ODF unit tests plus
+all integration/example targets. The no-default-features `litchi-ooxml`
+host suite passes 1,499 unit tests and its integration targets; the crate
+boundary audit remains green at 35 packages, 107 internal edges, and 13
+scheduled debts. This structural batch makes no native Office, performance,
+or full-workspace Clippy claim.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

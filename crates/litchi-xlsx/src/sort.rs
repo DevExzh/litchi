@@ -228,6 +228,7 @@ impl SortState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn sort_domains_are_compact_exact_and_strict() {
@@ -252,8 +253,8 @@ mod tests {
         }
         assert!("pinyin".parse::<SortMethod>().is_err());
         assert!("color".parse::<SortBy>().is_err());
-        assert_eq!(std::mem::size_of::<SortMethod>(), 1);
-        assert_eq!(std::mem::size_of::<SortBy>(), 1);
+        assert_eq!(size_of::<SortMethod>(), 1);
+        assert_eq!(size_of::<SortBy>(), 1);
     }
 
     #[test]

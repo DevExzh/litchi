@@ -4220,10 +4220,10 @@ mod tests {
         let store = worksheet::parse(&edited, || Ok(None)).expect("reparse columns");
         let b = store.column(Column::new(1).expect("B"));
         assert!(!b.hidden());
-        assert_eq!(b.width().map(crate::column::Width::get), Some(20.0));
+        assert_eq!(b.width().map(Width::get), Some(20.0));
         let c = store.column(Column::new(2).expect("C"));
         assert!(c.hidden());
-        assert_eq!(c.width().map(crate::column::Width::get), Some(10.0));
+        assert_eq!(c.width().map(Width::get), Some(10.0));
         assert!(store.column(Column::new(3).expect("D")).hidden());
         assert!(store.column(Column::new(4).expect("E")).hidden());
     }

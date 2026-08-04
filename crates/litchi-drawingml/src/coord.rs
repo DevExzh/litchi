@@ -484,6 +484,7 @@ const fn xsd_whitespace(character: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn unqualified_coordinates_are_canonical_and_bounded() {
@@ -559,7 +560,7 @@ mod tests {
 
     #[test]
     fn extents_are_nonnegative_bounded_and_representation_compact() {
-        assert_eq!(std::mem::size_of::<Extent>(), std::mem::size_of::<i64>());
+        assert_eq!(size_of::<Extent>(), size_of::<i64>());
         assert_eq!(Extent::ZERO.as_emu(), 0);
         assert_eq!(Extent::emu(0).unwrap(), Extent::ZERO);
         assert_eq!(Extent::emu(1).unwrap().as_emu(), 1);

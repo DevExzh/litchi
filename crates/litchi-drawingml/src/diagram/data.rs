@@ -1620,7 +1620,7 @@ fn is_dml(namespace: &str) -> bool {
     matches!(namespace, DML_NAMESPACE | DML_NAMESPACE_STRICT)
 }
 
-fn xml_error(error: impl std::fmt::Display) -> Error {
+fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
 

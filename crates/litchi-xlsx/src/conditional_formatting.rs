@@ -1725,7 +1725,7 @@ fn decode_raw_text(bytes: &[u8]) -> Result<String> {
     }
     Ok(value)
 }
-fn xml_error(error: impl std::fmt::Display) -> Error {
+fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
 fn invalid(message: impl Into<String>) -> Error {
@@ -1736,6 +1736,7 @@ fn invalid(message: impl Into<String>) -> Error {
 mod tests {
     use super::*;
     use litchi_opc::PackURI;
+    use std::mem::size_of;
 
     fn fixture(
         relative: &str,
@@ -1785,15 +1786,15 @@ mod tests {
 
     #[test]
     fn fixed_domains_are_compact_exact_and_strict() {
-        assert_eq!(std::mem::size_of::<Kind>(), 1);
-        assert_eq!(std::mem::size_of::<Operator>(), 1);
-        assert_eq!(std::mem::size_of::<ValueKind>(), 1);
-        assert_eq!(std::mem::size_of::<Period>(), 1);
-        assert_eq!(std::mem::size_of::<Direction>(), 1);
-        assert_eq!(std::mem::size_of::<Axis>(), 1);
-        assert_eq!(std::mem::size_of::<ColorRole>(), 1);
-        assert_eq!(std::mem::size_of::<IconSet>(), 1);
-        assert_eq!(std::mem::size_of::<IconSet14>(), 1);
+        assert_eq!(size_of::<Kind>(), 1);
+        assert_eq!(size_of::<Operator>(), 1);
+        assert_eq!(size_of::<ValueKind>(), 1);
+        assert_eq!(size_of::<Period>(), 1);
+        assert_eq!(size_of::<Direction>(), 1);
+        assert_eq!(size_of::<Axis>(), 1);
+        assert_eq!(size_of::<ColorRole>(), 1);
+        assert_eq!(size_of::<IconSet>(), 1);
+        assert_eq!(size_of::<IconSet14>(), 1);
 
         assert_eq!("cellIs".parse::<Kind>(), Ok(Kind::CellIs));
         assert_eq!("between".parse::<Operator>(), Ok(Operator::Between));

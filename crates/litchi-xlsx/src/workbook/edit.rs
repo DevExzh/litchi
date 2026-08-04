@@ -1389,8 +1389,8 @@ struct GraphChange {
     part: Box<dyn Part + Send + Sync>,
 }
 
-impl std::fmt::Debug for GraphChange {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for GraphChange {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("GraphChange")
             .field("action", &self.action)
@@ -6387,7 +6387,7 @@ mod tests {
                 .expect("worksheet part")
                 .blob()
                 .to_vec();
-            let after = crate::raw::web::replace(&source, &bindings).expect("write bindings");
+            let after = raw::web::replace(&source, &bindings).expect("write bindings");
             package
                 .get_part_mut(&uri)
                 .expect("worksheet part")
@@ -6478,14 +6478,8 @@ mod tests {
             Some(Cell::Formula(_))
         ));
         let extents = sheet.extents().expect("committed extents");
-        assert_eq!(
-            extents.declared().map(crate::Rect::a1).as_deref(),
-            Some("A1:C3")
-        );
-        assert_eq!(
-            extents.content().map(crate::Rect::a1).as_deref(),
-            Some("A1:C3")
-        );
+        assert_eq!(extents.declared().map(Rect::a1).as_deref(), Some("A1:C3"));
+        assert_eq!(extents.content().map(Rect::a1).as_deref(), Some("A1:C3"));
 
         let restored = book
             .apply(&committed.patch().inverse())

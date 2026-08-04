@@ -246,8 +246,8 @@ impl Settings<NoteNumberFormat> {
     /// Map the owner-local note format to a host format without reparsing XML.
     pub fn try_map_note_format<G, E>(
         self,
-        mut map: impl FnMut(NoteNumberFormat) -> std::result::Result<G, E>,
-    ) -> std::result::Result<Settings<G>, E> {
+        mut map: impl FnMut(NoteNumberFormat) -> Result<G, E>,
+    ) -> Result<Settings<G>, E> {
         let Settings {
             protected,
             protection_type,

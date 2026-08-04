@@ -211,7 +211,7 @@ mod comments {
         validate_modern_comment_graph_for_mutation(package, &parts)?;
         let xml = staged.comments.to_xml()?;
         ModernCommentList::parse(&xml)?;
-        package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
+        package.try_add_part(Box::new(BlobPart::new(
             part_name.clone(),
             MODERN_COMMENT_CONTENT_TYPE.into(),
             xml,
@@ -516,8 +516,8 @@ mod comments {
         parts: &[ModernCommentPart],
     ) -> Result<()> {
         ensure_all_modern_ids_are_unique(parts)?;
-        let authors = super::authors::load_modern_comment_authors(package)?;
-        super::authors::validate_modern_comment_author_references(authors.as_ref(), parts)
+        let authors = load_modern_comment_authors(package)?;
+        validate_modern_comment_author_references(authors.as_ref(), parts)
     }
 
     fn ensure_modern_comment_id_is_free(parts: &[ModernCommentPart], id: &str) -> Result<()> {
@@ -534,7 +534,7 @@ mod comments {
         parts: &[ModernCommentPart],
         comment: &ModernComment,
     ) -> Result<()> {
-        let mut ids = std::collections::HashSet::new();
+        let mut ids = HashSet::new();
         for reply in &comment.replies {
             if reply.id == comment.id
                 || !ids.insert(reply.id.clone())
@@ -550,7 +550,7 @@ mod comments {
     }
 
     fn ensure_all_modern_ids_are_unique(parts: &[ModernCommentPart]) -> Result<()> {
-        let mut ids = std::collections::HashSet::new();
+        let mut ids = HashSet::new();
         for part in parts {
             for comment in &part.comments.comments {
                 if !ids.insert(comment.id.clone()) {
@@ -772,7 +772,7 @@ mod authors {
 
     pub fn load_modern_comment_graph(package: &OpcPackage) -> Result<ModernCommentGraph> {
         let authors = load_modern_comment_authors(package)?;
-        let comments = super::comments::load_modern_comments(package)?;
+        let comments = load_modern_comments(package)?;
         validate_modern_comment_author_references(authors.as_ref(), &comments)?;
         Ok(ModernCommentGraph { authors, comments })
     }
@@ -827,7 +827,7 @@ mod authors {
                 "package already contains a modern Comment Author part",
             ));
         }
-        let comments = super::comments::load_modern_comments(package)?;
+        let comments = load_modern_comments(package)?;
         validate_modern_comment_author_references(Some(value), &comments)?;
         validate_relationship_id(&value.relationship_id)?;
         let presentation = package.main_document_part()?;
@@ -914,7 +914,7 @@ mod authors {
         validate_modern_comment_author_references(Some(&part), &graph.comments)?;
         let xml = part.authors.to_xml()?;
         ModernCommentAuthorList::parse(&xml)?;
-        package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
+        package.try_add_part(Box::new(BlobPart::new(
             part_name.clone(),
             MODERN_COMMENT_AUTHOR_CONTENT_TYPE.into(),
             xml,
@@ -1139,6 +1139,7 @@ mod comment_tests {
     use super::*;
     use crate::modern_comments::{AC, MAX_BYTES, P188, PC};
     use litchi_opc::Part as _;
+    use std::mem::size_of;
 
     const AUTHOR: &str = "{CD37207E-7903-4ED4-8AE8-017538D2DF7E}";
     const COMMENT: &str = "{62A8A96D-E5A8-4BFC-B993-A6EAE3907CAD}";
@@ -1239,10 +1240,7 @@ mod comment_tests {
 
     #[test]
     fn progress_is_bounded_typed_and_written_in_office_units() {
-        assert_eq!(
-            std::mem::size_of::<Option<Progress>>(),
-            std::mem::size_of::<u32>()
-        );
+        assert_eq!(size_of::<Option<Progress>>(), size_of::<u32>());
         assert_eq!(Progress::ZERO.thousandths(), 0);
         assert_eq!(Progress::FULL.thousandths(), 100_000);
         assert_eq!(Progress::new(25).unwrap().thousandths(), 25_000);

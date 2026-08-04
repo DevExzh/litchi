@@ -476,6 +476,7 @@ fn validate_opts(opts: Opts) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn defaults_round_trip_exactly() {
@@ -489,7 +490,7 @@ mod tests {
 
     #[test]
     fn representation_has_small_structural_bounds() {
-        assert_eq!(std::mem::size_of::<Opts>(), 2);
-        assert!(std::mem::size_of::<Props>() <= 32);
+        assert_eq!(size_of::<Opts>(), 2);
+        assert!(size_of::<Props>() <= 32);
     }
 }

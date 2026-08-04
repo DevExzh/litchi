@@ -3443,7 +3443,7 @@ fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> 
     Ok(())
 }
 
-fn validate_scale_thresholds14(scale: &crate::conditional_formatting::Scale) -> XlsbResult<()> {
+fn validate_scale_thresholds14(scale: &Scale) -> XlsbResult<()> {
     if matches!(scale.min_cfvo.cfvo_type, 3 | 8 | 9)
         || matches!(scale.max_cfvo.cfvo_type, 2 | 8 | 9)
     {
@@ -3473,10 +3473,7 @@ fn validate_scale_thresholds14(scale: &crate::conditional_formatting::Scale) -> 
     Ok(())
 }
 
-fn validate_data_bar14(
-    bar: &crate::conditional_formatting::Bar14,
-    priority: i32,
-) -> XlsbResult<()> {
+fn validate_data_bar14(bar: &Bar14, priority: i32) -> XlsbResult<()> {
     if matches!(bar.min_cfvo.cfvo_type, 3 | 9) || matches!(bar.max_cfvo.cfvo_type, 2 | 8) {
         return Err(invalid(
             "BrtBeginDatabar14",
@@ -3497,7 +3494,7 @@ fn validate_data_bar14(
     Ok(())
 }
 
-fn validate_icon_set14(set: &crate::conditional_formatting::IconSet14) -> XlsbResult<()> {
+fn validate_icon_set14(set: &IconSet14) -> XlsbResult<()> {
     let expected = icon_count14(set.icon_set_type);
     if expected == 0 || set.cfvos.len() != expected {
         return Err(invalid(
@@ -3560,7 +3557,7 @@ fn write_color14<W: Write>(
     Ok(())
 }
 
-fn validate_scale_thresholds(scale: &crate::conditional_formatting::Scale) -> XlsbResult<()> {
+fn validate_scale_thresholds(scale: &Scale) -> XlsbResult<()> {
     validate_boundary_thresholds(&scale.min_cfvo, &scale.max_cfvo, "BrtBeginColorScale")?;
     if scale.mid_cfvo.is_some() != scale.mid_color_record.is_some()
         || scale.mid_cfvo.is_some() != scale.mid_color.is_some()

@@ -360,7 +360,7 @@ mod tests {
     async fn test_eval_sin_pi_over_2() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
-        let args = vec![num_expr(std::f64::consts::FRAC_PI_2)];
+        let args = vec![num_expr(FRAC_PI_2)];
         let result = eval_sin(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
@@ -444,7 +444,7 @@ mod tests {
     async fn test_eval_csc() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
-        let args = vec![num_expr(std::f64::consts::FRAC_PI_2)];
+        let args = vec![num_expr(FRAC_PI_2)];
         let result = eval_csc(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
@@ -480,7 +480,7 @@ mod tests {
     async fn test_eval_sec_undefined() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
-        let args = vec![num_expr(std::f64::consts::FRAC_PI_2)];
+        let args = vec![num_expr(FRAC_PI_2)];
         let result = eval_sec(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("undefined")),
@@ -507,7 +507,7 @@ mod tests {
         let args = vec![num_expr(1.0)];
         let result = eval_asin(ctx, "Sheet1", &args).await.unwrap();
         match result {
-            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_2).abs() < 1e-9),
+            CellValue::Float(v) => assert!((v - FRAC_PI_2).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
@@ -531,7 +531,7 @@ mod tests {
         let args = vec![num_expr(0.0)];
         let result = eval_acos(ctx, "Sheet1", &args).await.unwrap();
         match result {
-            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_2).abs() < 1e-9),
+            CellValue::Float(v) => assert!((v - FRAC_PI_2).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
@@ -579,7 +579,7 @@ mod tests {
         let args = vec![num_expr(1.0), num_expr(0.0)];
         let result = eval_atan2(ctx, "Sheet1", &args).await.unwrap();
         match result {
-            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_2).abs() < 1e-9),
+            CellValue::Float(v) => assert!((v - FRAC_PI_2).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }

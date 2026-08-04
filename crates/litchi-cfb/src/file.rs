@@ -85,17 +85,17 @@ fn try_filled_vec<T: Clone>(
 }
 
 fn read_u16_le(bytes: &[u8], description: &str) -> Result<u16, OleError> {
-    let bytes: [u8; 2] = bytes
+    let value: [u8; 2] = bytes
         .try_into()
         .map_err(|_| OleError::InvalidFormat(format!("{description} is truncated")))?;
-    Ok(u16::from_le_bytes(bytes))
+    Ok(u16::from_le_bytes(value))
 }
 
 fn read_u32_le(bytes: &[u8], description: &str) -> Result<u32, OleError> {
-    let bytes: [u8; 4] = bytes
+    let value: [u8; 4] = bytes
         .try_into()
         .map_err(|_| OleError::InvalidFormat(format!("{description} is truncated")))?;
-    Ok(u32::from_le_bytes(bytes))
+    Ok(u32::from_le_bytes(value))
 }
 
 /// Raw OLE directory entry structure (128 bytes)
@@ -1714,7 +1714,7 @@ impl<R: Read + Seek> OleFile<R> {
 
         // Use iterative in-order traversal with a work queue (pre-allocated for efficiency)
         // This handles all tree structures correctly, including improperly ordered trees
-        let mut queue = smallvec::SmallVec::<[u32; 32]>::new();
+        let mut queue = SmallVec::<[u32; 32]>::new();
         queue.push(sid);
 
         while let Some(current_sid) = queue.pop() {

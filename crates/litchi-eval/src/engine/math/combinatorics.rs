@@ -354,7 +354,7 @@ pub(crate) async fn eval_permutationa(
             ));
         },
     };
-    let base = n as f64;
+    let base = n;
     let mut result = 1.0;
     for _ in 0..(k as u64) {
         result *= base;
