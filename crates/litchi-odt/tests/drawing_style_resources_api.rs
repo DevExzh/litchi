@@ -2,7 +2,7 @@ use litchi_odt::{
     Document, FlatOpenDocument, MutableDocument, OpenDocumentPackage,
     drawing_gradient::OdfDrawingGradient, drawing_stroke_dash::OdfStrokeDashStyle,
 };
-use std::io::{Cursor, Write};
+mod support;
 
 const CONTENT: &str =
     include_str!("../../../test-data/odf/odt/drawing-style-resources-content.xml");
@@ -11,26 +11,11 @@ const FLAT: &str = include_str!("../../../test-data/odf/odt/drawing-style-resour
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
 fn document() -> Document {
-    let mut output = Cursor::new(Vec::new());
-    let mut zip = zip::ZipWriter::new(&mut output);
-    let stored =
-        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    let deflated = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
-    zip.start_file("mimetype", stored).unwrap();
-    zip.write_all(MIMETYPE.as_bytes()).unwrap();
-    zip.start_file("content.xml", deflated).unwrap();
-    zip.write_all(CONTENT.as_bytes()).unwrap();
-    zip.start_file("styles.xml", deflated).unwrap();
-    zip.write_all(STYLES.as_bytes()).unwrap();
-    zip.start_file("META-INF/manifest.xml", deflated).unwrap();
-    write!(
-        zip,
-        r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" m:version="1.3"><m:file-entry m:full-path="/" m:media-type="{MIMETYPE}"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/><m:file-entry m:full-path="styles.xml" m:media-type="text/xml"/></m:manifest>"#
-    )
-    .unwrap();
-    zip.finish().unwrap();
-    Document::from_bytes(output.into_inner()).unwrap()
+    Document::from_bytes(support::package(
+        MIMETYPE,
+        &[("content.xml", CONTENT.as_bytes()), ("styles.xml", STYLES.as_bytes())],
+    ))
+    .unwrap()
 }
 
 fn assert_resources(

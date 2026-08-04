@@ -16,11 +16,13 @@ fn sequence() -> OdtPageSequence {
 }
 
 fn content_xml(bytes: &[u8]) -> String {
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
-    let mut entry = archive.by_name("content.xml").unwrap();
-    let mut xml = String::new();
-    std::io::Read::read_to_string(&mut entry, &mut xml).unwrap();
-    xml
+    String::from_utf8(
+        Document::from_bytes(bytes.to_vec())
+            .unwrap()
+            .get_file("content.xml")
+            .unwrap(),
+    )
+    .unwrap()
 }
 
 #[test]

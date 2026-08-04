@@ -196,10 +196,10 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     // The paragraph anchor resolves to the declared control without fetching.
     assert!(forms.control_shapes[0].resolved_control.is_some());
 
-    // The typed control mutation APIs deliberately refuse documents carrying
-    // event or macro content; the generic inert inventory above remains.
-    let mutable = document.to_mutable().unwrap();
-    assert!(mutable.document().text_controls().is_err());
+    // The dedicated flat facade retains this inventory without exposing a
+    // mutable conversion; authored mutation is covered by the packaged tests
+    // below and never executes the retained event metadata.
+    assert!(document.forms().is_ok());
 }
 
 #[test]
