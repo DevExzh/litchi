@@ -109,14 +109,11 @@ pub use litchi_docx::settings::{
     ColorSchemeMapping, ColorSchemeSlot, CompatFlag, CompatibilityOption, CompatibilitySetting,
     DocumentView, MAX_LANGUAGE_TAG_LENGTH, MAX_SETTINGS_XML_BYTES as OWNER_MAX_SETTINGS_XML_BYTES,
     MAX_SETTINGS_XML_DEPTH as OWNER_MAX_SETTINGS_XML_DEPTH,
-    MAX_SETTINGS_XML_NODES as OWNER_MAX_SETTINGS_XML_NODES, NoteNumberFormat, NoteNumberingRestart,
-    NotePosition, ParseCompatFlagError, ParseNoteNumberFormatError, ParseNotePositionError,
-    ProofState, ProofingState, ProtectionType, SmartTagType, ThemeFontLanguages,
+    MAX_SETTINGS_XML_NODES as OWNER_MAX_SETTINGS_XML_NODES, NoteNumberFormat,
+    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ParseCompatFlagError,
+    ParseNoteNumberFormatError, ParseNotePositionError, ProofState, ProofingState, ProtectionType,
+    SmartTagType, ThemeFontLanguages,
 };
-
-/// Historical host spelling retained while note-number formats are owned by
-/// the canonical DOCX settings module.
-pub type NoteNumberingProperties = litchi_docx::settings::NoteNumberingProperties<Format>;
 
 type OwnedSettings = litchi_docx::settings::Settings<Format>;
 impl DocumentSettings {
@@ -204,13 +201,13 @@ impl DocumentSettings {
 
     /// Return the document-level footnote properties, if present.
     #[inline]
-    pub fn footnote_properties(&self) -> Option<&NoteNumberingProperties> {
+    pub fn footnote_properties(&self) -> Option<&NoteNumberingProperties<Format>> {
         self.values.footnote_properties()
     }
 
     /// Return the document-level endnote properties, if present.
     #[inline]
-    pub fn endnote_properties(&self) -> Option<&NoteNumberingProperties> {
+    pub fn endnote_properties(&self) -> Option<&NoteNumberingProperties<Format>> {
         self.values.endnote_properties()
     }
 
@@ -432,8 +429,8 @@ enum PendingGroup {
         options: Vec<CompatibilityOption>,
         settings: Vec<CompatibilitySetting>,
     },
-    FootnoteProperties(NoteNumberingProperties),
-    EndnoteProperties(NoteNumberingProperties),
+    FootnoteProperties(NoteNumberingProperties<Format>),
+    EndnoteProperties(NoteNumberingProperties<Format>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -466,7 +463,7 @@ fn begin_settings_group(
                 ));
             }
             Ok(Some(PendingGroup::FootnoteProperties(
-                NoteNumberingProperties::default(),
+                NoteNumberingProperties::<Format>::default(),
             )))
         },
         b"endnotePr" => {
@@ -476,7 +473,7 @@ fn begin_settings_group(
                 ));
             }
             Ok(Some(PendingGroup::EndnoteProperties(
-                NoteNumberingProperties::default(),
+                NoteNumberingProperties::<Format>::default(),
             )))
         },
         _ => Ok(None),
@@ -562,7 +559,7 @@ fn parse_group_child(
 }
 
 fn parse_note_property_child(
-    properties: &mut NoteNumberingProperties,
+    properties: &mut NoteNumberingProperties<Format>,
     kind: NoteKind,
     element: &BytesStart<'_>,
     decoder: Decoder,
@@ -626,7 +623,7 @@ fn parse_note_property_child(
         // `w:footnote`/`w:endnote` separator references carry no properties.
         _ => {},
     }
-    *properties = NoteNumberingProperties::from_parts(position, format, start, restart);
+    *properties = NoteNumberingProperties::<Format>::from_parts(position, format, start, restart);
     Ok(())
 }
 
