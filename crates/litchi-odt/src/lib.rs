@@ -122,19 +122,11 @@ pub mod master_page;
 pub mod media;
 pub mod notes_configuration;
 pub mod outline_style;
-pub mod paragraph_alignment;
-pub mod paragraph_border;
-pub mod paragraph_break;
-pub mod paragraph_drop_cap;
-pub mod paragraph_flow;
-pub mod paragraph_line_spacing;
-pub mod paragraph_margin;
-pub mod paragraph_tab_stop;
-pub mod paragraph_writing_mode;
 pub mod ruby_family;
 pub mod script_package;
 pub mod section_properties;
 pub mod settings;
+pub mod style;
 pub mod style_columns;
 pub mod table_cell_properties;
 pub mod table_column_properties;
@@ -359,78 +351,6 @@ pub use outline_style::{
     OdfOutlineStyle, OdfOutlineStyles, OdfOutlineTextAlign, OdfOutlineTextProperties,
     parse_outline_styles, remove_outline_style_xml, set_outline_style_xml,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph style semantics"
-)]
-pub use paragraph_alignment::{
-    ParagraphAlignment, ParagraphStyleAlignment, ParagraphStyleAlignmentSet, ParagraphTextAlign,
-    ParagraphVerticalAlign, parse_paragraph_style_alignments, set_paragraph_style_alignment_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph border semantics"
-)]
-pub use paragraph_border::{
-    ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
-    ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, ParagraphStyleBorderSet,
-    parse_paragraph_style_borders, set_paragraph_style_border_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph break semantics"
-)]
-pub use paragraph_break::{
-    ParagraphBreak, ParagraphBreaks, ParagraphPageNumber, ParagraphStyleBreaks,
-    ParagraphStyleBreaksSet, parse_paragraph_style_breaks, set_paragraph_style_breaks_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph drop-cap semantics"
-)]
-pub use paragraph_drop_cap::{
-    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
-    ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
-};
-#[allow(unused_imports, reason = "ODT facade exposes paragraph flow semantics")]
-pub use paragraph_flow::{
-    HyphenationKeep, HyphenationLadder, Keep, LineBreak, ParagraphFlowProperties,
-    ParagraphStyleFlow, ParagraphStyleFlowSet, PunctuationWrap, parse_paragraph_style_flows,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph spacing semantics"
-)]
-pub use paragraph_line_spacing::{
-    LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing,
-    ParagraphStyleLineSpacing, ParagraphStyleLineSpacingSet, TextAlignLast, TextAutospace,
-    parse_paragraph_style_line_spacings,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph margin semantics"
-)]
-pub use paragraph_margin::{
-    ParagraphHorizontalMargin, ParagraphMargins, ParagraphStyleMargins, ParagraphStyleMarginsSet,
-    ParagraphTextIndent, ParagraphVerticalMargin, parse_paragraph_style_margins,
-    set_paragraph_style_margins_xml,
-};
-#[allow(unused_imports, reason = "ODT facade exposes paragraph tab semantics")]
-pub use paragraph_tab_stop::{
-    MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
-    ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
-    ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
-    parse_paragraph_style_tab_stops,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph writing-mode semantics"
-)]
-pub use paragraph_writing_mode::{
-    ParagraphStyleWritingMode, ParagraphStyleWritingModeSet, ParagraphWritingMode,
-    ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
-    set_paragraph_style_writing_mode_xml,
-};
 #[allow(unused_imports, reason = "ODT facade exposes ruby semantics")]
 pub use ruby_family::{
     RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
@@ -456,6 +376,70 @@ pub use section_properties::{
 pub use settings::{
     OdfConfigItem, OdfConfigMap, OdfConfigMapEntry, OdfConfigNode, OdfConfigSet, OdfConfigValue,
     OdfSettings,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes paragraph style semantics"
+)]
+pub use style::paragraph::border::{
+    ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
+    ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, ParagraphStyleBorderSet,
+    parse_paragraph_style_borders, set_paragraph_style_border_xml,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes paragraph break semantics"
+)]
+pub use style::paragraph::breaks::{
+    ParagraphBreak, ParagraphBreaks, ParagraphPageNumber, ParagraphStyleBreaks,
+    ParagraphStyleBreaksSet, parse_paragraph_style_breaks, set_paragraph_style_breaks_xml,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes paragraph drop-cap semantics"
+)]
+pub use style::paragraph::drop_cap::{
+    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
+    ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
+};
+#[allow(unused_imports, reason = "ODT facade exposes paragraph flow semantics")]
+pub use style::paragraph::flow::{
+    HyphenationKeep, HyphenationLadder, Keep, LineBreak, ParagraphFlowProperties,
+    ParagraphStyleFlow, ParagraphStyleFlowSet, PunctuationWrap, parse_paragraph_style_flows,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes paragraph spacing semantics"
+)]
+pub use style::paragraph::line_spacing::{
+    LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing,
+    ParagraphStyleLineSpacing, ParagraphStyleLineSpacingSet, TextAlignLast, TextAutospace,
+    parse_paragraph_style_line_spacings,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes paragraph margin semantics"
+)]
+pub use style::paragraph::margin::{
+    ParagraphHorizontalMargin, ParagraphMargins, ParagraphStyleMargins, ParagraphStyleMarginsSet,
+    ParagraphTextIndent, ParagraphVerticalMargin, parse_paragraph_style_margins,
+    set_paragraph_style_margins_xml,
+};
+#[allow(unused_imports, reason = "ODT facade exposes paragraph tab semantics")]
+pub use style::paragraph::tab_stop::{
+    MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
+    ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
+    ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
+    parse_paragraph_style_tab_stops,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes paragraph writing-mode semantics"
+)]
+pub use style::paragraph::writing_mode::{
+    ParagraphStyleWritingMode, ParagraphStyleWritingModeSet, ParagraphWritingMode,
+    ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
+    set_paragraph_style_writing_mode_xml,
 };
 #[allow(
     unused_imports,

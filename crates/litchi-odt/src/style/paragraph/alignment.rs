@@ -1,13 +1,15 @@
-//! Typed ODF paragraph writing-mode and register properties.
+//! Typed ODF paragraph alignment properties.
 //!
-//! Models the writing-mode attribute group of `style:paragraph-properties`:
-//! `style:writing-mode` accepts the `lr-tb`, `rl-tb`, `tb-rl`, `tb-lr`,
-//! `lr`, `rl`, `tb`, and `page` tokens; `style:writing-mode-automatic`,
-//! `style:register-true`, and `style:join-border` are booleans restricted to
-//! the `true` and `false` tokens. All other sibling-owned attributes are
-//! ignored. Duplicates and malformed owned values are rejected.
+//! Models the alignment attribute group of `style:paragraph-properties`
+//! (`fo:text-align`, `style:vertical-align`). `fo:text-align` accepts the
+//! `start`, `end`, `left`, `right`, `center`, and `justify` tokens and
+//! `style:vertical-align` accepts `top`, `middle`, `bottom`, `auto`, and
+//! `baseline`. The sibling `style:justify-single-word` attribute is owned by
+//! the line-spacing module; all other sibling-owned attributes are ignored.
+//! Duplicates and malformed owned values are rejected.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, paragraph_margin::rewrite_start_tag};
+use super::margin::rewrite_start_tag;
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -19,7 +21,9 @@ use std::collections::HashSet;
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const FO: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const STYLE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const FO_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const MAX_XML: usize = 64 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_STYLES: usize = 65_536;
@@ -31,10 +35,7 @@ const MAX_ATTRIBUTES: usize = 64;
 fn owned_attribute(namespace: Ns, local: &[u8]) -> bool {
     matches!(
         (namespace, local),
-        (Ns::Style, b"writing-mode")
-            | (Ns::Style, b"writing-mode-automatic")
-            | (Ns::Style, b"register-true")
-            | (Ns::Style, b"join-border")
+        (Ns::Fo, b"text-align") | (Ns::Style, b"vertical-align")
     )
 }
 
@@ -47,64 +48,79 @@ fn name_ok(value: &str, field: &str) -> Result<()> {
     }
     Ok(())
 }
-fn bool_value(value: &str, field: &str) -> Result<bool> {
-    match value {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err(bad(format!("invalid {field}"))),
-    }
-}
 
-/// The `style:writing-mode` value of a paragraph.
+/// The `fo:text-align` value of a paragraph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphWritingMode {
-    LrTb,
-    RlTb,
-    TbRl,
-    TbLr,
-    Lr,
-    Rl,
-    Tb,
-    Page,
+pub enum Horizontal {
+    Start,
+    End,
+    Left,
+    Right,
+    Center,
+    Justify,
 }
-impl ParagraphWritingMode {
+impl Horizontal {
     fn parse(value: &str) -> Result<Self> {
         match value {
-            "lr-tb" => Ok(Self::LrTb),
-            "rl-tb" => Ok(Self::RlTb),
-            "tb-rl" => Ok(Self::TbRl),
-            "tb-lr" => Ok(Self::TbLr),
-            "lr" => Ok(Self::Lr),
-            "rl" => Ok(Self::Rl),
-            "tb" => Ok(Self::Tb),
-            "page" => Ok(Self::Page),
-            _ => Err(bad("invalid style:writing-mode")),
+            "start" => Ok(Self::Start),
+            "end" => Ok(Self::End),
+            "left" => Ok(Self::Left),
+            "right" => Ok(Self::Right),
+            "center" => Ok(Self::Center),
+            "justify" => Ok(Self::Justify),
+            _ => Err(bad("invalid fo:text-align")),
         }
     }
     fn xml(self) -> &'static str {
         match self {
-            Self::LrTb => "lr-tb",
-            Self::RlTb => "rl-tb",
-            Self::TbRl => "tb-rl",
-            Self::TbLr => "tb-lr",
-            Self::Lr => "lr",
-            Self::Rl => "rl",
-            Self::Tb => "tb",
-            Self::Page => "page",
+            Self::Start => "start",
+            Self::End => "end",
+            Self::Left => "left",
+            Self::Right => "right",
+            Self::Center => "center",
+            Self::Justify => "justify",
         }
     }
 }
 
-/// The writing-mode attribute group of one `style:paragraph-properties`
-/// element.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphWritingModeProperties {
-    pub writing_mode: Option<ParagraphWritingMode>,
-    pub writing_mode_automatic: Option<bool>,
-    pub register_true: Option<bool>,
-    pub join_border: Option<bool>,
+/// The `style:vertical-align` value of a paragraph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Vertical {
+    Top,
+    Middle,
+    Bottom,
+    Auto,
+    Baseline,
 }
-impl ParagraphWritingModeProperties {
+impl Vertical {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "top" => Ok(Self::Top),
+            "middle" => Ok(Self::Middle),
+            "bottom" => Ok(Self::Bottom),
+            "auto" => Ok(Self::Auto),
+            "baseline" => Ok(Self::Baseline),
+            _ => Err(bad("invalid style:vertical-align")),
+        }
+    }
+    fn xml(self) -> &'static str {
+        match self {
+            Self::Top => "top",
+            Self::Middle => "middle",
+            Self::Bottom => "bottom",
+            Self::Auto => "auto",
+            Self::Baseline => "baseline",
+        }
+    }
+}
+
+/// The alignment attribute group of one `style:paragraph-properties` element.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Properties {
+    pub horizontal: Option<Horizontal>,
+    pub vertical: Option<Vertical>,
+}
+impl Properties {
     pub fn new() -> Self {
         Self::default()
     }
@@ -114,43 +130,35 @@ impl ParagraphWritingModeProperties {
     /// Serialized owned attributes, each prefixed with one space.
     fn attributes_xml(&self) -> String {
         let mut xml = String::new();
-        if let Some(value) = self.writing_mode {
-            xml.push_str(&format!(r#" style:writing-mode="{}""#, value.xml()));
+        if let Some(value) = self.horizontal {
+            xml.push_str(&format!(r#" fo:text-align="{}""#, value.xml()));
         }
-        if let Some(value) = self.writing_mode_automatic {
-            xml.push_str(&format!(r#" style:writing-mode-automatic="{value}""#));
-        }
-        if let Some(value) = self.register_true {
-            xml.push_str(&format!(r#" style:register-true="{value}""#));
-        }
-        if let Some(value) = self.join_border {
-            xml.push_str(&format!(r#" style:join-border="{value}""#));
+        if let Some(value) = self.vertical {
+            xml.push_str(&format!(r#" style:vertical-align="{}""#, value.xml()));
         }
         xml
     }
     /// Emit the properties as a `style:paragraph-properties` fragment.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
-        let mut xml = format!(r#"<style:paragraph-properties xmlns:style="{STYLE_STR}""#);
+        let mut xml =
+            format!(r#"<style:paragraph-properties xmlns:style="{STYLE_STR}" xmlns:fo="{FO_STR}""#);
         xml.push_str(&self.attributes_xml());
         xml.push_str("/>");
         Ok(xml)
     }
 }
 
-/// A named or default paragraph style and its writing-mode properties.
+/// A named or default paragraph style and its alignment properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleWritingMode {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphWritingModeProperties>,
+    pub properties: Option<Properties>,
 }
-impl ParagraphStyleWritingMode {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<ParagraphWritingModeProperties>,
-    ) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -160,7 +168,7 @@ impl ParagraphStyleWritingMode {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphWritingModeProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -213,18 +221,18 @@ impl ParagraphStyleWritingMode {
     }
 }
 
-/// All paragraph styles of a styles part that carry writing-mode properties.
+/// All paragraph styles of a styles part that carry alignment properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleWritingModeSet {
-    pub styles: Vec<ParagraphStyleWritingMode>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleWritingModeSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleWritingMode> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleWritingMode> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -233,12 +241,14 @@ impl ParagraphStyleWritingModeSet {
 enum Ns {
     Office,
     Style,
+    Fo,
     Other,
 }
 fn known(resolve: ResolveResult<'_>) -> Ns {
     match resolve {
         ResolveResult::Bound(value) if value.as_ref() == OFFICE => Ns::Office,
         ResolveResult::Bound(value) if value.as_ref() == STYLE => Ns::Style,
+        ResolveResult::Bound(value) if value.as_ref() == FO => Ns::Fo,
         _ => Ns::Other,
     }
 }
@@ -261,7 +271,7 @@ fn style_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleWritingMode>> {
+) -> Result<Option<Style>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -293,7 +303,7 @@ fn style_attributes(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleWritingMode {
+    let result = Style {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -303,17 +313,17 @@ fn style_attributes(
     Ok(Some(result))
 }
 
-fn writing_mode_attributes(
+fn alignment_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphWritingModeProperties> {
-    let mut properties = ParagraphWritingModeProperties::new();
+) -> Result<Properties> {
+    let mut properties = Properties::new();
     let mut seen = HashSet::new();
     let mut count = 0;
     for attribute in start.attributes().with_checks(true) {
         let attribute =
-            attribute.map_err(|error| bad(format!("invalid writing-mode attribute: {error}")))?;
+            attribute.map_err(|error| bad(format!("invalid alignment attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -332,18 +342,11 @@ fn writing_mode_attributes(
             return Err(bad("paragraph-properties attribute is too large"));
         }
         match (namespace, local.as_ref()) {
-            (Ns::Style, b"writing-mode") => {
-                properties.writing_mode = Some(ParagraphWritingMode::parse(&value)?);
+            (Ns::Fo, b"text-align") => {
+                properties.horizontal = Some(Horizontal::parse(&value)?);
             },
-            (Ns::Style, b"writing-mode-automatic") => {
-                properties.writing_mode_automatic =
-                    Some(bool_value(&value, "style:writing-mode-automatic")?);
-            },
-            (Ns::Style, b"register-true") => {
-                properties.register_true = Some(bool_value(&value, "style:register-true")?);
-            },
-            (Ns::Style, b"join-border") => {
-                properties.join_border = Some(bool_value(&value, "style:join-border")?);
+            (Ns::Style, b"vertical-align") => {
+                properties.vertical = Some(Vertical::parse(&value)?);
             },
             // Other paragraph-properties attributes are owned by sibling modules.
             _ => {},
@@ -353,11 +356,7 @@ fn writing_mode_attributes(
     Ok(properties)
 }
 
-fn push_style(
-    styles: &mut Vec<ParagraphStyleWritingMode>,
-    style: ParagraphStyleWritingMode,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many paragraph styles"));
     }
@@ -370,7 +369,7 @@ fn push_style(
     *total += style.name.as_deref().map_or(0, str::len)
         + style.parent_style_name.as_deref().map_or(0, str::len);
     if *total > MAX_TOTAL {
-        return Err(bad("paragraph writing-mode data is too large"));
+        return Err(bad("paragraph alignment data is too large"));
     }
     styles.push(style);
     Ok(())
@@ -385,17 +384,17 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleWritingMode,
+    style: Style,
     seen_properties: bool,
 }
 
-/// Parse paragraph styles and their writing-mode properties from a styles part.
-pub fn parse_paragraph_style_writing_modes(xml: &str) -> Result<ParagraphStyleWritingModeSet> {
+/// Parse paragraph styles and their alignment properties from a styles part.
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleWritingModeSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -433,8 +432,7 @@ pub fn parse_paragraph_style_writing_modes(xml: &str) -> Result<ParagraphStyleWr
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                     state.seen_properties = true;
-                    state.style.properties =
-                        Some(writing_mode_attributes(&reader, version, &start)?);
+                    state.style.properties = Some(alignment_attributes(&reader, version, &start)?);
                 }
             },
             Ok(Event::Empty(start)) => {
@@ -456,8 +454,7 @@ pub fn parse_paragraph_style_writing_modes(xml: &str) -> Result<ParagraphStyleWr
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                     state.seen_properties = true;
-                    state.style.properties =
-                        Some(writing_mode_attributes(&reader, version, &start)?);
+                    state.style.properties = Some(alignment_attributes(&reader, version, &start)?);
                 }
             },
             Ok(Event::End(_)) => {
@@ -483,7 +480,7 @@ pub fn parse_paragraph_style_writing_modes(xml: &str) -> Result<ParagraphStyleWr
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleWritingModeSet { styles })
+    Ok(Styles { styles })
 }
 
 #[derive(Default)]
@@ -494,7 +491,7 @@ struct Span {
     qname: String,
     empty: bool,
     owned: Vec<String>,
-    missing_style_ns: bool,
+    missing_ns: (bool, bool),
 }
 #[derive(Default)]
 struct TargetSpans {
@@ -527,7 +524,7 @@ fn owned_qnames(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Vec<
     let mut owned = Vec::new();
     for attribute in start.attributes().with_checks(true) {
         let attribute =
-            attribute.map_err(|error| bad(format!("invalid writing-mode attribute: {error}")))?;
+            attribute.map_err(|error| bad(format!("invalid alignment attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -539,23 +536,37 @@ fn owned_qnames(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Vec<
     Ok(owned)
 }
 
-/// Whether the `style:` prefix is not bound to its ODF namespace in the
-/// reader's current scope, so inserted attributes need a local namespace
-/// declaration.
-fn missing_style_ns(reader: &NsReader<&[u8]>) -> bool {
-    !matches!(
-        reader.resolver().resolve_attribute(QName(b"style:x")),
-        (ResolveResult::Bound(namespace), _) if namespace.as_ref() == STYLE
-    )
+/// Whether the `fo:` and `style:` prefixes are not bound to their ODF
+/// namespaces in the reader's current scope, so inserted attributes need
+/// local namespace declarations.
+fn missing_ns_decls(reader: &NsReader<&[u8]>) -> (bool, bool) {
+    let unbound = |probe: &[u8], uri: &[u8]| {
+        !matches!(
+            reader.resolver().resolve_attribute(QName(probe)),
+            (ResolveResult::Bound(namespace), _) if namespace.as_ref() == uri
+        )
+    };
+    (unbound(b"fo:x", FO), unbound(b"style:x", STYLE))
 }
 
-/// Losslessly replace, insert, or remove this module's writing-mode attributes
-/// on one existing paragraph style's `style:paragraph-properties` element.
+/// Prepend local namespace declarations to the serialized attributes for any
+/// prefix that is unbound in the target scope.
+fn qualify_insert(insert: &str, missing: (bool, bool)) -> String {
+    let mut qualified = String::new();
+    if missing.0 && insert.contains(" fo:") {
+        qualified.push_str(&format!(r#" xmlns:fo="{FO_STR}""#));
+    }
+    if missing.1 && insert.contains(" style:") {
+        qualified.push_str(&format!(r#" xmlns:style="{STYLE_STR}""#));
+    }
+    qualified.push_str(insert);
+    qualified
+}
+
+/// Losslessly replace, insert, or remove this module's alignment attributes on
+/// one existing paragraph style's `style:paragraph-properties` element.
 /// Attributes owned by sibling modules and child elements are preserved.
-pub fn set_paragraph_style_writing_mode_xml(
-    xml: &str,
-    requested: &ParagraphStyleWritingMode,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -602,7 +613,7 @@ pub fn set_paragraph_style_writing_mode_xml(
                         end,
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         owned: owned_qnames(&reader, &start)?,
-                        missing_style_ns: missing_style_ns(&reader),
+                        missing_ns: missing_ns_decls(&reader),
                         ..Default::default()
                     };
                     if active.as_mut().unwrap().properties.replace(span).is_some() {
@@ -642,7 +653,7 @@ pub fn set_paragraph_style_writing_mode_xml(
                 {
                     let span = Span {
                         owned: owned_qnames(&reader, &start)?,
-                        missing_style_ns: missing_style_ns(&reader),
+                        missing_ns: missing_ns_decls(&reader),
                         ..span
                     };
                     if active.as_mut().unwrap().properties.replace(span).is_some() {
@@ -690,15 +701,11 @@ pub fn set_paragraph_style_writing_mode_xml(
     let insert = requested
         .properties
         .as_ref()
-        .map(ParagraphWritingModeProperties::attributes_xml)
+        .map(Properties::attributes_xml)
         .unwrap_or_default();
     if let Some(properties) = &spans.properties {
         let raw = &xml[properties.start..properties.end];
-        let insert = if properties.missing_style_ns && insert.contains(" style:") {
-            format!(r#" xmlns:style="{STYLE_STR}"{insert}"#)
-        } else {
-            insert
-        };
+        let insert = qualify_insert(&insert, properties.missing_ns);
         let rewritten = rewrite_start_tag(raw, &properties.owned, &insert)?;
         if properties.empty {
             return Ok(replace_span(xml, properties, &rewritten));
@@ -723,15 +730,13 @@ pub fn set_paragraph_style_writing_mode_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_writing_modes(&self) -> Result<ParagraphStyleWritingModeSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleWritingModeSet::default()),
-            |xml| parse_paragraph_style_writing_modes(&xml),
-        )
+    pub fn paragraph_style_alignments(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_writing_modes(&self) -> Result<ParagraphStyleWritingModeSet> {
-        parse_paragraph_style_writing_modes(self.xml())
+    pub fn paragraph_style_alignments(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }

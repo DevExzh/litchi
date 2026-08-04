@@ -1,15 +1,13 @@
-//! Typed ODF paragraph break, page-number, and line-numbering properties.
+//! Typed ODF paragraph writing-mode and register properties.
 //!
-//! Models the pagination attribute group of `style:paragraph-properties`
-//! (`fo:break-before`, `fo:break-after`, `style:page-number`,
-//! `text:number-lines`, `text:line-number`). Breaks accept `auto`, `column`,
-//! or `page`; `style:page-number` accepts `auto` or a positive integer;
-//! `text:number-lines` is a boolean; `text:line-number` is a non-negative
-//! integer. These are presentation metadata only: the model never paginates
-//! or counts lines. Attributes owned by sibling paragraph modules are
-//! ignored; duplicates and malformed owned values are rejected.
+//! Models the writing-mode attribute group of `style:paragraph-properties`:
+//! `style:writing-mode` accepts the `lr-tb`, `rl-tb`, `tb-rl`, `tb-lr`,
+//! `lr`, `rl`, `tb`, and `page` tokens; `style:writing-mode-automatic`,
+//! `style:register-true`, and `style:join-border` are booleans restricted to
+//! the `true` and `false` tokens. All other sibling-owned attributes are
+//! ignored. Duplicates and malformed owned values are rejected.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, paragraph_margin::rewrite_start_tag};
+use crate::{FlatOpenDocument, OpenDocumentPackage, style::paragraph::margin::rewrite_start_tag};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -21,29 +19,22 @@ use std::collections::HashSet;
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
-const FO: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
-const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const STYLE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
-const FO_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
-const TEXT_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const MAX_XML: usize = 64 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_STYLES: usize = 65_536;
 const MAX_VALUE: usize = 4_096;
 const MAX_TOTAL: usize = 16 * 1024 * 1024;
 const MAX_ATTRIBUTES: usize = 64;
-const MAX_PAGE_NUMBER: u64 = 1_000_000_000;
-const MAX_LINE_NUMBER: u64 = 1_000_000_000;
 
 /// Whether this module owns the attribute with the given expanded name.
 fn owned_attribute(namespace: Ns, local: &[u8]) -> bool {
     matches!(
         (namespace, local),
-        (Ns::Fo, b"break-before")
-            | (Ns::Fo, b"break-after")
-            | (Ns::Style, b"page-number")
-            | (Ns::Text, b"number-lines")
-            | (Ns::Text, b"line-number")
+        (Ns::Style, b"writing-mode")
+            | (Ns::Style, b"writing-mode-automatic")
+            | (Ns::Style, b"register-true")
+            | (Ns::Style, b"join-border")
     )
 }
 
@@ -56,130 +47,110 @@ fn name_ok(value: &str, field: &str) -> Result<()> {
     }
     Ok(())
 }
-fn parse_bool(value: &str, field: &str) -> Result<bool> {
+fn bool_value(value: &str, field: &str) -> Result<bool> {
     match value {
         "true" => Ok(true),
         "false" => Ok(false),
-        _ => Err(bad(format!("{field} must be true or false"))),
+        _ => Err(bad(format!("invalid {field}"))),
     }
 }
 
-/// An `fo:break-before`/`fo:break-after` value.
+/// The `style:writing-mode` value of a paragraph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphBreak {
-    Auto,
-    Column,
+pub enum ParagraphWritingMode {
+    LrTb,
+    RlTb,
+    TbRl,
+    TbLr,
+    Lr,
+    Rl,
+    Tb,
     Page,
 }
-impl ParagraphBreak {
+impl ParagraphWritingMode {
     fn parse(value: &str) -> Result<Self> {
         match value {
-            "auto" => Ok(Self::Auto),
-            "column" => Ok(Self::Column),
+            "lr-tb" => Ok(Self::LrTb),
+            "rl-tb" => Ok(Self::RlTb),
+            "tb-rl" => Ok(Self::TbRl),
+            "tb-lr" => Ok(Self::TbLr),
+            "lr" => Ok(Self::Lr),
+            "rl" => Ok(Self::Rl),
+            "tb" => Ok(Self::Tb),
             "page" => Ok(Self::Page),
-            _ => Err(bad("invalid paragraph break value")),
+            _ => Err(bad("invalid style:writing-mode")),
         }
     }
     fn xml(self) -> &'static str {
         match self {
-            Self::Auto => "auto",
-            Self::Column => "column",
+            Self::LrTb => "lr-tb",
+            Self::RlTb => "rl-tb",
+            Self::TbRl => "tb-rl",
+            Self::TbLr => "tb-lr",
+            Self::Lr => "lr",
+            Self::Rl => "rl",
+            Self::Tb => "tb",
             Self::Page => "page",
         }
     }
 }
 
-/// The `style:page-number` value: `auto` or a positive integer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphPageNumber {
-    Auto,
-    Number(u64),
-}
-impl ParagraphPageNumber {
-    fn parse(value: &str) -> Result<Self> {
-        if value == "auto" {
-            return Ok(Self::Auto);
-        }
-        let number: u64 = value
-            .parse()
-            .map_err(|_| bad("invalid style:page-number"))?;
-        if number == 0 || number > MAX_PAGE_NUMBER {
-            return Err(bad("style:page-number out of range"));
-        }
-        Ok(Self::Number(number))
-    }
-    fn xml(self) -> String {
-        match self {
-            Self::Auto => "auto".to_owned(),
-            Self::Number(number) => number.to_string(),
-        }
-    }
-}
-
-/// The break, page-number, and line-numbering group of one
-/// `style:paragraph-properties` element.
+/// The writing-mode attribute group of one `style:paragraph-properties`
+/// element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphBreaks {
-    pub break_before: Option<ParagraphBreak>,
-    pub break_after: Option<ParagraphBreak>,
-    pub page_number: Option<ParagraphPageNumber>,
-    pub number_lines: Option<bool>,
-    pub line_number: Option<u64>,
+pub struct ParagraphWritingModeProperties {
+    pub writing_mode: Option<ParagraphWritingMode>,
+    pub writing_mode_automatic: Option<bool>,
+    pub register_true: Option<bool>,
+    pub join_border: Option<bool>,
 }
-impl ParagraphBreaks {
+impl ParagraphWritingModeProperties {
     pub fn new() -> Self {
         Self::default()
     }
     pub fn validate(&self) -> Result<()> {
-        if let Some(number) = self.line_number
-            && number > MAX_LINE_NUMBER
-        {
-            return Err(bad("text:line-number out of range"));
-        }
         Ok(())
     }
     /// Serialized owned attributes, each prefixed with one space.
     fn attributes_xml(&self) -> String {
         let mut xml = String::new();
-        if let Some(value) = self.break_before {
-            xml.push_str(&format!(r#" fo:break-before="{}""#, value.xml()));
+        if let Some(value) = self.writing_mode {
+            xml.push_str(&format!(r#" style:writing-mode="{}""#, value.xml()));
         }
-        if let Some(value) = self.break_after {
-            xml.push_str(&format!(r#" fo:break-after="{}""#, value.xml()));
+        if let Some(value) = self.writing_mode_automatic {
+            xml.push_str(&format!(r#" style:writing-mode-automatic="{value}""#));
         }
-        if let Some(value) = self.page_number {
-            xml.push_str(&format!(r#" style:page-number="{}""#, value.xml()));
+        if let Some(value) = self.register_true {
+            xml.push_str(&format!(r#" style:register-true="{value}""#));
         }
-        if let Some(value) = self.number_lines {
-            xml.push_str(&format!(r#" text:number-lines="{value}""#));
-        }
-        if let Some(value) = self.line_number {
-            xml.push_str(&format!(r#" text:line-number="{value}""#));
+        if let Some(value) = self.join_border {
+            xml.push_str(&format!(r#" style:join-border="{value}""#));
         }
         xml
     }
     /// Emit the properties as a `style:paragraph-properties` fragment.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
-        let mut xml = format!(
-            r#"<style:paragraph-properties xmlns:style="{STYLE_STR}" xmlns:fo="{FO_STR}" xmlns:text="{TEXT_STR}""#
-        );
+        let mut xml = format!(r#"<style:paragraph-properties xmlns:style="{STYLE_STR}""#);
         xml.push_str(&self.attributes_xml());
         xml.push_str("/>");
         Ok(xml)
     }
 }
 
-/// A named or default paragraph style and its break properties.
+/// A named or default paragraph style and its writing-mode properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleBreaks {
+pub struct ParagraphStyleWritingMode {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphBreaks>,
+    pub properties: Option<ParagraphWritingModeProperties>,
 }
-impl ParagraphStyleBreaks {
-    pub fn named(name: impl Into<String>, properties: Option<ParagraphBreaks>) -> Result<Self> {
+impl ParagraphStyleWritingMode {
+    pub fn named(
+        name: impl Into<String>,
+        properties: Option<ParagraphWritingModeProperties>,
+    ) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -189,7 +160,7 @@ impl ParagraphStyleBreaks {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphBreaks>) -> Self {
+    pub fn default_style(properties: Option<ParagraphWritingModeProperties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -242,18 +213,18 @@ impl ParagraphStyleBreaks {
     }
 }
 
-/// All paragraph styles of a styles part that carry break properties.
+/// All paragraph styles of a styles part that carry writing-mode properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleBreaksSet {
-    pub styles: Vec<ParagraphStyleBreaks>,
+pub struct ParagraphStyleWritingModeSet {
+    pub styles: Vec<ParagraphStyleWritingMode>,
 }
-impl ParagraphStyleBreaksSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleBreaks> {
+impl ParagraphStyleWritingModeSet {
+    pub fn get(&self, name: &str) -> Option<&ParagraphStyleWritingMode> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleBreaks> {
+    pub fn default_style(&self) -> Option<&ParagraphStyleWritingMode> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -262,16 +233,12 @@ impl ParagraphStyleBreaksSet {
 enum Ns {
     Office,
     Style,
-    Fo,
-    Text,
     Other,
 }
 fn known(resolve: ResolveResult<'_>) -> Ns {
     match resolve {
         ResolveResult::Bound(value) if value.as_ref() == OFFICE => Ns::Office,
         ResolveResult::Bound(value) if value.as_ref() == STYLE => Ns::Style,
-        ResolveResult::Bound(value) if value.as_ref() == FO => Ns::Fo,
-        ResolveResult::Bound(value) if value.as_ref() == TEXT => Ns::Text,
         _ => Ns::Other,
     }
 }
@@ -294,7 +261,7 @@ fn style_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleBreaks>> {
+) -> Result<Option<ParagraphStyleWritingMode>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -326,7 +293,7 @@ fn style_attributes(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleBreaks {
+    let result = ParagraphStyleWritingMode {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -336,17 +303,17 @@ fn style_attributes(
     Ok(Some(result))
 }
 
-fn break_attributes(
+fn writing_mode_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphBreaks> {
-    let mut properties = ParagraphBreaks::new();
+) -> Result<ParagraphWritingModeProperties> {
+    let mut properties = ParagraphWritingModeProperties::new();
     let mut seen = HashSet::new();
     let mut count = 0;
     for attribute in start.attributes().with_checks(true) {
         let attribute =
-            attribute.map_err(|error| bad(format!("invalid break attribute: {error}")))?;
+            attribute.map_err(|error| bad(format!("invalid writing-mode attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -365,21 +332,18 @@ fn break_attributes(
             return Err(bad("paragraph-properties attribute is too large"));
         }
         match (namespace, local.as_ref()) {
-            (Ns::Fo, b"break-before") => {
-                properties.break_before = Some(ParagraphBreak::parse(&value)?);
+            (Ns::Style, b"writing-mode") => {
+                properties.writing_mode = Some(ParagraphWritingMode::parse(&value)?);
             },
-            (Ns::Fo, b"break-after") => {
-                properties.break_after = Some(ParagraphBreak::parse(&value)?);
+            (Ns::Style, b"writing-mode-automatic") => {
+                properties.writing_mode_automatic =
+                    Some(bool_value(&value, "style:writing-mode-automatic")?);
             },
-            (Ns::Style, b"page-number") => {
-                properties.page_number = Some(ParagraphPageNumber::parse(&value)?);
+            (Ns::Style, b"register-true") => {
+                properties.register_true = Some(bool_value(&value, "style:register-true")?);
             },
-            (Ns::Text, b"number-lines") => {
-                properties.number_lines = Some(parse_bool(&value, "text:number-lines")?);
-            },
-            (Ns::Text, b"line-number") => {
-                let number: u64 = value.parse().map_err(|_| bad("invalid text:line-number"))?;
-                properties.line_number = Some(number);
+            (Ns::Style, b"join-border") => {
+                properties.join_border = Some(bool_value(&value, "style:join-border")?);
             },
             // Other paragraph-properties attributes are owned by sibling modules.
             _ => {},
@@ -390,8 +354,8 @@ fn break_attributes(
 }
 
 fn push_style(
-    styles: &mut Vec<ParagraphStyleBreaks>,
-    style: ParagraphStyleBreaks,
+    styles: &mut Vec<ParagraphStyleWritingMode>,
+    style: ParagraphStyleWritingMode,
     total: &mut usize,
 ) -> Result<()> {
     if styles.len() >= MAX_STYLES {
@@ -406,7 +370,7 @@ fn push_style(
     *total += style.name.as_deref().map_or(0, str::len)
         + style.parent_style_name.as_deref().map_or(0, str::len);
     if *total > MAX_TOTAL {
-        return Err(bad("paragraph break data is too large"));
+        return Err(bad("paragraph writing-mode data is too large"));
     }
     styles.push(style);
     Ok(())
@@ -421,17 +385,17 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleBreaks,
+    style: ParagraphStyleWritingMode,
     seen_properties: bool,
 }
 
-/// Parse paragraph styles and their break properties from a styles part.
-pub fn parse_paragraph_style_breaks(xml: &str) -> Result<ParagraphStyleBreaksSet> {
+/// Parse paragraph styles and their writing-mode properties from a styles part.
+pub fn parse_paragraph_style_writing_modes(xml: &str) -> Result<ParagraphStyleWritingModeSet> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleBreaksSet::default());
+        return Ok(ParagraphStyleWritingModeSet::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -469,7 +433,8 @@ pub fn parse_paragraph_style_breaks(xml: &str) -> Result<ParagraphStyleBreaksSet
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                     state.seen_properties = true;
-                    state.style.properties = Some(break_attributes(&reader, version, &start)?);
+                    state.style.properties =
+                        Some(writing_mode_attributes(&reader, version, &start)?);
                 }
             },
             Ok(Event::Empty(start)) => {
@@ -491,7 +456,8 @@ pub fn parse_paragraph_style_breaks(xml: &str) -> Result<ParagraphStyleBreaksSet
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                     state.seen_properties = true;
-                    state.style.properties = Some(break_attributes(&reader, version, &start)?);
+                    state.style.properties =
+                        Some(writing_mode_attributes(&reader, version, &start)?);
                 }
             },
             Ok(Event::End(_)) => {
@@ -517,7 +483,7 @@ pub fn parse_paragraph_style_breaks(xml: &str) -> Result<ParagraphStyleBreaksSet
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleBreaksSet { styles })
+    Ok(ParagraphStyleWritingModeSet { styles })
 }
 
 #[derive(Default)]
@@ -528,7 +494,7 @@ struct Span {
     qname: String,
     empty: bool,
     owned: Vec<String>,
-    missing_ns: (bool, bool, bool),
+    missing_style_ns: bool,
 }
 #[derive(Default)]
 struct TargetSpans {
@@ -561,7 +527,7 @@ fn owned_qnames(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Vec<
     let mut owned = Vec::new();
     for attribute in start.attributes().with_checks(true) {
         let attribute =
-            attribute.map_err(|error| bad(format!("invalid break attribute: {error}")))?;
+            attribute.map_err(|error| bad(format!("invalid writing-mode attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -573,46 +539,22 @@ fn owned_qnames(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Vec<
     Ok(owned)
 }
 
-/// Whether the `fo:`, `style:`, and `text:` prefixes are not bound to their
-/// ODF namespaces in the reader's current scope, so inserted attributes need
-/// local namespace declarations.
-fn missing_ns_decls(reader: &NsReader<&[u8]>) -> (bool, bool, bool) {
-    let unbound = |probe: &[u8], uri: &[u8]| {
-        !matches!(
-            reader.resolver().resolve_attribute(QName(probe)),
-            (ResolveResult::Bound(namespace), _) if namespace.as_ref() == uri
-        )
-    };
-    (
-        unbound(b"fo:x", FO),
-        unbound(b"style:x", STYLE),
-        unbound(b"text:x", TEXT),
+/// Whether the `style:` prefix is not bound to its ODF namespace in the
+/// reader's current scope, so inserted attributes need a local namespace
+/// declaration.
+fn missing_style_ns(reader: &NsReader<&[u8]>) -> bool {
+    !matches!(
+        reader.resolver().resolve_attribute(QName(b"style:x")),
+        (ResolveResult::Bound(namespace), _) if namespace.as_ref() == STYLE
     )
 }
 
-/// Prepend local namespace declarations to the serialized attributes for any
-/// prefix that is unbound in the target scope.
-fn qualify_insert(insert: &str, missing: (bool, bool, bool)) -> String {
-    let mut qualified = String::new();
-    if missing.0 && insert.contains(" fo:") {
-        qualified.push_str(&format!(r#" xmlns:fo="{FO_STR}""#));
-    }
-    if missing.1 && insert.contains(" style:") {
-        qualified.push_str(&format!(r#" xmlns:style="{STYLE_STR}""#));
-    }
-    if missing.2 && insert.contains(" text:") {
-        qualified.push_str(&format!(r#" xmlns:text="{TEXT_STR}""#));
-    }
-    qualified.push_str(insert);
-    qualified
-}
-
-/// Losslessly replace, insert, or remove this module's break attributes on one
-/// existing paragraph style's `style:paragraph-properties` element. Attributes
-/// owned by sibling modules and child elements are preserved.
-pub fn set_paragraph_style_breaks_xml(
+/// Losslessly replace, insert, or remove this module's writing-mode attributes
+/// on one existing paragraph style's `style:paragraph-properties` element.
+/// Attributes owned by sibling modules and child elements are preserved.
+pub fn set_paragraph_style_writing_mode_xml(
     xml: &str,
-    requested: &ParagraphStyleBreaks,
+    requested: &ParagraphStyleWritingMode,
 ) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
@@ -660,7 +602,7 @@ pub fn set_paragraph_style_breaks_xml(
                         end,
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         owned: owned_qnames(&reader, &start)?,
-                        missing_ns: missing_ns_decls(&reader),
+                        missing_style_ns: missing_style_ns(&reader),
                         ..Default::default()
                     };
                     if active.as_mut().unwrap().properties.replace(span).is_some() {
@@ -700,7 +642,7 @@ pub fn set_paragraph_style_breaks_xml(
                 {
                     let span = Span {
                         owned: owned_qnames(&reader, &start)?,
-                        missing_ns: missing_ns_decls(&reader),
+                        missing_style_ns: missing_style_ns(&reader),
                         ..span
                     };
                     if active.as_mut().unwrap().properties.replace(span).is_some() {
@@ -748,11 +690,15 @@ pub fn set_paragraph_style_breaks_xml(
     let insert = requested
         .properties
         .as_ref()
-        .map(ParagraphBreaks::attributes_xml)
+        .map(ParagraphWritingModeProperties::attributes_xml)
         .unwrap_or_default();
     if let Some(properties) = &spans.properties {
         let raw = &xml[properties.start..properties.end];
-        let insert = qualify_insert(&insert, properties.missing_ns);
+        let insert = if properties.missing_style_ns && insert.contains(" style:") {
+            format!(r#" xmlns:style="{STYLE_STR}"{insert}"#)
+        } else {
+            insert
+        };
         let rewritten = rewrite_start_tag(raw, &properties.owned, &insert)?;
         if properties.empty {
             return Ok(replace_span(xml, properties, &rewritten));
@@ -777,15 +723,15 @@ pub fn set_paragraph_style_breaks_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_breaks(&self) -> Result<ParagraphStyleBreaksSet> {
+    pub fn paragraph_style_writing_modes(&self) -> Result<ParagraphStyleWritingModeSet> {
         self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleBreaksSet::default()),
-            |xml| parse_paragraph_style_breaks(&xml),
+            || Ok(ParagraphStyleWritingModeSet::default()),
+            |xml| parse_paragraph_style_writing_modes(&xml),
         )
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_breaks(&self) -> Result<ParagraphStyleBreaksSet> {
-        parse_paragraph_style_breaks(self.xml())
+    pub fn paragraph_style_writing_modes(&self) -> Result<ParagraphStyleWritingModeSet> {
+        parse_paragraph_style_writing_modes(self.xml())
     }
 }

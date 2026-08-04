@@ -77,7 +77,7 @@ pub struct DocumentBuilder {
     paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
     paragraph_margin_styles: Vec<crate::ParagraphStyleMargins>,
     paragraph_border_styles: Vec<crate::ParagraphStyleBorder>,
-    paragraph_alignment_styles: Vec<crate::ParagraphStyleAlignment>,
+    paragraph_alignment_styles: Vec<crate::style::paragraph::alignment::Style>,
     paragraph_break_styles: Vec<crate::ParagraphStyleBreaks>,
     paragraph_writing_mode_styles: Vec<crate::ParagraphStyleWritingMode>,
     table_row_property_styles: Vec<crate::TableRowStyleProperties>,
@@ -276,7 +276,7 @@ impl DocumentBuilder {
         if let Some(tabs) = self
             .paragraph_tab_styles
             .iter()
-            .find(|tabs| crate::paragraph_drop_cap::same_style_identity(&style, tabs))
+            .find(|tabs| crate::style::paragraph::drop_cap::same_style_identity(&style, tabs))
             && tabs.parent_style_name != style.parent_style_name
         {
             return Err(litchi_core::Error::InvalidFormat(
@@ -434,7 +434,7 @@ impl DocumentBuilder {
     /// properties.
     pub fn add_paragraph_alignment_style(
         &mut self,
-        style: crate::ParagraphStyleAlignment,
+        style: crate::style::paragraph::alignment::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_alignment_styles.len() >= 4096
@@ -1764,7 +1764,9 @@ impl DocumentBuilder {
                 .map(|style| {
                     self.paragraph_drop_cap_styles
                         .iter()
-                        .find(|cap| crate::paragraph_drop_cap::same_style_identity(cap, style))
+                        .find(|cap| {
+                            crate::style::paragraph::drop_cap::same_style_identity(cap, style)
+                        })
                         .map_or_else(
                             || {
                                 style
@@ -1772,7 +1774,7 @@ impl DocumentBuilder {
                                     .expect("validated paragraph tab style")
                             },
                             |cap| {
-                                crate::paragraph_drop_cap::merge_with_tab_style(style, cap)
+                                crate::style::paragraph::drop_cap::merge_with_tab_style(style, cap)
                                     .expect("validated merged paragraph style")
                             },
                         )
@@ -1786,10 +1788,9 @@ impl DocumentBuilder {
                 .paragraph_drop_cap_styles
                 .iter()
                 .filter(|cap| {
-                    !self
-                        .paragraph_tab_styles
-                        .iter()
-                        .any(|tabs| crate::paragraph_drop_cap::same_style_identity(cap, tabs))
+                    !self.paragraph_tab_styles.iter().any(|tabs| {
+                        crate::style::paragraph::drop_cap::same_style_identity(cap, tabs)
+                    })
                 })
                 .map(|style| {
                     style

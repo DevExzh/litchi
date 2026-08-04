@@ -1,14 +1,15 @@
-//! Typed ODF paragraph alignment properties.
+//! Typed ODF paragraph break, page-number, and line-numbering properties.
 //!
-//! Models the alignment attribute group of `style:paragraph-properties`
-//! (`fo:text-align`, `style:vertical-align`). `fo:text-align` accepts the
-//! `start`, `end`, `left`, `right`, `center`, and `justify` tokens and
-//! `style:vertical-align` accepts `top`, `middle`, `bottom`, `auto`, and
-//! `baseline`. The sibling `style:justify-single-word` attribute is owned by
-//! the line-spacing module; all other sibling-owned attributes are ignored.
-//! Duplicates and malformed owned values are rejected.
+//! Models the pagination attribute group of `style:paragraph-properties`
+//! (`fo:break-before`, `fo:break-after`, `style:page-number`,
+//! `text:number-lines`, `text:line-number`). Breaks accept `auto`, `column`,
+//! or `page`; `style:page-number` accepts `auto` or a positive integer;
+//! `text:number-lines` is a boolean; `text:line-number` is a non-negative
+//! integer. These are presentation metadata only: the model never paginates
+//! or counts lines. Attributes owned by sibling paragraph modules are
+//! ignored; duplicates and malformed owned values are rejected.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, paragraph_margin::rewrite_start_tag};
+use crate::{FlatOpenDocument, OpenDocumentPackage, style::paragraph::margin::rewrite_start_tag};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -21,20 +22,28 @@ use std::collections::HashSet;
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const FO: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
+const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const STYLE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const FO_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
+const TEXT_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const MAX_XML: usize = 64 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_STYLES: usize = 65_536;
 const MAX_VALUE: usize = 4_096;
 const MAX_TOTAL: usize = 16 * 1024 * 1024;
 const MAX_ATTRIBUTES: usize = 64;
+const MAX_PAGE_NUMBER: u64 = 1_000_000_000;
+const MAX_LINE_NUMBER: u64 = 1_000_000_000;
 
 /// Whether this module owns the attribute with the given expanded name.
 fn owned_attribute(namespace: Ns, local: &[u8]) -> bool {
     matches!(
         (namespace, local),
-        (Ns::Fo, b"text-align") | (Ns::Style, b"vertical-align")
+        (Ns::Fo, b"break-before")
+            | (Ns::Fo, b"break-after")
+            | (Ns::Style, b"page-number")
+            | (Ns::Text, b"number-lines")
+            | (Ns::Text, b"line-number")
     )
 }
 
@@ -47,117 +56,130 @@ fn name_ok(value: &str, field: &str) -> Result<()> {
     }
     Ok(())
 }
-
-/// The `fo:text-align` value of a paragraph.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphTextAlign {
-    Start,
-    End,
-    Left,
-    Right,
-    Center,
-    Justify,
-}
-impl ParagraphTextAlign {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "start" => Ok(Self::Start),
-            "end" => Ok(Self::End),
-            "left" => Ok(Self::Left),
-            "right" => Ok(Self::Right),
-            "center" => Ok(Self::Center),
-            "justify" => Ok(Self::Justify),
-            _ => Err(bad("invalid fo:text-align")),
-        }
-    }
-    fn xml(self) -> &'static str {
-        match self {
-            Self::Start => "start",
-            Self::End => "end",
-            Self::Left => "left",
-            Self::Right => "right",
-            Self::Center => "center",
-            Self::Justify => "justify",
-        }
+fn parse_bool(value: &str, field: &str) -> Result<bool> {
+    match value {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(bad(format!("{field} must be true or false"))),
     }
 }
 
-/// The `style:vertical-align` value of a paragraph.
+/// An `fo:break-before`/`fo:break-after` value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphVerticalAlign {
-    Top,
-    Middle,
-    Bottom,
+pub enum ParagraphBreak {
     Auto,
-    Baseline,
+    Column,
+    Page,
 }
-impl ParagraphVerticalAlign {
+impl ParagraphBreak {
     fn parse(value: &str) -> Result<Self> {
         match value {
-            "top" => Ok(Self::Top),
-            "middle" => Ok(Self::Middle),
-            "bottom" => Ok(Self::Bottom),
             "auto" => Ok(Self::Auto),
-            "baseline" => Ok(Self::Baseline),
-            _ => Err(bad("invalid style:vertical-align")),
+            "column" => Ok(Self::Column),
+            "page" => Ok(Self::Page),
+            _ => Err(bad("invalid paragraph break value")),
         }
     }
     fn xml(self) -> &'static str {
         match self {
-            Self::Top => "top",
-            Self::Middle => "middle",
-            Self::Bottom => "bottom",
             Self::Auto => "auto",
-            Self::Baseline => "baseline",
+            Self::Column => "column",
+            Self::Page => "page",
         }
     }
 }
 
-/// The alignment attribute group of one `style:paragraph-properties` element.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphAlignment {
-    pub text_align: Option<ParagraphTextAlign>,
-    pub vertical_align: Option<ParagraphVerticalAlign>,
+/// The `style:page-number` value: `auto` or a positive integer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParagraphPageNumber {
+    Auto,
+    Number(u64),
 }
-impl ParagraphAlignment {
+impl ParagraphPageNumber {
+    fn parse(value: &str) -> Result<Self> {
+        if value == "auto" {
+            return Ok(Self::Auto);
+        }
+        let number: u64 = value
+            .parse()
+            .map_err(|_| bad("invalid style:page-number"))?;
+        if number == 0 || number > MAX_PAGE_NUMBER {
+            return Err(bad("style:page-number out of range"));
+        }
+        Ok(Self::Number(number))
+    }
+    fn xml(self) -> String {
+        match self {
+            Self::Auto => "auto".to_owned(),
+            Self::Number(number) => number.to_string(),
+        }
+    }
+}
+
+/// The break, page-number, and line-numbering group of one
+/// `style:paragraph-properties` element.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ParagraphBreaks {
+    pub break_before: Option<ParagraphBreak>,
+    pub break_after: Option<ParagraphBreak>,
+    pub page_number: Option<ParagraphPageNumber>,
+    pub number_lines: Option<bool>,
+    pub line_number: Option<u64>,
+}
+impl ParagraphBreaks {
     pub fn new() -> Self {
         Self::default()
     }
     pub fn validate(&self) -> Result<()> {
+        if let Some(number) = self.line_number
+            && number > MAX_LINE_NUMBER
+        {
+            return Err(bad("text:line-number out of range"));
+        }
         Ok(())
     }
     /// Serialized owned attributes, each prefixed with one space.
     fn attributes_xml(&self) -> String {
         let mut xml = String::new();
-        if let Some(value) = self.text_align {
-            xml.push_str(&format!(r#" fo:text-align="{}""#, value.xml()));
+        if let Some(value) = self.break_before {
+            xml.push_str(&format!(r#" fo:break-before="{}""#, value.xml()));
         }
-        if let Some(value) = self.vertical_align {
-            xml.push_str(&format!(r#" style:vertical-align="{}""#, value.xml()));
+        if let Some(value) = self.break_after {
+            xml.push_str(&format!(r#" fo:break-after="{}""#, value.xml()));
+        }
+        if let Some(value) = self.page_number {
+            xml.push_str(&format!(r#" style:page-number="{}""#, value.xml()));
+        }
+        if let Some(value) = self.number_lines {
+            xml.push_str(&format!(r#" text:number-lines="{value}""#));
+        }
+        if let Some(value) = self.line_number {
+            xml.push_str(&format!(r#" text:line-number="{value}""#));
         }
         xml
     }
     /// Emit the properties as a `style:paragraph-properties` fragment.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
-        let mut xml =
-            format!(r#"<style:paragraph-properties xmlns:style="{STYLE_STR}" xmlns:fo="{FO_STR}""#);
+        let mut xml = format!(
+            r#"<style:paragraph-properties xmlns:style="{STYLE_STR}" xmlns:fo="{FO_STR}" xmlns:text="{TEXT_STR}""#
+        );
         xml.push_str(&self.attributes_xml());
         xml.push_str("/>");
         Ok(xml)
     }
 }
 
-/// A named or default paragraph style and its alignment properties.
+/// A named or default paragraph style and its break properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleAlignment {
+pub struct ParagraphStyleBreaks {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphAlignment>,
+    pub properties: Option<ParagraphBreaks>,
 }
-impl ParagraphStyleAlignment {
-    pub fn named(name: impl Into<String>, properties: Option<ParagraphAlignment>) -> Result<Self> {
+impl ParagraphStyleBreaks {
+    pub fn named(name: impl Into<String>, properties: Option<ParagraphBreaks>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -167,7 +189,7 @@ impl ParagraphStyleAlignment {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphAlignment>) -> Self {
+    pub fn default_style(properties: Option<ParagraphBreaks>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -220,18 +242,18 @@ impl ParagraphStyleAlignment {
     }
 }
 
-/// All paragraph styles of a styles part that carry alignment properties.
+/// All paragraph styles of a styles part that carry break properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleAlignmentSet {
-    pub styles: Vec<ParagraphStyleAlignment>,
+pub struct ParagraphStyleBreaksSet {
+    pub styles: Vec<ParagraphStyleBreaks>,
 }
-impl ParagraphStyleAlignmentSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleAlignment> {
+impl ParagraphStyleBreaksSet {
+    pub fn get(&self, name: &str) -> Option<&ParagraphStyleBreaks> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleAlignment> {
+    pub fn default_style(&self) -> Option<&ParagraphStyleBreaks> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -241,6 +263,7 @@ enum Ns {
     Office,
     Style,
     Fo,
+    Text,
     Other,
 }
 fn known(resolve: ResolveResult<'_>) -> Ns {
@@ -248,6 +271,7 @@ fn known(resolve: ResolveResult<'_>) -> Ns {
         ResolveResult::Bound(value) if value.as_ref() == OFFICE => Ns::Office,
         ResolveResult::Bound(value) if value.as_ref() == STYLE => Ns::Style,
         ResolveResult::Bound(value) if value.as_ref() == FO => Ns::Fo,
+        ResolveResult::Bound(value) if value.as_ref() == TEXT => Ns::Text,
         _ => Ns::Other,
     }
 }
@@ -270,7 +294,7 @@ fn style_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleAlignment>> {
+) -> Result<Option<ParagraphStyleBreaks>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -302,7 +326,7 @@ fn style_attributes(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleAlignment {
+    let result = ParagraphStyleBreaks {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -312,17 +336,17 @@ fn style_attributes(
     Ok(Some(result))
 }
 
-fn alignment_attributes(
+fn break_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphAlignment> {
-    let mut properties = ParagraphAlignment::new();
+) -> Result<ParagraphBreaks> {
+    let mut properties = ParagraphBreaks::new();
     let mut seen = HashSet::new();
     let mut count = 0;
     for attribute in start.attributes().with_checks(true) {
         let attribute =
-            attribute.map_err(|error| bad(format!("invalid alignment attribute: {error}")))?;
+            attribute.map_err(|error| bad(format!("invalid break attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -341,11 +365,21 @@ fn alignment_attributes(
             return Err(bad("paragraph-properties attribute is too large"));
         }
         match (namespace, local.as_ref()) {
-            (Ns::Fo, b"text-align") => {
-                properties.text_align = Some(ParagraphTextAlign::parse(&value)?);
+            (Ns::Fo, b"break-before") => {
+                properties.break_before = Some(ParagraphBreak::parse(&value)?);
             },
-            (Ns::Style, b"vertical-align") => {
-                properties.vertical_align = Some(ParagraphVerticalAlign::parse(&value)?);
+            (Ns::Fo, b"break-after") => {
+                properties.break_after = Some(ParagraphBreak::parse(&value)?);
+            },
+            (Ns::Style, b"page-number") => {
+                properties.page_number = Some(ParagraphPageNumber::parse(&value)?);
+            },
+            (Ns::Text, b"number-lines") => {
+                properties.number_lines = Some(parse_bool(&value, "text:number-lines")?);
+            },
+            (Ns::Text, b"line-number") => {
+                let number: u64 = value.parse().map_err(|_| bad("invalid text:line-number"))?;
+                properties.line_number = Some(number);
             },
             // Other paragraph-properties attributes are owned by sibling modules.
             _ => {},
@@ -356,8 +390,8 @@ fn alignment_attributes(
 }
 
 fn push_style(
-    styles: &mut Vec<ParagraphStyleAlignment>,
-    style: ParagraphStyleAlignment,
+    styles: &mut Vec<ParagraphStyleBreaks>,
+    style: ParagraphStyleBreaks,
     total: &mut usize,
 ) -> Result<()> {
     if styles.len() >= MAX_STYLES {
@@ -372,7 +406,7 @@ fn push_style(
     *total += style.name.as_deref().map_or(0, str::len)
         + style.parent_style_name.as_deref().map_or(0, str::len);
     if *total > MAX_TOTAL {
-        return Err(bad("paragraph alignment data is too large"));
+        return Err(bad("paragraph break data is too large"));
     }
     styles.push(style);
     Ok(())
@@ -387,17 +421,17 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleAlignment,
+    style: ParagraphStyleBreaks,
     seen_properties: bool,
 }
 
-/// Parse paragraph styles and their alignment properties from a styles part.
-pub fn parse_paragraph_style_alignments(xml: &str) -> Result<ParagraphStyleAlignmentSet> {
+/// Parse paragraph styles and their break properties from a styles part.
+pub fn parse_paragraph_style_breaks(xml: &str) -> Result<ParagraphStyleBreaksSet> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleAlignmentSet::default());
+        return Ok(ParagraphStyleBreaksSet::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -435,7 +469,7 @@ pub fn parse_paragraph_style_alignments(xml: &str) -> Result<ParagraphStyleAlign
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                     state.seen_properties = true;
-                    state.style.properties = Some(alignment_attributes(&reader, version, &start)?);
+                    state.style.properties = Some(break_attributes(&reader, version, &start)?);
                 }
             },
             Ok(Event::Empty(start)) => {
@@ -457,7 +491,7 @@ pub fn parse_paragraph_style_alignments(xml: &str) -> Result<ParagraphStyleAlign
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                     state.seen_properties = true;
-                    state.style.properties = Some(alignment_attributes(&reader, version, &start)?);
+                    state.style.properties = Some(break_attributes(&reader, version, &start)?);
                 }
             },
             Ok(Event::End(_)) => {
@@ -483,7 +517,7 @@ pub fn parse_paragraph_style_alignments(xml: &str) -> Result<ParagraphStyleAlign
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleAlignmentSet { styles })
+    Ok(ParagraphStyleBreaksSet { styles })
 }
 
 #[derive(Default)]
@@ -494,7 +528,7 @@ struct Span {
     qname: String,
     empty: bool,
     owned: Vec<String>,
-    missing_ns: (bool, bool),
+    missing_ns: (bool, bool, bool),
 }
 #[derive(Default)]
 struct TargetSpans {
@@ -527,7 +561,7 @@ fn owned_qnames(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Vec<
     let mut owned = Vec::new();
     for attribute in start.attributes().with_checks(true) {
         let attribute =
-            attribute.map_err(|error| bad(format!("invalid alignment attribute: {error}")))?;
+            attribute.map_err(|error| bad(format!("invalid break attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -539,22 +573,26 @@ fn owned_qnames(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Vec<
     Ok(owned)
 }
 
-/// Whether the `fo:` and `style:` prefixes are not bound to their ODF
-/// namespaces in the reader's current scope, so inserted attributes need
+/// Whether the `fo:`, `style:`, and `text:` prefixes are not bound to their
+/// ODF namespaces in the reader's current scope, so inserted attributes need
 /// local namespace declarations.
-fn missing_ns_decls(reader: &NsReader<&[u8]>) -> (bool, bool) {
+fn missing_ns_decls(reader: &NsReader<&[u8]>) -> (bool, bool, bool) {
     let unbound = |probe: &[u8], uri: &[u8]| {
         !matches!(
             reader.resolver().resolve_attribute(QName(probe)),
             (ResolveResult::Bound(namespace), _) if namespace.as_ref() == uri
         )
     };
-    (unbound(b"fo:x", FO), unbound(b"style:x", STYLE))
+    (
+        unbound(b"fo:x", FO),
+        unbound(b"style:x", STYLE),
+        unbound(b"text:x", TEXT),
+    )
 }
 
 /// Prepend local namespace declarations to the serialized attributes for any
 /// prefix that is unbound in the target scope.
-fn qualify_insert(insert: &str, missing: (bool, bool)) -> String {
+fn qualify_insert(insert: &str, missing: (bool, bool, bool)) -> String {
     let mut qualified = String::new();
     if missing.0 && insert.contains(" fo:") {
         qualified.push_str(&format!(r#" xmlns:fo="{FO_STR}""#));
@@ -562,16 +600,19 @@ fn qualify_insert(insert: &str, missing: (bool, bool)) -> String {
     if missing.1 && insert.contains(" style:") {
         qualified.push_str(&format!(r#" xmlns:style="{STYLE_STR}""#));
     }
+    if missing.2 && insert.contains(" text:") {
+        qualified.push_str(&format!(r#" xmlns:text="{TEXT_STR}""#));
+    }
     qualified.push_str(insert);
     qualified
 }
 
-/// Losslessly replace, insert, or remove this module's alignment attributes on
-/// one existing paragraph style's `style:paragraph-properties` element.
-/// Attributes owned by sibling modules and child elements are preserved.
-pub fn set_paragraph_style_alignment_xml(
+/// Losslessly replace, insert, or remove this module's break attributes on one
+/// existing paragraph style's `style:paragraph-properties` element. Attributes
+/// owned by sibling modules and child elements are preserved.
+pub fn set_paragraph_style_breaks_xml(
     xml: &str,
-    requested: &ParagraphStyleAlignment,
+    requested: &ParagraphStyleBreaks,
 ) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
@@ -707,7 +748,7 @@ pub fn set_paragraph_style_alignment_xml(
     let insert = requested
         .properties
         .as_ref()
-        .map(ParagraphAlignment::attributes_xml)
+        .map(ParagraphBreaks::attributes_xml)
         .unwrap_or_default();
     if let Some(properties) = &spans.properties {
         let raw = &xml[properties.start..properties.end];
@@ -736,15 +777,15 @@ pub fn set_paragraph_style_alignment_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_alignments(&self) -> Result<ParagraphStyleAlignmentSet> {
+    pub fn paragraph_style_breaks(&self) -> Result<ParagraphStyleBreaksSet> {
         self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleAlignmentSet::default()),
-            |xml| parse_paragraph_style_alignments(&xml),
+            || Ok(ParagraphStyleBreaksSet::default()),
+            |xml| parse_paragraph_style_breaks(&xml),
         )
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_alignments(&self) -> Result<ParagraphStyleAlignmentSet> {
-        parse_paragraph_style_alignments(self.xml())
+    pub fn paragraph_style_breaks(&self) -> Result<ParagraphStyleBreaksSet> {
+        parse_paragraph_style_breaks(self.xml())
     }
 }

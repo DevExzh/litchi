@@ -2124,9 +2124,9 @@ impl MutableDocument {
                 "document has no styles.xml paragraph style to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(crate::paragraph_drop_cap::set_paragraph_style_drop_cap_xml(
-            styles, style,
-        )?);
+        self.styles_xml = Some(
+            crate::style::paragraph::drop_cap::set_paragraph_style_drop_cap_xml(styles, style)?,
+        );
         Ok(())
     }
 

@@ -11,7 +11,7 @@ use crate::{
     FlatOpenDocument, HorizontalBackgroundPosition, OdfNonNegativeLength, OpenDocumentPackage,
     TableRowBackgroundColor, TableRowBackgroundImage, TableRowBackgroundPosition,
     TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowOpacity, TableShadow,
-    VerticalBackgroundPosition, paragraph_margin::rewrite_start_tag,
+    VerticalBackgroundPosition, style::paragraph::margin::rewrite_start_tag,
 };
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
