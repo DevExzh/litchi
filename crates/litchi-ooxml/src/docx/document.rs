@@ -4,22 +4,17 @@ use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::Part as CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
-use crate::docx::field::CompareField;
+use crate::docx::field::Compare;
 use crate::docx::field::{
-    ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
-    BarcodeField, BibliographyField, BidiOutlineField, CitationField, DatabaseField, DdeField,
-    DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
-    EmbedField, EquationField, ExternalIncludeField, Field, FormulaField, GoToButtonField,
-    HyperlinkField, IfField, IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField,
-    ListNumberField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
-    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PrintField,
-    PrivateField, PromptField, QuoteField, ReferenceField, ReferencedDocumentField, SequenceField,
-    SetField, ShapeField, StyleReferenceField, SymbolField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesField, TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
+    ActiveContent, Advance, AutoNumber, AutoText, AutoTextList, Barcode, Bibliography, BidiOutline,
+    Citation, Context, Database, Dde, Embed, Equation, Field, Formula, GoToButton, Hyperlink, If,
+    Include, Index, IndexEntry, Info, Information, LegacyForm, Link, ListNumber, MacroButton,
+    Merge, MergeControl, MergeCounter, MergeData, MergeNext, Print, Private, Prompt, Property,
+    Quote, Recipient, Reference, Sequence, Set, Shape, StyleReference, SubDocument, Symbol, Toa,
+    ToaEntry, Toc, TocEntry, UserIdentity, Variable,
 };
 use crate::docx::footnote::Note;
 use crate::docx::header_footer::HeaderFooter;
-use crate::docx::hyperlink::Hyperlink;
 use crate::docx::mail_merge::{Recipients, extract_recipients, is_settings_relationship};
 use crate::docx::numbering::parse_part;
 use crate::docx::paragraph::Paragraph;
@@ -1057,12 +1052,14 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn hyperlinks(&self) -> Result<Vec<Hyperlink>> {
+    pub fn hyperlinks(&self) -> Result<Vec<crate::docx::hyperlink::Hyperlink>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
         let xml_bytes = self.part.xml_bytes();
 
-        Ok(Hyperlink::extract_from_document(xml_bytes, rels)?)
+        Ok(crate::docx::hyperlink::Hyperlink::extract_from_document(
+            xml_bytes, rels,
+        )?)
     }
 
     /// Get the number of `<w:hyperlink>` element hyperlinks in the document.
@@ -1329,7 +1326,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored targets, bookmarks, display metadata,
     /// switches, cached content, and dirty/lock state only. This method never
     /// opens, resolves, follows, activates, or refreshes a link.
-    pub fn hyperlink_fields(&self) -> Result<Vec<HyperlinkField>> {
+    pub fn hyperlink_fields(&self) -> Result<Vec<Hyperlink>> {
         self.fields()?
             .iter()
             .map(|field| Field::hyperlink_field(field).map_err(OoxmlError::from))
@@ -1347,7 +1344,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored source tags, switches, cached content, and
     /// dirty/lock state only. This method never looks up bibliography sources,
     /// formats citations, or refreshes fields.
-    pub fn citations(&self) -> Result<Vec<CitationField>> {
+    pub fn citations(&self) -> Result<Vec<Citation>> {
         self.fields()?
             .iter()
             .map(|field| Field::citation(field).map_err(OoxmlError::from))
@@ -1365,7 +1362,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored switches and cached content only. This
     /// method never loads source XML, sorts sources, or regenerates a
     /// bibliography.
-    pub fn bibliographies(&self) -> Result<Vec<BibliographyField>> {
+    pub fn bibliographies(&self) -> Result<Vec<Bibliography>> {
         self.fields()?
             .iter()
             .map(|field| Field::bibliography(field).map_err(OoxmlError::from))
@@ -1383,7 +1380,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored names, switches, cached content, and
     /// dirty/lock state only. This method never reads the settings part,
     /// resolves document-variable values, or refreshes fields.
-    pub fn document_variable_fields(&self) -> Result<Vec<DocumentVariableField>> {
+    pub fn document_variable_fields(&self) -> Result<Vec<Variable>> {
         self.fields()?
             .iter()
             .map(|field| Field::document_variable(field).map_err(OoxmlError::from))
@@ -1401,7 +1398,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored property names, switches, cached content,
     /// and dirty/lock state only. This method never reads core, extended, or
     /// custom package properties, resolves a value, or refreshes fields.
-    pub fn document_property_fields(&self) -> Result<Vec<DocumentPropertyField>> {
+    pub fn document_property_fields(&self) -> Result<Vec<Property>> {
         self.fields()?
             .iter()
             .map(|field| Field::document_property(field).map_err(OoxmlError::from))
@@ -1420,7 +1417,7 @@ impl<'a> Document<'a> {
     /// values, switches, cached content, and dirty/lock state only. This method
     /// never reads, resolves, modifies, or writes document or template
     /// properties, or refreshes a field.
-    pub fn info_fields(&self) -> Result<Vec<InfoField>> {
+    pub fn info_fields(&self) -> Result<Vec<Info>> {
         self.fields()?
             .iter()
             .map(|field| Field::info_field(field).map_err(OoxmlError::from))
@@ -1439,7 +1436,7 @@ impl<'a> Document<'a> {
     /// dirty/lock state. This method never reads package metadata or host
     /// identity data, calculates dates, revisions, or statistics, resolves a
     /// value, or refreshes fields.
-    pub fn document_information_fields(&self) -> Result<Vec<DocumentInformationField>> {
+    pub fn document_information_fields(&self) -> Result<Vec<Information>> {
         self.fields()?
             .iter()
             .map(|field| Field::document_information(field).map_err(OoxmlError::from))
@@ -1458,7 +1455,7 @@ impl<'a> Document<'a> {
     /// dirty/lock state. This method never reads a document path, attached
     /// template, host filesystem state or file size, current clock, or page and
     /// section layout; resolves a value; or refreshes fields.
-    pub fn document_context_fields(&self) -> Result<Vec<DocumentContextField>> {
+    pub fn document_context_fields(&self) -> Result<Vec<Context>> {
         self.fields()?
             .iter()
             .map(|field| Field::document_context(field).map_err(OoxmlError::from))
@@ -1476,7 +1473,7 @@ impl<'a> Document<'a> {
     /// Returned values expose only stored macro or command names, button text,
     /// cached results, and dirty/lock state. This method never resolves, loads,
     /// invokes, or otherwise executes a macro or command.
-    pub fn macro_button_fields(&self) -> Result<Vec<MacroButtonField>> {
+    pub fn macro_button_fields(&self) -> Result<Vec<MacroButton>> {
         self.fields()?
             .iter()
             .map(|field| Field::macro_button(field).map_err(OoxmlError::from))
@@ -1496,7 +1493,7 @@ impl<'a> Document<'a> {
     /// dirty/lock state only. This method never loads an add-in, instantiates
     /// an OCX or HTML control, invokes code, executes script, renders content,
     /// accesses an external resource, or refreshes a field.
-    pub fn active_content_fields(&self) -> Result<Vec<ActiveContentField>> {
+    pub fn active_content_fields(&self) -> Result<Vec<ActiveContent>> {
         self.fields()?
             .iter()
             .map(|field| Field::active_content_field(field).map_err(OoxmlError::from))
@@ -1515,7 +1512,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state only. This method never looks up a
     /// building block, reads a template, inserts content, changes bookmarks,
     /// accesses an external resource, or refreshes a field.
-    pub fn auto_text_fields(&self) -> Result<Vec<AutoTextField>> {
+    pub fn auto_text_fields(&self) -> Result<Vec<AutoText>> {
         self.fields()?
             .iter()
             .map(|field| Field::auto_text_field(field).map_err(OoxmlError::from))
@@ -1534,7 +1531,7 @@ impl<'a> Document<'a> {
     /// switches, cached content, and dirty/lock state only. This method never
     /// shows a selection UI, looks up a building block, reads a template,
     /// inserts content, accesses an external resource, or refreshes a field.
-    pub fn auto_text_list_fields(&self) -> Result<Vec<AutoTextListField>> {
+    pub fn auto_text_list_fields(&self) -> Result<Vec<AutoTextList>> {
         self.fields()?
             .iter()
             .map(|field| Field::auto_text_list_field(field).map_err(OoxmlError::from))
@@ -1552,7 +1549,7 @@ impl<'a> Document<'a> {
     /// Returned values expose only stored destinations, button text, cached
     /// results, and dirty/lock state. This method never resolves a destination,
     /// changes the insertion point, activates a jump, or refreshes a field.
-    pub fn go_to_button_fields(&self) -> Result<Vec<GoToButtonField>> {
+    pub fn go_to_button_fields(&self) -> Result<Vec<GoToButton>> {
         self.fields()?
             .iter()
             .map(|field| Field::go_to_button(field).map_err(OoxmlError::from))
@@ -1571,7 +1568,7 @@ impl<'a> Document<'a> {
     /// results, and dirty/lock state. This method never interprets control
     /// codes, opens a printer, sends output, changes print settings, or
     /// refreshes a field.
-    pub fn print_fields(&self) -> Result<Vec<PrintField>> {
+    pub fn print_fields(&self) -> Result<Vec<Print>> {
         self.fields()?
             .iter()
             .map(|field| Field::print_field(field).map_err(OoxmlError::from))
@@ -1590,7 +1587,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state. This method never loads, inspects,
     /// deserializes, activates, renders, or executes an embedded object,
     /// accesses an external resource, or refreshes a field.
-    pub fn embed_fields(&self) -> Result<Vec<EmbedField>> {
+    pub fn embed_fields(&self) -> Result<Vec<Embed>> {
         self.fields()?
             .iter()
             .map(|field| Field::embed_field(field).map_err(OoxmlError::from))
@@ -1609,7 +1606,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state. This method never parses or validates
     /// barcode data or symbology, generates or renders a barcode, accesses an
     /// external resource, or refreshes a field.
-    pub fn barcode_fields(&self) -> Result<Vec<BarcodeField>> {
+    pub fn barcode_fields(&self) -> Result<Vec<Barcode>> {
         self.fields()?
             .iter()
             .map(|field| Field::barcode_field(field).map_err(OoxmlError::from))
@@ -1628,7 +1625,7 @@ impl<'a> Document<'a> {
     /// and dirty/lock state. This method never reads right-to-left language,
     /// paragraph outline, or layout state; chooses a numbering system;
     /// calculates a result; or refreshes a field.
-    pub fn bidi_outline_fields(&self) -> Result<Vec<BidiOutlineField>> {
+    pub fn bidi_outline_fields(&self) -> Result<Vec<BidiOutline>> {
         self.fields()?
             .iter()
             .map(|field| Field::bidi_outline_field(field).map_err(OoxmlError::from))
@@ -1646,7 +1643,7 @@ impl<'a> Document<'a> {
     /// Returned values expose only stored opaque instructions, cached content,
     /// and dirty/lock state. This method never locates, links, loads, positions,
     /// lays out, or renders a drawing or canvas, or refreshes a field.
-    pub fn shape_fields(&self) -> Result<Vec<ShapeField>> {
+    pub fn shape_fields(&self) -> Result<Vec<Shape>> {
         self.fields()?
             .iter()
             .map(|field| Field::shape_field(field).map_err(OoxmlError::from))
@@ -1665,7 +1662,7 @@ impl<'a> Document<'a> {
     /// instructions, cached content, and dirty/lock state. This method never
     /// reads associated form-property XML, fills a form, changes a selection or
     /// checkbox state, invokes entry or exit macros, or refreshes a field.
-    pub fn legacy_form_fields(&self) -> Result<Vec<LegacyFormField>> {
+    pub fn legacy_form_fields(&self) -> Result<Vec<LegacyForm>> {
         self.fields()?
             .iter()
             .map(|field| Field::legacy_form_field(field).map_err(OoxmlError::from))
@@ -1684,7 +1681,7 @@ impl<'a> Document<'a> {
     /// and dirty/lock state. This method never converts a document, interprets
     /// field data, changes hidden-text visibility or layout, or refreshes a
     /// field. `PRIVATE` is not treated as a confidentiality mechanism.
-    pub fn private_fields(&self) -> Result<Vec<PrivateField>> {
+    pub fn private_fields(&self) -> Result<Vec<Private>> {
         self.fields()?
             .iter()
             .map(|field| Field::private_field(field).map_err(OoxmlError::from))
@@ -1703,7 +1700,7 @@ impl<'a> Document<'a> {
     /// and dirty/lock state. This method never opens a data source or database,
     /// uses connection information, executes SQL, generates or inserts a table,
     /// changes layout, or refreshes a field.
-    pub fn database_fields(&self) -> Result<Vec<DatabaseField>> {
+    pub fn database_fields(&self) -> Result<Vec<Database>> {
         self.fields()?
             .iter()
             .map(|field| Field::database_field(field).map_err(OoxmlError::from))
@@ -1721,7 +1718,7 @@ impl<'a> Document<'a> {
     /// Returned values expose only stored kind, override, formatting, cached
     /// content, and dirty/lock state. This method never reads or modifies a host
     /// user's identity, applies formatting, or refreshes a field.
-    pub fn user_identity_fields(&self) -> Result<Vec<UserIdentityField>> {
+    pub fn user_identity_fields(&self) -> Result<Vec<UserIdentity>> {
         self.fields()?
             .iter()
             .map(|field| Field::user_identity_field(field).map_err(OoxmlError::from))
@@ -1739,7 +1736,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored point adjustments, cached content, and
     /// dirty/lock state only. This method never moves text, changes layout,
     /// reflows content, or refreshes a field.
-    pub fn advance_fields(&self) -> Result<Vec<AdvanceField>> {
+    pub fn advance_fields(&self) -> Result<Vec<Advance>> {
         self.fields()?
             .iter()
             .map(|field| Field::advance_field(field).map_err(OoxmlError::from))
@@ -1758,7 +1755,7 @@ impl<'a> Document<'a> {
     /// storage, cached content, and dirty/lock metadata only. This method never
     /// launches an application, initiates a DDE conversation, opens a source,
     /// requests data, refreshes, converts, evaluates, or executes anything.
-    pub fn dde_links(&self) -> Result<Vec<DdeField>> {
+    pub fn dde_links(&self) -> Result<Vec<Dde>> {
         self.fields()?
             .iter()
             .map(|field| Field::dde_link(field).map_err(OoxmlError::from))
@@ -1778,7 +1775,7 @@ impl<'a> Document<'a> {
     /// and dirty/lock metadata only. This method never opens, resolves,
     /// imports, fetches, refreshes, converts, transforms, evaluates, or
     /// executes anything.
-    pub fn external_includes(&self) -> Result<Vec<ExternalIncludeField>> {
+    pub fn external_includes(&self) -> Result<Vec<Include>> {
         self.fields()?
             .iter()
             .map(|field| Field::external_include(field).map_err(OoxmlError::from))
@@ -1797,7 +1794,7 @@ impl<'a> Document<'a> {
     /// cached content, and dirty/lock metadata only. This method never opens,
     /// resolves, reads, imports, refreshes, evaluates, or executes a referenced
     /// document.
-    pub fn referenced_documents(&self) -> Result<Vec<ReferencedDocumentField>> {
+    pub fn referenced_documents(&self) -> Result<Vec<SubDocument>> {
         self.fields()?
             .iter()
             .map(|field| Field::referenced_document(field).map_err(OoxmlError::from))
@@ -1816,7 +1813,7 @@ impl<'a> Document<'a> {
     /// formatting, cached content, and dirty/lock metadata only. This method
     /// never activates an OLE server, launches an application, opens a source,
     /// requests data, refreshes, converts, evaluates, or executes anything.
-    pub fn link_fields(&self) -> Result<Vec<LinkField>> {
+    pub fn link_fields(&self) -> Result<Vec<Link>> {
         self.fields()?
             .iter()
             .map(|field| Field::link(field).map_err(OoxmlError::from))
@@ -1835,7 +1832,7 @@ impl<'a> Document<'a> {
     /// discovered. Returned values expose the stored instruction, switches,
     /// cached result, and dirty/lock state; this method never paginates,
     /// regenerates a table of contents, follows its links, or executes fields.
-    pub fn table_of_contents(&self) -> Result<Vec<TableOfContentsField>> {
+    pub fn table_of_contents(&self) -> Result<Vec<Toc>> {
         self.fields()?
             .iter()
             .map(|field| Field::table_of_contents(field).map_err(OoxmlError::from))
@@ -1854,7 +1851,7 @@ impl<'a> Document<'a> {
     /// page-number omission requests, switches, cached content, and dirty/lock
     /// state. This method never changes hidden text, calculates page numbers,
     /// generates a table of contents, or refreshes fields.
-    pub fn table_of_contents_entries(&self) -> Result<Vec<TableOfContentsEntryField>> {
+    pub fn table_of_contents_entries(&self) -> Result<Vec<TocEntry>> {
         self.fields()?
             .iter()
             .map(|field| Field::table_of_contents_entry(field).map_err(OoxmlError::from))
@@ -1872,7 +1869,7 @@ impl<'a> Document<'a> {
     /// Returned fields expose stored switches and cached content only. This
     /// method never locates citation text, paginates the document, generates a
     /// table of authorities, or refreshes fields.
-    pub fn tables_of_authorities(&self) -> Result<Vec<TableOfAuthoritiesField>> {
+    pub fn tables_of_authorities(&self) -> Result<Vec<Toa>> {
         self.fields()?
             .iter()
             .map(|field| Field::table_of_authorities(field).map_err(OoxmlError::from))
@@ -1889,7 +1886,7 @@ impl<'a> Document<'a> {
     ///
     /// These are stored citation markers. This method does not search for
     /// matching visible text, change hidden-text state, or generate a `TOA`.
-    pub fn table_of_authorities_entries(&self) -> Result<Vec<TableOfAuthoritiesEntryField>> {
+    pub fn table_of_authorities_entries(&self) -> Result<Vec<ToaEntry>> {
         self.fields()?
             .iter()
             .map(|field| Field::table_of_authorities_entry(field).map_err(OoxmlError::from))
@@ -1907,7 +1904,7 @@ impl<'a> Document<'a> {
     /// Returned fields expose stored switches and cached content only. This
     /// method never searches for index markers, sorts entries, calculates page
     /// references, generates an index, or refreshes fields.
-    pub fn indexes(&self) -> Result<Vec<IndexField>> {
+    pub fn indexes(&self) -> Result<Vec<Index>> {
         self.fields()?
             .iter()
             .map(|field| Field::index(field).map_err(OoxmlError::from))
@@ -1924,7 +1921,7 @@ impl<'a> Document<'a> {
     ///
     /// These are stored index markers. This method does not change hidden text,
     /// resolve page-range bookmarks, sort entries, or generate an `INDEX`.
-    pub fn index_entries(&self) -> Result<Vec<IndexEntryField>> {
+    pub fn index_entries(&self) -> Result<Vec<IndexEntry>> {
         self.fields()?
             .iter()
             .map(|field| Field::index_entry(field).map_err(OoxmlError::from))
@@ -1945,7 +1942,7 @@ impl<'a> Document<'a> {
     ///
     /// For backward-compatible access to the raw fields, use
     /// [`Self::merge_fields`].
-    pub fn typed_merge_fields(&self) -> Result<Vec<MergeField>> {
+    pub fn typed_merge_fields(&self) -> Result<Vec<Merge>> {
         self.fields()?
             .iter()
             .map(|field| Field::merge_field(field).map_err(OoxmlError::from))
@@ -1964,7 +1961,7 @@ impl<'a> Document<'a> {
     /// identifiers, switches, cached content, and dirty/lock state. This method
     /// never opens, reads, connects to, resolves, or modifies either source; it
     /// never selects a record, performs a merge, or refreshes a field result.
-    pub fn mail_merge_data_fields(&self) -> Result<Vec<MailMergeDataField>> {
+    pub fn mail_merge_data_fields(&self) -> Result<Vec<MergeData>> {
         self.fields()?
             .iter()
             .map(|field| Field::mail_merge_data(field).map_err(OoxmlError::from))
@@ -1982,7 +1979,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored kind, cached content, and dirty/lock state
     /// only. This method never selects or counts records, opens a data source,
     /// performs a merge, or refreshes field results.
-    pub fn mail_merge_counters(&self) -> Result<Vec<MailMergeCounterField>> {
+    pub fn mail_merge_counters(&self) -> Result<Vec<MergeCounter>> {
         self.fields()?
             .iter()
             .map(|field| Field::mail_merge_counter(field).map_err(OoxmlError::from))
@@ -2000,7 +1997,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored cached content and dirty/lock state only.
     /// This method never advances a record, opens a data source, performs a
     /// merge, or refreshes field results.
-    pub fn mail_merge_next_fields(&self) -> Result<Vec<MailMergeNextField>> {
+    pub fn mail_merge_next_fields(&self) -> Result<Vec<MergeNext>> {
         self.fields()?
             .iter()
             .map(|field| Field::mail_merge_next(field).map_err(OoxmlError::from))
@@ -2019,7 +2016,7 @@ impl<'a> Document<'a> {
     /// dirty/lock state only. This method never evaluates a comparison, changes
     /// record selection, opens a data source, performs a merge, or refreshes
     /// field results.
-    pub fn mail_merge_conditional_controls(&self) -> Result<Vec<MailMergeConditionalControlField>> {
+    pub fn mail_merge_conditional_controls(&self) -> Result<Vec<MergeControl>> {
         self.fields()?
             .iter()
             .map(|field| Field::mail_merge_conditional_control(field).map_err(OoxmlError::from))
@@ -2037,7 +2034,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored expression text, cached content, and
     /// dirty/lock state only. This method never parses or evaluates an
     /// expression, resolves field values, or refreshes a field result.
-    pub fn if_fields(&self) -> Result<Vec<IfField>> {
+    pub fn if_fields(&self) -> Result<Vec<If>> {
         self.fields()?
             .iter()
             .map(|field| Field::if_field(field).map_err(OoxmlError::from))
@@ -2055,7 +2052,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored comparisons, cached content, and
     /// dirty/lock state only. This method never parses or evaluates a
     /// comparison, resolves nested field values, or refreshes a field.
-    pub fn compare_fields(&self) -> Result<Vec<CompareField>> {
+    pub fn compare_fields(&self) -> Result<Vec<Compare>> {
         self.fields()?
             .iter()
             .map(|field| Field::compare_field(field).map_err(OoxmlError::from))
@@ -2074,7 +2071,7 @@ impl<'a> Document<'a> {
     /// cached content, and dirty/lock state only. This method never looks up a
     /// bookmark, reads a referenced range or note, resolves a page number,
     /// creates a link, calculates a relative position, or refreshes a field.
-    pub fn reference_fields(&self) -> Result<Vec<ReferenceField>> {
+    pub fn reference_fields(&self) -> Result<Vec<Reference>> {
         self.fields()?
             .iter()
             .map(|field| Field::reference_field(field).map_err(OoxmlError::from))
@@ -2093,7 +2090,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state only. This method never evaluates an
     /// expression, looks up or changes a bookmark, changes document state, or
     /// refreshes a field.
-    pub fn set_fields(&self) -> Result<Vec<SetField>> {
+    pub fn set_fields(&self) -> Result<Vec<Set>> {
         self.fields()?
             .iter()
             .map(|field| Field::set_field(field).map_err(OoxmlError::from))
@@ -2111,7 +2108,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored formulas, cached content, and dirty/lock
     /// state only. This method never parses or evaluates a formula, reads table
     /// cells or bookmarks, resolves field values, or refreshes a field.
-    pub fn formula_fields(&self) -> Result<Vec<FormulaField>> {
+    pub fn formula_fields(&self) -> Result<Vec<Formula>> {
         self.fields()?
             .iter()
             .map(|field| Field::formula_field(field).map_err(OoxmlError::from))
@@ -2129,7 +2126,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored expressions, cached content, and dirty/lock
     /// state only. This method never parses, calculates, formats, renders, or
     /// refreshes an equation.
-    pub fn equations(&self) -> Result<Vec<EquationField>> {
+    pub fn equations(&self) -> Result<Vec<Equation>> {
         self.fields()?
             .iter()
             .map(|field| Field::equation(field).map_err(OoxmlError::from))
@@ -2148,7 +2145,7 @@ impl<'a> Document<'a> {
     /// tails, cached content, and dirty/lock state only. This method never
     /// looks up a bookmark, increments or resets a sequence, calculates a
     /// number, or refreshes a field.
-    pub fn sequence_fields(&self) -> Result<Vec<SequenceField>> {
+    pub fn sequence_fields(&self) -> Result<Vec<Sequence>> {
         self.fields()?
             .iter()
             .map(|field| Field::sequence_field(field).map_err(OoxmlError::from))
@@ -2167,7 +2164,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state only. This method never looks up styled
     /// text, searches document stories, calculates paragraph numbers or
     /// relative positions, resolves page layout, or refreshes a field.
-    pub fn style_reference_fields(&self) -> Result<Vec<StyleReferenceField>> {
+    pub fn style_reference_fields(&self) -> Result<Vec<StyleReference>> {
         self.fields()?
             .iter()
             .map(|field| Field::style_reference_field(field).map_err(OoxmlError::from))
@@ -2185,7 +2182,7 @@ impl<'a> Document<'a> {
     /// Returned values expose stored text arguments, switches, cached content,
     /// and dirty/lock state only. This method never interprets character codes,
     /// expands nested fields, inserts text, or refreshes a field result.
-    pub fn quote_fields(&self) -> Result<Vec<QuoteField>> {
+    pub fn quote_fields(&self) -> Result<Vec<Quote>> {
         self.fields()?
             .iter()
             .map(|field| Field::quote_field(field).map_err(OoxmlError::from))
@@ -2204,7 +2201,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state only. This method never maps a character
     /// code, looks up a font, inserts a glyph, changes formatting or layout, or
     /// refreshes a field result.
-    pub fn symbol_fields(&self) -> Result<Vec<SymbolField>> {
+    pub fn symbol_fields(&self) -> Result<Vec<Symbol>> {
         self.fields()?
             .iter()
             .map(|field| Field::symbol_field(field).map_err(OoxmlError::from))
@@ -2223,7 +2220,7 @@ impl<'a> Document<'a> {
     /// dirty/lock state only. This method never calculates paragraph numbers,
     /// reads heading or style state, changes paragraphs or layout, or refreshes
     /// a field result.
-    pub fn auto_number_fields(&self) -> Result<Vec<AutoNumberField>> {
+    pub fn auto_number_fields(&self) -> Result<Vec<AutoNumber>> {
         self.fields()?
             .iter()
             .map(|field| Field::auto_number_field(field).map_err(OoxmlError::from))
@@ -2242,7 +2239,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state only. This method never looks up a list,
     /// determines a level or start value, calculates a number, changes layout,
     /// or refreshes a field result.
-    pub fn list_number_fields(&self) -> Result<Vec<ListNumberField>> {
+    pub fn list_number_fields(&self) -> Result<Vec<ListNumber>> {
         self.fields()?
             .iter()
             .map(|field| Field::list_number_field(field).map_err(OoxmlError::from))
@@ -2261,7 +2258,7 @@ impl<'a> Document<'a> {
     /// content, and dirty/lock state only. This method never displays a prompt,
     /// captures a response, creates or updates a bookmark, performs a merge, or
     /// refreshes a field result.
-    pub fn prompt_fields(&self) -> Result<Vec<PromptField>> {
+    pub fn prompt_fields(&self) -> Result<Vec<Prompt>> {
         self.fields()?
             .iter()
             .map(|field| Field::prompt_field(field).map_err(OoxmlError::from))
@@ -2281,7 +2278,7 @@ impl<'a> Document<'a> {
     /// cached-content, and dirty/lock state only. This method never opens a data
     /// source, selects a record, performs a merge, expands placeholders, generates
     /// text, or refreshes a field result.
-    pub fn mail_merge_recipient_fields(&self) -> Result<Vec<MailMergeRecipientField>> {
+    pub fn mail_merge_recipient_fields(&self) -> Result<Vec<Recipient>> {
         self.fields()?
             .iter()
             .map(|field| Field::mail_merge_recipient_field(field).map_err(OoxmlError::from))

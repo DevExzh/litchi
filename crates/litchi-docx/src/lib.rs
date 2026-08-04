@@ -34,24 +34,17 @@ pub use bibliography::{
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use error::{Error, Result};
 pub use field::{
-    ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AdvanceField,
-    AdvanceFieldAdjustment, AdvanceFieldOperation, AutoNumberField, AutoNumberFieldKind,
-    AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption, BarcodeField,
-    BibliographyField, BidiOutlineField, CitationField, CompareField, DatabaseField, DdeField,
-    DdeFieldKind, DdeRepresentation, DocumentContextField, DocumentContextFieldKind,
-    DocumentInformationField, DocumentInformationFieldKind, DocumentPropertyField,
-    DocumentVariableField, EmbedField, EquationField, ExternalIncludeField, ExternalIncludeOption,
-    Field, FieldSwitch, FormulaField, GoToButtonField, HyperlinkField, IfField, IncludeFieldKind,
-    IndexEntryField, IndexField, IndexSortOrder, InfoField, LegacyFormField, LegacyFormFieldKind,
-    LinkField, LinkFormatting, LinkResultOption, ListNumberField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
-    MailMergeCounterKind, MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
-    MailMergeRecipientFieldKind, MergeField, PrintField, PrivateField, PromptField,
-    PromptFieldKind, QuoteField, ReferenceField, ReferenceFieldKind, ReferenceFieldOption,
-    ReferencedDocumentField, SequenceField, SetField, ShapeField, StyleReferenceField,
-    StyleReferenceFieldOption, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsEntryField, TableOfContentsField, TableOfContentsLevelRange,
-    TableOfContentsSwitch, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
+    ActiveContent, ActiveContentKind, Advance, AdvanceAdjustment, AdvanceOperation, AutoNumber,
+    AutoNumberKind, AutoText, AutoTextKind, AutoTextList, AutoTextListOption, Barcode,
+    Bibliography, BidiOutline, Citation, Compare, Context, ContextKind, CountryInclusion, Database,
+    Dde, DdeFormat, DdeKind, Embed, Equation, Field, Formula, GoToButton, If, Include, IncludeKind,
+    IncludeOption, Index, IndexEntry, IndexOrder, Info, Information, InformationKind, LegacyForm,
+    LegacyFormKind, Link, LinkFormat, LinkResult, ListNumber, MacroButton, Merge, MergeControl,
+    MergeControlKind, MergeCounter, MergeCounterKind, MergeData, MergeNext, Print, Private, Prompt,
+    PromptKind, Property, Quote, RecipientKind, Reference, ReferenceKind, ReferenceOption,
+    Sequence, Set, Shape, StyleOption, StyleReference, SubDocument, Switch, Symbol, Toa, ToaEntry,
+    Toc, TocEntry, TocLevelRange, TocSwitch, UserIdentity, UserIdentityFormat, UserIdentityKind,
+    Variable,
 };
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 pub use hyperlink::Hyperlink;

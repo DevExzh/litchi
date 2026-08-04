@@ -4131,7 +4131,7 @@ mod tests {
         assert!(toc[0].hides_page_numbers_in_web_layout());
         assert_eq!(
             toc[0].heading_style_levels().unwrap(),
-            vec![crate::docx::TableOfContentsLevelRange::new(1, 4).unwrap()]
+            vec![crate::docx::TocLevelRange::new(1, 4).unwrap()]
         );
     }
 
@@ -4396,17 +4396,11 @@ mod tests {
         let fields = document.document_information_fields().unwrap();
         assert_eq!(document.document_information_field_count().unwrap(), 2);
         assert_eq!(fields.len(), 2);
-        assert_eq!(
-            fields[0].kind(),
-            crate::docx::DocumentInformationFieldKind::Title
-        );
+        assert_eq!(fields[0].kind(), crate::docx::InformationKind::Title);
         assert_eq!(fields[0].cached_result(), Some("cached title"));
         assert!(fields[0].has_switch('*'));
         assert_eq!(fields[0].switches()[0].argument(), Some("MERGEFORMAT"));
-        assert_eq!(
-            fields[1].kind(),
-            crate::docx::DocumentInformationFieldKind::Author
-        );
+        assert_eq!(fields[1].kind(), crate::docx::InformationKind::Author);
         assert_eq!(fields[1].cached_result(), Some("cached author"));
         assert!(fields[1].has_switch('@'));
         assert_eq!(fields[1].switches()[0].argument(), Some("opaque format"));
@@ -4436,16 +4430,10 @@ mod tests {
         let fields = document.document_context_fields().unwrap();
         assert_eq!(document.document_context_field_count().unwrap(), 2);
         assert_eq!(fields.len(), 2);
-        assert_eq!(
-            fields[0].kind(),
-            crate::docx::DocumentContextFieldKind::FileName
-        );
+        assert_eq!(fields[0].kind(), crate::docx::ContextKind::FileName);
         assert_eq!(fields[0].cached_result(), Some("cached file name"));
         assert!(fields[0].has_switch('p'));
-        assert_eq!(
-            fields[1].kind(),
-            crate::docx::DocumentContextFieldKind::Page
-        );
+        assert_eq!(fields[1].kind(), crate::docx::ContextKind::Page);
         assert_eq!(fields[1].cached_result(), Some("cached page"));
         assert!(fields[1].has_switch('*'));
         assert_eq!(fields[1].switches()[0].argument(), Some("MERGEFORMAT"));
@@ -4509,15 +4497,9 @@ mod tests {
         let counters = document.mail_merge_counters().unwrap();
         assert_eq!(document.mail_merge_counter_count().unwrap(), 2);
         assert_eq!(counters.len(), 2);
-        assert_eq!(
-            counters[0].kind(),
-            crate::docx::MailMergeCounterKind::Record
-        );
+        assert_eq!(counters[0].kind(), crate::docx::MergeCounterKind::Record);
         assert_eq!(counters[0].cached_result(), Some("12"));
-        assert_eq!(
-            counters[1].kind(),
-            crate::docx::MailMergeCounterKind::Sequence
-        );
+        assert_eq!(counters[1].kind(), crate::docx::MergeCounterKind::Sequence);
         assert_eq!(counters[1].cached_result(), Some("3"));
     }
 
@@ -4560,10 +4542,7 @@ mod tests {
         let controls = document.mail_merge_conditional_controls().unwrap();
         assert_eq!(document.mail_merge_conditional_control_count().unwrap(), 1);
         assert_eq!(controls.len(), 1);
-        assert_eq!(
-            controls[0].kind(),
-            crate::docx::MailMergeConditionalControlKind::SkipIf
-        );
+        assert_eq!(controls[0].kind(), crate::docx::MergeControlKind::SkipIf);
         assert_eq!(controls[0].comparison(), "MERGEFIELD Order < 100");
         assert_eq!(controls[0].cached_result(), Some("cached skipif"));
     }
@@ -4645,8 +4624,8 @@ mod tests {
         assert_eq!(
             style_references[0].options(),
             &[
-                crate::docx::StyleReferenceFieldOption::ParagraphNumber,
-                crate::docx::StyleReferenceFieldOption::RelativePosition,
+                crate::docx::StyleOption::ParagraphNumber,
+                crate::docx::StyleOption::RelativePosition,
             ]
         );
         assert_eq!(style_references[0].cached_result(), Some("1 above"));
@@ -4683,64 +4662,61 @@ mod tests {
         assert_eq!(document.reference_field_count().unwrap(), 4);
         assert_eq!(references.len(), 4);
 
-        assert_eq!(
-            references[0].kind(),
-            crate::docx::ReferenceFieldKind::Reference
-        );
+        assert_eq!(references[0].kind(), crate::docx::ReferenceKind::Reference);
         assert_eq!(references[0].bookmark(), "Target Bookmark");
         assert_eq!(
             references[0].options(),
             &[
-                crate::docx::ReferenceFieldOption::SequencePageSeparator("-".to_string()),
-                crate::docx::ReferenceFieldOption::ReferencedNoteContent,
-                crate::docx::ReferenceFieldOption::Hyperlink,
-                crate::docx::ReferenceFieldOption::ParagraphNumberWithoutContext,
-                crate::docx::ReferenceFieldOption::RelativePosition,
-                crate::docx::ReferenceFieldOption::ParagraphNumberRelativeContext,
-                crate::docx::ReferenceFieldOption::SuppressNonNumberText,
-                crate::docx::ReferenceFieldOption::ParagraphNumberFullContext,
+                crate::docx::ReferenceOption::SequencePageSeparator("-".to_string()),
+                crate::docx::ReferenceOption::ReferencedNoteContent,
+                crate::docx::ReferenceOption::Hyperlink,
+                crate::docx::ReferenceOption::ParagraphNumberWithoutContext,
+                crate::docx::ReferenceOption::RelativePosition,
+                crate::docx::ReferenceOption::ParagraphNumberRelativeContext,
+                crate::docx::ReferenceOption::SuppressNonNumberText,
+                crate::docx::ReferenceOption::ParagraphNumberFullContext,
             ]
         );
         assert_eq!(references[0].cached_result(), Some("cached reference"));
 
         assert_eq!(
             references[1].kind(),
-            crate::docx::ReferenceFieldKind::PageReference
+            crate::docx::ReferenceKind::PageReference
         );
         assert_eq!(references[1].bookmark(), "PageTarget");
         assert_eq!(
             references[1].options(),
             &[
-                crate::docx::ReferenceFieldOption::Hyperlink,
-                crate::docx::ReferenceFieldOption::RelativePosition,
+                crate::docx::ReferenceOption::Hyperlink,
+                crate::docx::ReferenceOption::RelativePosition,
             ]
         );
         assert_eq!(references[1].cached_result(), Some("12 above"));
 
         assert_eq!(
             references[2].kind(),
-            crate::docx::ReferenceFieldKind::FootnoteReference
+            crate::docx::ReferenceKind::FootnoteReference
         );
         assert_eq!(references[2].bookmark(), "FootnoteTarget");
         assert_eq!(
             references[2].options(),
             &[
-                crate::docx::ReferenceFieldOption::RelativePosition,
-                crate::docx::ReferenceFieldOption::NoteMarkFormatting,
+                crate::docx::ReferenceOption::RelativePosition,
+                crate::docx::ReferenceOption::NoteMarkFormatting,
             ]
         );
         assert_eq!(references[2].cached_result(), Some("1 above"));
 
         assert_eq!(
             references[3].kind(),
-            crate::docx::ReferenceFieldKind::NoteReference
+            crate::docx::ReferenceKind::NoteReference
         );
         assert_eq!(references[3].bookmark(), "EndnoteTarget");
         assert_eq!(
             references[3].options(),
             &[
-                crate::docx::ReferenceFieldOption::RelativePosition,
-                crate::docx::ReferenceFieldOption::NoteMarkFormatting,
+                crate::docx::ReferenceOption::RelativePosition,
+                crate::docx::ReferenceOption::NoteMarkFormatting,
             ]
         );
         assert_eq!(references[3].cached_result(), Some("i above"));
@@ -4847,12 +4823,12 @@ mod tests {
         let fields = document.prompt_fields().unwrap();
         assert_eq!(document.prompt_field_count().unwrap(), 2);
         assert_eq!(fields.len(), 2);
-        assert_eq!(fields[0].kind(), crate::docx::PromptFieldKind::Ask);
+        assert_eq!(fields[0].kind(), crate::docx::PromptKind::Ask);
         assert_eq!(fields[0].bookmark(), Some("AskResponse"));
         assert_eq!(fields[0].default_response(), Some(""));
         assert!(fields[0].prompts_once_per_mail_merge());
         assert_eq!(fields[0].cached_result(), Some("cached ask response"));
-        assert_eq!(fields[1].kind(), crate::docx::PromptFieldKind::FillIn);
+        assert_eq!(fields[1].kind(), crate::docx::PromptKind::FillIn);
         assert_eq!(fields[1].bookmark(), None);
         assert_eq!(fields[1].prompt(), Some("Enter appointment time"));
         assert_eq!(fields[1].default_response(), Some("09:00"));
@@ -4924,15 +4900,15 @@ mod tests {
         assert_eq!(active_content.len(), 3);
         assert_eq!(
             active_content[0].kind(),
-            crate::docx::ActiveContentFieldKind::AddIn
+            crate::docx::ActiveContentKind::AddIn
         );
         assert_eq!(
             active_content[1].kind(),
-            crate::docx::ActiveContentFieldKind::OcxControl
+            crate::docx::ActiveContentKind::OcxControl
         );
         assert_eq!(
             active_content[2].kind(),
-            crate::docx::ActiveContentFieldKind::HtmlControl
+            crate::docx::ActiveContentKind::HtmlControl
         );
         assert_eq!(
             active_content[2].cached_result(),
@@ -4942,15 +4918,9 @@ mod tests {
         let auto_text = document.auto_text_fields().unwrap();
         assert_eq!(document.auto_text_field_count().unwrap(), 2);
         assert_eq!(auto_text.len(), 2);
-        assert_eq!(
-            auto_text[0].kind(),
-            crate::docx::AutoTextFieldKind::Glossary
-        );
+        assert_eq!(auto_text[0].kind(), crate::docx::AutoTextKind::Glossary);
         assert_eq!(auto_text[0].entry_name(), "Legacy Clause");
-        assert_eq!(
-            auto_text[1].kind(),
-            crate::docx::AutoTextFieldKind::AutoText
-        );
+        assert_eq!(auto_text[1].kind(), crate::docx::AutoTextKind::AutoText);
         assert_eq!(auto_text[1].entry_name(), "Reusable Clause");
 
         let auto_text_lists = document.auto_text_list_fields().unwrap();
@@ -4987,22 +4957,22 @@ mod tests {
         let links = document.dde_links().unwrap();
         assert_eq!(document.dde_link_count().unwrap(), 2);
         assert_eq!(links.len(), 2);
-        assert_eq!(links[0].kind(), crate::docx::DdeFieldKind::Dde);
+        assert_eq!(links[0].kind(), crate::docx::DdeKind::Dde);
         assert_eq!(links[0].application(), "Excel");
         assert_eq!(links[0].source(), "missing.xlsx");
         assert_eq!(links[0].item(), Some("Sheet1!A1"));
         assert!(links[0].requests_automatic_updates());
         assert_eq!(
             links[0].representation(),
-            Some(crate::docx::DdeRepresentation::Picture)
+            Some(crate::docx::DdeFormat::Picture)
         );
         assert_eq!(links[0].cached_result(), Some("cached DDE link"));
-        assert_eq!(links[1].kind(), crate::docx::DdeFieldKind::DdeAuto);
+        assert_eq!(links[1].kind(), crate::docx::DdeKind::DdeAuto);
         assert_eq!(links[1].item(), Some("Sheet1!A2"));
         assert!(links[1].requests_automatic_updates());
         assert_eq!(
             links[1].representation(),
-            Some(crate::docx::DdeRepresentation::Text)
+            Some(crate::docx::DdeFormat::Text)
         );
         assert_eq!(links[1].cached_result(), Some("cached DDE auto link"));
     }
@@ -5042,39 +5012,39 @@ mod tests {
         let includes = document.external_includes().unwrap();
         assert_eq!(document.external_include_count().unwrap(), 4);
         assert_eq!(includes.len(), 4);
-        assert_eq!(includes[0].kind(), crate::docx::IncludeFieldKind::Text);
+        assert_eq!(includes[0].kind(), crate::docx::IncludeKind::Text);
         assert_eq!(includes[0].source(), "file:///no-contact/source.docx");
         assert_eq!(includes[0].bookmark(), Some("Summary"));
         assert!(includes[0].suppresses_nested_field_updates());
         assert_eq!(
             includes[0].options(),
             &[
-                crate::docx::ExternalIncludeOption::Converter("Word8".to_string()),
-                crate::docx::ExternalIncludeOption::XPath("/resume/name".to_string()),
+                crate::docx::IncludeOption::Converter("Word8".to_string()),
+                crate::docx::IncludeOption::XPath("/resume/name".to_string()),
             ]
         );
         assert_eq!(includes[0].cached_result(), Some("cached included text"));
-        assert_eq!(includes[1].kind(), crate::docx::IncludeFieldKind::Picture);
+        assert_eq!(includes[1].kind(), crate::docx::IncludeKind::Picture);
         assert_eq!(includes[1].source(), "file:///no-contact/picture.gif");
         assert!(includes[1].omits_picture_data());
         assert_eq!(
             includes[1].options(),
-            &[crate::docx::ExternalIncludeOption::Converter(
+            &[crate::docx::IncludeOption::Converter(
                 "Pictim32".to_string()
             )]
         );
         assert_eq!(includes[1].cached_result(), Some("cached picture"));
-        assert_eq!(includes[2].kind(), crate::docx::IncludeFieldKind::Text);
+        assert_eq!(includes[2].kind(), crate::docx::IncludeKind::Text);
         assert_eq!(includes[2].source(), "file:///no-contact/legacy.docx");
         assert_eq!(includes[2].bookmark(), Some("LegacySection"));
         assert!(includes[2].suppresses_nested_field_updates());
         assert_eq!(includes[2].cached_result(), Some("cached legacy text"));
-        assert_eq!(includes[3].kind(), crate::docx::IncludeFieldKind::Picture);
+        assert_eq!(includes[3].kind(), crate::docx::IncludeKind::Picture);
         assert_eq!(includes[3].source(), "file:///no-contact/legacy.wmf");
         assert!(includes[3].omits_picture_data());
         assert_eq!(
             includes[3].options(),
-            &[crate::docx::ExternalIncludeOption::Converter(
+            &[crate::docx::IncludeOption::Converter(
                 "GraphicsFilter".to_string()
             )]
         );
@@ -5149,18 +5119,18 @@ mod tests {
         assert!(links[0].requests_automatic_updates());
         assert_eq!(
             links[0].formatting_modes(),
-            &[crate::docx::LinkFormatting::SpreadsheetSource]
+            &[crate::docx::LinkFormat::SpreadsheetSource]
         );
         assert_eq!(
             links[0].effective_result_option(),
-            Some(crate::docx::LinkResultOption::Picture)
+            Some(crate::docx::LinkResult::Picture)
         );
         assert_eq!(links[0].cached_result(), Some("cached spreadsheet link"));
         assert_eq!(links[1].application_type(), "Word.Document.8");
         assert_eq!(links[1].item(), Some("Bookmark"));
         assert_eq!(
             links[1].effective_result_option(),
-            Some(crate::docx::LinkResultOption::Text)
+            Some(crate::docx::LinkResult::Text)
         );
         assert_eq!(links[1].cached_result(), Some("cached text link"));
     }
