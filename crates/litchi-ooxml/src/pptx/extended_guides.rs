@@ -64,12 +64,12 @@ pub struct ExtendedGuideList {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct PresentationExtendedGuides {
+pub struct ExtendedGuides {
     pub slide: Option<ExtendedGuideList>,
     pub notes: Option<ExtendedGuideList>,
 }
 
-impl PresentationExtendedGuides {
+impl ExtendedGuides {
     /// Parse guide extensions from a complete `p:presentation` document.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_BYTES {
@@ -277,7 +277,7 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()>
     Ok(())
 }
 
-fn parse_presentation(root: &Node) -> Result<PresentationExtendedGuides> {
+fn parse_presentation(root: &Node) -> Result<ExtendedGuides> {
     expect(root, &[P, PS], "presentation")?;
     let mut root_ext = None;
     for child in children(root)? {
@@ -286,9 +286,9 @@ fn parse_presentation(root: &Node) -> Result<PresentationExtendedGuides> {
         }
     }
     let Some(root_ext) = root_ext else {
-        return Ok(PresentationExtendedGuides::default());
+        return Ok(ExtendedGuides::default());
     };
-    let mut value = PresentationExtendedGuides::default();
+    let mut value = ExtendedGuides::default();
     for extension in children(root_ext)? {
         expect(extension, &[P, PS], "ext")?;
         let uri = required_attr(extension, "uri")?;
@@ -441,7 +441,7 @@ fn validate_extension_list(node: &Node) -> Result<()> {
     Ok(())
 }
 
-fn validate(value: &PresentationExtendedGuides) -> Result<()> {
+fn validate(value: &ExtendedGuides) -> Result<()> {
     for list in value.slide.iter().chain(value.notes.iter()) {
         if list.guides.len() > MAX_GUIDES {
             return Err(invalid("extended guide count exceeds limit"));
@@ -791,7 +791,7 @@ mod tests {
         assert_eq!(guides[0].color.kind, ExtendedGuideColorKind::Srgb);
         assert_eq!(guides[1].orientation, None);
         let xml = value.to_xml(false).unwrap();
-        let again = PresentationExtendedGuides::from_xml(wrap(&xml).as_bytes()).unwrap();
+        let again = ExtendedGuides::from_xml(wrap(&xml).as_bytes()).unwrap();
         assert_eq!(again.slide.unwrap().guides.len(), 2);
     }
 
@@ -800,7 +800,7 @@ mod tests {
         let xml = wrap(&format!(
             r#"<p:extLst><p:ext uri="{SLIDE_GUIDES_URI}"><p15:sldGuideLst xmlns:p15="{P15}"><p15:guide id="7" name="Named" orient="vert" pos="-20" userDrawn="0"><p15:clr><a:schemeClr val="accent1"/></p15:clr><p:extLst><p:ext uri="urn:guide"><v:data xmlns:v="urn:vendor" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rIdNeverFetched" href="https://example.invalid/not-opened"/></p:ext></p:extLst></p15:guide><p:extLst><p:ext uri="urn:list"><v:list xmlns:v="urn:vendor"/></p:ext></p:extLst></p15:sldGuideLst></p:ext><p:ext uri="{NOTES_GUIDES_URI}"><p15:notesGuideLst xmlns:p15="{P15}"/></p:ext></p:extLst>"#
         ));
-        let value = PresentationExtendedGuides::from_xml(xml.as_bytes()).unwrap();
+        let value = ExtendedGuides::from_xml(xml.as_bytes()).unwrap();
         let guide = &value.slide.as_ref().unwrap().guides[0];
         assert_eq!(guide.name.as_deref(), Some("Named"));
         assert_eq!(guide.color.kind, ExtendedGuideColorKind::Scheme);
@@ -810,7 +810,7 @@ mod tests {
         assert!(value.notes.as_ref().unwrap().guides.is_empty());
         for strict in [false, true] {
             let written = value.to_xml(strict).unwrap();
-            let again = PresentationExtendedGuides::from_xml(wrap(&written).as_bytes()).unwrap();
+            let again = ExtendedGuides::from_xml(wrap(&written).as_bytes()).unwrap();
             assert_eq!(again.slide.as_ref().unwrap().guides[0].id, 7);
             assert!(
                 std::str::from_utf8(
@@ -856,7 +856,7 @@ mod tests {
         ];
         for xml in cases {
             assert!(
-                PresentationExtendedGuides::from_xml(xml.as_bytes()).is_err(),
+                ExtendedGuides::from_xml(xml.as_bytes()).is_err(),
                 "accepted {xml}"
             );
         }
@@ -877,7 +877,7 @@ mod tests {
             color: color.clone(),
             extension_xml: None,
         };
-        let mut value = PresentationExtendedGuides {
+        let mut value = ExtendedGuides {
             slide: Some(ExtendedGuideList {
                 guides: vec![guide; MAX_GUIDES + 1],
                 extension_xml: None,

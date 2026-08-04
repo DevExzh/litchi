@@ -52,7 +52,7 @@ pub struct ChangesData {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocumentChangeKind {
+pub enum ChangeKind {
     CustomSelection,
     AddSlide,
     DeleteSlide,
@@ -66,7 +66,7 @@ pub enum DocumentChangeKind {
     ModifySection,
 }
 
-impl DocumentChangeKind {
+impl ChangeKind {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "custSel" => Ok(Self::CustomSelection),
@@ -86,16 +86,16 @@ impl DocumentChangeKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentChangeDescriptor {
-    pub change_kinds: Vec<DocumentChangeKind>,
+pub struct ChangeDescriptor {
+    pub change_kinds: Vec<ChangeKind>,
     /// Complete `pc:docChg` fragment with nested commands kept inert.
     pub xml: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DocumentChangesList {
+pub struct ChangesList {
     pub author: Option<ChangesData>,
-    pub changes: Vec<DocumentChangeDescriptor>,
+    pub changes: Vec<ChangeDescriptor>,
     /// Optional complete PresentationML `p:extLst` fragment.
     pub extension_xml: Option<Vec<u8>>,
 }
@@ -104,7 +104,7 @@ pub struct DocumentChangesList {
 pub struct ChangesInformation {
     pub command_prefix: String,
     pub namespace_declarations: Vec<ChangesNamespaceDeclaration>,
-    pub document_change_lists: Vec<DocumentChangesList>,
+    pub change_lists: Vec<ChangesList>,
 }
 
 impl Default for ChangesInformation {
@@ -112,7 +112,7 @@ impl Default for ChangesInformation {
         Self {
             command_prefix: "pc".into(),
             namespace_declarations: Vec::new(),
-            document_change_lists: Vec::new(),
+            change_lists: Vec::new(),
         }
     }
 }
@@ -134,11 +134,11 @@ impl ChangesInformation {
         let prefix = &self.command_prefix;
         let mut out = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec();
         open_root(&mut out, prefix, &self.namespace_declarations);
-        if self.document_change_lists.is_empty() {
+        if self.change_lists.is_empty() {
             out.extend_from_slice(b"/>");
         } else {
             out.push(b'>');
-            for list in &self.document_change_lists {
+            for list in &self.change_lists {
                 open_pc(&mut out, prefix, "docChgLst");
                 out.push(b'>');
                 if let Some(author) = &list.author {
@@ -290,7 +290,7 @@ enum Frame {
     Metadata,
     MetadataExtension,
     Document {
-        kinds: Vec<DocumentChangeKind>,
+        kinds: Vec<ChangeKind>,
         order: u8,
         has_moniker: bool,
     },
@@ -312,7 +312,7 @@ enum Frame {
 #[derive(Debug)]
 enum PendingSlice {
     Metadata(usize),
-    Document(usize, Vec<DocumentChangeKind>),
+    Document(usize, Vec<ChangeKind>),
     ListExtension(usize),
 }
 
@@ -334,7 +334,7 @@ fn parse_changes_information(xml: &[u8]) -> Result<ChangesInformation> {
     let mut command_prefix = String::new();
     let mut namespaces = Vec::new();
     let mut lists = Vec::new();
-    let mut current_list: Option<DocumentChangesList> = None;
+    let mut current_list: Option<ChangesList> = None;
     let mut list_order = 0u8;
     let mut metadata_extension_start = None;
     let mut document_start = None;
@@ -357,7 +357,7 @@ fn parse_changes_information(xml: &[u8]) -> Result<ChangesInformation> {
                         .extension_xml = Some(bytes[from..start].to_vec());
                 },
                 PendingSlice::Document(from, kinds) => {
-                    list.changes.push(DocumentChangeDescriptor {
+                    list.changes.push(ChangeDescriptor {
                         change_kinds: kinds,
                         xml: bytes[from..start].to_vec(),
                     });
@@ -397,7 +397,7 @@ fn parse_changes_information(xml: &[u8]) -> Result<ChangesInformation> {
                             if lists.len() >= MAX_LISTS || current_list.is_some() {
                                 return Err(limit("document change lists"));
                             }
-                            current_list = Some(DocumentChangesList::default());
+                            current_list = Some(ChangesList::default());
                             list_order = 0;
                             Frame::List
                         },
@@ -649,7 +649,7 @@ fn parse_changes_information(xml: &[u8]) -> Result<ChangesInformation> {
                 list.author.as_mut().expect("author").extension_xml =
                     Some(bytes[from..end].to_vec())
             },
-            PendingSlice::Document(from, kinds) => list.changes.push(DocumentChangeDescriptor {
+            PendingSlice::Document(from, kinds) => list.changes.push(ChangeDescriptor {
                 change_kinds: kinds,
                 xml: bytes[from..end].to_vec(),
             }),
@@ -664,7 +664,7 @@ fn parse_changes_information(xml: &[u8]) -> Result<ChangesInformation> {
     let value = ChangesInformation {
         command_prefix,
         namespace_declarations: namespaces,
-        document_change_lists: lists,
+        change_lists: lists,
     };
     validate_model(&value)?;
     Ok(value)
@@ -724,10 +724,7 @@ fn parse_changes_data(element: &BytesStart<'_>, decoder: Decoder) -> Result<Chan
     })
 }
 
-fn parse_change_kinds(
-    element: &BytesStart<'_>,
-    decoder: Decoder,
-) -> Result<Vec<DocumentChangeKind>> {
+fn parse_change_kinds(element: &BytesStart<'_>, decoder: Decoder) -> Result<Vec<ChangeKind>> {
     let attrs = known_attributes(element, decoder, &["chg"])?;
     let value = attrs
         .iter()
@@ -736,7 +733,7 @@ fn parse_change_kinds(
         .ok_or_else(|| invalid("docChg is missing required chg"))?;
     let kinds: Vec<_> = value
         .split_whitespace()
-        .map(DocumentChangeKind::parse)
+        .map(ChangeKind::parse)
         .collect::<Result<_>>()?;
     if kinds.is_empty() {
         return Err(invalid("docChg chg list cannot be empty"));
@@ -764,7 +761,7 @@ fn validate_model(value: &ChangesInformation) -> Result<()> {
     if !value.command_prefix.is_empty() {
         validate_ncname(&value.command_prefix, "command prefix")?;
     }
-    if value.document_change_lists.len() > MAX_LISTS {
+    if value.change_lists.len() > MAX_LISTS {
         return Err(limit("document change lists"));
     }
     let mut prefixes = HashSet::new();
@@ -780,7 +777,7 @@ fn validate_model(value: &ChangesInformation) -> Result<()> {
         bounded(&declaration.uri)?;
     }
     let mut total = 0usize;
-    for list in &value.document_change_lists {
+    for list in &value.change_lists {
         if let Some(author) = &list.author {
             validate_changes_data(author)?;
         }
@@ -1189,9 +1186,9 @@ mod tests {
         )
         .unwrap();
         let loaded = load_changes_information(&powerpoint).unwrap().unwrap();
-        assert!(!loaded.changes_information.document_change_lists.is_empty());
+        assert!(!loaded.changes_information.change_lists.is_empty());
         assert_eq!(
-            loaded.changes_information.document_change_lists[0]
+            loaded.changes_information.change_lists[0]
                 .author
                 .as_ref()
                 .unwrap()
@@ -1208,12 +1205,10 @@ mod tests {
         assert!(
             loaded
                 .changes_information
-                .document_change_lists
+                .change_lists
                 .iter()
                 .flat_map(|list| &list.changes)
-                .any(|change| change
-                    .change_kinds
-                    .contains(&DocumentChangeKind::AddSection))
+                .any(|change| change.change_kinds.contains(&ChangeKind::AddSection))
         );
     }
 

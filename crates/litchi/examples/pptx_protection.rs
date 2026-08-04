@@ -1,21 +1,19 @@
 //! Presentation protection example - demonstrates security settings.
 
-use litchi::ooxml::pptx::{
-    CryptoAlgorithm, Package, PresentationProtection, ProtectionType, SlideProtection,
-};
+use litchi::ooxml::pptx::{CryptoAlgorithm, Package, Protection, ProtectionType, SlideProtection};
 
 fn main() {
     println!("=== Presentation Protection Example ===\n");
 
     // Create unprotected presentation
-    let unprotected = PresentationProtection::new();
+    let unprotected = Protection::new();
     println!("Unprotected Presentation:");
     println!("  Is protected: {}", unprotected.is_protected());
     println!("  Protection type: {:?}", unprotected.protection_type());
     assert_eq!(unprotected.protection_type(), ProtectionType::None);
 
     // Create read-only recommended
-    let read_only = PresentationProtection::new().with_read_only_recommended(true);
+    let read_only = Protection::new().with_read_only_recommended(true);
 
     println!("\nRead-Only Recommended:");
     println!("  Is protected: {}", read_only.is_protected());
@@ -26,7 +24,7 @@ fn main() {
     );
 
     // Create with structure protection
-    let structure_protected = PresentationProtection::new()
+    let structure_protected = Protection::new()
         .with_structure_protection(true)
         .with_window_protection(true);
 
@@ -38,7 +36,7 @@ fn main() {
     println!("  Protect windows: {}", structure_protected.protect_windows);
 
     // Test password protection
-    let mut password_protected = PresentationProtection::new();
+    let mut password_protected = Protection::new();
     if let Err(e) = password_protected.set_modify_password("secret123") {
         println!("\nError setting modify password: {e}");
         return;
@@ -119,7 +117,7 @@ fn main() {
     );
 
     // Generate XML
-    let mut with_password = PresentationProtection::new();
+    let mut with_password = Protection::new();
     if let Err(error) = with_password.set_modify_password("secret123") {
         println!("\nError setting XML example password: {error}");
         return;
@@ -153,7 +151,7 @@ fn generate_protection_pptx() -> Result<(), Box<dyn std::error::Error>> {
             7315200,
             914400,
         );
-        let mut protection = PresentationProtection::new();
+        let mut protection = Protection::new();
         protection.set_modify_password("secret123")?;
         pres.set_protection(protection);
     }

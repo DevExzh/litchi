@@ -103,10 +103,9 @@ pub mod writer;
 pub use animations::{Direction, Effect, EffectInstance, Sequence};
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use changes_information::{
-    CHANGES_INFORMATION_CONTENT_TYPE, CHANGES_INFORMATION_RELATIONSHIP_TYPE, ChangesData,
-    ChangesInformation, ChangesInformationPart, ChangesNamespaceDeclaration,
-    DocumentChangeDescriptor, DocumentChangeKind, DocumentChangesList, load_changes_information,
-    store_changes_information,
+    CHANGES_INFORMATION_CONTENT_TYPE, CHANGES_INFORMATION_RELATIONSHIP_TYPE, ChangeDescriptor,
+    ChangeKind, ChangesData, ChangesInformation, ChangesInformationPart, ChangesList,
+    ChangesNamespaceDeclaration, load_changes_information, store_changes_information,
 };
 pub use color_map::{ColorMap, ColorMapOverride, ColorMapSlot, ThemeColorRole};
 pub use comments::{
@@ -125,7 +124,7 @@ pub use controls::{
 pub use customshow::{CustomShow, CustomShowList};
 pub use extended_guides::{
     ExtendedGuide, ExtendedGuideColor, ExtendedGuideColorKind, ExtendedGuideList,
-    ExtendedGuideOrientation, PresentationExtendedGuides,
+    ExtendedGuideOrientation, ExtendedGuides,
 };
 pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
@@ -200,15 +199,15 @@ pub use presentation_properties::{
     WebColor, WebScreenSize, load_from_package as load_presentation_properties,
 };
 pub use presentation_structure::{
-    PresentationSlideReference, PresentationStructure, add_custom_show, add_custom_show_slide,
-    add_section, add_section_slide, find_custom_show, find_section, load_presentation_structure,
+    SlideReference, Structure, add_custom_show, add_custom_show_slide, add_section,
+    add_section_slide, find_custom_show, find_section, load_presentation_structure,
     remove_custom_show, remove_custom_show_slide, remove_section, remove_section_slide,
     reorder_custom_show_slides, reorder_custom_shows, reorder_section_slides, reorder_sections,
     replace_custom_show, replace_section, store_presentation_structure,
     synchronize_presentation_structure_after_slide_mutation, update_custom_show, update_section,
 };
 pub use protection::{
-    CryptoAlgorithm, ModifyVerifier, PresentationProtection, ProtectionType, SlideProtection,
+    CryptoAlgorithm, ModifyVerifier, Protection, ProtectionType, SlideProtection,
 };
 pub use revision_information::{
     ClientRevision, REVISION_INFORMATION_CONTENT_TYPE, REVISION_INFORMATION_RELATIONSHIP_TYPE,

@@ -131,7 +131,7 @@ pub struct WebVttTrack {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PresentationTrackTarget {
+pub enum TrackTarget {
     Internal {
         part_name: String,
         track: WebVttTrack,
@@ -142,10 +142,10 @@ pub enum PresentationTrackTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationTrack {
+pub struct Track {
     pub source_part_name: String,
     pub relationship_id: String,
-    pub target: PresentationTrackTarget,
+    pub target: TrackTarget,
 }
 
 impl WebVttTrack {
@@ -185,7 +185,7 @@ impl WebVttTrack {
     }
 }
 
-pub fn load_presentation_tracks(package: &OpcPackage) -> Result<Vec<PresentationTrack>> {
+pub fn load_presentation_tracks(package: &OpcPackage) -> Result<Vec<Track>> {
     if package
         .rels()
         .iter()
@@ -213,7 +213,7 @@ pub fn load_presentation_tracks(package: &OpcPackage) -> Result<Vec<Presentation
                 if rel.target_ref().is_empty() {
                     return Err(invalid("external Track target cannot be empty"));
                 }
-                PresentationTrackTarget::External {
+                TrackTarget::External {
                     target: rel.target_ref().to_owned(),
                 }
             } else {
@@ -232,12 +232,12 @@ pub fn load_presentation_tracks(package: &OpcPackage) -> Result<Vec<Presentation
                     )));
                 }
                 targets.insert(name.to_string());
-                PresentationTrackTarget::Internal {
+                TrackTarget::Internal {
                     part_name: name.to_string(),
                     track: WebVttTrack::parse(part.blob())?,
                 }
             };
-            values.push(PresentationTrack {
+            values.push(Track {
                 source_part_name: source.partname().to_string(),
                 relationship_id: rel.r_id().to_owned(),
                 target,
@@ -256,7 +256,7 @@ pub fn load_presentation_tracks(package: &OpcPackage) -> Result<Vec<Presentation
     Ok(values)
 }
 
-pub fn store_presentation_track(package: &mut OpcPackage, value: &PresentationTrack) -> Result<()> {
+pub fn store_presentation_track(package: &mut OpcPackage, value: &Track) -> Result<()> {
     load_presentation_tracks(package)?;
     valid_rel_id(&value.relationship_id)?;
     let source_name = PackURI::new(&value.source_part_name).map_err(OoxmlError::InvalidUri)?;
@@ -270,7 +270,7 @@ pub fn store_presentation_track(package: &mut OpcPackage, value: &PresentationTr
         return Err(invalid("Track relationship ID already exists"));
     }
     match &value.target {
-        PresentationTrackTarget::External { target } => {
+        TrackTarget::External { target } => {
             if target.is_empty() {
                 return Err(invalid("external Track target cannot be empty"));
             }
@@ -284,7 +284,7 @@ pub fn store_presentation_track(package: &mut OpcPackage, value: &PresentationTr
                     true,
                 );
         },
-        PresentationTrackTarget::Internal { part_name, track } => {
+        TrackTarget::Internal { part_name, track } => {
             let name = PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?;
             if package.iter_parts().any(|part| part.partname() == &name) {
                 return Err(invalid(format!("part '{name}' already exists")));
@@ -813,11 +813,11 @@ mod tests {
         )));
         package
     }
-    fn internal() -> PresentationTrack {
-        PresentationTrack {
+    fn internal() -> Track {
+        Track {
             source_part_name: "/ppt/slides/slide1.xml".into(),
             relationship_id: "rId9".into(),
-            target: PresentationTrackTarget::Internal {
+            target: TrackTarget::Internal {
                 part_name: "/ppt/media/captions1.vtt".into(),
                 track: WebVttTrack::parse(W3C).unwrap(),
             },
@@ -846,12 +846,12 @@ mod tests {
         let track = WebVttTrack::parse(bytes).unwrap();
         let mut package = package(SLIDE);
         let mut value = internal();
-        let PresentationTrackTarget::Internal { track: target, .. } = &mut value.target else {
+        let TrackTarget::Internal { track: target, .. } = &mut value.target else {
             unreachable!()
         };
         *target = track.clone();
         store_presentation_track(&mut package, &value).unwrap();
-        let PresentationTrackTarget::Internal { track: loaded, .. } =
+        let TrackTarget::Internal { track: loaded, .. } =
             &load_presentation_tracks(&package).unwrap()[0].target
         else {
             panic!("internal")
@@ -862,10 +862,10 @@ mod tests {
     #[test]
     fn external_leaf_orphan_and_atomic_graph_rules() {
         let mut external_package = package(LAYOUT);
-        let external = PresentationTrack {
+        let external = Track {
             source_part_name: "/ppt/slides/slide1.xml".into(),
             relationship_id: "rId8".into(),
-            target: PresentationTrackTarget::External {
+            target: TrackTarget::External {
                 target: "https://example.invalid/captions.vtt".into(),
             },
         };
@@ -891,7 +891,7 @@ mod tests {
         assert!(load_presentation_tracks(&outbound).is_err());
         let mut atomic = package(SLIDE);
         let mut bad = internal();
-        let PresentationTrackTarget::Internal { track, .. } = &mut bad.target else {
+        let TrackTarget::Internal { track, .. } = &mut bad.target else {
             unreachable!()
         };
         let WebVttBlock::Cue(cue) = &mut track.blocks[0] else {

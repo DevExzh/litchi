@@ -2,7 +2,7 @@
 use crate::error::{OoxmlError, Result};
 use crate::pptx::customshow::{CustomShow, CustomShowList};
 use crate::pptx::handout::HandoutMaster;
-use crate::pptx::protection::PresentationProtection;
+use crate::pptx::protection::Protection;
 use crate::pptx::sections::{Section, SectionList};
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
@@ -75,7 +75,7 @@ pub struct MutablePresentation {
     /// Custom slide shows
     custom_shows: CustomShowList,
     /// Presentation protection settings
-    protection: PresentationProtection,
+    protection: Protection,
     /// Handout master for printing settings
     handout_master: Option<HandoutMaster>,
     /// Whether the presentation has been modified
@@ -117,7 +117,7 @@ impl MutablePresentation {
             slide_height: 6858000, // 7.5 inches
             sections: SectionList::new(),
             custom_shows: CustomShowList::new(),
-            protection: PresentationProtection::new(),
+            protection: Protection::new(),
             handout_master: None,
             modified: false,
             charts: HashMap::new(),
@@ -617,27 +617,27 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi_ooxml::pptx::{MutablePresentation, PresentationProtection};
+    /// use litchi_ooxml::pptx::{MutablePresentation, Protection};
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.set_protection(
-    ///     PresentationProtection::new()
+    ///     Protection::new()
     ///         .with_read_only_recommended(true)
     ///         .with_structure_protection(true)
     /// );
     /// ```
-    pub fn set_protection(&mut self, protection: PresentationProtection) {
+    pub fn set_protection(&mut self, protection: Protection) {
         self.protection = protection;
         self.modified = true;
     }
 
     /// Get the protection settings.
-    pub fn protection(&self) -> &PresentationProtection {
+    pub fn protection(&self) -> &Protection {
         &self.protection
     }
 
     /// Get mutable protection settings.
-    pub fn protection_mut(&mut self) -> &mut PresentationProtection {
+    pub fn protection_mut(&mut self) -> &mut Protection {
         self.modified = true;
         &mut self.protection
     }

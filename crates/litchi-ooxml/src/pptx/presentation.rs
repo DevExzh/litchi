@@ -427,9 +427,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Guide metadata and unknown extensions remain inert document data. This
     /// accessor does not resolve or open extension targets.
-    pub fn extended_guides(
-        &self,
-    ) -> Result<crate::pptx::extended_guides::PresentationExtendedGuides> {
+    pub fn extended_guides(&self) -> Result<crate::pptx::extended_guides::ExtendedGuides> {
         self.part.extended_guides()
     }
 
@@ -1086,7 +1084,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Internal tracks are parsed as bounded inert text. External targets are
     /// retained as document metadata and are never fetched.
-    pub fn caption_tracks(&self) -> Result<Vec<crate::pptx::tracks::PresentationTrack>> {
+    pub fn caption_tracks(&self) -> Result<Vec<crate::pptx::tracks::Track>> {
         crate::pptx::tracks::load_presentation_tracks(self.package)
     }
 

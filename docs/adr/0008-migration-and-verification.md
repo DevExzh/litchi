@@ -2638,7 +2638,7 @@ not yet claim the final consuming `Locked<T>`/`Sensitive<T>` type-state facade
 required when each concrete format leaves the migration host.
 
 Presentation modification protection is also made structurally separate and
-safe. `PresentationProtection` owns an optional private `ModifyVerifier`
+safe. `Protection` owns an optional private `ModifyVerifier`
 aggregate instead of public independent algorithm, spin-count, salt, hash, and
 enabled fields. Callers can inspect it through short read-only accessors but
 can construct it only through strict parsing or atomic password setting. The

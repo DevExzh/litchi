@@ -27,7 +27,7 @@ const MAX_DEPTH: usize = 128;
 
 /// One entry in `p:sldIdLst`, resolved through the presentation relationship set.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationSlideReference {
+pub struct SlideReference {
     pub slide_id: u32,
     pub relationship_id: String,
     pub part_name: String,
@@ -35,24 +35,21 @@ pub struct PresentationSlideReference {
 
 /// Validated presentation ordering, custom shows, and modern sections.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationStructure {
-    pub slides: Vec<PresentationSlideReference>,
+pub struct Structure {
+    pub slides: Vec<SlideReference>,
     pub custom_shows: CustomShowList,
     pub sections: SectionList,
 }
 
 /// Load and validate the presentation structure graph.
-pub fn load_presentation_structure(package: &OpcPackage) -> Result<PresentationStructure> {
+pub fn load_presentation_structure(package: &OpcPackage) -> Result<Structure> {
     let presentation = package.main_document_part()?;
     require_presentation(presentation.content_type())?;
     parse_structure_blob(package, presentation.blob(), true)
 }
 
 /// Atomically replace custom shows and sections while preserving unrelated XML.
-pub fn store_presentation_structure(
-    package: &mut OpcPackage,
-    value: &PresentationStructure,
-) -> Result<()> {
+pub fn store_presentation_structure(package: &mut OpcPackage, value: &Structure) -> Result<()> {
     validate_graph(package, value)?;
     let presentation_name = package.main_document_part()?.partname().clone();
     let original = package.get_part(&presentation_name)?.blob().to_vec();
@@ -332,7 +329,7 @@ pub fn synchronize_presentation_structure_after_slide_mutation(
 
 fn mutate<F>(package: &mut OpcPackage, operation: F) -> Result<()>
 where
-    F: FnOnce(&mut PresentationStructure) -> Result<()>,
+    F: FnOnce(&mut Structure) -> Result<()>,
 {
     let mut graph = load_presentation_structure(package)?;
     operation(&mut graph)?;
@@ -343,7 +340,7 @@ fn parse_structure_blob(
     package: &OpcPackage,
     xml: &[u8],
     strict_references: bool,
-) -> Result<PresentationStructure> {
+) -> Result<Structure> {
     if xml.len() > MAX_BYTES {
         return Err(invalid("presentation structure exceeds 8 MiB"));
     }
@@ -373,7 +370,7 @@ fn parse_structure_blob(
                 "relationship {relationship_id} targets a non-slide part"
             )));
         }
-        slides.push(PresentationSlideReference {
+        slides.push(SlideReference {
             slide_id,
             relationship_id,
             part_name: target.to_string(),
@@ -398,7 +395,7 @@ fn parse_structure_blob(
         }
         custom_shows.add(show);
     }
-    let graph = PresentationStructure {
+    let graph = Structure {
         slides,
         custom_shows,
         sections: SectionList::from_xml(xml)?,
@@ -569,7 +566,7 @@ fn required_qualified<'a>(values: &'a [(String, String)], local: &str) -> Result
         .ok_or_else(|| invalid(format!("missing relationship attribute '{local}'")))
 }
 
-fn validate_graph(package: &OpcPackage, graph: &PresentationStructure) -> Result<()> {
+fn validate_graph(package: &OpcPackage, graph: &Structure) -> Result<()> {
     let mut slide_ids = HashSet::new();
     let mut rel_ids = HashSet::new();
     let mut part_names = HashSet::new();
@@ -656,7 +653,7 @@ fn validate_graph(package: &OpcPackage, graph: &PresentationStructure) -> Result
 
 fn write_custom_shows(
     shows: &CustomShowList,
-    slides: &[PresentationSlideReference],
+    slides: &[SlideReference],
     p_namespace: &str,
     r_namespace: &str,
 ) -> Result<String> {
@@ -926,7 +923,7 @@ fn document_namespaces(xml: &[u8]) -> (&'static str, &'static str) {
     }
 }
 
-fn require_slide(graph: &PresentationStructure, slide_id: u32) -> Result<()> {
+fn require_slide(graph: &Structure, slide_id: u32) -> Result<()> {
     if graph.slides.iter().any(|slide| slide.slide_id == slide_id) {
         Ok(())
     } else {

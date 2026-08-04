@@ -1,6 +1,6 @@
 use litchi_ooxml::pptx::Package;
 use litchi_ooxml::pptx::tracks::{
-    PresentationTrackTarget, TRACK_CONTENT_TYPE, TRACK_RELATIONSHIP_TYPE, WebVttBlock,
+    TRACK_CONTENT_TYPE, TRACK_RELATIONSHIP_TYPE, TrackTarget, WebVttBlock,
 };
 use litchi_ooxml::{OoxmlError, PackURI};
 use litchi_opc::constants::content_type as ct;
@@ -18,7 +18,7 @@ fn presentation_caption_tracks_load_internal_webvtt() {
     assert_eq!(tracks.len(), 1);
     assert_eq!(tracks[0].source_part_name, "/ppt/slides/slide1.xml");
     assert_eq!(tracks[0].relationship_id, "rIdCaptions");
-    let PresentationTrackTarget::Internal { part_name, track } = &tracks[0].target else {
+    let TrackTarget::Internal { part_name, track } = &tracks[0].target else {
         panic!("expected an internal WebVTT track");
     };
     assert_eq!(part_name, "/ppt/media/captions.vtt");

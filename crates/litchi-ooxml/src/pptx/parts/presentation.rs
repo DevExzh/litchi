@@ -870,10 +870,8 @@ impl<'a> PresentationPart<'a> {
     ///
     /// Guide metadata has no relationships. Unknown guide extensions remain
     /// inert and this accessor never opens package or external targets.
-    pub fn extended_guides(
-        &self,
-    ) -> Result<crate::pptx::extended_guides::PresentationExtendedGuides> {
-        crate::pptx::extended_guides::PresentationExtendedGuides::from_xml(self.xml_bytes())
+    pub fn extended_guides(&self) -> Result<crate::pptx::extended_guides::ExtendedGuides> {
+        crate::pptx::extended_guides::ExtendedGuides::from_xml(self.xml_bytes())
     }
 
     /// Get the underlying OPC part.

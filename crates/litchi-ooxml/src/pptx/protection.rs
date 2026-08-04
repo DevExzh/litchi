@@ -180,7 +180,7 @@ impl std::fmt::Debug for ModifyVerifier {
 
 /// Protection settings for a presentation.
 #[derive(Debug, Clone, Default)]
-pub struct PresentationProtection {
+pub struct Protection {
     /// Whether the presentation is marked as read-only recommended
     pub read_only_recommended: bool,
     /// Modification protection is one validated aggregate, so callers cannot
@@ -192,7 +192,7 @@ pub struct PresentationProtection {
     pub protect_windows: bool,
 }
 
-impl PresentationProtection {
+impl Protection {
     /// Create new protection settings with no protection.
     pub fn new() -> Self {
         Self::default()
@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     fn test_protection_type() {
-        let mut prot = PresentationProtection::new();
+        let mut prot = Protection::new();
         assert_eq!(prot.protection_type(), ProtectionType::None);
 
         prot.read_only_recommended = true;
@@ -542,7 +542,7 @@ mod tests {
     #[test]
     fn modify_password_hashing_does_not_retain_or_debug_the_password() {
         let password = "unique plaintext password 9bQ!";
-        let mut protection = PresentationProtection::new();
+        let mut protection = Protection::new();
 
         protection.set_modify_password(password).unwrap();
 
@@ -573,7 +573,7 @@ mod tests {
         let xml = format!(
             r#"<p:modifyVerifier xmlns:p="urn:p" cryptAlgorithmSid="14" spinCount="100000" saltData="{salt}" hashData="{hash}"/>"#
         );
-        let parsed = PresentationProtection::parse_xml(&xml).expect("valid verifier");
+        let parsed = Protection::parse_xml(&xml).expect("valid verifier");
         let verifier = parsed.modify().expect("parsed verifier");
         assert_eq!(verifier.algorithm(), CryptoAlgorithm::Sha512);
         assert_eq!(verifier.spins(), 100_000);
@@ -592,7 +592,7 @@ mod tests {
                 r#"<p:modifyVerifier xmlns:p="urn:p" cryptAlgorithmSid="14" spinCount="100000" saltData="{salt}"/>"#
             ),
         ] {
-            assert!(PresentationProtection::parse_xml(&malformed).is_err());
+            assert!(Protection::parse_xml(&malformed).is_err());
         }
     }
 
