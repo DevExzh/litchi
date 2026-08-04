@@ -10,8 +10,8 @@ mod package;
 
 pub use codec::{parse_query_table, write_query_table};
 pub use model::{
-    Conformance, ExtensionAttribute, ExtensionList, Field, GrowShrinkType, IconSet, Refresh,
-    SortBy, SortCondition, SortMethod, SortState, Table, WorksheetTable,
+    Conformance, ExtensionAttribute, ExtensionList, Field, GrowShrinkType, IconSet, Part, Refresh,
+    SortBy, SortCondition, SortMethod, SortState, Table,
 };
 pub use package::{
     QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,

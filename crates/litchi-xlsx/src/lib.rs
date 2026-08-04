@@ -174,12 +174,12 @@ pub use threaded_comments::{
     validate_timestamp, write_comments, write_persons,
 };
 pub use timelines::{
-    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, PivotFilter,
+    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
     TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE,
     TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI, TIMELINES_RELATIONSHIP_TYPE, View, Views,
-    WorksheetView, load_timeline_caches, load_timelines, parse_timeline_cache_definition,
-    parse_timelines, store_timeline_caches, store_worksheet_timelines,
-    write_timeline_cache_definition, write_timelines,
+    load_timeline_caches, load_timelines, parse_timeline_cache_definition, parse_timelines,
+    store_timeline_caches, store_worksheet_timelines, write_timeline_cache_definition,
+    write_timelines,
 };
 pub use views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,

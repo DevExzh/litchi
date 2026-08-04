@@ -190,7 +190,6 @@ pub use shapes::{
     parse_drawing_shapes,
 };
 pub use shared_strings::SharedStrings;
-pub use sheet_format::{WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties};
 pub use sheet_properties::{
     PageSetupProperties, SheetProperties, SynchronizationReference, TabColor,
     parse_sheet_properties,
@@ -294,12 +293,12 @@ pub use threaded_comments::{
 };
 pub mod timelines;
 pub use timelines::{
-    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml,
+    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part,
     TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE,
     TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI, TIMELINES_RELATIONSHIP_TYPE, View, Views,
-    WorksheetView, load_timeline_caches, load_timelines, parse_timeline_cache_definition,
-    parse_timelines, store_timeline_caches, store_worksheet_timelines,
-    write_timeline_cache_definition, write_timelines,
+    load_timeline_caches, load_timelines, parse_timeline_cache_definition, parse_timelines,
+    store_timeline_caches, store_worksheet_timelines, write_timeline_cache_definition,
+    write_timelines,
 };
 pub mod custom_data;
 pub use custom_data::{

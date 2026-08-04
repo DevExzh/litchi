@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use crate::error::Result;
 
 use super::codec::parse_query_table;
-use super::model::{Conformance, Table, WorksheetTable, invalid};
+use super::model::{Conformance, Part, Table, invalid};
 
 pub const QUERY_TABLE_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml";
@@ -27,7 +27,7 @@ pub fn is_query_table_relationship_type(value: &str) -> bool {
 pub fn load_worksheet_query_tables(
     package: &OpcPackage,
     worksheet_part: &PackURI,
-) -> Result<Vec<WorksheetTable>> {
+) -> Result<Vec<Part>> {
     let worksheet = package.get_part(worksheet_part)?;
     let mut result = Vec::new();
     let mut seen_parts = HashSet::new();
@@ -53,7 +53,7 @@ pub fn load_worksheet_query_tables(
         if part.rels().iter().next().is_some() {
             return Err(invalid("query-table parts must not have relationships"));
         }
-        result.push(WorksheetTable::new(
+        result.push(Part::new(
             relationship.r_id().to_string(),
             part_name.to_string(),
             parse_query_table(part.blob())?,
@@ -67,7 +67,7 @@ pub fn find_worksheet_query_table(
     package: &OpcPackage,
     worksheet_part: &PackURI,
     relationship_id: &str,
-) -> Result<Option<WorksheetTable>> {
+) -> Result<Option<Part>> {
     Ok(load_worksheet_query_tables(package, worksheet_part)?
         .into_iter()
         .find(|item| item.relationship_id == relationship_id))
@@ -79,7 +79,7 @@ pub fn add_worksheet_query_table(
     worksheet_part: &PackURI,
     query_table: Table,
     conformance: Conformance,
-) -> Result<WorksheetTable> {
+) -> Result<Part> {
     validate_query_table_connection(package, query_table.connection_id)?;
     let xml = query_table.to_xml(conformance)?;
     parse_query_table(&xml)?;
@@ -105,7 +105,7 @@ pub fn add_worksheet_query_table(
             false,
         );
     package.unsign();
-    Ok(WorksheetTable::new(
+    Ok(Part::new(
         relationship_id,
         part_name.to_string(),
         query_table,
@@ -176,7 +176,7 @@ pub fn reorder_worksheet_query_tables(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     ordered_relationship_ids: &[String],
-) -> Result<Vec<WorksheetTable>> {
+) -> Result<Vec<Part>> {
     let existing = load_worksheet_query_tables(package, worksheet_part)?;
     if existing.len() != ordered_relationship_ids.len() {
         return Err(invalid(
@@ -225,7 +225,7 @@ pub fn reorder_worksheet_query_tables(
             id.clone(),
             false,
         );
-        result.push(WorksheetTable::new(id, item.part_name, item.query_table));
+        result.push(Part::new(id, item.part_name, item.query_table));
     }
     package.unsign();
     Ok(result)

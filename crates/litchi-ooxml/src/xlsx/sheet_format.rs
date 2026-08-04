@@ -4,10 +4,9 @@ use crate::error::{OoxmlError, Result};
 
 /// Effective worksheet defaults and outline metadata from `sheetFormatPr`.
 ///
-/// This remains a compatibility view for the legacy OOXML host API. The
-/// checked semantic model and all XML validation live in `litchi-xlsx`.
+/// The checked semantic model and XML validation live in `litchi-xlsx`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorksheetSheetFormatProperties {
+pub struct Properties {
     base_column_width: u32,
     default_column_width: Option<f64>,
     default_row_height: f64,
@@ -20,7 +19,7 @@ pub struct WorksheetSheetFormatProperties {
     dy_descent: Option<f64>,
 }
 
-impl WorksheetSheetFormatProperties {
+impl Properties {
     pub fn base_column_width(&self) -> u32 {
         self.base_column_width
     }
@@ -68,7 +67,7 @@ impl WorksheetSheetFormatProperties {
     }
 }
 
-impl From<&litchi_xlsx::layout::Defaults> for WorksheetSheetFormatProperties {
+impl From<&litchi_xlsx::layout::Defaults> for Properties {
     fn from(defaults: &litchi_xlsx::layout::Defaults) -> Self {
         Self {
             base_column_width: u32::from(defaults.base_width()),
@@ -87,11 +86,9 @@ impl From<&litchi_xlsx::layout::Defaults> for WorksheetSheetFormatProperties {
 
 /// Parse the worksheet's direct `sheetFormatPr` child through the canonical
 /// XLSX owner.
-pub fn parse_worksheet_sheet_format_properties(
-    xml: &[u8],
-) -> Result<Option<WorksheetSheetFormatProperties>> {
+pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
     let defaults = litchi_xlsx::raw::parse_worksheet_defaults(xml).map_err(map_xlsx_error)?;
-    Ok(defaults.as_ref().map(WorksheetSheetFormatProperties::from))
+    Ok(defaults.as_ref().map(Properties::from))
 }
 
 fn map_xlsx_error(error: litchi_xlsx::Error) -> OoxmlError {
@@ -106,20 +103,19 @@ fn map_xlsx_error(error: litchi_xlsx::Error) -> OoxmlError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Properties, parse};
+    use crate::error::Result;
     use litchi_opc::{OpcPackage, PackURI};
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetSheetFormatProperties>> {
-        parse_worksheet_sheet_format_properties(
-            format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
-        )
+    fn parse_child(child: &str) -> Result<Option<Properties>> {
+        parse(format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes())
     }
 
     #[test]
     fn parses_all_core_attributes_and_effective_defaults() {
-        let value = parse(concat!(
+        let value = parse_child(concat!(
             r#"<sheetFormatPr baseColWidth="9" defaultColWidth="11.5" "#,
             r#"defaultRowHeight="18.25" customHeight="false" zeroHeight="1" "#,
             r#"thickTop="true" thickBottom="1" outlineLevelRow="4" outlineLevelCol="3"/>"#,
@@ -135,7 +131,7 @@ mod tests {
         assert_eq!(value.outline_level_row(), 4);
         assert_eq!(value.outline_level_column(), 3);
 
-        let defaults = parse(r#"<sheetFormatPr defaultRowHeight="15"/>"#)
+        let defaults = parse_child(r#"<sheetFormatPr defaultRowHeight="15"/>"#)
             .unwrap()
             .unwrap();
         assert_eq!(defaults.base_column_width(), 8);
@@ -148,21 +144,11 @@ mod tests {
     #[test]
     fn supports_strict_namespace_and_direct_child_only() {
         let strict = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><sheetFormatPr defaultRowHeight="16"/></worksheet>"#;
-        assert_eq!(
-            parse_worksheet_sheet_format_properties(strict)
-                .unwrap()
-                .unwrap()
-                .default_row_height(),
-            16.0
-        );
+        assert_eq!(parse(strict).unwrap().unwrap().default_row_height(), 16.0);
         let nested = format!(
             r#"<worksheet xmlns="{NS}"><wrapper><sheetFormatPr defaultRowHeight="15"/></wrapper></worksheet>"#
         );
-        assert!(
-            parse_worksheet_sheet_format_properties(nested.as_bytes())
-                .unwrap()
-                .is_none()
-        );
+        assert!(parse(nested.as_bytes()).unwrap().is_none());
     }
 
     #[test]
@@ -175,9 +161,7 @@ mod tests {
             ),
             NS
         );
-        let value = parse_worksheet_sheet_format_properties(xml.as_bytes())
-            .unwrap()
-            .unwrap();
+        let value = parse(xml.as_bytes()).unwrap().unwrap();
         assert_eq!(value.dy_descent(), Some(0.25));
         assert!(value.custom_height());
     }
@@ -194,10 +178,13 @@ mod tests {
             r#"<sheetFormatPr defaultRowHeight="15" mystery="1"/>"#,
             r#"<sheetFormatPr defaultRowHeight="15"><child/></sheetFormatPr>"#,
         ] {
-            assert!(parse(child).is_err(), "expected rejection for {child}");
+            assert!(
+                parse_child(child).is_err(),
+                "expected rejection for {child}"
+            );
         }
         assert!(
-            parse(concat!(
+            parse_child(concat!(
                 r#"<sheetFormatPr defaultRowHeight="15"/>"#,
                 r#"<sheetFormatPr defaultRowHeight="15"/>"#
             ))
@@ -205,14 +192,12 @@ mod tests {
         );
     }
 
-    fn fixture_sheet(bytes: &[u8]) -> WorksheetSheetFormatProperties {
+    fn fixture_sheet(bytes: &[u8]) -> Properties {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .unwrap();
-        parse_worksheet_sheet_format_properties(part.blob())
-            .unwrap()
-            .unwrap()
+        parse(part.blob()).unwrap().unwrap()
     }
 
     #[test]

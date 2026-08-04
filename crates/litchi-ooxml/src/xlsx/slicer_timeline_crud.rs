@@ -20,9 +20,9 @@ use crate::xlsx::slicers::{
     write_slicers,
 };
 use crate::xlsx::timelines::{
-    Cache, CacheDefinition, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
-    TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_EXTENSION_URI, View, Views, WorksheetView,
-    load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
+    Cache, CacheDefinition, Part as TimelinePart, TIMELINE_CACHE_CONTENT_TYPE,
+    TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_EXTENSION_URI, View,
+    Views, load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
     write_timeline_cache_definition, write_timelines,
 };
 
@@ -534,7 +534,7 @@ pub fn add_timeline(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     timeline: View,
-) -> Result<WorksheetView> {
+) -> Result<TimelinePart> {
     let workbook = package.main_document_part()?.partname().clone();
     let caches = load_timeline_caches(package, &workbook)?;
     validate_timeline_cache_reference(&timeline, &caches)?;
@@ -561,7 +561,7 @@ pub fn add_timeline(
         package.unsign();
         return Ok(sheets[index].clone());
     }
-    let value = WorksheetView {
+    let value = TimelinePart {
         worksheet_part_name: worksheet.to_string(),
         relationship_id: next_relationship_id(package.get_part(worksheet)?, "rIdTimeline")?,
         part_name: next_part_name(package, "/xl/timelines/timeline%d.xml")?.to_string(),
@@ -861,7 +861,7 @@ fn validate_slicer_views(
     Ok(())
 }
 
-fn validate_timeline_views(sheets: &[WorksheetView], caches: &[Cache]) -> Result<()> {
+fn validate_timeline_views(sheets: &[TimelinePart], caches: &[Cache]) -> Result<()> {
     let cache_names: HashSet<String> = caches
         .iter()
         .map(|cache| cache.definition.name.to_ascii_lowercase())

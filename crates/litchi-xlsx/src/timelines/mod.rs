@@ -72,8 +72,8 @@ pub use codec::{
     write_timelines,
 };
 pub use model::{
-    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, PivotFilter, Range,
-    State, View, Views, WorksheetView,
+    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
+    Range, State, View, Views,
 };
 pub use package::{
     load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,

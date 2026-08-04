@@ -235,7 +235,7 @@ mod tests {
             load_timeline_caches(&package, &workbook).unwrap(),
             vec![expected_cache]
         );
-        let expected = WorksheetView {
+        let expected = Part {
             worksheet_part_name: "/xl/worksheets/sheet1.xml".into(),
             relationship_id: "rIdView1".into(),
             part_name: "/xl/timelines/timeline1.xml".into(),
@@ -271,7 +271,7 @@ mod tests {
     fn rejects_package_graph_and_unknown_cache_errors() {
         let (mut package, workbook) = package();
         store_timeline_caches(&mut package, &workbook, &[cache()]).unwrap();
-        let mut bad = WorksheetView {
+        let mut bad = Part {
             worksheet_part_name: "/xl/worksheets/sheet1.xml".into(),
             relationship_id: "rIdView1".into(),
             part_name: "/xl/timelines/timeline1.xml".into(),

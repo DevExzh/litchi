@@ -8,10 +8,10 @@ use crate::error::{OoxmlError, Result};
 use litchi_opc::{OpcPackage, PackURI};
 
 pub use litchi_xlsx::timelines::{
-    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, PivotFilter, Range,
-    State, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
+    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
+    Range, State, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
     TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI,
-    TIMELINES_RELATIONSHIP_TYPE, View, Views, WorksheetView,
+    TIMELINES_RELATIONSHIP_TYPE, View, Views,
 };
 
 fn map_error(error: litchi_xlsx::Error) -> OoxmlError {
@@ -53,14 +53,14 @@ pub fn store_timeline_caches(
     litchi_xlsx::timelines::store_timeline_caches(package, workbook_name, caches).map_err(map_error)
 }
 
-pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<WorksheetView>> {
+pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<Part>> {
     litchi_xlsx::timelines::load_timelines(package, workbook_name).map_err(map_error)
 }
 
 pub fn store_worksheet_timelines(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
-    value: &WorksheetView,
+    value: &Part,
 ) -> Result<()> {
     litchi_xlsx::timelines::store_worksheet_timelines(package, workbook_name, value)
         .map_err(map_error)

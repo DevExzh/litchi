@@ -712,13 +712,13 @@ impl Table {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetTable {
+pub struct Part {
     pub(crate) relationship_id: String,
     pub(crate) part_name: String,
     pub(crate) query_table: Table,
 }
 
-impl WorksheetTable {
+impl Part {
     pub fn new(relationship_id: String, part_name: String, query_table: Table) -> Self {
         Self {
             relationship_id,

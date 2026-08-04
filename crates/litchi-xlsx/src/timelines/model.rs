@@ -384,7 +384,7 @@ pub struct Views {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetView {
+pub struct Part {
     pub worksheet_part_name: String,
     pub relationship_id: String,
     pub part_name: String,
@@ -562,7 +562,7 @@ pub(super) fn validate_views_local(value: &Views) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validate_global_views(values: &[WorksheetView]) -> Result<()> {
+pub(super) fn validate_global_views(values: &[Part]) -> Result<()> {
     let count: usize = values
         .iter()
         .map(|value| value.timelines.timelines.len())

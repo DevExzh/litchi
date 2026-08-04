@@ -4592,7 +4592,7 @@ impl Workbook {
     pub fn query_tables_on_sheet(
         &self,
         sheet_name: &str,
-    ) -> SheetResult<Vec<super::query_table::WorksheetTable>> {
+    ) -> SheetResult<Vec<super::query_table::Part>> {
         let info = self
             .worksheets
             .iter()

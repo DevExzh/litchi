@@ -6,7 +6,7 @@ use super::codec::{
     write_timeline_cache_definition, write_timelines,
 };
 use super::model::{
-    Cache, WorksheetView, validate_cache_set, validate_global_views, validate_relationship_id,
+    Cache, Part, validate_cache_set, validate_global_views, validate_relationship_id,
     validate_views_local,
 };
 use super::{
@@ -211,7 +211,7 @@ pub fn store_timeline_caches(
 }
 
 /// Load every worksheet Views part and cross-validate views against View Caches.
-pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<WorksheetView>> {
+pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<Part>> {
     reject_root_relationships(package, TIMELINES_RELATIONSHIP_TYPE, "Views")?;
     let caches = load_timeline_caches(package, workbook_name)?;
     let cache_names: HashSet<String> = caches
@@ -304,7 +304,7 @@ pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<V
                 )));
             }
         }
-        output.push(WorksheetView {
+        output.push(Part {
             worksheet_part_name: part.partname().to_string(),
             relationship_id: id,
             part_name: target.to_string(),
@@ -327,7 +327,7 @@ pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<V
 pub fn store_worksheet_timelines(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
-    value: &WorksheetView,
+    value: &Part,
 ) -> Result<()> {
     validate_views_local(&value.timelines)?;
     let caches = load_timeline_caches(package, workbook_name)?;

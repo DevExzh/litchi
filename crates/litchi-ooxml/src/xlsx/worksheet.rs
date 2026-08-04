@@ -29,11 +29,10 @@ use super::named_sheet_view::{self, discover_named_sheet_views};
 use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
 use super::query_table::{
-    QUERY_TABLE_CONTENT_TYPE, WorksheetTable, is_query_table_relationship_type, parse_query_table,
+    Part as QueryTablePart, QUERY_TABLE_CONTENT_TYPE, is_query_table_relationship_type,
+    parse_query_table,
 };
-use super::sheet_format::{
-    WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
-};
+use super::sheet_format::{Properties as SheetFormatProperties, parse as parse_sheet_format};
 use super::sheet_properties::{SheetProperties, parse_sheet_properties};
 use super::sheet_protection::{Metadata, ProtectedRange, Protection, parse_protection};
 use super::sheet_view::{self, parse_worksheet_views};
@@ -217,7 +216,7 @@ pub struct Worksheet<'a> {
     /// Typed static worksheet page setup.
     page_setup: Option<Setup>,
     /// Effective static worksheet row/column defaults and outline metadata.
-    sheet_format_properties: Option<WorksheetSheetFormatProperties>,
+    sheet_format_properties: Option<SheetFormatProperties>,
     /// User-reviewed worksheet error-checking exceptions.
     ignored_errors: Option<IgnoredErrors>,
     /// Watch-window cell references tracked by the worksheet.
@@ -242,7 +241,7 @@ pub struct Worksheet<'a> {
     sparkline_groups: Vec<SparklineGroup>,
     web_bindings: Bindings,
     tables: Vec<Table>,
-    query_tables: Vec<WorksheetTable>,
+    query_tables: Vec<QueryTablePart>,
     images: Vec<Image>,
     charts: Vec<WorksheetChart>,
 }
@@ -369,7 +368,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Static query-table refresh metadata associated with this worksheet.
-    pub fn query_tables(&self) -> &[WorksheetTable] {
+    pub fn query_tables(&self) -> &[QueryTablePart] {
         &self.query_tables
     }
 
@@ -405,8 +404,7 @@ impl<'a> Worksheet<'a> {
         let page_margins = parse_page_margins(sheet_data.as_bytes())?;
         let print_options = parse_print_options(sheet_data.as_bytes())?;
         let page_setup = parse_worksheet_page_setup(sheet_data.as_bytes())?;
-        let sheet_format_properties =
-            parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
+        let sheet_format_properties = parse_sheet_format(sheet_data.as_bytes())?;
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
         let cell_watches = parse_cell_watches(sheet_data.as_bytes())?;
         let sheet_calculation_properties = parse(sheet_data.as_bytes())?;
@@ -876,7 +874,7 @@ impl<'a> Worksheet<'a> {
                 );
             }
             let query_table = parse_query_table(part.blob())?;
-            query_tables.push(WorksheetTable::new(
+            query_tables.push(QueryTablePart::new(
                 relationship_id,
                 part_uri.to_string(),
                 query_table,
@@ -1970,7 +1968,7 @@ impl<'a> Worksheet<'a> {
     // ===== Sheet Format Properties =====
 
     /// Effective worksheet row/column defaults and outline metadata.
-    pub fn sheet_format_properties(&self) -> Option<&WorksheetSheetFormatProperties> {
+    pub fn sheet_format_properties(&self) -> Option<&SheetFormatProperties> {
         self.sheet_format_properties.as_ref()
     }
 
