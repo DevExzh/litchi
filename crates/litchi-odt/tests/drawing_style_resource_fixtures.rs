@@ -1,11 +1,11 @@
 use litchi_odt::{
     FlatOpenDocument,
-    drawing_fill_image::FillImageLinkKind,
-    drawing_gradient::{DrawingGradient, parse_drawing_gradients},
-    drawing_hatch::parse_drawing_hatches,
-    drawing_marker::MarkerViewBox,
-    drawing_opacity::OpacityStyle,
-    drawing_stroke_dash::parse_drawing_stroke_dashes,
+    drawing::resources::fill_image::FillImageLinkKind,
+    drawing::resources::gradient::{Gradient, parse_drawing_gradients},
+    drawing::resources::hatch::parse_drawing_hatches,
+    drawing::resources::marker::MarkerViewBox,
+    drawing::resources::opacity::OpacityStyle,
+    drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
 };
 
 const MULTICOLOR_GRADIENT: &str =
@@ -25,7 +25,7 @@ const OPACITY_EXTENSION_STOPS: &str =
 fn local_gradient_fixture_preserves_multicolor_roundtrip_coverage() {
     let gradients = parse_drawing_gradients(MULTICOLOR_GRADIENT).unwrap();
     assert!(gradients.gradients.len() >= 6);
-    let DrawingGradient::Legacy(first) = &gradients.gradients[0] else {
+    let Gradient::Legacy(first) = &gradients.gradients[0] else {
         panic!("local fixture should begin with a legacy gradient");
     };
     assert_eq!(first.extension_stops.len(), 2);

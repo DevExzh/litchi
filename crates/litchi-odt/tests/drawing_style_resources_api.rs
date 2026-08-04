@@ -1,6 +1,6 @@
 use litchi_odt::{
     Document, FlatOpenDocument, MutableDocument, OpenDocumentPackage,
-    drawing_gradient::DrawingGradient, drawing_stroke_dash::StrokeDashStyle,
+    drawing::resources::gradient::Gradient, drawing::resources::stroke_dash::StrokeDashStyle,
 };
 mod support;
 
@@ -22,12 +22,12 @@ fn document() -> Document {
 }
 
 fn assert_resources(
-    fill_images: &litchi_odt::drawing_fill_image::DrawingFillImages,
-    gradients: &litchi_odt::drawing_gradient::DrawingGradients,
-    hatches: &litchi_odt::drawing_hatch::DrawingHatches,
-    markers: &litchi_odt::drawing_marker::DrawingMarkers,
-    opacities: &litchi_odt::drawing_opacity::DrawingOpacities,
-    dashes: &litchi_odt::drawing_stroke_dash::DrawingStrokeDashes,
+    fill_images: &litchi_odt::drawing::resources::fill_image::FillImages,
+    gradients: &litchi_odt::drawing::resources::gradient::Gradients,
+    hatches: &litchi_odt::drawing::resources::hatch::Hatches,
+    markers: &litchi_odt::drawing::resources::marker::Markers,
+    opacities: &litchi_odt::drawing::resources::opacity::Opacities,
+    dashes: &litchi_odt::drawing::resources::stroke_dash::StrokeDashes,
 ) {
     assert_eq!(fill_images.images.len(), 1);
     assert_eq!(
@@ -42,10 +42,7 @@ fn assert_resources(
     );
     assert_eq!(gradients.gradients.len(), 2);
     assert!(gradients.get("Legacy").is_some());
-    assert!(matches!(
-        gradients.get("Linear"),
-        Some(DrawingGradient::Linear(_))
-    ));
+    assert!(matches!(gradients.get("Linear"), Some(Gradient::Linear(_))));
     assert_eq!(hatches.hatches.len(), 1);
     assert!(hatches.get("Hatch").is_some());
     assert_eq!(markers.markers.len(), 1);

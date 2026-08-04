@@ -120,7 +120,7 @@ impl fmt::Display for StrokeDashMeasure {
 
 /// One named `draw:stroke-dash` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DrawingStrokeDash {
+pub struct StrokeDash {
     pub name: String,
     pub display_name: Option<String>,
     pub style: Option<StrokeDashStyle>,
@@ -131,7 +131,7 @@ pub struct DrawingStrokeDash {
     pub distance: Option<StrokeDashMeasure>,
 }
 
-impl DrawingStrokeDash {
+impl StrokeDash {
     /// ODF defaults an omitted cap style to `rect`.
     pub fn effective_style(&self) -> StrokeDashStyle {
         self.style.unwrap_or(StrokeDashStyle::Rect)
@@ -166,12 +166,12 @@ impl DrawingStrokeDash {
 
 /// Ordered stroke-dash resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct DrawingStrokeDashes {
-    pub dashes: Vec<DrawingStrokeDash>,
+pub struct StrokeDashes {
+    pub dashes: Vec<StrokeDash>,
 }
 
-impl DrawingStrokeDashes {
-    pub fn get(&self, name: &str) -> Option<&DrawingStrokeDash> {
+impl StrokeDashes {
+    pub fn get(&self, name: &str) -> Option<&StrokeDash> {
         self.dashes.iter().find(|dash| dash.name == name)
     }
 
@@ -233,15 +233,15 @@ struct Frame {
 
 struct ActiveDash {
     parent_depth: usize,
-    value: DrawingStrokeDash,
+    value: StrokeDash,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse stroke-dash resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<DrawingStrokeDashes> {
+pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<StrokeDashes> {
     if !xml.contains("stroke-dash") {
-        return Ok(DrawingStrokeDashes::default());
+        return Ok(StrokeDashes::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing stroke-dash XML exceeds 64 MiB");
@@ -252,7 +252,7 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<DrawingStrokeDashes> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveDash> = None;
-    let mut result = DrawingStrokeDashes::default();
+    let mut result = StrokeDashes::default();
     let mut aggregate = 0usize;
 
     loop {
@@ -352,7 +352,7 @@ fn parse_dash(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<DrawingStrokeDash> {
+) -> Result<StrokeDash> {
     let mut values = attributes(reader, element, aggregate)?;
     let name = required(&mut values, NamespaceKind::Draw, "name", "draw:name")?;
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
@@ -365,7 +365,7 @@ fn parse_dash(
     let dots2_length = take_measure(&mut values, "dots2-length")?;
     let distance = take_measure(&mut values, "distance")?;
     reject_attributes(&values)?;
-    let value = DrawingStrokeDash {
+    let value = StrokeDash {
         name,
         display_name,
         style,
@@ -547,7 +547,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool) -> Result<()> {
     Ok(())
 }
 
-fn write_dash(output: &mut String, value: &DrawingStrokeDash, standalone: bool) {
+fn write_dash(output: &mut String, value: &StrokeDash, standalone: bool) {
     output.push_str("<draw:stroke-dash");
     if standalone {
         output.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#);
@@ -681,7 +681,7 @@ mod tests {
 
     #[test]
     fn parses_local_dashed_line_fixture() {
-        let xml = include_str!("../../../test-data/odf/drawing/dashed-line.fodg");
+        let xml = include_str!("../../../../../test-data/odf/drawing/dashed-line.fodg");
         let parsed = parse_drawing_stroke_dashes(xml).unwrap();
         let dash = parsed.get("DoubleDashDotDot").unwrap();
         assert_eq!(dash.dots1, Some(1));

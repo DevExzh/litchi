@@ -2,9 +2,9 @@
 
 use crate::{
     FlatOpenDocument, OpenDocumentPackage,
-    drawing_gradient::{DrawingGradients, parse_drawing_gradients},
-    drawing_hatch::{DrawingHatches, parse_drawing_hatches},
-    drawing_stroke_dash::{DrawingStrokeDashes, parse_drawing_stroke_dashes},
+    drawing::resources::gradient::{Gradients, parse_drawing_gradients},
+    drawing::resources::hatch::{Hatches, parse_drawing_hatches},
+    drawing::resources::stroke_dash::{StrokeDashes, parse_drawing_stroke_dashes},
 };
 use litchi_core::Result;
 
@@ -13,7 +13,7 @@ impl OpenDocumentPackage {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<DrawingGradients> {
+    pub fn drawing_gradients(&self) -> Result<Gradients> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
             |styles| parse_drawing_gradients(&styles),
@@ -24,7 +24,7 @@ impl OpenDocumentPackage {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<DrawingHatches> {
+    pub fn drawing_hatches(&self) -> Result<Hatches> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
             |styles| parse_drawing_hatches(&styles),
@@ -35,7 +35,7 @@ impl OpenDocumentPackage {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render strokes.
-    pub fn drawing_stroke_dashes(&self) -> Result<DrawingStrokeDashes> {
+    pub fn drawing_stroke_dashes(&self) -> Result<StrokeDashes> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
             |styles| parse_drawing_stroke_dashes(&styles),
@@ -48,7 +48,7 @@ impl FlatOpenDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<DrawingGradients> {
+    pub fn drawing_gradients(&self) -> Result<Gradients> {
         parse_drawing_gradients(self.xml())
     }
 
@@ -56,7 +56,7 @@ impl FlatOpenDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<DrawingHatches> {
+    pub fn drawing_hatches(&self) -> Result<Hatches> {
         parse_drawing_hatches(self.xml())
     }
 
@@ -64,7 +64,7 @@ impl FlatOpenDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render strokes.
-    pub fn drawing_stroke_dashes(&self) -> Result<DrawingStrokeDashes> {
+    pub fn drawing_stroke_dashes(&self) -> Result<StrokeDashes> {
         parse_drawing_stroke_dashes(self.xml())
     }
 }

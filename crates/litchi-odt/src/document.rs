@@ -460,10 +460,12 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::DrawingGradients> {
+    pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Gradients> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing_gradient::parse_drawing_gradients(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::gradient::parse_drawing_gradients(styles.xml_content())
+            },
         )
     }
 
@@ -471,10 +473,10 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::DrawingHatches> {
+    pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Hatches> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing_hatch::parse_drawing_hatches(styles.xml_content()),
+            |styles| crate::drawing::resources::hatch::parse_drawing_hatches(styles.xml_content()),
         )
     }
 
@@ -482,10 +484,16 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render strokes.
-    pub fn drawing_stroke_dashes(&self) -> Result<crate::drawing_stroke_dash::DrawingStrokeDashes> {
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing::resources::stroke_dash::StrokeDashes> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing_stroke_dash::parse_drawing_stroke_dashes(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
+                    styles.xml_content(),
+                )
+            },
         )
     }
 
@@ -493,10 +501,14 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
-    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::DrawingFillImages> {
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::FillImages> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing_fill_image::parse_drawing_fill_images(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::fill_image::parse_drawing_fill_images(
+                    styles.xml_content(),
+                )
+            },
         )
     }
 
@@ -504,10 +516,10 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
-    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::DrawingMarkers> {
+    pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Markers> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing_marker::parse_drawing_markers(styles.xml_content()),
+            |styles| crate::drawing::resources::marker::parse_drawing_markers(styles.xml_content()),
         )
     }
 
@@ -515,10 +527,12 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
-    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::DrawingOpacities> {
+    pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Opacities> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing_opacity::parse_drawing_opacities(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::opacity::parse_drawing_opacities(styles.xml_content())
+            },
         )
     }
 

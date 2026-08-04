@@ -95,14 +95,8 @@ pub mod chart_properties;
 pub mod content_validation;
 pub mod dde_connection;
 pub mod document_scripts;
-pub mod drawing_fill_image;
-pub mod drawing_gradient;
-pub mod drawing_hatch;
-pub mod drawing_marker;
-pub mod drawing_opacity;
+pub mod drawing;
 pub mod drawing_page_properties;
-pub mod drawing_stroke_dash;
-pub mod drawing_style_resources;
 pub mod embedded_object;
 pub mod font_face;
 pub mod footnote_separator;
@@ -170,6 +164,23 @@ pub use dde_connection::{DdeConnectionDeclaration, DdeConnectionUse};
 pub use document_scripts::{
     DocumentEventListener, DocumentScripts, EmbeddedScript, ScriptBinding, ScriptEventListener,
     parse_document_scripts,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes drawing resource semantics"
+)]
+pub use drawing::resources::{
+    FillImage, FillImageActuate, FillImageLength, FillImageLengthUnit, FillImageLink,
+    FillImageLinkKind, FillImageShow, FillImageSource, FillImages, Gradient, GradientAngle,
+    GradientCoordinate, GradientCoordinateUnit, GradientIntensity, GradientPercent,
+    GradientSpreadMethod, GradientStopOffset, Gradients, Hatch, HatchLength, HatchLengthUnit,
+    HatchRotation, HatchStyle, Hatches, LegacyGradient, LegacyGradientStyle,
+    LibreOfficeGradientColorType, LibreOfficeGradientStop, Marker, MarkerPathData, MarkerViewBox,
+    Markers, Opacities, Opacity, OpacityAngle, OpacityGeometryPercent, OpacityPercent, OpacityStop,
+    OpacityStopValue, OpacityStyle, RgbColor, StrokeDash, StrokeDashMeasure, StrokeDashMeasureUnit,
+    StrokeDashStyle, StrokeDashes, SvgGradientCommon, SvgGradientStop, SvgLinearGradient,
+    SvgRadialGradient, parse_drawing_fill_images, parse_drawing_gradients, parse_drawing_hatches,
+    parse_drawing_markers, parse_drawing_opacities, parse_drawing_stroke_dashes,
 };
 #[allow(unused_imports, reason = "ODT facade exposes drawing style resources")]
 pub use drawing_page_properties::{

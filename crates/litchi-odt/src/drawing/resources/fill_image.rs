@@ -180,7 +180,7 @@ pub enum FillImageActuate {
 
 /// One named `draw:fill-image` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DrawingFillImage {
+pub struct FillImage {
     pub name: String,
     pub display_name: Option<String>,
     pub width: Option<FillImageLength>,
@@ -190,7 +190,7 @@ pub struct DrawingFillImage {
     pub actuate: Option<FillImageActuate>,
 }
 
-impl DrawingFillImage {
+impl FillImage {
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
@@ -228,12 +228,12 @@ impl DrawingFillImage {
 
 /// Ordered fill-image resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct DrawingFillImages {
-    pub images: Vec<DrawingFillImage>,
+pub struct FillImages {
+    pub images: Vec<FillImage>,
 }
 
-impl DrawingFillImages {
-    pub fn get(&self, name: &str) -> Option<&DrawingFillImage> {
+impl FillImages {
+    pub fn get(&self, name: &str) -> Option<&FillImage> {
         self.images.iter().find(|image| image.name == name)
     }
 
@@ -291,7 +291,7 @@ impl DrawingFillImages {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn drawing_fill_images(&self) -> Result<DrawingFillImages> {
+    pub fn drawing_fill_images(&self) -> Result<FillImages> {
         let styles = self.styles_xml()?;
         parse_drawing_fill_images(styles.as_deref().unwrap_or_default())
     }
@@ -299,7 +299,7 @@ impl crate::OpenDocumentPackage {
     /// Load a safe package image or borrow inline bytes without copying.
     pub fn drawing_fill_image_bytes<'a>(
         &self,
-        image: &'a DrawingFillImage,
+        image: &'a FillImage,
     ) -> Result<Option<Cow<'a, [u8]>>> {
         match &image.source {
             FillImageSource::Inline { bytes, .. } => Ok(Some(Cow::Borrowed(bytes))),
@@ -318,7 +318,7 @@ impl crate::OpenDocumentPackage {
 }
 
 impl crate::FlatOpenDocument {
-    pub fn drawing_fill_images(&self) -> Result<DrawingFillImages> {
+    pub fn drawing_fill_images(&self) -> Result<FillImages> {
         parse_drawing_fill_images(self.xml())
     }
 }
@@ -355,9 +355,9 @@ struct FillBuilder {
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
-pub fn parse_drawing_fill_images(xml: &str) -> Result<DrawingFillImages> {
+pub fn parse_drawing_fill_images(xml: &str) -> Result<FillImages> {
     if !xml.contains("fill-image") {
-        return Ok(DrawingFillImages::default());
+        return Ok(FillImages::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing fill-image XML exceeds 64 MiB");
@@ -367,7 +367,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<DrawingFillImages> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<FillBuilder> = None;
-    let mut result = DrawingFillImages::default();
+    let mut result = FillImages::default();
     let mut aggregate = 0usize;
     let mut inline_total = 0usize;
 
@@ -556,7 +556,7 @@ fn parse_fill_start(
     })
 }
 
-fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<DrawingFillImage> {
+fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<FillImage> {
     let source = if builder.binary_present {
         let bytes = BASE64_STANDARD
             .decode(builder.encoded.as_bytes())
@@ -581,7 +581,7 @@ fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<Drawing
                 .ok_or_else(|| make_error("fill image requires xlink:href or binary data"))?,
         )
     };
-    let image = DrawingFillImage {
+    let image = FillImage {
         name: builder.name,
         display_name: builder.display_name,
         width: builder.width,
@@ -803,7 +803,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool, limit: usize) -> Re
     Ok(())
 }
 
-fn write_fill_image(output: &mut String, image: &DrawingFillImage, standalone: bool) {
+fn write_fill_image(output: &mut String, image: &FillImage, standalone: bool) {
     output.push_str("<draw:fill-image");
     if standalone {
         output.push_str(
@@ -965,7 +965,8 @@ mod tests {
 
     #[test]
     fn parses_local_linked_and_inline_resources() {
-        let linked_xml = include_str!("../../../test-data/odf/drawing/fill-image-linked.fodp");
+        let linked_xml =
+            include_str!("../../../../../test-data/odf/drawing/fill-image-linked.fodp");
         let linked = crate::FlatOpenDocument::from_bytes(linked_xml.as_bytes().to_vec()).unwrap();
         let images = linked.drawing_fill_images().unwrap();
         assert_eq!(
@@ -979,7 +980,8 @@ mod tests {
             FillImageLinkKind::InertExternal
         );
 
-        let inline_xml = include_str!("../../../test-data/odf/drawing/fill-image-inline.fodg");
+        let inline_xml =
+            include_str!("../../../../../test-data/odf/drawing/fill-image-inline.fodg");
         let inline = crate::FlatOpenDocument::from_bytes(inline_xml.as_bytes().to_vec()).unwrap();
         let images = inline.drawing_fill_images().unwrap();
         let bytes = images

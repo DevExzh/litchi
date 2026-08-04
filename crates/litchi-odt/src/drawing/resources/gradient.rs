@@ -455,13 +455,13 @@ pub struct SvgRadialGradient {
 
 /// One gradient resource in document order.
 #[derive(Clone, Debug, PartialEq)]
-pub enum DrawingGradient {
+pub enum Gradient {
     Legacy(LegacyGradient),
     Linear(SvgLinearGradient),
     Radial(SvgRadialGradient),
 }
 
-impl DrawingGradient {
+impl Gradient {
     pub fn name(&self) -> Option<&str> {
         match self {
             Self::Legacy(value) => value.name.as_deref(),
@@ -488,12 +488,12 @@ impl DrawingGradient {
 
 /// Ordered named gradients from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct DrawingGradients {
-    pub gradients: Vec<DrawingGradient>,
+pub struct Gradients {
+    pub gradients: Vec<Gradient>,
 }
 
-impl DrawingGradients {
-    pub fn get(&self, name: &str) -> Option<&DrawingGradient> {
+impl Gradients {
+    pub fn get(&self, name: &str) -> Option<&Gradient> {
         self.gradients
             .iter()
             .find(|value| value.name() == Some(name))
@@ -555,15 +555,15 @@ struct Frame {
 
 struct ActiveGradient {
     depth: usize,
-    value: DrawingGradient,
+    value: Gradient,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse legacy and SVG gradient resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_gradients(xml: &str) -> Result<DrawingGradients> {
+pub fn parse_drawing_gradients(xml: &str) -> Result<Gradients> {
     if !xml.contains("gradient") && !xml.contains("Gradient") {
-        return Ok(DrawingGradients::default());
+        return Ok(Gradients::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing gradient XML exceeds 64 MiB");
@@ -574,7 +574,7 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<DrawingGradients> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveGradient> = None;
-    let mut result = DrawingGradients::default();
+    let mut result = Gradients::default();
 
     loop {
         let (resolved, event) = reader
@@ -675,16 +675,16 @@ fn parse_gradient_start(
     namespace: NamespaceKind,
     local: &str,
     element: &BytesStart<'_>,
-) -> Result<Option<DrawingGradient>> {
+) -> Result<Option<Gradient>> {
     Ok(Some(match (namespace, local) {
         (NamespaceKind::Draw, "gradient") => {
-            DrawingGradient::Legacy(parse_legacy_gradient(reader, element)?)
+            Gradient::Legacy(parse_legacy_gradient(reader, element)?)
         },
         (NamespaceKind::Svg, "linearGradient") => {
-            DrawingGradient::Linear(parse_linear_gradient(reader, element)?)
+            Gradient::Linear(parse_linear_gradient(reader, element)?)
         },
         (NamespaceKind::Svg, "radialGradient") => {
-            DrawingGradient::Radial(parse_radial_gradient(reader, element)?)
+            Gradient::Radial(parse_radial_gradient(reader, element)?)
         },
         _ => return Ok(None),
     }))
@@ -817,10 +817,10 @@ fn add_stop(
     namespace: NamespaceKind,
     local: &str,
     element: &BytesStart<'_>,
-    gradient: &mut DrawingGradient,
+    gradient: &mut Gradient,
 ) -> Result<()> {
     match gradient {
-        DrawingGradient::Legacy(value)
+        Gradient::Legacy(value)
             if namespace == NamespaceKind::Loext && local == "gradient-stop" =>
         {
             if value.extension_stops.len() >= MAX_STOPS {
@@ -830,13 +830,13 @@ fn add_stop(
                 .extension_stops
                 .push(parse_loext_stop(reader, element)?);
         },
-        DrawingGradient::Linear(value) if namespace == NamespaceKind::Svg && local == "stop" => {
+        Gradient::Linear(value) if namespace == NamespaceKind::Svg && local == "stop" => {
             if value.common.stops.len() >= MAX_STOPS {
                 return invalid(format!("SVG gradient exceeds {MAX_STOPS} stops"));
             }
             value.common.stops.push(parse_svg_stop(reader, element)?);
         },
-        DrawingGradient::Radial(value) if namespace == NamespaceKind::Svg && local == "stop" => {
+        Gradient::Radial(value) if namespace == NamespaceKind::Svg && local == "stop" => {
             if value.common.stops.len() >= MAX_STOPS {
                 return invalid(format!("SVG gradient exceeds {MAX_STOPS} stops"));
             }
@@ -1011,11 +1011,11 @@ fn reject_spoofed_name(namespace: NamespaceKind, local: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_gradient(output: &mut String, gradient: &DrawingGradient, standalone: bool) {
+fn write_gradient(output: &mut String, gradient: &Gradient, standalone: bool) {
     match gradient {
-        DrawingGradient::Legacy(value) => write_legacy(output, value, standalone),
-        DrawingGradient::Linear(value) => write_linear(output, value, standalone),
-        DrawingGradient::Radial(value) => write_radial(output, value, standalone),
+        Gradient::Legacy(value) => write_legacy(output, value, standalone),
+        Gradient::Linear(value) => write_linear(output, value, standalone),
+        Gradient::Radial(value) => write_radial(output, value, standalone),
     }
 }
 
@@ -1266,7 +1266,7 @@ mod tests {
         let gradients = parse_drawing_gradients(&xml).unwrap();
         assert_eq!(gradients.gradients.len(), 3);
         assert_eq!(gradients.get("legacy").unwrap().name(), Some("legacy"));
-        let DrawingGradient::Legacy(legacy) = &gradients.gradients[0] else {
+        let Gradient::Legacy(legacy) = &gradients.gradients[0] else {
             panic!("expected legacy gradient");
         };
         assert_eq!(legacy.extension_stops.len(), 2);
@@ -1296,10 +1296,10 @@ mod tests {
 
     #[test]
     fn parses_local_multicolor_gradient_fixture() {
-        let xml = include_str!("../../../test-data/odf/drawing/multicolor-gradient.fodp");
+        let xml = include_str!("../../../../../test-data/odf/drawing/multicolor-gradient.fodp");
         let gradients = parse_drawing_gradients(xml).unwrap();
         assert!(gradients.gradients.len() >= 6);
-        let DrawingGradient::Legacy(first) = &gradients.gradients[0] else {
+        let Gradient::Legacy(first) = &gradients.gradients[0] else {
             panic!("local fixture should begin with a legacy gradient");
         };
         assert_eq!(first.extension_stops.len(), 2);

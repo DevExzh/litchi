@@ -161,7 +161,7 @@ pub struct OpacityStop {
 
 /// One `draw:opacity` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DrawingOpacity {
+pub struct Opacity {
     pub name: Option<String>,
     pub display_name: Option<String>,
     pub style: OpacityStyle,
@@ -174,7 +174,7 @@ pub struct DrawingOpacity {
     pub extension_stops: Vec<OpacityStop>,
 }
 
-impl DrawingOpacity {
+impl Opacity {
     pub fn validate(&self) -> Result<()> {
         if let Some(name) = &self.name {
             validate_text(name, "draw:name", false)?;
@@ -220,12 +220,12 @@ impl DrawingOpacity {
 
 /// Ordered opacity resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct DrawingOpacities {
-    pub opacities: Vec<DrawingOpacity>,
+pub struct Opacities {
+    pub opacities: Vec<Opacity>,
 }
 
-impl DrawingOpacities {
-    pub fn get(&self, name: &str) -> Option<&DrawingOpacity> {
+impl Opacities {
+    pub fn get(&self, name: &str) -> Option<&Opacity> {
         self.opacities
             .iter()
             .find(|opacity| opacity.name.as_deref() == Some(name))
@@ -280,14 +280,14 @@ impl DrawingOpacities {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn drawing_opacities(&self) -> Result<DrawingOpacities> {
+    pub fn drawing_opacities(&self) -> Result<Opacities> {
         let styles = self.styles_xml()?;
         parse_drawing_opacities(styles.as_deref().unwrap_or_default())
     }
 }
 
 impl crate::FlatOpenDocument {
-    pub fn drawing_opacities(&self) -> Result<DrawingOpacities> {
+    pub fn drawing_opacities(&self) -> Result<Opacities> {
         parse_drawing_opacities(self.xml())
     }
 }
@@ -310,14 +310,14 @@ struct Frame {
 
 struct ActiveOpacity {
     parent_depth: usize,
-    value: DrawingOpacity,
+    value: Opacity,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
-pub fn parse_drawing_opacities(xml: &str) -> Result<DrawingOpacities> {
+pub fn parse_drawing_opacities(xml: &str) -> Result<Opacities> {
     if !xml.contains("opacity") {
-        return Ok(DrawingOpacities::default());
+        return Ok(Opacities::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing opacity XML exceeds 64 MiB");
@@ -327,7 +327,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<DrawingOpacities> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveOpacity> = None;
-    let mut result = DrawingOpacities::default();
+    let mut result = Opacities::default();
     let mut aggregate = 0usize;
     let mut stop_count = 0usize;
 
@@ -432,7 +432,7 @@ fn parse_opacity(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<DrawingOpacity> {
+) -> Result<Opacity> {
     let mut values = attributes(reader, element, aggregate)?;
     let name = take(&mut values, NamespaceKind::Draw, "name");
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
@@ -451,7 +451,7 @@ fn parse_opacity(
         .transpose()?;
     let border = take_geometry_percent(&mut values, "border")?;
     reject_attributes(&values, "draw:opacity")?;
-    Ok(DrawingOpacity {
+    Ok(Opacity {
         name,
         display_name,
         style,
@@ -668,7 +668,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool) -> Result<()> {
     Ok(())
 }
 
-fn write_opacity(output: &mut String, opacity: &DrawingOpacity, standalone: bool) {
+fn write_opacity(output: &mut String, opacity: &Opacity, standalone: bool) {
     output.push_str("<draw:opacity");
     if standalone {
         output.push_str(
@@ -821,7 +821,7 @@ mod tests {
 
     #[test]
     fn parses_local_angles_and_extension_stops() {
-        let angles_xml = include_str!("../../../test-data/odf/drawing/opacity-angles.fodg");
+        let angles_xml = include_str!("../../../../../test-data/odf/drawing/opacity-angles.fodg");
         let angles = crate::FlatOpenDocument::from_bytes(angles_xml.as_bytes().to_vec()).unwrap();
         let values = angles.drawing_opacities().unwrap();
         assert_eq!(values.opacities.len(), 6);
@@ -838,7 +838,8 @@ mod tests {
             "1000grad"
         );
 
-        let stops_xml = include_str!("../../../test-data/odf/drawing/opacity-extension-stops.fodt");
+        let stops_xml =
+            include_str!("../../../../../test-data/odf/drawing/opacity-extension-stops.fodt");
         let stops = crate::FlatOpenDocument::from_bytes(stops_xml.as_bytes().to_vec()).unwrap();
         let values = stops.drawing_opacities().unwrap();
         let value = values.get("Transparency_20_1").unwrap();

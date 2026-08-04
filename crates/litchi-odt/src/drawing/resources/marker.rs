@@ -108,14 +108,14 @@ impl FromStr for MarkerPathData {
 
 /// One named `draw:marker` resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DrawingMarker {
+pub struct Marker {
     pub name: String,
     pub display_name: Option<String>,
     pub view_box: MarkerViewBox,
     pub path_data: MarkerPathData,
 }
 
-impl DrawingMarker {
+impl Marker {
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
@@ -134,12 +134,12 @@ impl DrawingMarker {
 
 /// Ordered marker resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct DrawingMarkers {
-    pub markers: Vec<DrawingMarker>,
+pub struct Markers {
+    pub markers: Vec<Marker>,
 }
 
-impl DrawingMarkers {
-    pub fn get(&self, name: &str) -> Option<&DrawingMarker> {
+impl Markers {
+    pub fn get(&self, name: &str) -> Option<&Marker> {
         self.markers.iter().find(|marker| marker.name == name)
     }
 
@@ -188,7 +188,7 @@ impl DrawingMarkers {
 
 impl crate::OpenDocumentPackage {
     /// Parse named marker resources from the package `styles.xml` part.
-    pub fn drawing_markers(&self) -> Result<DrawingMarkers> {
+    pub fn drawing_markers(&self) -> Result<Markers> {
         let styles = self.styles_xml()?;
         parse_drawing_markers(styles.as_deref().unwrap_or_default())
     }
@@ -196,7 +196,7 @@ impl crate::OpenDocumentPackage {
 
 impl crate::FlatOpenDocument {
     /// Parse named marker resources from this flat OpenDocument.
-    pub fn drawing_markers(&self) -> Result<DrawingMarkers> {
+    pub fn drawing_markers(&self) -> Result<Markers> {
         parse_drawing_markers(self.xml())
     }
 }
@@ -218,15 +218,15 @@ struct Frame {
 
 struct ActiveMarker {
     parent_depth: usize,
-    value: DrawingMarker,
+    value: Marker,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse marker resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_markers(xml: &str) -> Result<DrawingMarkers> {
+pub fn parse_drawing_markers(xml: &str) -> Result<Markers> {
     if !xml.contains("marker") {
-        return Ok(DrawingMarkers::default());
+        return Ok(Markers::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing marker XML exceeds 64 MiB");
@@ -237,7 +237,7 @@ pub fn parse_drawing_markers(xml: &str) -> Result<DrawingMarkers> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveMarker> = None;
-    let mut result = DrawingMarkers::default();
+    let mut result = Markers::default();
     let mut aggregate = 0usize;
 
     loop {
@@ -333,14 +333,14 @@ fn parse_marker(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<DrawingMarker> {
+) -> Result<Marker> {
     let mut values = attributes(reader, element, aggregate)?;
     let name = required(&mut values, NamespaceKind::Draw, "name", "draw:name")?;
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
     let view_box = required(&mut values, NamespaceKind::Svg, "viewBox", "svg:viewBox")?.parse()?;
     let path_data = MarkerPathData::new(required(&mut values, NamespaceKind::Svg, "d", "svg:d")?)?;
     reject_attributes(&values)?;
-    let marker = DrawingMarker {
+    let marker = Marker {
         name,
         display_name,
         view_box,
@@ -463,7 +463,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool, limit: usize) -> Re
     Ok(())
 }
 
-fn write_marker(output: &mut String, marker: &DrawingMarker, standalone: bool) {
+fn write_marker(output: &mut String, marker: &Marker, standalone: bool) {
     output.push_str("<draw:marker");
     if standalone {
         output.push_str(
@@ -569,7 +569,7 @@ mod tests {
 
     #[test]
     fn parses_local_flat_document_through_public_api() {
-        let xml = include_str!("../../../test-data/odf/drawing/marker-flat.fods");
+        let xml = include_str!("../../../../../test-data/odf/drawing/marker-flat.fods");
         let document = crate::FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         let markers = document.drawing_markers().unwrap();
         let marker = markers.get("Arrowheads_20_1").unwrap();

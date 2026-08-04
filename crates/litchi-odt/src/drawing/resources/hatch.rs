@@ -1,6 +1,6 @@
 //! Typed ODF drawing hatch resources.
 
-use crate::drawing_gradient::RgbColor;
+use crate::drawing::resources::gradient::RgbColor;
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -148,7 +148,7 @@ impl HatchRotation {
 
 /// One named `draw:hatch` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DrawingHatch {
+pub struct Hatch {
     pub name: String,
     pub display_name: Option<String>,
     pub style: HatchStyle,
@@ -157,7 +157,7 @@ pub struct DrawingHatch {
     pub rotation: Option<HatchRotation>,
 }
 
-impl DrawingHatch {
+impl Hatch {
     pub fn new(name: impl Into<String>, style: HatchStyle) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -197,12 +197,12 @@ impl DrawingHatch {
 
 /// Ordered hatch resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct DrawingHatches {
-    pub hatches: Vec<DrawingHatch>,
+pub struct Hatches {
+    pub hatches: Vec<Hatch>,
 }
 
-impl DrawingHatches {
-    pub fn get(&self, name: &str) -> Option<&DrawingHatch> {
+impl Hatches {
+    pub fn get(&self, name: &str) -> Option<&Hatch> {
         self.hatches.iter().find(|hatch| hatch.name == name)
     }
 
@@ -270,9 +270,9 @@ struct Frame {
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse named hatch resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_hatches(xml: &str) -> Result<DrawingHatches> {
+pub fn parse_drawing_hatches(xml: &str) -> Result<Hatches> {
     if !xml.contains("hatch") {
-        return Ok(DrawingHatches::default());
+        return Ok(Hatches::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing hatch XML exceeds 64 MiB");
@@ -282,7 +282,7 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<DrawingHatches> {
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
-    let mut result = DrawingHatches::default();
+    let mut result = Hatches::default();
 
     loop {
         let (resolved, event) = reader
@@ -333,7 +333,7 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<DrawingHatches> {
     Ok(result)
 }
 
-fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DrawingHatch> {
+fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Hatch> {
     let mut values = attributes(reader, element)?;
     let name = required(&mut values, "name", "draw:name")?;
     let display_name = take(&mut values, "display-name");
@@ -348,7 +348,7 @@ fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Dra
         .map(HatchRotation::new)
         .transpose()?;
     reject_attributes(&values)?;
-    let value = DrawingHatch {
+    let value = Hatch {
         name,
         display_name,
         style,
@@ -430,7 +430,7 @@ fn reject_spoofed_name(namespace: NamespaceKind, local: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_hatch(output: &mut String, hatch: &DrawingHatch, standalone: bool) {
+fn write_hatch(output: &mut String, hatch: &Hatch, standalone: bool) {
     output.push_str("<draw:hatch");
     if standalone {
         output.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#);
@@ -565,7 +565,7 @@ mod tests {
 
     #[test]
     fn parses_local_angle_fixture() {
-        let xml = include_str!("../../../test-data/odf/drawing/hatch-angles.fodg");
+        let xml = include_str!("../../../../../test-data/odf/drawing/hatch-angles.fodg");
         let hatches = parse_drawing_hatches(xml).unwrap();
         assert_eq!(hatches.hatches.len(), 4);
         assert_eq!(
