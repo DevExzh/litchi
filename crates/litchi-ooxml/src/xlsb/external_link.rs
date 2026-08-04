@@ -21,6 +21,7 @@ impl From<litchi_xlsb::external_link::Error> for XlsbError {
             litchi_xlsb::external_link::Error::Allocation { resource, source } => {
                 Self::Allocation { resource, source }
             },
+            error => Self::InvalidFormula(error.to_string()),
         }
     }
 }

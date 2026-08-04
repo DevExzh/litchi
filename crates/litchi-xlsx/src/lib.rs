@@ -39,6 +39,7 @@ pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
+pub mod slicer_cache;
 pub mod sort;
 pub mod style;
 pub mod timelines;
@@ -178,6 +179,12 @@ pub use sheet_view::{
     WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,
     WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
     WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
+};
+pub use slicer_cache::{
+    SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, SlicerCacheData,
+    SlicerCacheDataKind, SlicerCacheDefinition, SlicerCacheExtensionList, SlicerCachePivotTable,
+    WorkbookSlicerCache, parse_slicer_cache_definition, validate_slicer_cache_definition,
+    write_slicer_cache_definition,
 };
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};

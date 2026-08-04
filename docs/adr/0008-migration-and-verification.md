@@ -3908,6 +3908,47 @@ all-features Clippy remains environment-blocked before compilation because
 evidence; native Office and performance evidence remain governed by the
 evidence levels below.
 
+## XLSB conditional formatting and external links, XLSX slicer-cache follow-up
+
+The next disjoint owner batch moves three format-owned codec seams out of the
+migration host while retaining package traversal, relationship orchestration,
+and historical host paths as explicit adapters:
+
+- BIFF12 classic and Office 2013 conditional-formatting models, formula-bearing
+  thresholds, visualizations, extension GUIDs, validation, and bounded record
+  parsing/writing now live in `litchi-xlsb::conditional_formatting`. The host
+  retains worksheet/contextual formula resolution and worksheet/package record
+  orchestration.
+- BIFF12 External Link models, restricted external-name Ptgs, workbook/DDE/OLE
+  cached values, and bounded `BrtSupBook` stream parsing/writing now live in
+  `litchi-xlsb::external_link`. The host retains external-link OPC part and
+  relationship lifecycle operations. Links remain inert metadata: no external
+  workbook, DDE server, OLE object, refresh, or code path is opened or invoked.
+- SpreadsheetML slicer-cache definition XML now lives in
+  `litchi-xlsx::slicer_cache`. The owner retains bounded inert
+  `x14:slicerCacheDefinition` data, while the host retains workbook-extension
+  edits, internal/no-outbound-relationship checks, slicer cross-validation, and
+  atomic OPC graph mutations.
+
+The checked-in specification anchors are `[MS-XLSB]` §§2.2.6.2.1,
+2.4.23--2.4.24, 2.4.43--2.4.44, 2.4.91--2.4.92, 2.4.332--2.4.335,
+2.4.380--2.4.381, 2.4.399--2.4.400, 2.4.445--2.4.446, 2.5.19--2.5.20,
+2.5.98.7 for conditional formatting; and §§2.1.7.25, 2.2.7.4,
+2.2.7.4.2--2.2.7.4.3, 2.4.235, 2.4.588, 2.4.720--2.4.721, 2.4.811,
+2.5.34, 2.5.97, and 3.5 for External Links. Slicer-cache parts and their
+relationship/profile rules are pinned to `[MS-XLSX]` §§2.1.4, 2.2.4.8,
+2.3.2.1, 2.4.38, 2.4.60, 2.6.70--2.6.85, 2.6.97, and 2.6.103--2.6.104.
+
+The owner suites pass 101 listed XLSB tests and 364 XLSX unit tests; the
+complete `litchi-ooxml` package surface passes 1,543 host unit tests plus its
+integration and doctest targets. Owner all-feature all-target strict Clippy,
+host default all-target strict Clippy, formatting, diff, and the crate-boundary
+audit pass: 35 workspace packages, 107 internal dependency declarations, and
+the same 13 explicitly scheduled debt edges remain. Host all-features Clippy
+remains environment-blocked before compilation because `pkg-config`/fontconfig
+is unavailable. This is functional and boundary evidence; native Office and
+performance evidence remain governed by the evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

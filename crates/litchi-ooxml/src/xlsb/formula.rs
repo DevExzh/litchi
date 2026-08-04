@@ -174,7 +174,7 @@ impl CellParsedFormula {
         }
     }
 
-    fn into_owner(self) -> litchi_xlsb::formula::CellParsedFormula {
+    pub(crate) fn into_owner(self) -> litchi_xlsb::formula::CellParsedFormula {
         litchi_xlsb::formula::CellParsedFormula {
             rgce: self.rgce,
             rgcb: self.rgcb,
@@ -1002,6 +1002,66 @@ impl FormulaResolutionContext {
             format_formula_prefix(&format!("[{}]", book.metadata.source())),
             name.name()
         ))
+    }
+}
+
+fn owner_formula_resolution<T>(result: XlsbResult<T>) -> litchi_xlsb::formula::Result<T> {
+    result.map_err(|error| match error {
+        XlsbError::InvalidFormula(message) => litchi_xlsb::formula::Error::InvalidFormula(message),
+        XlsbError::InvalidCellReference(reference) => {
+            litchi_xlsb::formula::Error::InvalidCellReference(reference)
+        },
+        XlsbError::InvalidLength { expected, found } => {
+            litchi_xlsb::formula::Error::InvalidLength { expected, found }
+        },
+        XlsbError::UnsupportedFeature(feature) => {
+            litchi_xlsb::formula::Error::UnsupportedFeature(feature)
+        },
+        XlsbError::Encoding(message) => litchi_xlsb::formula::Error::Encoding(message),
+        error => litchi_xlsb::formula::Error::InvalidFormula(error.to_string()),
+    })
+}
+
+impl litchi_xlsb::formula::FormulaResolution for FormulaResolutionContext {
+    fn sheet_prefix(&self, index: u16) -> litchi_xlsb::formula::Result<String> {
+        owner_formula_resolution(self.resolve_sheet_prefix(index))
+    }
+
+    fn defined_name(&self, index: u32) -> litchi_xlsb::formula::Result<String> {
+        let index = usize::try_from(index)
+            .ok()
+            .and_then(|index| index.checked_sub(1))
+            .ok_or_else(|| {
+                litchi_xlsb::formula::Error::InvalidFormula(
+                    "PtgName index is one-based and cannot be zero".to_string(),
+                )
+            })?;
+        self.defined_names.get(index).cloned().ok_or_else(|| {
+            litchi_xlsb::formula::Error::InvalidFormula(format!(
+                "PtgName index {} exceeds {} workbook names",
+                index + 1,
+                self.defined_names.len()
+            ))
+        })
+    }
+
+    fn external_name(
+        &self,
+        sheet_index: u16,
+        name_index: u32,
+    ) -> litchi_xlsb::formula::Result<String> {
+        owner_formula_resolution(self.resolve_external_name(sheet_index, name_index))
+    }
+
+    fn table_reference(
+        &self,
+        reference: &litchi_xlsb::formula::FormulaTableReference,
+    ) -> litchi_xlsb::formula::Result<String> {
+        owner_formula_resolution(self.resolve_table_reference(reference))
+    }
+
+    fn pivot_name(&self, index: u32) -> litchi_xlsb::formula::Result<String> {
+        owner_formula_resolution(self.resolve_pivot_name(index))
     }
 }
 

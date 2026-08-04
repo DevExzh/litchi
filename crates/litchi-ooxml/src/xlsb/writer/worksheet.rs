@@ -478,7 +478,7 @@ impl MutableXlsbWorksheet {
                     location,
                 )
                 .expect("conditional value collected from worksheet")
-                .formula_binary = Some(formula);
+                .formula_binary = Some(formula.into_owner());
                 (formatting_index, rule_index, location)
             })
             .collect();

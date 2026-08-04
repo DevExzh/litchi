@@ -3,79 +3,6 @@
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{CellParsedFormula, MAX_CELL_FORMULA_BYTES};
 
-pub(crate) type FrtRange = (u32, u32, u32, u32);
-
-/// Parse the sqref-only FRTHeader used by `BrtBeginConditionalFormatting14`.
-pub(crate) fn parse_sqref_header(
-    data: &[u8],
-    record: &'static str,
-    maximum_ranges: usize,
-) -> XlsbResult<(Vec<FrtRange>, usize)> {
-    let mut cursor = FrtCursor::new(data, record);
-    if cursor.read_u32()? != 0x02 {
-        return Err(invalid(record, "FRTHeader is not sqref-only"));
-    }
-    if cursor.read_u32()? != 1 {
-        return Err(invalid(record, "FRTSqrefs count is not 1"));
-    }
-    let sqref_flags = cursor.read_u32()?;
-    if sqref_flags & 0x02 == 0 || sqref_flags & !0x0001_000f != 0 {
-        return Err(invalid(
-            record,
-            format!("invalid FRTSqref flags 0x{sqref_flags:08X}"),
-        ));
-    }
-    let count = usize::try_from(cursor.read_u32()? as i32)
-        .map_err(|_| invalid(record, "NULL range collection"))?;
-    if count == 0 || count > maximum_ranges || count > cursor.remaining() / 16 {
-        return Err(invalid(record, format!("invalid range count {count}")));
-    }
-    let mut ranges = Vec::with_capacity(count);
-    for _ in 0..count {
-        let row_first = cursor.read_u32()?;
-        let row_last = cursor.read_u32()?;
-        let col_first = cursor.read_u32()?;
-        let col_last = cursor.read_u32()?;
-        if row_first > row_last
-            || row_last >= 1_048_576
-            || col_first > col_last
-            || col_last >= 16_384
-        {
-            return Err(invalid(record, "invalid FRT target range"));
-        }
-        ranges.push((row_first, row_last, col_first, col_last));
-    }
-    Ok((ranges, cursor.offset))
-}
-
-/// Serialize the sqref-only FRTHeader used by conditional formatting 14.
-pub(crate) fn serialize_sqref_header(ranges: &[FrtRange]) -> XlsbResult<Vec<u8>> {
-    if ranges.is_empty() || ranges.len() > i32::MAX as usize {
-        return Err(invalid(
-            "FRTHeader",
-            format!("invalid range count {}", ranges.len()),
-        ));
-    }
-    let mut data = Vec::with_capacity(16 + ranges.len() * 16);
-    data.extend_from_slice(&2u32.to_le_bytes());
-    data.extend_from_slice(&1u32.to_le_bytes());
-    data.extend_from_slice(&2u32.to_le_bytes());
-    data.extend_from_slice(&(ranges.len() as u32).to_le_bytes());
-    for &(row_first, row_last, col_first, col_last) in ranges {
-        if row_first > row_last
-            || row_last >= 1_048_576
-            || col_first > col_last
-            || col_last >= 16_384
-        {
-            return Err(invalid("FRTHeader", "invalid FRT target range"));
-        }
-        for value in [row_first, row_last, col_first, col_last] {
-            data.extend_from_slice(&value.to_le_bytes());
-        }
-    }
-    Ok(data)
-}
-
 /// Parse an FRTHeader whose only optional field is `rgFormulas`.
 ///
 /// Returns the formulas and the number of consumed bytes so the containing
@@ -202,10 +129,6 @@ impl<'a> FrtCursor<'a> {
         ))
     }
 
-    fn remaining(&self) -> usize {
-        self.data.len().saturating_sub(self.offset)
-    }
-
     fn read_formula(&mut self) -> XlsbResult<CellParsedFormula> {
         let flags = self.read_u32()?;
         if flags != 2 {
@@ -276,22 +199,5 @@ mod tests {
         ]
         .concat();
         assert!(parse_formula_header(&truncated, "test", 2).is_err());
-    }
-
-    #[test]
-    fn sqref_header_roundtrips_more_than_classic_range_limit() {
-        let ranges = vec![(0, 0, 0, 0); 8_193];
-        let data = serialize_sqref_header(&ranges).unwrap();
-        let (parsed, consumed) = parse_sqref_header(&data, "test", 10_000).unwrap();
-        assert_eq!(consumed, data.len());
-        assert_eq!(parsed, ranges);
-    }
-
-    #[test]
-    fn sqref_header_rejects_reserved_flags_and_invalid_bounds() {
-        let mut data = serialize_sqref_header(&[(0, 0, 0, 0)]).unwrap();
-        data[8..12].copy_from_slice(&0x12u32.to_le_bytes());
-        assert!(parse_sqref_header(&data, "test", 10).is_err());
-        assert!(serialize_sqref_header(&[(0, 1_048_576, 0, 0)]).is_err());
     }
 }

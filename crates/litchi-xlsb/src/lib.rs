@@ -8,7 +8,9 @@
 #![forbid(unsafe_code)]
 
 pub mod calc;
+pub mod conditional_formatting;
 pub mod date_utils;
+pub mod external_link;
 pub mod formula;
 pub mod hyperlinks;
 pub mod merged_cells;
