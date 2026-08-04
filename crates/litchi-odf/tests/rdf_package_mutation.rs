@@ -1,6 +1,6 @@
 use litchi_odf::{
-    Document, OdfRdfObject, OdfRdfSubject, OdfRdfTriple, OwnedPackage, PackageWriter, Presentation,
-    Spreadsheet, constants,
+    Document, Object, OwnedPackage, PackageWriter, Presentation, Spreadsheet, Subject, Triple,
+    constants,
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -44,11 +44,11 @@ fn package(mimetype: &str, family: &str, rdf: &[(&str, &[u8])], signed: bool) ->
     writer.finish_to_bytes().unwrap()
 }
 
-fn literal(subject: &str, predicate: &str, value: &str) -> OdfRdfTriple {
-    OdfRdfTriple {
-        subject: OdfRdfSubject::Iri(subject.to_string()),
+fn literal(subject: &str, predicate: &str, value: &str) -> Triple {
+    Triple {
+        subject: Subject::Iri(subject.to_string()),
         predicate: predicate.to_string(),
-        object: OdfRdfObject::Literal {
+        object: Object::Literal {
             value: value.to_string(),
             datatype: None,
             language: Some("en".to_string()),
@@ -61,10 +61,10 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
     let mut document =
         Document::from_bytes(package(constants::ODF_TEXT, "text", &[], true)).unwrap();
     let first = literal("#anchor", "https://example.invalid/schema#label", "first");
-    let second = OdfRdfTriple {
-        subject: OdfRdfSubject::Iri("#anchor".to_string()),
+    let second = Triple {
+        subject: Subject::Iri("#anchor".to_string()),
         predicate: "https://example.invalid/schema#related".to_string(),
-        object: OdfRdfObject::Iri("https://example.invalid/resource".to_string()),
+        object: Object::Iri("https://example.invalid/resource".to_string()),
     };
     let path = document
         .add_rdf_graph(None, &[first.clone(), second.clone()])
@@ -85,7 +85,7 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
     assert_eq!(document.add_rdf_triple(&path, &third).unwrap(), 2);
     document.move_rdf_triple(&path, 2, 0).unwrap();
     assert!(
-        matches!(&document.rdf_graphs().unwrap()[0].triples[0].object, OdfRdfObject::Literal { value, .. } if value == "third")
+        matches!(&document.rdf_graphs().unwrap()[0].triples[0].object, Object::Literal { value, .. } if value == "third")
     );
     let replacement = literal("#anchor", "https://example.invalid/schema#label", "changed");
     document.replace_rdf_triple(&path, 0, &replacement).unwrap();
@@ -106,10 +106,10 @@ fn shared_graph_references_block_dangling_removal() {
     let target = document
         .add_rdf_graph(Some("Metadata/target.rdf"), &[])
         .unwrap();
-    let reference = OdfRdfTriple {
-        subject: OdfRdfSubject::Iri(String::new()),
+    let reference = Triple {
+        subject: Subject::Iri(String::new()),
         predicate: "http://docs.oasis-open.org/ns/office/1.2/meta/pkg#hasPart".to_string(),
-        object: OdfRdfObject::Iri(target.clone()),
+        object: Object::Iri(target.clone()),
     };
     let owner = document
         .add_rdf_graph(Some("manifest.rdf"), &[reference])
@@ -158,10 +158,10 @@ fn libreoffice_rdf_and_malformed_xml_discovery() {
 
 #[test]
 fn ods_and_odp_facades_roundtrip_blank_nodes_and_datatypes() {
-    let triple = OdfRdfTriple {
-        subject: OdfRdfSubject::BlankNode("node_1".to_string()),
+    let triple = Triple {
+        subject: Subject::BlankNode("node_1".to_string()),
         predicate: "https://example.invalid/schema#count".to_string(),
-        object: OdfRdfObject::Literal {
+        object: Object::Literal {
             value: "42".to_string(),
             datatype: Some("http://www.w3.org/2001/XMLSchema#integer".to_string()),
             language: None,

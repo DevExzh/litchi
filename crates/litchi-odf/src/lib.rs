@@ -375,7 +375,7 @@ mod master_page;
 mod media;
 mod notes_configuration;
 mod ods_definition_package;
-mod rdf_package;
+mod rdf;
 mod ruby_family;
 mod settings;
 mod signature_crypto;
@@ -642,7 +642,7 @@ pub use paragraph_writing_mode::{
     ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
     set_paragraph_style_writing_mode_xml,
 };
-pub use rdf_package::{OdfRdfGraph, OdfRdfObject, OdfRdfSubject, OdfRdfTriple};
+pub use rdf::{Graph, Object, Subject, Triple};
 pub use ruby_family::{
     RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
     RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,

@@ -185,29 +185,29 @@ impl Presentation {
         crate::form::parse_form_parts(&parts)
     }
 
-    pub fn rdf_graphs(&self) -> Result<Vec<crate::OdfRdfGraph>> {
-        crate::rdf_package::graphs(&self.package)
+    pub fn rdf_graphs(&self) -> Result<Vec<crate::Graph>> {
+        crate::rdf::graphs(&self.package)
     }
     pub fn add_rdf_graph(
         &mut self,
         preferred_path: Option<&str>,
-        triples: &[crate::OdfRdfTriple],
+        triples: &[crate::Triple],
     ) -> Result<String> {
-        let (bytes, path) = crate::rdf_package::add_graph(&self.package, preferred_path, triples)?;
+        let (bytes, path) = crate::rdf::add_graph(&self.package, preferred_path, triples)?;
         *self = Self::from_bytes(bytes)?;
         Ok(path)
     }
-    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::OdfRdfTriple]) -> Result<()> {
-        let bytes = crate::rdf_package::replace_graph(&self.package, path, triples)?;
+    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::Triple]) -> Result<()> {
+        let bytes = crate::rdf::replace_graph(&self.package, path, triples)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
     pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
-        let bytes = crate::rdf_package::remove_graph(&self.package, path)?;
+        let bytes = crate::rdf::remove_graph(&self.package, path)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
-    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::OdfRdfTriple) -> Result<usize> {
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::Triple) -> Result<usize> {
         let index = self
             .rdf_graphs()?
             .into_iter()
@@ -215,7 +215,7 @@ impl Presentation {
             .ok_or_else(|| Error::InvalidFormat(format!("RDF graph '{path}' was not found")))?
             .triples
             .len();
-        let (bytes, _) = crate::rdf_package::add_triple(&self.package, path, triple)?;
+        let (bytes, _) = crate::rdf::add_triple(&self.package, path, triple)?;
         *self = Self::from_bytes(bytes)?;
         Ok(index)
     }
@@ -223,19 +223,19 @@ impl Presentation {
         &mut self,
         path: &str,
         index: usize,
-        triple: &crate::OdfRdfTriple,
+        triple: &crate::Triple,
     ) -> Result<()> {
-        let bytes = crate::rdf_package::replace_triple(&self.package, path, index, triple)?;
+        let bytes = crate::rdf::replace_triple(&self.package, path, index, triple)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
-        let bytes = crate::rdf_package::remove_triple(&self.package, path, index)?;
+        let bytes = crate::rdf::remove_triple(&self.package, path, index)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::rdf_package::move_triple(&self.package, path, from, to)?;
+        let bytes = crate::rdf::move_triple(&self.package, path, from, to)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
