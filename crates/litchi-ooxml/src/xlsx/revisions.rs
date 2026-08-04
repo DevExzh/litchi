@@ -5,6 +5,7 @@
 
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_ooxml_common::custom_xml::valid_guid as is_valid_guid;
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
@@ -281,7 +282,7 @@ pub fn parse_revision_users(xml: &[u8]) -> Result<RevisionUsers> {
                 .into(),
             extension_elements: node.children.iter().map(to_public).collect::<Result<_>>()?,
         };
-        valid_guid(&user.guid)?;
+        validate_guid(&user.guid)?;
         valid_date(&user.date_time)?;
         bounded(&user.name)?;
         if !ids.insert(user.id) || !guids.insert(user.guid.clone()) {
@@ -329,9 +330,9 @@ pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
             (RevisionAttributeNamespace::Unqualified, "version"),
         ],
     )?;
-    valid_guid(&properties.guid)?;
+    validate_guid(&properties.guid)?;
     if let Some(v) = &properties.last_guid {
-        valid_guid(v)?;
+        validate_guid(v)?;
     }
     if root.children.len() > MAX_HEADERS {
         return Err(limit("revision headers"));
@@ -403,7 +404,7 @@ pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
                 .map(to_public)
                 .collect::<Result<_>>()?,
         };
-        valid_guid(&header.guid)?;
+        validate_guid(&header.guid)?;
         valid_date(&header.date_time)?;
         bounded(&header.user_name)?;
         if header.relationship_id.is_empty() {
@@ -782,7 +783,7 @@ fn validate_users(v: &RevisionUsers) -> Result<()> {
     }
     let (mut ids, mut guids) = (HashSet::new(), HashSet::new());
     for u in &v.users {
-        valid_guid(&u.guid)?;
+        validate_guid(&u.guid)?;
         valid_date(&u.date_time)?;
         bounded(&u.name)?;
         if !ids.insert(u.id) || !guids.insert(&u.guid) {
@@ -795,16 +796,16 @@ fn validate_users(v: &RevisionUsers) -> Result<()> {
     Ok(())
 }
 fn validate_headers(v: &RevisionHeaders) -> Result<()> {
-    valid_guid(&v.properties.guid)?;
+    validate_guid(&v.properties.guid)?;
     if let Some(g) = &v.properties.last_guid {
-        valid_guid(g)?;
+        validate_guid(g)?;
     }
     if v.headers.len() > MAX_HEADERS {
         return Err(limit("revision headers"));
     }
     let (mut gs, mut rs) = (HashSet::new(), HashSet::new());
     for h in &v.headers {
-        valid_guid(&h.guid)?;
+        validate_guid(&h.guid)?;
         valid_date(&h.date_time)?;
         bounded(&h.user_name)?;
         if h.relationship_id.is_empty() || !gs.insert(&h.guid) || !rs.insert(&h.relationship_id) {
@@ -1280,18 +1281,9 @@ fn take_u32(
         Ok(None)
     }
 }
-fn valid_guid(v: &str) -> Result<()> {
-    let b = v.as_bytes();
-    if b.len() != 38
-        || b[0] != b'{'
-        || b[37] != b'}'
-        || [9, 14, 19, 24].iter().any(|i| b[*i] != b'-')
-        || b[1..37]
-            .iter()
-            .enumerate()
-            .any(|(i, c)| ![8, 13, 18, 23].contains(&i) && !c.is_ascii_hexdigit())
-    {
-        Err(invalid(format!("invalid GUID '{v}'")))
+fn validate_guid(value: &str) -> Result<()> {
+    if !is_valid_guid(value) {
+        Err(invalid(format!("invalid GUID '{value}'")))
     } else {
         Ok(())
     }

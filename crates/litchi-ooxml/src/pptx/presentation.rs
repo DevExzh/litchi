@@ -774,10 +774,8 @@ impl<'a> Presentation<'a> {
     ///
     /// Author and comment XML remain inert document data. This accessor never
     /// resolves identities or executes embedded payloads.
-    pub fn modern_comments(
-        &self,
-    ) -> Result<crate::pptx::modern_comment_authors::ModernCommentGraph> {
-        crate::pptx::modern_comment_authors::load_modern_comment_graph(self.package)
+    pub fn modern_comments(&self) -> Result<crate::pptx::modern_comments::ModernCommentGraph> {
+        crate::pptx::modern_comments::load_modern_comment_graph(self.package)
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 

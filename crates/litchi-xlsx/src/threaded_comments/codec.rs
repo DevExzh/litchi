@@ -15,6 +15,7 @@ use super::model::{Comment, Comments, Graph, Mention, People, Person};
 use super::{
     MAX_COMMENTS, MAX_IDENTITY_BYTES, MAX_MENTIONS, MAX_PART_BYTES, MAX_PERSONS, MAX_TEXT_UTF16,
 };
+use litchi_ooxml_common::custom_xml::valid_guid;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
 const THREADED_COMMENTS_NAMESPACE: &[u8] =
@@ -562,16 +563,7 @@ fn optional_guid(
 }
 
 pub fn validate_guid(value: &str, description: &str) -> SheetResult<()> {
-    let bytes = value.as_bytes();
-    let valid = bytes.len() == 38
-        && bytes[0] == b'{'
-        && bytes[37] == b'}'
-        && [9, 14, 19, 24].iter().all(|&index| bytes[index] == b'-')
-        && bytes[1..37]
-            .iter()
-            .enumerate()
-            .all(|(index, byte)| matches!(index + 1, 9 | 14 | 19 | 24) || byte.is_ascii_hexdigit());
-    if !valid {
+    if !valid_guid(value) {
         return Err(format!("invalid {description} GUID '{value}'").into());
     }
     Ok(())

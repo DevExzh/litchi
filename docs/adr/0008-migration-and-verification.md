@@ -4110,6 +4110,47 @@ all-features tests/Clippy and the full workspace test remain blocked before
 compilation because `pkg-config`/fontconfig is unavailable. No native Office
 or performance claim is made for this batch.
 
+## PPTX modern comments, DOCX modern comments, and XLSB conditional-formatting owner follow-up
+
+This batch applies the layered owner and concise-name rule to the three
+format-specific seams highlighted by the public API audit:
+
+- `litchi-pptx::modern_comments` is now the single owner folder for comments
+  and authors, split into `model.rs`, `codec.rs`, and `package.rs`. The former
+  `modern_comment_authors` module remains only as a compatibility re-export;
+  `ModernComment*` values are aliases of concise `Comment`, `Author`, `Part`,
+  `Graph`, and related models.
+- `litchi-docx::modern_comments` is split into `model.rs`, `codec.rs`, and
+  `package.rs`. `Conformance`, `Comment`, `Reaction`, `Metadata`, `Person`,
+  and related concise models are canonical; historical `ModernComment*` and
+  `CommentReaction*` spellings remain aliases.
+- `litchi-xlsb::conditional_formatting` is split into `model.rs` and
+  `codec.rs`. `Formatting`, `Rule`, `RuleType`, `Value`, `Color`, `Bar`, and
+  related names are canonical; the host's historical conditional-formatting
+  vocabulary remains aliases with no duplicate definitions.
+
+The shared OOXML `ST_Guid` lexical validator already owned by
+`litchi-ooxml-common::custom_xml` is now reused by PPTX modern comments, XLSX
+threaded comments, XLSX data validation, and OOXML revision parts. No
+format-specific XML DOM or binary-record codec was forced into a common crate;
+the OLE/IWA grammars remain separate until a format-neutral seam is proven.
+
+Checked-in specification anchors are `[MS-PPTX]` §§2.1.5--2.1.6, 2.2.10,
+2.4.3.2, 2.4.3.6, 2.16.1.1--2.16.1.3, 2.16.3.3--2.16.3.8, and
+2.16.4.3--2.16.4.4; `[MS-DOCX]` §§2.1.2--2.1.5, 2.5, 2.8, and 2.10 plus
+`[MS-OREACTXML]` §2.1; and `[MS-XLSB]` §§2.3 and 2.4.23--2.4.36,
+2.4.332--2.4.335, and 2.4.380--2.4.393.
+
+Focused owner all-target tests pass: 254 DOCX, 196 PPTX, 91 XLSB, and 395
+XLSX library tests, with their integration/doctest targets passing. The
+no-default-features `litchi-ooxml` suite passes 1,499 host library tests and
+all targets; strict owner and host Clippy, formatting, diff, and the crate
+boundary audit pass. The audit remains at 35 workspace packages, 107 internal
+dependency declarations, and 13 scheduled debt edges. The full workspace
+test remains blocked before project compilation because `pkg-config` is not
+available for `yeslogic-fontconfig-sys`/fontconfig. No native Office or
+performance claim is made for this batch.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

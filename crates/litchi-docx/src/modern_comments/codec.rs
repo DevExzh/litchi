@@ -1,110 +1,21 @@
-//! Typed metadata for modern Word comment threads.
-//!
-//! The four metadata parts supplement, but do not replace, ISO/IEC 29500
-//! `comments.xml`. No presence service, identity provider, or external content
-//! is contacted by this module.
+//! Bounded XML, MCE, and reaction codec for modern Word comments.
 
+use super::model::{
+    COMMENTS_EXTENSIBLE_NAMESPACE, COMMENTS_IDS_NAMESPACE, Comment, Conformance, Extended,
+    Extension, ExtensionList, IdMapping, MAX_MODERN_COMMENT_DEPTH, MAX_MODERN_COMMENT_ITEMS,
+    MAX_MODERN_COMMENT_PART_BYTES, MAX_MODERN_COMMENT_STRING_BYTES, Metadata,
+    OFFICE_EXTENSION_LIST_NAMESPACE, Person, Presence, REACTIONS_NAMESPACE, Reaction, ReactionInfo,
+    ReactionUser, WORD_2012_NAMESPACE, WORD_2018_NAMESPACE,
+};
 use crate::{Error, Result};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
-use litchi_opc::part::XmlPart;
-use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, Writer, XmlVersion};
 use std::collections::{HashMap, HashSet};
 
-pub const WORD_2012_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
-pub const COMMENTS_IDS_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2016/wordml/cid";
-pub const COMMENTS_EXTENSIBLE_NAMESPACE: &str =
-    "http://schemas.microsoft.com/office/word/2018/wordml/cex";
-pub const WORD_2018_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2018/wordml";
-pub const REACTIONS_NAMESPACE: &str = "http://schemas.microsoft.com/office/comments/2020/reactions";
-pub const OFFICE_EXTENSION_LIST_NAMESPACE: &str = "http://schemas.microsoft.com/office/2019/extlst";
-pub const TRANSITIONAL_WORD_NAMESPACE: &str =
-    "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-pub const STRICT_WORD_NAMESPACE: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+pub(super) const REACTIONS_EXTENSION_URI: &str = "{CE6994B0-6A32-4C9F-8C6B-6E91EDA988CE}";
 
-pub const COMMENTS_EXTENDED_RELATIONSHIP: &str =
-    "http://schemas.microsoft.com/office/2011/relationships/commentsExtended";
-pub const COMMENTS_IDS_RELATIONSHIP: &str =
-    "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds";
-pub const COMMENTS_EXTENSIBLE_RELATIONSHIP: &str =
-    "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible";
-pub const PEOPLE_RELATIONSHIP: &str =
-    "http://schemas.microsoft.com/office/2011/relationships/people";
-
-pub const COMMENTS_EXTENDED_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml";
-pub const COMMENTS_IDS_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml";
-pub const COMMENTS_EXTENSIBLE_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml";
-pub const PEOPLE_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml";
-
-const REACTIONS_EXTENSION_URI: &str = "{CE6994B0-6A32-4C9F-8C6B-6E91EDA988CE}";
-pub const MAX_MODERN_COMMENT_PART_BYTES: usize = 4 * 1024 * 1024;
-pub const MAX_MODERN_COMMENT_DEPTH: usize = 128;
-pub const MAX_MODERN_COMMENT_ITEMS: usize = 65_536;
-pub const MAX_MODERN_COMMENT_STRING_BYTES: usize = 8 * 1024 * 1024;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ModernCommentConformance {
-    Transitional,
-    Strict,
-}
-
-impl ModernCommentConformance {
-    fn word_namespace(self) -> &'static str {
-        match self {
-            Self::Transitional => TRANSITIONAL_WORD_NAMESPACE,
-            Self::Strict => STRICT_WORD_NAMESPACE,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommentExtension {
-    pub paragraph_id: u32,
-    pub parent_paragraph_id: Option<u32>,
-    pub done: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommentIdMapping {
-    pub paragraph_id: u32,
-    pub durable_id: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommentReactionUser {
-    pub user_id: String,
-    pub user_name: String,
-    pub user_provider: String,
-    pub extensions: Option<ModernCommentExtensionList>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommentReactionInfo {
-    pub date_utc: Option<String>,
-    pub user: Option<CommentReactionUser>,
-    pub extensions: Option<ModernCommentExtensionList>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommentReaction {
-    pub reaction_type: u32,
-    pub reactions: Vec<CommentReactionInfo>,
-    pub extensions: Option<ModernCommentExtensionList>,
-}
-
-/// One inert MS-OEXTXML extension with exactly one lax child element.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ModernCommentExtension {
-    uri: Option<String>,
-    child_xml: String,
-}
-
-impl ModernCommentExtension {
+impl Extension {
     pub fn new(uri: Option<String>, child_xml: impl Into<String>) -> Result<Self> {
         let uri = uri.map(|value| normalize_xsd_token(&value));
         let child_xml = canonical_extension_child(&child_xml.into())?;
@@ -129,25 +40,19 @@ impl ModernCommentExtension {
     }
 }
 
-/// Bounded ordered MS-OEXTXML extension list.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ModernCommentExtensionList {
-    extensions: Vec<ModernCommentExtension>,
-}
-
-impl ModernCommentExtensionList {
-    pub fn new(extensions: Vec<ModernCommentExtension>) -> Result<Self> {
+impl ExtensionList {
+    pub fn new(extensions: Vec<Extension>) -> Result<Self> {
         enforce_count("modern comment extension", extensions.len())?;
         let list = Self { extensions };
         validate_extension_list(&list)?;
         Ok(list)
     }
 
-    pub fn extensions(&self) -> &[ModernCommentExtension] {
+    pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
 
-    pub fn push(&mut self, extension: ModernCommentExtension) -> Result<()> {
+    pub fn push(&mut self, extension: Extension) -> Result<()> {
         enforce_count(
             "modern comment extension",
             self.extensions.len().saturating_add(1),
@@ -156,48 +61,12 @@ impl ModernCommentExtensionList {
         Ok(())
     }
 
-    pub fn remove(&mut self, index: usize) -> Option<ModernCommentExtension> {
+    pub fn remove(&mut self, index: usize) -> Option<Extension> {
         (index < self.extensions.len()).then(|| self.extensions.remove(index))
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtensibleComment {
-    pub durable_id: u32,
-    pub date_utc: Option<String>,
-    pub intelligent_placeholder: Option<bool>,
-    pub reactions: Vec<CommentReaction>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresenceInfo {
-    pub provider_id: String,
-    pub user_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Person {
-    pub author: String,
-    pub presence: Option<PresenceInfo>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ModernCommentMetadata {
-    pub comments_extended: Option<Vec<CommentExtension>>,
-    pub comments_ids: Option<Vec<CommentIdMapping>>,
-    pub comments_extensible: Option<Vec<ExtensibleComment>>,
-    pub people: Option<Vec<Person>>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ModernCommentRelationshipIds {
-    pub comments_extended: Option<String>,
-    pub comments_ids: Option<String>,
-    pub comments_extensible: Option<String>,
-    pub people: Option<String>,
-}
-
-pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<CommentExtension>> {
+pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<Extended>> {
     let document = parse_document(xml)?;
     let root = document.root()?;
     require_name(root, WORD_2012_NAMESPACE, "commentsEx")?;
@@ -223,7 +92,7 @@ pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<CommentExtension>> {
                 format_hex(paragraph_id)
             ));
         }
-        items.push(CommentExtension {
+        items.push(Extended {
             paragraph_id,
             parent_paragraph_id: optional_hex(child, WORD_2012_NAMESPACE, "paraIdParent")?,
             done: optional_on_off(child, WORD_2012_NAMESPACE, "done")?.unwrap_or(false),
@@ -232,7 +101,7 @@ pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<CommentExtension>> {
     Ok(items)
 }
 
-pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<CommentIdMapping>> {
+pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<IdMapping>> {
     let document = parse_document(xml)?;
     let root = document.root()?;
     require_name(root, COMMENTS_IDS_NAMESPACE, "commentsIds")?;
@@ -257,7 +126,7 @@ pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<CommentIdMapping>> {
         if !paragraph_ids.insert(paragraph_id) || !durable_ids.insert(durable_id) {
             return invalid("commentsIds contains duplicate paragraph or durable ID".into());
         }
-        items.push(CommentIdMapping {
+        items.push(IdMapping {
             paragraph_id,
             durable_id,
         });
@@ -265,7 +134,7 @@ pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<CommentIdMapping>> {
     Ok(items)
 }
 
-pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<ExtensibleComment>> {
+pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<Comment>> {
     let document = parse_document(xml)?;
     let root = document.root()?;
     require_name(root, COMMENTS_EXTENSIBLE_NAMESPACE, "commentsExtensible")?;
@@ -306,7 +175,7 @@ pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<ExtensibleComment>> {
             validate_utc(date)?;
         }
         let reactions = parse_comment_extensions(child)?;
-        comments.push(ExtensibleComment {
+        comments.push(Comment {
             durable_id,
             date_utc,
             intelligent_placeholder: optional_on_off(
@@ -348,7 +217,7 @@ pub fn parse_people(xml: &[u8]) -> Result<Vec<Person>> {
                     ],
                 )?;
                 require_empty(presence)?;
-                Some(PresenceInfo {
+                Some(Presence {
                     provider_id: required_attr(presence, WORD_2012_NAMESPACE, "providerId")?.into(),
                     user_id: required_attr(presence, WORD_2012_NAMESPACE, "userId")?.into(),
                 })
@@ -360,10 +229,7 @@ pub fn parse_people(xml: &[u8]) -> Result<Vec<Person>> {
     Ok(people)
 }
 
-pub fn write_comments_extended(
-    items: &[CommentExtension],
-    conformance: ModernCommentConformance,
-) -> Result<Vec<u8>> {
+pub fn write_comments_extended(items: &[Extended], conformance: Conformance) -> Result<Vec<u8>> {
     validate_extended(items)?;
     let mut out = xml_header("w15", WORD_2012_NAMESPACE, "commentsEx", conformance);
     for item in items {
@@ -381,10 +247,7 @@ pub fn write_comments_extended(
     Ok(out.into_bytes())
 }
 
-pub fn write_comments_ids(
-    items: &[CommentIdMapping],
-    conformance: ModernCommentConformance,
-) -> Result<Vec<u8>> {
+pub fn write_comments_ids(items: &[IdMapping], conformance: Conformance) -> Result<Vec<u8>> {
     validate_ids(items)?;
     let mut out = xml_header("w16cid", COMMENTS_IDS_NAMESPACE, "commentsIds", conformance);
     for item in items {
@@ -399,8 +262,8 @@ pub fn write_comments_ids(
 }
 
 pub fn write_comments_extensible(
-    comments: &[ExtensibleComment],
-    conformance: ModernCommentConformance,
+    comments: &[Comment],
+    conformance: Conformance,
 ) -> Result<Vec<u8>> {
     validate_extensible(comments)?;
     let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
@@ -480,7 +343,7 @@ pub fn write_comments_extensible(
     Ok(out.into_bytes())
 }
 
-pub fn write_people(people: &[Person], conformance: ModernCommentConformance) -> Result<Vec<u8>> {
+pub fn write_people(people: &[Person], conformance: Conformance) -> Result<Vec<u8>> {
     validate_people(people)?;
     let mut out = xml_header("w15", WORD_2012_NAMESPACE, "people", conformance);
     for person in people {
@@ -500,247 +363,7 @@ pub fn write_people(people: &[Person], conformance: ModernCommentConformance) ->
     Ok(out.into_bytes())
 }
 
-pub fn load_modern_comment_metadata(
-    package: &OpcPackage,
-    document_part_name: &PackURI,
-) -> Result<ModernCommentMetadata> {
-    reject_misplaced_relationships(package, document_part_name)?;
-    let document = package.get_part(document_part_name).map_err(|error| {
-        Error::Invalid(format!(
-            "Word main document '{}': {error}",
-            document_part_name.as_str()
-        ))
-    })?;
-    require_main_document_content_type(document.content_type())?;
-    let metadata = ModernCommentMetadata {
-        comments_extended: load_part(
-            package,
-            document,
-            COMMENTS_EXTENDED_RELATIONSHIP,
-            COMMENTS_EXTENDED_CONTENT_TYPE,
-            parse_comments_extended,
-        )?,
-        comments_ids: load_part(
-            package,
-            document,
-            COMMENTS_IDS_RELATIONSHIP,
-            COMMENTS_IDS_CONTENT_TYPE,
-            parse_comments_ids,
-        )?,
-        comments_extensible: load_part(
-            package,
-            document,
-            COMMENTS_EXTENSIBLE_RELATIONSHIP,
-            COMMENTS_EXTENSIBLE_CONTENT_TYPE,
-            parse_comments_extensible,
-        )?,
-        people: load_part(
-            package,
-            document,
-            PEOPLE_RELATIONSHIP,
-            PEOPLE_CONTENT_TYPE,
-            parse_people,
-        )?,
-    };
-    validate_metadata(&metadata)?;
-    Ok(metadata)
-}
-
-pub fn store_modern_comment_metadata(
-    package: &mut OpcPackage,
-    document_part_name: &PackURI,
-    metadata: &ModernCommentMetadata,
-    relationship_ids: &ModernCommentRelationshipIds,
-    conformance: ModernCommentConformance,
-) -> Result<()> {
-    validate_metadata(metadata)?;
-    let document = package.get_part(document_part_name).map_err(|error| {
-        Error::Invalid(format!(
-            "Word main document '{}': {error}",
-            document_part_name.as_str()
-        ))
-    })?;
-    require_main_document_content_type(document.content_type())?;
-    let specs = [
-        (
-            metadata
-                .comments_extended
-                .as_ref()
-                .map(|items| write_comments_extended(items, conformance)),
-            relationship_ids.comments_extended.as_deref(),
-            "/word/commentsExtended.xml",
-            COMMENTS_EXTENDED_RELATIONSHIP,
-            COMMENTS_EXTENDED_CONTENT_TYPE,
-        ),
-        (
-            metadata
-                .comments_ids
-                .as_ref()
-                .map(|items| write_comments_ids(items, conformance)),
-            relationship_ids.comments_ids.as_deref(),
-            "/word/commentsIds.xml",
-            COMMENTS_IDS_RELATIONSHIP,
-            COMMENTS_IDS_CONTENT_TYPE,
-        ),
-        (
-            metadata
-                .comments_extensible
-                .as_ref()
-                .map(|items| write_comments_extensible(items, conformance)),
-            relationship_ids.comments_extensible.as_deref(),
-            "/word/commentsExtensible.xml",
-            COMMENTS_EXTENSIBLE_RELATIONSHIP,
-            COMMENTS_EXTENSIBLE_CONTENT_TYPE,
-        ),
-        (
-            metadata
-                .people
-                .as_ref()
-                .map(|items| write_people(items, conformance)),
-            relationship_ids.people.as_deref(),
-            "/word/people.xml",
-            PEOPLE_RELATIONSHIP,
-            PEOPLE_CONTENT_TYPE,
-        ),
-    ];
-    let mut pending = Vec::new();
-    let mut ids = HashSet::new();
-    for (xml, relationship_id, part_name, relationship_type, content_type) in specs {
-        match (xml, relationship_id) {
-            (None, None) => continue,
-            (Some(_), None) => return invalid(format!("missing relationship ID for {part_name}")),
-            (None, Some(_)) => {
-                return invalid(format!("relationship ID supplied without {part_name}"));
-            },
-            (Some(xml), Some(relationship_id)) => {
-                if relationship_id.is_empty() || !ids.insert(relationship_id) {
-                    return invalid(
-                        "modern comment relationship IDs must be nonempty and unique".into(),
-                    );
-                }
-                let part_name = PackURI::new(part_name).map_err(Error::Uri)?;
-                if package
-                    .iter_parts()
-                    .any(|part| part.partname() == &part_name)
-                    || document.rels().iter().any(|relationship| {
-                        relationship.r_id() == relationship_id
-                            || relationship.reltype() == relationship_type
-                    })
-                {
-                    return invalid(format!(
-                        "modern comment part or relationship already exists: {}",
-                        part_name.as_str()
-                    ));
-                }
-                pending.push((
-                    part_name,
-                    xml?,
-                    relationship_id.to_owned(),
-                    relationship_type,
-                    content_type,
-                ));
-            },
-        }
-    }
-    for (part_name, xml, relationship_id, relationship_type, content_type) in pending {
-        let target = part_name.relative_ref(document_part_name.base_uri());
-        package.add_part(Box::new(XmlPart::new(part_name, content_type.into(), xml)));
-        package
-            .get_part_mut(document_part_name)?
-            .rels_mut()
-            .add_relationship(relationship_type.into(), target, relationship_id, false);
-    }
-    Ok(())
-}
-
-fn load_part<T>(
-    package: &OpcPackage,
-    document: &dyn Part,
-    relationship_type: &str,
-    content_type: &str,
-    parser: fn(&[u8]) -> Result<Vec<T>>,
-) -> Result<Option<Vec<T>>> {
-    let relationships: Vec<_> = document
-        .rels()
-        .iter()
-        .filter(|relationship| relationship.reltype() == relationship_type)
-        .collect();
-    if relationships.len() > 1 {
-        return invalid(format!("multiple '{relationship_type}' relationships"));
-    }
-    let Some(relationship) = relationships.first() else {
-        return Ok(None);
-    };
-    if relationship.is_external() {
-        return invalid(format!(
-            "modern comment relationship '{}' must be internal",
-            relationship.r_id()
-        ));
-    }
-    let target = relationship
-        .target_partname()
-        .map_err(|error| Error::Invalid(format!("invalid modern comment target: {error}")))?;
-    let part = package.get_part(&target).map_err(|error| {
-        Error::Invalid(format!(
-            "modern comment part '{}': {error}",
-            target.as_str()
-        ))
-    })?;
-    if part.content_type() != content_type {
-        return Err(Error::ContentType {
-            expected: content_type.into(),
-            actual: part.content_type().into(),
-        });
-    }
-    if part.rels().iter().next().is_some() {
-        return invalid(format!(
-            "modern comment part '{}' must not have relationships",
-            target.as_str()
-        ));
-    }
-    parser(part.blob()).map(Some).map_err(|error| {
-        Error::Invalid(format!(
-            "invalid modern comment part '{}': {error}",
-            target.as_str()
-        ))
-    })
-}
-
-fn reject_misplaced_relationships(package: &OpcPackage, document_name: &PackURI) -> Result<()> {
-    if package
-        .rels()
-        .iter()
-        .any(|relationship| is_modern_relationship(relationship.reltype()))
-    {
-        return invalid("package root cannot source modern Word comment relationships".into());
-    }
-    for part in package.iter_parts() {
-        if part.partname() != document_name
-            && part
-                .rels()
-                .iter()
-                .any(|relationship| is_modern_relationship(relationship.reltype()))
-        {
-            return invalid(format!(
-                "modern comment relationship has invalid source '{}'",
-                part.partname().as_str()
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn is_modern_relationship(value: &str) -> bool {
-    matches!(
-        value,
-        COMMENTS_EXTENDED_RELATIONSHIP
-            | COMMENTS_IDS_RELATIONSHIP
-            | COMMENTS_EXTENSIBLE_RELATIONSHIP
-            | PEOPLE_RELATIONSHIP
-    )
-}
-
-fn validate_metadata(metadata: &ModernCommentMetadata) -> Result<()> {
+pub(super) fn validate_metadata(metadata: &Metadata) -> Result<()> {
     if let Some(items) = &metadata.comments_extended {
         validate_extended(items)?;
     }
@@ -783,7 +406,7 @@ fn validate_metadata(metadata: &ModernCommentMetadata) -> Result<()> {
     Ok(())
 }
 
-fn validate_extended(items: &[CommentExtension]) -> Result<()> {
+fn validate_extended(items: &[Extended]) -> Result<()> {
     enforce_count("commentEx", items.len())?;
     let ids: HashSet<_> = items.iter().map(|item| item.paragraph_id).collect();
     if ids.len() != items.len() {
@@ -792,7 +415,7 @@ fn validate_extended(items: &[CommentExtension]) -> Result<()> {
     Ok(())
 }
 
-fn validate_ids(items: &[CommentIdMapping]) -> Result<()> {
+fn validate_ids(items: &[IdMapping]) -> Result<()> {
     enforce_count("commentId", items.len())?;
     let mut paragraphs = HashSet::new();
     let mut durable = HashSet::new();
@@ -805,7 +428,7 @@ fn validate_ids(items: &[CommentIdMapping]) -> Result<()> {
     Ok(())
 }
 
-fn validate_extensible(items: &[ExtensibleComment]) -> Result<()> {
+fn validate_extensible(items: &[Comment]) -> Result<()> {
     enforce_count("commentExtensible", items.len())?;
     let mut ids = HashSet::new();
     for item in items {
@@ -870,7 +493,7 @@ fn validate_people(people: &[Person]) -> Result<()> {
     Ok(())
 }
 
-fn parse_comment_extensions(comment: &Node) -> Result<Vec<CommentReaction>> {
+fn parse_comment_extensions(comment: &Node) -> Result<Vec<Reaction>> {
     if comment.children.is_empty() {
         return Ok(Vec::new());
     }
@@ -938,20 +561,20 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<CommentReaction>> {
                         );
                     }
                 }
-                infos.push(CommentReactionInfo {
+                infos.push(ReactionInfo {
                     date_utc,
                     user,
                     extensions: info_extensions,
                 });
             }
-            reactions.push(CommentReaction {
+            reactions.push(Reaction {
                 reaction_type,
                 reactions: infos,
                 extensions,
             });
         }
     }
-    validate_extensible(&[ExtensibleComment {
+    validate_extensible(&[Comment {
         durable_id: 1,
         date_utc: None,
         intelligent_placeholder: None,
@@ -960,7 +583,7 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<CommentReaction>> {
     Ok(reactions)
 }
 
-fn parse_reaction_user(node: &Node) -> Result<CommentReactionUser> {
+fn parse_reaction_user(node: &Node) -> Result<ReactionUser> {
     require_name(node, REACTIONS_NAMESPACE, "user")?;
     reject_attributes(
         node,
@@ -971,7 +594,7 @@ fn parse_reaction_user(node: &Node) -> Result<CommentReactionUser> {
         [extensions] => Some(parse_extension_list(extensions)?),
         _ => return invalid("reaction user permits at most one extLst".into()),
     };
-    Ok(CommentReactionUser {
+    Ok(ReactionUser {
         user_id: required_attr(node, "", "userId")?.into(),
         user_name: required_attr(node, "", "userName")?.into(),
         user_provider: required_attr(node, "", "userProvider")?.into(),
@@ -979,7 +602,7 @@ fn parse_reaction_user(node: &Node) -> Result<CommentReactionUser> {
     })
 }
 
-fn parse_extension_list(node: &Node) -> Result<ModernCommentExtensionList> {
+fn parse_extension_list(node: &Node) -> Result<ExtensionList> {
     require_name(node, OFFICE_EXTENSION_LIST_NAMESPACE, "extLst")?;
     reject_attributes(node, &[])?;
     enforce_count("modern comment extension", node.children.len())?;
@@ -990,15 +613,15 @@ fn parse_extension_list(node: &Node) -> Result<ModernCommentExtensionList> {
         if extension.has_non_whitespace_text || extension.children.len() != 1 {
             return invalid("oel:ext requires exactly one lax child element".into());
         }
-        extensions.push(ModernCommentExtension::new(
+        extensions.push(Extension::new(
             attr(extension, "", "uri").map(str::to_owned),
             extension.children[0].raw_xml.clone(),
         )?);
     }
-    ModernCommentExtensionList::new(extensions)
+    ExtensionList::new(extensions)
 }
 
-fn write_extension_list(out: &mut String, list: &ModernCommentExtensionList) {
+fn write_extension_list(out: &mut String, list: &ExtensionList) {
     out.push_str("<oel:extLst>");
     for extension in list.extensions() {
         out.push_str("<oel:ext");
@@ -1014,7 +637,7 @@ fn write_extension_list(out: &mut String, list: &ModernCommentExtensionList) {
     out.push_str("</oel:extLst>");
 }
 
-fn validate_extension_list(list: &ModernCommentExtensionList) -> Result<()> {
+fn validate_extension_list(list: &ExtensionList) -> Result<()> {
     enforce_count("modern comment extension", list.extensions.len())?;
     for extension in &list.extensions {
         if let Some(uri) = &extension.uri
@@ -1049,32 +672,11 @@ fn canonical_extension_child(value: &str) -> Result<String> {
     Ok(document.root()?.raw_xml.clone())
 }
 
-fn xml_header(
-    prefix: &str,
-    namespace: &str,
-    root: &str,
-    conformance: ModernCommentConformance,
-) -> String {
+fn xml_header(prefix: &str, namespace: &str, root: &str, conformance: Conformance) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><{prefix}:{root} xmlns:{prefix}=\"{namespace}\" xmlns:w=\"{}\">",
         conformance.word_namespace()
     )
-}
-
-fn require_main_document_content_type(content_type: &str) -> Result<()> {
-    if matches!(
-        content_type,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
-            | "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"
-            | "application/vnd.ms-word.document.macroEnabled.main+xml"
-            | "application/vnd.ms-word.template.macroEnabledTemplate.main+xml"
-    ) {
-        Ok(())
-    } else {
-        invalid(format!(
-            "'{content_type}' is not a Word main-document content type"
-        ))
-    }
 }
 
 fn validate_durable_id(value: u32) -> Result<()> {
@@ -1571,342 +1173,4 @@ fn is_whitespace(value: &[u8]) -> bool {
 
 fn invalid<T>(message: String) -> Result<T> {
     Err(Error::Invalid(message))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use litchi_opc::part::BlobPart;
-
-    const POI_DOCX: &[u8] =
-        include_bytes!("../../../test-data/poi/test-data/document/testComment.docx");
-    const LO_DOCX: &[u8] = include_bytes!(
-        "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx"
-    );
-
-    #[test]
-    fn loads_poi_and_libreoffice_reference_packages() {
-        for bytes in [POI_DOCX, LO_DOCX] {
-            let package = OpcPackage::from_bytes(bytes).unwrap();
-            let metadata = load_modern_comment_metadata(
-                &package,
-                &PackURI::new("/word/document.xml").unwrap(),
-            )
-            .unwrap();
-            assert_eq!(metadata.comments_extended.as_ref().unwrap().len(), 1);
-            assert_eq!(metadata.comments_ids.as_ref().unwrap().len(), 1);
-            assert_eq!(metadata.comments_extensible.as_ref().unwrap().len(), 1);
-        }
-        let package = OpcPackage::from_bytes(LO_DOCX).unwrap();
-        let metadata =
-            load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
-                .unwrap();
-        assert_eq!(metadata.people.unwrap()[0].author, "Miklos Vajna");
-    }
-
-    #[test]
-    fn all_writers_are_deterministic_and_round_trip_strict() {
-        let metadata = sample_metadata();
-        let extended = write_comments_extended(
-            metadata.comments_extended.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
-        )
-        .unwrap();
-        assert_eq!(
-            extended,
-            write_comments_extended(
-                metadata.comments_extended.as_ref().unwrap(),
-                ModernCommentConformance::Strict
-            )
-            .unwrap()
-        );
-        assert!(
-            std::str::from_utf8(&extended)
-                .unwrap()
-                .contains(STRICT_WORD_NAMESPACE)
-        );
-        assert_eq!(
-            parse_comments_extended(&extended).unwrap(),
-            metadata.comments_extended.unwrap()
-        );
-
-        let ids = write_comments_ids(
-            metadata.comments_ids.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
-        )
-        .unwrap();
-        assert_eq!(
-            parse_comments_ids(&ids).unwrap(),
-            metadata.comments_ids.unwrap()
-        );
-        let extensible = write_comments_extensible(
-            metadata.comments_extensible.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
-        )
-        .unwrap();
-        assert_eq!(
-            parse_comments_extensible(&extensible).unwrap(),
-            metadata.comments_extensible.unwrap()
-        );
-        let people = write_people(
-            metadata.people.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
-        )
-        .unwrap();
-        assert_eq!(parse_people(&people).unwrap(), metadata.people.unwrap());
-    }
-
-    #[test]
-    fn mce_selects_fallback_comment() {
-        let xml = format!(
-            r#"<w15:commentsEx xmlns:w15="{WORD_2012_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><w15:commentEx w15:paraId="AAAAAAAA"/></mc:Choice><mc:Fallback><w15:commentEx w15:paraId="BBBBBBBB"/></mc:Fallback></mc:AlternateContent></w15:commentsEx>"#
-        );
-        assert_eq!(
-            parse_comments_extended(xml.as_bytes()).unwrap()[0].paragraph_id,
-            0xBBBB_BBBB
-        );
-    }
-
-    #[test]
-    fn package_writer_round_trips_all_parts() {
-        let mut package = OpcPackage::new();
-        package.add_part(Box::new(BlobPart::new(
-            PackURI::new("/word/document.xml").unwrap(),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml".into(),
-            b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"/>".to_vec(),
-        )));
-        let metadata = sample_metadata();
-        store_modern_comment_metadata(
-            &mut package,
-            &PackURI::new("/word/document.xml").unwrap(),
-            &metadata,
-            &ModernCommentRelationshipIds {
-                comments_extended: Some("rIdEx".into()),
-                comments_ids: Some("rIdIds".into()),
-                comments_extensible: Some("rIdCex".into()),
-                people: Some("rIdPeople".into()),
-            },
-            ModernCommentConformance::Transitional,
-        )
-        .unwrap();
-        assert_eq!(
-            load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
-                .unwrap(),
-            metadata
-        );
-    }
-
-    #[test]
-    fn rejects_malformed_xml_graph_and_cross_part_ids() {
-        assert!(parse_comments_extended(br#"<!DOCTYPE x><x/>"#).is_err());
-        let bad_hex = format!(
-            r#"<w15:commentsEx xmlns:w15="{WORD_2012_NAMESPACE}"><w15:commentEx w15:paraId="123"/></w15:commentsEx>"#
-        );
-        assert!(parse_comments_extended(bad_hex.as_bytes()).is_err());
-        let bad_date = format!(
-            r#"<w16cex:commentsExtensible xmlns:w16cex="{COMMENTS_EXTENSIBLE_NAMESPACE}"><w16cex:commentExtensible w16cex:durableId="00000001" w16cex:dateUtc="2026-01-01T01:00:00+01:00"/></w16cex:commentsExtensible>"#
-        );
-        assert!(parse_comments_extensible(bad_date.as_bytes()).is_err());
-
-        let mut metadata = sample_metadata();
-        metadata.comments_extensible.as_mut().unwrap()[0].durable_id = 2;
-        assert!(validate_metadata(&metadata).is_err());
-
-        let mut package = OpcPackage::new();
-        let mut document = BlobPart::new(
-            PackURI::new("/word/document.xml").unwrap(),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
-                .into(),
-            b"<document/>".to_vec(),
-        );
-        document.rels_mut().add_relationship(
-            COMMENTS_EXTENDED_RELATIONSHIP.into(),
-            "https://example.invalid/comments".into(),
-            "rId1".into(),
-            true,
-        );
-        package.add_part(Box::new(document));
-        assert!(
-            load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn enforces_size_depth_count_and_reaction_constraints() {
-        assert!(parse_people(&vec![b' '; MAX_MODERN_COMMENT_PART_BYTES + 1]).is_err());
-        let deep = format!(
-            "{}{}",
-            "<x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1),
-            "</x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1)
-        );
-        assert!(parse_people(deep.as_bytes()).is_err());
-        let mut metadata = sample_metadata();
-        metadata.comments_extensible.as_mut().unwrap()[0].reactions[0].reaction_type = 0;
-        assert!(validate_metadata(&metadata).is_err());
-    }
-
-    fn sample_metadata() -> ModernCommentMetadata {
-        ModernCommentMetadata {
-            comments_extended: Some(vec![CommentExtension {
-                paragraph_id: 0x1234_ABCD,
-                parent_paragraph_id: None,
-                done: true,
-            }]),
-            comments_ids: Some(vec![CommentIdMapping {
-                paragraph_id: 0x1234_ABCD,
-                durable_id: 0x0123_4567,
-            }]),
-            comments_extensible: Some(vec![ExtensibleComment {
-                durable_id: 0x0123_4567,
-                date_utc: Some("2026-07-17T00:00:00Z".into()),
-                intelligent_placeholder: Some(false),
-                reactions: vec![CommentReaction {
-                    reaction_type: 1,
-                    reactions: vec![CommentReactionInfo {
-                        date_utc: Some("2026-07-17T01:00:00Z".into()),
-                        user: Some(CommentReactionUser {
-                            user_id: "alice@example.test".into(),
-                            user_name: "Alice & Bob".into(),
-                            user_provider: "O365".into(),
-                            extensions: None,
-                        }),
-                        extensions: None,
-                    }],
-                    extensions: None,
-                }],
-            }]),
-            people: Some(vec![Person {
-                author: "Alice & Bob".into(),
-                presence: Some(PresenceInfo {
-                    provider_id: "O365".into(),
-                    user_id: "alice@example.test".into(),
-                }),
-            }]),
-        }
-    }
-}
-
-#[cfg(test)]
-mod reaction_extension_list_tests {
-    use super::*;
-
-    fn comments_with_reaction(reaction_body: &str) -> String {
-        format!(
-            r#"<w16cex:commentsExtensible xmlns:w16cex="{COMMENTS_EXTENSIBLE_NAMESPACE}" xmlns:w16="{WORD_2018_NAMESPACE}" xmlns:cr="{REACTIONS_NAMESPACE}" xmlns:oel="{OFFICE_EXTENSION_LIST_NAMESPACE}" xmlns:x="urn:example:unknown"><w16cex:commentExtensible w16cex:durableId="00000001"><w16cex:extLst><w16:ext w16:uri="{REACTIONS_EXTENSION_URI}"><cr:reactions><cr:reaction reactionType="1">{reaction_body}</cr:reaction></cr:reactions></w16:ext></w16cex:extLst></w16cex:commentExtensible></w16cex:commentsExtensible>"#
-        )
-    }
-
-    #[test]
-    fn official_extension_shape_round_trips_at_all_three_levels_and_mutates() {
-        let xml = comments_with_reaction(
-            r#"<cr:reactionInfo dateUtc="2026-07-17T01:00:00Z"><cr:user userId="alice" userName="Alice" userProvider="O365"><oel:extLst><oel:ext uri="  urn:user   metadata  "><x:userData x:flag="1">opaque &amp; <x:value>mixed</x:value></x:userData></oel:ext></oel:extLst></cr:user><oel:extLst><oel:ext><x:infoData><x:value>42</x:value></x:infoData></oel:ext></oel:extLst></cr:reactionInfo><oel:extLst><oel:ext uri="urn:reaction"><x:reactionData/></oel:ext></oel:extLst>"#,
-        );
-        let mut comments = parse_comments_extensible(xml.as_bytes()).unwrap();
-        let reaction = &comments[0].reactions[0];
-        assert_eq!(
-            reaction.extensions.as_ref().unwrap().extensions()[0].uri(),
-            Some("urn:reaction")
-        );
-        let info = &reaction.reactions[0];
-        assert_eq!(
-            info.extensions.as_ref().unwrap().extensions()[0].uri(),
-            None
-        );
-        let user_extension = &info
-            .user
-            .as_ref()
-            .unwrap()
-            .extensions
-            .as_ref()
-            .unwrap()
-            .extensions()[0];
-        assert_eq!(user_extension.uri(), Some("urn:user metadata"));
-        assert!(user_extension.child_xml().contains("opaque &amp;"));
-        assert!(
-            user_extension
-                .child_xml()
-                .contains("xmlns:x=\"urn:example:unknown\"")
-        );
-
-        let first =
-            write_comments_extensible(&comments, ModernCommentConformance::Transitional).unwrap();
-        let reparsed = parse_comments_extensible(&first).unwrap();
-        let second =
-            write_comments_extensible(&reparsed, ModernCommentConformance::Transitional).unwrap();
-        assert_eq!(first, second);
-        assert_eq!(comments, reparsed);
-
-        let user_list = comments[0].reactions[0].reactions[0]
-            .user
-            .as_mut()
-            .unwrap()
-            .extensions
-            .as_mut()
-            .unwrap();
-        user_list.extensions[0].set_uri(Some("  urn:changed\tvalue ".into()));
-        user_list.extensions[0]
-            .set_child_xml(
-                r#"<z:data xmlns:z="urn:mutated">new <z:value>content</z:value></z:data>"#,
-            )
-            .unwrap();
-        user_list
-            .push(ModernCommentExtension::new(None, r#"<q:extra xmlns:q="urn:q"/>"#).unwrap())
-            .unwrap();
-        let removed = user_list.remove(1).unwrap();
-        assert_eq!(removed.uri(), None);
-        let mutated =
-            write_comments_extensible(&comments, ModernCommentConformance::Strict).unwrap();
-        let reparsed = parse_comments_extensible(&mutated).unwrap();
-        let extension = &reparsed[0].reactions[0].reactions[0]
-            .user
-            .as_ref()
-            .unwrap()
-            .extensions
-            .as_ref()
-            .unwrap()
-            .extensions()[0];
-        assert_eq!(extension.uri(), Some("urn:changed value"));
-        assert!(extension.child_xml().contains("urn:mutated"));
-    }
-
-    #[test]
-    fn rejects_namespace_sequence_cardinality_duplicate_and_resource_violations() {
-        for body in [
-            r#"<oel:extLst/><cr:reactionInfo/>"#,
-            r#"<oel:extLst/><oel:extLst/>"#,
-            r#"<cr:extLst/>"#,
-            r#"<oel:extLst><oel:ext/></oel:extLst>"#,
-            r#"<oel:extLst><oel:ext>text<x:a/></oel:ext></oel:extLst>"#,
-            r#"<oel:extLst><oel:ext><x:a/><x:b/></oel:ext></oel:extLst>"#,
-            r#"<oel:extLst><oel:ext oel:uri="urn:qualified"><x:a/></oel:ext></oel:extLst>"#,
-            r#"<cr:reactionInfo><oel:extLst/><cr:user userId="a" userName="A" userProvider="P"/></cr:reactionInfo>"#,
-            r#"<cr:reactionInfo><cr:user userId="a" userId="b" userName="A" userProvider="P"/></cr:reactionInfo>"#,
-        ] {
-            assert!(
-                parse_comments_extensible(comments_with_reaction(body).as_bytes()).is_err(),
-                "accepted {body}"
-            );
-        }
-
-        let extension = ModernCommentExtension::new(None, r#"<x:a xmlns:x="urn:x"/>"#).unwrap();
-        assert!(
-            ModernCommentExtensionList::new(vec![extension; MAX_MODERN_COMMENT_ITEMS + 1]).is_err()
-        );
-        let oversized = format!(
-            "<x:a xmlns:x=\"urn:x\">{}</x:a>",
-            "x".repeat(MAX_MODERN_COMMENT_PART_BYTES)
-        );
-        assert!(ModernCommentExtension::new(None, oversized).is_err());
-        let deep = format!(
-            "<x:a xmlns:x=\"urn:x\">{}{}</x:a>",
-            "<x:b>".repeat(MAX_MODERN_COMMENT_DEPTH),
-            "</x:b>".repeat(MAX_MODERN_COMMENT_DEPTH)
-        );
-        assert!(ModernCommentExtension::new(None, deep).is_err());
-        assert!(
-            ModernCommentExtension::new(None, "<?xml version=\"1.0\"?><x:a xmlns:x=\"urn:x\"/>")
-                .is_err()
-        );
-    }
 }

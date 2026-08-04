@@ -2,6 +2,7 @@
 
 use crate::error::{Error, Result};
 use litchi_core::xml::escape::escape_xml;
+use litchi_ooxml_common::custom_xml::valid_guid;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::Writer;
@@ -1941,18 +1942,6 @@ fn uid_attr(
     }
     Ok(result)
 }
-fn valid_guid(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    bytes.len() == 38
-        && bytes[0] == b'{'
-        && bytes[37] == b'}'
-        && [9, 14, 19, 24].iter().all(|i| bytes[*i] == b'-')
-        && bytes[1..37]
-            .iter()
-            .enumerate()
-            .all(|(i, b)| matches!(i, 8 | 13 | 18 | 23) || b.is_ascii_hexdigit())
-}
-
 fn optional_attr(
     element: &BytesStart<'_>,
     name: &[u8],
