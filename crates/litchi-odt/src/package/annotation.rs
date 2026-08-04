@@ -1,7 +1,7 @@
 //! Lossless, package-safe ODF annotation discovery and mutation.
 
 use crate::core::OwnedPackage;
-use crate::embedded_chart::rebuild_package;
+use crate::package::charts::rebuild_package;
 use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::annotation::{AnnotationBuilder, CellAnnotation};
 use quick_xml::XmlVersion;
@@ -1225,9 +1225,9 @@ macro_rules! annotation_facade_methods {
     ($host:ident) => {
         /// Inspect annotations in document order without following body links.
         pub fn annotations(&self) -> litchi_core::Result<Vec<crate::AnnotationInfo>> {
-            crate::annotation_package::annotations(
+            crate::package::annotation::annotations(
                 self.content.xml_content(),
-                crate::annotation_package::AnnotationHost::$host,
+                crate::package::annotation::AnnotationHost::$host,
             )
         }
 
@@ -1236,9 +1236,9 @@ macro_rules! annotation_facade_methods {
             &self,
             name: &str,
         ) -> litchi_core::Result<Option<crate::AnnotationInfo>> {
-            crate::annotation_package::find_annotation(
+            crate::package::annotation::find_annotation(
                 self.content.xml_content(),
-                crate::annotation_package::AnnotationHost::$host,
+                crate::package::annotation::AnnotationHost::$host,
                 name,
             )
         }
@@ -1249,10 +1249,10 @@ macro_rules! annotation_facade_methods {
             anchor: &crate::AnnotationAnchor,
             annotation: &crate::Annotation,
         ) -> litchi_core::Result<usize> {
-            let (bytes, index) = crate::annotation_package::add(
+            let (bytes, index) = crate::package::annotation::add(
                 &self.package,
                 self.content.xml_content(),
-                crate::annotation_package::AnnotationHost::$host,
+                crate::package::annotation::AnnotationHost::$host,
                 anchor,
                 annotation,
             )?;
@@ -1267,10 +1267,10 @@ macro_rules! annotation_facade_methods {
             index: usize,
             annotation: &crate::Annotation,
         ) -> litchi_core::Result<()> {
-            let bytes = crate::annotation_package::replace(
+            let bytes = crate::package::annotation::replace(
                 &self.package,
                 self.content.xml_content(),
-                crate::annotation_package::AnnotationHost::$host,
+                crate::package::annotation::AnnotationHost::$host,
                 index,
                 annotation,
             )?;
@@ -1285,10 +1285,10 @@ macro_rules! annotation_facade_methods {
             index: usize,
             update: &crate::AnnotationUpdate,
         ) -> litchi_core::Result<()> {
-            let bytes = crate::annotation_package::update(
+            let bytes = crate::package::annotation::update(
                 &self.package,
                 self.content.xml_content(),
-                crate::annotation_package::AnnotationHost::$host,
+                crate::package::annotation::AnnotationHost::$host,
                 index,
                 update,
             )?;
@@ -1299,10 +1299,10 @@ macro_rules! annotation_facade_methods {
 
         /// Remove an annotation and its paired end marker, if any.
         pub fn remove_annotation(&mut self, index: usize) -> litchi_core::Result<()> {
-            let bytes = crate::annotation_package::remove(
+            let bytes = crate::package::annotation::remove(
                 &self.package,
                 self.content.xml_content(),
-                crate::annotation_package::AnnotationHost::$host,
+                crate::package::annotation::AnnotationHost::$host,
                 index,
             )?;
             let replacement = Self::from_bytes(bytes)?;
@@ -1312,10 +1312,10 @@ macro_rules! annotation_facade_methods {
 
         /// Reorder point annotations that are direct XML siblings.
         pub fn reorder_annotation(&mut self, from: usize, to: usize) -> litchi_core::Result<()> {
-            let bytes = crate::annotation_package::reorder(
+            let bytes = crate::package::annotation::reorder(
                 &self.package,
                 self.content.xml_content(),
-                crate::annotation_package::AnnotationHost::$host,
+                crate::package::annotation::AnnotationHost::$host,
                 from,
                 to,
             )?;

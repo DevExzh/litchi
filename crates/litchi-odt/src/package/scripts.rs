@@ -6,7 +6,7 @@ use crate::core::OwnedPackage;
 use crate::document_scripts::{
     DocumentEventListener, DocumentScripts, EmbeddedScript, ScriptBinding, parse_document_scripts,
 };
-use crate::embedded_chart::{Addition, rebuild_package};
+use crate::package::charts::{Addition, rebuild_package};
 use litchi_core::{Error, Result};
 use litchi_odf_common::package::resolve_package_path;
 use quick_xml::events::Event;
@@ -690,13 +690,13 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 macro_rules! script_facade_methods {
     () => {
         pub fn document_scripts(&self) -> litchi_core::Result<Option<crate::DocumentScripts>> {
-            crate::script_package::document_scripts(self.content.xml_content())
+            crate::package::scripts::document_scripts(self.content.xml_content())
         }
         pub fn set_document_scripts(
             &mut self,
             scripts: Option<&crate::DocumentScripts>,
         ) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::set_document_scripts(
+            let bytes = crate::package::scripts::set_document_scripts(
                 &self.package,
                 self.content.xml_content(),
                 scripts,
@@ -708,7 +708,7 @@ macro_rules! script_facade_methods {
             &mut self,
             script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<usize> {
-            let (bytes, index) = crate::script_package::add_embedded_script(
+            let (bytes, index) = crate::package::scripts::add_embedded_script(
                 &self.package,
                 self.content.xml_content(),
                 script,
@@ -721,7 +721,7 @@ macro_rules! script_facade_methods {
             index: usize,
             script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::replace_embedded_script(
+            let bytes = crate::package::scripts::replace_embedded_script(
                 &self.package,
                 self.content.xml_content(),
                 index,
@@ -731,7 +731,7 @@ macro_rules! script_facade_methods {
             Ok(())
         }
         pub fn remove_document_script(&mut self, index: usize) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::remove_embedded_script(
+            let bytes = crate::package::scripts::remove_embedded_script(
                 &self.package,
                 self.content.xml_content(),
                 index,
@@ -740,7 +740,7 @@ macro_rules! script_facade_methods {
             Ok(())
         }
         pub fn move_document_script(&mut self, from: usize, to: usize) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::move_embedded_script(
+            let bytes = crate::package::scripts::move_embedded_script(
                 &self.package,
                 self.content.xml_content(),
                 from,
@@ -753,7 +753,7 @@ macro_rules! script_facade_methods {
             &mut self,
             listener: &crate::DocumentEventListener,
         ) -> litchi_core::Result<usize> {
-            let (bytes, index) = crate::script_package::add_event_listener(
+            let (bytes, index) = crate::package::scripts::add_event_listener(
                 &self.package,
                 self.content.xml_content(),
                 listener,
@@ -766,7 +766,7 @@ macro_rules! script_facade_methods {
             index: usize,
             listener: &crate::DocumentEventListener,
         ) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::replace_event_listener(
+            let bytes = crate::package::scripts::replace_event_listener(
                 &self.package,
                 self.content.xml_content(),
                 index,
@@ -776,7 +776,7 @@ macro_rules! script_facade_methods {
             Ok(())
         }
         pub fn remove_document_event_listener(&mut self, index: usize) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::remove_event_listener(
+            let bytes = crate::package::scripts::remove_event_listener(
                 &self.package,
                 self.content.xml_content(),
                 index,
@@ -789,7 +789,7 @@ macro_rules! script_facade_methods {
             from: usize,
             to: usize,
         ) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::move_event_listener(
+            let bytes = crate::package::scripts::move_event_listener(
                 &self.package,
                 self.content.xml_content(),
                 from,
@@ -799,19 +799,19 @@ macro_rules! script_facade_methods {
             Ok(())
         }
         pub fn script_resources(&self) -> litchi_core::Result<Vec<crate::ScriptResource>> {
-            crate::script_package::resources(&self.package)
+            crate::package::scripts::resources(&self.package)
         }
         pub fn find_script_resource(
             &self,
             path: &str,
         ) -> litchi_core::Result<Option<crate::ScriptResource>> {
-            crate::script_package::find_resource(&self.package, path)
+            crate::package::scripts::find_resource(&self.package, path)
         }
         pub fn add_script_resource(
             &mut self,
             resource: &crate::ScriptResourceSpec,
         ) -> litchi_core::Result<String> {
-            let (bytes, path) = crate::script_package::add_resource(
+            let (bytes, path) = crate::package::scripts::add_resource(
                 &self.package,
                 self.content.xml_content(),
                 resource,
@@ -824,7 +824,7 @@ macro_rules! script_facade_methods {
             path: &str,
             resource: &crate::ScriptResourceSpec,
         ) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::replace_resource(
+            let bytes = crate::package::scripts::replace_resource(
                 &self.package,
                 self.content.xml_content(),
                 path,
@@ -841,7 +841,7 @@ macro_rules! script_facade_methods {
             self.replace_script_resource(path, resource)
         }
         pub fn remove_script_resource(&mut self, path: &str) -> litchi_core::Result<()> {
-            let bytes = crate::script_package::remove_resource(
+            let bytes = crate::package::scripts::remove_resource(
                 &self.package,
                 self.content.xml_content(),
                 path,

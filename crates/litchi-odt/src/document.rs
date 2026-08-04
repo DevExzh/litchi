@@ -70,8 +70,8 @@ pub struct Document {
 }
 
 impl Document {
-    crate::script_package::script_facade_methods!();
-    crate::annotation_package::annotation_facade_methods!(Text);
+    crate::package::scripts::script_facade_methods!();
+    crate::package::annotation::annotation_facade_methods!(Text);
 
     pub(crate) fn into_package(self) -> OwnedPackage {
         self.package
@@ -1081,11 +1081,11 @@ impl Document {
     }
 
     pub fn add_form(&mut self, group_index: usize, form: &crate::AuthoredForm) -> Result<usize> {
-        let (bytes, index) = crate::form_package::add_form(
+        let (bytes, index) = crate::package::forms::add_form(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
-            crate::form_package::FormHost::Text,
+            crate::package::forms::FormHost::Text,
             group_index,
             None,
             form,
@@ -1098,11 +1098,11 @@ impl Document {
         parent_form: usize,
         form: &crate::AuthoredForm,
     ) -> Result<usize> {
-        let (bytes, index) = crate::form_package::add_form(
+        let (bytes, index) = crate::package::forms::add_form(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
-            crate::form_package::FormHost::Text,
+            crate::package::forms::FormHost::Text,
             0,
             Some(parent_form),
             form,
@@ -1111,7 +1111,7 @@ impl Document {
         Ok(index)
     }
     pub fn replace_form(&mut self, index: usize, form: &crate::AuthoredForm) -> Result<()> {
-        let bytes = crate::form_package::replace_form(
+        let bytes = crate::package::forms::replace_form(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1122,7 +1122,7 @@ impl Document {
         Ok(())
     }
     pub fn remove_form(&mut self, index: usize) -> Result<()> {
-        let bytes = crate::form_package::remove_form(
+        let bytes = crate::package::forms::remove_form(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1132,7 +1132,7 @@ impl Document {
         Ok(())
     }
     pub fn move_form(&mut self, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::form_package::move_form(
+        let bytes = crate::package::forms::move_form(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1147,7 +1147,7 @@ impl Document {
         form_index: usize,
         control: &crate::AuthoredFormControl,
     ) -> Result<usize> {
-        let (bytes, index) = crate::form_package::add_control(
+        let (bytes, index) = crate::package::forms::add_control(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1162,7 +1162,7 @@ impl Document {
         index: usize,
         control: &crate::AuthoredFormControl,
     ) -> Result<()> {
-        let bytes = crate::form_package::replace_control(
+        let bytes = crate::package::forms::replace_control(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1173,7 +1173,7 @@ impl Document {
         Ok(())
     }
     pub fn remove_form_control(&mut self, index: usize) -> Result<()> {
-        let bytes = crate::form_package::remove_control(
+        let bytes = crate::package::forms::remove_control(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1183,7 +1183,7 @@ impl Document {
         Ok(())
     }
     pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::form_package::move_control(
+        let bytes = crate::package::forms::move_control(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1216,7 +1216,7 @@ impl Document {
 
     /// Open one inert embedded chart as a standalone chart document.
     pub fn embedded_chart(&self, index: usize) -> Result<crate::ChartDocument> {
-        crate::embedded_chart::open_embedded_chart(
+        crate::package::charts::open_embedded_chart(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1238,11 +1238,11 @@ impl Document {
         definition: &crate::ChartDefinition,
         storage: crate::EmbeddedChartStorage,
     ) -> Result<usize> {
-        let (bytes, index) = crate::embedded_chart::add_embedded_chart(
+        let (bytes, index) = crate::package::charts::add_embedded_chart(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
-            crate::embedded_chart::EmbeddedChartHost::Text,
+            crate::package::charts::EmbeddedChartHost::Text,
             storage,
             definition,
         )?;
@@ -1255,7 +1255,7 @@ impl Document {
         index: usize,
         definition: &crate::ChartDefinition,
     ) -> Result<()> {
-        let bytes = crate::embedded_chart::replace_embedded_chart(
+        let bytes = crate::package::charts::replace_embedded_chart(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1267,7 +1267,7 @@ impl Document {
     }
 
     pub fn remove_embedded_chart(&mut self, index: usize) -> Result<()> {
-        let bytes = crate::embedded_chart::remove_embedded_chart(
+        let bytes = crate::package::charts::remove_embedded_chart(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
@@ -1279,11 +1279,11 @@ impl Document {
 
     /// Append an inert embedded object or image to the text body.
     pub fn add_embedded_resource(&mut self, resource: &crate::EmbeddedResource) -> Result<usize> {
-        let (bytes, index) = crate::embedded_package::add(
+        let (bytes, index) = crate::package::embedded::add(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
-            crate::embedded_chart::EmbeddedChartHost::Text,
+            crate::package::charts::EmbeddedChartHost::Text,
             resource,
         )?;
         *self = Self::from_bytes(bytes)?;
@@ -1295,12 +1295,12 @@ impl Document {
         index: usize,
         resource: &crate::EmbeddedResource,
     ) -> Result<()> {
-        let bytes = crate::embedded_package::replace(
+        let bytes = crate::package::embedded::replace(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
             index,
-            crate::embedded_package::ResourceTarget::Object,
+            crate::package::embedded::ResourceTarget::Object,
             resource,
         )?;
         *self = Self::from_bytes(bytes)?;
@@ -1312,12 +1312,12 @@ impl Document {
         index: usize,
         resource: &crate::EmbeddedResource,
     ) -> Result<()> {
-        let bytes = crate::embedded_package::replace(
+        let bytes = crate::package::embedded::replace(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
             index,
-            crate::embedded_package::ResourceTarget::Image,
+            crate::package::embedded::ResourceTarget::Image,
             resource,
         )?;
         *self = Self::from_bytes(bytes)?;
@@ -1325,50 +1325,50 @@ impl Document {
     }
 
     pub fn remove_embedded_object(&mut self, index: usize) -> Result<()> {
-        let bytes = crate::embedded_package::remove(
+        let bytes = crate::package::embedded::remove(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
             index,
-            crate::embedded_package::ResourceTarget::Object,
+            crate::package::embedded::ResourceTarget::Object,
         )?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
     pub fn remove_embedded_image(&mut self, index: usize) -> Result<()> {
-        let bytes = crate::embedded_package::remove(
+        let bytes = crate::package::embedded::remove(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
             index,
-            crate::embedded_package::ResourceTarget::Image,
+            crate::package::embedded::ResourceTarget::Image,
         )?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
     pub fn move_embedded_object(&mut self, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::embedded_package::reorder(
+        let bytes = crate::package::embedded::reorder(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
             from,
             to,
-            crate::embedded_package::ResourceTarget::Object,
+            crate::package::embedded::ResourceTarget::Object,
         )?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
     pub fn move_embedded_image(&mut self, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::embedded_package::reorder(
+        let bytes = crate::package::embedded::reorder(
             &self.package,
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
             from,
             to,
-            crate::embedded_package::ResourceTarget::Image,
+            crate::package::embedded::ResourceTarget::Image,
         )?;
         *self = Self::from_bytes(bytes)?;
         Ok(())

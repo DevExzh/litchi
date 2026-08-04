@@ -89,7 +89,6 @@ pub enum CellValue {
     Time(String),
 }
 
-pub mod annotation_package;
 pub mod auto_mark_file;
 pub mod bibliography_configuration;
 pub mod chart_properties;
@@ -104,13 +103,10 @@ pub mod drawing_opacity;
 pub mod drawing_page_properties;
 pub mod drawing_stroke_dash;
 pub mod drawing_style_resources;
-pub mod embedded_chart;
 pub mod embedded_object;
-pub mod embedded_package;
 pub mod font_face;
 pub mod footnote_separator;
 pub mod form;
-pub mod form_package;
 pub mod generic;
 pub mod graphic_properties;
 pub mod header_footer_properties;
@@ -122,8 +118,8 @@ pub mod master_page;
 pub mod media;
 pub mod notes_configuration;
 pub mod outline_style;
+pub mod package;
 pub mod ruby_family;
-pub mod script_package;
 pub mod section_properties;
 pub mod settings;
 pub mod style;
@@ -135,13 +131,6 @@ pub mod table_row_properties;
 pub mod text_properties;
 pub mod variable_declaration;
 
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes package annotation operations"
-)]
-pub use annotation_package::{
-    Annotation, AnnotationAnchor, AnnotationInfo, AnnotationPosition, AnnotationUpdate,
-};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes inert concordance metadata"
@@ -204,22 +193,10 @@ pub use elements::bookmark::{
 };
 #[allow(
     unused_imports,
-    reason = "ODT facade exposes embedded-chart storage policy"
-)]
-pub use embedded_chart::EmbeddedChartStorage;
-#[allow(
-    unused_imports,
     reason = "ODT facade exposes inert embedded-resource models"
 )]
 pub use embedded_object::{
     EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes inert embedded-resource updates"
-)]
-pub use embedded_package::{
-    EmbeddedResource, EmbeddedResourceFile, EmbeddedResourceKind, EmbeddedResourceSource,
 };
 #[allow(unused_imports, reason = "ODT facade exposes font-face semantics")]
 pub use font_face::{
@@ -268,8 +245,6 @@ pub use form::{
     replace_value_range_control_xml, replace_visual_control_xml, selection_controls, text_controls,
     typed_value_controls, value_range_controls, visual_controls,
 };
-#[allow(unused_imports, reason = "ODT facade exposes authored form operations")]
-pub use form_package::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
@@ -344,6 +319,32 @@ pub use outline_style::{
     OutlineStyles, OutlineTextAlign, OutlineTextProperties, parse_outline_styles,
     remove_outline_style_xml, set_outline_style_xml,
 };
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes package annotation operations"
+)]
+pub use package::annotation::{
+    Annotation, AnnotationAnchor, AnnotationInfo, AnnotationPosition, AnnotationUpdate,
+};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes embedded-chart storage policy"
+)]
+pub use package::charts::EmbeddedChartStorage;
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes inert embedded-resource updates"
+)]
+pub use package::embedded::{
+    EmbeddedResource, EmbeddedResourceFile, EmbeddedResourceKind, EmbeddedResourceSource,
+};
+#[allow(unused_imports, reason = "ODT facade exposes authored form operations")]
+pub use package::forms::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes inert package script resources"
+)]
+pub use package::scripts::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
 #[allow(unused_imports, reason = "ODT facade exposes ruby semantics")]
 pub use ruby_family::{
     RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
@@ -351,11 +352,6 @@ pub use ruby_family::{
     remove_ruby_annotation_xml, remove_ruby_style_xml, replace_ruby_annotation_xml,
     set_ruby_style_xml, wrap_ruby_annotation_xml,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes inert package script resources"
-)]
-pub use script_package::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes common style configurations"

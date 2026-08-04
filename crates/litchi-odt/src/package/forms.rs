@@ -1,7 +1,7 @@
 //! Package-safe, lossless mutation of form trees and typed controls.
 
 use crate::core::OwnedPackage;
-use crate::embedded_chart::{rebuild_package, splice};
+use crate::package::charts::{rebuild_package, splice};
 use crate::{
     Form, FormNode, FormPart, FormProperty, GenericFormControl, GridControl, ImageFrameControl,
     InteractiveControl, PasswordFileControl, SelectionControl, TextControl, TypedValueControl,

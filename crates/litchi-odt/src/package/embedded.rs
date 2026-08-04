@@ -1,7 +1,7 @@
 //! Atomic authoring of inert embedded objects, OLE payloads, and images.
 
 use crate::core::OwnedPackage;
-use crate::embedded_chart::{
+use crate::package::charts::{
     Addition, EmbeddedChartHost, ObjectSpan, insert_at_host, locate_objects, rebuild_package,
     splice, unused_object_root,
 };
