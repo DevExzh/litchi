@@ -25,7 +25,7 @@ pub enum Table {
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::Table<'static>>),
     #[cfg(feature = "odf")]
-    Odt(Box<litchi_odf::Table>),
+    Odt(Box<litchi_odt::elements::table::Table>),
 }
 
 impl Table {
@@ -130,7 +130,7 @@ pub enum Row {
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::Row<'static>>),
     #[cfg(feature = "odf")]
-    Odt(Box<litchi_odf::Row>),
+    Odt(Box<litchi_odt::elements::table::TableRow>),
 }
 
 impl Row {
@@ -263,7 +263,7 @@ pub enum Cell {
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::Cell<'static>>),
     #[cfg(feature = "odf")]
-    Odt(Box<litchi_odf::Cell>),
+    Odt(Box<litchi_odt::elements::table::TableCell>),
 }
 
 impl Cell {
@@ -449,7 +449,6 @@ fn rtf_merge(role: Option<litchi_rtf::TableCellMergeRole>) -> CellMerge {
 #[cfg(test)]
 mod tests {
     use super::super::{CellMerge, Document};
-    use crate::Error;
     use std::path::PathBuf;
 
     fn test_data_path() -> PathBuf {

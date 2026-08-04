@@ -156,21 +156,22 @@ impl Workbook {
 
             #[cfg(feature = "odf")]
             DetectedFormat::Ods(data) => {
-                let ods = litchi_odf::Spreadsheet::from_bytes(data)
+                let ods = litchi_ods::Spreadsheet::from_bytes(data)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                let metadata = ods.metadata().unwrap_or_default();
-                (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)
+                (
+                    WorkbookImpl::Ods(std::cell::RefCell::new(ods)),
+                    Metadata::default(),
+                )
             },
 
             #[cfg(feature = "odf")]
-            DetectedFormat::FlatOdf(litchi_core::detection::FileFormat::Ods, data) => {
-                let flat = litchi_odf::FlatSpreadsheet::from_bytes(data)
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                let metadata = flat.spreadsheet().metadata().unwrap_or_default();
-                (
-                    WorkbookImpl::FlatOds(std::cell::RefCell::new(flat)),
-                    metadata,
-                )
+            DetectedFormat::FlatOdf(format, data) => {
+                let _ = data;
+                return Err(Box::new(Error::Unsupported(format!(
+                    "flat OpenDocument {:?} is detected but the dedicated family facade exposes packaged parsing only",
+                    format
+                )))
+                    as Box<dyn std::error::Error + Send + Sync>);
             },
 
             // Handle mismatched formats
@@ -225,22 +226,14 @@ impl Workbook {
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_names().to_vec()),
 
             #[cfg(feature = "odf")]
-            WorkbookImpl::Ods(ods_ref) => {
-                let mut ods = ods_ref.borrow_mut();
-                let sheets = ods
-                    .sheets()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                Ok(sheets.iter().map(|s| s.name.clone()).collect())
-            },
-
-            #[cfg(feature = "odf")]
-            WorkbookImpl::FlatOds(flat_ref) => {
-                let mut flat = flat_ref.borrow_mut();
-                let sheets = flat
-                    .spreadsheet_mut()
-                    .sheets()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                Ok(sheets.iter().map(|s| s.name.clone()).collect())
+            WorkbookImpl::Ods(spreadsheet) => {
+                // Keep the parsed package alive for the dedicated ODS facade;
+                // worksheet enumeration is not exposed at this boundary yet.
+                let _ = spreadsheet;
+                Err(Box::new(Error::Unsupported(
+                "litchi-ods::Spreadsheet currently exposes package/XML and RDF APIs; worksheet enumeration is not yet exposed by its facade"
+                    .to_string(),
+                )) as Box<dyn std::error::Error + Send + Sync>)
             },
 
             #[cfg(any(feature = "xls", feature = "ooxml"))]
@@ -279,21 +272,12 @@ impl Workbook {
             #[cfg(feature = "xls")]
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_count()),
             #[cfg(feature = "odf")]
-            WorkbookImpl::Ods(ods_ref) => {
-                let mut ods = ods_ref.borrow_mut();
-                let count = ods
-                    .sheet_count()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                Ok(count)
-            },
-            #[cfg(feature = "odf")]
-            WorkbookImpl::FlatOds(flat_ref) => {
-                let mut flat = flat_ref.borrow_mut();
-                let count = flat
-                    .spreadsheet_mut()
-                    .sheet_count()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                Ok(count)
+            WorkbookImpl::Ods(spreadsheet) => {
+                let _ = spreadsheet;
+                Err(Box::new(Error::Unsupported(
+                "litchi-ods::Spreadsheet currently exposes package/XML and RDF APIs; worksheet enumeration is not yet exposed by its facade"
+                    .to_string(),
+                )) as Box<dyn std::error::Error + Send + Sync>)
             },
             #[cfg(any(feature = "xls", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
@@ -549,18 +533,12 @@ impl Workbook {
             },
 
             #[cfg(feature = "odf")]
-            WorkbookImpl::Ods(ods_ref) => {
-                let mut ods = ods_ref.borrow_mut();
-                ods.text()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-            },
-
-            #[cfg(feature = "odf")]
-            WorkbookImpl::FlatOds(flat_ref) => {
-                let mut flat = flat_ref.borrow_mut();
-                flat.spreadsheet_mut()
-                    .text()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+            WorkbookImpl::Ods(spreadsheet) => {
+                let _ = spreadsheet;
+                Err(Box::new(Error::Unsupported(
+                "litchi-ods::Spreadsheet currently exposes package/XML and RDF APIs; text extraction is not yet exposed by its facade"
+                    .to_string(),
+                )) as Box<dyn std::error::Error + Send + Sync>)
             },
 
             #[cfg(any(feature = "xls", feature = "ooxml"))]
@@ -690,15 +668,17 @@ mod flat_ods_dispatch_tests {
             ))
         ));
 
-        let workbook = Workbook::from_bytes(FLAT_ODS.to_vec()).expect("flat ODS should open");
-        assert_eq!(workbook.worksheet_names().unwrap(), ["Sheet1"]);
-        assert_eq!(workbook.worksheet_count().unwrap(), 1);
-        assert_eq!(workbook.text().unwrap(), "value");
+        assert!(matches!(
+            Workbook::from_bytes(FLAT_ODS.to_vec()),
+            Err(error) if error.to_string().contains("flat OpenDocument")
+        ));
 
         let file = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(file.path(), FLAT_ODS).unwrap();
-        let opened = Workbook::open(file.path()).expect("flat ODS path should open");
-        assert_eq!(opened.worksheet_names().unwrap(), ["Sheet1"]);
+        assert!(matches!(
+            Workbook::open(file.path()),
+            Err(error) if error.to_string().contains("flat OpenDocument")
+        ));
     }
 }
 

@@ -72,11 +72,10 @@ mod flat_odp_tests {
             _ => panic!("flat ODP was not detected as flat OpenDocument presentation"),
         }
 
-        let presentation =
-            Presentation::from_bytes(FLAT_ODP.to_vec()).expect("flat ODP should open");
-        assert!(presentation.text().unwrap().contains("Hello flat slides"));
-        assert_eq!(presentation.slide_count().unwrap(), 1);
-        assert_eq!(presentation.slides().unwrap().len(), 1);
+        assert!(matches!(
+            Presentation::from_bytes(FLAT_ODP.to_vec()),
+            Err(litchi_core::Error::Unsupported(_))
+        ));
     }
 }
 
@@ -211,22 +210,16 @@ impl Presentation {
                 })
             },
             #[cfg(feature = "odf")]
-            DetectedFormat::FlatOdf(litchi_core::detection::FileFormat::Odp, data) => {
-                let doc = litchi_odf::FlatPresentation::from_bytes(data).map_err(|e| {
-                    Error::ParseError(format!(
-                        "Failed to parse flat ODP presentation from bytes: {}",
-                        e
-                    ))
-                })?;
-
-                Ok(Self {
-                    inner: PresentationImpl::FlatOdp(doc),
-                    cached_metadata: Some(litchi_core::Metadata::default()),
-                })
+            DetectedFormat::FlatOdf(format, data) => {
+                let _ = data;
+                Err(Error::Unsupported(format!(
+                    "flat OpenDocument {:?} is detected but the dedicated family facade exposes packaged parsing only",
+                    format
+                )))
             },
             #[cfg(feature = "odf")]
             DetectedFormat::Odp(data) => {
-                let doc = litchi_odf::Presentation::from_bytes(data).map_err(|e| {
+                let doc = litchi_odp::Presentation::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!(
                         "Failed to parse ODP presentation from bytes: {}",
                         e
@@ -286,11 +279,6 @@ impl Presentation {
             PresentationImpl::Odp(doc) => doc
                 .text()
                 .map_err(|e| Error::ParseError(format!("Failed to extract ODP text: {}", e))),
-            #[cfg(feature = "odf")]
-            PresentationImpl::FlatOdp(doc) => doc
-                .presentation()
-                .text()
-                .map_err(|e| Error::ParseError(format!("Failed to extract flat ODP text: {}", e))),
         }
     }
 
@@ -327,10 +315,6 @@ impl Presentation {
             PresentationImpl::Odp(doc) => doc
                 .slide_count()
                 .map_err(|e| Error::ParseError(format!("Failed to get ODP slide count: {}", e))),
-            #[cfg(feature = "odf")]
-            PresentationImpl::FlatOdp(doc) => doc.presentation().slide_count().map_err(|e| {
-                Error::ParseError(format!("Failed to get flat ODP slide count: {}", e))
-            }),
         }
     }
 
@@ -397,13 +381,6 @@ impl Presentation {
                     .map_err(|e| Error::ParseError(format!("Failed to get ODP slides: {}", e)))?;
                 Ok(odp_slides.into_iter().map(Slide::Odp).collect())
             },
-            #[cfg(feature = "odf")]
-            PresentationImpl::FlatOdp(doc) => {
-                let odp_slides = doc.presentation().slides().map_err(|e| {
-                    Error::ParseError(format!("Failed to get flat ODP slides: {}", e))
-                })?;
-                Ok(odp_slides.into_iter().map(Slide::Odp).collect())
-            },
         }
     }
 
@@ -436,8 +413,6 @@ impl Presentation {
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odf")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
-            #[cfg(feature = "odf")]
-            PresentationImpl::FlatOdp(_) => Ok(None), // Flat ODP doesn't expose slide dimensions in unified API yet
         }
     }
 
@@ -470,8 +445,6 @@ impl Presentation {
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odf")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
-            #[cfg(feature = "odf")]
-            PresentationImpl::FlatOdp(_) => Ok(None), // Flat ODP doesn't expose slide dimensions in unified API yet
         }
     }
 

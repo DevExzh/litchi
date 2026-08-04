@@ -23,7 +23,7 @@ pub enum Run {
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Run<'static>),
     #[cfg(feature = "odf")]
-    Odt(litchi_odf::Run),
+    Odt(litchi_odt::elements::text::Span),
 }
 
 impl Run {

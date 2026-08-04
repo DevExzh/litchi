@@ -51,20 +51,6 @@ pub enum DetectedFormat {
     Odp(Vec<u8>),
     #[cfg(feature = "odf")]
     Ods(Vec<u8>),
-    #[cfg(feature = "odf")]
-    Odg(Vec<u8>),
-    #[cfg(feature = "odf")]
-    Odc(Vec<u8>),
-    #[cfg(feature = "odf")]
-    Odf(Vec<u8>),
-    #[cfg(feature = "odf")]
-    Odi(Vec<u8>),
-    #[cfg(feature = "odf")]
-    Odm(Vec<u8>),
-    #[cfg(feature = "odf")]
-    Oth(Vec<u8>),
-    #[cfg(feature = "odf")]
-    Odb(Vec<u8>),
     /// Flat OpenDocument XML with its detected family.
     #[cfg(feature = "odf")]
     FlatOdf(litchi_core::detection::FileFormat, Vec<u8>),
@@ -103,7 +89,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     }
 
     #[cfg(feature = "odf")]
-    if let Some(format) = litchi_odf::detect::flat(&bytes) {
+    if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
 
@@ -160,18 +146,11 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         }
 
         #[cfg(feature = "odf")]
-        if let Some(format) = litchi_odf::detect::bytes(&bytes) {
+        if let Some(format) = litchi_odf_common::detect::bytes(&bytes) {
             return match format {
                 FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
                 FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
                 FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
-                FileFormat::Odg => Some(DetectedFormat::Odg(bytes)),
-                FileFormat::Odc => Some(DetectedFormat::Odc(bytes)),
-                FileFormat::Odf => Some(DetectedFormat::Odf(bytes)),
-                FileFormat::Odi => Some(DetectedFormat::Odi(bytes)),
-                FileFormat::Odm => Some(DetectedFormat::Odm(bytes)),
-                FileFormat::Oth => Some(DetectedFormat::Oth(bytes)),
-                FileFormat::Odb => Some(DetectedFormat::Odb(bytes)),
                 _ => None,
             };
         }
@@ -204,77 +183,6 @@ mod short_signature_tests {
         match detect_format_smart(br#"{\rtf"#.to_vec()) {
             Some(super::DetectedFormat::Rtf(bytes)) => assert_eq!(bytes, br#"{\rtf"#),
             _ => panic!("minimal RTF signature was not retained"),
-        }
-    }
-}
-
-#[cfg(all(test, feature = "odf"))]
-mod tests {
-    use super::*;
-    use litchi_core::detection::FileFormat;
-    use std::io::{Cursor, Write};
-
-    fn package_with_mimetype(mimetype: &str) -> Vec<u8> {
-        let mut bytes = Vec::new();
-        {
-            let mut writer = zip::ZipWriter::new(Cursor::new(&mut bytes));
-            let options = zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Stored);
-            writer.start_file("mimetype", options).unwrap();
-            writer.write_all(mimetype.as_bytes()).unwrap();
-            writer.finish().unwrap();
-        }
-        bytes
-    }
-
-    #[test]
-    fn smart_detection_retains_all_additional_odf_families() {
-        for (mimetype, expected) in [
-            (
-                "application/vnd.oasis.opendocument.graphics",
-                FileFormat::Odg,
-            ),
-            ("application/vnd.oasis.opendocument.chart", FileFormat::Odc),
-            (
-                "application/vnd.oasis.opendocument.formula",
-                FileFormat::Odf,
-            ),
-            ("application/vnd.oasis.opendocument.image", FileFormat::Odi),
-            (
-                "application/vnd.oasis.opendocument.text-master",
-                FileFormat::Odm,
-            ),
-            (
-                "application/vnd.oasis.opendocument.text-web",
-                FileFormat::Oth,
-            ),
-            ("application/vnd.oasis.opendocument.base", FileFormat::Odb),
-        ] {
-            let bytes = package_with_mimetype(mimetype);
-            let detected = detect_format_smart(bytes.clone()).unwrap();
-            let (format, retained) = match detected {
-                DetectedFormat::Odg(retained) => (FileFormat::Odg, retained),
-                DetectedFormat::Odc(retained) => (FileFormat::Odc, retained),
-                DetectedFormat::Odf(retained) => (FileFormat::Odf, retained),
-                DetectedFormat::Odi(retained) => (FileFormat::Odi, retained),
-                DetectedFormat::Odm(retained) => (FileFormat::Odm, retained),
-                DetectedFormat::Oth(retained) => (FileFormat::Oth, retained),
-                DetectedFormat::Odb(retained) => (FileFormat::Odb, retained),
-                _ => panic!("wrong smart-detection result for {mimetype}"),
-            };
-            assert_eq!(format, expected);
-            assert_eq!(retained, bytes);
-        }
-    }
-
-    #[test]
-    fn smart_detection_keeps_flat_odf_distinct_from_packages() {
-        let xml = br#"<?xml version="1.0"?><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.graphics"><o:body><o:drawing/></o:body></o:document>"#;
-        match detect_format_smart(xml.to_vec()).unwrap() {
-            DetectedFormat::FlatOdf(FileFormat::Odg, retained) => {
-                assert_eq!(retained, xml);
-            },
-            _ => panic!("flat ODG was not retained as flat OpenDocument XML"),
         }
     }
 }

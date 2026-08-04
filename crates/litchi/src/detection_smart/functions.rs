@@ -13,7 +13,7 @@ use litchi_core::detection::simd_utils::{check_office_signatures, signature_matc
 use litchi_core::detection::{rtf, utils};
 
 #[cfg(feature = "odf")]
-use litchi_odf::detect as odf;
+use litchi_odf_common::detect as odf;
 
 /// Detect file format from a file path.
 ///

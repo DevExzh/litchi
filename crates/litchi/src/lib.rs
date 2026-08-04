@@ -378,14 +378,22 @@ pub mod iwa {
 
 /// OpenDocument Format (ODF) Support
 ///
-/// Provides unified APIs for working with OpenDocument files (.odt, .ods, .odp).
-/// The format is automatically detected and handled transparently.
-/// Use [`odf::Document`], [`odf::Spreadsheet`], or [`odf::Presentation`] to get started.
+/// Provides the layered OpenDocument family facades for `.odt`, `.ods`, and
+/// `.odp`. Use [`odf::odt`], [`odf::ods`], or [`odf::odp`] to access the
+/// format-specific APIs; the high-level [`Document`], [`Workbook`], and
+/// [`Presentation`] facades auto-detect packaged files.
 ///
 /// **Note**: This requires the `odf` feature to be enabled.
 #[cfg(feature = "odf")]
 pub mod odf {
-    pub use litchi_odf::*;
+    pub use litchi_odf_common as common;
+    pub use litchi_odf_common::detect;
+    #[cfg(feature = "odf")]
+    pub use litchi_odp as odp;
+    #[cfg(feature = "odf")]
+    pub use litchi_ods as ods;
+    #[cfg(feature = "odf")]
+    pub use litchi_odt as odt;
 }
 
 /// RTF (Rich Text Format) Support

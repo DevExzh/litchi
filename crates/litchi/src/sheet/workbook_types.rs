@@ -29,12 +29,10 @@ pub(super) enum WorkbookImpl {
     #[cfg(feature = "xls")]
     XlsMem(crate::xls::XlsWorkbook<std::io::Cursor<Vec<u8>>>),
 
-    // OpenDocument Spreadsheet
+    /// Parsed ODS package retained for the dedicated facade to expose richer
+    /// worksheet APIs as they become available.
     #[cfg(feature = "odf")]
-    Ods(std::cell::RefCell<litchi_odf::Spreadsheet>),
-    // Flat OpenDocument Spreadsheet (`.fods`) with its lossless source wrapper
-    #[cfg(feature = "odf")]
-    FlatOds(std::cell::RefCell<litchi_odf::FlatSpreadsheet>),
+    Ods(std::cell::RefCell<litchi_ods::Spreadsheet>),
 
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "xls", feature = "ooxml"))]
@@ -126,7 +124,7 @@ pub fn refine_workbook_format<R: Read + Seek>(
         }
 
         #[cfg(feature = "odf")]
-        if litchi_odf::detect::bytes(&data) == Some(FileFormat::Ods) {
+        if litchi_odf_common::detect::bytes(&data) == Some(FileFormat::Ods) {
             return Ok(WorkbookFormat::Ods);
         }
 

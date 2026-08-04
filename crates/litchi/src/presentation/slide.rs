@@ -15,7 +15,7 @@ pub enum Slide {
     Keynote(crate::iwa::keynote::KeynoteSlide),
     /// OpenDocument Presentation slide
     #[cfg(feature = "odf")]
-    Odp(litchi_odf::Slide),
+    Odp(litchi_odp::Slide),
 }
 
 impl Slide {

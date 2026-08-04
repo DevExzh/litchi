@@ -50,11 +50,10 @@ mod flat_odt_tests {
             _ => panic!("flat ODT was not detected as flat OpenDocument text"),
         }
 
-        let document = Document::from_bytes(FLAT_ODT.to_vec()).expect("flat ODT should open");
-        assert!(document.text().unwrap().contains("Hello flat text"));
-        assert_eq!(document.paragraph_count().unwrap(), 1);
-        assert_eq!(document.paragraphs().unwrap().len(), 1);
-        assert!(!document.elements().unwrap().is_empty());
+        assert!(matches!(
+            Document::from_bytes(FLAT_ODT.to_vec()),
+            Err(litchi_core::Error::Unsupported(_))
+        ));
     }
 }
 
@@ -263,21 +262,16 @@ impl Document {
                 })
             },
             #[cfg(feature = "odf")]
-            DetectedFormat::FlatOdf(litchi_core::detection::FileFormat::Odt, data) => {
-                let doc = litchi_odf::FlatTextDocument::from_bytes(data).map_err(|e| {
-                    Error::ParseError(format!(
-                        "Failed to parse flat ODT document from bytes: {}",
-                        e
-                    ))
-                })?;
-
-                Ok(Self {
-                    inner: DocumentImpl::FlatOdt(doc),
-                })
+            DetectedFormat::FlatOdf(format, data) => {
+                let _ = data;
+                Err(Error::Unsupported(format!(
+                    "flat OpenDocument {:?} is detected but the dedicated family facade exposes packaged parsing only",
+                    format
+                )))
             },
             #[cfg(feature = "odf")]
             DetectedFormat::Odt(data) => {
-                let doc = litchi_odf::Document::from_bytes(data).map_err(|e| {
+                let doc = litchi_odt::Document::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!("Failed to parse ODT document from bytes: {}", e))
                 })?;
 
@@ -326,10 +320,6 @@ impl Document {
             DocumentImpl::Odt(doc) => doc
                 .text()
                 .map_err(|e| Error::ParseError(format!("Failed to extract text from ODT: {}", e))),
-            #[cfg(feature = "odf")]
-            DocumentImpl::FlatOdt(doc) => doc.document().text().map_err(|e| {
-                Error::ParseError(format!("Failed to extract text from flat ODT: {}", e))
-            }),
         }
     }
 
@@ -368,10 +358,6 @@ impl Document {
             DocumentImpl::Odt(doc) => doc
                 .paragraph_count()
                 .map_err(|e| Error::ParseError(format!("Failed to get paragraph count: {}", e))),
-            #[cfg(feature = "odf")]
-            DocumentImpl::FlatOdt(doc) => doc.document().paragraph_count().map_err(|e| {
-                Error::ParseError(format!("Failed to get flat ODT paragraph count: {}", e))
-            }),
         }
     }
 
@@ -450,13 +436,6 @@ impl Document {
                     .map_err(|e| Error::ParseError(format!("Failed to get paragraphs: {}", e)))?;
                 Ok(paras.into_iter().map(Paragraph::Odt).collect())
             },
-            #[cfg(feature = "odf")]
-            DocumentImpl::FlatOdt(doc) => {
-                let paras = doc.document().paragraphs().map_err(|e| {
-                    Error::ParseError(format!("Failed to get flat ODT paragraphs: {}", e))
-                })?;
-                Ok(paras.into_iter().map(Paragraph::Odt).collect())
-            },
         }
     }
 
@@ -517,16 +496,6 @@ impl Document {
                 let tables = doc
                     .tables()
                     .map_err(|e| Error::ParseError(format!("Failed to get tables: {}", e)))?;
-                Ok(tables
-                    .into_iter()
-                    .map(|table| Table::Odt(Box::new(table)))
-                    .collect())
-            },
-            #[cfg(feature = "odf")]
-            DocumentImpl::FlatOdt(doc) => {
-                let tables = doc.document().tables().map_err(|e| {
-                    Error::ParseError(format!("Failed to get flat ODT tables: {}", e))
-                })?;
                 Ok(tables
                     .into_iter()
                     .map(|table| Table::Odt(Box::new(table)))
@@ -655,8 +624,8 @@ impl Document {
             #[cfg(feature = "odf")]
             DocumentImpl::Odt(doc) => {
                 use super::DocumentElement;
-                use litchi_odf::elements::parser::DocumentOrderElement;
-                use litchi_odf::elements::text::Paragraph as ElementParagraph;
+                use litchi_odt::elements::parser::DocumentOrderElement;
+                use litchi_odt::elements::text::Paragraph as ElementParagraph;
 
                 // Get ODF-specific elements and convert to unified API types
                 let odf_elements = doc
@@ -698,51 +667,6 @@ impl Document {
                             // Lists are typically expanded to paragraphs in text extraction
                             // Skip in the unified document element API for now
                         },
-                    }
-                }
-
-                Ok(elements)
-            },
-            #[cfg(feature = "odf")]
-            DocumentImpl::FlatOdt(doc) => {
-                use super::DocumentElement;
-                use litchi_odf::elements::parser::DocumentOrderElement;
-                use litchi_odf::elements::text::Paragraph as ElementParagraph;
-
-                let odf_elements = doc.document().elements().map_err(|e| {
-                    Error::ParseError(format!("Failed to get flat ODT elements: {}", e))
-                })?;
-
-                let mut elements = Vec::new();
-                for element in odf_elements {
-                    match element {
-                        DocumentOrderElement::Paragraph(para) => {
-                            elements
-                                .push(DocumentElement::Paragraph(Box::new(Paragraph::Odt(para))));
-                        },
-                        DocumentOrderElement::NumberedParagraph(para) => {
-                            elements.push(DocumentElement::Paragraph(Box::new(Paragraph::Odt(
-                                para.into_paragraph(),
-                            ))));
-                        },
-                        DocumentOrderElement::Heading(heading) => {
-                            if let Ok(text) = heading.text() {
-                                let mut para = ElementParagraph::new();
-                                para.set_text(&text);
-                                if let Some(style) = heading.style_name() {
-                                    para.set_style_name(style);
-                                }
-                                elements.push(DocumentElement::Paragraph(Box::new(
-                                    Paragraph::Odt(para),
-                                )));
-                            }
-                        },
-                        DocumentOrderElement::Table(table) => {
-                            elements.push(DocumentElement::Table(Box::new(Table::Odt(Box::new(
-                                table,
-                            )))));
-                        },
-                        DocumentOrderElement::List(_list) => {},
                     }
                 }
 
@@ -806,11 +730,6 @@ impl Document {
             DocumentImpl::Odt(doc) => doc
                 .metadata()
                 .map_err(|e| Error::ParseError(format!("Failed to get metadata: {}", e))),
-            #[cfg(feature = "odf")]
-            DocumentImpl::FlatOdt(doc) => doc
-                .document()
-                .metadata()
-                .map_err(|e| Error::ParseError(format!("Failed to get flat ODT metadata: {}", e))),
         }
     }
 }

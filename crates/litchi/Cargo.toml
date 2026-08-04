@@ -61,7 +61,12 @@ full = [
 ]
 # Format support features
 iwa = ["dep:litchi-iwa"]
-odf = ["dep:litchi-odf"]
+odf = [
+    "dep:litchi-odf-common",
+    "dep:litchi-odp",
+    "dep:litchi-ods",
+    "dep:litchi-odt",
+]
 doc = ["dep:litchi-cfb", "dep:litchi-doc", "sign"]
 ppt = ["dep:litchi-cfb", "dep:litchi-ppt", "sign"]
 xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]
@@ -107,7 +112,10 @@ litchi-formula = { workspace = true, optional = true } # Formula parser/converte
 litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conversion (carved out in workspace split, gated by `imgconv` feature)
 litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbers, .key) parser (carved out in workspace split, gated by `iwa` feature)
 litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpers (carved out in workspace split)
-litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
+litchi-odf-common = { workspace = true, optional = true } # Format-neutral OpenDocument vocabulary and detection
+litchi-odp = { workspace = true, optional = true } # OpenDocument Presentation (.odp) parser, gated by `odf`
+litchi-ods = { workspace = true, optional = true } # OpenDocument Spreadsheet (.ods) parser, gated by `odf`
+litchi-odt = { workspace = true, optional = true } # OpenDocument Text (.odt) parser, gated by `odf`
 litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt image grammar exposed by the image facade
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
 litchi-ooxml-common = { workspace = true, optional = true } # Host-neutral OOXML package grammar exposed directly by the OOXML facade
