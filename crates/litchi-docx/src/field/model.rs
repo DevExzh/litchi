@@ -5774,9 +5774,6 @@ impl Advance {
     }
 }
 
-/// Backward-compatible name for a lexical switch exposed by a TOC field.
-pub type TocSwitch = Switch;
-
 /// An inclusive heading-level range selected by a `TOC \o` switch.
 ///
 /// WordprocessingML heading levels are bounded to one through nine.
