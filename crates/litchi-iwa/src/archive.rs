@@ -172,6 +172,11 @@ impl Archive {
                 ))
             })?;
             let archive_info: ArchiveInfo = protobuf::tsp::ArchiveInfo::decode(header_data)?.into();
+            if archive_info.identifier.is_none() {
+                return Err(Error::Archive(
+                    "IWA object is missing its archive identifier".to_string(),
+                ));
+            }
             cursor.set_position(header_end as u64);
             let data_start = cursor.position();
 
@@ -538,5 +543,23 @@ mod tests {
         let mut bytes = varint::encode_varint(header.len() as u64);
         bytes.extend_from_slice(&header);
         assert!(Archive::parse(&bytes).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_identifier_before_materializing_later_objects() {
+        // An empty ArchiveInfo has no identifier. The trailing zero-length
+        // headers would otherwise be materialized as objects before the
+        // malformed varint is reached.
+        let mut bytes = vec![0];
+        bytes.extend(std::iter::repeat(0).take(4096));
+        bytes.push(0x80);
+
+        let error = Archive::parse(&bytes).unwrap_err();
+
+        assert!(matches!(
+            error,
+            Error::Archive(message)
+                if message == "IWA object is missing its archive identifier"
+        ));
     }
 }
