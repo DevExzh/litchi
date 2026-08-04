@@ -1,14 +1,14 @@
 #[cfg(feature = "odf")]
 use litchi::Result;
 #[cfg(feature = "odf")]
-use litchi::odf::{Document, DocumentBuilder, MutableDocument};
+use litchi::odf::odt::{Builder, Document, MutableDocument};
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
     let base_file = "odt_mutable_page_styles_base.odt";
     let output_file = "odt_mutable_page_styles_demo.odt";
 
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
     builder.add_heading("Mutable ODT Demo", 1)?;
     builder
         .add_paragraph("This seed file will be reopened and updated through MutableDocument.")?;

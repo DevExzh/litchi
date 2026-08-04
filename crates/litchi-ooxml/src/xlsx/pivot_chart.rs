@@ -238,7 +238,7 @@ pub enum PivotChartSheetKind {
 
 /// Pivot charts anchored on one worksheet or chartsheet.
 #[derive(Debug, Clone)]
-pub struct WorksheetPivotCharts {
+pub struct SheetPivotCharts {
     /// Sheet name from the workbook
     pub worksheet_name: String,
     /// Sheet part name (for example `/xl/worksheets/sheet1.xml`)
@@ -345,7 +345,7 @@ pub fn parse_pivot_chart_binding(xml: &[u8]) -> Result<Option<PivotChartBinding>
 /// returned chart has its `c:pivotSource` name resolved to the typed
 /// pivot-table model read from the package graph; broken or dangling
 /// bindings are errors.
-pub fn load_pivot_charts(package: &OpcPackage) -> Result<Vec<WorksheetPivotCharts>> {
+pub fn load_pivot_charts(package: &OpcPackage) -> Result<Vec<SheetPivotCharts>> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let tables = read_pivot_tables(package).map_err(|error| invalid(error.to_string()))?;
@@ -357,7 +357,7 @@ pub fn load_pivot_charts(package: &OpcPackage) -> Result<Vec<WorksheetPivotChart
             continue;
         };
         if !charts.is_empty() {
-            output.push(WorksheetPivotCharts {
+            output.push(SheetPivotCharts {
                 worksheet_name: sheet.name.clone(),
                 worksheet_part_name: part_name.to_string(),
                 sheet_kind,
@@ -370,10 +370,7 @@ pub fn load_pivot_charts(package: &OpcPackage) -> Result<Vec<WorksheetPivotChart
 
 /// Load the pivot charts anchored on one worksheet or chartsheet, addressed
 /// by sheet name. Sheets of other kinds yield an empty list.
-pub fn load_worksheet_pivot_charts(
-    package: &OpcPackage,
-    sheet_name: &str,
-) -> Result<Vec<PivotChart>> {
+pub fn load_sheet_pivot_charts(package: &OpcPackage, sheet_name: &str) -> Result<Vec<PivotChart>> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let tables = read_pivot_tables(package).map_err(|error| invalid(error.to_string()))?;
@@ -1475,10 +1472,10 @@ mod tests {
 
         // Per-worksheet accessor with a plain, unqualified pivot-table name.
         let (package, _) = package_with_pivot_chart(&pivot_chart_xml("PivotOne"));
-        let charts = load_worksheet_pivot_charts(&package, "Pivot").unwrap();
+        let charts = load_sheet_pivot_charts(&package, "Pivot").unwrap();
         assert_eq!(charts.len(), 1);
         assert_eq!(charts[0].pivot_table.name, "PivotOne");
-        assert!(load_worksheet_pivot_charts(&package, "Missing").is_err());
+        assert!(load_sheet_pivot_charts(&package, "Missing").is_err());
     }
 
     #[test]
@@ -1503,7 +1500,7 @@ mod tests {
         let (package, _) = package_with_pivot_chart(&ordinary);
         assert!(load_pivot_charts(&package).unwrap().is_empty());
         assert!(
-            load_worksheet_pivot_charts(&package, "Pivot")
+            load_sheet_pivot_charts(&package, "Pivot")
                 .unwrap()
                 .is_empty()
         );
@@ -1560,7 +1557,7 @@ mod tests {
         assert_eq!(chart.pivot_table.sheet_name, "Pivot");
 
         // The per-sheet accessor works for chartsheets too.
-        let charts = load_worksheet_pivot_charts(&package, "ChartSheet1").unwrap();
+        let charts = load_sheet_pivot_charts(&package, "ChartSheet1").unwrap();
         assert_eq!(charts.len(), 1);
         assert_eq!(charts[0].pivot_table.name, "PivotOne");
 
@@ -1616,10 +1613,10 @@ mod tests {
         assert_eq!(chart.pivot_table.name, "PivotTable2");
         assert_eq!(chart.pivot_table.sheet_name, "Sheet2");
 
-        let charts = load_worksheet_pivot_charts(&package, "Chart2").unwrap();
+        let charts = load_sheet_pivot_charts(&package, "Chart2").unwrap();
         assert_eq!(charts.len(), 1);
         assert!(
-            load_worksheet_pivot_charts(&package, "Sheet1")
+            load_sheet_pivot_charts(&package, "Sheet1")
                 .unwrap()
                 .is_empty()
         );

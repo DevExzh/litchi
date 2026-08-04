@@ -208,7 +208,7 @@ pub struct OleObjectProperties {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetOleObject {
+pub struct OleObject {
     pub program_id: Option<String>,
     pub data_or_view_aspect: Option<OleObjectAspect>,
     pub link: Option<String>,
@@ -223,8 +223,8 @@ pub struct WorksheetOleObject {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorksheetOleObjects {
-    pub objects: Vec<WorksheetOleObject>,
+pub struct OleObjects {
+    pub objects: Vec<OleObject>,
 }
 
 #[derive(Clone)]
@@ -243,7 +243,7 @@ struct Node {
 }
 
 /// Parses the optional `oleObjects` collection from a complete worksheet part.
-pub fn parse_worksheet_ole_objects(xml: &[u8]) -> Result<Option<WorksheetOleObjects>> {
+pub fn parse_ole_objects(xml: &[u8]) -> Result<Option<OleObjects>> {
     let root = parse_document(xml)?;
     let conformance = conformance(&root)?;
     let mut lists = root
@@ -266,12 +266,12 @@ pub fn parse_worksheet_ole_objects(xml: &[u8]) -> Result<Option<WorksheetOleObje
         require(child, conformance.sml(), "oleObject")?;
         objects.push(parse_object(child, conformance)?);
     }
-    let value = WorksheetOleObjects { objects };
+    let value = OleObjects { objects };
     validate_value(&value, false)?;
     Ok(Some(value))
 }
 
-fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<WorksheetOleObject> {
+fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<OleObject> {
     whitespace(node)?;
     if node.children.len() > 1 {
         return Err(invalid("oleObject has multiple child elements"));
@@ -308,7 +308,7 @@ fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<Worksh
         .first()
         .map(|child| parse_properties(child, conformance))
         .transpose()?;
-    Ok(WorksheetOleObject {
+    Ok(OleObject {
         program_id,
         data_or_view_aspect,
         link,
@@ -414,10 +414,7 @@ fn parse_marker(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
 }
 
 /// Deterministically serializes a self-contained `oleObjects` fragment.
-pub fn write_worksheet_ole_objects(
-    value: &WorksheetOleObjects,
-    conformance: OleObjectConformance,
-) -> Result<Vec<u8>> {
+pub fn write_ole_objects(value: &OleObjects, conformance: OleObjectConformance) -> Result<Vec<u8>> {
     validate_value(value, false)?;
     let mut output = Vec::new();
     output.extend_from_slice(b"<x:oleObjects xmlns:x=\"");
@@ -519,10 +516,10 @@ fn write_marker(output: &mut Vec<u8>, name: &str, marker: &OleObjectMarker) {
 }
 
 /// Loads OLE anchors and validates all payload and preview relationships for one worksheet.
-pub fn load_worksheet_ole_objects(
+pub fn load_ole_objects(
     package: &OpcPackage,
     worksheet_name: &PackURI,
-) -> Result<Option<WorksheetOleObjects>> {
+) -> Result<Option<OleObjects>> {
     if package
         .rels()
         .iter()
@@ -534,7 +531,7 @@ pub fn load_worksheet_ole_objects(
     }
     let worksheet = package.get_part(worksheet_name)?;
     require_worksheet(worksheet)?;
-    let Some(mut value) = parse_worksheet_ole_objects(worksheet.blob())? else {
+    let Some(mut value) = parse_ole_objects(worksheet.blob())? else {
         if worksheet
             .rels()
             .iter()
@@ -649,14 +646,14 @@ pub fn load_worksheet_ole_objects(
 }
 
 /// Adds a new OLE collection and its inert relationships to one worksheet.
-pub fn store_worksheet_ole_objects(
+pub fn store_ole_objects(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
-    value: &WorksheetOleObjects,
+    value: &OleObjects,
     conformance: OleObjectConformance,
 ) -> Result<()> {
     validate_value(value, true)?;
-    if load_worksheet_ole_objects(package, worksheet_name)?.is_some() {
+    if load_ole_objects(package, worksheet_name)?.is_some() {
         return Err(invalid("worksheet already contains OLE objects"));
     }
     let worksheet = package.get_part(worksheet_name)?;
@@ -666,7 +663,7 @@ pub fn store_worksheet_ole_objects(
             "requested conformance does not match worksheet namespace",
         ));
     }
-    let fragment = write_worksheet_ole_objects(value, conformance)?;
+    let fragment = write_ole_objects(value, conformance)?;
     let updated = insert_collection(worksheet.blob(), &fragment, conformance)?;
     let mut relationships: HashMap<String, (String, String, bool)> = HashMap::new();
     let mut parts: HashMap<String, OleObjectResource> = HashMap::new();
@@ -975,7 +972,7 @@ fn insert_collection(
     Ok(output)
 }
 
-fn validate_value(value: &WorksheetOleObjects, require_targets: bool) -> Result<()> {
+fn validate_value(value: &OleObjects, require_targets: bool) -> Result<()> {
     if value.objects.len() > MAX_OBJECTS {
         return Err(limit("object count"));
     }
@@ -1336,9 +1333,9 @@ mod tests {
             row_offset: 0,
         }
     }
-    fn value() -> WorksheetOleObjects {
-        WorksheetOleObjects {
-            objects: vec![WorksheetOleObject {
+    fn value() -> OleObjects {
+        OleObjects {
+            objects: vec![OleObject {
                 program_id: Some("Package.2".into()),
                 data_or_view_aspect: Some(OleObjectAspect::Icon),
                 link: None,
@@ -1397,15 +1394,14 @@ mod tests {
     #[test]
     fn strict_round_trip_covers_complete_typed_properties() {
         let expected = value();
-        let fragment =
-            write_worksheet_ole_objects(&expected, OleObjectConformance::Strict).unwrap();
+        let fragment = write_ole_objects(&expected, OleObjectConformance::Strict).unwrap();
         let xml = [
             format!("<x:worksheet xmlns:x=\"{STRICT_SML}\">").as_bytes(),
             fragment.as_slice(),
             b"</x:worksheet>",
         ]
         .concat();
-        let parsed = parse_worksheet_ole_objects(&xml).unwrap().unwrap();
+        let parsed = parse_ole_objects(&xml).unwrap().unwrap();
         assert_eq!(parsed.objects[0].program_id.as_deref(), Some("Package.2"));
         assert_eq!(
             parsed.objects[0].properties.as_ref().unwrap().anchor.to.row,
@@ -1418,7 +1414,7 @@ mod tests {
     fn loads_real_poi_mce_objects_without_opening_payloads() {
         let package = OpcPackage::from_bytes(POI).unwrap();
         let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
-        let objects = load_worksheet_ole_objects(&package, &uri).unwrap().unwrap();
+        let objects = load_ole_objects(&package, &uri).unwrap().unwrap();
         assert_eq!(objects.objects.len(), 2);
         assert_eq!(objects.objects[0].program_id.as_deref(), Some("Package"));
         assert_eq!(objects.objects[1].program_id.as_deref(), Some("Package2"));
@@ -1445,12 +1441,8 @@ mod tests {
     fn strict_package_writer_round_trips_and_inserts_in_schema_order() {
         let (mut package, uri) = package(OleObjectConformance::Strict);
         let expected = value();
-        store_worksheet_ole_objects(&mut package, &uri, &expected, OleObjectConformance::Strict)
-            .unwrap();
-        assert_eq!(
-            load_worksheet_ole_objects(&package, &uri).unwrap().unwrap(),
-            expected
-        );
+        store_ole_objects(&mut package, &uri, &expected, OleObjectConformance::Strict).unwrap();
+        assert_eq!(load_ole_objects(&package, &uri).unwrap().unwrap(), expected);
         let xml = package.get_part(&uri).unwrap().blob();
         assert!(
             memchr::memmem::find(xml, b"<x:oleObjects").unwrap()
@@ -1469,17 +1461,14 @@ mod tests {
         ));
         object.link = Some("'https://example.invalid/object.xlsx'!A1".into());
         object.properties = None;
-        store_worksheet_ole_objects(
+        store_ole_objects(
             &mut package,
             &uri,
             &expected,
             OleObjectConformance::Transitional,
         )
         .unwrap();
-        assert_eq!(
-            load_worksheet_ole_objects(&package, &uri).unwrap().unwrap(),
-            expected
-        );
+        assert_eq!(load_ole_objects(&package, &uri).unwrap().unwrap(), expected);
     }
 
     #[test]
@@ -1493,15 +1482,11 @@ mod tests {
             ),
             format!(r#"<!DOCTYPE x><worksheet xmlns="{SML}"/>"#),
         ] {
-            assert!(
-                parse_worksheet_ole_objects(xml.as_bytes()).is_err(),
-                "{xml}"
-            );
+            assert!(parse_ole_objects(xml.as_bytes()).is_err(), "{xml}");
         }
-        assert!(parse_worksheet_ole_objects(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
+        assert!(parse_ole_objects(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
         let (mut missing, uri) = package(OleObjectConformance::Transitional);
-        let fragment =
-            write_worksheet_ole_objects(&value(), OleObjectConformance::Transitional).unwrap();
+        let fragment = write_ole_objects(&value(), OleObjectConformance::Transitional).unwrap();
         missing.get_part_mut(&uri).unwrap().set_blob(
             [
                 format!("<x:worksheet xmlns:x=\"{SML}\">").as_bytes(),
@@ -1510,7 +1495,7 @@ mod tests {
             ]
             .concat(),
         );
-        assert!(load_worksheet_ole_objects(&missing, &uri).is_err());
+        assert!(load_ole_objects(&missing, &uri).is_err());
         let (mut unreferenced, uri) = package(OleObjectConformance::Transitional);
         unreferenced
             .get_part_mut(&uri)
@@ -1522,6 +1507,6 @@ mod tests {
                 "rIdX".into(),
                 false,
             );
-        assert!(load_worksheet_ole_objects(&unreferenced, &uri).is_err());
+        assert!(load_ole_objects(&unreferenced, &uri).is_err());
     }
 }

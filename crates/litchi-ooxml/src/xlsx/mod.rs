@@ -174,31 +174,30 @@ pub use named_sheet_view::{
     store_worksheet_named_sheet_views, write_named_sheet_views,
 };
 pub use ole_objects::{
-    OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker, OleObjectProperties,
-    OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate,
-    WorksheetOleObject, WorksheetOleObjects, load_worksheet_ole_objects,
-    parse_worksheet_ole_objects, store_worksheet_ole_objects, write_worksheet_ole_objects,
+    OleObject, OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker,
+    OleObjectProperties, OleObjectRelationshipKind, OleObjectResource, OleObjectTarget,
+    OleObjectUpdate, OleObjects, load_ole_objects, parse_ole_objects, store_ole_objects,
+    write_ole_objects,
 };
 pub use page_setup::parse_worksheet_page_setup;
 pub use printer_settings::{
-    PrinterSettingsConformance, PrinterSettingsResource, WorksheetPrinterSettings,
-    WorksheetPrinterSettingsReference, load_worksheet_printer_settings,
-    parse_worksheet_printer_settings_reference, store_worksheet_printer_settings,
-    write_worksheet_printer_settings_reference,
+    PrinterSettings, PrinterSettingsConformance, PrinterSettingsReference, PrinterSettingsResource,
+    load_printer_settings, parse_printer_settings_reference, store_printer_settings,
+    write_printer_settings_reference,
 };
 pub use shapes::{
     AnchoredObject, BodyProperties, CellMarker, ClientData, Columns, ConnectionEnd,
     ConnectionShape, Coordinate32, DrawingObject, DrawingOleObject, EditAs, EditAsError, Emu,
     EmuExtent, EmuOffset, Geometry, Group, GroupTransform, NonVisual, Paragraph, Run, Shape,
-    ShapeAnchor, TextBody, TextInsets, TextSize, WorksheetShapes, XlsxTextAutofit,
-    XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap, load_shapes,
-    load_worksheet_shapes, parse_drawing_shapes,
+    ShapeAnchor, Shapes, TextBody, TextInsets, TextSize, XlsxTextAutofit, XlsxTextDirection,
+    XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap, load_shapes, load_sheet_shapes,
+    parse_drawing_shapes,
 };
 pub use shared_strings::SharedStrings;
 pub use sheet_format::{WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties};
 pub use sheet_properties::{
-    WorksheetPageSetupProperties, WorksheetSheetProperties, WorksheetSynchronizationReference,
-    WorksheetTabColor, parse_worksheet_sheet_properties,
+    PageSetupProperties, SheetProperties, SynchronizationReference, TabColor,
+    parse_sheet_properties,
 };
 pub use sheet_protection::{
     ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeReference,
@@ -224,9 +223,8 @@ pub use slicer_timeline_crud::{
     update_timeline_cache,
 };
 pub use slicers::{
-    SLICERS_CONTENT_TYPE, SLICERS_RELATIONSHIP_TYPE, Slicer, SlicerExtensionList, Slicers,
-    WorksheetSlicers, load_worksheet_slicers, parse_slicers, store_worksheet_slicers,
-    write_slicers,
+    SLICERS_CONTENT_TYPE, SLICERS_RELATIONSHIP_TYPE, Slicer, SlicerExtensionList, SlicerPart,
+    Slicers, load_slicer_parts, parse_slicers, store_slicer_part, write_slicers,
 };
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{
@@ -279,8 +277,8 @@ pub use pivot::{
 pub use pivot_chart::{
     DEFAULT_PIVOT_CHART_FORMAT_ID, PIVOT_OPTIONS_EXTENSION_URI, PivotChart, PivotChartBinding,
     PivotChartDropZoneVisibility, PivotChartFieldType, PivotChartPivotOptions, PivotChartSeries,
-    PivotChartSheetKind, PivotChartSource, WorksheetPivotCharts, load_pivot_charts,
-    load_worksheet_pivot_charts, parse_pivot_chart_binding,
+    PivotChartSheetKind, PivotChartSource, SheetPivotCharts, load_pivot_charts,
+    load_sheet_pivot_charts, parse_pivot_chart_binding,
 };
 // Re-export writer types
 pub use writer::{

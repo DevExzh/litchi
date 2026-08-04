@@ -13,7 +13,7 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::Metadata;
 #[cfg(feature = "odf")]
-use litchi::odf::DocumentBuilder;
+use litchi::odf::odt::Builder;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
@@ -22,8 +22,8 @@ fn main() -> Result<()> {
     let output_file = "odt_writer_test_output.odt";
     println!("📝 Creating comprehensive ODT document: {}", output_file);
 
-    // Create a new document using DocumentBuilder
-    let mut builder = DocumentBuilder::new();
+    // Create a new document using the ODT builder.
+    let mut builder = Builder::new();
 
     // Set document metadata
     println!("✅ Setting metadata...");

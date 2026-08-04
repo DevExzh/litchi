@@ -388,10 +388,9 @@ pub mod iwa {
 pub mod odf {
     pub use litchi_odf_common as common;
     pub use litchi_odf_common::detect;
-    pub use litchi_odp::{self as odp, Builder, Presentation, Shape, Slide};
-    pub use litchi_ods::{self as ods, MutableSpreadsheet, Spreadsheet};
-    pub use litchi_odt::elements::text::Paragraph;
-    pub use litchi_odt::{self as odt, Document, DocumentBuilder, MutableDocument};
+    pub use litchi_odp as odp;
+    pub use litchi_ods as ods;
+    pub use litchi_odt as odt;
 }
 
 /// RTF (Rich Text Format) Support

@@ -6,9 +6,9 @@ use crate::xlsx::data_validation::{
 };
 use crate::xlsx::page_setup::{Fit, Setup};
 use crate::xlsx::sheet_protection::{
-    ProtectionPasswordVerifier, WorksheetProtection, WorksheetProtectionConformance,
-    WorksheetProtectionMetadata, write_worksheet_protection_core,
-    write_worksheet_protection_extensions,
+    ProtectionPasswordVerifier, Protection, Conformance as ProtectionConformance,
+    Metadata, write_core,
+    write_extensions,
 };
 use crate::xlsx::sort::{SortCondition, SortState};
 use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
@@ -454,7 +454,7 @@ pub struct MutableWorksheet {
     /// Manual column page breaks
     col_breaks: Vec<PageBreak>,
     /// Sheet protection configuration
-    protection: WorksheetProtectionMetadata,
+    protection: Metadata,
     /// Hyperlinks by cell reference
     hyperlinks: Vec<Hyperlink>,
     /// Cell comments
@@ -549,7 +549,7 @@ impl MutableWorksheet {
             sheet_view: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
-            protection: WorksheetProtectionMetadata::default(),
+            protection: Metadata::default(),
             hyperlinks: Vec::new(),
             comments: Vec::new(),
             conditional_formats: Vec::new(),
@@ -2347,7 +2347,7 @@ impl MutableWorksheet {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn protect_sheet(&mut self, password: Option<&str>) {
-        let mut protection = WorksheetProtection::default();
+        let mut protection = Protection::default();
         protection.set_sheet_locked(true);
         protection.set_format_cells_locked(false);
         protection.set_format_columns_locked(false);
@@ -2381,7 +2381,7 @@ impl MutableWorksheet {
     pub fn protect_sheet_with_options(
         &mut self,
         password: Option<&str>,
-        mut permissions: WorksheetProtection,
+        mut permissions: Protection,
     ) {
         if let Some(password) = password {
             permissions
@@ -2398,15 +2398,15 @@ impl MutableWorksheet {
 
     pub fn set_protection_metadata(
         &mut self,
-        metadata: WorksheetProtectionMetadata,
+        metadata: Metadata,
     ) -> SheetResult<()> {
-        crate::xlsx::sheet_protection::validate_worksheet_protection_metadata(&metadata)?;
+        crate::xlsx::sheet_protection::validate_metadata(&metadata)?;
         self.protection = metadata;
         self.modified = true;
         Ok(())
     }
 
-    pub fn protection_metadata(&self) -> &WorksheetProtectionMetadata {
+    pub fn protection_metadata(&self) -> &Metadata {
         &self.protection
     }
 
@@ -2422,7 +2422,7 @@ impl MutableWorksheet {
     }
 
     /// Get the protection configuration.
-    pub fn get_protection(&self) -> Option<&WorksheetProtection> {
+    pub fn get_protection(&self) -> Option<&Protection> {
         self.protection.sheet_protection()
     }
 
@@ -2887,9 +2887,9 @@ impl MutableWorksheet {
                 Conformance::Transitional,
             )?);
         }
-        xml.push_str(&write_worksheet_protection_extensions(
+        xml.push_str(&write_extensions(
             &self.protection,
-            WorksheetProtectionConformance::Transitional,
+            ProtectionConformance::Transitional,
         )?);
         xml.push_str("</worksheet>");
 
@@ -4084,9 +4084,9 @@ impl MutableWorksheet {
 
     /// Write sheet protection section.
     fn write_sheet_protection(&self, xml: &mut String) -> SheetResult<()> {
-        xml.push_str(&write_worksheet_protection_core(
+        xml.push_str(&write_core(
             &self.protection,
-            WorksheetProtectionConformance::Transitional,
+            ProtectionConformance::Transitional,
         )?);
         Ok(())
     }
@@ -4592,7 +4592,7 @@ mod tests {
             r#"<pageSetup paperSize="9" fitToWidth="1" fitToHeight="0" orientation="landscape"/>"#
         ));
 
-        let properties = crate::xlsx::parse_worksheet_sheet_properties(xml.as_bytes())
+        let properties = crate::xlsx::parse_sheet_properties(xml.as_bytes())
             .unwrap()
             .unwrap();
         let page_setup = properties.page_setup_properties().unwrap();
@@ -4785,7 +4785,7 @@ mod tests {
                 "http://purl.oclc.org/ooxml/spreadsheetml/main",
             );
 
-        let properties = crate::xlsx::parse_worksheet_sheet_properties(xml.as_bytes())
+        let properties = crate::xlsx::parse_sheet_properties(xml.as_bytes())
             .unwrap()
             .unwrap();
         let page_setup = properties.page_setup_properties().unwrap();

@@ -11,7 +11,7 @@
 //! OLE objects (`xdr:oleObject` inside a `xdr:graphicFrame`).
 //!
 //! [`parse_drawing_shapes`] parses one drawing part into the typed model;
-//! [`load_shapes`] and [`load_worksheet_shapes`] resolve drawing parts
+//! [`load_shapes`] and [`load_sheet_shapes`] resolve drawing parts
 //! through the package relationship graph. Everything here is read-only and
 //! inert: unknown elements are skipped, OLE payloads and external targets are
 //! never followed, and all inputs are bounded by named limits.
@@ -515,7 +515,7 @@ pub struct AnchoredObject {
 
 /// Shape inventory of one worksheet drawing part.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetShapes {
+pub struct Shapes {
     /// Worksheet name from the workbook.
     pub worksheet_name: String,
     /// Worksheet part name (for example `/xl/worksheets/sheet1.xml`).
@@ -542,12 +542,12 @@ pub fn parse_drawing_shapes(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
 ///
 /// One entry is returned per worksheet that anchors at least one shape-like
 /// object; worksheets without shapes are omitted.
-pub fn load_shapes(package: &OpcPackage) -> Result<Vec<WorksheetShapes>> {
+pub fn load_shapes(package: &OpcPackage) -> Result<Vec<Shapes>> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let mut output = Vec::new();
     for sheet in &sheets {
-        let shapes = load_sheet_shapes(package, workbook_part, sheet)?;
+        let shapes = load_shapes_for_sheet(package, workbook_part, sheet)?;
         if !shapes.objects.is_empty() {
             output.push(shapes);
         }
@@ -556,14 +556,14 @@ pub fn load_shapes(package: &OpcPackage) -> Result<Vec<WorksheetShapes>> {
 }
 
 /// Load the shape inventory of one worksheet, addressed by sheet name.
-pub fn load_worksheet_shapes(package: &OpcPackage, sheet_name: &str) -> Result<WorksheetShapes> {
+pub fn load_sheet_shapes(package: &OpcPackage, sheet_name: &str) -> Result<Shapes> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let sheet = sheets
         .iter()
         .find(|sheet| sheet.name == sheet_name)
         .ok_or_else(|| invalid(format!("worksheet '{sheet_name}' not found")))?;
-    load_sheet_shapes(package, workbook_part, sheet)
+    load_shapes_for_sheet(package, workbook_part, sheet)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1501,11 +1501,11 @@ fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<WorksheetInfo>> {
         .sheets)
 }
 
-fn load_sheet_shapes(
+fn load_shapes_for_sheet(
     package: &OpcPackage,
     workbook_part: &dyn Part,
     sheet: &WorksheetInfo,
-) -> Result<WorksheetShapes> {
+) -> Result<Shapes> {
     let relationship = workbook_part
         .rels()
         .get(&sheet.relationship_id)
@@ -1572,7 +1572,7 @@ fn load_sheet_shapes(
             objects.push(object);
         }
     }
-    Ok(WorksheetShapes {
+    Ok(Shapes {
         worksheet_name: sheet.name.clone(),
         worksheet_part_name: sheet_uri.to_string(),
         objects,
@@ -2163,7 +2163,7 @@ mod tests {
     #[test]
     fn loads_shapes_through_the_package_graph() {
         let package = package_with_shapes(&drawing(&two_cell_anchor(text_box_shape())));
-        let shapes = load_worksheet_shapes(&package, "Data").unwrap();
+        let shapes = load_sheet_shapes(&package, "Data").unwrap();
         assert_eq!(shapes.worksheet_name, "Data");
         assert_eq!(shapes.worksheet_part_name, "/xl/worksheets/sheet1.xml");
         assert_eq!(shapes.objects.len(), 1);
@@ -2177,12 +2177,12 @@ mod tests {
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].worksheet_name, "Data");
         assert!(
-            load_worksheet_shapes(&package, "Empty")
+            load_sheet_shapes(&package, "Empty")
                 .unwrap()
                 .objects
                 .is_empty()
         );
-        assert!(load_worksheet_shapes(&package, "Missing").is_err());
+        assert!(load_sheet_shapes(&package, "Missing").is_err());
     }
 
     #[test]

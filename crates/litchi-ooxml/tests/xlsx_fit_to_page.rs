@@ -5,7 +5,7 @@ use litchi_ooxml::xlsx::{
         Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, Measure, Order, Orientation, Paper,
         Scale, Setup, Unit,
     },
-    parse_worksheet_page_setup, parse_worksheet_sheet_properties,
+    parse_sheet_properties, parse_worksheet_page_setup,
 };
 use litchi_opc::{OpcPackage, PackURI};
 
@@ -43,7 +43,7 @@ fn fit_to_one_by_n_pages_survives_package_save_and_reopen() {
     assert!(xml.contains(r#"<pageSetUpPr autoPageBreaks="0" fitToPage="1"/>"#));
     assert!(xml.contains(r#"fitToWidth="1" fitToHeight="0""#));
 
-    let properties = parse_worksheet_sheet_properties(worksheet_part.blob())
+    let properties = parse_sheet_properties(worksheet_part.blob())
         .unwrap()
         .unwrap();
     let page_setup = properties.page_setup_properties().unwrap();

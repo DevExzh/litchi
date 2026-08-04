@@ -149,10 +149,6 @@ pub use scenarios::{
     InputCell, Scenario, ScenarioCellReference, ScenarioRangeReference, Scenarios,
     parse_worksheet_scenarios, write_worksheet_scenarios,
 };
-pub use sheet_calculation_properties::{
-    WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
-    parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
-};
 pub use sheet_protection::{
     ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeReference,
     ProtectionRangeReferenceKind, ProtectionRangeSqref, StrongProtectionPasswordVerifier,

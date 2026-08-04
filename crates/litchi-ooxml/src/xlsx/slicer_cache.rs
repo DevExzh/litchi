@@ -1121,7 +1121,7 @@ fn allocation(resource: &'static str, source: TryReserveError) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsx::{Slicer, Slicers, WorksheetSlicers, store_worksheet_slicers};
+    use crate::xlsx::{Slicer, SlicerPart, Slicers, store_slicer_part};
 
     fn microsoft() -> String {
         format!(
@@ -1182,10 +1182,10 @@ mod tests {
     #[test]
     fn package_store_load_and_slicer_name_cross_validation() {
         let (mut package, _, worksheet) = package();
-        store_worksheet_slicers(
+        store_slicer_part(
             &mut package,
             &worksheet,
-            &WorksheetSlicers {
+            &SlicerPart {
                 relationship_id: "rIdSlicers".into(),
                 part_name: "/xl/slicers/slicer1.xml".into(),
                 slicers: Slicers::new(vec![Slicer::new("StateView", "Slicer_State", 228600)]),
@@ -1297,10 +1297,10 @@ mod tests {
         assert!(load_slicer_caches(&outbound).is_err());
 
         let (mut mismatch, _, worksheet) = package();
-        store_worksheet_slicers(
+        store_slicer_part(
             &mut mismatch,
             &worksheet,
-            &WorksheetSlicers {
+            &SlicerPart {
                 relationship_id: "rIdS".into(),
                 part_name: "/xl/slicers/slicer1.xml".into(),
                 slicers: Slicers::new(vec![Slicer::new("View", "MissingCache", 1)]),

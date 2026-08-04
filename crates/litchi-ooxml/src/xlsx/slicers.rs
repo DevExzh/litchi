@@ -103,7 +103,7 @@ impl Slicers {
 
 /// A Slicers part and its explicit relationship from one worksheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetSlicers {
+pub struct SlicerPart {
     pub relationship_id: String,
     pub part_name: String,
     pub slicers: Slicers,
@@ -347,10 +347,10 @@ pub fn write_slicers(value: &Slicers) -> Result<Vec<u8>> {
 
 /// Resolves every Slicers relationship owned by `worksheet_name`, after
 /// validating all MS-XLSX Slicers edges in the package.
-pub fn load_worksheet_slicers(
+pub fn load_slicer_parts(
     package: &OpcPackage,
     worksheet_name: &PackURI,
-) -> Result<Vec<WorksheetSlicers>> {
+) -> Result<Vec<SlicerPart>> {
     validate_package_graph(package)?;
     let worksheet = package.get_part(worksheet_name)?;
     require_worksheet(worksheet)?;
@@ -366,7 +366,7 @@ pub fn load_worksheet_slicers(
     for relationship in relationships {
         let target = relationship.target_partname()?;
         let part = package.get_part(&target)?;
-        output.push(WorksheetSlicers {
+        output.push(SlicerPart {
             relationship_id: relationship.r_id().to_owned(),
             part_name: target.to_string(),
             slicers: parse_slicers(part.blob())?,
@@ -376,10 +376,10 @@ pub fn load_worksheet_slicers(
 }
 
 /// Adds one leaf Slicers part and its explicit worksheet relationship.
-pub fn store_worksheet_slicers(
+pub fn store_slicer_part(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
-    value: &WorksheetSlicers,
+    value: &SlicerPart,
 ) -> Result<()> {
     validate_package_graph(package)?;
     validate_relationship_id(&value.relationship_id)?;
@@ -937,14 +937,14 @@ mod tests {
     #[test]
     fn package_store_and_load_round_trip() {
         let (mut package, worksheet) = package();
-        let expected = WorksheetSlicers {
+        let expected = SlicerPart {
             relationship_id: "rIdSlicers".into(),
             part_name: "/xl/slicers/slicer1.xml".into(),
             slicers: parse_slicers(sample().as_bytes()).unwrap(),
         };
-        store_worksheet_slicers(&mut package, &worksheet, &expected).unwrap();
+        store_slicer_part(&mut package, &worksheet, &expected).unwrap();
         assert_eq!(
-            load_worksheet_slicers(&package, &worksheet).unwrap(),
+            load_slicer_parts(&package, &worksheet).unwrap(),
             vec![expected]
         );
     }
@@ -994,7 +994,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_package_graphs() {
-        let value = WorksheetSlicers {
+        let value = SlicerPart {
             relationship_id: "rId1".into(),
             part_name: "/xl/slicers/slicer1.xml".into(),
             slicers: Slicers::new(vec![Slicer::new("a", "cache", 1)]),
@@ -1011,16 +1011,16 @@ mod tests {
                 "rId1".into(),
                 true,
             );
-        assert!(load_worksheet_slicers(&external, &worksheet).is_err());
+        assert!(load_slicer_parts(&external, &worksheet).is_err());
 
         let (mut outbound, worksheet) = package();
-        store_worksheet_slicers(&mut outbound, &worksheet, &value).unwrap();
+        store_slicer_part(&mut outbound, &worksheet, &value).unwrap();
         outbound
             .get_part_mut(&PackURI::new("/xl/slicers/slicer1.xml").unwrap())
             .unwrap()
             .rels_mut()
             .add_relationship("urn:forbidden".into(), "x".into(), "rId9".into(), false);
-        assert!(load_worksheet_slicers(&outbound, &worksheet).is_err());
+        assert!(load_slicer_parts(&outbound, &worksheet).is_err());
 
         let (mut orphan, worksheet) = package();
         orphan.add_part(Box::new(BlobPart::new(
@@ -1028,7 +1028,7 @@ mod tests {
             SLICERS_CONTENT_TYPE.into(),
             write_slicers(&value.slicers).unwrap(),
         )));
-        assert!(load_worksheet_slicers(&orphan, &worksheet).is_err());
+        assert!(load_slicer_parts(&orphan, &worksheet).is_err());
 
         let (mut wrong_source, worksheet) = package();
         let other = PackURI::new("/xl/workbook.xml").unwrap();
@@ -1049,6 +1049,6 @@ mod tests {
             SLICERS_CONTENT_TYPE.into(),
             write_slicers(&value.slicers).unwrap(),
         )));
-        assert!(load_worksheet_slicers(&wrong_source, &worksheet).is_err());
+        assert!(load_slicer_parts(&wrong_source, &worksheet).is_err());
     }
 }

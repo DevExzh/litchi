@@ -12,16 +12,16 @@ use litchi_xlsx::active_x as owner;
 
 pub use owner::{
     Binary, ControlProperties, Font, Marker, ObjectAnchor, Persistence, Picture, PreviewImage,
-    Property, PropertyObject, WorksheetControl,
+    Property, PropertyObject, WorksheetControl as Control,
 };
 
 /// The worksheet `controls` collection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorksheetControls {
-    pub controls: Vec<WorksheetControl>,
+pub struct Controls {
+    pub controls: Vec<Control>,
 }
 
-impl WorksheetControls {
+impl Controls {
     pub fn parse(xml: &[u8]) -> Result<Self> {
         owner::WorksheetControls::parse(xml)
             .map(Self::from_owner)
@@ -90,7 +90,7 @@ impl Descriptor {
 /// An inert ActiveX control descriptor and its opaque package resources.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedControl {
-    pub control: WorksheetControl,
+    pub control: Control,
     pub descriptor_uri: PackURI,
     pub descriptor: Descriptor,
     pub binaries: Vec<Binary>,
@@ -145,7 +145,7 @@ impl LoadedControl {
 
 /// Replace the direct worksheet `controls` collection while preserving
 /// unrelated worksheet bytes.
-pub fn replace_worksheet_controls_xml(xml: &[u8], controls: &WorksheetControls) -> Result<Vec<u8>> {
+pub fn replace_controls_xml(xml: &[u8], controls: &Controls) -> Result<Vec<u8>> {
     owner::replace_worksheet_controls_xml(xml, &controls.to_owner()).map_err(map_owner_error)
 }
 

@@ -51,7 +51,7 @@ impl PrinterSettingsConformance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetPrinterSettingsReference {
+pub struct PrinterSettingsReference {
     pub relationship_id: String,
 }
 
@@ -63,15 +63,13 @@ pub struct PrinterSettingsResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetPrinterSettings {
-    pub reference: WorksheetPrinterSettingsReference,
+pub struct PrinterSettings {
+    pub reference: PrinterSettingsReference,
     pub resource: PrinterSettingsResource,
 }
 
 /// Parses the optional Printer Settings relationship reference from a worksheet.
-pub fn parse_worksheet_printer_settings_reference(
-    xml: &[u8],
-) -> Result<Option<WorksheetPrinterSettingsReference>> {
+pub fn parse_printer_settings_reference(xml: &[u8]) -> Result<Option<PrinterSettingsReference>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("worksheet XML bytes"));
     }
@@ -79,14 +77,14 @@ pub fn parse_worksheet_printer_settings_reference(
         return Ok(None);
     };
     validate_id(id.as_str())?;
-    Ok(Some(WorksheetPrinterSettingsReference {
+    Ok(Some(PrinterSettingsReference {
         relationship_id: id.into_string(),
     }))
 }
 
 /// Deterministically writes a self-contained `pageSetup` reference fragment.
-pub fn write_worksheet_printer_settings_reference(
-    reference: &WorksheetPrinterSettingsReference,
+pub fn write_printer_settings_reference(
+    reference: &PrinterSettingsReference,
     conformance: PrinterSettingsConformance,
 ) -> Result<Vec<u8>> {
     validate_id(&reference.relationship_id)?;
@@ -102,10 +100,10 @@ pub fn write_worksheet_printer_settings_reference(
 }
 
 /// Resolves and validates the Printer Settings part for one worksheet.
-pub fn load_worksheet_printer_settings(
+pub fn load_printer_settings(
     package: &OpcPackage,
     worksheet_name: &PackURI,
-) -> Result<Option<WorksheetPrinterSettings>> {
+) -> Result<Option<PrinterSettings>> {
     if package
         .rels()
         .iter()
@@ -117,7 +115,7 @@ pub fn load_worksheet_printer_settings(
     }
     let worksheet = package.get_part(worksheet_name)?;
     require_worksheet(worksheet)?;
-    let reference = parse_worksheet_printer_settings_reference(worksheet.blob())?;
+    let reference = parse_printer_settings_reference(worksheet.blob())?;
     let mut relationships = worksheet
         .rels()
         .iter()
@@ -162,7 +160,7 @@ pub fn load_worksheet_printer_settings(
                 )));
             }
             validate_settings_bytes(part.blob())?;
-            Ok(Some(WorksheetPrinterSettings {
+            Ok(Some(PrinterSettings {
                 reference,
                 resource: PrinterSettingsResource {
                     part_name: target.to_string(),
@@ -174,17 +172,17 @@ pub fn load_worksheet_printer_settings(
 }
 
 /// Adds one inert Printer Settings part and its `pageSetup` reference to a worksheet.
-pub fn store_worksheet_printer_settings(
+pub fn store_printer_settings(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
-    value: &WorksheetPrinterSettings,
+    value: &PrinterSettings,
     conformance: PrinterSettingsConformance,
 ) -> Result<()> {
     validate_id(&value.reference.relationship_id)?;
     validate_settings_bytes(&value.resource.data)?;
     let resource_uri = PackURI::new(&value.resource.part_name).map_err(OoxmlError::InvalidUri)?;
     validate_printer_settings_uri(&resource_uri)?;
-    if load_worksheet_printer_settings(package, worksheet_name)?.is_some() {
+    if load_printer_settings(package, worksheet_name)?.is_some() {
         return Err(invalid("worksheet already has Printer Settings"));
     }
     let worksheet = package.get_part(worksheet_name)?;
@@ -232,7 +230,7 @@ pub fn store_worksheet_printer_settings(
 
 fn add_reference_to_worksheet(
     xml: &[u8],
-    reference: &WorksheetPrinterSettingsReference,
+    reference: &PrinterSettingsReference,
     conformance: PrinterSettingsConformance,
 ) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
@@ -352,7 +350,7 @@ fn add_reference_to_worksheet(
         return Ok(output);
     }
     let position = insert.ok_or_else(|| invalid("missing worksheet closing element"))?;
-    addition = write_worksheet_printer_settings_reference(reference, conformance)?;
+    addition = write_printer_settings_reference(reference, conformance)?;
     let length = xml
         .len()
         .checked_add(addition.len())
@@ -526,9 +524,9 @@ mod tests {
         package.add_part(Box::new(BlobPart::new(uri.clone(), ct::SML_WORKSHEET.into(), format!("<x:worksheet xmlns:x=\"{}\"><x:sheetData/>{page_setup}<x:headerFooter/></x:worksheet>", conformance.sml()).into_bytes())));
         (package, uri)
     }
-    fn value() -> WorksheetPrinterSettings {
-        WorksheetPrinterSettings {
-            reference: WorksheetPrinterSettingsReference {
+    fn value() -> PrinterSettings {
+        PrinterSettings {
+            reference: PrinterSettingsReference {
                 relationship_id: "rIdPrinter".into(),
             },
             resource: PrinterSettingsResource {
@@ -540,14 +538,12 @@ mod tests {
 
     #[test]
     fn strict_reference_round_trip_and_mce_fallback() {
-        let reference = WorksheetPrinterSettingsReference {
+        let reference = PrinterSettingsReference {
             relationship_id: "rId9".into(),
         };
-        let fragment = write_worksheet_printer_settings_reference(
-            &reference,
-            PrinterSettingsConformance::Strict,
-        )
-        .unwrap();
+        let fragment =
+            write_printer_settings_reference(&reference, PrinterSettingsConformance::Strict)
+                .unwrap();
         let xml = [
             format!("<x:worksheet xmlns:x=\"{STRICT_SML}\">").as_bytes(),
             fragment.as_slice(),
@@ -555,16 +551,14 @@ mod tests {
         ]
         .concat();
         assert_eq!(
-            parse_worksheet_printer_settings_reference(&xml)
-                .unwrap()
-                .unwrap(),
+            parse_printer_settings_reference(&xml).unwrap().unwrap(),
             reference
         );
         let mce = format!(
             r#"<x:worksheet xmlns:x="{SML}" xmlns:r="{REL}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:f="urn:future"><mc:AlternateContent><mc:Choice Requires="f"><x:pageSetup r:id="future"/></mc:Choice><mc:Fallback><x:pageSetup r:id="fallback"/></mc:Fallback></mc:AlternateContent></x:worksheet>"#
         );
         assert_eq!(
-            parse_worksheet_printer_settings_reference(mce.as_bytes())
+            parse_printer_settings_reference(mce.as_bytes())
                 .unwrap()
                 .unwrap()
                 .relationship_id,
@@ -576,19 +570,17 @@ mod tests {
     fn loads_poi_and_libreoffice_reference_packages() {
         let poi = OpcPackage::open(root().join("test-data/poi/test-data/spreadsheet/sample.xlsx"))
             .unwrap();
-        let settings = load_worksheet_printer_settings(
-            &poi,
-            &PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
-        )
-        .unwrap()
-        .unwrap();
+        let settings =
+            load_printer_settings(&poi, &PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+                .unwrap()
+                .unwrap();
         assert_eq!(settings.reference.relationship_id, "rId1");
         assert_eq!(settings.resource.data.len(), 2452);
         let libreoffice = OpcPackage::open(root().join(
             "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
         ))
         .unwrap();
-        let settings = load_worksheet_printer_settings(
+        let settings = load_printer_settings(
             &libreoffice,
             &PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
         )
@@ -605,7 +597,7 @@ mod tests {
             "<x:pageSetup orientation=\"landscape\"/>",
         );
         let expected = value();
-        store_worksheet_printer_settings(
+        store_printer_settings(
             &mut package,
             &uri,
             &expected,
@@ -613,9 +605,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            load_worksheet_printer_settings(&package, &uri)
-                .unwrap()
-                .unwrap(),
+            load_printer_settings(&package, &uri).unwrap().unwrap(),
             expected
         );
         let xml = package.get_part(&uri).unwrap().blob();
@@ -628,7 +618,7 @@ mod tests {
     #[test]
     fn package_writer_inserts_missing_page_setup_deterministically() {
         let (mut package, uri) = package(PrinterSettingsConformance::Transitional, "");
-        store_worksheet_printer_settings(
+        store_printer_settings(
             &mut package,
             &uri,
             &value(),
@@ -651,7 +641,7 @@ mod tests {
         let original_xml = package.get_part(&uri).unwrap().blob().to_vec();
         let original_part_count = package.part_count();
 
-        let error = store_worksheet_printer_settings(
+        let error = store_printer_settings(
             &mut package,
             &uri,
             &value(),
@@ -664,26 +654,18 @@ mod tests {
         ));
         assert_eq!(package.part_count(), original_part_count);
         assert_eq!(package.get_part(&uri).unwrap().blob(), original_xml);
-        assert!(
-            load_worksheet_printer_settings(&package, &uri)
-                .unwrap()
-                .is_none()
-        );
+        assert!(load_printer_settings(&package, &uri).unwrap().is_none());
         assert_eq!(package.get_part(&equivalent).unwrap().blob(), &[0x01]);
 
         assert!(package.remove_part(&equivalent));
-        store_worksheet_printer_settings(
+        store_printer_settings(
             &mut package,
             &uri,
             &value(),
             PrinterSettingsConformance::Transitional,
         )
         .unwrap();
-        assert!(
-            load_worksheet_printer_settings(&package, &uri)
-                .unwrap()
-                .is_some()
-        );
+        assert!(load_printer_settings(&package, &uri).unwrap().is_some());
     }
 
     #[test]
@@ -691,7 +673,7 @@ mod tests {
         let existing = format!(r#"<x:pageSetup xmlns:r="{REL}" orientation="portrait"/>"#);
         let (mut existing_package, uri) =
             package(PrinterSettingsConformance::Transitional, &existing);
-        store_worksheet_printer_settings(
+        store_printer_settings(
             &mut existing_package,
             &uri,
             &value(),
@@ -702,7 +684,7 @@ mod tests {
         assert_eq!(xml.matches(&format!(r#"xmlns:r="{REL}""#)).count(), 1);
         assert!(xml.contains(r#" r:id="rIdPrinter""#));
         assert_eq!(
-            parse_worksheet_printer_settings_reference(xml.as_bytes())
+            parse_printer_settings_reference(xml.as_bytes())
                 .unwrap()
                 .unwrap()
                 .relationship_id,
@@ -712,7 +694,7 @@ mod tests {
         let conflicting =
             r#"<x:pageSetup xmlns:r="urn:vendor" orientation="portrait"> </x:pageSetup>"#;
         let (mut package, uri) = package(PrinterSettingsConformance::Transitional, conflicting);
-        store_worksheet_printer_settings(
+        store_printer_settings(
             &mut package,
             &uri,
             &value(),
@@ -723,7 +705,7 @@ mod tests {
         assert!(xml.contains(r#"xmlns:r="urn:vendor""#));
         assert!(xml.contains(&format!(r#"xmlns:r1="{REL}" r1:id="rIdPrinter""#)));
         assert_eq!(
-            parse_worksheet_printer_settings_reference(xml.as_bytes())
+            parse_printer_settings_reference(xml.as_bytes())
                 .unwrap()
                 .unwrap()
                 .relationship_id,
@@ -741,13 +723,11 @@ mod tests {
             format!(r#"<!DOCTYPE x><worksheet xmlns="{SML}"/>"#),
         ] {
             assert!(
-                parse_worksheet_printer_settings_reference(xml.as_bytes()).is_err(),
+                parse_printer_settings_reference(xml.as_bytes()).is_err(),
                 "{xml}"
             );
         }
-        assert!(
-            parse_worksheet_printer_settings_reference(&vec![b' '; MAX_XML_BYTES + 1]).is_err()
-        );
+        assert!(parse_printer_settings_reference(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
         let (mut external, uri) = package(
             PrinterSettingsConformance::Transitional,
             &format!("<x:pageSetup xmlns:r=\"{REL}\" r:id=\"rId1\"/>"),
@@ -762,9 +742,9 @@ mod tests {
                 "rId1".into(),
                 true,
             );
-        assert!(load_worksheet_printer_settings(&external, &uri).is_err());
+        assert!(load_printer_settings(&external, &uri).is_err());
         let (mut outbound, uri) = package(PrinterSettingsConformance::Transitional, "");
-        store_worksheet_printer_settings(
+        store_printer_settings(
             &mut outbound,
             &uri,
             &value(),
@@ -776,12 +756,12 @@ mod tests {
             .unwrap()
             .rels_mut()
             .add_relationship("urn:forbidden".into(), "x".into(), "rId1".into(), false);
-        assert!(load_worksheet_printer_settings(&outbound, &uri).is_err());
+        assert!(load_printer_settings(&outbound, &uri).is_err());
         let mut too_large = value();
         too_large.resource.data = vec![0; MAX_SETTINGS_BYTES + 1];
         let (mut package, uri) = package(PrinterSettingsConformance::Transitional, "");
         assert!(
-            store_worksheet_printer_settings(
+            store_printer_settings(
                 &mut package,
                 &uri,
                 &too_large,

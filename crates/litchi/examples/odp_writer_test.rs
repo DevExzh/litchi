@@ -13,7 +13,7 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::{Metadata, ShapeType};
 #[cfg(feature = "odf")]
-use litchi::odf::{Builder, Shape, Slide};
+use litchi::odf::odp::{Builder, Shape, Slide};
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {

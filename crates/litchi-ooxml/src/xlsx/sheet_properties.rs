@@ -18,13 +18,13 @@ const MAX_EVENTS: usize = 1_000_000;
 
 /// A bounded A1 anchor used to synchronize worksheet window positions.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetSynchronizationReference {
+pub struct SynchronizationReference {
     value: String,
     row: u32,
     column: u32,
 }
 
-impl WorksheetSynchronizationReference {
+impl SynchronizationReference {
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -38,7 +38,7 @@ impl WorksheetSynchronizationReference {
 
 /// Sheet-tab color metadata from `sheetPr/tabColor`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorksheetTabColor {
+pub struct TabColor {
     automatic: bool,
     indexed: Option<u32>,
     argb: Option<[u8; 4]>,
@@ -46,7 +46,7 @@ pub struct WorksheetTabColor {
     tint: f64,
 }
 
-impl WorksheetTabColor {
+impl TabColor {
     pub fn automatic(&self) -> bool {
         self.automatic
     }
@@ -66,12 +66,12 @@ impl WorksheetTabColor {
 
 /// Effective page-setup flags from `sheetPr/pageSetUpPr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WorksheetPageSetupProperties {
+pub struct PageSetupProperties {
     automatic_page_breaks: bool,
     fit_to_page: bool,
 }
 
-impl WorksheetPageSetupProperties {
+impl PageSetupProperties {
     pub fn automatic_page_breaks(&self) -> bool {
         self.automatic_page_breaks
     }
@@ -82,9 +82,9 @@ impl WorksheetPageSetupProperties {
 
 /// Complete immutable metadata from a worksheet's direct `sheetPr` child.
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorksheetSheetProperties {
+pub struct SheetProperties {
     code_name: Option<String>,
-    synchronization_reference: Option<WorksheetSynchronizationReference>,
+    synchronization_reference: Option<SynchronizationReference>,
     synchronize_horizontally: bool,
     synchronize_vertically: bool,
     transition_evaluation: bool,
@@ -92,17 +92,17 @@ pub struct WorksheetSheetProperties {
     published: bool,
     filter_mode: bool,
     format_condition_calculation_enabled: bool,
-    tab_color: Option<WorksheetTabColor>,
+    tab_color: Option<TabColor>,
     outline_properties: Option<OutlineProperties>,
-    page_setup_properties: Option<WorksheetPageSetupProperties>,
+    page_setup_properties: Option<PageSetupProperties>,
 }
 
-impl WorksheetSheetProperties {
+impl SheetProperties {
     /// Stable VBA-facing name, retained as inert metadata only.
     pub fn code_name(&self) -> Option<&str> {
         self.code_name.as_deref()
     }
-    pub fn synchronization_reference(&self) -> Option<&WorksheetSynchronizationReference> {
+    pub fn synchronization_reference(&self) -> Option<&SynchronizationReference> {
         self.synchronization_reference.as_ref()
     }
     pub fn synchronize_horizontally(&self) -> bool {
@@ -126,13 +126,13 @@ impl WorksheetSheetProperties {
     pub fn format_condition_calculation_enabled(&self) -> bool {
         self.format_condition_calculation_enabled
     }
-    pub fn tab_color(&self) -> Option<&WorksheetTabColor> {
+    pub fn tab_color(&self) -> Option<&TabColor> {
         self.tab_color.as_ref()
     }
     pub fn outline_properties(&self) -> Option<&OutlineProperties> {
         self.outline_properties.as_ref()
     }
-    pub fn page_setup_properties(&self) -> Option<&WorksheetPageSetupProperties> {
+    pub fn page_setup_properties(&self) -> Option<&PageSetupProperties> {
         self.page_setup_properties.as_ref()
     }
 }
@@ -140,7 +140,7 @@ impl WorksheetSheetProperties {
 #[derive(Default)]
 struct Builder {
     code_name: Option<String>,
-    synchronization_reference: Option<WorksheetSynchronizationReference>,
+    synchronization_reference: Option<SynchronizationReference>,
     synchronize_horizontally: Option<bool>,
     synchronize_vertically: Option<bool>,
     transition_evaluation: Option<bool>,
@@ -148,13 +148,13 @@ struct Builder {
     published: Option<bool>,
     filter_mode: Option<bool>,
     format_condition_calculation_enabled: Option<bool>,
-    tab_color: Option<WorksheetTabColor>,
-    page_setup_properties: Option<WorksheetPageSetupProperties>,
+    tab_color: Option<TabColor>,
+    page_setup_properties: Option<PageSetupProperties>,
 }
 
 impl Builder {
-    fn finish(self, outline_properties: Option<OutlineProperties>) -> WorksheetSheetProperties {
-        WorksheetSheetProperties {
+    fn finish(self, outline_properties: Option<OutlineProperties>) -> SheetProperties {
+        SheetProperties {
             code_name: self.code_name,
             synchronization_reference: self.synchronization_reference,
             synchronize_horizontally: self.synchronize_horizontally.unwrap_or(false),
@@ -195,7 +195,7 @@ struct Parser {
 /// Parse the worksheet's exact `worksheet/sheetPr` child path.
 // Text/CData arms keep `?`-bearing whitespace checks out of guards; guards cannot use `?`.
 #[allow(clippy::collapsible_match)]
-pub fn parse_worksheet_sheet_properties(xml: &[u8]) -> Result<Option<WorksheetSheetProperties>> {
+pub fn parse_sheet_properties(xml: &[u8]) -> Result<Option<SheetProperties>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
@@ -587,7 +587,7 @@ fn parse_tab_color(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<WorksheetTabColor> {
+) -> Result<TabColor> {
     let mut automatic = None;
     let mut indexed = None;
     let mut argb = None;
@@ -634,7 +634,7 @@ fn parse_tab_color(
             },
         }
     }
-    Ok(WorksheetTabColor {
+    Ok(TabColor {
         automatic: automatic.unwrap_or(false),
         indexed,
         argb,
@@ -647,7 +647,7 @@ fn parse_page_setup_properties(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<WorksheetPageSetupProperties> {
+) -> Result<PageSetupProperties> {
     let mut automatic_page_breaks = None;
     let mut fit_to_page = None;
     for attribute in element.attributes().with_checks(true) {
@@ -684,13 +684,13 @@ fn parse_page_setup_properties(
             },
         }
     }
-    Ok(WorksheetPageSetupProperties {
+    Ok(PageSetupProperties {
         automatic_page_breaks: automatic_page_breaks.unwrap_or(true),
         fit_to_page: fit_to_page.unwrap_or(false),
     })
 }
 
-fn parse_reference(value: &str) -> Result<WorksheetSynchronizationReference> {
+fn parse_reference(value: &str) -> Result<SynchronizationReference> {
     let bytes = value.as_bytes();
     let mut index = usize::from(bytes.first() == Some(&b'$'));
     let column_start = index;
@@ -725,7 +725,7 @@ fn parse_reference(value: &str) -> Result<WorksheetSynchronizationReference> {
             "sheetPr syncRef is outside worksheet bounds: '{value}'"
         )));
     }
-    Ok(WorksheetSynchronizationReference {
+    Ok(SynchronizationReference {
         value: value.to_owned(),
         row,
         column,
@@ -809,10 +809,8 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetSheetProperties>> {
-        parse_worksheet_sheet_properties(
-            format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
-        )
+    fn parse(child: &str) -> Result<Option<SheetProperties>> {
+        parse_sheet_properties(format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes())
     }
 
     #[test]
@@ -879,7 +877,7 @@ mod tests {
     fn supports_strict_mce_and_exact_scoping() {
         let strict = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><sheetPr filterMode="1"><tabColor rgb="FF112233"/></sheetPr></worksheet>"#;
         assert!(
-            parse_worksheet_sheet_properties(strict)
+            parse_sheet_properties(strict)
                 .unwrap()
                 .unwrap()
                 .filter_mode()
@@ -894,7 +892,7 @@ mod tests {
             NS
         );
         assert!(
-            parse_worksheet_sheet_properties(mce.as_bytes())
+            parse_sheet_properties(mce.as_bytes())
                 .unwrap()
                 .unwrap()
                 .page_setup_properties()
@@ -948,7 +946,7 @@ mod tests {
             format!(r#"<worksheet xmlns="{NS}"><![CDATA[data]]></worksheet>"#),
         ] {
             assert!(
-                parse_worksheet_sheet_properties(xml.as_bytes()).is_err(),
+                parse_sheet_properties(xml.as_bytes()).is_err(),
                 "expected rejection for {xml}"
             );
         }
@@ -961,17 +959,15 @@ mod tests {
             xml.push_str("</extension>");
         }
         xml.push_str("</worksheet>");
-        assert!(parse_worksheet_sheet_properties(xml.as_bytes()).is_err());
+        assert!(parse_sheet_properties(xml.as_bytes()).is_err());
     }
 
-    fn fixture(bytes: &[u8]) -> WorksheetSheetProperties {
+    fn fixture(bytes: &[u8]) -> SheetProperties {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .unwrap();
-        parse_worksheet_sheet_properties(part.blob())
-            .unwrap()
-            .unwrap()
+        parse_sheet_properties(part.blob()).unwrap().unwrap()
     }
 
     #[test]

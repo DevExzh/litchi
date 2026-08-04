@@ -16,8 +16,8 @@ use crate::xlsx::slicer_cache::{
     write_slicer_cache_definition,
 };
 use crate::xlsx::slicers::{
-    SLICERS_CONTENT_TYPE, Slicer, Slicers, WorksheetSlicers, load_worksheet_slicers,
-    store_worksheet_slicers, write_slicers,
+    SLICERS_CONTENT_TYPE, Slicer, SlicerPart, Slicers, load_slicer_parts, store_slicer_part,
+    write_slicers,
 };
 use crate::xlsx::timelines::{
     Cache, CacheDefinition, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
@@ -41,7 +41,7 @@ pub fn find_slicer(
     worksheet_name: &PackURI,
     slicer_name: &str,
 ) -> Result<Option<Slicer>> {
-    Ok(load_worksheet_slicers(package, worksheet_name)?
+    Ok(load_slicer_parts(package, worksheet_name)?
         .into_iter()
         .flat_map(|part| part.slicers.slicers)
         .find(|slicer| slicer.name.eq_ignore_ascii_case(slicer_name)))
@@ -51,10 +51,10 @@ pub fn add_slicer(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     slicer: Slicer,
-) -> Result<WorksheetSlicers> {
+) -> Result<SlicerPart> {
     let caches = load_slicer_caches(package)?;
     validate_slicer_cache_reference(&slicer, &caches)?;
-    let mut parts = load_worksheet_slicers(package, worksheet_name)?;
+    let mut parts = load_slicer_parts(package, worksheet_name)?;
     if all_slicer_names(package)?.contains(&slicer.name.to_ascii_lowercase()) {
         return Err(invalid(format!("duplicate slicer name '{}'", slicer.name)));
     }
@@ -71,12 +71,12 @@ pub fn add_slicer(
     }
     let part_name = next_part_name(package, "/xl/slicers/slicer%d.xml")?;
     let relationship_id = next_relationship_id(package.get_part(worksheet_name)?, "rIdSlicer")?;
-    let value = WorksheetSlicers {
+    let value = SlicerPart {
         relationship_id,
         part_name: part_name.to_string(),
         slicers: Slicers::new(vec![slicer]),
     };
-    store_worksheet_slicers(package, worksheet_name, &value)?;
+    store_slicer_part(package, worksheet_name, &value)?;
     package.unsign();
     Ok(value)
 }
@@ -91,7 +91,7 @@ where
     F: FnOnce(&mut Slicer),
 {
     let caches = load_slicer_caches(package)?;
-    let mut parts = load_worksheet_slicers(package, worksheet_name)?;
+    let mut parts = load_slicer_parts(package, worksheet_name)?;
     let mut update = Some(update);
     let mut changed = None;
     for (part_index, part) in parts.iter_mut().enumerate() {
@@ -143,7 +143,7 @@ pub fn remove_slicer(
     worksheet_name: &PackURI,
     slicer_name: &str,
 ) -> Result<bool> {
-    let mut parts = load_worksheet_slicers(package, worksheet_name)?;
+    let mut parts = load_slicer_parts(package, worksheet_name)?;
     let Some(part_index) = parts.iter().position(|part| {
         part.slicers
             .slicers
@@ -184,7 +184,7 @@ pub fn reorder_slicers(
     ordered_names: &[String],
 ) -> Result<Vec<Slicer>> {
     let caches = load_slicer_caches(package)?;
-    let mut parts = load_worksheet_slicers(package, worksheet_name)?;
+    let mut parts = load_slicer_parts(package, worksheet_name)?;
     let counts: Vec<usize> = parts
         .iter()
         .map(|part| part.slicers.slicers.len())

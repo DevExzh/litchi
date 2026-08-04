@@ -29,9 +29,9 @@ use crate::xlsx::named_sheet_view::{
     store_worksheet_named_sheet_views,
 };
 use crate::xlsx::sheet_protection::{
-    WorksheetProtectedRangeCollection, WorksheetProtection, WorksheetProtectionMetadata,
-    parse_worksheet_protection, replace_worksheet_protection,
-    validate_worksheet_protection_metadata,
+    ProtectedRangeCollection, Protection, Metadata,
+    parse_protection, replace_protection,
+    validate_metadata,
 };
 use crate::xlsx::styles::Rgb;
 use crate::xlsx::vba_project::{
@@ -217,7 +217,7 @@ pub struct Workbook {
     chain_conformance: Option<ChainConformance>,
     external_links: Vec<ExternalLinkEntry>,
     defined_names: Vec<NamedRange>,
-    worksheet_protection_mutations: HashMap<usize, WorksheetProtectionMetadata>,
+    worksheet_protection_mutations: HashMap<usize, Metadata>,
     worksheet_data_validation_mutations: HashMap<usize, Vec<Collection>>,
     worksheet_web_binding_mutations: HashMap<usize, Bindings>,
     /// Encryption profile of the opened outer package.
@@ -237,7 +237,7 @@ struct WriteRollbackGuard<'a> {
     workbook: &'a mut Workbook,
     package_before: OpcPackage,
     reload_caches: bool,
-    worksheet_protection_mutations_before: HashMap<usize, WorksheetProtectionMetadata>,
+    worksheet_protection_mutations_before: HashMap<usize, Metadata>,
     worksheet_data_validation_mutations_before: HashMap<usize, Vec<Collection>>,
     worksheet_web_binding_mutations_before: HashMap<usize, Bindings>,
     committed: bool,
@@ -1868,7 +1868,7 @@ impl Workbook {
     pub fn worksheet_protection_metadata(
         &self,
         index: usize,
-    ) -> SheetResult<WorksheetProtectionMetadata> {
+    ) -> SheetResult<Metadata> {
         if let Some(value) = self.worksheet_protection_mutations.get(&index) {
             return Ok(value.clone());
         }
@@ -1878,23 +1878,23 @@ impl Workbook {
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
-        parse_worksheet_protection(part.blob()).map_err(Into::into)
+        parse_protection(part.blob()).map_err(Into::into)
     }
 
     /// Atomically replace all worksheet protection metadata.
     pub fn replace_worksheet_protection(
         &mut self,
         index: usize,
-        metadata: WorksheetProtectionMetadata,
+        metadata: Metadata,
     ) -> SheetResult<()> {
-        validate_worksheet_protection_metadata(&metadata)?;
+        validate_metadata(&metadata)?;
         let info = self
             .worksheets
             .get(index)
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
-        replace_worksheet_protection(part.blob(), &metadata)?;
+        replace_protection(part.blob(), &metadata)?;
         self.worksheet_protection_mutations.insert(index, metadata);
         Ok(())
     }
@@ -1902,7 +1902,7 @@ impl Workbook {
     /// Atomically update worksheet protection through a cloned candidate.
     pub fn update_worksheet_protection<F>(&mut self, index: usize, update: F) -> SheetResult<()>
     where
-        F: FnOnce(&mut WorksheetProtectionMetadata),
+        F: FnOnce(&mut Metadata),
     {
         let mut candidate = self.worksheet_protection_metadata(index)?;
         update(&mut candidate);
@@ -1912,7 +1912,7 @@ impl Workbook {
     pub fn set_sheet_protection(
         &mut self,
         index: usize,
-        protection: WorksheetProtection,
+        protection: Protection,
     ) -> SheetResult<()> {
         let mut candidate = self.worksheet_protection_metadata(index)?;
         candidate.set_sheet_protection(Some(protection))?;
@@ -1928,7 +1928,7 @@ impl Workbook {
     pub fn set_protected_ranges(
         &mut self,
         index: usize,
-        collections: Vec<WorksheetProtectedRangeCollection>,
+        collections: Vec<ProtectedRangeCollection>,
     ) -> SheetResult<()> {
         let mut candidate = self.worksheet_protection_metadata(index)?;
         candidate.set_protected_range_collections(collections)?;
@@ -2958,7 +2958,7 @@ impl Workbook {
             let original = part.blob_arc();
             let mut replacement = original.as_ref().clone();
             if let Some(metadata) = self.worksheet_protection_mutations.get(&index) {
-                replacement = replace_worksheet_protection(&replacement, metadata)?;
+                replacement = replace_protection(&replacement, metadata)?;
             }
             if let Some(collections) = self.worksheet_data_validation_mutations.get(&index) {
                 replacement = replace_data_validation_collections(&replacement, collections)?;
@@ -4626,7 +4626,7 @@ impl Workbook {
         &self,
         sheet_name: &str,
     ) -> SheetResult<Vec<super::pivot_chart::PivotChart>> {
-        Ok(super::pivot_chart::load_worksheet_pivot_charts(
+        Ok(super::pivot_chart::load_sheet_pivot_charts(
             self.package(),
             sheet_name,
         )?)
@@ -4638,8 +4638,8 @@ impl Workbook {
     /// the worksheet's drawing part are returned in drawing order; pictures
     /// and charts are covered by `Worksheet::images()` and
     /// `Worksheet::charts()` instead. Everything is read-only and inert.
-    pub fn shapes_on_sheet(&self, sheet_name: &str) -> SheetResult<super::shapes::WorksheetShapes> {
-        Ok(super::shapes::load_worksheet_shapes(
+    pub fn shapes_on_sheet(&self, sheet_name: &str) -> SheetResult<super::shapes::Shapes> {
+        Ok(super::shapes::load_sheet_shapes(
             self.package(),
             sheet_name,
         )?)
@@ -4785,7 +4785,7 @@ fn validate_threaded_comment_people<'a>(
 mod tests {
     use super::{Workbook, WorkbookProtectionMetadata, validate_threaded_comment_people};
     use crate::xlsx::active_x::{
-        ControlSet, Descriptor, LoadedControl, Persistence, Property, WorksheetControl,
+        Control, ControlSet, Descriptor, LoadedControl, Persistence, Property,
     };
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
@@ -5014,7 +5014,7 @@ mod tests {
             .set_cell_value(1, 1, "retryable unwind");
         workbook.props_mut().unwrap().title = Some("Retry after unwind".to_owned());
         workbook
-            .replace_worksheet_protection(0, crate::xlsx::WorksheetProtectionMetadata::default())
+            .replace_worksheet_protection(0, crate::xlsx::Metadata::default())
             .unwrap();
 
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
@@ -6298,7 +6298,7 @@ mod tests {
         let mut workbook = Workbook::create().unwrap();
         let value = ControlSet {
             controls: vec![LoadedControl {
-                control: WorksheetControl {
+                control: Control {
                     shape_id: 17,
                     relationship_id: "rIdGeneratedControl".into(),
                     name: Some("Generated".into()),

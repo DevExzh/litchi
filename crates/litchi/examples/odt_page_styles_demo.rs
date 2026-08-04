@@ -3,13 +3,15 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::Metadata;
 #[cfg(feature = "odf")]
-use litchi::odf::{DocumentBuilder, Paragraph};
+use litchi::odf::odt::elements::text::Paragraph;
+#[cfg(feature = "odf")]
+use litchi::odf::odt::Builder;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
     let output_file = "odt_page_styles_demo.odt";
 
-    let mut builder = DocumentBuilder::new();
+    let mut builder = Builder::new();
 
     let metadata = Metadata {
         title: Some("ODT Page Style Demo".to_string()),
