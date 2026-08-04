@@ -755,11 +755,8 @@ impl IWorkPackage {
 
     pub(crate) fn parsed_archive(&self, name: &str) -> Result<Arc<Archive>> {
         let normalized = normalize_entry_name(name);
-        if let Some(archive) = self.state.cached_archive(normalized) {
-            return Ok(archive);
-        }
-        let archive = Arc::new(self.parse_archive(normalized)?);
-        Ok(self.state.cache_archive(normalized, archive))
+        self.state
+            .get_or_parse_archive(normalized, || self.parse_archive(normalized))
     }
 
     fn parse_archive(&self, normalized: &str) -> Result<Archive> {
@@ -1225,6 +1222,10 @@ fn validate_entry_name(name: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Barrier;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::thread;
+
     use super::*;
     use crate::archive::{ArchiveObject, RawMessage};
 
@@ -1525,6 +1526,86 @@ mod tests {
                     Arc::ptr_eq(&first, &archive) && archive.object(1).is_some()
                 })
         );
+    }
+
+    #[test]
+    fn parsed_archive_single_flight_shares_one_arc_across_threads() {
+        const CALLERS: usize = 8;
+        let state = Arc::new(PackageState::default());
+        let ready = Arc::new(Barrier::new(CALLERS + 1));
+        let first_parse_started = Arc::new(Barrier::new(2));
+        let parse_count = Arc::new(AtomicUsize::new(0));
+        let handles = (0..CALLERS)
+            .map(|_| {
+                let state = Arc::clone(&state);
+                let ready = Arc::clone(&ready);
+                let first_parse_started = Arc::clone(&first_parse_started);
+                let parse_count = Arc::clone(&parse_count);
+                thread::spawn(move || {
+                    ready.wait();
+                    state.get_or_parse_archive("Index/Document.iwa", || {
+                        if parse_count.fetch_add(1, Ordering::SeqCst) == 0 {
+                            first_parse_started.wait();
+                        }
+                        Ok(archive())
+                    })
+                })
+            })
+            .collect::<Vec<_>>();
+
+        ready.wait();
+        first_parse_started.wait();
+        let mut results = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap().unwrap())
+            .collect::<Vec<_>>();
+        let first = results.pop().unwrap();
+        assert!(results.iter().all(|result| Arc::ptr_eq(&first, result)));
+        assert_eq!(parse_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn failed_archive_flight_wakes_waiters_and_allows_a_retry() {
+        const CALLERS: usize = 6;
+        let state = Arc::new(PackageState::default());
+        let ready = Arc::new(Barrier::new(CALLERS + 1));
+        let first_parse_started = Arc::new(Barrier::new(2));
+        let parse_count = Arc::new(AtomicUsize::new(0));
+        let handles = (0..CALLERS)
+            .map(|_| {
+                let state = Arc::clone(&state);
+                let ready = Arc::clone(&ready);
+                let first_parse_started = Arc::clone(&first_parse_started);
+                let parse_count = Arc::clone(&parse_count);
+                thread::spawn(move || {
+                    ready.wait();
+                    state.get_or_parse_archive("Index/Document.iwa", || {
+                        if parse_count.fetch_add(1, Ordering::SeqCst) == 0 {
+                            first_parse_started.wait();
+                        }
+                        Err(Error::InvalidFormat("synthetic parse failure".to_owned()))
+                    })
+                })
+            })
+            .collect::<Vec<_>>();
+
+        ready.wait();
+        first_parse_started.wait();
+        for handle in handles {
+            let error = handle.join().unwrap().unwrap_err();
+            assert!(error.to_string().contains("synthetic parse failure"));
+        }
+
+        let retry_count = AtomicUsize::new(0);
+        let retry = state
+            .get_or_parse_archive("Index/Document.iwa", || {
+                retry_count.fetch_add(1, Ordering::SeqCst);
+                Ok(archive())
+            })
+            .unwrap();
+        assert!(retry.object(1).is_some());
+        assert_eq!(retry_count.load(Ordering::SeqCst), 1);
+        assert!(parse_count.load(Ordering::SeqCst) >= 1);
     }
 
     #[test]
