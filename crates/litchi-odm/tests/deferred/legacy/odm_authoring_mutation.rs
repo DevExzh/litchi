@@ -220,9 +220,9 @@ fn encrypted_and_signed_master_packages_compose() {
 #[test]
 fn odm_authoring_contains_no_unsafe_code() {
     for source in [
-        include_str!("../src/odm/document.rs"),
-        include_str!("../src/odm/builder.rs"),
-        include_str!("../src/odm/mutable.rs"),
+        include_str!("../../../src/migration/legacy/document.rs"),
+        include_str!("../../../src/migration/legacy/builder.rs"),
+        include_str!("../../../src/migration/legacy/mutable.rs"),
     ] {
         assert!(!source.contains("unsafe {"));
     }

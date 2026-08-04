@@ -238,8 +238,8 @@ fn encrypted_and_signed_schema_package_reopens() {
 #[test]
 fn odb_schema_crud_contains_no_unsafe_code() {
     for source in [
-        include_str!("../src/odb/document.rs"),
-        include_str!("../src/odb/schema.rs"),
+        include_str!("../../../src/migration/legacy/document.rs"),
+        include_str!("../../../src/migration/legacy/schema.rs"),
     ] {
         assert!(!source.contains("unsafe {"));
     }
