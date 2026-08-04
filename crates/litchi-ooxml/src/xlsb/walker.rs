@@ -6,15 +6,15 @@
 //! types are ignored, and known begin/end record pairs that carry no
 //! modelled data are skipped as balanced collections.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_xlsb::raw::{Kind, Record, Records, kind as rt};
 
 /// Maximum number of leading future-record wrapper blocks skipped while
 /// looking for the record that opens a part stream.
 const MAX_LEADING_WRAPPER_BLOCKS: usize = 16;
 
-pub(crate) fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+pub(crate) fn malformed(context: &str, detail: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: context.to_string(),
         val: detail.into(),
     }
@@ -32,13 +32,13 @@ impl<'a> RecordWalker<'a> {
         }
     }
 
-    pub(crate) fn next(&mut self) -> XlsbResult<Option<Record<'a>>> {
+    pub(crate) fn next(&mut self) -> Result<Option<Record<'a>>> {
         Ok(self.iter.next().transpose()?)
     }
 
-    pub(crate) fn required(&mut self, context: &'static str) -> XlsbResult<Record<'a>> {
+    pub(crate) fn required(&mut self, context: &'static str) -> Result<Record<'a>> {
         self.next()?
-            .ok_or_else(|| XlsbError::UnexpectedEndOfStream(context.to_string()))
+            .ok_or_else(|| Error::UnexpectedEndOfStream(context.to_string()))
     }
 
     /// Read the record that opens a part stream, requiring it to be
@@ -55,7 +55,7 @@ impl<'a> RecordWalker<'a> {
         &mut self,
         begin_type: Kind,
         context: &'static str,
-    ) -> XlsbResult<Record<'a>> {
+    ) -> Result<Record<'a>> {
         for _ in 0..MAX_LEADING_WRAPPER_BLOCKS {
             let record = self.required(context)?;
             let record_type = record.kind();
@@ -63,14 +63,14 @@ impl<'a> RecordWalker<'a> {
                 return Ok(record);
             }
             if !matches!(record_type, rt::AC_BEGIN | rt::FRT_BEGIN) {
-                return Err(XlsbError::UnexpectedRecord {
+                return Err(Error::UnexpectedRecord {
                     expected: begin_type.get(),
                     found: record_type.get(),
                 });
             }
             self.skip_unhandled(record_type, context)?;
         }
-        Err(XlsbError::UnexpectedRecord {
+        Err(Error::UnexpectedRecord {
             expected: begin_type.get(),
             found: rt::AC_BEGIN.get(),
         })
@@ -83,7 +83,7 @@ impl<'a> RecordWalker<'a> {
         begin_type: Kind,
         end_type: Kind,
         context: &'static str,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         let mut depth = 1u32;
         while let Some(record) = self.next()? {
             if record.kind() == begin_type {
@@ -95,7 +95,7 @@ impl<'a> RecordWalker<'a> {
                 }
             }
         }
-        Err(XlsbError::UnexpectedEndOfStream(context.to_string()))
+        Err(Error::UnexpectedEndOfStream(context.to_string()))
     }
 
     /// Skip a record the parser does not handle: a balanced collection when
@@ -104,7 +104,7 @@ impl<'a> RecordWalker<'a> {
         &mut self,
         record_type: Kind,
         context: &'static str,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         if let Some(end_type) = paired_end(record_type) {
             self.skip_collection(record_type, end_type, context)?;
         }
@@ -113,7 +113,7 @@ impl<'a> RecordWalker<'a> {
 
     /// Consume everything up to the matching end record of a collection that
     /// is expected to contain no modelled children.
-    pub(crate) fn expect_end(&mut self, end_type: Kind, context: &'static str) -> XlsbResult<()> {
+    pub(crate) fn expect_end(&mut self, end_type: Kind, context: &'static str) -> Result<()> {
         while let Some(record) = self.next()? {
             let record_type = record.kind();
             if record_type == end_type {
@@ -121,7 +121,7 @@ impl<'a> RecordWalker<'a> {
             }
             self.skip_unhandled(record_type, context)?;
         }
-        Err(XlsbError::UnexpectedEndOfStream(context.to_string()))
+        Err(Error::UnexpectedEndOfStream(context.to_string()))
     }
 }
 

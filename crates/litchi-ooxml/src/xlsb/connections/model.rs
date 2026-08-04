@@ -33,9 +33,9 @@ pub enum SourceType {
 }
 
 impl TryFrom<u32> for SourceType {
-    type Error = crate::xlsb::error::XlsbError;
+    type Error = crate::xlsb::error::Error;
 
-    fn try_from(value: u32) -> Result<Self, crate::xlsb::error::XlsbError> {
+    fn try_from(value: u32) -> Result<Self, crate::xlsb::error::Error> {
         Ok(match value {
             1 => Self::Odbc,
             2 => Self::Dao,
@@ -77,9 +77,9 @@ pub enum CommandType {
 }
 
 impl TryFrom<u32> for CommandType {
-    type Error = crate::xlsb::error::XlsbError;
+    type Error = crate::xlsb::error::Error;
 
-    fn try_from(value: u32) -> Result<Self, crate::xlsb::error::XlsbError> {
+    fn try_from(value: u32) -> Result<Self, crate::xlsb::error::Error> {
         Ok(match value {
             0 => Self::None,
             1 => Self::Cube,

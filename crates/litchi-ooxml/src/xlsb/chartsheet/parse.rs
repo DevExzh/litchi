@@ -6,7 +6,7 @@
 //! header/footer blocks, ...) are skipped as balanced collections.
 
 use crate::xlsb::chartsheet::model::*;
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::walker::{RecordWalker, malformed};
 use crate::xlsb::worksheet::StrongProtection;
 use litchi_xlsb::raw::{Cursor, kind as rt};
@@ -57,13 +57,13 @@ const MAX_SPIN_COUNT: u32 = 10_000_000;
 /// workbook part. The stream must start with `BrtBeginSheet` and end with
 /// `BrtEndSheet`. Records after `BrtEndSheet` are ignored. Unknown record
 /// types anywhere in the stream are skipped without failing.
-pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResult<ChartSheet> {
+pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> Result<ChartSheet> {
     let state = match state {
         0 => State::Visible,
         1 => State::Hidden,
         2 => State::VeryHidden,
         other => {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBundleSh hsState".to_string(),
                 val: other.to_string(),
             });
@@ -165,11 +165,11 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResu
             other => walker.skip_unhandled(other, "Chart Sheet stream")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream("BrtEndSheet".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndSheet".to_string()))
 }
 
 /// `BrtCsProp` payload (MS-XLSB 2.4.344).
-fn parse_cs_prop(data: &[u8], sheet: &mut ChartSheet) -> XlsbResult<()> {
+fn parse_cs_prop(data: &[u8], sheet: &mut ChartSheet) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtCsProp");
     let flags = cursor.read_u16()?;
     sheet.published = flags & CS_PROP_PUBLISHED != 0;
@@ -180,7 +180,7 @@ fn parse_cs_prop(data: &[u8], sheet: &mut ChartSheet) -> XlsbResult<()> {
 }
 
 /// `BrtColor` structure (MS-XLSB 2.4.337).
-fn parse_brt_color(data: &[u8]) -> XlsbResult<Color> {
+fn parse_brt_color(data: &[u8]) -> Result<Color> {
     debug_assert_eq!(data.len(), BRT_COLOR_LEN);
     let valid_rgb = data[0] & COLOR_VALID_RGB != 0;
     let color_type = match data[0] >> COLOR_TYPE_SHIFT {
@@ -211,7 +211,7 @@ fn parse_brt_color(data: &[u8]) -> XlsbResult<Color> {
 }
 
 /// `BrtCsPageSetup` payload (MS-XLSB 2.4.343).
-fn parse_cs_page_setup(data: &[u8]) -> XlsbResult<PageSetup> {
+fn parse_cs_page_setup(data: &[u8]) -> Result<PageSetup> {
     let mut cursor = Cursor::new(data, "BrtCsPageSetup");
     let paper_size = cursor.read_u32()?;
     let horizontal_resolution = cursor.read_u32()?;
@@ -243,7 +243,7 @@ fn parse_cs_page_setup(data: &[u8]) -> XlsbResult<PageSetup> {
 }
 
 /// `BrtCsProtection` payload (MS-XLSB 2.4.345).
-fn parse_cs_protection(data: &[u8]) -> XlsbResult<Protection> {
+fn parse_cs_protection(data: &[u8]) -> Result<Protection> {
     let mut cursor = Cursor::new(data, "BrtCsProtection");
     let protection = Protection {
         password_verifier: cursor.read_u16()?,
@@ -259,7 +259,7 @@ fn parse_cs_protection(data: &[u8]) -> XlsbResult<Protection> {
 /// Returns the strong protection data plus the `fLocked` and `fObjects`
 /// flags, which the immediately following `BrtCsProtection` record must
 /// repeat.
-fn parse_cs_protection_iso(data: &[u8]) -> XlsbResult<(StrongProtection, bool, bool)> {
+fn parse_cs_protection_iso(data: &[u8]) -> Result<(StrongProtection, bool, bool)> {
     let mut cursor = Cursor::new(data, "BrtCsProtectionIso");
     let spin_count = cursor.read_u32()?;
     if spin_count > MAX_SPIN_COUNT {
@@ -294,11 +294,7 @@ fn parse_cs_protection_iso(data: &[u8]) -> XlsbResult<(StrongProtection, bool, b
 }
 
 /// `BrtBeginCsViews` collection (MS-XLSB 2.4.38, 2.4.39).
-fn parse_cs_views(
-    walker: &mut RecordWalker<'_>,
-    data: &[u8],
-    views: &mut Vec<View>,
-) -> XlsbResult<()> {
+fn parse_cs_views(walker: &mut RecordWalker<'_>, data: &[u8], views: &mut Vec<View>) -> Result<()> {
     if !views.is_empty() {
         return Err(malformed("BrtBeginCsViews", "duplicate collection"));
     }
@@ -317,7 +313,7 @@ fn parse_cs_views(
                 views.push(parse_cs_view(record.payload())?);
                 let end = walker.required("BrtEndCsView")?;
                 if end.kind() != rt::END_CS_VIEW {
-                    return Err(XlsbError::UnexpectedRecord {
+                    return Err(Error::UnexpectedRecord {
                         expected: rt::END_CS_VIEW.get(),
                         found: end.kind().get(),
                     });
@@ -330,7 +326,7 @@ fn parse_cs_views(
 }
 
 /// `BrtBeginCsView` payload (MS-XLSB 2.4.38).
-fn parse_cs_view(data: &[u8]) -> XlsbResult<View> {
+fn parse_cs_view(data: &[u8]) -> Result<View> {
     let mut cursor = Cursor::new(data, "BrtBeginCsView");
     let flags = cursor.read_u16()?;
     let scale = cursor.read_u32()?;
@@ -348,7 +344,7 @@ fn parse_cs_view(data: &[u8]) -> XlsbResult<View> {
 
 /// Shared payload shape of `BrtDrawing` / `BrtLegacyDrawing` /
 /// `BrtLegacyDrawingHF`: a single `RelID` (MS-XLSB 2.5.115).
-fn set_rel_id(data: &[u8], context: &'static str, slot: &mut Option<String>) -> XlsbResult<()> {
+fn set_rel_id(data: &[u8], context: &'static str, slot: &mut Option<String>) -> Result<()> {
     if slot.is_some() {
         return Err(malformed(context, "duplicate record"));
     }

@@ -6,9 +6,7 @@
 
 pub use litchi_xlsb::external_link::*;
 
-use crate::xlsb::error::XlsbError;
-
-impl From<litchi_xlsb::external_link::Error> for XlsbError {
+impl From<litchi_xlsb::external_link::Error> for crate::xlsb::error::Error {
     fn from(error: litchi_xlsb::external_link::Error) -> Self {
         match error {
             litchi_xlsb::external_link::Error::Wire(error) => Self::Wire(error),

@@ -3,7 +3,7 @@
 use litchi_ooxml_common::web;
 use std::collections::HashSet;
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::formula::{CellParsedFormula, FormulaParser, Token};
 use crate::xlsb::frt::{parse_formula_header, serialize_formula_header};
 use litchi_xlsb::raw::{Records, Writer, kind};
@@ -40,7 +40,7 @@ impl Binding {
         application_reference: impl Into<String>,
         formula: CellParsedFormula,
         valid_external_sheet: impl FnOnce(u16) -> bool,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let application_reference = application_reference.into();
         validate_app_ref(&application_reference)?;
         let range = range_from_formula(&formula)?;
@@ -61,7 +61,7 @@ impl Binding {
     pub fn parse_payload(
         data: &[u8],
         valid_external_sheet: impl FnOnce(u16) -> bool,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let (mut formulas, consumed) = parse_formula_header(data, "BrtWebExtension", 1)?;
         if formulas.len() != 1 {
             return Err(invalid(
@@ -75,7 +75,7 @@ impl Binding {
                 "FRTHeader must contain exactly one formula",
             )
         })?;
-        let string_data = data.get(consumed..).ok_or(XlsbError::InvalidLength {
+        let string_data = data.get(consumed..).ok_or(Error::InvalidLength {
             expected: consumed,
             found: data.len(),
         })?;
@@ -84,7 +84,7 @@ impl Binding {
     }
 
     /// Serialize one `BrtWebExtension` payload.
-    pub fn to_payload(&self) -> XlsbResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         validate_app_ref(&self.application_reference)?;
         if range_from_formula(&self.formula)? != self.range {
             return Err(invalid(
@@ -102,11 +102,11 @@ impl Binding {
 pub fn parse_xlsb_web_extension_bindings(
     records: &[u8],
     mut valid_external_sheet: impl FnMut(u16) -> bool,
-) -> XlsbResult<Vec<Binding>> {
+) -> Result<Vec<Binding>> {
     let mut iterator = Records::new(records);
     let begin = iterator
         .next()
-        .ok_or_else(|| XlsbError::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+        .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
     if begin.kind() != kind::BEGIN_WEB_EXTENSIONS || !begin.payload().is_empty() {
         return Err(invalid(
             "WEBEXTENSIONS",
@@ -118,7 +118,7 @@ pub fn parse_xlsb_web_extension_bindings(
     loop {
         let record = iterator
             .next()
-            .ok_or_else(|| XlsbError::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+            .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
         match record.kind() {
             kind::WEB_EXTENSION => {
                 if bindings.len() == MAX_BINDINGS {
@@ -160,7 +160,7 @@ pub fn parse_xlsb_web_extension_bindings(
 }
 
 /// Serialize a complete `WEBEXTENSIONS` record collection.
-pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> XlsbResult<Vec<u8>> {
+pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> Result<Vec<u8>> {
     if bindings.is_empty() || bindings.len() > MAX_BINDINGS {
         return Err(invalid(
             "WEBEXTENSIONS",
@@ -185,7 +185,7 @@ pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> XlsbResult<Vec
 pub fn validate_xlsb_web_extension_apprefs<'a>(
     worksheet_bindings: &[Binding],
     package_bindings: impl IntoIterator<Item = &'a web::Binding>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     PackageAppRefs::new(package_bindings)?.validate(worksheet_bindings)
 }
 
@@ -196,7 +196,7 @@ pub(crate) struct PackageAppRefs<'a> {
 impl<'a> PackageAppRefs<'a> {
     pub(crate) fn new(
         package_bindings: impl IntoIterator<Item = &'a web::Binding>,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let mut values = HashSet::new();
         let mut count = 0usize;
         for binding in package_bindings {
@@ -227,7 +227,7 @@ impl<'a> PackageAppRefs<'a> {
         Ok(Self { values })
     }
 
-    pub(crate) fn validate(&self, worksheet_bindings: &[Binding]) -> XlsbResult<()> {
+    pub(crate) fn validate(&self, worksheet_bindings: &[Binding]) -> Result<()> {
         if worksheet_bindings.len() > MAX_BINDINGS {
             return Err(invalid(
                 "WEBEXTENSIONS",
@@ -249,7 +249,7 @@ impl<'a> PackageAppRefs<'a> {
     }
 }
 
-fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<Range> {
+fn range_from_formula(formula: &CellParsedFormula) -> Result<Range> {
     if formula
         .rgce
         .first()
@@ -313,7 +313,7 @@ fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<Range> {
     }
 }
 
-fn validate_app_ref(value: &str) -> XlsbResult<()> {
+fn validate_app_ref(value: &str) -> Result<()> {
     let units = value.encode_utf16().count();
     if units == 0 || units > MAX_APP_REF_CODE_UNITS {
         return Err(invalid(
@@ -330,12 +330,12 @@ fn validate_app_ref(value: &str) -> XlsbResult<()> {
     Ok(())
 }
 
-fn parse_wide_string_exact(data: &[u8]) -> XlsbResult<String> {
-    let length_bytes = data.get(..4).ok_or(XlsbError::InvalidLength {
+fn parse_wide_string_exact(data: &[u8]) -> Result<String> {
+    let length_bytes = data.get(..4).ok_or(Error::InvalidLength {
         expected: 4,
         found: data.len(),
     })?;
-    let length_bytes = <[u8; 4]>::try_from(length_bytes).map_err(|_| XlsbError::InvalidLength {
+    let length_bytes = <[u8; 4]>::try_from(length_bytes).map_err(|_| Error::InvalidLength {
         expected: 4,
         found: data.len(),
     })?;
@@ -351,12 +351,12 @@ fn parse_wide_string_exact(data: &[u8]) -> XlsbResult<String> {
         )
         .ok_or_else(|| invalid("BrtWebExtension.appRef", "length overflow"))?;
     if data.len() != expected {
-        return Err(XlsbError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected,
             found: data.len(),
         });
     }
-    let encoded = data.get(4..).ok_or(XlsbError::InvalidLength {
+    let encoded = data.get(4..).ok_or(Error::InvalidLength {
         expected,
         found: data.len(),
     })?;
@@ -367,12 +367,12 @@ fn parse_wide_string_exact(data: &[u8]) -> XlsbResult<String> {
                 .map(u16::from_le_bytes)
                 .map_err(|_| invalid("BrtWebExtension.appRef", "invalid UTF-16 unit"))
         })
-        .collect::<XlsbResult<Vec<_>>>()?;
+        .collect::<Result<Vec<_>>>()?;
     String::from_utf16(&units)
         .map_err(|_| invalid("BrtWebExtension.appRef", "invalid UTF-16 string"))
 }
 
-fn write_wide_string(output: &mut Vec<u8>, value: &str) -> XlsbResult<()> {
+fn write_wide_string(output: &mut Vec<u8>, value: &str) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     if units.is_empty() || units.len() > MAX_APP_REF_CODE_UNITS {
         return Err(invalid("BrtWebExtension.appRef", "invalid string length"));
@@ -385,8 +385,8 @@ fn write_wide_string(output: &mut Vec<u8>, value: &str) -> XlsbResult<()> {
     Ok(())
 }
 
-fn invalid(typ: impl Into<String>, val: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: typ.into(),
         val: val.into(),
     }

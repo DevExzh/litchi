@@ -2,7 +2,7 @@
 
 use super::model::*;
 use super::parse::parse_pivot_cache_definition;
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_xlsb::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
@@ -30,7 +30,7 @@ fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     data
 }
 
-fn parse(records: &[(Kind, Vec<u8>)]) -> XlsbResult<PivotCacheDefinition> {
+fn parse(records: &[(Kind, Vec<u8>)]) -> Result<PivotCacheDefinition> {
     parse_pivot_cache_definition(&stream(records))
 }
 
@@ -708,7 +708,7 @@ fn skips_unknown_records_and_collections() {
 fn rejects_malformed_streams() {
     // Does not start with BrtBeginPivotCacheDef.
     let error = parse(&[(rt::BEGIN_PCD_FIELDS, 0u32.to_le_bytes().to_vec())]).unwrap_err();
-    assert!(matches!(error, XlsbError::UnexpectedRecord { .. }));
+    assert!(matches!(error, Error::UnexpectedRecord { .. }));
 
     // Truncated definition payload.
     let error = parse(&[
@@ -718,7 +718,7 @@ fn rejects_malformed_streams() {
     .unwrap_err();
     assert!(matches!(
         error,
-        XlsbError::Wire(WireError::Truncated {
+        Error::Wire(WireError::Truncated {
             stage: Stage::Value,
             ..
         })
@@ -726,7 +726,7 @@ fn rejects_malformed_streams() {
 
     // Missing BrtEndPivotCacheDef.
     let error = parse(&[(rt::BEGIN_PIVOT_CACHE_DEF, definition_payload())]).unwrap_err();
-    assert!(matches!(error, XlsbError::UnexpectedEndOfStream(_)));
+    assert!(matches!(error, Error::UnexpectedEndOfStream(_)));
 
     // Invalid enumerated value (iSrcType out of range).
     let mut source = Vec::new();
@@ -739,5 +739,5 @@ fn rejects_malformed_streams() {
         (rt::END_PIVOT_CACHE_DEF, Vec::new()),
     ])
     .unwrap_err();
-    assert!(matches!(error, XlsbError::Unrecognized { .. }));
+    assert!(matches!(error, Error::Unrecognized { .. }));
 }

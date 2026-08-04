@@ -3,10 +3,10 @@
 //! This is the exact inverse of `parse.rs`: payload layouts, flag bits,
 //! optional-field presence flags, and collection structure all mirror the
 //! reader so authored connections round-trip through
-//! `parse_connections_part` and `XlsbWorkbook::connections`.
+//! `parse_connections_part` and `Workbook::connections`.
 
 use crate::xlsb::connections::model::*;
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_xlsb::raw::Writer;
 use litchi_xlsb::raw::kind as rt;
 use std::collections::HashSet;
@@ -73,14 +73,14 @@ const PARAM_DATA_DOUBLE: u32 = 1;
 const PARAM_DATA_STRING: u32 = 2;
 const PARAM_DATA_BOOLEAN: u32 = 4;
 
-fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn malformed(context: &str, detail: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: context.to_string(),
         val: detail.into(),
     }
 }
 
-fn validate_string(value: &str, context: &str, max_utf16_units: usize) -> XlsbResult<()> {
+fn validate_string(value: &str, context: &str, max_utf16_units: usize) -> Result<()> {
     if value.encode_utf16().count() > max_utf16_units {
         return Err(malformed(
             context,
@@ -91,7 +91,7 @@ fn validate_string(value: &str, context: &str, max_utf16_units: usize) -> XlsbRe
 }
 
 /// Validate model invariants shared by parsed-package and new-workbook authors.
-pub(crate) fn validate_connections(connections: &Connections) -> XlsbResult<()> {
+pub(crate) fn validate_connections(connections: &Connections) -> Result<()> {
     if connections.connections.len() > MAX_CONNECTIONS {
         return Err(malformed(
             "ExternalDataConnections",
@@ -442,7 +442,7 @@ fn web_props_payload(props: &WebProperties) -> Vec<u8> {
 }
 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
-fn param_payload(parameter: &Parameter) -> XlsbResult<Vec<u8>> {
+fn param_payload(parameter: &Parameter) -> Result<Vec<u8>> {
     const CONTEXT: &str = "BrtBeginECParam";
     let (pbt, data_type) = match parameter.parameter_type {
         ParameterType::Prompt => (PBT_PROMPT, None),
@@ -491,7 +491,7 @@ fn param_payload(parameter: &Parameter) -> XlsbResult<Vec<u8>> {
 }
 
 /// Serialize the complete External Data Connections part.
-pub(crate) fn write_connections_part(connections: &Connections) -> XlsbResult<Vec<u8>> {
+pub(crate) fn write_connections_part(connections: &Connections) -> Result<Vec<u8>> {
     validate_connections(connections)?;
     let mut data = Vec::with_capacity(512);
     let mut writer = Writer::new(&mut data);

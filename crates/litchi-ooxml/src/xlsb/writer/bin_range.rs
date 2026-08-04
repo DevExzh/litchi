@@ -9,7 +9,7 @@
 //! - **BinRange** (16 bytes): `row_first(i32) + row_last(i32) + col_first(i32) + col_last(i32)`
 //! - **BinRangeList**: `count(i32)` followed by `count` × `BinRange`
 
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::Result;
 use crate::xlsb::utils::parse_cell_reference;
 use std::io::Write;
 
@@ -38,7 +38,7 @@ impl CellRange {
     ///
     /// Both parts are expected in standard Excel notation (1-based rows, letter
     /// columns). The returned coordinates are 0-based.
-    pub fn parse(range_str: &str) -> XlsbResult<Self> {
+    pub fn parse(range_str: &str) -> Result<Self> {
         if let Some((left, right)) = range_str.split_once(':') {
             let (r1, c1) = parse_cell_reference(left.trim())?;
             let (r2, c2) = parse_cell_reference(right.trim())?;
@@ -50,7 +50,7 @@ impl CellRange {
     }
 
     /// Serialize as a single BIFF12 `BinRange` (16 bytes, little-endian i32s).
-    pub fn write<W: Write>(&self, w: &mut W) -> XlsbResult<()> {
+    pub fn write<W: Write>(&self, w: &mut W) -> Result<()> {
         w.write_all(&(self.row_first as i32).to_le_bytes())?;
         w.write_all(&(self.row_last as i32).to_le_bytes())?;
         w.write_all(&(self.col_first as i32).to_le_bytes())?;
@@ -61,7 +61,7 @@ impl CellRange {
 
 /// Parse a comma-separated list of range strings (e.g. `"A1:B2,C3:D4"`) into
 /// a vector of [`CellRange`]s.
-pub fn parse_range_list(sqref: &str) -> XlsbResult<Vec<CellRange>> {
+pub fn parse_range_list(sqref: &str) -> Result<Vec<CellRange>> {
     sqref
         .split([',', ' '])
         .filter(|s| !s.is_empty())
@@ -72,7 +72,7 @@ pub fn parse_range_list(sqref: &str) -> XlsbResult<Vec<CellRange>> {
 /// Serialize a slice of [`CellRange`]s as a BIFF12 `BinRangeList`.
 ///
 /// Layout: `count(i32)` + `count` × 16-byte `BinRange`.
-pub fn write_bin_range_list<W: Write>(ranges: &[CellRange], w: &mut W) -> XlsbResult<()> {
+pub fn write_bin_range_list<W: Write>(ranges: &[CellRange], w: &mut W) -> Result<()> {
     w.write_all(&(ranges.len() as i32).to_le_bytes())?;
     for r in ranges {
         r.write(w)?;

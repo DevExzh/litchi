@@ -5,10 +5,10 @@
 //! untouched worksheet streams.
 
 use litchi_core::sheet::traits::WorkbookTrait;
-use litchi_ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+use litchi_ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi_ooxml::xlsb::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
-    XlsbWorkbook,
+    Workbook,
 };
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::raw::{Kind, Records, kind};
@@ -23,9 +23,9 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn workbook_bytes(configure: impl FnOnce(&mut MutableXlsbWorksheet)) -> Vec<u8> {
-    let mut workbook = XlsbWorkbookWriter::new();
-    let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+fn workbook_bytes(configure: impl FnOnce(&mut MutableWorksheet)) -> Vec<u8> {
+    let mut workbook = WorkbookWriter::new();
+    let mut sheet = MutableWorksheet::new("Sheet1");
     sheet.set_cell(0, 0, "views");
     configure(&mut sheet);
     workbook.add_worksheet(sheet);
@@ -57,7 +57,7 @@ fn sheet_records(package_bytes: &[u8]) -> Vec<(Kind, Vec<u8>)> {
 }
 
 fn first_view(package_bytes: &[u8]) -> SheetView {
-    let workbook = XlsbWorkbook::new(Cursor::new(package_bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(package_bytes)).unwrap();
     let worksheet = workbook.worksheet(0).unwrap();
     let views = worksheet.sheet_views();
     assert_eq!(views.len(), 1);
@@ -218,8 +218,8 @@ fn explicit_sheet_view_round_trip() {
 
 #[test]
 fn freeze_panes_conflict_with_explicit_pane_fails() {
-    let mut workbook = XlsbWorkbookWriter::new();
-    let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+    let mut workbook = WorkbookWriter::new();
+    let mut sheet = MutableWorksheet::new("Sheet1");
     sheet.set_sheet_view(SheetView {
         pane: Some(SheetPane {
             state: Some(SheetPaneState::Split),
@@ -236,7 +236,7 @@ fn freeze_panes_conflict_with_explicit_pane_fails() {
 #[test]
 fn reads_excel_fixture_views_and_selections() {
     let path = fixture("test-data/ooxml/xlsb/Simple.xlsb");
-    let workbook = XlsbWorkbook::new(File::open(&path).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(&path).unwrap()).unwrap();
 
     let first = workbook.worksheet(0).unwrap();
     let views = first.sheet_views();
@@ -264,7 +264,7 @@ fn reads_excel_fixture_views_and_selections() {
 fn untouched_worksheet_stream_round_trips_byte_identical() {
     let path = fixture("test-data/ooxml/xlsb/Simple.xlsb");
     let original = std::fs::read(&path).unwrap();
-    let workbook = XlsbWorkbook::new(Cursor::new(&original)).unwrap();
+    let workbook = Workbook::new(Cursor::new(&original)).unwrap();
     // Force the read path across every worksheet, then save unmodified.
     for index in 0..workbook.worksheet_names().len() {
         let worksheet = workbook.worksheet(index).unwrap();

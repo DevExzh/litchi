@@ -2,7 +2,7 @@
 
 use super::model::*;
 use super::parse::{parse_table_part, parse_table_part_rel_ids};
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_xlsb::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
@@ -30,7 +30,7 @@ fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     data
 }
 
-fn parse(records: &[(Kind, Vec<u8>)]) -> XlsbResult<Table> {
+fn parse(records: &[(Kind, Vec<u8>)]) -> Result<Table> {
     parse_table_part(&stream(records))
 }
 
@@ -262,17 +262,17 @@ fn rejects_truncated_and_malformed_streams() {
     // Empty stream.
     assert!(matches!(
         parse_table_part(&[]),
-        Err(XlsbError::UnexpectedEndOfStream(_))
+        Err(Error::UnexpectedEndOfStream(_))
     ));
     // Wrong first record.
     assert!(matches!(
         parse(&[(rt::END_LIST, Vec::new())]),
-        Err(XlsbError::UnexpectedRecord { .. })
+        Err(Error::UnexpectedRecord { .. })
     ));
     // Truncated BrtBeginList payload.
     assert!(matches!(
         parse(&[(rt::BEGIN_LIST, vec![0; 8])]),
-        Err(XlsbError::Wire(WireError::Truncated {
+        Err(Error::Wire(WireError::Truncated {
             stage: Stage::Value,
             ..
         }))
@@ -280,7 +280,7 @@ fn rejects_truncated_and_malformed_streams() {
     // Missing BrtEndList.
     assert!(matches!(
         parse(&[(rt::BEGIN_LIST, list_payload())]),
-        Err(XlsbError::UnexpectedEndOfStream(_))
+        Err(Error::UnexpectedEndOfStream(_))
     ));
     // Unterminated column collection.
     assert!(matches!(
@@ -288,7 +288,7 @@ fn rejects_truncated_and_malformed_streams() {
             (rt::BEGIN_LIST, list_payload()),
             (rt::BEGIN_LIST_COLS, 0u32.to_le_bytes().to_vec()),
         ]),
-        Err(XlsbError::UnexpectedEndOfStream(_))
+        Err(Error::UnexpectedEndOfStream(_))
     ));
     // Trailing bytes in an understood payload.
     assert!(matches!(
@@ -300,7 +300,7 @@ fn rejects_truncated_and_malformed_streams() {
             }),
             (rt::END_LIST, Vec::new()),
         ]),
-        Err(XlsbError::Wire(WireError::Trailing {
+        Err(Error::Wire(WireError::Trailing {
             context: "BrtBeginList",
             ..
         }))
@@ -310,7 +310,7 @@ fn rejects_truncated_and_malformed_streams() {
     bad_type[16] = 1; // lt = 0x00000001 is not a ListType
     assert!(matches!(
         parse(&[(rt::BEGIN_LIST, bad_type), (rt::END_LIST, Vec::new())]),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Invalid totals-row function enumeration value.
     assert!(matches!(
@@ -322,14 +322,14 @@ fn rejects_truncated_and_malformed_streams() {
             (rt::END_LIST_COLS, Vec::new()),
             (rt::END_LIST, Vec::new()),
         ]),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Non-Boolean crwHeader.
     let mut bad_flag = list_payload();
     bad_flag[24] = 2;
     assert!(matches!(
         parse(&[(rt::BEGIN_LIST, bad_flag), (rt::END_LIST, Vec::new())]),
-        Err(XlsbError::Wire(WireError::InvalidBool { value: 2, .. }))
+        Err(Error::Wire(WireError::InvalidBool { value: 2, .. }))
     ));
     // Declared column count disagrees with the record collection.
     assert!(matches!(
@@ -341,7 +341,7 @@ fn rejects_truncated_and_malformed_streams() {
             (rt::END_LIST_COLS, Vec::new()),
             (rt::END_LIST, Vec::new()),
         ]),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
 }
 
@@ -379,7 +379,7 @@ fn extracts_table_part_relationship_ids_from_worksheet_stream() {
             (rt::LIST_PART, wide_string("rIdTable1")),
             (rt::END_LIST_PARTS, Vec::new()),
         ])),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Unterminated collection is rejected.
     assert!(matches!(
@@ -387,7 +387,7 @@ fn extracts_table_part_relationship_ids_from_worksheet_stream() {
             rt::BEGIN_LIST_PARTS,
             0u32.to_le_bytes().to_vec()
         )])),
-        Err(XlsbError::UnexpectedEndOfStream(_))
+        Err(Error::UnexpectedEndOfStream(_))
     ));
 }
 
@@ -396,7 +396,7 @@ fn extracts_table_part_relationship_ids_from_worksheet_stream() {
 /// accessors.
 #[test]
 fn resolves_tables_through_workbook_relationships() {
-    use crate::xlsb::XlsbWorkbook;
+    use crate::xlsb::Workbook;
     use litchi_opc::constants::relationship_type;
     use litchi_opc::part::Part;
     use litchi_opc::{BlobPart, OpcPackage, PackURI};
@@ -454,7 +454,7 @@ fn resolves_tables_through_workbook_relationships() {
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(sheet_part));
     package.add_part(Box::new(table_part));
-    let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+    let workbook = Workbook::from_opc_package(package).unwrap();
 
     let tables = workbook.structured_tables();
     assert_eq!(tables.len(), 1);
@@ -508,5 +508,5 @@ fn resolves_tables_through_workbook_relationships() {
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(sheet_part));
     package.add_part(Box::new(broken_table));
-    assert!(XlsbWorkbook::from_opc_package(package).is_err());
+    assert!(Workbook::from_opc_package(package).is_err());
 }

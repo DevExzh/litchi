@@ -7,7 +7,7 @@
 //! performs no Excel display-name validation (a display name containing
 //! spaces, for example, is kept as-is even though Excel would reject it).
 
-use crate::xlsb::error::XlsbError;
+use crate::xlsb::error::Error;
 
 /// A structured table parsed from one `tables/table*.bin` part
 /// (`BrtBeginList` and its record collection, MS-XLSB 2.4.100).
@@ -105,14 +105,14 @@ pub enum Type {
 }
 
 impl TryFrom<u32> for Type {
-    type Error = XlsbError;
+    type Error = Error;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::Range),
             2 => Ok(Self::Xml),
             3 => Ok(Self::QueryTable),
-            _ => Err(XlsbError::Unrecognized {
+            _ => Err(Error::Unrecognized {
                 typ: "table type".to_string(),
                 val: format!("0x{value:08X}"),
             }),
@@ -150,7 +150,7 @@ pub enum TotalsRowFunction {
 }
 
 impl TryFrom<u32> for TotalsRowFunction {
-    type Error = XlsbError;
+    type Error = Error;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
@@ -164,7 +164,7 @@ impl TryFrom<u32> for TotalsRowFunction {
             7 => Ok(Self::StdDev),
             8 => Ok(Self::Var),
             9 => Ok(Self::Custom),
-            _ => Err(XlsbError::Unrecognized {
+            _ => Err(Error::Unrecognized {
                 typ: "table totals-row function".to_string(),
                 val: format!("0x{value:08X}"),
             }),

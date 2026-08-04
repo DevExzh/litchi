@@ -1,14 +1,14 @@
-use litchi_ooxml::xlsb::XlsbWorkbook;
+use litchi_ooxml::xlsb::Workbook;
 use litchi_ooxml::xlsb::merged_cells::MergedCell;
-use litchi_ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+use litchi_ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::raw::{Kind, Records, Writer, kind};
 use std::io::Cursor;
 
 fn workbook_bytes(sheets: &[(&str, &[MergedCell])]) -> Vec<u8> {
-    let mut workbook = XlsbWorkbookWriter::new();
+    let mut workbook = WorkbookWriter::new();
     for (name, ranges) in sheets {
-        let mut sheet = MutableXlsbWorksheet::new(*name);
+        let mut sheet = MutableWorksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} preserved"));
         for range in *ranges {
             sheet.add_merged_cell(range.clone());
@@ -20,7 +20,7 @@ fn workbook_bytes(sheets: &[(&str, &[MergedCell])]) -> Vec<u8> {
     output.into_inner()
 }
 
-fn save(workbook: &XlsbWorkbook) -> Vec<u8> {
+fn save(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     workbook.save(&mut output).unwrap();
     output.into_inner()
@@ -117,7 +117,7 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
     let original_other_sheet = part_blob(&source, "/xl/worksheets/sheet2.bin");
     let original_workbook = part_blob(&source, "/xl/workbook.bin");
 
-    let mut workbook = XlsbWorkbook::new(Cursor::new(&source)).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(&source)).unwrap();
     workbook
         .set_merged_cell_ranges_by_name(
             "First",
@@ -150,7 +150,7 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
         assert_eq!(after.content_type(), before.content_type());
         assert_eq!(after.rels().iter().count(), before.rels().iter().count());
     }
-    let reparsed = XlsbWorkbook::new(Cursor::new(output)).unwrap();
+    let reparsed = Workbook::new(Cursor::new(output)).unwrap();
     assert_eq!(
         reparsed.merged_cell_ranges_by_name("First").unwrap(),
         [MergedCell::new(0, 1, 0, 1), MergedCell::new(5, 6, 2, 3)]
@@ -167,7 +167,7 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
 fn replaces_adds_removes_and_clears_present_block_by_index_and_name() {
     let initial = [MergedCell::new(0, 1, 0, 1)];
     let source = workbook_bytes(&[("Data", &initial), ("Other", &[])]);
-    let mut workbook = XlsbWorkbook::new(Cursor::new(source)).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(source)).unwrap();
     workbook
         .add_merged_cell_range_by_name("Data", MergedCell::new(3, 4, 3, 4))
         .unwrap();
@@ -201,7 +201,7 @@ fn replaces_adds_removes_and_clears_present_block_by_index_and_name() {
 #[test]
 fn rejects_bounds_duplicates_and_overlaps_atomically() {
     let source = workbook_bytes(&[("Data", &[])]);
-    let mut workbook = XlsbWorkbook::new(Cursor::new(source)).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(source)).unwrap();
     let invalid_sets = [
         vec![MergedCell::new(2, 1, 0, 1)],
         vec![MergedCell::new(0, 1_048_576, 0, 1)],
@@ -254,7 +254,7 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
     ];
     for source in malformed {
         let original = part_blob(&source, "/xl/worksheets/sheet1.bin");
-        let mut workbook = XlsbWorkbook::new(Cursor::new(source)).unwrap();
+        let mut workbook = Workbook::new(Cursor::new(source)).unwrap();
         assert!(workbook.merged_cell_ranges(0).is_err());
         assert!(
             workbook
@@ -271,7 +271,7 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
 #[test]
 fn count_payload_and_record_order_are_strict_after_roundtrip() {
     let source = workbook_bytes(&[("Data", &[])]);
-    let mut workbook = XlsbWorkbook::new(Cursor::new(source)).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(source)).unwrap();
     workbook
         .set_merged_cell_ranges(
             0,
@@ -293,7 +293,7 @@ fn count_payload_and_record_order_are_strict_after_roundtrip() {
     assert_eq!(records[begin + 3].0, kind::END_MERGE_CELLS);
     assert!(records[begin + 3].3.is_empty());
 
-    let reparsed = XlsbWorkbook::new(Cursor::new(output)).unwrap();
+    let reparsed = Workbook::new(Cursor::new(output)).unwrap();
     assert_eq!(
         reparsed.merged_cell_ranges(0).unwrap(),
         [MergedCell::new(1, 2, 4, 5), MergedCell::new(8, 9, 2, 3)]

@@ -4,7 +4,7 @@
 //! formula-preserving semantic model. The OOXML host supplies its formula
 //! representation, error surface, and worksheet/package orchestration.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::formula::CellParsedFormula;
 
 use litchi_xlsb::data_validation as owner;
@@ -28,7 +28,7 @@ impl owner::FormulaBinary for CellParsedFormula {
     }
 }
 
-impl From<owner::Error> for XlsbError {
+impl From<owner::Error> for Error {
     fn from(error: owner::Error) -> Self {
         match error {
             owner::Error::InvalidLength { expected, found } => {
@@ -53,14 +53,14 @@ impl From<owner::Error> for XlsbError {
 pub(crate) fn parse_collection_settings(
     data: &[u8],
     extension14: bool,
-) -> XlsbResult<(DataValidationSettings, u32)> {
+) -> Result<(DataValidationSettings, u32)> {
     owner::parse_collection_settings(data, extension14).map_err(Into::into)
 }
 
-pub(crate) fn parse_dval_list(data: &[u8]) -> XlsbResult<String> {
+pub(crate) fn parse_dval_list(data: &[u8]) -> Result<String> {
     owner::parse_dval_list(data).map_err(Into::into)
 }
 
-pub(crate) fn validate_dval_list_formula(value: &str) -> XlsbResult<()> {
+pub(crate) fn validate_dval_list_formula(value: &str) -> Result<()> {
     owner::validate_dval_list_formula(value).map_err(Into::into)
 }

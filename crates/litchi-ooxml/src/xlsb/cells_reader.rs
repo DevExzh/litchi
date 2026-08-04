@@ -4,7 +4,7 @@ use crate::xlsb::cell::{Cell, CellHeader};
 use crate::xlsb::data_validation::{
     DataValidationSettings, Validation, parse_collection_settings, parse_dval_list,
 };
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::formula::{CellParsedFormula, FormulaGroup, FormulaResolutionContext, GroupKind};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
@@ -35,9 +35,9 @@ fn build_color_scale(
     colors: Vec<Color>,
     record: &'static str,
     extension14: bool,
-) -> XlsbResult<Scale> {
+) -> Result<Scale> {
     if !(cfvos.len() == 2 || cfvos.len() == 3) || colors.len() != cfvos.len() {
-        return Err(XlsbError::Unrecognized {
+        return Err(Error::Unrecognized {
             typ: record.to_string(),
             val: format!("{} thresholds and {} colors", cfvos.len(), colors.len()),
         });
@@ -47,7 +47,7 @@ fn build_color_scale(
         || cfvos[cfvos.len() - 1].cfvo_type == 2
         || (cfvos.len() == 3 && matches!(cfvos[1].cfvo_type, 2 | 3))
     {
-        return Err(XlsbError::Unrecognized {
+        return Err(Error::Unrecognized {
             typ: record.to_string(),
             val: "invalid min/mid/max threshold type".to_string(),
         });
@@ -143,7 +143,7 @@ where
         shared_strings: &'a [SharedString],
         formula_context: &'a FormulaResolutionContext,
         cell_xf_count: usize,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let mut buf = Vec::with_capacity(1024);
 
         // Walk the worksheet preamble up to BrtWsDim (worksheet dimensions),
@@ -160,7 +160,7 @@ where
             }
         }
         if buf.len() != 16 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 16,
                 found: buf.len(),
             });
@@ -218,7 +218,7 @@ where
         self.dimensions
     }
 
-    pub fn next_cell(&mut self) -> XlsbResult<Option<Cell>> {
+    pub fn next_cell(&mut self) -> Result<Option<Cell>> {
         loop {
             self.buf.clear();
             let typ = if let Some((typ, data)) = self.pending_record.take() {
@@ -353,7 +353,7 @@ where
                     },
                 kind::CELL_R_STRING => {
                     if self.buf.len() < 9 {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 9,
                             found: self.buf.len(),
                         });
@@ -369,7 +369,7 @@ where
                 kind::FMLA_STRING => {
                     // BrtFmlaString - formula with string result
                     if self.buf.len() < 12 {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 12,
                             found: self.buf.len(),
                         });
@@ -384,7 +384,7 @@ where
                 kind::FMLA_NUM => {
                     // BrtFmlaNum - formula with numeric result
                     if self.buf.len() < 18 {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 18,
                             found: self.buf.len(),
                         });
@@ -398,7 +398,7 @@ where
                 kind::FMLA_BOOL => {
                     // BrtFmlaBool - formula with boolean result
                     if self.buf.len() < 11 {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 11,
                             found: self.buf.len(),
                         });
@@ -416,7 +416,7 @@ where
                 kind::FMLA_ERROR => {
                     // BrtFmlaError - formula with error result
                     if self.buf.len() < 11 {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 11,
                             found: self.buf.len(),
                         });
@@ -431,7 +431,7 @@ where
                     return self.resolve_formula_record(parsed).map(Some);
                 },
                 kind::ARR_FMLA | kind::SHR_FMLA => {
-                    return Err(XlsbError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "array/shared formula definition is not immediately preceded by a formula cell"
                             .to_string(),
                     ));
@@ -456,9 +456,9 @@ where
         }
     }
 
-    fn parse_column_info(data: &[u8], cell_xf_count: usize) -> XlsbResult<ColumnInfo> {
+    fn parse_column_info(data: &[u8], cell_xf_count: usize) -> Result<ColumnInfo> {
         if data.len() != 18 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 18,
                 found: data.len(),
             });
@@ -469,25 +469,25 @@ where
         let style_id = binary::read_u32_le_at(data, 12)?;
         let flags = binary::read_u16_le_at(data, 16)?;
         if first_column > last_column || last_column >= 0x4000 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtColInfo range".to_string(),
                 val: format!("{first_column}..={last_column}"),
             });
         }
         if width_raw > 0xFFFF {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtColInfo coldx".to_string(),
                 val: width_raw.to_string(),
             });
         }
         if style_id as usize >= cell_xf_count {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtColInfo ixfe".to_string(),
                 val: format!("{style_id} (cell XF count {cell_xf_count})"),
             });
         }
         if flags & !0x170F != 0 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtColInfo flags".to_string(),
                 val: format!("0x{flags:04X}"),
             });
@@ -510,9 +510,9 @@ where
         data: &[u8],
         cell_xf_count: usize,
         previous_row: Option<u32>,
-    ) -> XlsbResult<RowInfo> {
+    ) -> Result<RowInfo> {
         if data.len() < 17 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 17,
                 found: data.len(),
             });
@@ -525,7 +525,7 @@ where
         let phonetic_flags = data[12];
         let span_count = binary::read_u32_le_at(data, 13)? as usize;
         if span_count > 16 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtRowHdr ccolspan".to_string(),
                 val: span_count.to_string(),
             });
@@ -533,34 +533,34 @@ where
         let expected = span_count
             .checked_mul(8)
             .and_then(|size| size.checked_add(17))
-            .ok_or_else(|| XlsbError::Encoding("BrtRowHdr size overflow".to_string()))?;
+            .ok_or_else(|| Error::Encoding("BrtRowHdr size overflow".to_string()))?;
         if data.len() != expected {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected,
                 found: data.len(),
             });
         }
         if row >= 0x10_0000 || previous_row.is_some_and(|previous| row <= previous) {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtRowHdr rw".to_string(),
                 val: row.to_string(),
             });
         }
         if height_twips > 0x2000 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtRowHdr miyRw".to_string(),
                 val: height_twips.to_string(),
             });
         }
         if flags1 & 0xFC != 0 || flags2 & 0x80 != 0 || phonetic_flags & 0xFE != 0 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtRowHdr flags".to_string(),
                 val: format!("0x{flags1:02X}/0x{flags2:02X}/0x{phonetic_flags:02X}"),
             });
         }
         let style_applied = flags2 & 0x40 != 0;
         if style_applied && raw_style_id as usize >= cell_xf_count {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtRowHdr ixfe".to_string(),
                 val: format!("{raw_style_id} (cell XF count {cell_xf_count})"),
             });
@@ -577,7 +577,7 @@ where
                 || last / 1024 != segment
                 || previous_segment.is_some_and(|previous| segment <= previous)
             {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtRowHdr BrtColSpan".to_string(),
                     val: format!("{first}..={last}"),
                 });
@@ -600,20 +600,20 @@ where
         })
     }
 
-    fn parse_cell_header(&self) -> XlsbResult<CellHeader> {
+    fn parse_cell_header(&self) -> Result<CellHeader> {
         Self::decode_cell_header(&self.buf, self.cell_xf_count)
     }
 
-    fn decode_cell_header(data: &[u8], cell_xf_count: usize) -> XlsbResult<CellHeader> {
+    fn decode_cell_header(data: &[u8], cell_xf_count: usize) -> Result<CellHeader> {
         if data.len() < 8 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             });
         }
         let flags = data[7];
         if flags & 0xFE != 0 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "Cell flags".to_string(),
                 val: format!("0x{flags:02X}"),
             });
@@ -621,7 +621,7 @@ where
         let col = binary::read_u32_le_at(data, 0)?;
         let style_id = u32::from(data[4]) | (u32::from(data[5]) << 8) | (u32::from(data[6]) << 16);
         if style_id as usize >= cell_xf_count {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "Cell iStyleRef".to_string(),
                 val: format!("{style_id} (cell XF count {cell_xf_count})"),
             });
@@ -638,25 +638,25 @@ where
         header: CellHeader,
         cached_value: CellValue,
         flags_offset: usize,
-    ) -> XlsbResult<ParsedFormulaCell> {
-        let formula_offset = flags_offset.checked_add(2).ok_or_else(|| {
-            XlsbError::InvalidFormula("formula record offset overflow".to_string())
-        })?;
+    ) -> Result<ParsedFormulaCell> {
+        let formula_offset = flags_offset
+            .checked_add(2)
+            .ok_or_else(|| Error::InvalidFormula("formula record offset overflow".to_string()))?;
         if self.buf.len() < formula_offset {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: formula_offset,
                 found: self.buf.len(),
             });
         }
         let flags = binary::read_u16_le_at(&self.buf, flags_offset)?;
         if flags & !0x0002 != 0 {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "invalid GrbitFmla flags 0x{flags:04X}"
             )));
         }
         let (formula, consumed) = CellParsedFormula::parse(&self.buf[formula_offset..])?;
         if formula_offset + consumed != self.buf.len() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "formula record has {} trailing bytes",
                 self.buf.len() - formula_offset - consumed
             )));
@@ -669,7 +669,7 @@ where
         })
     }
 
-    fn resolve_formula_record(&mut self, parsed: ParsedFormulaCell) -> XlsbResult<Cell> {
+    fn resolve_formula_record(&mut self, parsed: ParsedFormulaCell) -> Result<Cell> {
         let position = (self.current_row, parsed.header.col);
         let exp_cell = parsed.formula.exp_cell()?;
 
@@ -687,13 +687,13 @@ where
 
         let group = if let Some(group) = new_group {
             if exp_cell.is_none() {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "{:?} formula definition is not preceded by PtgExp",
                     group.kind
                 )));
             }
             if exp_cell != Some(position) {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "group definition at ({}, {}) is referenced by PtgExp ({}, {})",
                     position.0,
                     position.1,
@@ -702,20 +702,20 @@ where
                 )));
             }
             if group.formula.rgce.first() == Some(&crate::xlsb::formula::ptg_types::PTG_EXP) {
-                return Err(XlsbError::InvalidFormula(
+                return Err(Error::InvalidFormula(
                     "array/shared formula definition cannot contain PtgExp".to_string(),
                 ));
             }
             match group.kind {
                 GroupKind::Array if group.range.top_left() != position => {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "BrtArrFmla range {} is not anchored at {}",
                         group.range.to_a1(),
                         crate::xlsb::utils::cell_reference(position.0, position.1)
                     )));
                 },
                 GroupKind::Shared if group.range.top_left() != position => {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "BrtShrFmla range {} is not anchored at {}",
                         group.range.to_a1(),
                         crate::xlsb::utils::cell_reference(position.0, position.1)
@@ -749,7 +749,7 @@ where
                 self.formula_context,
             ))
         } else if exp_cell.is_some() {
-            Err(XlsbError::InvalidFormula(format!(
+            Err(Error::InvalidFormula(format!(
                 "PtgExp cell {} has no array/shared formula definition",
                 crate::xlsb::utils::cell_reference(position.0, position.1)
             )))
@@ -791,7 +791,7 @@ where
     ///
     /// This reads merged cells, hyperlinks, and other advanced features
     /// that appear after the sheet data section.
-    fn read_advanced_features(&mut self) -> XlsbResult<()> {
+    fn read_advanced_features(&mut self) -> Result<()> {
         loop {
             self.buf.clear();
 
@@ -822,7 +822,7 @@ where
                 },
                 kind::BEGIN_A_FILTER => {
                     if self.auto_filter.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginAFilter".to_string(),
                             val: "duplicate worksheet AutoFilter".to_string(),
                         });
@@ -832,7 +832,7 @@ where
                 },
                 kind::SHEET_PROTECTION => {
                     if self.sheet_protection.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtSheetProtection".to_string(),
                             val: "duplicate record".to_string(),
                         });
@@ -841,7 +841,7 @@ where
                 },
                 kind::SHEET_PROTECTION_ISO => {
                     if self.sheet_protection.is_some() || self.strong_sheet_protection.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtSheetProtectionIso".to_string(),
                             val: "duplicate protection record".to_string(),
                         });
@@ -851,7 +851,7 @@ where
                     let next_type = self.iter.read_type()?;
                     let _ = self.iter.fill_buffer(&mut self.buf)?;
                     if next_type != kind::SHEET_PROTECTION {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtSheetProtectionIso".to_string(),
                             val: "not immediately followed by BrtSheetProtection".to_string(),
                         });
@@ -860,7 +860,7 @@ where
                     if base.password_hash.is_some()
                         || Self::sheet_protection_flags(&base) != iso_flags
                     {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtSheetProtectionIso".to_string(),
                             val: "following protection record does not match".to_string(),
                         });
@@ -870,7 +870,7 @@ where
                 },
                 kind::BEGIN_D_VALS => {
                     if self.data_validation_settings.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginDVals".to_string(),
                             val: "duplicate collection".to_string(),
                         });
@@ -881,7 +881,7 @@ where
                 },
                 kind::BEGIN_D_VALS14 => {
                     if self.data_validation14_settings.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginDVals14".to_string(),
                             val: "duplicate collection".to_string(),
                         });
@@ -903,13 +903,13 @@ where
                 },
                 kind::BEGIN_WEB_EXTENSIONS => {
                     if self.saw_web_extension_collection {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginWebExtensions".to_string(),
                             val: "duplicate collection".to_string(),
                         });
                     }
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginWebExtensions".to_string(),
                             val: "begin record must be empty".to_string(),
                         });
@@ -931,7 +931,7 @@ where
         Ok(())
     }
 
-    fn consume_web_extension_bindings(&mut self) -> XlsbResult<()> {
+    fn consume_web_extension_bindings(&mut self) -> Result<()> {
         let mut app_refs = HashSet::new();
         loop {
             self.buf.clear();
@@ -940,7 +940,7 @@ where
             match typ {
                 kind::WEB_EXTENSION => {
                     if self.web_extension_bindings.len() == 65_536 {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "WEBEXTENSIONS".to_string(),
                             val: "binding count exceeds 65,536".to_string(),
                         });
@@ -949,7 +949,7 @@ where
                         self.formula_context.is_internal_single_sheet_xti(index)
                     })?;
                     if !app_refs.insert(binding.application_reference.clone()) {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "WEBEXTENSIONS".to_string(),
                             val: "duplicate binding appRef".to_string(),
                         });
@@ -958,13 +958,13 @@ where
                 },
                 kind::END_WEB_EXTENSIONS => {
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtEndWebExtensions".to_string(),
                             val: "end record must be empty".to_string(),
                         });
                     }
                     if self.web_extension_bindings.is_empty() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "WEBEXTENSIONS".to_string(),
                             val: "collection requires at least one binding".to_string(),
                         });
@@ -972,7 +972,7 @@ where
                     return Ok(());
                 },
                 other => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "WEBEXTENSIONS".to_string(),
                         val: format!("unexpected record 0x{other:04X}"),
                     });
@@ -981,7 +981,7 @@ where
         }
     }
 
-    fn resolve_conditional_formatting_links(&mut self) -> XlsbResult<()> {
+    fn resolve_conditional_formatting_links(&mut self) -> Result<()> {
         let mut classic = HashMap::new();
         for formatting in &self.conditional_formattings {
             if formatting.record_kind != RecordKind::Classic {
@@ -991,18 +991,15 @@ where
                 let Some(guid) = rule.classic_extension_guid else {
                     continue;
                 };
-                let bar = rule
-                    .data_bar
-                    .as_ref()
-                    .ok_or_else(|| XlsbError::Unrecognized {
-                        typ: "BrtCFRuleExt".to_string(),
-                        val: "is attached to a non-data-bar rule".to_string(),
-                    })?;
+                let bar = rule.data_bar.as_ref().ok_or_else(|| Error::Unrecognized {
+                    typ: "BrtCFRuleExt".to_string(),
+                    val: "is attached to a non-data-bar rule".to_string(),
+                })?;
                 if classic
                     .insert(guid, (rule.priority, bar.min_length, bar.max_length))
                     .is_some()
                 {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtCFRuleExt".to_string(),
                         val: "duplicate GUID".to_string(),
                     });
@@ -1031,7 +1028,7 @@ where
                     continue;
                 };
                 if !matched.insert(metadata.guid) {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginCFRule14".to_string(),
                         val: "multiple data-bar extensions use the same GUID".to_string(),
                     });
@@ -1046,7 +1043,7 @@ where
                     (bar.min_length, bar.max_length)
                 };
                 if (classic_min, classic_max) != expected_lengths {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginDatabar14".to_string(),
                         val: "widths do not agree with the linked classic data bar".to_string(),
                     });
@@ -1055,7 +1052,7 @@ where
             }
         }
         if let Some(orphan) = classic.keys().find(|guid| !matched.contains(*guid)) {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtCFRuleExt".to_string(),
                 val: format!("GUID {orphan:02X?} has no matching data-bar extension"),
             });
@@ -1063,7 +1060,7 @@ where
         Ok(())
     }
 
-    fn consume_classic_data_validations(&mut self, expected_count: u32) -> XlsbResult<()> {
+    fn consume_classic_data_validations(&mut self, expected_count: u32) -> Result<()> {
         let start = self.data_validations.len();
         let mut pending_list = None;
         loop {
@@ -1073,7 +1070,7 @@ where
             match typ {
                 kind::D_VAL_LIST => {
                     if pending_list.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtDValList".to_string(),
                             val: "consecutive list overrides".to_string(),
                         });
@@ -1090,13 +1087,13 @@ where
                 },
                 kind::END_D_VALS => {
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 0,
                             found: self.buf.len(),
                         });
                     }
                     if pending_list.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtDValList".to_string(),
                             val: "not followed by BrtDVal".to_string(),
                         });
@@ -1104,7 +1101,7 @@ where
                     break;
                 },
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginDVals collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1113,7 +1110,7 @@ where
         }
         let found = self.data_validations.len() - start;
         if found != expected_count as usize {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginDVals count".to_string(),
                 val: format!("declared {expected_count}, found {found}"),
             });
@@ -1121,7 +1118,7 @@ where
         Ok(())
     }
 
-    fn consume_extension_data_validations(&mut self, expected_count: u32) -> XlsbResult<()> {
+    fn consume_extension_data_validations(&mut self, expected_count: u32) -> Result<()> {
         let start = self.data_validations.len();
         loop {
             self.buf.clear();
@@ -1134,7 +1131,7 @@ where
                 )?),
                 kind::END_D_VALS14 => {
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 0,
                             found: self.buf.len(),
                         });
@@ -1142,7 +1139,7 @@ where
                     break;
                 },
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginDVals14 collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1151,7 +1148,7 @@ where
         }
         let found = self.data_validations.len() - start;
         if found != expected_count as usize {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginDVals14 count".to_string(),
                 val: format!("declared {expected_count}, found {found}"),
             });
@@ -1164,7 +1161,7 @@ where
         formatting: &mut Formatting,
         expected_count: u32,
         base: (u32, u32),
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
@@ -1178,7 +1175,7 @@ where
                         .chain(self.conditional_formattings.iter().flat_map(|cf| &cf.rules))
                         .any(|existing| existing.priority == rule.priority)
                     {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginCFRule priority".to_string(),
                             val: format!("duplicate {}", rule.priority),
                         });
@@ -1188,7 +1185,7 @@ where
                 },
                 kind::END_COND_FORMATTING => {
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 0,
                             found: self.buf.len(),
                         });
@@ -1196,7 +1193,7 @@ where
                     break;
                 },
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginConditionalFormatting collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1204,7 +1201,7 @@ where
             }
         }
         if formatting.rules.len() != expected_count as usize {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginConditionalFormatting count".to_string(),
                 val: format!(
                     "declared {expected_count}, found {}",
@@ -1220,7 +1217,7 @@ where
         formatting: &mut Formatting,
         expected_count: u32,
         base: (u32, u32),
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
@@ -1244,7 +1241,7 @@ where
                             .chain(self.conditional_formattings.iter().flat_map(|cf| &cf.rules))
                             .any(|existing| existing.priority == rule.priority)
                     {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginCFRule14 priority".to_string(),
                             val: format!("duplicate {}", rule.priority),
                         });
@@ -1254,7 +1251,7 @@ where
                 },
                 kind::END_COND_FORMATTING14 => {
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 0,
                             found: self.buf.len(),
                         });
@@ -1262,7 +1259,7 @@ where
                     break;
                 },
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginConditionalFormatting14 collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1270,7 +1267,7 @@ where
             }
         }
         if formatting.rules.len() != expected_count as usize {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginConditionalFormatting14 count".to_string(),
                 val: format!(
                     "declared {expected_count}, found {}",
@@ -1285,7 +1282,7 @@ where
         &mut self,
         rule: &mut Rule,
         base: (u32, u32),
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
@@ -1293,7 +1290,7 @@ where
             match typ {
                 kind::BEGIN_COLOR_SCALE14 => {
                     if rule.color_scale14.is_some() || !self.buf.is_empty() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginColorScale14".to_string(),
                             val: "duplicate record or nonempty payload".to_string(),
                         });
@@ -1302,7 +1299,7 @@ where
                 },
                 kind::BEGIN_DATABAR14 => {
                     if rule.data_bar14.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginDatabar14".to_string(),
                             val: "duplicate record".to_string(),
                         });
@@ -1317,7 +1314,7 @@ where
                 },
                 kind::BEGIN_ICON_SET14 => {
                     if rule.icon_set14.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginIconSet14".to_string(),
                             val: "duplicate record".to_string(),
                         });
@@ -1327,7 +1324,7 @@ where
                 },
                 kind::END_CF_RULE14 => {
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 0,
                             found: self.buf.len(),
                         });
@@ -1335,7 +1332,7 @@ where
                     break;
                 },
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginCFRule14 collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1365,7 +1362,7 @@ where
             },
         };
         if !valid_visual {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginCFRule14 collection".to_string(),
                 val: "visualization records do not match rule type".to_string(),
             });
@@ -1373,7 +1370,7 @@ where
         Ok(())
     }
 
-    fn consume_conditional_rule(&mut self, rule: &mut Rule, base: (u32, u32)) -> XlsbResult<()> {
+    fn consume_conditional_rule(&mut self, rule: &mut Rule, base: (u32, u32)) -> Result<()> {
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
@@ -1381,7 +1378,7 @@ where
             match typ {
                 kind::BEGIN_COLOR_SCALE => {
                     if rule.color_scale.is_some() || !self.buf.is_empty() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginColorScale".to_string(),
                             val: "duplicate record or nonempty payload".to_string(),
                         });
@@ -1390,7 +1387,7 @@ where
                 },
                 kind::BEGIN_DATABAR => {
                     if rule.data_bar.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginDatabar".to_string(),
                             val: "duplicate record".to_string(),
                         });
@@ -1400,7 +1397,7 @@ where
                 },
                 kind::BEGIN_ICON_SET => {
                     if rule.icon_set.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtBeginIconSet".to_string(),
                             val: "duplicate record".to_string(),
                         });
@@ -1410,7 +1407,7 @@ where
                 },
                 kind::CF_RULE_EXT => {
                     if rule.classic_extension_guid.is_some() {
-                        return Err(XlsbError::Unrecognized {
+                        return Err(Error::Unrecognized {
                             typ: "BrtCFRuleExt".to_string(),
                             val: "duplicate record".to_string(),
                         });
@@ -1419,7 +1416,7 @@ where
                 },
                 kind::END_CF_RULE => {
                     if !self.buf.is_empty() {
-                        return Err(XlsbError::InvalidLength {
+                        return Err(Error::InvalidLength {
                             expected: 0,
                             found: self.buf.len(),
                         });
@@ -1427,7 +1424,7 @@ where
                     break;
                 },
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginCFRule collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1447,7 +1444,7 @@ where
             _ => rule.color_scale.is_none() && rule.data_bar.is_none() && rule.icon_set.is_none(),
         };
         if !valid_visual {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginCFRule collection".to_string(),
                 val: "visualization records do not match rule type".to_string(),
             });
@@ -1455,7 +1452,7 @@ where
         Ok(())
     }
 
-    fn consume_color_scale(&mut self, base: (u32, u32)) -> XlsbResult<Scale> {
+    fn consume_color_scale(&mut self, base: (u32, u32)) -> Result<Scale> {
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
         loop {
@@ -1471,7 +1468,7 @@ where
                 kind::COLOR => colors.push(Color::parse(&self.buf)?),
                 kind::END_COLOR_SCALE if self.buf.is_empty() => break,
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginColorScale collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1479,7 +1476,7 @@ where
             }
         }
         if !(cfvos.len() == 2 || cfvos.len() == 3) || colors.len() != cfvos.len() {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginColorScale collection".to_string(),
                 val: format!("{} thresholds and {} colors", cfvos.len(), colors.len()),
             });
@@ -1488,29 +1485,29 @@ where
             || cfvos.last().is_some_and(|cfvo| cfvo.cfvo_type == 2)
             || (cfvos.len() == 3 && matches!(cfvos[1].cfvo_type, 2 | 3))
         {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginColorScale collection".to_string(),
                 val: "invalid min/mid/max threshold type".to_string(),
             });
         }
         let has_middle = colors.len() == 3;
         let mut cfvos = cfvos.into_iter();
-        let min_cfvo = cfvos.next().ok_or_else(|| XlsbError::Unrecognized {
+        let min_cfvo = cfvos.next().ok_or_else(|| Error::Unrecognized {
             typ: "BrtBeginColorScale collection".to_string(),
             val: "missing minimum threshold".to_string(),
         })?;
         let middle_cfvo = if has_middle { cfvos.next() } else { None };
-        let max_cfvo = cfvos.next().ok_or_else(|| XlsbError::Unrecognized {
+        let max_cfvo = cfvos.next().ok_or_else(|| Error::Unrecognized {
             typ: "BrtBeginColorScale collection".to_string(),
             val: "missing maximum threshold".to_string(),
         })?;
         let mut colors = colors.into_iter();
-        let min_color_record = colors.next().ok_or_else(|| XlsbError::Unrecognized {
+        let min_color_record = colors.next().ok_or_else(|| Error::Unrecognized {
             typ: "BrtBeginColorScale collection".to_string(),
             val: "missing minimum color".to_string(),
         })?;
         let mid_color_record = if has_middle { colors.next() } else { None };
-        let max_color_record = colors.next().ok_or_else(|| XlsbError::Unrecognized {
+        let max_color_record = colors.next().ok_or_else(|| Error::Unrecognized {
             typ: "BrtBeginColorScale collection".to_string(),
             val: "missing maximum color".to_string(),
         })?;
@@ -1527,7 +1524,7 @@ where
         })
     }
 
-    fn consume_color_scale14(&mut self, base: (u32, u32)) -> XlsbResult<Scale> {
+    fn consume_color_scale14(&mut self, base: (u32, u32)) -> Result<Scale> {
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
         loop {
@@ -1541,7 +1538,7 @@ where
                 kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
                 kind::END_COLOR_SCALE14 if self.buf.is_empty() => break,
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginColorScale14 collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1551,9 +1548,9 @@ where
         build_color_scale(cfvos, colors, "BrtBeginColorScale14 collection", true)
     }
 
-    fn consume_data_bar(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<Bar> {
+    fn consume_data_bar(&mut self, begin: &[u8], base: (u32, u32)) -> Result<Bar> {
         if begin.len() != 3 || begin[0] > begin[1] || begin[1] > 100 || begin[2] > 1 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginDatabar".to_string(),
                 val: "invalid width or show-value field".to_string(),
             });
@@ -1573,7 +1570,7 @@ where
                 kind::COLOR if color.is_none() => color = Some(Color::parse(&self.buf)?),
                 kind::END_DATABAR if self.buf.is_empty() => break,
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginDatabar collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1581,23 +1578,23 @@ where
             }
         }
         if cfvos.len() != 2 || color.is_none() {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginDatabar collection".to_string(),
                 val: format!("{} thresholds, color={}", cfvos.len(), color.is_some()),
             });
         }
         if cfvos[0].cfvo_type == 3 || cfvos[1].cfvo_type == 2 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginDatabar collection".to_string(),
                 val: "invalid minimum/maximum threshold type".to_string(),
             });
         }
         let [min_cfvo, max_cfvo]: [Value; 2] =
-            cfvos.try_into().map_err(|_| XlsbError::Unrecognized {
+            cfvos.try_into().map_err(|_| Error::Unrecognized {
                 typ: "BrtBeginDatabar collection".to_string(),
                 val: "invalid threshold count".to_string(),
             })?;
-        let color_record = color.ok_or_else(|| XlsbError::Unrecognized {
+        let color_record = color.ok_or_else(|| Error::Unrecognized {
             typ: "BrtBeginDatabar collection".to_string(),
             val: "missing color".to_string(),
         })?;
@@ -1617,7 +1614,7 @@ where
         begin: &[u8],
         base: (u32, u32),
         priority: i32,
-    ) -> XlsbResult<Bar14> {
+    ) -> Result<Bar14> {
         let header = Bar14::parse_header(begin)?;
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
@@ -1632,7 +1629,7 @@ where
                 kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
                 kind::END_DATABAR14 if self.buf.is_empty() => break,
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginDatabar14 collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1643,7 +1640,7 @@ where
             || matches!(cfvos[0].cfvo_type, 3 | 9)
             || matches!(cfvos[1].cfvo_type, 2 | 8)
         {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginDatabar14 collection".to_string(),
                 val: "invalid minimum/maximum thresholds".to_string(),
             });
@@ -1654,7 +1651,7 @@ where
             + usize::from(header.custom_negative_border && header.border)
             + usize::from(header.axis_position != AxisPosition14::None);
         if colors.len() != expected_colors {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginDatabar14 collection".to_string(),
                 val: format!("expected {expected_colors} colors, found {}", colors.len()),
             });
@@ -1691,9 +1688,9 @@ where
         })
     }
 
-    fn consume_icon_set(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<IconSet> {
+    fn consume_icon_set(&mut self, begin: &[u8], base: (u32, u32)) -> Result<IconSet> {
         if begin.len() != 6 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 6,
                 found: begin.len(),
             });
@@ -1701,7 +1698,7 @@ where
         let icon_set = binary::read_u32_le_at(begin, 0)?;
         let flags = binary::read_u16_le_at(begin, 4)?;
         if icon_set > 16 || flags & !0x7e != 0 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginIconSet".to_string(),
                 val: format!("set {icon_set}, flags 0x{flags:04X}"),
             });
@@ -1726,7 +1723,7 @@ where
                 )?),
                 kind::END_ICON_SET if self.buf.is_empty() => break,
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginIconSet collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1734,7 +1731,7 @@ where
             }
         }
         if cfvos.len() != expected {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginIconSet collection".to_string(),
                 val: format!("expected {expected} thresholds, found {}", cfvos.len()),
             });
@@ -1743,7 +1740,7 @@ where
             .iter()
             .any(|cfvo| matches!(cfvo.cfvo_type, 2 | 3 | 8 | 9) || !cfvo.save_greater_than_or_equal)
         {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginIconSet collection".to_string(),
                 val: "invalid threshold type or fSaveGTE flag".to_string(),
             });
@@ -1756,7 +1753,7 @@ where
         })
     }
 
-    fn consume_icon_set14(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<IconSet14> {
+    fn consume_icon_set14(&mut self, begin: &[u8], base: (u32, u32)) -> Result<IconSet14> {
         let header = IconSet14::parse_header(begin)?;
         let expected = icon_count14(header.icon_set_type);
         let mut cfvos = Vec::new();
@@ -1772,7 +1769,7 @@ where
                 kind::CF_ICON => icons.push(Icon::parse(&self.buf)?),
                 kind::END_ICON_SET14 if self.buf.is_empty() => break,
                 _ => {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "BrtBeginIconSet14 collection".to_string(),
                         val: format!("unexpected record 0x{typ:04X}"),
                     });
@@ -1784,13 +1781,13 @@ where
                 matches!(cfvo.cfvo_type, 2 | 3 | 8 | 9) || !cfvo.save_greater_than_or_equal
             })
         {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginIconSet14 collection".to_string(),
                 val: format!("invalid set of {} thresholds", cfvos.len()),
             });
         }
         if (header.custom && icons.len() != expected) || (!header.custom && !icons.is_empty()) {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginIconSet14 collection".to_string(),
                 val: format!("invalid set of {} custom icons", icons.len()),
             });
@@ -1805,9 +1802,9 @@ where
         })
     }
 
-    fn parse_auto_filter(data: &[u8]) -> XlsbResult<AutoFilter> {
+    fn parse_auto_filter(data: &[u8]) -> Result<AutoFilter> {
         if data.len() != 16 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 16,
                 found: data.len(),
             });
@@ -1821,7 +1818,7 @@ where
             || first_column > last_column
             || last_column >= 0x4000
         {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginAFilter rfx".to_string(),
                 val: format!(
                     "rows {first_row}..={last_row}, columns {first_column}..={last_column}"
@@ -1836,14 +1833,14 @@ where
         })
     }
 
-    fn consume_auto_filter_records(&mut self) -> XlsbResult<()> {
+    fn consume_auto_filter_records(&mut self) -> Result<()> {
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             if typ == kind::END_A_FILTER {
                 if !self.buf.is_empty() {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 0,
                         found: self.buf.len(),
                     });
@@ -1851,7 +1848,7 @@ where
                 return Ok(());
             }
             if typ == kind::BEGIN_A_FILTER {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtBeginAFilter".to_string(),
                     val: "nested AutoFilter".to_string(),
                 });
@@ -1859,9 +1856,9 @@ where
         }
     }
 
-    fn parse_sheet_protection(data: &[u8]) -> XlsbResult<SheetProtection> {
+    fn parse_sheet_protection(data: &[u8]) -> Result<SheetProtection> {
         if data.len() != 66 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 66,
                 found: data.len(),
             });
@@ -1871,7 +1868,7 @@ where
         for (index, flag) in flags.iter_mut().enumerate() {
             let value = binary::read_u32_le_at(data, 2 + index * 4)?;
             if value > 1 {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtSheetProtection Boolean".to_string(),
                     val: format!("field {index}: {value}"),
                 });
@@ -1920,16 +1917,16 @@ where
         ]
     }
 
-    fn parse_strong_sheet_protection(data: &[u8]) -> XlsbResult<(StrongProtection, [bool; 16])> {
+    fn parse_strong_sheet_protection(data: &[u8]) -> Result<(StrongProtection, [bool; 16])> {
         if data.len() < 83 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 83,
                 found: data.len(),
             });
         }
         let spin_count = binary::read_u32_le_at(data, 0)?;
         if spin_count > 10_000_000 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtSheetProtectionIso dwSpinCount".to_string(),
                 val: spin_count.to_string(),
             });
@@ -1938,7 +1935,7 @@ where
         for (index, flag) in flags.iter_mut().enumerate() {
             let value = binary::read_u32_le_at(data, 4 + index * 4)?;
             if value > 1 {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtSheetProtectionIso Boolean".to_string(),
                     val: format!("field {index}: {value}"),
                 });
@@ -1948,7 +1945,7 @@ where
         let mut offset = 68;
         let hash = Self::read_length_prefixed_bytes(data, &mut offset, "rgbHash")?;
         if hash.is_empty() {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtSheetProtectionIso rgbHash".to_string(),
                 val: "empty".to_string(),
             });
@@ -1956,12 +1953,12 @@ where
         let salt = Self::read_length_prefixed_bytes(data, &mut offset, "rgbSalt")?;
         let algorithm = Self::read_nullable_wide_string(data, &mut offset)?
             .filter(|value| !value.is_empty())
-            .ok_or_else(|| XlsbError::Unrecognized {
+            .ok_or_else(|| Error::Unrecognized {
                 typ: "BrtSheetProtectionIso szAlgName".to_string(),
                 val: "null or empty".to_string(),
             })?;
         if offset != data.len() {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtSheetProtectionIso".to_string(),
                 val: format!("{} trailing bytes", data.len() - offset),
             });
@@ -1977,26 +1974,22 @@ where
         ))
     }
 
-    fn read_length_prefixed_bytes(
-        data: &[u8],
-        offset: &mut usize,
-        field: &str,
-    ) -> XlsbResult<Vec<u8>> {
+    fn read_length_prefixed_bytes(data: &[u8], offset: &mut usize, field: &str) -> Result<Vec<u8>> {
         let data_offset = offset.checked_add(4).ok_or_else(|| {
-            XlsbError::Encoding(format!("BrtSheetProtectionIso {field} offset overflow"))
+            Error::Encoding(format!("BrtSheetProtectionIso {field} offset overflow"))
         })?;
         if data_offset > data.len() {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: data_offset,
                 found: data.len(),
             });
         }
         let count = binary::read_u32_le_at(data, *offset)? as usize;
         let end = data_offset.checked_add(count).ok_or_else(|| {
-            XlsbError::Encoding(format!("BrtSheetProtectionIso {field} size overflow"))
+            Error::Encoding(format!("BrtSheetProtectionIso {field} size overflow"))
         })?;
         if end > data.len() {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
@@ -2005,12 +1998,12 @@ where
         Ok(data[data_offset..end].to_vec())
     }
 
-    fn read_nullable_wide_string(data: &[u8], offset: &mut usize) -> XlsbResult<Option<String>> {
+    fn read_nullable_wide_string(data: &[u8], offset: &mut usize) -> Result<Option<String>> {
         let text_offset = offset
             .checked_add(4)
-            .ok_or_else(|| XlsbError::Encoding("ISO algorithm offset overflow".to_string()))?;
+            .ok_or_else(|| Error::Encoding("ISO algorithm offset overflow".to_string()))?;
         if text_offset > data.len() {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: text_offset,
                 found: data.len(),
             });
@@ -2022,12 +2015,12 @@ where
         }
         let byte_count = (count as usize)
             .checked_mul(2)
-            .ok_or_else(|| XlsbError::Encoding("ISO algorithm size overflow".to_string()))?;
+            .ok_or_else(|| Error::Encoding("ISO algorithm size overflow".to_string()))?;
         let end = text_offset
             .checked_add(byte_count)
-            .ok_or_else(|| XlsbError::Encoding("ISO algorithm end overflow".to_string()))?;
+            .ok_or_else(|| Error::Encoding("ISO algorithm end overflow".to_string()))?;
         if end > data.len() {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
@@ -2037,13 +2030,13 @@ where
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         let value = String::from_utf16(&units)
-            .map_err(|error| XlsbError::Encoding(format!("invalid ISO algorithm: {error}")))?;
+            .map_err(|error| Error::Encoding(format!("invalid ISO algorithm: {error}")))?;
         *offset = end;
         Ok(Some(value))
     }
 
     /// Read merged cells section
-    fn read_merged_cells(&mut self) -> XlsbResult<()> {
+    fn read_merged_cells(&mut self) -> Result<()> {
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
@@ -2124,13 +2117,13 @@ mod tests {
         );
         assert!(matches!(
             Reader::decode_cell_header(&header, 0x1234),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         let reserved = [0, 0, 0, 0, 0, 0, 0, 2];
         assert!(matches!(
             Reader::decode_cell_header(&reserved, 1),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 
@@ -2248,7 +2241,7 @@ mod tests {
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
             reader.next_cell(),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 
@@ -2274,7 +2267,7 @@ mod tests {
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
             reader.next_cell(),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 

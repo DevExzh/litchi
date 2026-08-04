@@ -9,15 +9,15 @@
 //! cargo run --example xlsb_test_sheet_protection --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::writer::{MutableXlsbWorksheet, SheetProtection, XlsbWorkbookWriter};
+use litchi::ooxml::xlsb::writer::{MutableWorksheet, SheetProtection, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with basic sheet protection enabled...");
 
-    let mut workbook = XlsbWorkbookWriter::new();
-    let mut sheet = MutableXlsbWorksheet::new("Protected");
+    let mut workbook = WorkbookWriter::new();
+    let mut sheet = MutableWorksheet::new("Protected");
 
     sheet.set_cell(
         0,

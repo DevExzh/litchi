@@ -10,7 +10,7 @@
 //! formats: pane/frozen-split state, zoom scales, selections, and the
 //! tab-selected flag.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::utils::{cell_reference, parse_cell_reference};
 use litchi_xlsb::raw::{Cursor, Writer, kind};
 
@@ -54,8 +54,8 @@ const RANGE_LEN: usize = 16;
 const MAX_ZOOM_SCALE: u16 = 400;
 const MIN_ZOOM_SCALE: u16 = 10;
 
-fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn malformed(context: &str, detail: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: context.to_string(),
         val: detail.into(),
     }
@@ -118,8 +118,8 @@ impl ViewRange {
 }
 
 /// Parse one A1-style range token (`A1` or `A1:B2`) for writer-side sqref input.
-fn parse_range_token(token: &str) -> XlsbResult<ViewRange> {
-    let invalid = || XlsbError::InvalidCellReference(token.to_string());
+fn parse_range_token(token: &str) -> Result<ViewRange> {
+    let invalid = || Error::InvalidCellReference(token.to_string());
     let mut cells = token.split(':');
     let first = cells.next().ok_or_else(invalid)?;
     if first.is_empty() {
@@ -147,7 +147,7 @@ fn parse_range_token(token: &str) -> XlsbResult<ViewRange> {
 }
 
 /// Parse an A1-style cell reference, rejecting out-of-sheet and overflowing input.
-fn parse_view_cell(reference: &str, context: &str) -> XlsbResult<(u32, u32)> {
+fn parse_view_cell(reference: &str, context: &str) -> Result<(u32, u32)> {
     // Guard against absurd input before the unchecked arithmetic in
     // `parse_cell_reference` (e.g. column names long enough to overflow u32).
     if reference.len() > 10 {
@@ -165,7 +165,7 @@ fn parse_view_cell(reference: &str, context: &str) -> XlsbResult<(u32, u32)> {
     Ok((row, col))
 }
 
-fn zoom_or_default(value: Option<u16>, default: u16, context: &str) -> XlsbResult<u16> {
+fn zoom_or_default(value: Option<u16>, default: u16, context: &str) -> Result<u16> {
     let zoom = value.unwrap_or(default);
     if zoom != 0 && !(MIN_ZOOM_SCALE..=MAX_ZOOM_SCALE).contains(&zoom) {
         return Err(malformed(
@@ -180,7 +180,7 @@ fn zoom_or_default(value: Option<u16>, default: u16, context: &str) -> XlsbResul
 ///
 /// Pane and selection records following the view are attached by
 /// `read_sheet_views`, not by this function.
-pub fn parse_ws_view(data: &[u8]) -> XlsbResult<SheetView> {
+pub fn parse_ws_view(data: &[u8]) -> Result<SheetView> {
     let context = "BrtBeginWsView";
     let mut cursor = Cursor::new(data, context);
     let flags = cursor.read_u16()?;
@@ -230,7 +230,7 @@ pub fn parse_ws_view(data: &[u8]) -> XlsbResult<SheetView> {
 ///
 /// `None` emits the same default view the crate has always written for
 /// otherwise-unconfigured worksheets.
-pub fn write_ws_view_payload(view: Option<&SheetView>) -> XlsbResult<Vec<u8>> {
+pub fn write_ws_view_payload(view: Option<&SheetView>) -> Result<Vec<u8>> {
     let context = "BrtBeginWsView";
     let mut flags = 0u16;
     let mut set_flag = |bit: u16, value: Option<bool>, default: bool| {
@@ -332,7 +332,7 @@ pub fn write_ws_view_payload(view: Option<&SheetView>) -> XlsbResult<Vec<u8>> {
 }
 
 /// Parse a `BrtPane` record payload ([MS-XLSB] 2.4.723).
-pub fn parse_pane(data: &[u8]) -> XlsbResult<SheetPane> {
+pub fn parse_pane(data: &[u8]) -> Result<SheetPane> {
     let context = "BrtPane";
     let mut cursor = Cursor::new(data, context);
     let x_split = cursor.read_f64()?;
@@ -365,7 +365,7 @@ pub fn parse_pane(data: &[u8]) -> XlsbResult<SheetPane> {
 }
 
 /// Serialize a `BrtPane` record payload ([MS-XLSB] 2.4.723).
-pub fn write_pane_payload(pane: &SheetPane) -> XlsbResult<Vec<u8>> {
+pub fn write_pane_payload(pane: &SheetPane) -> Result<Vec<u8>> {
     let context = "BrtPane";
     let x_split = pane.x_split.unwrap_or(0.0);
     let y_split = pane.y_split.unwrap_or(0.0);
@@ -394,7 +394,7 @@ pub fn write_pane_payload(pane: &SheetPane) -> XlsbResult<Vec<u8>> {
 }
 
 /// Parse a `BrtSel` record payload ([MS-XLSB] 2.4.790).
-pub fn parse_selection(data: &[u8]) -> XlsbResult<SheetSelection> {
+pub fn parse_selection(data: &[u8]) -> Result<SheetSelection> {
     let context = "BrtSel";
     let mut cursor = Cursor::new(data, context);
     let pnn = cursor.read_u32()?;
@@ -407,7 +407,7 @@ pub fn parse_selection(data: &[u8]) -> XlsbResult<SheetSelection> {
         return Err(malformed(context, format!("sqrfx contains {count} ranges")));
     }
     if cursor.remaining() != count * RANGE_LEN {
-        return Err(XlsbError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: SEL_HEADER_LEN + count * RANGE_LEN,
             found: data.len(),
         });
@@ -435,7 +435,7 @@ pub fn parse_selection(data: &[u8]) -> XlsbResult<SheetSelection> {
 }
 
 /// Serialize a `BrtSel` record payload ([MS-XLSB] 2.4.790).
-pub fn write_selection_payload(selection: &SheetSelection) -> XlsbResult<Vec<u8>> {
+pub fn write_selection_payload(selection: &SheetSelection) -> Result<Vec<u8>> {
     let context = "BrtSel";
     let (row_active, col_active) = match selection.active_cell.as_deref() {
         Some(reference) => parse_view_cell(reference, context)?,
@@ -499,7 +499,7 @@ pub fn write_selection_payload(selection: &SheetSelection) -> XlsbResult<Vec<u8>
 pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
     iter: &mut crate::xlsb::records::Stream<RS>,
     buf: &mut Vec<u8>,
-) -> XlsbResult<Vec<SheetView>> {
+) -> Result<Vec<SheetView>> {
     let context = "BrtBeginWsViews collection";
     let mut views: Vec<SheetView> = Vec::new();
     // Index of the view opened by the innermost unmatched BrtBeginWsView.
@@ -657,7 +657,7 @@ mod tests {
     fn ws_view_rejects_invalid_length() {
         assert!(matches!(
             parse_ws_view(&EXCEL_WS_VIEW[..29]),
-            Err(XlsbError::Wire(WireError::Truncated {
+            Err(Error::Wire(WireError::Truncated {
                 stage: Stage::Value,
                 ..
             }))
@@ -698,7 +698,7 @@ mod tests {
         payload.push(PANE_FLAG_FROZEN | PANE_FLAG_FROZEN_NO_SPLIT);
         assert!(matches!(
             parse_pane(&payload),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 
@@ -743,7 +743,7 @@ mod tests {
         };
         assert!(matches!(
             write_selection_payload(&selection),
-            Err(XlsbError::InvalidCellReference(_))
+            Err(Error::InvalidCellReference(_))
         ));
         // active_cell_id outside the range collection.
         let selection = SheetSelection {
@@ -757,7 +757,7 @@ mod tests {
         payload[16] = 2;
         assert!(matches!(
             parse_selection(&payload),
-            Err(XlsbError::InvalidLength { .. })
+            Err(Error::InvalidLength { .. })
         ));
     }
 }

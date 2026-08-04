@@ -149,7 +149,7 @@ impl Workbook {
                     .unwrap_or_default();
 
                 // Create XLSB workbook directly from the parsed OPC package
-                let xlsb = crate::ooxml::xlsb::XlsbWorkbook::from_opc_package(opc_package)
+                let xlsb = crate::ooxml::xlsb::Workbook::from_opc_package(opc_package)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 (WorkbookImpl::Xlsb(xlsb), metadata)
             },

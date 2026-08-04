@@ -1,6 +1,6 @@
 //! Utility functions for XLSB parsing
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 
 /// Convert column number to Excel column name (A, B, ..., Z, AA, AB, etc.)
 ///
@@ -51,7 +51,7 @@ pub fn cell_reference(row: u32, col: u32) -> String {
 /// Parse Excel cell reference to row and column indices
 ///
 /// Returns 0-based row and column indices
-pub fn parse_cell_reference(ref_str: &str) -> XlsbResult<(u32, u32)> {
+pub fn parse_cell_reference(ref_str: &str) -> Result<(u32, u32)> {
     let ref_str = ref_str.to_ascii_uppercase();
     let mut col_str = String::new();
     let mut row_str = String::new();
@@ -61,28 +61,28 @@ pub fn parse_cell_reference(ref_str: &str) -> XlsbResult<(u32, u32)> {
         if ch.is_ascii_uppercase() {
             // Letters must come before digits
             if found_digit {
-                return Err(XlsbError::InvalidCellReference(ref_str.to_string()));
+                return Err(Error::InvalidCellReference(ref_str.to_string()));
             }
             col_str.push(ch);
         } else if ch.is_ascii_digit() {
             found_digit = true;
             row_str.push(ch);
         } else {
-            return Err(XlsbError::InvalidCellReference(ref_str.to_string()));
+            return Err(Error::InvalidCellReference(ref_str.to_string()));
         }
     }
 
     if col_str.is_empty() || row_str.is_empty() {
-        return Err(XlsbError::InvalidCellReference(ref_str.to_string()));
+        return Err(Error::InvalidCellReference(ref_str.to_string()));
     }
 
     let col = column_name_to_index(&col_str)
-        .ok_or_else(|| XlsbError::InvalidCellReference(ref_str.to_string()))?;
+        .ok_or_else(|| Error::InvalidCellReference(ref_str.to_string()))?;
     let row: u32 = row_str
         .parse()
-        .map_err(|_| XlsbError::InvalidCellReference(ref_str.to_string()))?;
+        .map_err(|_| Error::InvalidCellReference(ref_str.to_string()))?;
     if row == 0 {
-        return Err(XlsbError::InvalidCellReference(ref_str));
+        return Err(Error::InvalidCellReference(ref_str));
     }
 
     Ok((row - 1, col)) // Make 0-based

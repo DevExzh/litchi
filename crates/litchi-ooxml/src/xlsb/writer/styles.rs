@@ -3,7 +3,7 @@
 //! This module provides functionality to write style information (fonts, fills, borders, etc.)
 //! to XLSB binary format files.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::styles::{Border, BorderSide};
 use crate::xlsb::styles_table::{Fill, Font};
 use litchi_xlsb::raw::Writer;
@@ -128,7 +128,7 @@ impl StylesWriter {
     ///   BrtBeginTableStyles / BrtEndTableStyles        (no table styles, only defaults)
     /// BrtEndStyleSheet
     /// ```
-    pub(crate) fn write<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         // BrtBeginStyleSheet
         writer.write_record(kind::BEGIN_STYLE_SHEET, &[])?;
 
@@ -157,7 +157,7 @@ impl StylesWriter {
     }
 
     /// Write default number formats
-    fn write_default_formats<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_default_formats<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = Writer::new(&mut count_data);
         temp_writer.write_u32(0)?; // count = 0 (no custom formats)
@@ -168,7 +168,7 @@ impl StylesWriter {
     }
 
     /// Write fonts (default and custom)
-    fn write_default_fonts<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_default_fonts<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         // For now we always serialize at least one default font. Additional
         // fonts added through `add_font` are serialized using a simplified
         // BrtFont layout used by SheetJS and Excel.
@@ -195,7 +195,7 @@ impl StylesWriter {
     }
 
     /// Write the standard and user-added pattern fills.
-    fn write_fills<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_fills<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = Writer::new(&mut count_data);
         temp_writer.write_u32(self.fills.len() as u32)?;
@@ -203,7 +203,7 @@ impl StylesWriter {
 
         for fill in &self.fills {
             if !matches!(fill.pattern_type, 0..=18) {
-                return Err(XlsbError::UnsupportedFeature(format!(
+                return Err(Error::UnsupportedFeature(format!(
                     "XLSB fill pattern {} is not a supported pattern fill",
                     fill.pattern_type
                 )));
@@ -228,7 +228,7 @@ impl StylesWriter {
     }
 
     /// Write cell borders as `BrtBorder` records.
-    fn write_borders<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_borders<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = Writer::new(&mut count_data);
         temp_writer.write_u32(self.borders.len() as u32)?;
@@ -236,12 +236,12 @@ impl StylesWriter {
 
         for border in &self.borders {
             if border.vertical.is_some() || border.horizontal.is_some() {
-                return Err(XlsbError::UnsupportedFeature(
+                return Err(Error::UnsupportedFeature(
                     "vertical and horizontal table borders are not BrtBorder fields".to_string(),
                 ));
             }
             if (border.diagonal_down || border.diagonal_up) && border.diagonal.is_none() {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtBorder diagonal".to_string(),
                     val: "direction is set without a diagonal border".to_string(),
                 });
@@ -262,7 +262,7 @@ impl StylesWriter {
         Ok(())
     }
 
-    fn write_blxf<W: Write>(writer: &mut Writer<W>, side: Option<&BorderSide>) -> XlsbResult<()> {
+    fn write_blxf<W: Write>(writer: &mut Writer<W>, side: Option<&BorderSide>) -> Result<()> {
         if let Some(side) = side {
             writer.write_u8(side.style as u8)?;
             writer.write_u8(0)?;
@@ -275,7 +275,7 @@ impl StylesWriter {
     }
 
     /// Write default cell style XFs (BrtBeginCellStyleXFs / BrtXF / BrtEndCellStyleXFs).
-    fn write_default_cell_style_xfs<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_default_cell_style_xfs<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = Writer::new(&mut count_data);
         temp_writer.write_u32(1)?; // one style XF
@@ -289,7 +289,7 @@ impl StylesWriter {
     }
 
     /// Write default cell XFs (cell formats)
-    fn write_default_cell_xfs<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_default_cell_xfs<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = Writer::new(&mut count_data);
         temp_writer.write_u32(1)?; // one default XF
@@ -303,7 +303,7 @@ impl StylesWriter {
     }
 
     /// Write default styles table (BrtBeginStyles / BrtStyle / BrtEndStyles).
-    fn write_default_styles<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_default_styles<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = Writer::new(&mut count_data);
         temp_writer.write_u32(1)?; // one style: Normal
@@ -331,7 +331,7 @@ impl StylesWriter {
     /// Write DXF table (`BrtBeginDXFs` / `BrtDXF`* / `BrtEndDXFs`).
     ///
     /// Each [`DxfStyle`] is serialized as a `BrtDXF` record per [MS-XLSB] 2.4.356.
-    fn write_default_dxfs<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_default_dxfs<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         // BrtBeginDXFs: count(u32)
         let mut data = Vec::new();
         let mut temp_writer = Writer::new(&mut data);
@@ -422,7 +422,7 @@ impl StylesWriter {
 
     /// Write minimal table styles (BrtBeginTableStyles / BrtEndTableStyles) with
     /// zero styles but default names matching SheetJS and Excel.
-    fn write_default_table_styles<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_default_table_styles<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut data = Vec::new();
         let mut temp_writer = Writer::new(&mut data);
         temp_writer.write_u32(0)?; // cnt = 0
@@ -450,7 +450,7 @@ impl StylesWriter {
     /// u8  xfGrbitAtr
     /// u8  reserved
     /// ```
-    fn write_xf_record<W: Write>(writer: &mut Writer<W>, ixfe_parent: u16) -> XlsbResult<()> {
+    fn write_xf_record<W: Write>(writer: &mut Writer<W>, ixfe_parent: u16) -> Result<()> {
         let mut xf_data = Vec::new();
         let mut temp_writer = Writer::new(&mut xf_data);
 
@@ -473,17 +473,17 @@ impl StylesWriter {
     /// Helper to write a BrtFont payload for the simplified Font structure
     /// used by this crate. This closely follows SheetJS'
     /// `write_BrtFont` implementation.
-    fn write_font_record<W: Write>(writer: &mut Writer<W>, font: &Font) -> XlsbResult<()> {
+    fn write_font_record<W: Write>(writer: &mut Writer<W>, font: &Font) -> Result<()> {
         let height = (font.size * 20.0).round();
         if !font.size.is_finite() || !(20.0..=8191.0).contains(&height) {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtFont height".to_string(),
                 val: font.size.to_string(),
             });
         }
         let name_len = font.name.encode_utf16().count();
         if !(1..=31).contains(&name_len) {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtFont name length".to_string(),
                 val: name_len.to_string(),
             });
@@ -536,7 +536,7 @@ impl StylesWriter {
     }
 
     /// Write an automatic or direct ARGB `BrtColor`.
-    fn write_brt_color<W: Write>(writer: &mut Writer<W>, color: Option<u32>) -> XlsbResult<()> {
+    fn write_brt_color<W: Write>(writer: &mut Writer<W>, color: Option<u32>) -> Result<()> {
         if let Some(argb) = color {
             // fValidRGB=1, xColorType=2 (direct ARGB).
             writer.write_u8((2 << 1) | 1)?;

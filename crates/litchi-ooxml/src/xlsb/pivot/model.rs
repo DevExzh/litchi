@@ -4,7 +4,7 @@
 //! connection identifiers, and MDX/formula payloads are stored verbatim and
 //! are never dereferenced, contacted, or executed.
 
-use crate::xlsb::error::XlsbError;
+use crate::xlsb::error::Error;
 
 /// A PivotCache parsed from one `pivotCacheDefinition` part (MS-XLSB 2.4.168
 /// `BrtBeginPivotCacheDef` and its record collection).
@@ -78,7 +78,7 @@ pub enum PivotCacheSourceType {
 }
 
 impl TryFrom<u32> for PivotCacheSourceType {
-    type Error = XlsbError;
+    type Error = Error;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
@@ -86,7 +86,7 @@ impl TryFrom<u32> for PivotCacheSourceType {
             1 => Ok(Self::External),
             2 => Ok(Self::Consolidation),
             3 => Ok(Self::Scenario),
-            _ => Err(XlsbError::Unrecognized {
+            _ => Err(Error::Unrecognized {
                 typ: "PivotCache source type".to_string(),
                 val: format!("0x{value:08X}"),
             }),
@@ -300,7 +300,7 @@ pub enum PivotCacheErrorCode {
 }
 
 impl TryFrom<u8> for PivotCacheErrorCode {
-    type Error = XlsbError;
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -312,7 +312,7 @@ impl TryFrom<u8> for PivotCacheErrorCode {
             0x24 => Ok(Self::Num),
             0x2A => Ok(Self::NA),
             0x2B => Ok(Self::GettingData),
-            _ => Err(XlsbError::Unrecognized {
+            _ => Err(Error::Unrecognized {
                 typ: "PivotCache item error code".to_string(),
                 val: format!("0x{value:02X}"),
             }),
@@ -407,7 +407,7 @@ pub enum PivotCacheGroupBy {
 }
 
 impl TryFrom<u8> for PivotCacheGroupBy {
-    type Error = XlsbError;
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -419,7 +419,7 @@ impl TryFrom<u8> for PivotCacheGroupBy {
             5 => Ok(Self::Months),
             6 => Ok(Self::Quarters),
             7 => Ok(Self::Years),
-            _ => Err(XlsbError::Unrecognized {
+            _ => Err(Error::Unrecognized {
                 typ: "PivotCache grouping type".to_string(),
                 val: format!("0x{value:02X}"),
             }),
@@ -610,7 +610,7 @@ pub enum PivotNameFunction {
 }
 
 impl TryFrom<u8> for PivotNameFunction {
-    type Error = XlsbError;
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -626,7 +626,7 @@ impl TryFrom<u8> for PivotNameFunction {
             9 => Ok(Self::Var),
             10 => Ok(Self::VarP),
             255 => Ok(Self::Unspecified),
-            _ => Err(XlsbError::Unrecognized {
+            _ => Err(Error::Unrecognized {
                 typ: "PivotName aggregation function".to_string(),
                 val: format!("{value}"),
             }),

@@ -199,7 +199,7 @@ fn parses_real_fixture_workbook_drawing() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ooxml/xlsb/universal-content.xlsb"
     );
-    let workbook = crate::xlsb::XlsbWorkbook::new(std::fs::File::open(path).unwrap()).unwrap();
+    let workbook = crate::xlsb::Workbook::new(std::fs::File::open(path).unwrap()).unwrap();
     let drawing = workbook.sheet_drawing(0).expect("sheet 0 has a drawing");
     assert_eq!(drawing.sheet_index, 0);
     assert_eq!(drawing.drawing.anchors.len(), 1);

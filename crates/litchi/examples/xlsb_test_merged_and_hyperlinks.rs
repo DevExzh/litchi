@@ -4,15 +4,15 @@
 
 use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
 use litchi::ooxml::xlsb::merged_cells::MergedCell;
-use litchi::ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test: Merged cells + hyperlinks combined...");
 
-    let mut workbook = XlsbWorkbookWriter::new();
-    let mut sheet = MutableXlsbWorksheet::new("Dashboard");
+    let mut workbook = WorkbookWriter::new();
+    let mut sheet = MutableWorksheet::new("Dashboard");
 
     // Title row with merged cells
     sheet.set_cell(0, 0, CellValue::String("Sales Dashboard".to_string()));

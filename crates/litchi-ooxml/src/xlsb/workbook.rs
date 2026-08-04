@@ -1,7 +1,7 @@
 //! Workbook implementation for XLSB files
 
 use crate::xlsb::Cell;
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::Result;
 use crate::xlsb::external_link::{
     CachedValue, DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
     DDE_ITEM_RESERVED_MASK, DDE_ITEM_SUPPORTS_OLE, DdeItem, DefinedName, EXTERNAL_NAME_BUILT_IN,
@@ -24,7 +24,9 @@ use crate::xlsb::vba_project::{
 use crate::xlsb::web_extension_bindings::PackageAppRefs;
 use crate::xlsb::worksheet::Worksheet;
 use litchi_core::binary;
-use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
+use litchi_core::sheet::{
+    Result as SheetResult, Worksheet as SheetTrait, WorksheetIterator as SheetIterator,
+};
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use litchi_ooxml_common::ribbon;
@@ -48,7 +50,7 @@ const OLE_DATA_SOURCE_RELATIONSHIP_TYPES: &[&str] = &[
 
 /// XLSB workbook implementation
 #[allow(dead_code)]
-pub struct XlsbWorkbook {
+pub struct Workbook {
     package: OpcPackage,
     worksheets: Vec<Worksheet>,
     worksheet_rel_ids: Vec<Option<String>>,
@@ -90,9 +92,9 @@ struct MergeBlockLayout {
     insertion_offset: usize,
 }
 
-impl std::fmt::Debug for XlsbWorkbook {
+impl std::fmt::Debug for Workbook {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("XlsbWorkbook")
+        f.debug_struct("Workbook")
             .field("worksheet_names", &self.formula_context.worksheet_names)
             .field("worksheet_rel_ids", &self.worksheet_rel_ids)
             .field("shared_strings_count", &self.shared_strings.len())
@@ -103,9 +105,9 @@ impl std::fmt::Debug for XlsbWorkbook {
     }
 }
 
-impl XlsbWorkbook {
+impl Workbook {
     /// Load inert persisted Office Add-in task panes.
-    pub fn task_panes(&self) -> XlsbResult<Option<web::Panes>> {
+    pub fn task_panes(&self) -> Result<Option<web::Panes>> {
         Ok(web::load(&self.package)?)
     }
 
@@ -114,14 +116,14 @@ impl XlsbWorkbook {
         &mut self,
         panes: web::Panes,
         conformance: web::Conformance,
-    ) -> XlsbResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.validate_task_pane_bindings(&panes)?;
         web::put(&mut self.package, panes, conformance)?;
         Ok(self)
     }
 
     /// Remove task panes only when no binary worksheet binding would dangle.
-    pub fn remove_task_panes(&mut self) -> XlsbResult<bool> {
+    pub fn remove_task_panes(&mut self) -> Result<bool> {
         if !self
             .package
             .rels()
@@ -134,7 +136,7 @@ impl XlsbWorkbook {
         Ok(web::remove(&mut self.package)?)
     }
 
-    fn validate_task_pane_bindings(&self, panes: &web::Panes) -> XlsbResult<()> {
+    fn validate_task_pane_bindings(&self, panes: &web::Panes) -> Result<()> {
         let package_refs = PackageAppRefs::new(
             panes
                 .iter()
@@ -147,18 +149,18 @@ impl XlsbWorkbook {
     }
 
     /// Read the bounded, inert package-level Ribbon customizations.
-    pub fn ribbon(&self) -> XlsbResult<ribbon::Set<'_>> {
+    pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
         Ok(ribbon::load(&self.package)?)
     }
 
     /// Create or replace one Ribbon customization family.
-    pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> XlsbResult<&mut Self> {
+    pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
         ribbon::put(&mut self.package, version, xml)?;
         Ok(self)
     }
 
     /// Remove one Ribbon relationship family and its unreferenced part.
-    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> XlsbResult<bool> {
+    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
         Ok(ribbon::remove(&mut self.package, family)?)
     }
 
@@ -167,7 +169,7 @@ impl XlsbWorkbook {
     ///
     /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
     /// layer needs explicitly tuned limits.
-    pub fn embedded(&self) -> XlsbResult<Vec<embedded::Entry<'_>>> {
+    pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
         Ok(embedded::scan(&self.package)?)
     }
 
@@ -194,10 +196,7 @@ impl XlsbWorkbook {
     /// package signatures, reparses workbook-owned state, and revalidates the
     /// inert VBA and External Data Connections relationship graphs before
     /// publication.
-    pub fn edit_opc<T>(
-        &mut self,
-        edit: impl FnOnce(&mut OpcPackage) -> XlsbResult<T>,
-    ) -> XlsbResult<T> {
+    pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let mut candidate = self.package.clone();
         candidate.unsign();
         let value = edit(&mut candidate)?;
@@ -208,11 +207,11 @@ impl XlsbWorkbook {
         Ok(value)
     }
 
-    fn validate_edit_candidate(package: &OpcPackage) -> XlsbResult<()> {
+    fn validate_edit_candidate(package: &OpcPackage) -> Result<()> {
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let workbook = package.get_part(&workbook_uri)?;
         if workbook.content_type() != content_type::XLSB_BIN {
-            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+            return Err(crate::xlsb::error::Error::Unrecognized {
                 typ: "XLSB workbook content type".to_string(),
                 val: format!(
                     "expected '{}', found '{}'",
@@ -224,7 +223,7 @@ impl XlsbWorkbook {
 
         let main = package.main_document_part()?;
         if main.partname() != workbook.partname() || main.content_type() != content_type::XLSB_BIN {
-            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+            return Err(crate::xlsb::error::Error::Unrecognized {
                 typ: "XLSB main workbook relationship".to_string(),
                 val: format!(
                     "expected '{}' to be the binary workbook main part",
@@ -431,7 +430,7 @@ impl XlsbWorkbook {
     pub fn set_connections(
         &mut self,
         connections: crate::xlsb::connections::Connections,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let canonical = crate::xlsb::connections::package::store_on_workbook(
             &mut self.package,
@@ -445,7 +444,7 @@ impl XlsbWorkbook {
     /// Remove the External Data Connections relationship and part.
     ///
     /// Returns `true` when a graph was removed.
-    pub fn remove_connections(&mut self) -> XlsbResult<bool> {
+    pub fn remove_connections(&mut self) -> Result<bool> {
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let removed = crate::xlsb::connections::package::remove_from_workbook(
             &mut self.package,
@@ -464,7 +463,7 @@ impl XlsbWorkbook {
     /// connection identifiers, differential-formatting identifiers, and
     /// formula token streams are stored verbatim and are never dereferenced,
     /// contacted, or evaluated. Named `structured_tables` because
-    /// [`XlsbWorkbook::tables`] already exposes the formula-context table
+    /// [`Workbook::tables`] already exposes the formula-context table
     /// definitions.
     pub fn structured_tables(&self) -> &[(usize, crate::xlsb::table::Table)] {
         &self.structured_tables
@@ -486,7 +485,7 @@ impl XlsbWorkbook {
     /// These are inert data snapshots: relationship identifiers, password
     /// verifiers, and hash data are stored verbatim and are never
     /// dereferenced, verified, or executed. The chart hosted by a chart
-    /// sheet is surfaced through [`XlsbWorkbook::sheet_drawing`].
+    /// sheet is surfaced through [`Workbook::sheet_drawing`].
     pub fn chart_sheets(&self) -> &[(usize, crate::xlsb::chartsheet::ChartSheet)] {
         &self.chart_sheets
     }
@@ -525,10 +524,10 @@ impl XlsbWorkbook {
         &self,
         sheet_index: usize,
         drawing_part: &dyn litchi_opc::part::Part,
-    ) -> XlsbResult<crate::xlsb::drawing::SheetDrawing> {
+    ) -> Result<crate::xlsb::drawing::SheetDrawing> {
         use crate::xlsb::drawing::{EmbeddedChart, EmbeddedImage, Object, SheetDrawing};
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
-            crate::xlsb::error::XlsbError::Encoding(format!("Drawings part is not UTF-8: {error}"))
+            crate::xlsb::error::Error::Encoding(format!("Drawings part is not UTF-8: {error}"))
         })?;
         let shapes = crate::xlsx::shapes::parse_drawing_shapes(drawing_xml)?.unwrap_or_default();
         let drawing = crate::xlsb::drawing::parse_drawing_part(drawing_part.blob())?;
@@ -543,7 +542,7 @@ impl XlsbWorkbook {
             } = &anchor.object
             {
                 let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
-                    crate::xlsb::error::XlsbError::Unrecognized {
+                    crate::xlsb::error::Error::Unrecognized {
                         typ: "Drawings part".to_string(),
                         val: format!(
                             "picture {:?} relationship {rel_id:?} is missing",
@@ -556,7 +555,7 @@ impl XlsbWorkbook {
                     relationship_type::IMAGE | relationship_type::STRICT_IMAGE
                 ) {
                     if relationship.is_external() {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "Drawings part".to_string(),
                             val: format!("image relationship {rel_id:?} is external"),
                         });
@@ -569,7 +568,7 @@ impl XlsbWorkbook {
                         continue;
                     };
                     if images.len() >= crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES,
                             found: images.len() + 1,
                         });
@@ -580,7 +579,7 @@ impl XlsbWorkbook {
                         format.validate_payload(image_part.blob())?;
                         image_bytes = image_bytes
                             .checked_add(image_part.blob().len())
-                            .ok_or(crate::xlsb::error::XlsbError::InvalidLength {
+                            .ok_or(crate::xlsb::error::Error::InvalidLength {
                                 expected: crate::xlsb::drawing_image::
                                     MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
                                 found: usize::MAX,
@@ -588,7 +587,7 @@ impl XlsbWorkbook {
                         if image_bytes
                             > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES
                         {
-                            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                            return Err(crate::xlsb::error::Error::InvalidLength {
                                 expected:
                                     crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
                                 found: image_bytes,
@@ -615,7 +614,7 @@ impl XlsbWorkbook {
                 continue;
             };
             let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
-                crate::xlsb::error::XlsbError::Unrecognized {
+                crate::xlsb::error::Error::Unrecognized {
                     typ: "Drawings part".to_string(),
                     val: format!(
                         "graphic frame {:?} relationship {rel_id:?} is missing",
@@ -630,7 +629,7 @@ impl XlsbWorkbook {
                 continue;
             }
             if relationship.is_external() {
-                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                return Err(crate::xlsb::error::Error::Unrecognized {
                     typ: "Drawings part".to_string(),
                     val: format!("chart relationship {rel_id:?} is external"),
                 });
@@ -678,20 +677,20 @@ impl XlsbWorkbook {
     }
 
     /// Save this parsed workbook, including atomic worksheet-stream mutations.
-    pub fn save<W: Write + Seek>(&self, writer: W) -> XlsbResult<()> {
+    pub fn save<W: Write + Seek>(&self, writer: W) -> Result<()> {
         self.package.to_stream(writer)?;
         Ok(())
     }
 
     /// List merged ranges in a worksheet selected by zero-based index.
-    pub fn merged_cell_ranges(&self, worksheet_index: usize) -> XlsbResult<Vec<MergedCell>> {
+    pub fn merged_cell_ranges(&self, worksheet_index: usize) -> Result<Vec<MergedCell>> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let part = self.package.get_part(&uri)?;
         Ok(Self::inspect_merge_block(part.blob())?.ranges)
     }
 
     /// List merged ranges in a worksheet selected by exact name.
-    pub fn merged_cell_ranges_by_name(&self, worksheet_name: &str) -> XlsbResult<Vec<MergedCell>> {
+    pub fn merged_cell_ranges_by_name(&self, worksheet_name: &str) -> Result<Vec<MergedCell>> {
         self.merged_cell_ranges(self.worksheet_index(worksheet_name)?)
     }
 
@@ -700,7 +699,7 @@ impl XlsbWorkbook {
         &mut self,
         worksheet_index: usize,
         ranges: &[MergedCell],
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let original = self.package.get_part(&uri)?.blob().to_vec();
         let layout = Self::inspect_merge_block(&original)?;
@@ -713,7 +712,7 @@ impl XlsbWorkbook {
             .len()
             .checked_sub(end - start)
             .and_then(|value| value.checked_add(replacement.len()))
-            .ok_or(crate::xlsb::error::XlsbError::InvalidLength {
+            .ok_or(crate::xlsb::error::Error::InvalidLength {
                 expected: usize::MAX,
                 found: original.len(),
             })?;
@@ -731,7 +730,7 @@ impl XlsbWorkbook {
         &mut self,
         worksheet_name: &str,
         ranges: &[MergedCell],
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         let index = self.worksheet_index(worksheet_name)?;
         self.set_merged_cell_ranges(index, ranges)
     }
@@ -741,7 +740,7 @@ impl XlsbWorkbook {
         &mut self,
         worksheet_index: usize,
         range: MergedCell,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         let mut ranges = self.merged_cell_ranges(worksheet_index)?;
         ranges.push(range);
         self.set_merged_cell_ranges(worksheet_index, &ranges)
@@ -752,7 +751,7 @@ impl XlsbWorkbook {
         &mut self,
         worksheet_name: &str,
         range: MergedCell,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         let index = self.worksheet_index(worksheet_name)?;
         self.add_merged_cell_range(index, range)
     }
@@ -762,7 +761,7 @@ impl XlsbWorkbook {
         &mut self,
         worksheet_index: usize,
         range: &MergedCell,
-    ) -> XlsbResult<bool> {
+    ) -> Result<bool> {
         let mut ranges = self.merged_cell_ranges(worksheet_index)?;
         let Some(index) = ranges.iter().position(|candidate| candidate == range) else {
             return Ok(false);
@@ -777,24 +776,24 @@ impl XlsbWorkbook {
         &mut self,
         worksheet_name: &str,
         range: &MergedCell,
-    ) -> XlsbResult<bool> {
+    ) -> Result<bool> {
         let index = self.worksheet_index(worksheet_name)?;
         self.remove_merged_cell_range(index, range)
     }
 
     /// Atomically clear all merged ranges in a worksheet selected by index.
-    pub fn clear_merged_cell_ranges(&mut self, worksheet_index: usize) -> XlsbResult<()> {
+    pub fn clear_merged_cell_ranges(&mut self, worksheet_index: usize) -> Result<()> {
         self.set_merged_cell_ranges(worksheet_index, &[])
     }
 
     /// Atomically clear all merged ranges in a worksheet selected by name.
-    pub fn clear_merged_cell_ranges_by_name(&mut self, worksheet_name: &str) -> XlsbResult<()> {
+    pub fn clear_merged_cell_ranges_by_name(&mut self, worksheet_name: &str) -> Result<()> {
         let index = self.worksheet_index(worksheet_name)?;
         self.clear_merged_cell_ranges(index)
     }
 
     /// Open an XLSB workbook from a reader
-    pub fn new<R: Read + Seek>(reader: R) -> XlsbResult<Self> {
+    pub fn new<R: Read + Seek>(reader: R) -> Result<Self> {
         let package = OpcPackage::from_reader(reader)?;
         Self::from_opc_package(package)
     }
@@ -807,8 +806,8 @@ impl XlsbWorkbook {
     /// # Arguments
     ///
     /// * `package` - An already-parsed OPC package
-    pub fn from_opc_package(package: OpcPackage) -> XlsbResult<Self> {
-        let mut workbook = XlsbWorkbook {
+    pub fn from_opc_package(package: OpcPackage) -> Result<Self> {
+        let mut workbook = Workbook {
             package,
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
@@ -831,17 +830,15 @@ impl XlsbWorkbook {
         Ok(workbook)
     }
 
-    fn worksheet_index(&self, worksheet_name: &str) -> XlsbResult<usize> {
+    fn worksheet_index(&self, worksheet_name: &str) -> Result<usize> {
         self.formula_context
             .worksheet_names
             .iter()
             .position(|name| name == worksheet_name)
-            .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::WorksheetNotFound(worksheet_name.to_string())
-            })
+            .ok_or_else(|| crate::xlsb::error::Error::WorksheetNotFound(worksheet_name.to_string()))
     }
 
-    fn worksheet_uri(&self, index: usize) -> XlsbResult<litchi_opc::PackURI> {
+    fn worksheet_uri(&self, index: usize) -> Result<litchi_opc::PackURI> {
         let name = self
             .formula_context
             .worksheet_names
@@ -856,19 +853,19 @@ impl XlsbWorkbook {
             .get(index)
             .and_then(Option::as_deref)
             .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                crate::xlsb::error::Error::UnsupportedFeature(format!(
                     "sheet {name:?} has no worksheet relationship"
                 ))
             })?;
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let workbook_part = self.package.get_part(&workbook_uri)?;
         let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-            crate::xlsb::error::XlsbError::FileNotFound(format!(
+            crate::xlsb::error::Error::FileNotFound(format!(
                 "relationship {rel_id:?} for sheet {name:?}"
             ))
         })?;
         if relationship.is_external() {
-            return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+            return Err(crate::xlsb::error::Error::UnsupportedFeature(format!(
                 "sheet {name:?} has an external worksheet relationship"
             )));
         }
@@ -884,9 +881,9 @@ impl XlsbWorkbook {
         )
     }
 
-    fn normalize_merge_ranges(ranges: &[MergedCell]) -> XlsbResult<Vec<MergedCell>> {
+    fn normalize_merge_ranges(ranges: &[MergedCell]) -> Result<Vec<MergedCell>> {
         if ranges.len() > MAX_MERGED_CELL_RANGES {
-            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+            return Err(crate::xlsb::error::Error::InvalidLength {
                 expected: MAX_MERGED_CELL_RANGES,
                 found: ranges.len(),
             });
@@ -903,9 +900,9 @@ impl XlsbWorkbook {
     fn validate_merge_range_collection(
         ranges: &[MergedCell],
         require_canonical_order: bool,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         if ranges.len() > MAX_MERGED_CELL_RANGES {
-            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+            return Err(crate::xlsb::error::Error::InvalidLength {
                 expected: MAX_MERGED_CELL_RANGES,
                 found: ranges.len(),
             });
@@ -917,7 +914,7 @@ impl XlsbWorkbook {
             range.validate()?;
             let key = Self::merge_range_key(range);
             if require_canonical_order && previous.is_some_and(|value| value >= key) {
-                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                return Err(crate::xlsb::error::Error::Unrecognized {
                     typ: "BrtMergeCell collection".to_string(),
                     val: "duplicate or noncanonical range order".to_string(),
                 });
@@ -938,13 +935,11 @@ impl XlsbWorkbook {
             if let Some((&col_first, &(col_last, _))) = active.range(..=range.col_last).next_back()
                 && col_last >= range.col_first
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidCellReference(
-                    format!(
-                        "merged range {} overlaps an existing range beginning in column {}",
-                        range.to_range_string(),
-                        col_first
-                    ),
-                ));
+                return Err(crate::xlsb::error::Error::InvalidCellReference(format!(
+                    "merged range {} overlaps an existing range beginning in column {}",
+                    range.to_range_string(),
+                    col_first
+                )));
             }
             active.insert(range.col_first, (range.col_last, range.row_last));
             expirations.push(Reverse((range.row_last, range.col_first)));
@@ -971,7 +966,7 @@ impl XlsbWorkbook {
         )
     }
 
-    fn inspect_merge_block(data: &[u8]) -> XlsbResult<MergeBlockLayout> {
+    fn inspect_merge_block(data: &[u8]) -> Result<MergeBlockLayout> {
         let mut records = Records::new(data);
         let mut begin_offset = None;
         let mut block_span = None;
@@ -988,20 +983,20 @@ impl XlsbWorkbook {
             match record.kind() {
                 kind::BEGIN_MERGE_CELLS => {
                     if in_block || begin_offset.is_some() || !saw_end_sheet_data {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtBeginMergeCells".to_string(),
                             val: "duplicate, nested, or out-of-order record".to_string(),
                         });
                     }
                     if record.payload().len() != 4 {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected: 4,
                             found: record.payload().len(),
                         });
                     }
                     let count = binary::read_u32_le_at(record.payload(), 0)? as usize;
                     if count == 0 || count > MAX_MERGED_CELL_RANGES {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected: MAX_MERGED_CELL_RANGES,
                             found: count,
                         });
@@ -1012,14 +1007,14 @@ impl XlsbWorkbook {
                 },
                 kind::MERGE_CELL => {
                     if !in_block {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtMergeCell".to_string(),
                             val: "record occurs outside BrtBeginMergeCells".to_string(),
                         });
                     }
                     ranges.push(MergedCell::parse(record.payload())?);
                     if ranges.len() > declared_count.unwrap_or_default() {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtBeginMergeCells".to_string(),
                             val: "declared count is smaller than the record collection".to_string(),
                         });
@@ -1027,13 +1022,13 @@ impl XlsbWorkbook {
                 },
                 kind::END_MERGE_CELLS => {
                     if !in_block || !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtEndMergeCells".to_string(),
                             val: "orphan, duplicate, or nonempty record".to_string(),
                         });
                     }
                     if declared_count != Some(ranges.len()) {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtBeginMergeCells".to_string(),
                             val: format!(
                                 "declared count {:?} disagrees with {} BrtMergeCell records",
@@ -1047,7 +1042,7 @@ impl XlsbWorkbook {
                 },
                 kind::END_SHEET_DATA => {
                     if in_block {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtMergeCells collection".to_string(),
                             val: "noncontiguous record collection".to_string(),
                         });
@@ -1056,7 +1051,7 @@ impl XlsbWorkbook {
                 },
                 kind::END_SHEET => {
                     if in_block || end_sheet_offset.replace(start).is_some() {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtEndSheet".to_string(),
                             val: "duplicate or embedded in merge collection".to_string(),
                         });
@@ -1064,7 +1059,7 @@ impl XlsbWorkbook {
                 },
                 record_type => {
                     if in_block {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtMergeCells collection".to_string(),
                             val: format!("unexpected record 0x{record_type:04X}"),
                         });
@@ -1079,15 +1074,15 @@ impl XlsbWorkbook {
             }
         }
         if in_block || begin_offset.is_some() != block_span.is_some() {
-            return Err(crate::xlsb::error::XlsbError::UnexpectedEndOfStream(
+            return Err(crate::xlsb::error::Error::UnexpectedEndOfStream(
                 "BrtMergeCells collection".to_string(),
             ));
         }
         let end_sheet_offset = end_sheet_offset.ok_or_else(|| {
-            crate::xlsb::error::XlsbError::UnexpectedEndOfStream("BrtEndSheet".to_string())
+            crate::xlsb::error::Error::UnexpectedEndOfStream("BrtEndSheet".to_string())
         })?;
         if !saw_end_sheet_data {
-            return Err(crate::xlsb::error::XlsbError::UnexpectedEndOfStream(
+            return Err(crate::xlsb::error::Error::UnexpectedEndOfStream(
                 "BrtEndSheetData".to_string(),
             ));
         }
@@ -1096,7 +1091,7 @@ impl XlsbWorkbook {
             if first_post_merge_offset
                 .is_some_and(|offset| block_span.is_some_and(|(begin, _)| offset < begin))
             {
-                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                return Err(crate::xlsb::error::Error::Unrecognized {
                     typ: "BrtMergeCells collection".to_string(),
                     val: "collection occurs after a later worksheet feature".to_string(),
                 });
@@ -1109,7 +1104,7 @@ impl XlsbWorkbook {
         })
     }
 
-    fn serialize_merge_block(ranges: &[MergedCell]) -> XlsbResult<Vec<u8>> {
+    fn serialize_merge_block(ranges: &[MergedCell]) -> Result<Vec<u8>> {
         if ranges.is_empty() {
             return Ok(Vec::new());
         }
@@ -1127,7 +1122,7 @@ impl XlsbWorkbook {
     }
 
     /// Load workbook information from workbook.bin
-    fn load_workbook_info(&mut self) -> XlsbResult<()> {
+    fn load_workbook_info(&mut self) -> Result<()> {
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let workbook_part = self.package.get_part(&workbook_uri)?;
 
@@ -1139,12 +1134,12 @@ impl XlsbWorkbook {
             .iter()
             .map(|rel_id| {
                 let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                    crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    crate::xlsb::error::Error::InvalidFormula(format!(
                         "BrtSupBookSrc relationship {rel_id:?} is missing"
                     ))
                 })?;
                 if relationship.is_external() {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "BrtSupBookSrc relationship {rel_id:?} is external"
                     )));
                 }
@@ -1152,23 +1147,23 @@ impl XlsbWorkbook {
                     relationship.reltype(),
                     relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
                 ) {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "BrtSupBookSrc relationship {rel_id:?} has invalid type {:?}",
                         relationship.reltype()
                     )));
                 }
                 relationship.target_partname().map_err(Into::into)
             })
-            .collect::<XlsbResult<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
         let external_books = external_link_uris
             .iter()
             .map(|uri| self.load_external_book(uri))
-            .collect::<XlsbResult<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
         let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob())?;
         let mut pivot_cache_definitions = Vec::with_capacity(pivot_cache_ids.len());
         for (cache_id, rel_id) in &pivot_cache_ids {
             let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                crate::xlsb::error::Error::InvalidFormula(format!(
                     "PivotCache {cache_id} relationship {rel_id:?} is missing"
                 ))
             })?;
@@ -1178,7 +1173,7 @@ impl XlsbWorkbook {
                     .to_ascii_lowercase()
                     .ends_with("/pivotcachedefinition")
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "PivotCache {cache_id} relationship is external or has the wrong type"
                 )));
             }
@@ -1215,7 +1210,7 @@ impl XlsbWorkbook {
                     .worksheet_names
                     .get(sheet_index)
                     .cloned()
-                    .ok_or_else(|| crate::xlsb::error::XlsbError::Unrecognized {
+                    .ok_or_else(|| crate::xlsb::error::Error::Unrecognized {
                         typ: "BrtBundleSh".to_string(),
                         val: format!("chart sheet index {sheet_index} out of bounds"),
                     })?;
@@ -1227,7 +1222,7 @@ impl XlsbWorkbook {
                 )?;
                 if let Some(drawing_rel_id) = chart_sheet.drawing_rel_id.clone() {
                     let relationship = sheet_part.rels().get(&drawing_rel_id).ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::Unrecognized {
+                        crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtDrawing".to_string(),
                             val: format!(
                                 "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is missing"
@@ -1239,7 +1234,7 @@ impl XlsbWorkbook {
                         relationship_type::DRAWING | relationship_type::STRICT_DRAWING
                     ) || relationship.is_external()
                     {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtDrawing".to_string(),
                             val: format!(
                                 "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is external or has the wrong type"
@@ -1261,7 +1256,7 @@ impl XlsbWorkbook {
                     )
                 }) {
                     if relationship.is_external() {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "worksheet drawing relationship".to_string(),
                             val: "external Drawings part".to_string(),
                         });
@@ -1272,12 +1267,12 @@ impl XlsbWorkbook {
             }
             for table_rel_id in crate::xlsb::table::parse_table_part_rel_ids(sheet_part.blob())? {
                 let relationship = sheet_part.rels().get(&table_rel_id).ok_or_else(|| {
-                    crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    crate::xlsb::error::Error::InvalidFormula(format!(
                         "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is missing"
                     ))
                 })?;
                 if relationship.is_external() {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is external"
                     )));
                 }
@@ -1293,7 +1288,7 @@ impl XlsbWorkbook {
                     == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells"
             }) {
                 if relationship.is_external() {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(
                         "worksheet has an external table relationship".to_string(),
                     ));
                 }
@@ -1302,7 +1297,7 @@ impl XlsbWorkbook {
                 if tables.iter().any(|existing: &FormulaTableDefinition| {
                     existing.table_id() == table.table_id()
                 }) {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "duplicate workbook table ID {}",
                         table.table_id()
                     )));
@@ -1310,7 +1305,7 @@ impl XlsbWorkbook {
                 if tables.iter().any(|existing: &FormulaTableDefinition| {
                     excel_name_eq(existing.display_name(), table.display_name())
                 }) {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "duplicate workbook table display name {:?}",
                         table.display_name()
                     )));
@@ -1324,7 +1319,7 @@ impl XlsbWorkbook {
                     .ends_with("/pivottable")
             }) {
                 if relationship.is_external() {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(
                         "worksheet has an external PivotTable relationship".to_string(),
                     ));
                 }
@@ -1334,7 +1329,7 @@ impl XlsbWorkbook {
                     .iter()
                     .any(|(cache_id, _)| *cache_id == view.cache_id())
                 {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "PivotTable view {:?} references unknown cache {}",
                         view.name(),
                         view.cache_id()
@@ -1348,7 +1343,7 @@ impl XlsbWorkbook {
                             && excel_name_eq(existing.name(), view.name())
                     })
                 {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "duplicate PivotTable view {:?} for cache {} on sheet {sheet_index}",
                         view.name(),
                         view.cache_id()
@@ -1382,7 +1377,7 @@ impl XlsbWorkbook {
     }
 
     /// Load shared strings from xl/sharedStrings.bin
-    fn load_shared_strings(&mut self) -> XlsbResult<()> {
+    fn load_shared_strings(&mut self) -> Result<()> {
         let shared_strings_uri = litchi_opc::PackURI::new("/xl/sharedStrings.bin")?;
         if let Ok(shared_strings_part) = self.package.get_part(&shared_strings_uri) {
             let blob = shared_strings_part.blob();
@@ -1395,7 +1390,7 @@ impl XlsbWorkbook {
 
     /// Load workbook styles. The default table keeps style index zero usable
     /// for minimal producer files that omit the optional styles part.
-    fn load_styles(&mut self) -> XlsbResult<()> {
+    fn load_styles(&mut self) -> Result<()> {
         let styles_uri = litchi_opc::PackURI::new("/xl/styles.bin")?;
         if let Ok(styles_part) = self.package.get_part(&styles_uri) {
             self.styles = StylesTable::from_bytes(styles_part.blob())?;
@@ -1404,7 +1399,7 @@ impl XlsbWorkbook {
     }
 
     /// Load a concrete XLSB worksheet by index, including related comments.
-    pub fn worksheet(&self, index: usize) -> XlsbResult<Worksheet> {
+    pub fn worksheet(&self, index: usize) -> Result<Worksheet> {
         if index >= self.formula_context.worksheet_names.len() {
             return Err(crate::error::OoxmlError::InvalidFormat(format!(
                 "Worksheet index {} out of bounds",
@@ -1419,19 +1414,19 @@ impl XlsbWorkbook {
             .get(index)
             .and_then(Option::as_deref)
             .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                crate::xlsb::error::Error::UnsupportedFeature(format!(
                     "sheet {name:?} has no worksheet relationship"
                 ))
             })?;
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let workbook_part = self.package.get_part(&workbook_uri)?;
         let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-            crate::xlsb::error::XlsbError::FileNotFound(format!(
+            crate::xlsb::error::Error::FileNotFound(format!(
                 "relationship {rel_id:?} for sheet {name:?}"
             ))
         })?;
         if relationship.is_external() {
-            return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+            return Err(crate::xlsb::error::Error::UnsupportedFeature(format!(
                 "sheet {name:?} has an external worksheet relationship"
             )));
         }
@@ -1445,14 +1440,14 @@ impl XlsbWorkbook {
                 .filter(|rel| rel.reltype() == relationship_type::COMMENTS);
             let first = relationships.next();
             if relationships.next().is_some() {
-                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                return Err(crate::xlsb::error::Error::Unrecognized {
                     typ: "worksheet comments relationship".to_string(),
                     val: "multiple relationships".to_string(),
                 });
             }
             match first {
                 Some(rel) if rel.is_external() => {
-                    return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(
+                    return Err(crate::xlsb::error::Error::UnsupportedFeature(
                         "external XLSB comments part".to_string(),
                     ));
                 },
@@ -1473,7 +1468,7 @@ impl XlsbWorkbook {
         if let Some(uri) = comments_uri {
             let part = self.package.get_part(&uri)?;
             if !part.rels().is_empty() {
-                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                return Err(crate::xlsb::error::Error::Unrecognized {
                     typ: "Comments part".to_string(),
                     val: "relationships are not permitted".to_string(),
                 });
@@ -1486,10 +1481,7 @@ impl XlsbWorkbook {
     }
 
     /// Read shared strings from SST
-    fn read_shared_strings(
-        iter: &mut Records<'_>,
-        strings: &mut Vec<SharedString>,
-    ) -> XlsbResult<()> {
+    fn read_shared_strings(iter: &mut Records<'_>, strings: &mut Vec<SharedString>) -> Result<()> {
         let initial_count = strings.len();
         let mut expected_unique = None;
         let mut ended = false;
@@ -1498,13 +1490,13 @@ impl XlsbWorkbook {
             match record.kind() {
                 kind::BEGIN_SST => {
                     if expected_unique.is_some() {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtBeginSst".to_string(),
                             val: "duplicate record".to_string(),
                         });
                     }
                     if record.payload().len() != 8 {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected: 8,
                             found: record.payload().len(),
                         });
@@ -1512,7 +1504,7 @@ impl XlsbWorkbook {
                     let total = binary::read_u32_le_at(record.payload(), 0)?;
                     let unique = binary::read_u32_le_at(record.payload(), 4)?;
                     if total > 0x7FFF_FFFF || unique > total {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtBeginSst counts".to_string(),
                             val: format!("total={total}, unique={unique}"),
                         });
@@ -1520,15 +1512,14 @@ impl XlsbWorkbook {
                     expected_unique = Some(unique as usize);
                 },
                 kind::SST_ITEM => {
-                    let expected = expected_unique.ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::Unrecognized {
+                    let expected =
+                        expected_unique.ok_or_else(|| crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtSSTItem".to_string(),
                             val: "record before BrtBeginSst".to_string(),
-                        }
-                    })?;
+                        })?;
                     let found = strings.len() - initial_count;
                     if found >= expected {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtSSTItem count".to_string(),
                             val: format!("more than declared {expected}"),
                         });
@@ -1537,20 +1528,19 @@ impl XlsbWorkbook {
                 },
                 kind::END_SST => {
                     if !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected: 0,
                             found: record.payload().len(),
                         });
                     }
-                    let expected = expected_unique.ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::Unrecognized {
+                    let expected =
+                        expected_unique.ok_or_else(|| crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtEndSst".to_string(),
                             val: "record before BrtBeginSst".to_string(),
-                        }
-                    })?;
+                        })?;
                     let found = strings.len() - initial_count;
                     if found != expected {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtSSTItem count".to_string(),
                             val: format!("declared {expected}, found {found}"),
                         });
@@ -1564,13 +1554,13 @@ impl XlsbWorkbook {
             }
         }
         if expected_unique.is_none() {
-            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+            return Err(crate::xlsb::error::Error::Unrecognized {
                 typ: "SST stream".to_string(),
                 val: "missing BrtBeginSst".to_string(),
             });
         }
         if !ended {
-            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+            return Err(crate::xlsb::error::Error::Unrecognized {
                 typ: "SST stream".to_string(),
                 val: "missing BrtEndSst".to_string(),
             });
@@ -1579,7 +1569,7 @@ impl XlsbWorkbook {
     }
 
     /// Read workbook structure
-    fn read_workbook(iter: &mut Records<'_>) -> XlsbResult<ParsedWorkbookInfo> {
+    fn read_workbook(iter: &mut Records<'_>) -> Result<ParsedWorkbookInfo> {
         let mut info = ParsedWorkbookInfo::default();
         let worksheet_names = &mut info.worksheet_names;
         let worksheet_rel_ids = &mut info.worksheet_rel_ids;
@@ -1601,7 +1591,7 @@ impl XlsbWorkbook {
                 },
                 kind::CALC_PROP => {
                     if info.calc.is_some() {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtCalcProp".to_string(),
                             val: "duplicate record".to_string(),
                         });
@@ -1615,7 +1605,7 @@ impl XlsbWorkbook {
                         .iter()
                         .any(|name| excel_name_eq(name, &bundle_sh.name))
                     {
-                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                        return Err(crate::xlsb::error::Error::Unrecognized {
                             typ: "BrtBundleSh strName".to_string(),
                             val: format!("duplicate sheet name {:?}", bundle_sh.name),
                         });
@@ -1633,12 +1623,12 @@ impl XlsbWorkbook {
                 kind::SUP_BOOK_SRC => {
                     let (rel_id, consumed) = crate::xlsb::records::decode_string(record.payload())?;
                     if rel_id.is_empty() || consumed != record.payload().len() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "BrtSupBookSrc has an invalid relationship ID".to_string(),
                         ));
                     }
                     let book_index = u32::try_from(external_link_rel_ids.len()).map_err(|_| {
-                        crate::xlsb::error::XlsbError::InvalidFormula(
+                        crate::xlsb::error::Error::InvalidFormula(
                             "external-link count overflow".to_string(),
                         )
                     })?;
@@ -1657,7 +1647,7 @@ impl XlsbWorkbook {
                         .sheet_id
                         .is_some_and(|index| index as usize >= worksheet_names.len())
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                             "BrtName {} has invalid sheet scope {:?}",
                             named_range.name, named_range.sheet_id
                         )));
@@ -1680,7 +1670,7 @@ impl XlsbWorkbook {
         formula_context: &FormulaResolutionContext,
         sheet_index: usize,
         cell_xf_count: usize,
-    ) -> XlsbResult<Worksheet> {
+    ) -> Result<Worksheet> {
         let mut worksheet = Worksheet::new(name);
         let iter = crate::xlsb::records::Stream::new(cursor);
         let formula_context = formula_context.for_sheet(sheet_index);
@@ -1723,36 +1713,34 @@ impl XlsbWorkbook {
     fn parse_extern_sheet(
         data: &[u8],
         external_sheets: &mut Vec<FormulaExternalSheet>,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         if data.len() < 4 {
-            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+            return Err(crate::xlsb::error::Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
         }
         let count = usize::try_from(binary::read_u32_le_at(data, 0)?).map_err(|_| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
-                "BrtExternSheet count overflow".to_string(),
-            )
+            crate::xlsb::error::Error::InvalidFormula("BrtExternSheet count overflow".to_string())
         })?;
         if count >= 65_536 {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "BrtExternSheet count {count} exceeds 65,535"
             )));
         }
         let expected = 4usize
             .checked_add(count.checked_mul(12).ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "BrtExternSheet size overflow".to_string(),
                 )
             })?)
             .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "BrtExternSheet size overflow".to_string(),
                 )
             })?;
         if data.len() != expected {
-            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+            return Err(crate::xlsb::error::Error::InvalidLength {
                 expected,
                 found: data.len(),
             });
@@ -1768,10 +1756,10 @@ impl XlsbWorkbook {
         Ok(())
     }
 
-    fn load_external_book(&self, uri: &litchi_opc::PackURI) -> XlsbResult<FormulaExternalBook> {
+    fn load_external_book(&self, uri: &litchi_opc::PackURI) -> Result<FormulaExternalBook> {
         let part = self.package.get_part(uri)?;
         if part.content_type() != "application/vnd.ms-excel.externalLink" {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "external link part {uri} has invalid content type {:?}",
                 part.content_type()
             )));
@@ -1799,19 +1787,19 @@ impl XlsbWorkbook {
         for record in &mut iter {
             let record = record?;
             if saw_end {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                return Err(crate::xlsb::error::Error::InvalidFormula(
                     "external link has records after BrtEndSupBook".to_string(),
                 ));
             }
             if link_type.is_none() && record.kind() != kind::BEGIN_SUP_BOOK {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                return Err(crate::xlsb::error::Error::InvalidFormula(
                     "external link does not start with BrtBeginSupBook".to_string(),
                 ));
             }
             match record.kind() {
                 kind::BEGIN_SUP_BOOK => {
                     if link_type.is_some() || record.payload().len() < 10 {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "invalid BrtBeginSupBook framing".to_string(),
                         ));
                     }
@@ -1831,12 +1819,12 @@ impl XlsbWorkbook {
                         || kind > EXTERNAL_REFERENCE_OLE
                         || first.is_empty()
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "invalid BrtBeginSupBook payload".to_string(),
                         ));
                     }
                     if kind == EXTERNAL_REFERENCE_WORKBOOK && second.is_some() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "external workbook BrtBeginSupBook string2 is not NULL".to_string(),
                         ));
                     }
@@ -1849,7 +1837,7 @@ impl XlsbWorkbook {
                         || saw_sup_tabs
                         || sup_name_state != 0
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unexpected BrtSupTabs".to_string(),
                         ));
                     }
@@ -1858,19 +1846,19 @@ impl XlsbWorkbook {
                 },
                 kind::SUP_NAME_START => {
                     let kind = link_type.ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::InvalidFormula(
+                        crate::xlsb::error::Error::InvalidFormula(
                             "BrtSupNameStart precedes BrtBeginSupBook".to_string(),
                         )
                     })?;
                     if sup_name_state != 0 || (kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs)
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unexpected BrtSupNameStart".to_string(),
                         ));
                     }
                     let (name, consumed) = crate::xlsb::records::decode_string(record.payload())?;
                     if consumed != record.payload().len() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "BrtSupNameStart has trailing bytes".to_string(),
                         ));
                     }
@@ -1888,23 +1876,23 @@ impl XlsbWorkbook {
                         || sup_name_state != 1
                         || record.payload().len() < 4
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unexpected BrtSupNameFmla".to_string(),
                         ));
                     }
                     let formula_len = usize::try_from(binary::read_u32_le_at(record.payload(), 0)?)
                         .map_err(|_| {
-                            crate::xlsb::error::XlsbError::InvalidFormula(
+                            crate::xlsb::error::Error::InvalidFormula(
                                 "BrtSupNameFmla size overflow".to_string(),
                             )
                         })?;
                     let expected = formula_len.checked_add(4).ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::InvalidFormula(
+                        crate::xlsb::error::Error::InvalidFormula(
                             "BrtSupNameFmla size overflow".to_string(),
                         )
                     })?;
                     if record.payload().len() != expected {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected,
                             found: record.payload().len(),
                         });
@@ -1918,7 +1906,7 @@ impl XlsbWorkbook {
                 },
                 kind::SUP_NAME_BITS => {
                     if sup_name_state != 2 || record.payload().len() != 7 {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unexpected BrtSupNameBits".to_string(),
                         ));
                     }
@@ -1939,7 +1927,7 @@ impl XlsbWorkbook {
                         || record.payload().len() != 8
                         || current_cache.is_some()
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unexpected BrtSupNameValueStart".to_string(),
                         ));
                     }
@@ -1953,12 +1941,12 @@ impl XlsbWorkbook {
                                 .and_then(|columns| rows.checked_mul(columns))
                         })
                         .ok_or_else(|| {
-                            crate::xlsb::error::XlsbError::InvalidFormula(
+                            crate::xlsb::error::Error::InvalidFormula(
                                 "external cached-value dimensions overflow".to_string(),
                             )
                         })?;
                     if count > MAX_XLSB_EXTERNAL_CACHED_VALUES {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected: MAX_XLSB_EXTERNAL_CACHED_VALUES,
                             found: count,
                         });
@@ -1974,12 +1962,12 @@ impl XlsbWorkbook {
                 | kind::SUP_NAME_ERROR
                 | kind::SUP_NAME_STRING => {
                     let Some((_, _, count)) = cache_dimensions else {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "cached external value occurs outside its matrix".to_string(),
                         ));
                     };
                     if sup_name_state != 4 || cache_values.len() >= count {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "too many or misplaced cached external values".to_string(),
                         ));
                     }
@@ -1990,7 +1978,7 @@ impl XlsbWorkbook {
                 },
                 kind::SUP_NAME_VALUE_END => {
                     let Some((rows, columns, count)) = cache_dimensions.take() else {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unexpected BrtSupNameValueEnd".to_string(),
                         ));
                     };
@@ -1998,7 +1986,7 @@ impl XlsbWorkbook {
                         || !record.payload().is_empty()
                         || cache_values.len() != count
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "invalid cached external value matrix".to_string(),
                         ));
                     }
@@ -2011,18 +1999,18 @@ impl XlsbWorkbook {
                 },
                 kind::SUP_NAME_END => {
                     if sup_name_state != 3 || !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "invalid BrtSupNameEnd".to_string(),
                         ));
                     }
                     let kind = link_type.expect("external link kind is present");
                     let name = current_name.take().ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::InvalidFormula(
+                        crate::xlsb::error::Error::InvalidFormula(
                             "external name block has no name".to_string(),
                         )
                     })?;
                     let bits = current_bits.take().ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::InvalidFormula(
+                        crate::xlsb::error::Error::InvalidFormula(
                             "external name block has no properties".to_string(),
                         )
                     })?;
@@ -2034,7 +2022,7 @@ impl XlsbWorkbook {
                             if scope != 0 {
                                 entry = entry.with_sheet_scope(u16::try_from(scope - 1).map_err(
                                     |_| {
-                                        crate::xlsb::error::XlsbError::InvalidFormula(
+                                        crate::xlsb::error::Error::InvalidFormula(
                                             "external defined-name scope overflow".to_string(),
                                         )
                                     },
@@ -2071,13 +2059,13 @@ impl XlsbWorkbook {
                 },
                 kind::END_SUP_BOOK => {
                     if !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                        return Err(crate::xlsb::error::Error::InvalidLength {
                             expected: 0,
                             found: record.payload().len(),
                         });
                     }
                     if sup_name_state != 0 {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "BrtEndSupBook occurs inside an external-name block".to_string(),
                         ));
                     }
@@ -2087,7 +2075,7 @@ impl XlsbWorkbook {
                     if sup_name_state == 4
                         || (link_type == Some(EXTERNAL_REFERENCE_WORKBOOK) && sup_name_state != 0)
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unexpected record inside an external name or cache".to_string(),
                         ));
                     }
@@ -2095,24 +2083,24 @@ impl XlsbWorkbook {
             }
         }
         let kind = link_type.ok_or_else(|| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
+            crate::xlsb::error::Error::InvalidFormula(
                 "external link has no BrtBeginSupBook".to_string(),
             )
         })?;
         if !saw_end {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+            return Err(crate::xlsb::error::Error::InvalidFormula(
                 "external link has no BrtEndSupBook".to_string(),
             ));
         }
         if kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+            return Err(crate::xlsb::error::Error::InvalidFormula(
                 "external workbook link has no BrtSupTabs".to_string(),
             ));
         }
         let (link_kind, source, detail) = match kind {
             EXTERNAL_REFERENCE_DDE => {
                 if !part.rels().is_empty() {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(
                         "DDE external link must not contain relationships".to_string(),
                     ));
                 }
@@ -2120,18 +2108,18 @@ impl XlsbWorkbook {
             },
             EXTERNAL_REFERENCE_WORKBOOK | EXTERNAL_REFERENCE_OLE => {
                 if part.rels().len() != 1 {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(
                         "external workbook/OLE link must have exactly one data-source relationship"
                             .to_string(),
                     ));
                 }
                 let relationship = part.rels().get(&target_key).ok_or_else(|| {
-                    crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    crate::xlsb::error::Error::InvalidFormula(format!(
                         "external data relationship {target_key:?} is missing"
                     ))
                 })?;
                 if !relationship.is_external() {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "external data relationship {target_key:?} is internal"
                     )));
                 }
@@ -2146,7 +2134,7 @@ impl XlsbWorkbook {
                     } else {
                         "OLE data source"
                     };
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                         "{source_kind} relationship {target_key:?} has invalid type {:?}",
                         relationship.reltype()
                     )));
@@ -2183,7 +2171,7 @@ impl XlsbWorkbook {
         Ok(FormulaExternalBook { metadata })
     }
 
-    fn validate_external_name_bits(kind: u16, bits: &[u8; 7]) -> XlsbResult<()> {
+    fn validate_external_name_bits(kind: u16, bits: &[u8; 7]) -> Result<()> {
         let reserved_word = &bits[2..6];
         let valid = match kind {
             EXTERNAL_REFERENCE_WORKBOOK => {
@@ -2204,7 +2192,7 @@ impl XlsbWorkbook {
             _ => false,
         };
         if !valid {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "invalid BrtSupNameBits properties for external-link kind {kind}"
             )));
         }
@@ -2214,7 +2202,7 @@ impl XlsbWorkbook {
     fn parse_external_cached_value(
         record_type: litchi_xlsb::raw::Kind,
         data: &[u8],
-    ) -> XlsbResult<CachedValue> {
+    ) -> Result<CachedValue> {
         match record_type {
             kind::SUP_NAME_NIL if data.is_empty() => Ok(CachedValue::Empty),
             kind::SUP_NAME_NUM if data.len() == 8 => {
@@ -2231,32 +2219,32 @@ impl XlsbWorkbook {
             kind::SUP_NAME_STRING => {
                 let (value, consumed) = crate::xlsb::records::decode_string(data)?;
                 if consumed != data.len() {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    return Err(crate::xlsb::error::Error::InvalidFormula(
                         "BrtSupNameSt has trailing bytes".to_string(),
                     ));
                 }
                 Ok(CachedValue::String(value))
             },
-            _ => Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            _ => Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "invalid cached external value record {record_type}"
             ))),
         }
     }
 
-    fn parse_external_sheet_names(data: &[u8]) -> XlsbResult<Vec<String>> {
+    fn parse_external_sheet_names(data: &[u8]) -> Result<Vec<String>> {
         if data.len() < 4 {
-            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+            return Err(crate::xlsb::error::Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
         }
         let count = usize::try_from(binary::read_u32_le_at(data, 0)?).map_err(|_| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
+            crate::xlsb::error::Error::InvalidFormula(
                 "external sheet-name count overflow".to_string(),
             )
         })?;
         if count >= 65_535 {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "external sheet-name count {count} exceeds 65,534"
             )));
         }
@@ -2265,7 +2253,7 @@ impl XlsbWorkbook {
         for _ in 0..count {
             let (name, consumed) = crate::xlsb::records::decode_string(&data[offset..])?;
             offset = offset.checked_add(consumed).ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "external sheet-name size overflow".to_string(),
                 )
             })?;
@@ -2276,7 +2264,7 @@ impl XlsbWorkbook {
                 || name.starts_with('\'')
                 || name.ends_with('\'')
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "external sheet name {name:?} does not follow sheet-name grammar"
                 )));
             }
@@ -2284,14 +2272,14 @@ impl XlsbWorkbook {
                 .iter()
                 .any(|existing: &String| excel_name_eq(existing, &name))
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "duplicate external sheet name {name:?}"
                 )));
             }
             names.push(name);
         }
         if offset != data.len() {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "BrtSupTabs has {} trailing bytes",
                 data.len() - offset
             )));
@@ -2299,9 +2287,9 @@ impl XlsbWorkbook {
         Ok(names)
     }
 
-    fn parse_nullable_wide_string(data: &[u8]) -> XlsbResult<(Option<String>, usize)> {
+    fn parse_nullable_wide_string(data: &[u8]) -> Result<(Option<String>, usize)> {
         if data.len() < 4 {
-            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+            return Err(crate::xlsb::error::Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
@@ -2314,7 +2302,7 @@ impl XlsbWorkbook {
         }
     }
 
-    fn parse_pivot_cache_ids(data: &[u8]) -> XlsbResult<Vec<(u32, String)>> {
+    fn parse_pivot_cache_ids(data: &[u8]) -> Result<Vec<(u32, String)>> {
         let mut in_collection = false;
         let mut open_cache = false;
         let mut ended = false;
@@ -2324,7 +2312,7 @@ impl XlsbWorkbook {
             match record.kind() {
                 kind::BEGIN_PIVOT_CACHE_IDS => {
                     if in_collection || ended {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "duplicate BrtBeginPivotCacheIDs collection".to_string(),
                         ));
                     }
@@ -2332,7 +2320,7 @@ impl XlsbWorkbook {
                 },
                 kind::BEGIN_PIVOT_CACHE_ID => {
                     if !in_collection || open_cache || record.payload().len() < 8 {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "malformed BrtBeginPivotCacheID nesting or payload".to_string(),
                         ));
                     }
@@ -2346,7 +2334,7 @@ impl XlsbWorkbook {
                             .iter()
                             .any(|(existing, _): &(u32, String)| *existing == cache_id)
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                             "invalid or duplicate PivotCache ID {cache_id}"
                         )));
                     }
@@ -2355,7 +2343,7 @@ impl XlsbWorkbook {
                 },
                 kind::END_PIVOT_CACHE_ID => {
                     if !open_cache || !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unbalanced BrtEndPivotCacheID".to_string(),
                         ));
                     }
@@ -2363,7 +2351,7 @@ impl XlsbWorkbook {
                 },
                 kind::END_PIVOT_CACHE_IDS => {
                     if !in_collection || open_cache || !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unbalanced BrtEndPivotCacheIDs".to_string(),
                         ));
                     }
@@ -2374,14 +2362,14 @@ impl XlsbWorkbook {
             }
         }
         if in_collection || open_cache {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+            return Err(crate::xlsb::error::Error::InvalidFormula(
                 "unterminated PivotCache ID collection".to_string(),
             ));
         }
         Ok(caches)
     }
 
-    fn parse_pivot_view(data: &[u8], sheet_index: usize) -> XlsbResult<FormulaPivotViewDefinition> {
+    fn parse_pivot_view(data: &[u8], sheet_index: usize) -> Result<FormulaPivotViewDefinition> {
         let mut view = None;
         for record in Records::new(data) {
             let record = record?;
@@ -2389,14 +2377,14 @@ impl XlsbWorkbook {
                 continue;
             }
             if view.is_some() || record.payload().len() < 36 {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                return Err(crate::xlsb::error::Error::InvalidFormula(
                     "PivotTable part has duplicate or truncated BrtBeginSXView".to_string(),
                 ));
             }
             let cache_id = binary::read_u32_le_at(record.payload(), 28)?;
             let (name, consumed) = crate::xlsb::records::decode_string(&record.payload()[32..])?;
             if consumed > record.payload().len() - 32 {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                return Err(crate::xlsb::error::Error::InvalidFormula(
                     "PivotTable view name overruns BrtBeginSXView".to_string(),
                 ));
             }
@@ -2407,16 +2395,13 @@ impl XlsbWorkbook {
             )?);
         }
         view.ok_or_else(|| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
+            crate::xlsb::error::Error::InvalidFormula(
                 "PivotTable part omits BrtBeginSXView".to_string(),
             )
         })
     }
 
-    fn parse_table_definition(
-        data: &[u8],
-        sheet_index: usize,
-    ) -> XlsbResult<FormulaTableDefinition> {
+    fn parse_table_definition(data: &[u8], sheet_index: usize) -> Result<FormulaTableDefinition> {
         let mut table_header: Option<(u32, String, usize)> = None;
         let mut expected_columns = None;
         let mut columns = Vec::new();
@@ -2427,14 +2412,14 @@ impl XlsbWorkbook {
         for record in iter.by_ref() {
             let record = record?;
             if ended_table {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                return Err(crate::xlsb::error::Error::InvalidFormula(
                     "XLSB table part contains records after BrtEndList".to_string(),
                 ));
             }
             match record.kind() {
                 kind::BEGIN_LIST => {
                     if table_header.is_some() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "XLSB table part contains duplicate BrtBeginList".to_string(),
                         ));
                     }
@@ -2442,23 +2427,23 @@ impl XlsbWorkbook {
                 },
                 kind::BEGIN_LIST_COLS => {
                     let (_, _, range_columns) = table_header.as_ref().ok_or_else(|| {
-                        crate::xlsb::error::XlsbError::InvalidFormula(
+                        crate::xlsb::error::Error::InvalidFormula(
                             "BrtBeginListCols precedes BrtBeginList".to_string(),
                         )
                     })?;
                     if expected_columns.is_some() || record.payload().len() != 4 {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "invalid or duplicate BrtBeginListCols".to_string(),
                         ));
                     }
                     let count = usize::try_from(binary::read_u32_le_at(record.payload(), 0)?)
                         .map_err(|_| {
-                            crate::xlsb::error::XlsbError::InvalidFormula(
+                            crate::xlsb::error::Error::InvalidFormula(
                                 "table column count overflow".to_string(),
                             )
                         })?;
                     if count == 0 || count > 16_384 || count != *range_columns {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                             "table column count {count} disagrees with range width {range_columns}"
                         )));
                     }
@@ -2466,7 +2451,7 @@ impl XlsbWorkbook {
                 },
                 kind::BEGIN_LIST_COL => {
                     if expected_columns.is_none() || ended_columns || in_column {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "BrtBeginListCol occurs outside its column collection".to_string(),
                         ));
                     }
@@ -2475,7 +2460,7 @@ impl XlsbWorkbook {
                 },
                 kind::END_LIST_COL => {
                     if !in_column || !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "unmatched or nonempty BrtEndListCol".to_string(),
                         ));
                     }
@@ -2487,7 +2472,7 @@ impl XlsbWorkbook {
                         || ended_columns
                         || !record.payload().is_empty()
                     {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "invalid BrtEndListCols".to_string(),
                         ));
                     }
@@ -2495,7 +2480,7 @@ impl XlsbWorkbook {
                 },
                 kind::END_LIST => {
                     if !ended_columns || in_column || !record.payload().is_empty() {
-                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        return Err(crate::xlsb::error::Error::InvalidFormula(
                             "invalid BrtEndList".to_string(),
                         ));
                     }
@@ -2505,17 +2490,17 @@ impl XlsbWorkbook {
             }
         }
         let (table_id, display_name, _) = table_header.ok_or_else(|| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
+            crate::xlsb::error::Error::InvalidFormula(
                 "XLSB table part omits BrtBeginList".to_string(),
             )
         })?;
         let expected = expected_columns.ok_or_else(|| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
+            crate::xlsb::error::Error::InvalidFormula(
                 "XLSB table part omits BrtBeginListCols".to_string(),
             )
         })?;
         if !ended_table || columns.len() != expected {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "XLSB table contains {} of {expected} declared columns or is unterminated",
                 columns.len()
             )));
@@ -2523,9 +2508,9 @@ impl XlsbWorkbook {
         FormulaTableDefinition::try_new(table_id, sheet_index, display_name, columns)
     }
 
-    fn parse_table_header(data: &[u8]) -> XlsbResult<(u32, String, usize)> {
+    fn parse_table_header(data: &[u8]) -> Result<(u32, String, usize)> {
         if data.len() < 64 {
-            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+            return Err(crate::xlsb::error::Error::InvalidLength {
                 expected: 64,
                 found: data.len(),
             });
@@ -2539,13 +2524,13 @@ impl XlsbWorkbook {
             || col_first > col_last
             || col_last >= 16_384
         {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+            return Err(crate::xlsb::error::Error::InvalidFormula(
                 "BrtBeginList contains an invalid table range".to_string(),
             ));
         }
         for offset in [24, 28] {
             if binary::read_u32_le_at(data, offset)? > 1 {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                return Err(crate::xlsb::error::Error::InvalidFormula(
                     "BrtBeginList contains a non-Boolean row flag".to_string(),
                 ));
             }
@@ -2556,20 +2541,20 @@ impl XlsbWorkbook {
         for _ in 0..6 {
             let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
             offset = offset.checked_add(consumed).ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "BrtBeginList string size overflow".to_string(),
                 )
             })?;
             strings.push(value);
         }
         if offset != data.len() {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "BrtBeginList has {} trailing bytes",
                 data.len() - offset
             )));
         }
         let display_name = strings[1].clone().ok_or_else(|| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
+            crate::xlsb::error::Error::InvalidFormula(
                 "BrtBeginList has a NULL display name".to_string(),
             )
         })?;
@@ -2580,9 +2565,9 @@ impl XlsbWorkbook {
         ))
     }
 
-    fn parse_table_column(data: &[u8], index: usize) -> XlsbResult<String> {
+    fn parse_table_column(data: &[u8], index: usize) -> Result<String> {
         if data.len() < 24 || binary::read_u32_le_at(data, 0)? == 0 {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "BrtBeginListCol {index} has an invalid header"
             )));
         }
@@ -2591,14 +2576,14 @@ impl XlsbWorkbook {
         for _ in 0..6 {
             let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
             offset = offset.checked_add(consumed).ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "BrtBeginListCol string size overflow".to_string(),
                 )
             })?;
             strings.push(value);
         }
         if offset != data.len() {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "BrtBeginListCol has {} trailing bytes",
                 data.len() - offset
             )));
@@ -2607,19 +2592,19 @@ impl XlsbWorkbook {
             .clone()
             .or_else(|| strings[1].clone())
             .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                crate::xlsb::error::Error::InvalidFormula(format!(
                     "BrtBeginListCol {index} has neither a name nor caption"
                 ))
             })
     }
 }
 
-impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
+impl litchi_core::sheet::WorkbookTrait for Workbook {
     fn active_sheet_index(&self) -> usize {
         0
     }
 
-    fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>> {
+    fn active_worksheet(&self) -> SheetResult<Box<dyn SheetTrait + '_>> {
         self.worksheet_by_index(0)
     }
 
@@ -2632,12 +2617,12 @@ impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
         &self.formula_context.worksheet_names
     }
 
-    fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn SheetTrait + '_>> {
         let worksheet = self.worksheet(index)?;
         Ok(Box::new(worksheet))
     }
 
-    fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn SheetTrait + '_>> {
         for (i, ws_name) in self.formula_context.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
@@ -2649,8 +2634,8 @@ impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
         ))))
     }
 
-    fn worksheets<'a>(&'a self) -> Box<dyn WorksheetIterator<'a> + 'a> {
-        Box::new(XlsbWorksheetIterator {
+    fn worksheets<'a>(&'a self) -> Box<dyn SheetIterator<'a> + 'a> {
+        Box::new(WorksheetIterator {
             workbook: self,
             index: 0,
         })
@@ -2661,13 +2646,13 @@ impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
     }
 }
 
-pub struct XlsbWorksheetIterator<'a> {
-    workbook: &'a XlsbWorkbook,
+pub struct WorksheetIterator<'a> {
+    workbook: &'a Workbook,
     index: usize,
 }
 
-impl<'a> WorksheetIterator<'a> for XlsbWorksheetIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetTrait + 'a>>> {
+impl<'a> SheetIterator<'a> for WorksheetIterator<'a> {
+    fn next(&mut self) -> Option<SheetResult<Box<dyn SheetTrait + 'a>>> {
         if self.index < self.workbook.formula_context.worksheet_names.len() {
             match self.workbook.worksheet(self.index) {
                 Ok(worksheet) => {
@@ -2714,8 +2699,8 @@ mod tests {
         data
     }
 
-    fn empty_workbook() -> XlsbWorkbook {
-        XlsbWorkbook {
+    fn empty_workbook() -> Workbook {
+        Workbook {
             package: OpcPackage::new(),
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
@@ -2732,12 +2717,12 @@ mod tests {
         }
     }
 
-    fn generated_workbook() -> XlsbWorkbook {
-        let mut writer = crate::xlsb::writer::XlsbWorkbookWriter::new();
-        writer.add_worksheet(crate::xlsb::writer::MutableXlsbWorksheet::new("Sheet1"));
+    fn generated_workbook() -> Workbook {
+        let mut writer = crate::xlsb::writer::WorkbookWriter::new();
+        writer.add_worksheet(crate::xlsb::writer::MutableWorksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
         writer.save(&mut bytes).unwrap();
-        XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap()
+        Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
     }
 
     #[test]
@@ -2752,7 +2737,7 @@ mod tests {
                     "application/octet-stream".to_string(),
                     b"published".to_vec(),
                 )))?;
-                Ok::<_, crate::xlsb::error::XlsbError>("published")
+                Ok::<_, crate::xlsb::error::Error>("published")
             })
             .unwrap();
 
@@ -2777,7 +2762,7 @@ mod tests {
         let error = workbook
             .edit_opc(|candidate| {
                 candidate.remove_part(&workbook_uri);
-                Ok::<_, crate::xlsb::error::XlsbError>(())
+                Ok::<_, crate::xlsb::error::Error>(())
             })
             .expect_err("an XLSB candidate without workbook.bin must be rejected");
 
@@ -2813,7 +2798,7 @@ mod tests {
         assert!(workbook.task_panes().unwrap().is_none());
     }
 
-    fn parse_external_link(records: &[(RawKind, Vec<u8>)]) -> XlsbResult<FormulaExternalBook> {
+    fn parse_external_link(records: &[(RawKind, Vec<u8>)]) -> Result<FormulaExternalBook> {
         parse_external_link_with_relationship_type(
             records,
             Some(relationship_type::EXTERNAL_LINK_PATH),
@@ -2823,7 +2808,7 @@ mod tests {
     fn parse_external_link_with_relationship_type(
         records: &[(RawKind, Vec<u8>)],
         target_relationship_type: Option<&str>,
-    ) -> XlsbResult<FormulaExternalBook> {
+    ) -> Result<FormulaExternalBook> {
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let mut part = BlobPart::new(
             uri.clone(),
@@ -2840,7 +2825,7 @@ mod tests {
         }
         let mut package = OpcPackage::new();
         package.add_part(Box::new(part));
-        let workbook = XlsbWorkbook {
+        let workbook = Workbook {
             package,
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
@@ -2858,13 +2843,11 @@ mod tests {
         workbook.load_external_book(&uri)
     }
 
-    fn parse_shared_string_records(
-        records: &[(RawKind, Vec<u8>)],
-    ) -> XlsbResult<Vec<SharedString>> {
+    fn parse_shared_string_records(records: &[(RawKind, Vec<u8>)]) -> Result<Vec<SharedString>> {
         let data = external_link_records(records);
         let mut iter = Records::new(data.as_slice());
         let mut strings = Vec::new();
-        XlsbWorkbook::read_shared_strings(&mut iter, &mut strings)?;
+        Workbook::read_shared_strings(&mut iter, &mut strings)?;
         Ok(strings)
     }
 
@@ -2913,7 +2896,7 @@ mod tests {
         package.add_part(Box::new(sheet_part));
         package.add_part(Box::new(payload));
 
-        let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+        let workbook = Workbook::from_opc_package(package).unwrap();
         let entries = workbook.embedded().unwrap();
 
         assert_eq!(entries.len(), 1);
@@ -2978,7 +2961,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/ooxml/xlsb/universal-content.xlsb"
         );
-        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
         let mut formula_cells = Vec::new();
         for index in 0..workbook.formula_context.worksheet_names.len() {
             let worksheet = workbook.worksheet(index).unwrap();
@@ -3030,7 +3013,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/ooxml/xlsb/cond_format.xlsb"
         );
-        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
         let worksheet = workbook.worksheet(0).unwrap();
         let formatting = worksheet.conditional_formattings();
         assert_eq!(formatting.len(), 1);
@@ -3055,7 +3038,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/ooxml/xlsb/sample.xlsb"
         );
-        let workbook = XlsbWorkbook::new(File::open(rich_path).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(rich_path).unwrap()).unwrap();
         let rich = workbook
             .shared_strings()
             .iter()
@@ -3086,7 +3069,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/ooxml/xlsb/51519.xlsb"
         );
-        let workbook = XlsbWorkbook::new(File::open(phonetic_path).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(phonetic_path).unwrap()).unwrap();
         let phonetic = workbook
             .shared_strings()
             .iter()
@@ -3111,7 +3094,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/ooxml/xlsb/comments.xlsb"
         );
-        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
         let worksheet = workbook.worksheet(0).unwrap();
         assert_eq!(worksheet.comments().len(), 4);
         let first = &worksheet.comments()[0];
@@ -3142,7 +3125,7 @@ mod tests {
         )];
         assert!(matches!(
             parse_shared_string_records(&invalid_counts),
-            Err(crate::xlsb::error::XlsbError::Unrecognized { .. })
+            Err(crate::xlsb::error::Error::Unrecognized { .. })
         ));
 
         let missing_item = vec![
@@ -3155,7 +3138,7 @@ mod tests {
         ];
         assert!(matches!(
             parse_shared_string_records(&missing_item),
-            Err(crate::xlsb::error::XlsbError::Unrecognized { .. })
+            Err(crate::xlsb::error::Error::Unrecognized { .. })
         ));
 
         let malformed_item = vec![
@@ -3182,7 +3165,7 @@ mod tests {
                 "{}/../../test-data/ooxml/xlsb/{fixture}",
                 env!("CARGO_MANIFEST_DIR")
             );
-            let workbook = XlsbWorkbook::new(File::open(path).unwrap())
+            let workbook = Workbook::new(File::open(path).unwrap())
                 .unwrap_or_else(|error| panic!("{fixture}: {error}"));
             assert!(!workbook.styles().cell_xfs.is_empty(), "{fixture}");
             for index in 0..workbook.formula_context.worksheet_names.len() {
@@ -3209,7 +3192,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/ooxml/xlsb/62815.xlsb"
         );
-        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
         assert!(workbook.styles().num_fmts.keys().any(|id| *id >= 164));
         let worksheet = workbook.worksheet(0).unwrap();
         assert!(worksheet.dimensions().is_some());
@@ -3223,7 +3206,7 @@ mod tests {
         );
 
         let package = OpcPackage::open(path).unwrap();
-        let workbook = XlsbWorkbook {
+        let workbook = Workbook {
             package,
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
@@ -3303,7 +3286,7 @@ mod tests {
             .1[6] = 0;
         assert!(matches!(
             parse_external_link_with_relationship_type(&invalid_dde, None),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
 
         let mut truncated_cache =
@@ -3325,7 +3308,7 @@ mod tests {
                 &truncated_cache,
                 Some(relationship_type::OLE_OBJECT),
             ),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
     }
 
@@ -3336,7 +3319,7 @@ mod tests {
                 &external_workbook_records(),
                 Some(relationship_type::OLE_OBJECT),
             ),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
 
         let dde_records = external_data_source_records(1, "Excel", "System", "Rates");
@@ -3345,7 +3328,7 @@ mod tests {
                 &dde_records,
                 Some(relationship_type::EXTERNAL_LINK_PATH),
             ),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
 
         let ole_records = external_data_source_records(2, "rIdPath", "Acme.Server", "Report");
@@ -3354,7 +3337,7 @@ mod tests {
                 &ole_records,
                 Some(relationship_type::EXTERNAL_LINK_PATH),
             ),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
     }
 
@@ -3403,7 +3386,7 @@ mod tests {
         let mut package = OpcPackage::new();
         package.add_part(Box::new(workbook_part));
         package.add_part(Box::new(external_part));
-        let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+        let workbook = Workbook::from_opc_package(package).unwrap();
 
         let links = workbook.external_links();
         assert_eq!(links.len(), 1);
@@ -3440,21 +3423,21 @@ mod tests {
         duplicate_tabs.insert(2, duplicate_tabs[1].clone());
         assert!(matches!(
             parse_external_link(&duplicate_tabs),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
 
         let mut unclosed_name = external_workbook_records();
         unclosed_name.remove(5);
         assert!(matches!(
             parse_external_link(&unclosed_name),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
 
         let mut trailing_record = external_workbook_records();
         trailing_record.push((kind::SUP_NAME_END, Vec::new()));
         assert!(matches!(
             parse_external_link(&trailing_record),
-            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+            Err(crate::xlsb::error::Error::InvalidFormula(_))
         ));
     }
 
@@ -3520,7 +3503,7 @@ mod tests {
         let mut package = OpcPackage::new();
         package.add_part(Box::new(workbook_part));
         package.add_part(Box::new(definition_part));
-        let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+        let workbook = Workbook::from_opc_package(package).unwrap();
 
         let definitions = workbook.pivot_cache_definitions();
         assert_eq!(definitions.len(), 1);

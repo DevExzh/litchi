@@ -1,4 +1,4 @@
-use litchi_ooxml::xlsb::XlsbWorkbook;
+use litchi_ooxml::xlsb::Workbook;
 use litchi_ooxml::xlsx::Workbook;
 use litchi_ooxml_common::ribbon::{Family, Set, Version};
 use litchi_opc::constants::relationship_type;
@@ -127,7 +127,7 @@ fn assert_legacy_effective(set: Set<'_>) {
     assert_eq!(effective.xml(), UI_2007);
 }
 
-fn xlsb_workbook() -> XlsbWorkbook {
+fn xlsb_workbook() -> Workbook {
     // BrtBundleSh declares one visible worksheet in the workbook stream.
     let mut bundle_sheet = 0u32.to_le_bytes().to_vec();
     bundle_sheet.extend_from_slice(&1u32.to_le_bytes());
@@ -158,7 +158,7 @@ fn xlsb_workbook() -> XlsbWorkbook {
     let mut package = OpcPackage::new();
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(sheet_part));
-    XlsbWorkbook::from_opc_package(package).expect("construct XLSB workbook")
+    Workbook::from_opc_package(package).expect("construct XLSB workbook")
 }
 
 fn records(values: &[(Kind, Vec<u8>)]) -> Vec<u8> {

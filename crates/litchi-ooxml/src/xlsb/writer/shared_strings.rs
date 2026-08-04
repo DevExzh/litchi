@@ -1,6 +1,6 @@
 //! Shared strings table writer for XLSB
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_xlsb::raw::Writer;
 use litchi_xlsb::raw::kind;
 use std::collections::HashMap;
@@ -54,18 +54,17 @@ impl MutableSharedStringsWriter {
     }
 
     /// Write shared strings table to binary format
-    pub(crate) fn write<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         // Write BrtBeginSst
         let mut sst_header = Vec::new();
         let mut temp_writer = Writer::new(&mut sst_header);
         let total_count = u32::try_from(self.total_count).map_err(|_| {
-            XlsbError::Encoding("shared-string occurrence count exceeds u32".to_string())
+            Error::Encoding("shared-string occurrence count exceeds u32".to_string())
         })?;
-        let unique_count = u32::try_from(self.strings.len()).map_err(|_| {
-            XlsbError::Encoding("shared-string unique count exceeds u32".to_string())
-        })?;
+        let unique_count = u32::try_from(self.strings.len())
+            .map_err(|_| Error::Encoding("shared-string unique count exceeds u32".to_string()))?;
         if total_count > 0x7FFF_FFFF || unique_count > total_count {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBeginSst counts".to_string(),
                 val: format!("total={total_count}, unique={unique_count}"),
             });
@@ -87,7 +86,7 @@ impl MutableSharedStringsWriter {
     }
 
     /// Write a single SST item
-    fn write_sst_item<W: Write>(&self, writer: &mut Writer<W>, s: &str) -> XlsbResult<()> {
+    fn write_sst_item<W: Write>(&self, writer: &mut Writer<W>, s: &str) -> Result<()> {
         let mut data = Vec::new();
         let mut temp_writer = Writer::new(&mut data);
 

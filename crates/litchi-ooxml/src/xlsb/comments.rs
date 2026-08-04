@@ -5,7 +5,7 @@
 //! `Comment` model, including its `SharedStringRun` type, while keeping
 //! package and host error mapping in `litchi-ooxml`.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::shared_strings::SharedStringRun;
 use litchi_xlsb::raw::Writer;
 use std::io::Write;
@@ -62,12 +62,12 @@ impl Comment {
     }
 }
 
-pub(crate) fn read_comments(bytes: &[u8]) -> XlsbResult<Vec<Comment>> {
+pub(crate) fn read_comments(bytes: &[u8]) -> Result<Vec<Comment>> {
     let owner_comments = litchi_xlsb::comments::read(bytes).map_err(map_owner_error)?;
     let mut comments = Vec::new();
     comments
         .try_reserve(owner_comments.len())
-        .map_err(|source| XlsbError::Allocation {
+        .map_err(|source| Error::Allocation {
             resource: "host comments",
             source,
         })?;
@@ -84,7 +84,7 @@ pub(crate) fn read_comments(bytes: &[u8]) -> XlsbResult<Vec<Comment>> {
         } = owner_comment;
         let mut runs = Vec::new();
         runs.try_reserve(owner_runs.len())
-            .map_err(|source| XlsbError::Allocation {
+            .map_err(|source| Error::Allocation {
                 resource: "host comment rich-string runs",
                 source,
             })?;
@@ -108,21 +108,18 @@ pub(crate) fn read_comments(bytes: &[u8]) -> XlsbResult<Vec<Comment>> {
     Ok(comments)
 }
 
-pub(crate) fn write_comments<W: Write>(
-    writer: &mut Writer<W>,
-    comments: &[Comment],
-) -> XlsbResult<()> {
+pub(crate) fn write_comments<W: Write>(writer: &mut Writer<W>, comments: &[Comment]) -> Result<()> {
     let mut owner_comments = Vec::new();
     owner_comments
         .try_reserve(comments.len())
-        .map_err(|source| XlsbError::Allocation {
+        .map_err(|source| Error::Allocation {
             resource: "owner comments",
             source,
         })?;
     for comment in comments {
         let mut runs = Vec::new();
         runs.try_reserve(comment.runs.len())
-            .map_err(|source| XlsbError::Allocation {
+            .map_err(|source| Error::Allocation {
                 resource: "owner comment rich-string runs",
                 source,
             })?;
@@ -146,26 +143,24 @@ pub(crate) fn write_comments<W: Write>(
     litchi_xlsb::comments::write(writer, &owner_comments).map_err(map_owner_error)
 }
 
-fn map_owner_error(error: litchi_xlsb::comments::Error) -> XlsbError {
+fn map_owner_error(error: litchi_xlsb::comments::Error) -> Error {
     match error {
-        litchi_xlsb::comments::Error::Wire(error) => XlsbError::Wire(error),
+        litchi_xlsb::comments::Error::Wire(error) => Error::Wire(error),
         litchi_xlsb::comments::Error::InvalidRecordType(record_type) => {
-            XlsbError::InvalidRecordType(record_type)
+            Error::InvalidRecordType(record_type)
         },
         litchi_xlsb::comments::Error::InvalidLength { expected, found } => {
-            XlsbError::InvalidLength { expected, found }
+            Error::InvalidLength { expected, found }
         },
-        litchi_xlsb::comments::Error::Unrecognized { typ, val } => {
-            XlsbError::Unrecognized { typ, val }
-        },
-        litchi_xlsb::comments::Error::Encoding(message) => XlsbError::Encoding(message),
+        litchi_xlsb::comments::Error::Unrecognized { typ, val } => Error::Unrecognized { typ, val },
+        litchi_xlsb::comments::Error::Encoding(message) => Error::Encoding(message),
         litchi_xlsb::comments::Error::UnsupportedFeature(feature) => {
-            XlsbError::UnsupportedFeature(feature)
+            Error::UnsupportedFeature(feature)
         },
         litchi_xlsb::comments::Error::Allocation { resource, source } => {
-            XlsbError::Allocation { resource, source }
+            Error::Allocation { resource, source }
         },
-        other => XlsbError::Encoding(other.to_string()),
+        other => Error::Encoding(other.to_string()),
     }
 }
 

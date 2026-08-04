@@ -1,6 +1,6 @@
 //! Bounded codecs for Future Record Type headers used by XLSB extensions.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::formula::{CellParsedFormula, MAX_CELL_FORMULA_BYTES};
 
 /// Parse an FRTHeader whose only optional field is `rgFormulas`.
@@ -11,7 +11,7 @@ pub(crate) fn parse_formula_header(
     data: &[u8],
     record: &'static str,
     maximum_formulas: usize,
-) -> XlsbResult<(Vec<CellParsedFormula>, usize)> {
+) -> Result<(Vec<CellParsedFormula>, usize)> {
     let mut cursor = FrtCursor::new(data, record);
     let flags = cursor.read_u32()?;
     if flags & !0x04 != 0 {
@@ -42,7 +42,7 @@ pub(crate) fn parse_formula_header(
 pub(crate) fn serialize_formula_header(
     formulas: &[CellParsedFormula],
     maximum_formulas: usize,
-) -> XlsbResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     if formulas.len() > maximum_formulas {
         return Err(invalid(
             "FRTHeader",
@@ -81,9 +81,9 @@ pub(crate) fn serialize_formula_header(
     Ok(data)
 }
 
-fn validate_formula(formula: &CellParsedFormula) -> XlsbResult<()> {
+fn validate_formula(formula: &CellParsedFormula) -> Result<()> {
     if formula.rgce.is_empty() || formula.rgce.len() > MAX_CELL_FORMULA_BYTES {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "FRT formula token length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
             formula.rgce.len()
         )));
@@ -106,7 +106,7 @@ impl<'a> FrtCursor<'a> {
         }
     }
 
-    fn take(&mut self, count: usize) -> XlsbResult<&'a [u8]> {
+    fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self
             .offset
             .checked_add(count)
@@ -114,7 +114,7 @@ impl<'a> FrtCursor<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsbError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
@@ -122,14 +122,14 @@ impl<'a> FrtCursor<'a> {
         Ok(bytes)
     }
 
-    fn read_u32(&mut self) -> XlsbResult<u32> {
+    fn read_u32(&mut self) -> Result<u32> {
         let bytes = self.take(4)?;
         Ok(u32::from_le_bytes(
             bytes.try_into().expect("four-byte field"),
         ))
     }
 
-    fn read_formula(&mut self) -> XlsbResult<CellParsedFormula> {
+    fn read_formula(&mut self) -> Result<CellParsedFormula> {
         let flags = self.read_u32()?;
         if flags != 2 {
             return Err(invalid(
@@ -142,7 +142,7 @@ impl<'a> FrtCursor<'a> {
         let cb = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula ancillary length overflow"))?;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "FRT formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
             )));
         }
@@ -153,8 +153,8 @@ impl<'a> FrtCursor<'a> {
     }
 }
 
-fn invalid(typ: impl Into<String>, val: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: typ.into(),
         val: val.into(),
     }

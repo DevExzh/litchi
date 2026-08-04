@@ -1,7 +1,7 @@
 //! Typed XLSB chart-sheet authoring (MS-XLSB 2.1.7.7).
 
 use crate::xlsb::chartsheet::{ChartSheet, Color, ColorType, PageSetup, Protection, State, View};
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::worksheet::StrongProtection;
 use crate::xlsx::WorksheetChart;
 use litchi_xlsb::raw::Writer;
@@ -91,9 +91,9 @@ impl MutableChartSheet {
         &mut self,
         mut page_setup: PageSetup,
         printer_settings: Vec<u8>,
-    ) -> XlsbResult<&mut Self> {
+    ) -> Result<&mut Self> {
         if printer_settings.is_empty() || printer_settings.len() > MAX_PRINTER_SETTINGS_BYTES {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: MAX_PRINTER_SETTINGS_BYTES,
                 found: printer_settings.len(),
             });
@@ -115,13 +115,13 @@ impl MutableChartSheet {
         self.printer_settings.as_deref()
     }
 
-    pub(crate) fn validate(&self) -> XlsbResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         validate_name(self.name())?;
         if self.metadata.drawing_rel_id.is_some()
             || self.metadata.legacy_drawing_rel_id.is_some()
             || self.metadata.legacy_drawing_header_footer_rel_id.is_some()
         {
-            return Err(XlsbError::UnsupportedFeature(
+            return Err(Error::UnsupportedFeature(
                 "chart-sheet relationship IDs are allocated by the XLSB writer; legacy VML authoring is unsupported"
                     .to_string(),
             ));
@@ -129,20 +129,20 @@ impl MutableChartSheet {
         validate_string(&self.metadata.code_name, "chart-sheet code name")?;
         validate_color(self.metadata.tab_color)?;
         if self.metadata.views.is_empty() || self.metadata.views.len() > MAX_VIEWS {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: MAX_VIEWS,
                 found: self.metadata.views.len(),
             });
         }
         for view in &self.metadata.views {
             if view.scale != 0 && !(10..=400).contains(&view.scale) {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "chart-sheet zoom {} is outside 10..=400 or zero",
                     view.scale
                 )));
             }
             if view.workbook_view_index != 0 {
-                return Err(XlsbError::UnsupportedFeature(format!(
+                return Err(Error::UnsupportedFeature(format!(
                     "chart-sheet workbook view index {} has no authored workbook view",
                     view.workbook_view_index
                 )));
@@ -151,7 +151,7 @@ impl MutableChartSheet {
         if let Some(strong) = &self.metadata.strong_protection {
             validate_strong_protection(strong)?;
             if self.metadata.protection.is_none() {
-                return Err(XlsbError::InvalidFormula(
+                return Err(Error::InvalidFormula(
                     "strong chart-sheet protection requires classic protection flags".to_string(),
                 ));
             }
@@ -160,7 +160,7 @@ impl MutableChartSheet {
             (Some(setup), Some(_)) => validate_page_setup(setup)?,
             (None, None) => {},
             _ => {
-                return Err(XlsbError::InvalidFormula(
+                return Err(Error::InvalidFormula(
                     "chart-sheet page setup and printer settings must be supplied together"
                         .to_string(),
                 ));
@@ -178,7 +178,7 @@ pub(crate) fn write_chart_sheet(
     sheet: &MutableChartSheet,
     drawing_rel_id: &str,
     printer_rel_id: Option<&str>,
-) -> XlsbResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     sheet.validate()?;
     let mut output = Vec::new();
     let mut writer = Writer::new(&mut output);
@@ -195,7 +195,7 @@ pub(crate) fn write_chart_sheet(
             &mut writer,
             setup,
             printer_rel_id.ok_or_else(|| {
-                XlsbError::InvalidFormula(
+                Error::InvalidFormula(
                     "chart-sheet page setup has no printer relationship".to_string(),
                 )
             })?,
@@ -206,7 +206,7 @@ pub(crate) fn write_chart_sheet(
     Ok(output)
 }
 
-fn validate_name(name: &str) -> XlsbResult<()> {
+fn validate_name(name: &str) -> Result<()> {
     let units = name.encode_utf16().count();
     if units == 0
         || units > 31
@@ -214,36 +214,36 @@ fn validate_name(name: &str) -> XlsbResult<()> {
         || name.starts_with('\'')
         || name.ends_with('\'')
     {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "chart-sheet name {name:?} does not follow BrtBundleSh grammar"
         )));
     }
     Ok(())
 }
 
-fn validate_string(value: &str, context: &str) -> XlsbResult<()> {
+fn validate_string(value: &str, context: &str) -> Result<()> {
     if value.encode_utf16().count() > MAX_STRING_UNITS || value.contains('\0') {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "{context} is too long or contains NUL"
         )));
     }
     Ok(())
 }
 
-fn validate_color(color: Color) -> XlsbResult<()> {
+fn validate_color(color: Color) -> Result<()> {
     if color.color_type == ColorType::Rgb && !color.valid_rgb {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "direct chart-sheet tab color is not marked valid".to_string(),
         ));
     }
     if color.color_type == ColorType::Theme && color.index > MAX_THEME_COLOR_INDEX {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "chart-sheet theme color index {} exceeds {MAX_THEME_COLOR_INDEX}",
             color.index
         )));
     }
     if color.color_type == ColorType::Indexed && color.index > MAX_INDEXED_COLOR {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "chart-sheet indexed color {} exceeds {MAX_INDEXED_COLOR}",
             color.index
         )));
@@ -251,29 +251,29 @@ fn validate_color(color: Color) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_strong_protection(value: &StrongProtection) -> XlsbResult<()> {
+fn validate_strong_protection(value: &StrongProtection) -> Result<()> {
     if value.spin_count > MAX_SPIN_COUNT
         || value.hash.is_empty()
         || value.hash.len() > MAX_PROTECTION_BYTES
         || value.salt.len() > MAX_PROTECTION_BYTES
         || value.algorithm.is_empty()
     {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "invalid or oversized chart-sheet strong-protection metadata".to_string(),
         ));
     }
     validate_string(&value.algorithm, "strong-protection algorithm")
 }
 
-fn validate_page_setup(value: &PageSetup) -> XlsbResult<()> {
+fn validate_page_setup(value: &PageSetup) -> Result<()> {
     if value.paper_size > MAX_PAPER_SIZE || (119..256).contains(&value.paper_size) {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "chart-sheet paper size {} is invalid or reserved",
             value.paper_size
         )));
     }
     if value.copies == 0 || value.copies > MAX_COPIES {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "chart-sheet print copies {} is outside 1..={MAX_COPIES}",
             value.copies
         )));
@@ -281,7 +281,7 @@ fn validate_page_setup(value: &PageSetup) -> XlsbResult<()> {
     Ok(())
 }
 
-fn write_properties<W: Write>(writer: &mut Writer<W>, value: &ChartSheet) -> XlsbResult<()> {
+fn write_properties<W: Write>(writer: &mut Writer<W>, value: &ChartSheet) -> Result<()> {
     let mut data = Vec::new();
     data.extend_from_slice(&(u16::from(value.published)).to_le_bytes());
     let color_type = match value.tab_color.color_type {
@@ -298,7 +298,7 @@ fn write_properties<W: Write>(writer: &mut Writer<W>, value: &ChartSheet) -> Xls
     Ok(writer.write_record(rt::CS_PROP, &data)?)
 }
 
-fn write_views<W: Write>(writer: &mut Writer<W>, views: &[View]) -> XlsbResult<()> {
+fn write_views<W: Write>(writer: &mut Writer<W>, views: &[View]) -> Result<()> {
     writer.write_record(rt::BEGIN_CS_VIEWS, &[])?;
     for view in views {
         let mut data = Vec::with_capacity(10);
@@ -315,7 +315,7 @@ fn write_protection<W: Write>(
     writer: &mut Writer<W>,
     classic: Option<Protection>,
     strong: Option<&StrongProtection>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let Some(classic) = classic else {
         return Ok(());
     };
@@ -347,7 +347,7 @@ fn write_page_setup<W: Write>(
     writer: &mut Writer<W>,
     setup: &PageSetup,
     printer_rel_id: &str,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut data = Vec::new();
     data.extend_from_slice(&setup.paper_size.to_le_bytes());
     data.extend_from_slice(&setup.horizontal_resolution.to_le_bytes());
@@ -368,16 +368,16 @@ fn write_rel_id<W: Write>(
     writer: &mut Writer<W>,
     record_type: litchi_xlsb::raw::Kind,
     rel_id: &str,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut data = Vec::new();
     Writer::new(&mut data).write_wide_string(rel_id)?;
     Ok(writer.write_record(record_type, &data)?)
 }
 
-fn write_blob(data: &mut Vec<u8>, value: &[u8]) -> XlsbResult<()> {
+fn write_blob(data: &mut Vec<u8>, value: &[u8]) -> Result<()> {
     data.extend_from_slice(
         &u32::try_from(value.len())
-            .map_err(|_| XlsbError::InvalidLength {
+            .map_err(|_| Error::InvalidLength {
                 expected: u32::MAX as usize,
                 found: value.len(),
             })?

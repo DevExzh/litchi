@@ -3,7 +3,7 @@
 //! This module implements parsing for BrtBorder records according to the MS-XLSB specification.
 //! Reference: [MS-XLSB] Section 2.4.55 - BrtBorder
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 
 /// Border side information
 #[derive(Debug, Clone)]
@@ -77,17 +77,17 @@ impl Border {
     /// The BrtBorder record specifies border formatting properties.
     /// Each border side is a 10-byte `Blxf`: style, reserved byte, and an
     /// 8-byte `BrtColor`.
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         const BORDER_SIZE: usize = 51;
         if data.len() < BORDER_SIZE {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: BORDER_SIZE,
                 found: data.len(),
             });
         }
         let flags = data[0];
         if flags & !0x03 != 0 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBorder flags".to_string(),
                 val: format!("0x{flags:02X}"),
             });
@@ -106,10 +106,10 @@ impl Border {
         })
     }
 
-    fn parse_blxf(data: &[u8]) -> XlsbResult<Option<BorderSide>> {
+    fn parse_blxf(data: &[u8]) -> Result<Option<BorderSide>> {
         let style_byte = data[0];
         if style_byte > 13 || data[1] != 0 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "Blxf".to_string(),
                 val: format!("style 0x{style_byte:02X}, reserved 0x{:02X}", data[1]),
             });
@@ -123,14 +123,14 @@ impl Border {
         Ok(Some(BorderSide { style, color }))
     }
 
-    fn parse_direct_color(data: &[u8]) -> XlsbResult<Option<u32>> {
+    fn parse_direct_color(data: &[u8]) -> Result<Option<u32>> {
         let valid_rgb = data[0] & 1 != 0;
         let color_type = data[0] >> 1;
         if color_type != 2 {
             return Ok(None);
         }
         if !valid_rgb {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtColor".to_string(),
                 val: "direct RGB color is not marked valid".to_string(),
             });
@@ -160,7 +160,7 @@ mod tests {
     fn test_empty_border() {
         assert!(matches!(
             Border::parse(&[]),
-            Err(XlsbError::InvalidLength { .. })
+            Err(Error::InvalidLength { .. })
         ));
     }
 

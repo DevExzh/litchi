@@ -5,7 +5,7 @@
 
 use super::{Connections, parse_connections_part};
 use crate::xlsb::connections::write::write_connections_part;
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_opc::constants::content_type;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
@@ -20,8 +20,8 @@ struct ConnectionsGraph {
     part_name: PackURI,
 }
 
-fn invalid(detail: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn invalid(detail: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: "External Data Connections package graph".to_string(),
         val: detail.into(),
     }
@@ -30,7 +30,7 @@ fn invalid(detail: impl Into<String>) -> XlsbError {
 pub(crate) fn load_from_workbook(
     package: &OpcPackage,
     workbook_uri: &PackURI,
-) -> XlsbResult<Option<Connections>> {
+) -> Result<Option<Connections>> {
     let Some(graph) = discover_graph(package, workbook_uri)? else {
         return Ok(None);
     };
@@ -43,12 +43,12 @@ pub(crate) fn store_on_workbook(
     package: &mut OpcPackage,
     workbook_uri: &PackURI,
     connections: &Connections,
-) -> XlsbResult<Connections> {
+) -> Result<Connections> {
     let payload = write_connections_part(connections)?;
     // Treat the reader as a post-serialization grammar oracle before mutation.
     let canonical_model = parse_connections_part(&payload)?;
     let existing = discover_graph(package, workbook_uri)?;
-    let canonical_part = PackURI::new(CONNECTIONS_PART_NAME).map_err(XlsbError::Encoding)?;
+    let canonical_part = PackURI::new(CONNECTIONS_PART_NAME).map_err(Error::Encoding)?;
     if existing
         .as_ref()
         .is_none_or(|graph| graph.part_name != canonical_part)
@@ -83,7 +83,7 @@ pub(crate) fn store_on_workbook(
 pub(crate) fn remove_from_workbook(
     package: &mut OpcPackage,
     workbook_uri: &PackURI,
-) -> XlsbResult<bool> {
+) -> Result<bool> {
     let Some(graph) = discover_graph(package, workbook_uri)? else {
         return Ok(false);
     };
@@ -99,7 +99,7 @@ pub(crate) fn remove_from_workbook(
 fn discover_graph(
     package: &OpcPackage,
     workbook_uri: &PackURI,
-) -> XlsbResult<Option<ConnectionsGraph>> {
+) -> Result<Option<ConnectionsGraph>> {
     let workbook = package.get_part(workbook_uri)?;
     if workbook.content_type() != content_type::XLSB_BIN {
         return Err(invalid(
@@ -142,7 +142,7 @@ fn discover_graph(
     }))
 }
 
-fn ensure_no_orphan_parts(package: &OpcPackage, expected: Option<&PackURI>) -> XlsbResult<()> {
+fn ensure_no_orphan_parts(package: &OpcPackage, expected: Option<&PackURI>) -> Result<()> {
     if package.iter_parts().any(|part| {
         part.content_type() == CONNECTIONS_CONTENT_TYPE && expected != Some(part.partname())
     }) {
@@ -153,7 +153,7 @@ fn ensure_no_orphan_parts(package: &OpcPackage, expected: Option<&PackURI>) -> X
     Ok(())
 }
 
-fn ensure_no_inbound_relationship(package: &OpcPackage, target: &PackURI) -> XlsbResult<()> {
+fn ensure_no_inbound_relationship(package: &OpcPackage, target: &PackURI) -> Result<()> {
     for relationship in package.rels().iter() {
         if !relationship.is_external() && relationship.target_partname()? == *target {
             return Err(invalid(
@@ -178,7 +178,7 @@ fn ensure_exclusive_inbound_relationship(
     target: &PackURI,
     expected_source: &PackURI,
     expected_relationship_id: &str,
-) -> XlsbResult<()> {
+) -> Result<()> {
     for relationship in package.rels().iter() {
         if !relationship.is_external() && relationship.target_partname()? == *target {
             return Err(invalid(
@@ -205,20 +205,20 @@ fn ensure_exclusive_inbound_relationship(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::XlsbWorkbook;
+    use crate::xlsb::Workbook;
     use crate::xlsb::connections::{
         CommandType, Connection, CredentialMethod, DbProperties, Properties, SourceType,
     };
     use crate::xlsb::merged_cells::MergedCell;
-    use crate::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+    use crate::xlsb::writer::{MutableWorksheet, WorkbookWriter};
     use std::io::Cursor;
 
-    fn generated_workbook() -> XlsbWorkbook {
-        let mut writer = XlsbWorkbookWriter::new();
-        writer.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+    fn generated_workbook() -> Workbook {
+        let mut writer = WorkbookWriter::new();
+        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
         writer.save(&mut bytes).unwrap();
-        XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap()
+        Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
     }
 
     fn connections(id: u32, name: &str) -> Connections {
@@ -240,7 +240,7 @@ mod tests {
         }
     }
 
-    fn saved(workbook: &XlsbWorkbook) -> Vec<u8> {
+    fn saved(workbook: &Workbook) -> Vec<u8> {
         let mut bytes = Cursor::new(Vec::new());
         workbook.save(&mut bytes).unwrap();
         bytes.into_inner()
@@ -261,14 +261,14 @@ mod tests {
 
         let replacement = connections(9, "Replacement");
         workbook.set_connections(replacement.clone()).unwrap();
-        let mut reopened = XlsbWorkbook::new(Cursor::new(saved(&workbook))).unwrap();
+        let mut reopened = Workbook::new(Cursor::new(saved(&workbook))).unwrap();
         assert_eq!(reopened.connections(), Some(&replacement));
         assert_eq!(reopened.merged_cell_ranges(0).unwrap(), vec![merged]);
 
         assert!(reopened.remove_connections().unwrap());
         assert!(reopened.connections().is_none());
         assert!(!reopened.remove_connections().unwrap());
-        let reopened = XlsbWorkbook::new(Cursor::new(saved(&reopened))).unwrap();
+        let reopened = Workbook::new(Cursor::new(saved(&reopened))).unwrap();
         assert!(reopened.connections().is_none());
     }
 
@@ -286,7 +286,7 @@ mod tests {
                     "application/octet-stream".to_string(),
                     b"preserve connections".to_vec(),
                 )))?;
-                Ok::<_, XlsbError>(())
+                Ok::<_, Error>(())
             })
             .unwrap();
 
@@ -295,7 +295,7 @@ mod tests {
             workbook.opc_package().get_part(&marker).unwrap().blob(),
             b"preserve connections"
         );
-        let reopened = XlsbWorkbook::new(Cursor::new(saved(&workbook))).unwrap();
+        let reopened = Workbook::new(Cursor::new(saved(&workbook))).unwrap();
         assert_eq!(reopened.connections(), Some(&original));
     }
 

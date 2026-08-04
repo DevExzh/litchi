@@ -1,13 +1,13 @@
 //! Semantic XLSB records built on the shared BIFF12 wire kernel.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_core::binary;
 use litchi_xlsb::named_ranges::Definition;
 use litchi_xlsb::raw::{Cursor, Header, Kind, Limits, kind};
 use std::io::Read;
 
 /// Decode one strict BIFF12 wide string and report consumed bytes.
-pub(crate) fn decode_string(buf: &[u8]) -> XlsbResult<(String, usize)> {
+pub(crate) fn decode_string(buf: &[u8]) -> Result<(String, usize)> {
     let mut cursor = Cursor::new(buf, "XLWideString");
     let value = cursor.read_wide_string()?;
     Ok((value, cursor.position()))
@@ -33,27 +33,24 @@ impl<R: Read> Stream<R> {
         }
     }
 
-    pub(crate) fn read_type(&mut self) -> XlsbResult<Kind> {
+    pub(crate) fn read_type(&mut self) -> Result<Kind> {
         if self.pending_len.is_some() {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BIFF12 stream".to_string(),
                 val: "payload must be read before the next header".to_string(),
             });
         }
         let header = Header::read(&mut self.reader, self.limits)?
-            .ok_or_else(|| XlsbError::UnexpectedEndOfStream("BIFF12 record header".to_string()))?;
+            .ok_or_else(|| Error::UnexpectedEndOfStream("BIFF12 record header".to_string()))?;
         self.pending_len = Some(header.len());
         Ok(header.kind())
     }
 
-    pub(crate) fn fill_buffer(&mut self, buf: &mut Vec<u8>) -> XlsbResult<usize> {
-        let len = self
-            .pending_len
-            .take()
-            .ok_or_else(|| XlsbError::Unrecognized {
-                typ: "BIFF12 stream".to_string(),
-                val: "record header must be read before its payload".to_string(),
-            })?;
+    pub(crate) fn fill_buffer(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
+        let len = self.pending_len.take().ok_or_else(|| Error::Unrecognized {
+            typ: "BIFF12 stream".to_string(),
+            val: "record header must be read before its payload".to_string(),
+        })?;
         buf.resize(len, 0);
         self.reader.read_exact(buf)?;
         Ok(len)
@@ -67,7 +64,7 @@ pub struct WorkbookPropRecord {
 }
 
 impl WorkbookPropRecord {
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.is_empty() {
             return Ok(WorkbookPropRecord { is_date1904: false });
         }
@@ -90,9 +87,9 @@ pub struct BundleSheetRecord {
 }
 
 impl BundleSheetRecord {
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 12 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 12,
                 found: data.len(),
             });
@@ -100,7 +97,7 @@ impl BundleSheetRecord {
 
         let state = binary::read_u32_le_at(data, 0)?;
         if state > 2 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBundleSh hsState".to_string(),
                 val: state.to_string(),
             });
@@ -112,14 +109,14 @@ impl BundleSheetRecord {
             // Excel beta XLSB files have an undocumented extra four bytes
             // before iTabID. This layout is also recognized by Apache POI.
             if data.len() < 16 {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtBundleSh iTabID".to_string(),
                     val: current_id.to_string(),
                 });
             }
             let beta_id = binary::read_u32_le_at(data, 8)?;
             if !(1..=0xFFFF).contains(&beta_id) {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtBundleSh iTabID".to_string(),
                     val: format!("current {current_id}, beta {beta_id}"),
                 });
@@ -132,7 +129,7 @@ impl BundleSheetRecord {
         } else {
             let (value, consumed) = decode_string(&data[strings_offset..])?;
             if value.is_empty() {
-                return Err(XlsbError::Unrecognized {
+                return Err(Error::Unrecognized {
                     typ: "BrtBundleSh strRelID".to_string(),
                     val: "empty relationship ID".to_string(),
                 });
@@ -140,17 +137,17 @@ impl BundleSheetRecord {
             (Some(value), consumed)
         };
         if rel_id.is_none() && state != 2 {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBundleSh strRelID".to_string(),
                 val: "NULL relationship on a sheet that is not very hidden".to_string(),
             });
         }
-        let name_offset = strings_offset.checked_add(rel_consumed).ok_or_else(|| {
-            XlsbError::Encoding("BrtBundleSh relationship size overflow".to_string())
-        })?;
+        let name_offset = strings_offset
+            .checked_add(rel_consumed)
+            .ok_or_else(|| Error::Encoding("BrtBundleSh relationship size overflow".to_string()))?;
         let (name, name_consumed) = decode_string(&data[name_offset..])?;
         if name_offset + name_consumed != data.len() {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBundleSh".to_string(),
                 val: format!(
                     "{} trailing bytes",
@@ -165,7 +162,7 @@ impl BundleSheetRecord {
             || name.starts_with('\'')
             || name.ends_with('\'')
         {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "BrtBundleSh strName".to_string(),
                 val: name,
             });
@@ -191,9 +188,9 @@ pub struct RowHeaderRecord {
 
 #[allow(dead_code)]
 impl RowHeaderRecord {
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 8 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             });
@@ -235,9 +232,9 @@ pub struct CellRecord {
 }
 
 impl CellRecord {
-    pub fn parse(record_type: Kind, data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(record_type: Kind, data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
@@ -250,7 +247,7 @@ impl CellRecord {
             kind::CELL_BLANK => CellValue::Blank,
             kind::CELL_BOOL => {
                 if data.len() < 7 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 7,
                         found: data.len(),
                     });
@@ -260,7 +257,7 @@ impl CellRecord {
             },
             kind::CELL_ERROR => {
                 if data.len() < 7 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 7,
                         found: data.len(),
                     });
@@ -269,7 +266,7 @@ impl CellRecord {
             },
             kind::CELL_REAL => {
                 if data.len() < 14 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 14,
                         found: data.len(),
                     });
@@ -282,7 +279,7 @@ impl CellRecord {
             },
             kind::CELL_ISST => {
                 if data.len() < 10 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 10,
                         found: data.len(),
                     });
@@ -291,7 +288,7 @@ impl CellRecord {
             },
             kind::CELL_RK => {
                 if data.len() < 10 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 10,
                         found: data.len(),
                     });
@@ -302,7 +299,7 @@ impl CellRecord {
             // Formula records - parse formula bytes and cached value
             kind::FMLA_STRING => {
                 if data.len() < 10 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 10,
                         found: data.len(),
                     });
@@ -310,7 +307,7 @@ impl CellRecord {
                 // Skip style_id (4 bytes) and flags (1 byte) and formula length (4 bytes)
                 let formula_len = binary::read_u32_le_at(data, 6)? as usize;
                 if data.len() < 10 + formula_len {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 10 + formula_len,
                         found: data.len(),
                     });
@@ -326,14 +323,14 @@ impl CellRecord {
             },
             kind::FMLA_NUM => {
                 if data.len() < 18 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 18,
                         found: data.len(),
                     });
                 }
                 let formula_len = binary::read_u32_le_at(data, 6)? as usize;
                 if data.len() < 10 + formula_len + 8 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 10 + formula_len + 8,
                         found: data.len(),
                     });
@@ -347,14 +344,14 @@ impl CellRecord {
             },
             kind::FMLA_BOOL => {
                 if data.len() < 11 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 11,
                         found: data.len(),
                     });
                 }
                 let formula_len = binary::read_u32_le_at(data, 6)? as usize;
                 if data.len() < 10 + formula_len + 1 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 10 + formula_len + 1,
                         found: data.len(),
                     });
@@ -369,14 +366,14 @@ impl CellRecord {
             },
             kind::FMLA_ERROR => {
                 if data.len() < 11 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 11,
                         found: data.len(),
                     });
                 }
                 let formula_len = binary::read_u32_le_at(data, 6)? as usize;
                 if data.len() < 10 + formula_len + 1 {
-                    return Err(XlsbError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 10 + formula_len + 1,
                         found: data.len(),
                     });
@@ -388,7 +385,7 @@ impl CellRecord {
                     formula: Some(formula_bytes),
                 }
             },
-            _ => return Err(XlsbError::InvalidRecordType(record_type.get())),
+            _ => return Err(Error::InvalidRecordType(record_type.get())),
         };
 
         Ok(CellRecord { row, col, value })
@@ -410,9 +407,9 @@ pub struct ColInfoRecord {
 
 impl ColInfoRecord {
     #[allow(dead_code)]
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 12 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 12,
                 found: data.len(),
             });
@@ -464,9 +461,9 @@ pub struct MergeCellRecord {
 
 impl MergeCellRecord {
     #[allow(dead_code)]
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 16 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 16,
                 found: data.len(),
             });
@@ -497,9 +494,9 @@ pub struct HyperlinkRecord {
 
 impl HyperlinkRecord {
     #[allow(dead_code)]
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 16 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 16,
                 found: data.len(),
             });
@@ -568,7 +565,7 @@ pub struct NameRecord {
 
 impl NameRecord {
     #[allow(dead_code)]
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let named_range = Definition::parse(data)?;
 
         Ok(NameRecord {
@@ -622,7 +619,7 @@ mod tests {
         invalid.extend_from_slice(&0u32.to_le_bytes());
         assert!(matches!(
             BundleSheetRecord::parse(&invalid),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         let mut null_visible = 0u32.to_le_bytes().to_vec();
@@ -631,7 +628,7 @@ mod tests {
         null_visible.extend_from_slice(&wide_string("Module"));
         assert!(matches!(
             BundleSheetRecord::parse(&null_visible),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 
@@ -658,7 +655,7 @@ mod tests {
         invalid_bool.push(2);
         assert!(matches!(
             CellRecord::parse(kind::CELL_BOOL, &invalid_bool),
-            Err(XlsbError::Wire(litchi_xlsb::Error::InvalidBool {
+            Err(Error::Wire(litchi_xlsb::Error::InvalidBool {
                 value: 2,
                 ..
             }))
@@ -670,7 +667,7 @@ mod tests {
         invalid_formula_bool.push(2);
         assert!(matches!(
             CellRecord::parse(kind::FMLA_BOOL, &invalid_formula_bool),
-            Err(XlsbError::Wire(litchi_xlsb::Error::InvalidBool {
+            Err(Error::Wire(litchi_xlsb::Error::InvalidBool {
                 value: 2,
                 ..
             }))

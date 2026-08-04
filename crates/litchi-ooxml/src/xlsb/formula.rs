@@ -24,7 +24,7 @@
 
 mod function_table;
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::external_link::Link;
 use function_table::BUILTIN_FUNCTIONS;
 use litchi_xlsb::named_ranges::validate_name;
@@ -37,7 +37,7 @@ pub use litchi_xlsb::formula::{
 };
 
 /// Compatibility parser whose historical methods continue to return the host
-/// `XlsbResult` while the binary implementation is owned by `litchi-xlsb`.
+/// `Result` while the binary implementation is owned by `litchi-xlsb`.
 pub struct FormulaParser<'a> {
     inner: litchi_xlsb::formula::FormulaParser<'a>,
 }
@@ -69,12 +69,12 @@ impl<'a> FormulaParser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> XlsbResult<Vec<Token>> {
+    pub fn parse(&mut self) -> Result<Vec<Token>> {
         self.inner.parse().map_err(Into::into)
     }
 }
 
-impl From<litchi_xlsb::formula::Error> for XlsbError {
+impl From<litchi_xlsb::formula::Error> for Error {
     fn from(error: litchi_xlsb::formula::Error) -> Self {
         match error {
             litchi_xlsb::formula::Error::InvalidFormula(message) => Self::InvalidFormula(message),
@@ -95,7 +95,7 @@ impl From<litchi_xlsb::formula::Error> for XlsbError {
 
 /// Inclusive worksheet range used by array and shared formulas.
 ///
-/// The host wrapper keeps the historical `XlsbResult` API while delegating
+/// The host wrapper keeps the historical `Result` API while delegating
 /// validation and binary conversion to the standalone XLSB codec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FormulaRange {
@@ -124,22 +124,22 @@ impl FormulaRange {
         }
     }
 
-    pub fn new(row_first: u32, row_last: u32, col_first: u32, col_last: u32) -> XlsbResult<Self> {
+    pub fn new(row_first: u32, row_last: u32, col_first: u32, col_last: u32) -> Result<Self> {
         litchi_xlsb::formula::Range::new(row_first, row_last, col_first, col_last)
             .map(Self::from_owner)
-            .map_err(XlsbError::from)
+            .map_err(Error::from)
     }
 
-    pub fn parse_a1(value: &str) -> XlsbResult<Self> {
+    pub fn parse_a1(value: &str) -> Result<Self> {
         litchi_xlsb::formula::Range::parse_a1(value)
             .map(Self::from_owner)
-            .map_err(XlsbError::from)
+            .map_err(Error::from)
     }
 
-    pub fn parse_binary(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse_binary(data: &[u8]) -> Result<Self> {
         litchi_xlsb::formula::Range::parse_binary(data)
             .map(Self::from_owner)
-            .map_err(XlsbError::from)
+            .map_err(Error::from)
     }
 
     pub fn to_binary(self) -> [u8; 16] {
@@ -181,34 +181,34 @@ impl CellParsedFormula {
         }
     }
 
-    pub fn parse(data: &[u8]) -> XlsbResult<(Self, usize)> {
+    pub fn parse(data: &[u8]) -> Result<(Self, usize)> {
         litchi_xlsb::formula::ParsedFormula::parse(data)
             .map(|(formula, consumed)| (Self::from_owner(formula), consumed))
-            .map_err(XlsbError::from)
+            .map_err(Error::from)
     }
 
-    pub fn to_bytes(&self) -> XlsbResult<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         litchi_xlsb::formula::ParsedFormula {
             rgce: self.rgce.clone(),
             rgcb: self.rgcb.clone(),
         }
         .to_bytes()
-        .map_err(XlsbError::from)
+        .map_err(Error::from)
     }
 
-    pub fn exp(row: u32, col: u32) -> XlsbResult<Self> {
+    pub fn exp(row: u32, col: u32) -> Result<Self> {
         litchi_xlsb::formula::ParsedFormula::exp(row, col)
             .map(Self::from_owner)
-            .map_err(XlsbError::from)
+            .map_err(Error::from)
     }
 
-    pub fn exp_cell(&self) -> XlsbResult<Option<(u32, u32)>> {
+    pub fn exp_cell(&self) -> Result<Option<(u32, u32)>> {
         litchi_xlsb::formula::ParsedFormula {
             rgce: self.rgce.clone(),
             rgcb: self.rgcb.clone(),
         }
         .exp_cell()
-        .map_err(XlsbError::from)
+        .map_err(Error::from)
     }
 }
 
@@ -231,19 +231,19 @@ impl FormulaGroup {
         }
     }
 
-    pub fn parse_array(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse_array(data: &[u8]) -> Result<Self> {
         litchi_xlsb::formula::Group::parse_array(data)
             .map(Self::from_owner)
-            .map_err(XlsbError::from)
+            .map_err(Error::from)
     }
 
-    pub fn parse_shared(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse_shared(data: &[u8]) -> Result<Self> {
         litchi_xlsb::formula::Group::parse_shared(data)
             .map(Self::from_owner)
-            .map_err(XlsbError::from)
+            .map_err(Error::from)
     }
 
-    pub fn to_record_data(&self) -> XlsbResult<Vec<u8>> {
+    pub fn to_record_data(&self) -> Result<Vec<u8>> {
         litchi_xlsb::formula::Group {
             kind: self.kind,
             range: self.range.into_owner(),
@@ -251,7 +251,7 @@ impl FormulaGroup {
             always_calculate: self.always_calculate,
         }
         .to_record_data()
-        .map_err(XlsbError::from)
+        .map_err(Error::from)
     }
 }
 
@@ -273,7 +273,7 @@ pub struct FormulaPivotViewDefinition {
 }
 
 impl FormulaPivotViewDefinition {
-    pub fn try_new(cache_id: u32, sheet_index: usize, name: String) -> XlsbResult<Self> {
+    pub fn try_new(cache_id: u32, sheet_index: usize, name: String) -> Result<Self> {
         validate_pivot_identifier(&name, "PivotTable view name", 255)?;
         Ok(Self {
             cache_id,
@@ -351,7 +351,7 @@ pub enum FormulaPivotNameReference {
 }
 
 impl FormulaPivotNameReference {
-    fn validate(&self) -> XlsbResult<()> {
+    fn validate(&self) -> Result<()> {
         match self {
             Self::Field { name, .. } => {
                 validate_pivot_identifier(name, "pivot cache field name", 32_767)
@@ -428,7 +428,7 @@ impl FormulaPivotNameScope {
         sheet_index: usize,
         view_name: String,
         references: Vec<FormulaPivotNameReference>,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         validate_pivot_identifier(&view_name, "PivotTable view name", 255)?;
         if references.len() > 16_384 {
             return Err(invalid(
@@ -482,16 +482,16 @@ impl FormulaTableDefinition {
         sheet_index: usize,
         display_name: impl Into<String>,
         columns: Vec<String>,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         if table_id == 0 || table_id == u32::MAX {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "table identifier {table_id} is outside 1..=4294967294"
             )));
         }
         let display_name = display_name.into();
         validate_table_name(&display_name)?;
         if columns.is_empty() || columns.len() > 16_384 {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "table {display_name:?} has {} columns, outside 1..=16384",
                 columns.len()
             )));
@@ -502,7 +502,7 @@ impl FormulaTableDefinition {
                 .iter()
                 .any(|existing| excel_name_eq(existing, column))
             {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "table {display_name:?} contains duplicate column {column:?}"
                 )));
             }
@@ -599,7 +599,7 @@ impl FormulaResolutionContext {
     }
 
     /// Bind formula-local `BrtBeginPName` metadata to an exact PivotTable view.
-    pub fn for_pivot_formula(&self, scope: FormulaPivotNameScope) -> XlsbResult<Self> {
+    pub fn for_pivot_formula(&self, scope: FormulaPivotNameScope) -> Result<Self> {
         let mut context = self.clone();
         context.current_sheet = Some(scope.sheet_index);
         context.active_pivot_scope =
@@ -609,9 +609,9 @@ impl FormulaResolutionContext {
         Ok(context)
     }
 
-    fn resolve_table_sheet(&self, index: u16) -> XlsbResult<usize> {
+    fn resolve_table_sheet(&self, index: u16) -> Result<usize> {
         if index == u16::MAX {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "structured reference uses invalid Xti index 0xFFFF".to_string(),
             ));
         }
@@ -619,7 +619,7 @@ impl FormulaResolutionContext {
             .external_sheets
             .get(usize::from(index))
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "structured-reference Xti index {index} exceeds {} entries",
                     self.external_sheets.len()
                 ))
@@ -627,10 +627,10 @@ impl FormulaResolutionContext {
         let link = self
             .supporting_links
             .get(usize::try_from(xti.external_link).map_err(|_| {
-                XlsbError::InvalidFormula("table external-link index overflow".to_string())
+                Error::InvalidFormula("table external-link index overflow".to_string())
             })?)
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "structured-reference Xti {index} refers to missing supporting link {}",
                     xti.external_link
                 ))
@@ -638,15 +638,15 @@ impl FormulaResolutionContext {
         match link {
             FormulaSupportingLink::SelfWorkbook => {
                 if xti.first_sheet < 0 || xti.first_sheet != xti.last_sheet {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "structured-reference Xti {index} must select exactly one worksheet"
                     )));
                 }
                 let sheet = usize::try_from(xti.first_sheet).map_err(|_| {
-                    XlsbError::InvalidFormula("table worksheet index overflow".to_string())
+                    Error::InvalidFormula("table worksheet index overflow".to_string())
                 })?;
                 if sheet >= self.worksheet_names.len() {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "structured-reference worksheet {} exceeds {} worksheets",
                         xti.first_sheet,
                         self.worksheet_names.len()
@@ -656,31 +656,31 @@ impl FormulaResolutionContext {
             },
             FormulaSupportingLink::SameSheet => {
                 if xti.first_sheet != -2 || xti.last_sheet != -2 {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "same-sheet structured-reference Xti {index} must use -2/-2"
                     )));
                 }
                 self.current_sheet.ok_or_else(|| {
-                    XlsbError::InvalidFormula(
+                    Error::InvalidFormula(
                         "same-sheet structured reference has no consuming worksheet".to_string(),
                     )
                 })
             },
-            FormulaSupportingLink::ExternalWorkbook(_) => Err(XlsbError::InvalidFormula(
+            FormulaSupportingLink::ExternalWorkbook(_) => Err(Error::InvalidFormula(
                 "resident structured reference points to an external workbook".to_string(),
             )),
-            FormulaSupportingLink::AddIn => Err(XlsbError::InvalidFormula(
+            FormulaSupportingLink::AddIn => Err(Error::InvalidFormula(
                 "structured reference points to an add-in".to_string(),
             )),
         }
     }
 
-    fn resolve_external_table_prefix(&self, index: u16) -> XlsbResult<String> {
+    fn resolve_external_table_prefix(&self, index: u16) -> Result<String> {
         let xti = self
             .external_sheets
             .get(usize::from(index))
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "external structured-reference Xti index {index} exceeds {} entries",
                     self.external_sheets.len()
                 ))
@@ -688,15 +688,15 @@ impl FormulaResolutionContext {
         let link = self
             .supporting_links
             .get(usize::try_from(xti.external_link).map_err(|_| {
-                XlsbError::InvalidFormula("table external-link index overflow".to_string())
+                Error::InvalidFormula("table external-link index overflow".to_string())
             })?)
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "external structured-reference Xti {index} has no supporting link"
                 ))
             })?;
         if !matches!(link, FormulaSupportingLink::ExternalWorkbook(_)) {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "nonresident structured reference does not point to an external workbook"
                     .to_string(),
             ));
@@ -704,13 +704,13 @@ impl FormulaResolutionContext {
         self.resolve_sheet_prefix(index)
     }
 
-    fn resolve_table_reference(&self, reference: &TableReference) -> XlsbResult<String> {
+    fn resolve_table_reference(&self, reference: &TableReference) -> Result<String> {
         if let Some(external) = &reference.external {
             if reference.row_type.is_some()
                 || reference.columns.is_some()
                 || reference.list_index.is_some()
             {
-                return Err(XlsbError::InvalidFormula(
+                return Err(Error::InvalidFormula(
                     "nonresident structured reference also contains resident metadata".to_string(),
                 ));
             }
@@ -730,13 +730,13 @@ impl FormulaResolutionContext {
         }
 
         let table_id = reference.list_index.ok_or_else(|| {
-            XlsbError::InvalidFormula("resident structured reference omits table ID".to_string())
+            Error::InvalidFormula("resident structured reference omits table ID".to_string())
         })?;
         let row_type = reference.row_type.ok_or_else(|| {
-            XlsbError::InvalidFormula("resident structured reference omits row type".to_string())
+            Error::InvalidFormula("resident structured reference omits row type".to_string())
         })?;
         let columns = reference.columns.ok_or_else(|| {
-            XlsbError::InvalidFormula("resident structured reference omits columns".to_string())
+            Error::InvalidFormula("resident structured reference omits columns".to_string())
         })?;
         let sheet = self.resolve_table_sheet(reference.sheet_index)?;
         let mut matches = self
@@ -744,17 +744,17 @@ impl FormulaResolutionContext {
             .iter()
             .filter(|table| table.table_id == table_id);
         let table = matches.next().ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "structured reference names missing table ID {table_id}"
             ))
         })?;
         if matches.next().is_some() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "structured reference table ID {table_id} is ambiguous"
             )));
         }
         if table.sheet_index != sheet {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "structured reference locates table ID {table_id} on worksheet {sheet}, but metadata places it on {}",
                 table.sheet_index
             )));
@@ -763,7 +763,7 @@ impl FormulaResolutionContext {
             TableColumns::All => TableNamedColumns::All,
             TableColumns::One(index) => {
                 let name = table.columns.get(usize::from(index)).ok_or_else(|| {
-                    XlsbError::InvalidFormula(format!(
+                    Error::InvalidFormula(format!(
                         "structured-reference column {index} exceeds {} columns in table {:?}",
                         table.columns.len(),
                         table.display_name
@@ -773,13 +773,13 @@ impl FormulaResolutionContext {
             },
             TableColumns::Range { first, last } => {
                 let first_name = table.columns.get(usize::from(first)).ok_or_else(|| {
-                    XlsbError::InvalidFormula(format!(
+                    Error::InvalidFormula(format!(
                         "structured-reference first column {first} exceeds {} columns",
                         table.columns.len()
                     ))
                 })?;
                 let last_name = table.columns.get(usize::from(last)).ok_or_else(|| {
-                    XlsbError::InvalidFormula(format!(
+                    Error::InvalidFormula(format!(
                         "structured-reference last column {last} exceeds {} columns",
                         table.columns.len()
                     ))
@@ -799,9 +799,9 @@ impl FormulaResolutionContext {
         ))
     }
 
-    fn resolve_sheet_prefix(&self, index: u16) -> XlsbResult<String> {
+    fn resolve_sheet_prefix(&self, index: u16) -> Result<String> {
         if index == u16::MAX {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "3D reference uses invalid Xti index 0xFFFF".to_string(),
             ));
         }
@@ -809,15 +809,15 @@ impl FormulaResolutionContext {
             .external_sheets
             .get(usize::from(index))
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "Xti index {index} exceeds {} extern-sheet entries",
                     self.external_sheets.len()
                 ))
             })?;
         let link_index = usize::try_from(xti.external_link)
-            .map_err(|_| XlsbError::InvalidFormula("external-link index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("external-link index overflow".to_string()))?;
         let supporting_link = self.supporting_links.get(link_index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "Xti index {index} refers to missing supporting link {}",
                 xti.external_link
             ))
@@ -825,28 +825,28 @@ impl FormulaResolutionContext {
         let (first_index, last_index) = match supporting_link {
             FormulaSupportingLink::SelfWorkbook => {
                 if xti.first_sheet < 0 || xti.last_sheet < xti.first_sheet {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "Xti index {index} has invalid self-reference sheet range {}..={}",
                         xti.first_sheet, xti.last_sheet
                     )));
                 }
                 (
                     usize::try_from(xti.first_sheet).map_err(|_| {
-                        XlsbError::InvalidFormula("first sheet index overflow".to_string())
+                        Error::InvalidFormula("first sheet index overflow".to_string())
                     })?,
                     usize::try_from(xti.last_sheet).map_err(|_| {
-                        XlsbError::InvalidFormula("last sheet index overflow".to_string())
+                        Error::InvalidFormula("last sheet index overflow".to_string())
                     })?,
                 )
             },
             FormulaSupportingLink::SameSheet => {
                 if xti.first_sheet != -2 || xti.last_sheet != -2 {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "same-sheet Xti index {index} must use workbook scope -2/-2"
                     )));
                 }
                 let sheet = self.current_sheet.ok_or_else(|| {
-                    XlsbError::UnsupportedFeature(
+                    Error::UnsupportedFeature(
                         "same-sheet reference requires a consuming worksheet".to_string(),
                     )
                 })?;
@@ -856,26 +856,26 @@ impl FormulaResolutionContext {
                 return self.resolve_external_sheet_prefix(index, xti, *book_index);
             },
             FormulaSupportingLink::AddIn => {
-                return Err(XlsbError::UnsupportedFeature(format!(
+                return Err(Error::UnsupportedFeature(format!(
                     "Xti index {index} refers to an add-in"
                 )));
             },
         };
         if last_index < first_index {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "Xti index {index} has invalid sheet range {}..={}",
                 xti.first_sheet, xti.last_sheet
             )));
         }
         let first = self.worksheet_names.get(first_index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "Xti first sheet {} exceeds {} worksheets",
                 xti.first_sheet,
                 self.worksheet_names.len()
             ))
         })?;
         let last = self.worksheet_names.get(last_index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "Xti last sheet {} exceeds {} worksheets",
                 xti.last_sheet,
                 self.worksheet_names.len()
@@ -894,42 +894,42 @@ impl FormulaResolutionContext {
         xti_index: u16,
         xti: &FormulaExternalSheet,
         book_index: u32,
-    ) -> XlsbResult<String> {
+    ) -> Result<String> {
         let book_index = usize::try_from(book_index)
-            .map_err(|_| XlsbError::InvalidFormula("external book index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("external book index overflow".to_string()))?;
         let book = self.external_books.get(book_index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "Xti index {xti_index} refers to missing external book {book_index}"
             ))
         })?;
         if !book.metadata.is_workbook() {
-            return Err(XlsbError::UnsupportedFeature(format!(
+            return Err(Error::UnsupportedFeature(format!(
                 "Xti index {xti_index} refers to a DDE or OLE data source"
             )));
         }
         if xti.first_sheet < 0 || xti.last_sheet < xti.first_sheet {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "Xti index {xti_index} has invalid external sheet range {}..={}",
                 xti.first_sheet, xti.last_sheet
             )));
         }
         let first_index = usize::try_from(xti.first_sheet)
-            .map_err(|_| XlsbError::InvalidFormula("external sheet index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("external sheet index overflow".to_string()))?;
         let last_index = usize::try_from(xti.last_sheet)
-            .map_err(|_| XlsbError::InvalidFormula("external sheet index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("external sheet index overflow".to_string()))?;
         let first = book
             .metadata
             .sheet_names()
             .get(first_index)
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "external sheet {} exceeds {} cached names",
                     xti.first_sheet,
                     book.metadata.sheet_names().len()
                 ))
             })?;
         let last = book.metadata.sheet_names().get(last_index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "external sheet {} exceeds {} cached names",
                 xti.last_sheet,
                 book.metadata.sheet_names().len()
@@ -946,9 +946,9 @@ impl FormulaResolutionContext {
         )))
     }
 
-    fn resolve_external_name(&self, xti_index: u16, name_index: u32) -> XlsbResult<String> {
+    fn resolve_external_name(&self, xti_index: u16, name_index: u32) -> Result<String> {
         if name_index == 0 {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "PtgNameX name index is one-based and cannot be zero".to_string(),
             ));
         }
@@ -956,43 +956,41 @@ impl FormulaResolutionContext {
             .external_sheets
             .get(usize::from(xti_index))
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "PtgNameX Xti index {xti_index} exceeds {} entries",
                     self.external_sheets.len()
                 ))
             })?;
         let link_index = usize::try_from(xti.external_link)
-            .map_err(|_| XlsbError::InvalidFormula("external-link index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("external-link index overflow".to_string()))?;
         let FormulaSupportingLink::ExternalWorkbook(book_index) =
             self.supporting_links.get(link_index).ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
+                Error::InvalidFormula(format!(
                     "PtgNameX refers to missing supporting link {}",
                     xti.external_link
                 ))
             })?
         else {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "PtgNameX does not refer to an external workbook".to_string(),
             ));
         };
         let external_book_index = usize::try_from(*book_index)
-            .map_err(|_| XlsbError::InvalidFormula("external book index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("external book index overflow".to_string()))?;
         let book = self
             .external_books
             .get(external_book_index)
-            .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!("missing external book {book_index}"))
-            })?;
+            .ok_or_else(|| Error::InvalidFormula(format!("missing external book {book_index}")))?;
         if !book.metadata.is_workbook() {
-            return Err(XlsbError::UnsupportedFeature(
+            return Err(Error::UnsupportedFeature(
                 "PtgNameX refers to a DDE or OLE data source".to_string(),
             ));
         }
         let index = usize::try_from(name_index - 1)
-            .map_err(|_| XlsbError::InvalidFormula("external name index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("external name index overflow".to_string()))?;
         let names = book.metadata.defined_names();
         let name = names.get(index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "external name index {name_index} exceeds {} names",
                 names.len()
             ))
@@ -1005,19 +1003,19 @@ impl FormulaResolutionContext {
     }
 }
 
-fn owner_formula_resolution<T>(result: XlsbResult<T>) -> litchi_xlsb::formula::Result<T> {
+fn owner_formula_resolution<T>(result: Result<T>) -> litchi_xlsb::formula::Result<T> {
     result.map_err(|error| match error {
-        XlsbError::InvalidFormula(message) => litchi_xlsb::formula::Error::InvalidFormula(message),
-        XlsbError::InvalidCellReference(reference) => {
+        Error::InvalidFormula(message) => litchi_xlsb::formula::Error::InvalidFormula(message),
+        Error::InvalidCellReference(reference) => {
             litchi_xlsb::formula::Error::InvalidCellReference(reference)
         },
-        XlsbError::InvalidLength { expected, found } => {
+        Error::InvalidLength { expected, found } => {
             litchi_xlsb::formula::Error::InvalidLength { expected, found }
         },
-        XlsbError::UnsupportedFeature(feature) => {
+        Error::UnsupportedFeature(feature) => {
             litchi_xlsb::formula::Error::UnsupportedFeature(feature)
         },
-        XlsbError::Encoding(message) => litchi_xlsb::formula::Error::Encoding(message),
+        Error::Encoding(message) => litchi_xlsb::formula::Error::Encoding(message),
         error => litchi_xlsb::formula::Error::InvalidFormula(error.to_string()),
     })
 }
@@ -1078,20 +1076,20 @@ fn format_formula_prefix(value: &str) -> String {
 }
 
 impl FormulaResolutionContext {
-    fn validate_active_pivot_scope(&self) -> XlsbResult<&FormulaPivotNameScope> {
+    fn validate_active_pivot_scope(&self) -> Result<&FormulaPivotNameScope> {
         let (cache_id, sheet_index, view_name) =
             self.active_pivot_scope.as_ref().ok_or_else(|| {
-                XlsbError::InvalidFormula(
+                Error::InvalidFormula(
                     "PtgSxName requires an explicit pivot cache, sheet, and view scope".to_string(),
                 )
             })?;
         if *sheet_index >= self.worksheet_names.len() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "pivot sheet index {sheet_index} is outside the workbook sheet range"
             )));
         }
         if self.current_sheet != Some(*sheet_index) {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "pivot scope sheet {sheet_index} does not match the formula sheet {:?}",
                 self.current_sheet
             )));
@@ -1103,12 +1101,12 @@ impl FormulaResolutionContext {
                 && view.name.eq_ignore_ascii_case(view_name)
         });
         let _view = views.next().ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "PivotTable view {view_name:?} on sheet {sheet_index} does not use cache {cache_id}"
             ))
         })?;
         if views.next().is_some() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "PivotTable view {view_name:?} on sheet {sheet_index} and cache {cache_id} is ambiguous"
             )));
         }
@@ -1119,25 +1117,25 @@ impl FormulaResolutionContext {
                 && scope.view_name.eq_ignore_ascii_case(view_name)
         });
         let scope = scopes.next().ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "calculated-name metadata is missing for PivotTable view {view_name:?}"
             ))
         })?;
         if scopes.next().is_some() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "calculated-name metadata for PivotTable view {view_name:?} is ambiguous"
             )));
         }
         Ok(scope)
     }
 
-    fn resolve_pivot_name(&self, index: u32) -> XlsbResult<String> {
+    fn resolve_pivot_name(&self, index: u32) -> Result<String> {
         let scope = self.validate_active_pivot_scope()?;
         let index = usize::try_from(index).map_err(|_| {
-            XlsbError::InvalidFormula("pivot calculated-name index overflow".to_string())
+            Error::InvalidFormula("pivot calculated-name index overflow".to_string())
         })?;
         let reference = scope.references.get(index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "pivot calculated-name index {index} is outside 0..{}",
                 scope.references.len()
             ))
@@ -1146,7 +1144,7 @@ impl FormulaResolutionContext {
     }
 }
 
-fn validate_pivot_identifier(name: &str, field: &str, max_utf16_len: usize) -> XlsbResult<()> {
+fn validate_pivot_identifier(name: &str, field: &str, max_utf16_len: usize) -> Result<()> {
     let utf16_len = name.encode_utf16().count();
     if utf16_len == 0 || utf16_len > max_utf16_len || name.contains('\0') {
         return Err(invalid(
@@ -1157,8 +1155,8 @@ fn validate_pivot_identifier(name: &str, field: &str, max_utf16_len: usize) -> X
     Ok(())
 }
 
-fn invalid(typ: &'static str, value: impl Into<String>) -> XlsbError {
-    XlsbError::InvalidFormula(format!("{typ}: {}", value.into()))
+fn invalid(typ: &'static str, value: impl Into<String>) -> Error {
+    Error::InvalidFormula(format!("{typ}: {}", value.into()))
 }
 
 fn format_pivot_identifier(name: &str) -> String {
@@ -1172,30 +1170,30 @@ fn format_pivot_identifier(name: &str) -> String {
     }
 }
 
-fn validate_table_name(name: &str) -> XlsbResult<()> {
+fn validate_table_name(name: &str) -> Result<()> {
     validate_name(name)?;
     if name
         .get(..3)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("_xl"))
     {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "table display name {name:?} uses reserved _xl prefix"
         )));
     }
     Ok(())
 }
 
-fn validate_table_column_name(name: &str, index: usize) -> XlsbResult<()> {
+fn validate_table_column_name(name: &str, index: usize) -> Result<()> {
     let units = name.encode_utf16().count();
     if units == 0 || units > 255 || name.contains('\0') {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "table column {index} has invalid name length or NUL content"
         )));
     }
     Ok(())
 }
 
-fn validate_named_table_columns(columns: &TableNamedColumns) -> XlsbResult<()> {
+fn validate_named_table_columns(columns: &TableNamedColumns) -> Result<()> {
     match columns {
         TableNamedColumns::All => Ok(()),
         TableNamedColumns::One(name) => validate_table_column_name(name, 0),
@@ -1289,7 +1287,7 @@ impl FormulaConverter {
 
     /// Convert tokens to text, rejecting token streams that cannot be
     /// represented faithfully by this converter.
-    pub fn try_tokens_to_string(tokens: &[Token]) -> XlsbResult<String> {
+    pub fn try_tokens_to_string(tokens: &[Token]) -> Result<String> {
         Self::try_tokens_to_string_with_optional_context(tokens, None)
     }
 
@@ -1297,14 +1295,14 @@ impl FormulaConverter {
     pub fn try_tokens_to_string_with_context(
         tokens: &[Token],
         context: &FormulaResolutionContext,
-    ) -> XlsbResult<String> {
+    ) -> Result<String> {
         Self::try_tokens_to_string_with_optional_context(tokens, Some(context))
     }
 
     fn try_tokens_to_string_with_optional_context(
         tokens: &[Token],
         context: Option<&FormulaResolutionContext>,
-    ) -> XlsbResult<String> {
+    ) -> Result<String> {
         let mut stack: Vec<String> = Vec::new();
 
         for token in tokens {
@@ -1314,7 +1312,7 @@ impl FormulaConverter {
                 Token::MissingArg => stack.push(String::new()),
                 Token::Parenthesis => {
                     let Some(expression) = stack.pop() else {
-                        return Err(XlsbError::InvalidFormula(
+                        return Err(Error::InvalidFormula(
                             "PtgParen has no preceding expression".to_string(),
                         ));
                     };
@@ -1323,9 +1321,9 @@ impl FormulaConverter {
                 Token::Attribute(_) => {},
                 Token::Array { rows, cols, values } => {
                     let expected = usize::try_from(u64::from(*rows) * u64::from(*cols))
-                        .map_err(|_| XlsbError::InvalidFormula("array is too large".to_string()))?;
+                        .map_err(|_| Error::InvalidFormula("array is too large".to_string()))?;
                     if values.len() != expected {
-                        return Err(XlsbError::InvalidFormula(format!(
+                        return Err(Error::InvalidFormula(format!(
                             "array dimensions require {expected} values, found {}",
                             values.len()
                         )));
@@ -1342,9 +1340,7 @@ impl FormulaConverter {
                             let index =
                                 usize::try_from(u64::from(row) * u64::from(*cols) + u64::from(col))
                                     .map_err(|_| {
-                                        XlsbError::InvalidFormula(
-                                            "array index overflow".to_string(),
-                                        )
+                                        Error::InvalidFormula("array index overflow".to_string())
                                     })?;
                             match &values[index] {
                                 ArrayValue::Number(value) => {
@@ -1422,7 +1418,7 @@ impl FormulaConverter {
                     col_relative,
                 } => {
                     let context = context.ok_or_else(|| {
-                        XlsbError::UnsupportedFeature(
+                        Error::UnsupportedFeature(
                             "PtgRef3d requires workbook extern-sheet resolution".to_string(),
                         )
                     })?;
@@ -1443,7 +1439,7 @@ impl FormulaConverter {
                     col_last_relative,
                 } => {
                     let context = context.ok_or_else(|| {
-                        XlsbError::UnsupportedFeature(
+                        Error::UnsupportedFeature(
                             "PtgArea3d requires workbook extern-sheet resolution".to_string(),
                         )
                     })?;
@@ -1465,7 +1461,7 @@ impl FormulaConverter {
                 Token::ReferenceError { .. } => stack.push("#REF!".to_string()),
                 Token::BinaryOp(op) => {
                     if stack.len() < 2 {
-                        return Err(XlsbError::InvalidFormula(
+                        return Err(Error::InvalidFormula(
                             "binary operator has fewer than two operands".to_string(),
                         ));
                     }
@@ -1476,7 +1472,7 @@ impl FormulaConverter {
                 },
                 Token::UnaryOp(op) => {
                     let Some(operand) = stack.pop() else {
-                        return Err(XlsbError::InvalidFormula(
+                        return Err(Error::InvalidFormula(
                             "unary operator has no operand".to_string(),
                         ));
                     };
@@ -1492,18 +1488,18 @@ impl FormulaConverter {
                     is_command,
                 } => {
                     if *is_command {
-                        return Err(XlsbError::UnsupportedFeature(format!(
+                        return Err(Error::UnsupportedFeature(format!(
                             "XLSB command function index {index}"
                         )));
                     }
                     let Some(function) = builtin_function_by_index(*index) else {
-                        return Err(XlsbError::UnsupportedFeature(format!(
+                        return Err(Error::UnsupportedFeature(format!(
                             "XLSB built-in function index {index}"
                         )));
                     };
                     let func_name = function.name;
                     if stack.len() < usize::from(*arg_count) {
-                        return Err(XlsbError::InvalidFormula(format!(
+                        return Err(Error::InvalidFormula(format!(
                             "function {func_name} requires {arg_count} stack operands"
                         )));
                     }
@@ -1517,15 +1513,14 @@ impl FormulaConverter {
                 },
                 Token::Name(idx) => {
                     let context = context.ok_or_else(|| {
-                        XlsbError::UnsupportedFeature(format!(
+                        Error::UnsupportedFeature(format!(
                             "XLSB defined name index {idx} requires workbook name resolution"
                         ))
                     })?;
-                    let index = usize::try_from(*idx - 1).map_err(|_| {
-                        XlsbError::InvalidFormula("PtgName index overflow".to_string())
-                    })?;
+                    let index = usize::try_from(*idx - 1)
+                        .map_err(|_| Error::InvalidFormula("PtgName index overflow".to_string()))?;
                     let name = context.defined_names.get(index).ok_or_else(|| {
-                        XlsbError::InvalidFormula(format!(
+                        Error::InvalidFormula(format!(
                             "PtgName index {idx} exceeds {} workbook names",
                             context.defined_names.len()
                         ))
@@ -1537,7 +1532,7 @@ impl FormulaConverter {
                     name_index,
                 } => {
                     let context = context.ok_or_else(|| {
-                        XlsbError::UnsupportedFeature(
+                        Error::UnsupportedFeature(
                             "PtgNameX requires workbook external-link resolution".to_string(),
                         )
                     })?;
@@ -1548,7 +1543,7 @@ impl FormulaConverter {
                 },
                 Token::TableReference(reference) => {
                     let context = context.ok_or_else(|| {
-                        XlsbError::UnsupportedFeature(format!(
+                        Error::UnsupportedFeature(format!(
                             "structured table reference on Xti {} requires table-definition resolution",
                             reference.sheet_index
                         ))
@@ -1557,14 +1552,14 @@ impl FormulaConverter {
                 },
                 Token::PivotName(index) => {
                     let context = context.ok_or_else(|| {
-                        XlsbError::InvalidFormula(
+                        Error::InvalidFormula(
                             "PtgSxName requires pivot-cache calculated-name metadata".to_string(),
                         )
                     })?;
                     stack.push(context.resolve_pivot_name(*index)?);
                 },
                 Token::Unknown(t) => {
-                    return Err(XlsbError::UnsupportedFeature(format!(
+                    return Err(Error::UnsupportedFeature(format!(
                         "XLSB formula token 0x{t:02X}"
                     )));
                 },
@@ -1572,7 +1567,7 @@ impl FormulaConverter {
         }
 
         if stack.len() != 1 {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "formula leaves {} values on the evaluation stack",
                 stack.len()
             )));
@@ -1769,14 +1764,14 @@ struct A1Reference {
 }
 
 impl<'a> FormulaCompiler<'a> {
-    pub fn compile(formula: &'a str) -> XlsbResult<CellParsedFormula> {
+    pub fn compile(formula: &'a str) -> Result<CellParsedFormula> {
         Self::compile_with_encoding(formula, FormulaEncoding::Cell, None)
     }
 
     pub(crate) fn compile_with_context(
         formula: &'a str,
         context: &'a FormulaCompilationContext<'a>,
-    ) -> XlsbResult<CellParsedFormula> {
+    ) -> Result<CellParsedFormula> {
         Self::compile_with_encoding(formula, FormulaEncoding::Cell, Some(context))
     }
 
@@ -1786,7 +1781,7 @@ impl<'a> FormulaCompiler<'a> {
         formula: &'a str,
         base_row: u32,
         base_col: u32,
-    ) -> XlsbResult<CellParsedFormula> {
+    ) -> Result<CellParsedFormula> {
         Self::compile_shared_with_optional_context(formula, base_row, base_col, None)
     }
 
@@ -1795,7 +1790,7 @@ impl<'a> FormulaCompiler<'a> {
         base_row: u32,
         base_col: u32,
         context: &'a FormulaCompilationContext<'a>,
-    ) -> XlsbResult<CellParsedFormula> {
+    ) -> Result<CellParsedFormula> {
         Self::compile_shared_with_optional_context(formula, base_row, base_col, Some(context))
     }
 
@@ -1804,9 +1799,9 @@ impl<'a> FormulaCompiler<'a> {
         base_row: u32,
         base_col: u32,
         context: Option<&'a FormulaCompilationContext<'a>>,
-    ) -> XlsbResult<CellParsedFormula> {
+    ) -> Result<CellParsedFormula> {
         if base_row >= 1_048_576 || base_col >= 16_384 {
-            return Err(XlsbError::InvalidCellReference(format!(
+            return Err(Error::InvalidCellReference(format!(
                 "shared formula base ({base_row}, {base_col})"
             )));
         }
@@ -1821,10 +1816,10 @@ impl<'a> FormulaCompiler<'a> {
         formula: &'a str,
         encoding: FormulaEncoding,
         context: Option<&'a FormulaCompilationContext<'a>>,
-    ) -> XlsbResult<CellParsedFormula> {
+    ) -> Result<CellParsedFormula> {
         let input = formula.strip_prefix('=').unwrap_or(formula).trim();
         if input.is_empty() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "formula expression is empty".to_string(),
             ));
         }
@@ -1843,7 +1838,7 @@ impl<'a> FormulaCompiler<'a> {
         let mut rgcb = Vec::new();
         Self::emit(&expression, &mut rgce, &mut rgcb, encoding)?;
         if rgce.len() > MAX_CELL_FORMULA_BYTES {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "compiled formula is {} bytes; maximum is {MAX_CELL_FORMULA_BYTES}",
                 rgce.len()
             )));
@@ -1851,7 +1846,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(CellParsedFormula { rgce, rgcb })
     }
 
-    fn parse_comparison(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_comparison(&mut self) -> Result<CompileExpr> {
         let mut expression = self.parse_concat()?;
         loop {
             let operator = if self.consume("<>") {
@@ -1876,7 +1871,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(expression)
     }
 
-    fn parse_concat(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_concat(&mut self) -> Result<CompileExpr> {
         let mut expression = self.parse_additive()?;
         while self.consume("&") {
             let right = self.parse_additive()?;
@@ -1889,7 +1884,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(expression)
     }
 
-    fn parse_additive(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_additive(&mut self) -> Result<CompileExpr> {
         let mut expression = self.parse_multiplicative()?;
         loop {
             let operator = if self.consume("+") {
@@ -1906,7 +1901,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(expression)
     }
 
-    fn parse_multiplicative(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_multiplicative(&mut self) -> Result<CompileExpr> {
         let mut expression = self.parse_power()?;
         loop {
             let operator = if self.consume("*") {
@@ -1923,7 +1918,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(expression)
     }
 
-    fn parse_power(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_power(&mut self) -> Result<CompileExpr> {
         let left = self.parse_unary()?;
         if self.consume("^") {
             let right = self.parse_power()?;
@@ -1937,7 +1932,7 @@ impl<'a> FormulaCompiler<'a> {
         }
     }
 
-    fn parse_unary(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_unary(&mut self) -> Result<CompileExpr> {
         if self.consume("+") {
             return Ok(CompileExpr::Unary(
                 UnaryOperator::Plus,
@@ -1957,7 +1952,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(expression)
     }
 
-    fn parse_primary(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_primary(&mut self) -> Result<CompileExpr> {
         self.skip_spaces();
         if self.consume("(") {
             let expression = self.parse_comparison()?;
@@ -2032,7 +2027,7 @@ impl<'a> FormulaCompiler<'a> {
         }
         if self.consume("(") {
             let function = builtin_function_by_name(&identifier).ok_or_else(|| {
-                XlsbError::UnsupportedFeature(format!(
+                Error::UnsupportedFeature(format!(
                     "XLSB formula function {identifier} is not in the supported Ftab set"
                 ))
             })?;
@@ -2057,10 +2052,10 @@ impl<'a> FormulaCompiler<'a> {
                 }
             }
             let argument_count = u8::try_from(arguments.len()).map_err(|_| {
-                XlsbError::InvalidFormula(format!("{} has more than 255 arguments", function.name))
+                Error::InvalidFormula(format!("{} has more than 255 arguments", function.name))
             })?;
             if !function.accepts_arg_count(argument_count) {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "{} does not accept {} arguments (range {}..={})",
                     function.name,
                     arguments.len(),
@@ -2096,7 +2091,7 @@ impl<'a> FormulaCompiler<'a> {
         }
     }
 
-    fn parse_structured_reference(&mut self) -> XlsbResult<ParsedStructuredReference> {
+    fn parse_structured_reference(&mut self) -> Result<ParsedStructuredReference> {
         debug_assert_eq!(self.peek_char(), Some('['));
         self.offset += 1;
         let leading_space = self.consume_structured_space()?;
@@ -2180,7 +2175,7 @@ impl<'a> FormulaCompiler<'a> {
     fn parse_structured_reference_item(
         &mut self,
         bracketed: bool,
-    ) -> XlsbResult<StructuredReferenceItem> {
+    ) -> Result<StructuredReferenceItem> {
         if bracketed {
             if self.peek_char() != Some('[') {
                 return Err(self.error("expected nested structured-reference item"));
@@ -2225,7 +2220,7 @@ impl<'a> FormulaCompiler<'a> {
         })
     }
 
-    fn consume_structured_space(&mut self) -> XlsbResult<bool> {
+    fn consume_structured_space(&mut self) -> Result<bool> {
         let start = self.offset;
         while self.peek_char().is_some_and(char::is_whitespace) {
             self.offset += self.peek_char().expect("checked").len_utf8();
@@ -2244,9 +2239,9 @@ impl<'a> FormulaCompiler<'a> {
     fn classify_structured_reference(
         items: Vec<StructuredReferenceItem>,
         separators: &[char],
-    ) -> XlsbResult<(TableRowType, TableNamedColumns)> {
+    ) -> Result<(TableRowType, TableNamedColumns)> {
         if separators.len() + 1 != items.len() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "structured-reference separator count is invalid".to_string(),
             ));
         }
@@ -2274,14 +2269,14 @@ impl<'a> FormulaCompiler<'a> {
                 rows.push(row);
                 item_is_column.push(false);
             } else if !item.first_character_escaped && item.text.starts_with('#') {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "unknown structured-reference row selector {:?}",
                     item.text
                 )));
             } else if !item.first_character_escaped && item.text.starts_with('@') {
                 let column = item.text[1..].to_string();
                 if column.is_empty() || !rows.is_empty() {
-                    return Err(XlsbError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "invalid or duplicate current-row structured reference".to_string(),
                     ));
                 }
@@ -2299,19 +2294,19 @@ impl<'a> FormulaCompiler<'a> {
             match separator {
                 ':' if item_is_column[index] && item_is_column[index + 1] => {
                     if colon.replace(index).is_some() {
-                        return Err(XlsbError::InvalidFormula(
+                        return Err(Error::InvalidFormula(
                             "structured reference has more than one column range".to_string(),
                         ));
                     }
                 },
                 ',' if !item_is_column[index] || !item_is_column[index + 1] => {},
                 ',' => {
-                    return Err(XlsbError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "disjoint structured-reference columns cannot fit one PtgList".to_string(),
                     ));
                 },
                 _ => {
-                    return Err(XlsbError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "structured-reference separator has invalid operands".to_string(),
                     ));
                 },
@@ -2324,7 +2319,7 @@ impl<'a> FormulaCompiler<'a> {
             [TableRowType::Headers, TableRowType::DataAlternate] => TableRowType::DataAndHeaders,
             [TableRowType::DataAlternate, TableRowType::Totals] => TableRowType::DataAndTotals,
             _ => {
-                return Err(XlsbError::InvalidFormula(
+                return Err(Error::InvalidFormula(
                     "structured-reference row union cannot fit one PtgList".to_string(),
                 ));
             },
@@ -2337,7 +2332,7 @@ impl<'a> FormulaCompiler<'a> {
                 last: last.clone(),
             },
             _ => {
-                return Err(XlsbError::InvalidFormula(
+                return Err(Error::InvalidFormula(
                     "structured-reference columns cannot fit one PtgList".to_string(),
                 ));
             },
@@ -2349,7 +2344,7 @@ impl<'a> FormulaCompiler<'a> {
     fn compile_bare_resident_table_reference(
         &self,
         table_name: &str,
-    ) -> XlsbResult<Option<CompileExpr>> {
+    ) -> Result<Option<CompileExpr>> {
         let Some(context) = self.context else {
             return Ok(None);
         };
@@ -2376,9 +2371,9 @@ impl<'a> FormulaCompiler<'a> {
         &self,
         table_name: &str,
         selection: ParsedStructuredReference,
-    ) -> XlsbResult<CompileExpr> {
+    ) -> Result<CompileExpr> {
         let context = self.context.ok_or_else(|| {
-            XlsbError::UnsupportedFeature(format!(
+            Error::UnsupportedFeature(format!(
                 "structured table reference {table_name:?} requires workbook compilation context"
             ))
         })?;
@@ -2387,20 +2382,19 @@ impl<'a> FormulaCompiler<'a> {
             .iter()
             .filter(|table| excel_name_eq(table.display_name(), table_name));
         let table = matches.next().ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "structured reference names missing table {table_name:?}"
             ))
         })?;
         if matches.next().is_some() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "structured reference table name {table_name:?} is ambiguous"
             )));
         }
-        let current_sheet = usize::try_from(context.current_sheet).map_err(|_| {
-            XlsbError::InvalidFormula("current worksheet index overflow".to_string())
-        })?;
+        let current_sheet = usize::try_from(context.current_sheet)
+            .map_err(|_| Error::InvalidFormula("current worksheet index overflow".to_string()))?;
         if table.sheet_index() != current_sheet {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "table {table_name:?} is on worksheet {}, not the formula worksheet {current_sheet}",
                 table.sheet_index()
             )));
@@ -2414,7 +2408,7 @@ impl<'a> FormulaCompiler<'a> {
                 let first = Self::resolve_table_column(table, &first)?;
                 let last = Self::resolve_table_column(table, &last)?;
                 if first > last {
-                    return Err(XlsbError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "structured-reference column range is reversed".to_string(),
                     ));
                 }
@@ -2425,7 +2419,7 @@ impl<'a> FormulaCompiler<'a> {
             .ok()
             .and_then(|index| index.checked_add(2))
             .ok_or_else(|| {
-                XlsbError::InvalidFormula(
+                Error::InvalidFormula(
                     "table worksheet cannot be represented in the extern-sheet table".to_string(),
                 )
             })?;
@@ -2442,25 +2436,25 @@ impl<'a> FormulaCompiler<'a> {
         }))
     }
 
-    fn resolve_table_column(table: &FormulaTableDefinition, name: &str) -> XlsbResult<u16> {
+    fn resolve_table_column(table: &FormulaTableDefinition, name: &str) -> Result<u16> {
         let mut matches = table
             .columns()
             .iter()
             .enumerate()
             .filter(|(_, column)| excel_name_eq(column, name));
         let (index, _) = matches.next().ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "structured reference names missing column {name:?} in table {:?}",
                 table.display_name()
             ))
         })?;
         if matches.next().is_some() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "structured-reference column {name:?} is ambiguous"
             )));
         }
         u16::try_from(index).map_err(|_| {
-            XlsbError::InvalidFormula("structured-reference column index overflow".to_string())
+            Error::InvalidFormula("structured-reference column index overflow".to_string())
         })
     }
 
@@ -2469,7 +2463,7 @@ impl<'a> FormulaCompiler<'a> {
         qualifier: &str,
         table: String,
         selection: ParsedStructuredReference,
-    ) -> XlsbResult<CompileExpr> {
+    ) -> Result<CompileExpr> {
         validate_table_name(&table)?;
         let sheet_index = self.resolve_external_table_xti(qualifier)?;
         Ok(CompileExpr::TableReference(TableReference {
@@ -2489,24 +2483,24 @@ impl<'a> FormulaCompiler<'a> {
         }))
     }
 
-    fn resolve_external_table_xti(&self, qualifier: &str) -> XlsbResult<u16> {
+    fn resolve_external_table_xti(&self, qualifier: &str) -> Result<u16> {
         let context = self.context.ok_or_else(|| {
-            XlsbError::UnsupportedFeature(
+            Error::UnsupportedFeature(
                 "external structured reference requires workbook compilation context".to_string(),
             )
         })?;
         let close = qualifier.find(']').ok_or_else(|| {
-            XlsbError::InvalidFormula("external structured reference omits ']'".to_string())
+            Error::InvalidFormula("external structured reference omits ']'".to_string())
         })?;
         if !qualifier.starts_with('[') || close == 1 || close + 1 == qualifier.len() {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "invalid external structured-reference qualifier {qualifier:?}"
             )));
         }
         let target = &qualifier[1..close];
         let sheet = &qualifier[close + 1..];
         if sheet.contains(':') {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "external structured reference must select exactly one worksheet".to_string(),
             ));
         }
@@ -2544,22 +2538,22 @@ impl<'a> FormulaCompiler<'a> {
                 continue;
             }
             let xti_index = u16::try_from(xti_index).map_err(|_| {
-                XlsbError::InvalidFormula("external structured-reference Xti overflow".to_string())
+                Error::InvalidFormula("external structured-reference Xti overflow".to_string())
             })?;
             if xti_index == u16::MAX || found.replace(xti_index).is_some() {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "external structured-reference qualifier {qualifier:?} is ambiguous"
                 )));
             }
         }
         found.ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "external structured-reference qualifier {qualifier:?} is missing"
             ))
         })
     }
 
-    fn parse_string(&mut self) -> XlsbResult<String> {
+    fn parse_string(&mut self) -> Result<String> {
         debug_assert_eq!(self.peek_char(), Some('"'));
         self.offset += 1;
         let mut value = String::new();
@@ -2580,14 +2574,14 @@ impl<'a> FormulaCompiler<'a> {
             }
         }
         if value.encode_utf16().count() > 255 {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "formula string literal exceeds 255 UTF-16 code units".to_string(),
             ));
         }
         Ok(value)
     }
 
-    fn parse_array_constant(&mut self) -> XlsbResult<CompileExpr> {
+    fn parse_array_constant(&mut self) -> Result<CompileExpr> {
         let mut values = Vec::new();
         let mut rows = 1_u32;
         let mut cols = 0_u32;
@@ -2634,9 +2628,9 @@ impl<'a> FormulaCompiler<'a> {
                 ArrayValue::Number(number)
             };
             values.push(value);
-            current_cols = current_cols.checked_add(1).ok_or_else(|| {
-                XlsbError::InvalidFormula("array column count overflow".to_string())
-            })?;
+            current_cols = current_cols
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormula("array column count overflow".to_string()))?;
 
             if self.consume(",") {
                 continue;
@@ -2647,9 +2641,9 @@ impl<'a> FormulaCompiler<'a> {
                 } else if cols != current_cols {
                     return Err(self.error("array rows have different column counts"));
                 }
-                rows = rows.checked_add(1).ok_or_else(|| {
-                    XlsbError::InvalidFormula("array row count overflow".to_string())
-                })?;
+                rows = rows
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormula("array row count overflow".to_string()))?;
                 current_cols = 0;
                 continue;
             }
@@ -2669,7 +2663,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(CompileExpr::Array { rows, cols, values })
     }
 
-    fn parse_number(&mut self) -> XlsbResult<f64> {
+    fn parse_number(&mut self) -> Result<f64> {
         self.skip_spaces();
         let start = self.offset;
         let mut seen_exponent = false;
@@ -2691,7 +2685,7 @@ impl<'a> FormulaCompiler<'a> {
             .map_err(|_| self.error("invalid numeric literal"))
     }
 
-    fn parse_error_literal(&mut self) -> XlsbResult<u8> {
+    fn parse_error_literal(&mut self) -> Result<u8> {
         self.skip_spaces();
         let rest = &self.input[self.offset..];
         let Some((literal, code)) = FORMULA_ERRORS.iter().find(|(literal, _)| {
@@ -2704,7 +2698,7 @@ impl<'a> FormulaCompiler<'a> {
         Ok(*code)
     }
 
-    fn parse_identifier(&mut self) -> XlsbResult<String> {
+    fn parse_identifier(&mut self) -> Result<String> {
         self.skip_spaces();
         let start = self.offset;
         while let Some(ch) = self.peek_char() {
@@ -2721,7 +2715,7 @@ impl<'a> FormulaCompiler<'a> {
         }
     }
 
-    fn parse_quoted_sheet_name(&mut self) -> XlsbResult<String> {
+    fn parse_quoted_sheet_name(&mut self) -> Result<String> {
         self.skip_spaces();
         debug_assert_eq!(self.peek_char(), Some('\''));
         self.offset += 1;
@@ -2748,12 +2742,12 @@ impl<'a> FormulaCompiler<'a> {
         Ok(name)
     }
 
-    fn split_sheet_qualifier(value: &str) -> XlsbResult<(&str, Option<&str>)> {
+    fn split_sheet_qualifier(value: &str) -> Result<(&str, Option<&str>)> {
         let Some((first, last)) = value.split_once(':') else {
             return Ok((value, None));
         };
         if first.is_empty() || last.is_empty() || last.contains(':') {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "invalid worksheet range {value:?}"
             )));
         }
@@ -2764,7 +2758,7 @@ impl<'a> FormulaCompiler<'a> {
         &mut self,
         first_sheet: &str,
         last_sheet: Option<&str>,
-    ) -> XlsbResult<CompileExpr> {
+    ) -> Result<CompileExpr> {
         let sheet_index = self.resolve_sheet_range(first_sheet, last_sheet)?;
         let first_text = self.parse_identifier()?;
         let first = parse_a1_reference(&first_text)
@@ -2779,9 +2773,9 @@ impl<'a> FormulaCompiler<'a> {
         }
     }
 
-    fn resolve_sheet_range(&self, first_sheet: &str, last_sheet: Option<&str>) -> XlsbResult<u16> {
+    fn resolve_sheet_range(&self, first_sheet: &str, last_sheet: Option<&str>) -> Result<u16> {
         let context = self.context.ok_or_else(|| {
-            XlsbError::UnsupportedFeature(
+            Error::UnsupportedFeature(
                 "sheet-qualified reference requires workbook compilation context".to_string(),
             )
         })?;
@@ -2789,18 +2783,18 @@ impl<'a> FormulaCompiler<'a> {
             .worksheet_names
             .iter()
             .position(|candidate| excel_name_eq(candidate, first_sheet))
-            .ok_or_else(|| XlsbError::WorksheetNotFound(first_sheet.to_string()))?;
+            .ok_or_else(|| Error::WorksheetNotFound(first_sheet.to_string()))?;
         let last_index = if let Some(last_sheet) = last_sheet {
             context
                 .worksheet_names
                 .iter()
                 .position(|candidate| excel_name_eq(candidate, last_sheet))
-                .ok_or_else(|| XlsbError::WorksheetNotFound(last_sheet.to_string()))?
+                .ok_or_else(|| Error::WorksheetNotFound(last_sheet.to_string()))?
         } else {
             first_index
         };
         if last_index < first_index {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "worksheet range {first_sheet:?}:{last_sheet:?} is in reverse workbook order"
             )));
         }
@@ -2809,16 +2803,16 @@ impl<'a> FormulaCompiler<'a> {
                 .ok()
                 .and_then(|index| index.checked_add(2))
                 .ok_or_else(|| {
-                    XlsbError::InvalidFormula(format!(
+                    Error::InvalidFormula(format!(
                         "worksheet {first_sheet:?} cannot be represented in the extern-sheet table"
                     ))
                 });
         }
 
         let first = u32::try_from(first_index)
-            .map_err(|_| XlsbError::InvalidFormula("first sheet index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("first sheet index overflow".to_string()))?;
         let last = u32::try_from(last_index)
-            .map_err(|_| XlsbError::InvalidFormula("last sheet index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("last sheet index overflow".to_string()))?;
         let mut ranges = context.sheet_ranges.borrow_mut();
         let range_index = if let Some(index) = ranges
             .iter()
@@ -2830,12 +2824,12 @@ impl<'a> FormulaCompiler<'a> {
                 .worksheet_names
                 .len()
                 .checked_add(2)
-                .ok_or_else(|| XlsbError::InvalidFormula("Xti count overflow".to_string()))?;
+                .ok_or_else(|| Error::InvalidFormula("Xti count overflow".to_string()))?;
             if base_count
                 .checked_add(ranges.len())
                 .is_none_or(|count| count >= usize::from(u16::MAX))
             {
-                return Err(XlsbError::InvalidFormula(
+                return Err(Error::InvalidFormula(
                     "formula sheet ranges exceed the XLSB extern-sheet limit".to_string(),
                 ));
             }
@@ -2847,14 +2841,14 @@ impl<'a> FormulaCompiler<'a> {
             .len()
             .checked_add(2)
             .and_then(|base| base.checked_add(range_index))
-            .ok_or_else(|| XlsbError::InvalidFormula("Xti index overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidFormula("Xti index overflow".to_string()))?;
         u16::try_from(xti_index)
-            .map_err(|_| XlsbError::InvalidFormula("Xti index overflow".to_string()))
+            .map_err(|_| Error::InvalidFormula("Xti index overflow".to_string()))
     }
 
-    fn resolve_defined_name(&self, name: &str) -> XlsbResult<u32> {
+    fn resolve_defined_name(&self, name: &str) -> Result<u32> {
         let context = self.context.ok_or_else(|| {
-            XlsbError::UnsupportedFeature(format!(
+            Error::UnsupportedFeature(format!(
                 "defined name {name:?} requires workbook compilation context"
             ))
         })?;
@@ -2868,7 +2862,7 @@ impl<'a> FormulaCompiler<'a> {
             })
         });
         let index = index.ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
+            Error::InvalidFormula(format!(
                 "defined name {name:?} is not visible from worksheet {}",
                 context.current_sheet
             ))
@@ -2876,7 +2870,7 @@ impl<'a> FormulaCompiler<'a> {
         u32::try_from(index)
             .ok()
             .and_then(|index| index.checked_add(1))
-            .ok_or_else(|| XlsbError::InvalidFormula("defined-name index overflow".to_string()))
+            .ok_or_else(|| Error::InvalidFormula("defined-name index overflow".to_string()))
     }
 
     fn consume(&mut self, text: &str) -> bool {
@@ -2899,8 +2893,8 @@ impl<'a> FormulaCompiler<'a> {
         self.input[self.offset..].chars().next()
     }
 
-    fn error(&self, message: &str) -> XlsbError {
-        XlsbError::InvalidFormula(format!("{message} at byte {}", self.offset))
+    fn error(&self, message: &str) -> Error {
+        Error::InvalidFormula(format!("{message} at byte {}", self.offset))
     }
 
     fn emit(
@@ -2908,7 +2902,7 @@ impl<'a> FormulaCompiler<'a> {
         output: &mut Vec<u8>,
         extra: &mut Vec<u8>,
         encoding: FormulaEncoding,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         match expression {
             CompileExpr::Number(value) => {
                 validate_xnum(*value, "compiled number")?;
@@ -2943,7 +2937,7 @@ impl<'a> FormulaCompiler<'a> {
             },
             CompileExpr::Array { rows, cols, values } => {
                 if matches!(encoding, FormulaEncoding::Shared { .. }) {
-                    return Err(XlsbError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "shared formulas cannot contain PtgArray".to_string(),
                     ));
                 }
@@ -3085,7 +3079,7 @@ impl<'a> FormulaCompiler<'a> {
         output: &mut Vec<u8>,
         extra: &mut Vec<u8>,
         encoding: FormulaEncoding,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         debug_assert!(matches!(arguments.len(), 2 | 3));
         Self::emit(&arguments[0], output, extra, encoding)?;
         let attr_if = append_attribute(output, 0x02, 0);
@@ -3112,7 +3106,7 @@ impl<'a> FormulaCompiler<'a> {
         output: &mut Vec<u8>,
         extra: &mut Vec<u8>,
         encoding: FormulaEncoding,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         debug_assert_eq!(arguments.len(), 2);
         Self::emit(&arguments[0], output, extra, encoding)?;
         let attr_if_error = append_attribute(output, 0x80, 0);
@@ -3130,7 +3124,7 @@ impl<'a> FormulaCompiler<'a> {
         output: &mut Vec<u8>,
         extra: &mut Vec<u8>,
         encoding: FormulaEncoding,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         debug_assert!((2..=255).contains(&arguments.len()));
         Self::emit(&arguments[0], output, extra, encoding)?;
         let choice_count = arguments.len() - 1;
@@ -3173,36 +3167,37 @@ fn append_attribute(output: &mut Vec<u8>, selector: u8, offset: u16) -> usize {
     position
 }
 
-fn patch_attribute_offset(output: &mut [u8], position: usize, offset: usize) -> XlsbResult<()> {
+fn patch_attribute_offset(output: &mut [u8], position: usize, offset: usize) -> Result<()> {
     patch_u16(output, position + 2, offset, "PtgAttr offset")
 }
 
-fn patch_skip_to_end(output: &mut [u8], position: usize) -> XlsbResult<()> {
-    let remaining = output.len().checked_sub(position + 4).ok_or_else(|| {
-        XlsbError::InvalidFormula("PtgAttrGoTo position exceeds formula".to_string())
-    })?;
-    let offset = remaining.checked_sub(1).ok_or_else(|| {
-        XlsbError::InvalidFormula("PtgAttrGoTo has no following token".to_string())
-    })?;
+fn patch_skip_to_end(output: &mut [u8], position: usize) -> Result<()> {
+    let remaining = output
+        .len()
+        .checked_sub(position + 4)
+        .ok_or_else(|| Error::InvalidFormula("PtgAttrGoTo position exceeds formula".to_string()))?;
+    let offset = remaining
+        .checked_sub(1)
+        .ok_or_else(|| Error::InvalidFormula("PtgAttrGoTo has no following token".to_string()))?;
     patch_attribute_offset(output, position, offset)
 }
 
-fn patch_u16(output: &mut [u8], position: usize, value: usize, context: &str) -> XlsbResult<()> {
+fn patch_u16(output: &mut [u8], position: usize, value: usize, context: &str) -> Result<()> {
     let value = u16::try_from(value)
-        .map_err(|_| XlsbError::InvalidFormula(format!("{context} exceeds 65,535 bytes")))?;
-    let target = output.get_mut(position..position + 2).ok_or_else(|| {
-        XlsbError::InvalidFormula(format!("{context} position is outside formula"))
-    })?;
+        .map_err(|_| Error::InvalidFormula(format!("{context} exceeds 65,535 bytes")))?;
+    let target = output
+        .get_mut(position..position + 2)
+        .ok_or_else(|| Error::InvalidFormula(format!("{context} position is outside formula")))?;
     target.copy_from_slice(&value.to_le_bytes());
     Ok(())
 }
 
-fn validate_xnum(value: f64, context: &str) -> XlsbResult<()> {
+fn validate_xnum(value: f64, context: &str) -> Result<()> {
     if !value.is_finite()
         || (value == 0.0 && value.is_sign_negative())
         || (value != 0.0 && !value.is_normal())
     {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "{context} contains a non-finite, denormalized, or negative-zero Xnum"
         )));
     }
@@ -3302,7 +3297,7 @@ fn emit_shared_reference(
     reference: A1Reference,
     base_row: u32,
     base_col: u32,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let (row, col) = encode_shared_reference(reference, base_row, base_col)?;
     output.push(token);
     output.extend_from_slice(&row.to_le_bytes());
@@ -3314,11 +3309,11 @@ fn encode_shared_reference(
     reference: A1Reference,
     base_row: u32,
     base_col: u32,
-) -> XlsbResult<(u32, u16)> {
+) -> Result<(u32, u16)> {
     let row = if reference.row_relative {
         let offset = i64::from(reference.row) - i64::from(base_row);
         i32::try_from(offset)
-            .map_err(|_| XlsbError::InvalidFormula("shared row offset overflow".to_string()))?
+            .map_err(|_| Error::InvalidFormula("shared row offset overflow".to_string()))?
             as u32
     } else {
         reference.row
@@ -3326,7 +3321,7 @@ fn encode_shared_reference(
     let col_value = if reference.col_relative {
         let offset = i64::from(reference.col) - i64::from(base_col);
         if !(-16_383..=16_383).contains(&offset) {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "shared column offset {offset} is outside the XLSB range"
             )));
         }
@@ -3455,13 +3450,13 @@ mod tests {
         malformed_if[4] = 6;
         assert!(matches!(
             FormulaParser::new(&malformed_if).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         let mut malformed_choose = FormulaCompiler::compile("CHOOSE(2,10,20)").unwrap().rgce;
         malformed_choose[7] = 5;
         assert!(matches!(
             FormulaParser::new(&malformed_choose).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -3595,24 +3590,24 @@ mod tests {
 
         assert!(matches!(
             FormulaParser::new(&[0x41, 0xE3, 0x00]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[0x42, 0x02, 0xD4, 0x00]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[0x42, 0x03, 0xE1, 0x01]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
 
         assert!(matches!(
             FormulaCompiler::compile("EXEC(\"calc\")"),
-            Err(XlsbError::UnsupportedFeature(_))
+            Err(Error::UnsupportedFeature(_))
         ));
         assert!(matches!(
             FormulaCompiler::compile("CONVERT(1,\"m\",\"ft\")"),
-            Err(XlsbError::UnsupportedFeature(_))
+            Err(Error::UnsupportedFeature(_))
         ));
     }
 
@@ -3630,7 +3625,7 @@ mod tests {
         let formula_256 = format!("SUM({})", vec!["1"; 256].join(","));
         assert!(matches!(
             FormulaCompiler::compile(&formula_256),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -3709,11 +3704,11 @@ mod tests {
 
         assert!(matches!(
             FormulaParser::new(&[0x4B; 12]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[0xAA, 0, 0, 0, 0, 0, 0]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -3785,19 +3780,19 @@ mod tests {
         let tokens = FormulaParser::new(&invalid_xti).parse().unwrap();
         assert!(matches!(
             FormulaConverter::try_tokens_to_string_with_context(&tokens, &context),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[0x43, 0, 0, 0, 0]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[0xDA, 0, 0, 0, 0, 0, 0, 0, 0]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[0x5B; 14]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -3811,20 +3806,20 @@ mod tests {
         ] {
             assert!(matches!(
                 FormulaParser::new(&bytes).parse(),
-                Err(XlsbError::InvalidFormula(_))
+                Err(Error::InvalidFormula(_))
             ));
         }
 
         let row_past_end = [0x44, 0x00, 0x00, 0x10, 0x00, 0, 0];
         assert!(matches!(
             FormulaParser::new(&row_past_end).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
 
         let reversed_area = [0x45, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         assert!(matches!(
             FormulaParser::new(&reversed_area).parse(),
-            Err(XlsbError::InvalidCellReference(_))
+            Err(Error::InvalidCellReference(_))
         ));
     }
 
@@ -3903,11 +3898,11 @@ mod tests {
         let tokens = FormulaParser::new(&invalid_name).parse().unwrap();
         assert!(matches!(
             FormulaConverter::try_tokens_to_string_with_context(&tokens, &context),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[0x59, 0, 0, 0, 0, 0, 0]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -3936,11 +3931,11 @@ mod tests {
     fn parser_rejects_invalid_scalar_boolean_and_error_values() {
         assert!(matches!(
             FormulaParser::new(&[ptg_types::PTG_BOOL, 2]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
         assert!(matches!(
             FormulaParser::new(&[ptg_types::PTG_ERR, 1]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -3961,7 +3956,7 @@ mod tests {
 
         assert!(matches!(
             FormulaParser::new(&attr_choose[..5]).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -4007,7 +4002,7 @@ mod tests {
         impossible.extend_from_slice(&16_384_u32.to_le_bytes());
         assert!(matches!(
             FormulaParser::with_extra(&rgce, &impossible).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
 
         let mut invalid_bool = Vec::new();
@@ -4016,7 +4011,7 @@ mod tests {
         invalid_bool.extend_from_slice(&[0x02, 0x02]);
         assert!(matches!(
             FormulaParser::with_extra(&rgce, &invalid_bool).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
 
         let mut invalid_number = Vec::new();
@@ -4026,7 +4021,7 @@ mod tests {
         invalid_number.extend_from_slice(&f64::NEG_INFINITY.to_le_bytes());
         assert!(matches!(
             FormulaParser::with_extra(&rgce, &invalid_number).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -4048,7 +4043,7 @@ mod tests {
 
         assert!(matches!(
             FormulaCompiler::compile_shared("SUM({1,2})", 0, 0),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -4091,13 +4086,13 @@ mod tests {
         rgcb.extend_from_slice(&u32::MAX.to_le_bytes());
         assert!(matches!(
             FormulaParser::with_extra(&rgce, &rgcb).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
 
         let oversized_expression = [0x49, 0x01, 0x00];
         assert!(matches!(
             FormulaParser::new(&oversized_expression).parse(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -4170,7 +4165,7 @@ mod tests {
         };
         assert!(matches!(
             malformed.exp_cell(),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
 
         let mut array = FormulaGroup {
@@ -4184,7 +4179,7 @@ mod tests {
         array[16] = 0x80;
         assert!(matches!(
             FormulaGroup::parse_array(&array),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
@@ -4219,14 +4214,14 @@ mod tests {
         oversized.extend_from_slice(&[0; 4]);
         assert!(matches!(
             CellParsedFormula::parse(&oversized),
-            Err(XlsbError::InvalidFormula(_))
+            Err(Error::InvalidFormula(_))
         ));
     }
 
     #[test]
     fn truncated_token_is_an_error_instead_of_becoming_unknown_bytes() {
         let error = FormulaParser::new(&[0x44, 0x01]).parse().unwrap_err();
-        assert!(matches!(error, XlsbError::InvalidFormula(_)));
+        assert!(matches!(error, Error::InvalidFormula(_)));
     }
 
     fn resident_table_reference(row_type: TableRowType, columns: TableColumns) -> Token {
@@ -4643,7 +4638,7 @@ mod pivot_name_resolution_tests {
         }
     }
 
-    fn render(index: u32, context: &FormulaResolutionContext) -> XlsbResult<String> {
+    fn render(index: u32, context: &FormulaResolutionContext) -> Result<String> {
         FormulaConverter::try_tokens_to_string_with_context(&[Token::PivotName(index)], context)
     }
 

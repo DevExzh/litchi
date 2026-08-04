@@ -1,7 +1,7 @@
 //! Tests for the chart sheet stream parser and its workbook wiring.
 
 use super::*;
-use crate::xlsb::error::XlsbError;
+use crate::xlsb::error::Error;
 use litchi_xlsb::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
@@ -166,7 +166,7 @@ fn maps_sheet_states() {
     assert_eq!(very_hidden.state, State::VeryHidden);
     assert!(matches!(
         parse_chart_sheet_part(&minimal, "C".to_string(), 3),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
 }
 
@@ -216,7 +216,7 @@ fn tab_color_variants() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
 
     // Unknown color type is rejected.
@@ -228,7 +228,7 @@ fn tab_color_variants() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
 
     // Out-of-range theme index is rejected.
@@ -240,7 +240,7 @@ fn tab_color_variants() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
 }
 
@@ -256,7 +256,7 @@ fn rejects_duplicate_singletons() {
         assert!(
             matches!(
                 parse_chart_sheet_part(&data, "C".to_string(), 0),
-                Err(XlsbError::Unrecognized { .. })
+                Err(Error::Unrecognized { .. })
             ),
             "duplicate 0x{record_type:04X} must be rejected"
         );
@@ -275,7 +275,7 @@ fn rejects_invalid_view_scale() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // 0 means "no zoom level set" and is accepted.
     let data = stream(&[
@@ -301,7 +301,7 @@ fn rejects_invalid_views_collections() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Unterminated views collection.
     let data = stream(&[
@@ -311,7 +311,7 @@ fn rejects_invalid_views_collections() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::UnexpectedEndOfStream(_))
+        Err(Error::UnexpectedEndOfStream(_))
     ));
     // View without its end record.
     let data = stream(&[
@@ -323,7 +323,7 @@ fn rejects_invalid_views_collections() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::UnexpectedRecord { .. })
+        Err(Error::UnexpectedRecord { .. })
     ));
 }
 
@@ -339,7 +339,7 @@ fn enforces_iso_protection_pairing() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // ISO record at the end of the stream.
     let data = stream(&[
@@ -349,7 +349,7 @@ fn enforces_iso_protection_pairing() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Following classic record carries a password verifier.
     let data = stream(&[
@@ -360,7 +360,7 @@ fn enforces_iso_protection_pairing() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Following classic record has different flags.
     let data = stream(&[
@@ -371,7 +371,7 @@ fn enforces_iso_protection_pairing() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Excessive spin count is rejected.
     let data = stream(&[
@@ -382,7 +382,7 @@ fn enforces_iso_protection_pairing() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
 }
 
@@ -392,13 +392,13 @@ fn rejects_malformed_streams() {
     let data = stream(&[(rt::END_SHEET, Vec::new())]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::UnexpectedRecord { .. })
+        Err(Error::UnexpectedRecord { .. })
     ));
     // Missing BrtEndSheet.
     let data = stream(&[(rt::BEGIN_SHEET, Vec::new())]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::UnexpectedEndOfStream(_))
+        Err(Error::UnexpectedEndOfStream(_))
     ));
     // Truncated BrtCsProp payload.
     let data = stream(&[
@@ -408,7 +408,7 @@ fn rejects_malformed_streams() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Wire(WireError::Truncated {
+        Err(Error::Wire(WireError::Truncated {
             stage: Stage::Value,
             ..
         }))
@@ -423,7 +423,7 @@ fn rejects_malformed_streams() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Wire(WireError::Trailing {
+        Err(Error::Wire(WireError::Trailing {
             context: "BrtCsProp",
             ..
         }))
@@ -436,7 +436,7 @@ fn rejects_malformed_streams() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // iCopies outside the permitted range.
     let data = stream(&[
@@ -446,14 +446,14 @@ fn rejects_malformed_streams() {
     ]);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Unrecognized { .. })
+        Err(Error::Unrecognized { .. })
     ));
     // Truncated record stream (record header cut off).
     let mut data = chart_sheet_stream(&[]);
     data.truncate(data.len() - 1);
     assert!(matches!(
         parse_chart_sheet_part(&data, "C".to_string(), 0),
-        Err(XlsbError::Wire(WireError::Truncated {
+        Err(Error::Wire(WireError::Truncated {
             stage: Stage::Length,
             ..
         }))
@@ -464,7 +464,7 @@ fn rejects_malformed_streams() {
 /// drawing hosts one chart, and verify the workbook accessors.
 #[test]
 fn resolves_chart_sheet_and_embedded_chart_through_workbook_relationships() {
-    use crate::xlsb::XlsbWorkbook;
+    use crate::xlsb::Workbook;
     use litchi_opc::constants::relationship_type;
     use litchi_opc::part::Part;
     use litchi_opc::{BlobPart, OpcPackage, PackURI};
@@ -555,7 +555,7 @@ fn resolves_chart_sheet_and_embedded_chart_through_workbook_relationships() {
     package.add_part(Box::new(chart_sheet_part));
     package.add_part(Box::new(drawing_part));
     package.add_part(Box::new(chart_part));
-    let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+    let workbook = Workbook::from_opc_package(package).unwrap();
 
     let chart_sheets = workbook.chart_sheets();
     assert_eq!(chart_sheets.len(), 1);
@@ -577,7 +577,7 @@ fn resolves_chart_sheet_and_embedded_chart_through_workbook_relationships() {
 /// error, matching the eager failure handling of PivotCache definitions.
 #[test]
 fn broken_chart_sheet_drawing_relationship_is_an_error() {
-    use crate::xlsb::XlsbWorkbook;
+    use crate::xlsb::Workbook;
     use litchi_opc::part::Part;
     use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
@@ -613,5 +613,5 @@ fn broken_chart_sheet_drawing_relationship_is_an_error() {
     let mut package = OpcPackage::new();
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(chart_sheet_part));
-    assert!(XlsbWorkbook::from_opc_package(package).is_err());
+    assert!(Workbook::from_opc_package(package).is_err());
 }

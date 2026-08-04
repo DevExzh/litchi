@@ -27,7 +27,7 @@ test fixture that cannot form an `OpcPackage`, uses the typed
 The chart workbook helper keeps its existing semantic XML generation but
 passes canonical `PackURI` values and package bytes through the OPC owner. OPC
 errors remain typed as `OoxmlError::Opc`; they are not flattened into formatted
-strings. The unused `XlsbError::Zip(String)` path and concrete-error conversion
+strings. The unused `xlsb::Error::Zip(String)` path and concrete-error conversion
 are deleted rather than retained as compatibility surface.
 
 Tests may sanitize a malformed third-party package through the same physical

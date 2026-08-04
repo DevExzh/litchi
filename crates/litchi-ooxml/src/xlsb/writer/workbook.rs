@@ -2,12 +2,12 @@
 //!
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
 };
 use crate::xlsb::writer::{
-    MutableChartSheet, MutableSharedStringsWriter, MutableXlsbWorksheet, StylesWriter,
+    MutableChartSheet, MutableSharedStringsWriter, MutableWorksheet, StylesWriter,
 };
 use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
@@ -32,12 +32,12 @@ const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi_ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
+/// use litchi_ooxml::xlsb::writer::{WorkbookWriter, MutableWorksheet};
 /// use std::fs::File;
 ///
-/// let mut workbook = XlsbWorkbookWriter::new();
+/// let mut workbook = WorkbookWriter::new();
 ///
-/// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+/// let mut sheet = MutableWorksheet::new("Sheet1");
 /// sheet.set_cell(0, 0, "Hello");
 /// sheet.set_cell(0, 1, 42.0);
 ///
@@ -47,10 +47,10 @@ const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
 /// workbook.save(file)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct XlsbWorkbookWriter {
-    worksheets: Vec<MutableXlsbWorksheet>,
+pub struct WorkbookWriter {
+    worksheets: Vec<MutableWorksheet>,
     chart_sheets: Vec<MutableChartSheet>,
-    sheet_order: Vec<XlsbSheetSlot>,
+    sheet_order: Vec<SheetSlot>,
     named_ranges: Vec<Definition>,
     shared_strings: MutableSharedStringsWriter,
     styles: StylesWriter,
@@ -63,7 +63,7 @@ pub struct XlsbWorkbookWriter {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum XlsbSheetSlot {
+enum SheetSlot {
     Worksheet(usize),
     ChartSheet(usize),
 }
@@ -91,10 +91,10 @@ const XLSB_WORKSHEET_BINARY_INDEX_EMPTY: [u8; 29] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x95, 0x02, 0x00,
 ];
 
-impl XlsbWorkbookWriter {
+impl WorkbookWriter {
     /// Create a new XLSB workbook writer
     pub fn new() -> Self {
-        XlsbWorkbookWriter {
+        WorkbookWriter {
             worksheets: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_order: Vec::new(),
@@ -136,7 +136,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Attach a cache-free, inert MS-OVBA project to generated workbooks.
-    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> XlsbResult<&mut Self> {
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<&mut Self> {
         self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
@@ -145,7 +145,7 @@ impl XlsbWorkbookWriter {
         &mut self,
         project: litchi_vba::build::Project,
         limits: &litchi_vba::Limits,
-    ) -> XlsbResult<&mut Self> {
+    ) -> Result<&mut Self> {
         let payload = project.finish(limits)?;
         Ok(self.put_vba(payload))
     }
@@ -166,16 +166,16 @@ impl XlsbWorkbookWriter {
     /// # Example
     ///
     /// ```rust
-    /// use litchi_ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
+    /// use litchi_ooxml::xlsb::writer::{WorkbookWriter, MutableWorksheet};
     ///
-    /// let mut workbook = XlsbWorkbookWriter::new();
-    /// let sheet = MutableXlsbWorksheet::new("Sheet1");
+    /// let mut workbook = WorkbookWriter::new();
+    /// let sheet = MutableWorksheet::new("Sheet1");
     /// workbook.add_worksheet(sheet);
     /// ```
-    pub fn add_worksheet(&mut self, worksheet: MutableXlsbWorksheet) {
+    pub fn add_worksheet(&mut self, worksheet: MutableWorksheet) {
         self.worksheets.push(worksheet);
         self.sheet_order
-            .push(XlsbSheetSlot::Worksheet(self.worksheets.len() - 1));
+            .push(SheetSlot::Worksheet(self.worksheets.len() - 1));
     }
 
     /// Add a chart sheet in the current workbook sheet order.
@@ -185,10 +185,10 @@ impl XlsbWorkbookWriter {
     pub fn add_chart_sheet(
         &mut self,
         chart_sheet: MutableChartSheet,
-    ) -> XlsbResult<&mut MutableChartSheet> {
+    ) -> Result<&mut MutableChartSheet> {
         chart_sheet.validate()?;
         if self.chart_sheets.len() >= super::chartsheet::max_chart_sheets() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "XLSB chart-sheet count limit exceeded".to_string(),
             ));
         }
@@ -197,14 +197,14 @@ impl XlsbWorkbookWriter {
             .iter()
             .any(|slot| excel_name_eq(self.sheet_name(*slot), chart_sheet.name()))
         {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "duplicate sheet name {:?}",
                 chart_sheet.name()
             )));
         }
         self.chart_sheets.push(chart_sheet);
         self.sheet_order
-            .push(XlsbSheetSlot::ChartSheet(self.chart_sheets.len() - 1));
+            .push(SheetSlot::ChartSheet(self.chart_sheets.len() - 1));
         Ok(self
             .chart_sheets
             .last_mut()
@@ -225,7 +225,7 @@ impl XlsbWorkbookWriter {
     pub fn set_connections(
         &mut self,
         connections: crate::xlsb::connections::Connections,
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         crate::xlsb::connections::write::validate_connections(&connections)?;
         self.connections = Some(connections);
         Ok(())
@@ -243,10 +243,10 @@ impl XlsbWorkbookWriter {
     pub fn add_external_link(
         &mut self,
         link: crate::xlsb::external_link::Link,
-    ) -> XlsbResult<&mut Self> {
+    ) -> Result<&mut Self> {
         link.validate()?;
         if self.external_links.len() >= MAX_AUTHORED_EXTERNAL_LINKS {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "XLSB external-link count exceeds the safety limit".to_string(),
             ));
         }
@@ -269,13 +269,13 @@ impl XlsbWorkbookWriter {
     pub fn add_pivot_cache(
         &mut self,
         definition: &crate::xlsb::pivot::PivotCacheDefinition,
-    ) -> XlsbResult<u32> {
+    ) -> Result<u32> {
         let bytes = crate::xlsb::pivot::write::write_pivot_cache_definition(definition)?;
         let cache_id = u32::try_from(self.pivot_caches.len())
             .ok()
             .and_then(|next| next.checked_add(1))
             .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "PivotCache identifier overflow".to_string(),
                 )
             })?;
@@ -288,7 +288,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Get a mutable reference to a worksheet by index
-    pub fn get_worksheet_mut(&mut self, index: usize) -> Option<&mut MutableXlsbWorksheet> {
+    pub fn get_worksheet_mut(&mut self, index: usize) -> Option<&mut MutableWorksheet> {
         self.worksheets.get_mut(index)
     }
 
@@ -307,10 +307,10 @@ impl XlsbWorkbookWriter {
         self.chart_sheets.get_mut(index)
     }
 
-    fn sheet_name(&self, slot: XlsbSheetSlot) -> &str {
+    fn sheet_name(&self, slot: SheetSlot) -> &str {
         match slot {
-            XlsbSheetSlot::Worksheet(index) => self.worksheets[index].name(),
-            XlsbSheetSlot::ChartSheet(index) => self.chart_sheets[index].name(),
+            SheetSlot::Worksheet(index) => self.worksheets[index].name(),
+            SheetSlot::ChartSheet(index) => self.chart_sheets[index].name(),
         }
     }
 
@@ -329,7 +329,7 @@ impl XlsbWorkbookWriter {
     /// # Arguments
     ///
     /// * `writer` - A writer that implements `Write` and `Seek`
-    pub fn save<W: Write + Seek>(&mut self, writer: W) -> XlsbResult<()> {
+    pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         self.validate_formula_metadata()?;
         let mut package = OpcPackage::new();
 
@@ -361,7 +361,7 @@ impl XlsbWorkbookWriter {
 
         for (index, link) in self.external_links.iter().enumerate() {
             let one_based_index = index.checked_add(1).ok_or_else(|| {
-                XlsbError::InvalidFormula("external-link part index overflow".to_string())
+                Error::InvalidFormula("external-link part index overflow".to_string())
             })?;
             package.add_part(Box::new(
                 crate::xlsb::external_link_write::author_external_link_part(link, one_based_index)?,
@@ -415,9 +415,9 @@ impl XlsbWorkbookWriter {
         Ok(())
     }
 
-    fn validate_formula_metadata(&self) -> XlsbResult<()> {
+    fn validate_formula_metadata(&self) -> Result<()> {
         if self.sheet_order.len() > usize::from(u16::MAX) - 2 {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "{} sheets exceed the XLSB extern-sheet index limit",
                 self.sheet_order.len()
             )));
@@ -431,7 +431,7 @@ impl XlsbWorkbookWriter {
                 || name.starts_with('\'')
                 || name.ends_with('\'')
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "sheet name {name:?} does not follow BrtBundleSh grammar"
                 )));
             }
@@ -439,7 +439,7 @@ impl XlsbWorkbookWriter {
                 .iter()
                 .any(|existing| excel_name_eq(self.sheet_name(*existing), name))
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "duplicate sheet name {name:?}"
                 )));
             }
@@ -449,14 +449,14 @@ impl XlsbWorkbookWriter {
         }
         for (index, named_range) in self.named_ranges.iter().enumerate() {
             if named_range.function {
-                return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                return Err(crate::xlsb::error::Error::UnsupportedFeature(format!(
                     "macro defined name {} cannot be emitted",
                     named_range.name
                 )));
             }
             validate_name(&named_range.name)?;
             if named_range.formula.is_none() {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "defined name {} has no formula",
                     named_range.name
                 )));
@@ -466,7 +466,7 @@ impl XlsbWorkbookWriter {
                     .ok()
                     .is_none_or(|sheet_id| sheet_id >= self.sheet_order.len())
             }) {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "defined name {} has invalid sheet scope {:?}",
                     named_range.name, named_range.sheet_id
                 )));
@@ -475,7 +475,7 @@ impl XlsbWorkbookWriter {
                 existing.sheet_id == named_range.sheet_id
                     && excel_name_eq(&existing.name, &named_range.name)
             }) {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "duplicate defined name {:?} in scope {:?}",
                     named_range.name, named_range.sheet_id
                 )));
@@ -500,7 +500,7 @@ impl XlsbWorkbookWriter {
         chart: &crate::xlsx::WorksheetChart,
         host_sheet_name: &str,
         authored_pivot_tables: &[(String, String)],
-    ) -> XlsbResult<crate::xlsx::WorksheetChart> {
+    ) -> Result<crate::xlsx::WorksheetChart> {
         let Some(source) = chart.chart.pivot_source.as_ref() else {
             return Ok(chart.clone());
         };
@@ -509,7 +509,7 @@ impl XlsbWorkbookWriter {
             host_sheet_name,
             authored_pivot_tables,
         )
-        .map_err(|error| XlsbError::InvalidFormula(error.to_string()))?;
+        .map_err(|error| Error::InvalidFormula(error.to_string()))?;
         let mut normalized = chart.clone();
         normalized
             .chart
@@ -521,10 +521,10 @@ impl XlsbWorkbookWriter {
     }
 
     /// Write workbook-level defined names (BrtName records).
-    fn write_named_ranges<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_named_ranges<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         for named_range in &self.named_ranges {
             if named_range.function {
-                return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                return Err(crate::xlsb::error::Error::UnsupportedFeature(format!(
                     "macro defined name {} cannot be emitted",
                     named_range.name
                 )));
@@ -535,13 +535,13 @@ impl XlsbWorkbookWriter {
                     .ok()
                     .is_none_or(|index| index >= self.sheet_order.len())
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "defined name {} has invalid sheet scope {sheet_id}",
                     named_range.name
                 )));
             }
             let formula = named_range.formula.as_ref().ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                crate::xlsb::error::Error::InvalidFormula(format!(
                     "defined name {} has no formula",
                     named_range.name
                 ))
@@ -576,7 +576,7 @@ impl XlsbWorkbookWriter {
     // Content types are handled automatically by the OPC package
 
     /// Add document properties (required by Excel to open the file)
-    fn add_doc_props(&self, package: &mut OpcPackage) -> XlsbResult<()> {
+    fn add_doc_props(&self, package: &mut OpcPackage) -> Result<()> {
         // Add app.xml (Extended Properties)
         let app_xml = self.create_app_xml();
         let app_uri = PackURI::new("/docProps/app.xml")?;
@@ -630,7 +630,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add theme (REQUIRED by Excel to open file)
-    fn add_theme(&self, package: &mut OpcPackage) -> XlsbResult<()> {
+    fn add_theme(&self, package: &mut OpcPackage) -> Result<()> {
         // Create minimal Office theme
         let theme_xml = self.create_minimal_theme();
         let theme_uri = PackURI::new("/xl/theme/theme1.xml")?;
@@ -655,7 +655,7 @@ impl XlsbWorkbookWriter {
         &self,
         package: &mut OpcPackage,
         formula_sheet_ranges: &[(u32, u32)],
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         // Create the workbook part with an empty blob first so that all
         // relationships are attached (with concrete IDs) before the workbook
         // stream is serialized: BrtBeginPivotCacheID records reference
@@ -674,13 +674,13 @@ impl XlsbWorkbookWriter {
             let rels = workbook_part.rels_mut();
             for slot in &self.sheet_order {
                 match *slot {
-                    XlsbSheetSlot::Worksheet(index) => {
+                    SheetSlot::Worksheet(index) => {
                         rels.get_or_add(
                             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
                             &format!("worksheets/sheet{}.bin", index + 1),
                         );
                     },
-                    XlsbSheetSlot::ChartSheet(index) => {
+                    SheetSlot::ChartSheet(index) => {
                         rels.get_or_add(
                             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
                             &format!("chartsheets/sheet{}.bin", index + 1),
@@ -777,7 +777,7 @@ impl XlsbWorkbookWriter {
         formula_sheet_ranges: &[(u32, u32)],
         pivot_cache_rel_ids: &[(u32, String)],
         external_link_rel_ids: &[String],
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         // BrtBeginBook
         writer.write_record(kind::BEGIN_BOOK, &[])?;
 
@@ -824,7 +824,7 @@ impl XlsbWorkbookWriter {
     fn write_pivot_cache_ids<W: Write>(
         writer: &mut Writer<W>,
         pivot_cache_rel_ids: &[(u32, String)],
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         if pivot_cache_rel_ids.is_empty() {
             return Ok(());
         }
@@ -843,7 +843,7 @@ impl XlsbWorkbookWriter {
 
     /// Write file version record (BrtFileVersion)
     /// This is REQUIRED for Excel to open the file
-    fn write_file_version<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_file_version<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         // Build structure per spec example (48 bytes total):
         // guidCodeName (16 zero bytes), stAppName ("xl"), stLastEdited ("4"),
         // stLowestEdited ("4"), stRupBuild ("4505")
@@ -870,7 +870,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Write workbook properties (BrtWbProp)
-    fn write_workbook_properties<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_workbook_properties<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         let mut data = Vec::new();
         let mut temp_writer = Writer::new(&mut data);
 
@@ -895,7 +895,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Write book views (REQUIRED by Excel)
-    fn write_book_views<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_book_views<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         writer.write_record(kind::BEGIN_BOOK_VIEWS, &[])?;
 
         // Write one default book view
@@ -925,7 +925,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Write bundle sheets in workbook order.
-    fn write_bundle_sheets<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_bundle_sheets<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         writer.write_record(kind::BEGIN_BUNDLE_SHS, &[])?;
 
         for (i, slot) in self.sheet_order.iter().copied().enumerate() {
@@ -933,9 +933,8 @@ impl XlsbWorkbookWriter {
             let mut temp_writer = Writer::new(&mut sheet_data);
 
             let state = match slot {
-                XlsbSheetSlot::Worksheet(_) => 0,
-                XlsbSheetSlot::ChartSheet(index) => match self.chart_sheets[index].metadata().state
-                {
+                SheetSlot::Worksheet(_) => 0,
+                SheetSlot::ChartSheet(index) => match self.chart_sheets[index].metadata().state {
                     crate::xlsb::chartsheet::State::Visible => 0,
                     crate::xlsb::chartsheet::State::Hidden => 1,
                     crate::xlsb::chartsheet::State::VeryHidden => 2,
@@ -943,9 +942,10 @@ impl XlsbWorkbookWriter {
             };
             temp_writer.write_u32(state)?;
             // itabID (u32): unique sheet id (1-based)
-            temp_writer.write_u32(u32::try_from(i + 1).map_err(|_| {
-                XlsbError::InvalidFormula("sheet identifier overflow".to_string())
-            })?)?;
+            temp_writer
+                .write_u32(u32::try_from(i + 1).map_err(|_| {
+                    Error::InvalidFormula("sheet identifier overflow".to_string())
+                })?)?;
             // RelID (XLWideString): rIdN
             temp_writer.write_wide_string(&format!("rId{}", i + 1))?;
             // strName (XLWideString): sheet name
@@ -961,7 +961,7 @@ impl XlsbWorkbookWriter {
     /// Write calculation properties (CALC_PROP, 0x009D)
     ///
     /// Spec example fields and order
-    fn write_calc<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+    fn write_calc<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         writer.write_header(kind::CALC_PROP, calc::LEN)?;
         calc::write(&self.calc, writer)?;
         Ok(())
@@ -976,7 +976,7 @@ impl XlsbWorkbookWriter {
         writer: &mut Writer<W>,
         formula_sheet_ranges: &[(u32, u32)],
         external_link_rel_ids: &[String],
-    ) -> XlsbResult<()> {
+    ) -> Result<()> {
         // BrtBeginExternals - no data
         writer.write_record(kind::BEGIN_EXTERNALS, &[])?;
 
@@ -1001,17 +1001,17 @@ impl XlsbWorkbookWriter {
             .checked_add(2)
             .and_then(|count| count.checked_add(formula_sheet_ranges.len()))
             .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "BrtExternSheet entry count overflow".to_string(),
                 )
             })?;
         if entry_count >= 65_536 {
-            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+            return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                 "BrtExternSheet entry count {entry_count} exceeds 65,535"
             )));
         }
         temp_writer.write_u32(u32::try_from(entry_count).map_err(|_| {
-            crate::xlsb::error::XlsbError::InvalidFormula(
+            crate::xlsb::error::Error::InvalidFormula(
                 "BrtExternSheet entry count overflow".to_string(),
             )
         })?)?;
@@ -1039,18 +1039,18 @@ impl XlsbWorkbookWriter {
                     .ok()
                     .is_none_or(|last_sheet| last_sheet >= sheet_count)
             {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                return Err(crate::xlsb::error::Error::InvalidFormula(format!(
                     "invalid formula sheet range {first_sheet}..={last_sheet}"
                 )));
             }
             temp_writer.write_u32(0)?;
             temp_writer.write_i32(i32::try_from(first_sheet).map_err(|_| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "first formula sheet index overflow".to_string(),
                 )
             })?)?;
             temp_writer.write_i32(i32::try_from(last_sheet).map_err(|_| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
+                crate::xlsb::error::Error::InvalidFormula(
                     "last formula sheet index overflow".to_string(),
                 )
             })?)?;
@@ -1065,7 +1065,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add worksheet parts to the package
-    fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> XlsbResult<Vec<(u32, u32)>> {
+    fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> Result<Vec<(u32, u32)>> {
         let authored_pivot_tables = self.authored_pivot_tables();
         let worksheet_names = self
             .sheet_order
@@ -1077,8 +1077,8 @@ impl XlsbWorkbookWriter {
             .iter()
             .enumerate()
             .filter_map(|(sheet_index, slot)| match slot {
-                XlsbSheetSlot::Worksheet(worksheet_index) => Some((*worksheet_index, sheet_index)),
-                XlsbSheetSlot::ChartSheet(_) => None,
+                SheetSlot::Worksheet(worksheet_index) => Some((*worksheet_index, sheet_index)),
+                SheetSlot::ChartSheet(_) => None,
             })
             .collect::<std::collections::HashMap<_, _>>();
         let defined_names = self
@@ -1185,7 +1185,7 @@ impl XlsbWorkbookWriter {
                     .iter()
                     .position(|cache| cache.id == view.cache_id())
                     .ok_or_else(|| {
-                        XlsbError::InvalidFormula(format!(
+                        Error::InvalidFormula(format!(
                             "PivotTable view {:?} references unknown cache {}",
                             view.name(),
                             view.cache_id()
@@ -1193,7 +1193,7 @@ impl XlsbWorkbookWriter {
                     })?;
                 let cache_version_created = self.pivot_caches[cache_index].version_created;
                 if (view.version_created() >= 3) != (cache_version_created >= 3) {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "PivotTable view {:?} functionality level {} is incompatible with cache {} level {}",
                         view.name(),
                         view.version_created(),
@@ -1204,7 +1204,7 @@ impl XlsbWorkbookWriter {
                 let pivot_name = format!("pivotTable{next_pivot_table_index}.bin");
                 next_pivot_table_index =
                     next_pivot_table_index.checked_add(1).ok_or_else(|| {
-                        XlsbError::InvalidFormula("PivotTable part index overflow".to_string())
+                        Error::InvalidFormula("PivotTable part index overflow".to_string())
                     })?;
                 sheet_part.relate_to(&format!("../pivotTables/{pivot_name}"), rel::PIVOT_TABLE);
                 let mut part = BlobPart::new(
@@ -1236,7 +1236,7 @@ impl XlsbWorkbookWriter {
                             &authored_pivot_tables,
                         )
                     })
-                    .collect::<XlsbResult<Vec<_>>>()?;
+                    .collect::<Result<Vec<_>>>()?;
                 let drawing_xml = crate::xlsb::drawing_write::serialize_drawing(
                     worksheet.images(),
                     &normalized_charts,
@@ -1246,7 +1246,7 @@ impl XlsbWorkbookWriter {
                 )?;
                 let drawing_name = format!("drawing{next_drawing_index}.xml");
                 next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
-                    XlsbError::InvalidFormula("drawing part index overflow".to_string())
+                    Error::InvalidFormula("drawing part index overflow".to_string())
                 })?;
                 let mut part = BlobPart::new(
                     PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
@@ -1257,13 +1257,13 @@ impl XlsbWorkbookWriter {
                     let image_name =
                         format!("image{next_image_index}.{}", image.format().extension());
                     next_image_index = next_image_index.checked_add(1).ok_or_else(|| {
-                        XlsbError::InvalidFormula("image part index overflow".to_string())
+                        Error::InvalidFormula("image part index overflow".to_string())
                     })?;
                     let relationship_id =
                         part.relate_to(&format!("../media/{image_name}"), rel::IMAGE);
                     let expected_relationship_id = format!("rId{}", image_ordinal + 1);
                     if relationship_id != expected_relationship_id {
-                        return Err(XlsbError::InvalidFormula(format!(
+                        return Err(Error::InvalidFormula(format!(
                             "drawing image relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
                         )));
                     }
@@ -1278,14 +1278,14 @@ impl XlsbWorkbookWriter {
                     let graph =
                         crate::xlsb::chart_resources::author_chart_graph(chart, next_chart_index)?;
                     next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
-                        XlsbError::InvalidFormula("chart part index overflow".to_string())
+                        Error::InvalidFormula("chart part index overflow".to_string())
                     })?;
                     let relationship_id =
                         part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
                     let expected_relationship_id =
                         format!("rId{}", worksheet.images().len() + chart_ordinal + 1);
                     if relationship_id != expected_relationship_id {
-                        return Err(XlsbError::InvalidFormula(format!(
+                        return Err(Error::InvalidFormula(format!(
                             "drawing chart relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
                         )));
                     }
@@ -1304,9 +1304,7 @@ impl XlsbWorkbookWriter {
             // in the hyperlink records.
             let mut sheet_data = Vec::new();
             let current_sheet = u32::try_from(worksheet_sheet_indexes[&i]).map_err(|_| {
-                crate::xlsb::error::XlsbError::InvalidFormula(
-                    "worksheet index overflow".to_string(),
-                )
+                crate::xlsb::error::Error::InvalidFormula("worksheet index overflow".to_string())
             })?;
             let formula_context = FormulaCompilationContext {
                 worksheet_names: &worksheet_names,
@@ -1353,31 +1351,31 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add binary Chart Sheet streams and their standard DrawingML graphs.
-    fn add_chart_sheet_parts(&self, package: &mut OpcPackage) -> XlsbResult<()> {
+    fn add_chart_sheet_parts(&self, package: &mut OpcPackage) -> Result<()> {
         let mut next_drawing_index = self
             .worksheets
             .iter()
             .filter(|sheet| sheet.has_drawing_objects())
             .count()
             .checked_add(1)
-            .ok_or_else(|| XlsbError::InvalidFormula("drawing part index overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidFormula("drawing part index overflow".to_string()))?;
         let mut next_chart_index = self
             .worksheets
             .iter()
             .try_fold(1usize, |next, sheet| next.checked_add(sheet.charts().len()))
-            .ok_or_else(|| XlsbError::InvalidFormula("chart part index overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidFormula("chart part index overflow".to_string()))?;
 
         for (index, sheet) in self.chart_sheets.iter().enumerate() {
             sheet.validate()?;
             let drawing_name = format!("drawing{next_drawing_index}.xml");
-            next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
-                XlsbError::InvalidFormula("drawing part index overflow".to_string())
-            })?;
+            next_drawing_index = next_drawing_index
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormula("drawing part index overflow".to_string()))?;
             let chart_index = next_chart_index;
             let chart_name = format!("chart{chart_index}.xml");
-            next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
-                XlsbError::InvalidFormula("chart part index overflow".to_string())
-            })?;
+            next_chart_index = next_chart_index
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormula("chart part index overflow".to_string()))?;
             let normalized_chart = Self::normalized_pivot_chart(
                 sheet.chart(),
                 sheet.name(),
@@ -1394,7 +1392,7 @@ impl XlsbWorkbookWriter {
             let drawing_rel_id =
                 chart_sheet_part.relate_to(&format!("../drawings/{drawing_name}"), rel::DRAWING);
             if drawing_rel_id != "rId1" {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "chart-sheet drawing relationship allocation mismatch: {drawing_rel_id}"
                 )));
             }
@@ -1430,7 +1428,7 @@ impl XlsbWorkbookWriter {
             let chart_rel_id =
                 drawing_part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
             if chart_rel_id != "rId1" {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "chart-sheet chart relationship allocation mismatch: {chart_rel_id}"
                 )));
             }
@@ -1448,7 +1446,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add shared strings part to the package
-    fn add_shared_strings_part(&self, package: &mut OpcPackage) -> XlsbResult<()> {
+    fn add_shared_strings_part(&self, package: &mut OpcPackage) -> Result<()> {
         let mut sst_data = Vec::new();
         let mut writer = Writer::new(&mut sst_data);
 
@@ -1467,7 +1465,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add styles part to the package
-    fn add_styles_part(&self, package: &mut OpcPackage) -> XlsbResult<()> {
+    fn add_styles_part(&self, package: &mut OpcPackage) -> Result<()> {
         let mut styles_data = Vec::new();
         let mut writer = Writer::new(&mut styles_data);
 
@@ -1486,7 +1484,7 @@ impl XlsbWorkbookWriter {
     }
 }
 
-impl Default for XlsbWorkbookWriter {
+impl Default for WorkbookWriter {
     fn default() -> Self {
         Self::new()
     }
@@ -1512,15 +1510,15 @@ mod tests {
 
     #[test]
     fn test_create_empty_workbook() {
-        let workbook = XlsbWorkbookWriter::new();
+        let workbook = WorkbookWriter::new();
         assert_eq!(workbook.worksheet_count(), 0);
         assert!(!workbook.is_1904);
     }
 
     #[test]
     fn test_add_worksheet() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let sheet = MutableXlsbWorksheet::new("Sheet1");
+        let mut workbook = WorkbookWriter::new();
+        let sheet = MutableWorksheet::new("Sheet1");
         workbook.add_worksheet(sheet);
         assert_eq!(workbook.worksheet_count(), 1);
     }
@@ -1532,8 +1530,8 @@ mod tests {
             NameFormula, NameFormulaKind, OleItem, SheetRange, ValueMatrix,
         };
 
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Host"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Host"));
         let external_formula = NameFormula::cell_reference(CellReference::new(
             SheetRange::sheets(0, 0).unwrap(),
             CellLocation::new(3, 2),
@@ -1676,7 +1674,7 @@ mod tests {
                     && relationship.reltype() == rel::OLE_OBJECT)
         );
 
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(bytes)).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(bytes)).unwrap();
         assert_eq!(reader.external_link_count(), 3);
         assert_eq!(reader.external_link_iter().len(), 3);
         assert_eq!(reader.external_link(1).unwrap().dde_topic(), Some("System"));
@@ -1845,17 +1843,17 @@ mod tests {
             )
             .unwrap();
 
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Data"));
         workbook.add_chart_sheet(chart_sheet).unwrap();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Tail"));
+        workbook.add_worksheet(MutableWorksheet::new("Tail"));
         assert_eq!(workbook.chart_sheet_count(), 1);
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
         let bytes = output.into_inner();
         let package = OpcPackage::from_bytes(&bytes).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(bytes)).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(bytes)).unwrap();
         assert_eq!(
             reader.worksheet_names(),
             &[
@@ -1900,8 +1898,8 @@ mod tests {
             ChartAnchor::new(0, 0, 5, 5),
         )
         .unwrap();
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Data"));
         workbook
             .add_chart_sheet(MutableChartSheet::new("Chart", chart.clone()))
             .unwrap();
@@ -1928,14 +1926,14 @@ mod tests {
 
     #[test]
     fn test_set_date_system() {
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         workbook.set_date_system(true);
         assert!(workbook.is_1904);
     }
 
     #[test]
     fn calc_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         let properties = workbook.calc_mut();
         properties
             .set_mode(Mode::Manual)
@@ -1948,12 +1946,12 @@ mod tests {
                 true,
             )
             .unwrap();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
 
         let expected = workbook.calc().clone();
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         assert_eq!(reader.calc(), &expected);
     }
 
@@ -1993,8 +1991,8 @@ mod tests {
             ],
         };
 
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
         workbook.set_connections(connections.clone()).unwrap();
         // Validation: zero id, duplicate id, duplicate name (case-insensitive).
         assert!(
@@ -2047,7 +2045,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let parsed = reader.connections().expect("connections part missing");
         assert_eq!(parsed, &connections);
         assert_eq!(parsed.by_id(42).unwrap().name, "Warehouse");
@@ -2100,8 +2098,8 @@ mod tests {
             ..Table::default()
         };
 
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Sheet1");
         sheet.set_cell(0, 0, "Region");
         sheet.set_cell(0, 1, "Amount");
         sheet.set_cell(1, 0, "North");
@@ -2151,7 +2149,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let tables = reader.structured_tables();
         assert_eq!(tables.len(), 1);
         assert_eq!(tables[0].0, 0);
@@ -2162,8 +2160,8 @@ mod tests {
 
     #[test]
     fn comments_survive_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Notes");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Notes");
         let mut first = Comment::new(2, 3, "Author".to_string(), "formatted note".to_string());
         first.runs = vec![SharedStringRun {
             character_index: 0,
@@ -2181,7 +2179,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
         assert_eq!(worksheet.comments().len(), 2);
         assert_eq!(worksheet.comments()[0].text, "formatted note");
@@ -2192,8 +2190,8 @@ mod tests {
 
     #[test]
     fn row_and_column_formatting_survive_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Layout");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Layout");
         sheet.set_cell(3, 2, "value");
         sheet.set_column_width(2, 18.25);
         sheet.set_column_hidden(2, true);
@@ -2204,7 +2202,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
 
         assert_eq!(worksheet.column_infos().len(), 1);
@@ -2225,15 +2223,15 @@ mod tests {
 
     #[test]
     fn auto_filter_range_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Filtered");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Filtered");
         sheet.set_cell(0, 0, "Header");
         sheet.set_auto_filter(0, 20, 0, 4);
         workbook.add_worksheet(sheet);
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let auto_filter = reader.worksheet(0).unwrap().auto_filter().unwrap();
         assert_eq!(
             auto_filter,
@@ -2248,8 +2246,8 @@ mod tests {
 
     #[test]
     fn classic_and_extension_validations_survive_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Validated");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Validated");
         sheet.set_cell(0, 0, 5);
 
         let mut classic = Validation::new(1, "A1:A10 C1:C10".to_string());
@@ -2277,13 +2275,13 @@ mod tests {
             prompt_y: 24,
         });
         workbook.add_worksheet(sheet);
-        let mut source = MutableXlsbWorksheet::new("Source");
+        let mut source = MutableWorksheet::new("Source");
         source.set_cell(0, 0, 1);
         workbook.add_worksheet(source);
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
         assert_eq!(worksheet.data_validations().len(), 2);
         assert_eq!(
@@ -2328,8 +2326,8 @@ mod tests {
 
     #[test]
     fn classic_conditional_formatting_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Formatted");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Formatted");
         sheet.set_cell(0, 0, 5);
         let mut formatting = Formatting::new(vec!["A1:A10 C1:C10".to_string()]);
         formatting.pivot_only = true;
@@ -2369,13 +2367,13 @@ mod tests {
         sheet.add_conditional_formatting(formatting);
         workbook.add_worksheet(sheet);
 
-        let mut source = MutableXlsbWorksheet::new("Source");
+        let mut source = MutableWorksheet::new("Source");
         source.set_cell(0, 0, 10);
         workbook.add_worksheet(source);
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
         let formatting = &worksheet.conditional_formattings()[0];
         assert_eq!(formatting.ranges, ["A1:A10", "C1:C10"]);
@@ -2395,8 +2393,8 @@ mod tests {
 
     #[test]
     fn extension_conditional_formatting_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Formatted");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Formatted");
         sheet.set_cell(0, 0, 5);
         let mut formatting = Formatting::new(vec!["A1:A10".to_string()]);
         formatting.record_kind = RecordKind::Extension14;
@@ -2420,13 +2418,13 @@ mod tests {
         sheet.add_conditional_formatting(formatting);
         workbook.add_worksheet(sheet);
 
-        let mut source = MutableXlsbWorksheet::new("Source");
+        let mut source = MutableWorksheet::new("Source");
         source.set_cell(0, 0, 10);
         workbook.add_worksheet(source);
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
         let formatting = &worksheet.conditional_formattings()[0];
         assert_eq!(formatting.record_kind, RecordKind::Extension14);
@@ -2444,8 +2442,8 @@ mod tests {
     #[test]
     fn extended_data_bar_resolves_its_classic_rule_guid() {
         let guid = [0x7b; 16];
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Formatted");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Formatted");
         sheet.set_cell(0, 0, -5);
 
         let mut classic = Formatting::new(vec!["A1:A10".to_string()]);
@@ -2487,7 +2485,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
         assert_eq!(worksheet.conditional_formattings().len(), 2);
         assert_eq!(
@@ -2513,8 +2511,8 @@ mod tests {
 
     #[test]
     fn sheet_protection_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Protected");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Protected");
         sheet.set_cell(0, 0, "locked");
         sheet.set_sheet_protection(Some(SheetProtection {
             password_hash: Some(0x5A3C),
@@ -2527,7 +2525,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let protection = reader.worksheet(0).unwrap().sheet_protection().unwrap();
         assert_eq!(protection.password_hash, Some(0x5A3C));
         assert!(protection.locked);
@@ -2541,15 +2539,15 @@ mod tests {
 
     #[test]
     fn test_workbook_writer_default() {
-        let workbook: XlsbWorkbookWriter = Default::default();
+        let workbook: WorkbookWriter = Default::default();
         assert_eq!(workbook.worksheet_count(), 0);
         assert!(!workbook.is_1904);
     }
 
     #[test]
     fn test_get_worksheet_mut() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let sheet = MutableXlsbWorksheet::new("Sheet1");
+        let mut workbook = WorkbookWriter::new();
+        let sheet = MutableWorksheet::new("Sheet1");
         workbook.add_worksheet(sheet);
 
         let sheet_ref = workbook.get_worksheet_mut(0);
@@ -2561,7 +2559,7 @@ mod tests {
 
     #[test]
     fn test_styles_accessor() {
-        let workbook = XlsbWorkbookWriter::new();
+        let workbook = WorkbookWriter::new();
         let styles = workbook.styles();
         // Just verify it returns a reference
         let _ = styles;
@@ -2569,7 +2567,7 @@ mod tests {
 
     #[test]
     fn test_styles_mut_accessor() {
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         let styles = workbook.styles_mut();
         // Just verify it returns a mutable reference
         let _ = styles;
@@ -2577,19 +2575,19 @@ mod tests {
 
     #[test]
     fn test_add_multiple_worksheets() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet2"));
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet3"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+        workbook.add_worksheet(MutableWorksheet::new("Sheet2"));
+        workbook.add_worksheet(MutableWorksheet::new("Sheet3"));
 
         assert_eq!(workbook.worksheet_count(), 3);
     }
 
     #[test]
     fn test_create_app_xml() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet2"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+        workbook.add_worksheet(MutableWorksheet::new("Sheet2"));
 
         assert_eq!(
             workbook.create_app_xml(),
@@ -2599,7 +2597,7 @@ mod tests {
 
     #[test]
     fn test_create_core_xml_is_repeatable_and_does_not_unwind() {
-        let workbook = XlsbWorkbookWriter::new();
+        let workbook = WorkbookWriter::new();
         let first = std::panic::catch_unwind(|| workbook.create_core_xml())
             .expect("deterministic core-property creation must not unwind");
         let second = std::panic::catch_unwind(|| workbook.create_core_xml())
@@ -2616,7 +2614,7 @@ mod tests {
 
     #[test]
     fn test_create_minimal_theme() {
-        let workbook = XlsbWorkbookWriter::new();
+        let workbook = WorkbookWriter::new();
         let theme = workbook.create_minimal_theme();
 
         assert!(theme.contains("<a:theme"));
@@ -2625,7 +2623,7 @@ mod tests {
 
     #[test]
     fn test_add_named_range() {
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         let named_range = Definition::new("TestRange".to_string(), None).with_formula(vec![
             crate::xlsb::formula::ptg_types::PTG_INT,
             1,
@@ -2638,13 +2636,13 @@ mod tests {
 
     #[test]
     fn defined_name_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Data Sheet"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Data Sheet"));
         workbook.add_named_range(
             Definition::new("SalesData".to_string(), None)
                 .with_formula(area3d_formula(0, 1, 3, 1, 1).unwrap()),
         );
-        let mut summary = MutableXlsbWorksheet::new("Summary");
+        let mut summary = MutableWorksheet::new("Summary");
         summary.set_cell(
             0,
             0,
@@ -2669,7 +2667,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         assert_eq!(reader.defined_names(), &["SalesData"]);
         let summary = reader.worksheet_by_index(1).unwrap();
         assert!(matches!(
@@ -2684,10 +2682,10 @@ mod tests {
 
     #[test]
     fn sheet_range_formula_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Data Sheet"));
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Middle"));
-        let mut summary = MutableXlsbWorksheet::new("Summary");
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Data Sheet"));
+        workbook.add_worksheet(MutableWorksheet::new("Middle"));
+        let mut summary = MutableWorksheet::new("Summary");
         for col in 0..2 {
             summary.set_cell(
                 0,
@@ -2704,7 +2702,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let summary = reader.worksheet_by_index(2).unwrap();
         for col in 0..2 {
             assert!(matches!(
@@ -2717,14 +2715,14 @@ mod tests {
 
     #[test]
     fn contextual_grouped_formulas_survive_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Middle"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Data"));
+        workbook.add_worksheet(MutableWorksheet::new("Middle"));
         workbook.add_named_range(
             Definition::new("Rate".to_string(), None)
                 .with_formula(area3d_formula(0, 0, 0, 0, 0).unwrap()),
         );
-        let mut summary = MutableXlsbWorksheet::new("Summary");
+        let mut summary = MutableWorksheet::new("Summary");
         summary
             .set_array_formula(0, 0, 0, 1, "SUM('Data:Middle'!A1)+Rate")
             .unwrap();
@@ -2745,7 +2743,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let summary = reader.worksheet_by_index(2).unwrap();
         for col in 0..=1 {
             assert!(matches!(
@@ -2783,7 +2781,7 @@ mod tests {
         workbook.get_worksheet_mut(0).unwrap().set_name("Renamed");
         assert!(workbook.save(Cursor::new(Vec::new())).is_err());
 
-        let mut invalid = MutableXlsbWorksheet::new("Invalid");
+        let mut invalid = MutableWorksheet::new("Invalid");
         assert!(
             invalid
                 .set_array_formula(0, 0, 0, 0, "NOT_A_REAL_FUNCTION(1)")
@@ -2793,17 +2791,17 @@ mod tests {
 
     #[test]
     fn rejects_ambiguous_formula_metadata_before_writing() {
-        let mut duplicate_sheets = XlsbWorkbookWriter::new();
-        duplicate_sheets.add_worksheet(MutableXlsbWorksheet::new("Data"));
-        duplicate_sheets.add_worksheet(MutableXlsbWorksheet::new("data"));
+        let mut duplicate_sheets = WorkbookWriter::new();
+        duplicate_sheets.add_worksheet(MutableWorksheet::new("Data"));
+        duplicate_sheets.add_worksheet(MutableWorksheet::new("data"));
         assert!(duplicate_sheets.save(Cursor::new(Vec::new())).is_err());
 
-        let mut invalid_sheet = XlsbWorkbookWriter::new();
-        invalid_sheet.add_worksheet(MutableXlsbWorksheet::new("Data/2026"));
+        let mut invalid_sheet = WorkbookWriter::new();
+        invalid_sheet.add_worksheet(MutableWorksheet::new("Data/2026"));
         assert!(invalid_sheet.save(Cursor::new(Vec::new())).is_err());
 
-        let mut duplicate_names = XlsbWorkbookWriter::new();
-        duplicate_names.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        let mut duplicate_names = WorkbookWriter::new();
+        duplicate_names.add_worksheet(MutableWorksheet::new("Data"));
         duplicate_names.add_named_range(
             Definition::new("Rate".to_string(), None)
                 .with_formula(area3d_formula(0, 0, 0, 0, 0).unwrap()),
@@ -2817,9 +2815,9 @@ mod tests {
 
     #[test]
     fn contextual_formula_tokens_are_not_cached_across_saves() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
-        let mut summary = MutableXlsbWorksheet::new("Summary");
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Data"));
+        let mut summary = MutableWorksheet::new("Summary");
         summary.set_cell(
             0,
             0,
@@ -2839,8 +2837,8 @@ mod tests {
 
     #[test]
     fn formula_survives_workbook_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Calculations");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Calculations");
         sheet.set_cell(0, 0, 2.0);
         sheet.set_cell(0, 1, 3.0);
         sheet.set_cell(
@@ -2907,7 +2905,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet_by_index(0).unwrap();
         let value = worksheet.cell_value(0, 2).unwrap();
         assert!(matches!(
@@ -2961,8 +2959,8 @@ mod tests {
 
     #[test]
     fn array_and_shared_formulas_survive_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Grouped formulas");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Grouped formulas");
         sheet.set_cell(2, 2, 10.0);
         sheet.set_cell(3, 2, 20.0);
         sheet.set_shared_formula(2, 2, 3, 2, "B3").unwrap();
@@ -2983,7 +2981,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet_by_index(0).unwrap();
 
         assert!(matches!(
@@ -3032,8 +3030,8 @@ mod tests {
 
     #[test]
     fn array_constant_survives_package_roundtrip() {
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut sheet = MutableXlsbWorksheet::new("Array constant");
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Array constant");
         sheet.set_cell(
             0,
             0,
@@ -3048,7 +3046,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet_by_index(0).unwrap();
         assert!(matches!(
             worksheet.cell_value(0, 0).unwrap().as_ref(),
@@ -3084,7 +3082,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut sheet = MutableXlsbWorksheet::new("Charts");
+        let mut sheet = MutableWorksheet::new("Charts");
         sheet.set_cell(0, 0, "Quarter");
         sheet.set_cell(0, 1, "Sales");
         sheet.add_chart(bar).unwrap();
@@ -3098,15 +3096,15 @@ mod tests {
             ChartAnchor::new(0, 0, 7, 12),
         )
         .unwrap();
-        let mut summary = MutableXlsbWorksheet::new("Summary");
+        let mut summary = MutableWorksheet::new("Summary");
         summary.add_chart(pie).unwrap();
 
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         workbook.add_worksheet(sheet);
         workbook.add_worksheet(summary);
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
         let drawing = reader.sheet_drawing(0).expect("sheet drawing missing");
         assert_eq!(drawing.drawing.anchors.len(), 2);
@@ -3206,11 +3204,11 @@ mod tests {
         .unwrap()
         .into_pivot_chart(view_name)
         .unwrap();
-        let mut sheet = MutableXlsbWorksheet::new("Pivot Host");
+        let mut sheet = MutableWorksheet::new("Pivot Host");
         sheet.add_pivot_table_view(view).unwrap();
         sheet.add_chart(chart).unwrap();
 
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         let cache_id = workbook
             .add_pivot_cache(&crate::xlsb::pivot::PivotCacheDefinition::default())
             .unwrap();
@@ -3243,7 +3241,7 @@ mod tests {
             PackURI::new("/xl/pivotCache/pivotCacheDefinition1.bin").unwrap()
         );
 
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(bytes)).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(bytes)).unwrap();
         assert_eq!(reader.pivot_views().len(), 1);
         assert_eq!(reader.pivot_views()[0].name(), view_name);
         assert_eq!(reader.pivot_views()[0].cache_id(), 1);
@@ -3271,9 +3269,9 @@ mod tests {
         .unwrap()
         .into_pivot_chart("MissingPivot")
         .unwrap();
-        let mut sheet = MutableXlsbWorksheet::new("Host");
+        let mut sheet = MutableWorksheet::new("Host");
         sheet.add_chart(chart).unwrap();
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         workbook.add_worksheet(sheet);
 
         let error = workbook
@@ -3355,8 +3353,8 @@ mod tests {
             Some(true),
         );
 
-        let mut workbook = XlsbWorkbookWriter::new();
-        let mut data = MutableXlsbWorksheet::new("Data");
+        let mut workbook = WorkbookWriter::new();
+        let mut data = MutableWorksheet::new("Data");
         data.add_chart(worksheet_chart).unwrap();
         workbook.add_worksheet(data);
         workbook
@@ -3365,7 +3363,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
         let worksheet_chart = &reader.sheet_drawing(0).unwrap().charts[0];
         match &worksheet_chart.external_data_part.as_ref().unwrap().target {
@@ -3428,7 +3426,7 @@ mod tests {
             ChartAnchor, ChartUserShapesPart, Relationship, RelationshipTarget, WorksheetChart,
         };
 
-        let mut sheet = MutableXlsbWorksheet::new("Charts");
+        let mut sheet = MutableWorksheet::new("Charts");
         let valid = WorksheetChart::bar_chart(
             "Valid",
             "Charts!$A$1:$A$2",
@@ -3510,7 +3508,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut sheet = MutableXlsbWorksheet::new("Pictures");
+        let mut sheet = MutableWorksheet::new("Pictures");
         sheet.add_image(png).unwrap();
         sheet.add_image(svg).unwrap();
         sheet.add_chart(chart).unwrap();
@@ -3531,7 +3529,7 @@ mod tests {
                 "Mixed drawing",
             )
             .unwrap();
-        let mut image_only = MutableXlsbWorksheet::new("Image only");
+        let mut image_only = MutableWorksheet::new("Image only");
         image_only
             .add_image(
                 Image::new(
@@ -3542,13 +3540,13 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         workbook.add_worksheet(sheet);
         workbook.add_worksheet(image_only);
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
 
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let drawing = reader.sheet_drawing(0).expect("sheet drawing missing");
         assert_eq!(drawing.images.len(), 2);
         assert_eq!(drawing.charts.len(), 1);
@@ -3655,7 +3653,7 @@ mod tests {
             ChartAnchor::new(0, 0, 1, 1),
         )
         .unwrap();
-        let mut sheet = MutableXlsbWorksheet::new("Pictures");
+        let mut sheet = MutableWorksheet::new("Pictures");
         sheet.add_image(valid.clone()).unwrap();
         assert_eq!(sheet.images().len(), 1);
         assert!(
@@ -3758,16 +3756,16 @@ mod tests {
             },
         );
 
-        let mut sheet = MutableXlsbWorksheet::new("Shapes");
+        let mut sheet = MutableWorksheet::new("Shapes");
         sheet.add_shape(standalone).unwrap();
         sheet.add_group(group).unwrap();
         sheet.add_connection(connection).unwrap();
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         workbook.add_worksheet(sheet);
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
 
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let drawing = reader.sheet_drawing(0).expect("shape drawing missing");
         assert!(drawing.images.is_empty());
         assert!(drawing.charts.is_empty());
@@ -3839,7 +3837,7 @@ mod tests {
 
         let valid = ShapeSpec::shape("Target", anchor((0, 0), (2, 2)), Preset::Rect, "target");
         let invalid = ShapeSpec::shape("Descending", anchor((2, 2), (1, 1)), Preset::Rect, "");
-        let mut sheet = MutableXlsbWorksheet::new("Shapes");
+        let mut sheet = MutableWorksheet::new("Shapes");
         assert!(sheet.add_shape(invalid).is_err());
         assert!(sheet.shapes().is_empty());
         let mut invalid_xml = valid.clone();
@@ -3870,7 +3868,7 @@ mod tests {
             ))
             .unwrap();
 
-        let mut workbook = XlsbWorkbookWriter::new();
+        let mut workbook = WorkbookWriter::new();
         workbook.add_worksheet(sheet);
         assert!(workbook.save(&mut Cursor::new(Vec::new())).is_err());
         let sheet = workbook.get_worksheet_mut(0).unwrap();

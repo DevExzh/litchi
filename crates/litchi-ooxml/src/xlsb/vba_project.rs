@@ -415,7 +415,7 @@ fn discover_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::{MutableXlsbWorksheet, XlsbWorkbook, XlsbWorkbookWriter};
+    use crate::xlsb::{MutableWorksheet, Workbook, WorkbookWriter};
     use litchi_opc::part::BlobPart;
     use litchi_vba::{Limits, Payload, build};
     use std::io::Cursor;
@@ -510,12 +510,12 @@ mod tests {
 
     #[test]
     fn parsed_xlsb_workbook_exposes_inert_project_metadata() {
-        let mut writer = XlsbWorkbookWriter::new();
-        writer.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        let mut writer = WorkbookWriter::new();
+        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
         writer.save(&mut bytes).unwrap();
 
-        let mut workbook = XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+        let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
         let workbook_name = workbook
             .opc_package()
             .main_document_part()
@@ -534,7 +534,7 @@ mod tests {
                     .get_part_mut(&workbook_name)
                     .unwrap()
                     .relate_to("vbaProject.bin", relationship_type::VBA_PROJECT);
-                Ok::<_, crate::xlsb::error::XlsbError>(())
+                Ok::<_, crate::xlsb::error::Error>(())
             })
             .unwrap();
 
@@ -551,12 +551,12 @@ mod tests {
         ))
     }
 
-    fn generated_workbook() -> XlsbWorkbook {
-        let mut writer = XlsbWorkbookWriter::new();
-        writer.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+    fn generated_workbook() -> Workbook {
+        let mut writer = WorkbookWriter::new();
+        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
         writer.save(&mut bytes).unwrap();
-        XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap()
+        Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
     }
 
     #[test]
@@ -566,7 +566,7 @@ mod tests {
 
         let mut bytes = Cursor::new(Vec::new());
         workbook.save(&mut bytes).unwrap();
-        let mut reopened = XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+        let mut reopened = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
         let metadata = reopened.vba().unwrap().unwrap();
         let parsed = metadata.project(reopened.opc_package()).unwrap();
         assert_eq!(parsed.name(), "BinaryWorkbookProject");
@@ -584,8 +584,8 @@ mod tests {
 
     #[test]
     fn workbook_writer_attaches_validated_project() {
-        let mut writer = XlsbWorkbookWriter::new();
-        writer.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        let mut writer = WorkbookWriter::new();
+        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let limits = Limits::default();
         writer.put_vba(authored_project().finish(&limits).unwrap());
 
@@ -595,7 +595,7 @@ mod tests {
         writer.save(&mut second).unwrap();
 
         for bytes in [first.into_inner(), second.into_inner()] {
-            let workbook = XlsbWorkbook::new(Cursor::new(bytes)).unwrap();
+            let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
             let metadata = workbook.vba().unwrap().unwrap();
             assert_eq!(metadata.project_part_name().as_str(), PROJECT_PART);
             assert_eq!(

@@ -4,7 +4,7 @@
 //! according to the MS-XLSB specification.
 //! Reference: [MS-XLSB] Section 2.4.865 - BrtXF
 
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::Result;
 
 /// Horizontal alignment values
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,7 +94,7 @@ impl Alignment {
     ///
     /// Rotation and indentation are stored as bytes 10 and 11. Alignment and
     /// protection flags occupy bytes 12 and 13.
-    pub fn parse(data: &[u8], offset: usize) -> XlsbResult<Option<Self>> {
+    pub fn parse(data: &[u8], offset: usize) -> Result<Option<Self>> {
         if offset + 16 > data.len() {
             return Ok(None);
         }

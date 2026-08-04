@@ -4,7 +4,7 @@
 //! grammars. Only the worksheet link is binary (`BrtDrawing`).
 
 use crate::xlsb::Image;
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsx::WorksheetChart;
 use crate::xlsx::writer::shape::{ConnectionShapeSpec, GroupSpec, ShapeEmitter, ShapeSpec};
 use litchi_core::xml::escape_xml;
@@ -15,15 +15,15 @@ const MAX_DRAWING_XML_BYTES: usize = 16 * 1024 * 1024;
 const CHART_SHEET_EXTENT_X: u64 = 8_582_025;
 const CHART_SHEET_EXTENT_Y: u64 = 5_838_825;
 
-pub(crate) fn validate_chart(chart: &WorksheetChart) -> XlsbResult<()> {
+pub(crate) fn validate_chart(chart: &WorksheetChart) -> Result<()> {
     crate::xlsx::chart::validate_chart_anchor(&chart.anchor)?;
     crate::xlsb::chart_resources::validate_chart_resources(chart)
 }
 
 /// Serialize the single absolute-anchored chart frame used by a chart sheet.
-pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> XlsbResult<Vec<u8>> {
+pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> Result<Vec<u8>> {
     if title.encode_utf16().count() > 32_767 || title.contains('\0') {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "chart-sheet drawing title is too long or contains NUL".to_string(),
         ));
     }
@@ -32,7 +32,7 @@ pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> XlsbResult<Vec<u8>> 
         escape_xml(title)
     );
     if xml.len() > MAX_DRAWING_XML_BYTES {
-        return Err(XlsbError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: MAX_DRAWING_XML_BYTES,
             found: xml.len(),
         });
@@ -47,21 +47,21 @@ pub(crate) fn serialize_drawing(
     shapes: &[ShapeSpec],
     groups: &[GroupSpec],
     connections: &[ConnectionShapeSpec],
-) -> XlsbResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     if images.is_empty()
         && charts.is_empty()
         && shapes.is_empty()
         && groups.is_empty()
         && connections.is_empty()
     {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "worksheet drawing requires at least one drawing object".to_string(),
         ));
     }
     if images.len() > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
         || charts.len() > MAX_CHARTS_PER_SHEET
     {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "worksheet drawing exceeds the {} image or {MAX_CHARTS_PER_SHEET} chart safety limit",
             crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
         )));
@@ -72,12 +72,12 @@ pub(crate) fn serialize_drawing(
         total_image_bytes =
             total_image_bytes
                 .checked_add(image.data().len())
-                .ok_or(XlsbError::InvalidLength {
+                .ok_or(Error::InvalidLength {
                     expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
                     found: usize::MAX,
                 })?;
         if total_image_bytes > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
                 found: total_image_bytes,
             });
@@ -103,19 +103,19 @@ pub(crate) fn serialize_drawing(
     for shape in shapes {
         shape
             .validate(object_count)
-            .map_err(XlsbError::InvalidFormula)?;
+            .map_err(Error::InvalidFormula)?;
         object_count += 1;
     }
     for group in groups {
         group
             .validate(object_count)
-            .map_err(XlsbError::InvalidFormula)?;
+            .map_err(Error::InvalidFormula)?;
         object_count += 1;
     }
     for connection in connections {
         connection
             .validate(object_count)
-            .map_err(XlsbError::InvalidFormula)?;
+            .map_err(Error::InvalidFormula)?;
         object_count += 1;
     }
     let first_shape_id = images
@@ -123,45 +123,42 @@ pub(crate) fn serialize_drawing(
         .checked_add(charts.len())
         .and_then(|count| count.checked_add(1))
         .and_then(|id| u32::try_from(id).ok())
-        .ok_or_else(|| {
-            XlsbError::InvalidFormula("worksheet drawing object ID overflow".to_string())
-        })?;
+        .ok_or_else(|| Error::InvalidFormula("worksheet drawing object ID overflow".to_string()))?;
     let mut emitter = ShapeEmitter::for_objects(first_shape_id, shapes, groups, connections)
-        .map_err(XlsbError::InvalidFormula)?;
+        .map_err(Error::InvalidFormula)?;
     for shape in shapes {
         emitter
             .write_anchored_shape(&mut xml, shape)
-            .map_err(XlsbError::InvalidFormula)?;
+            .map_err(Error::InvalidFormula)?;
         ensure_drawing_size(xml.len())?;
     }
     for group in groups {
         emitter
             .write_anchored_group(&mut xml, group)
-            .map_err(XlsbError::InvalidFormula)?;
+            .map_err(Error::InvalidFormula)?;
         ensure_drawing_size(xml.len())?;
     }
     for connection in connections {
         emitter
             .write_anchored_connection(&mut xml, connection)
-            .map_err(XlsbError::InvalidFormula)?;
+            .map_err(Error::InvalidFormula)?;
         ensure_drawing_size(xml.len())?;
     }
     xml.push_str("</xdr:wsDr>");
     ensure_drawing_size(xml.len())?;
     // The detailed shared reader verifies the complete shape/group/connector
     // grammar in addition to the lightweight XLSB drawing inventory below.
-    crate::xlsx::shapes::parse_drawing_shapes(&xml)?.ok_or_else(|| {
-        XlsbError::Encoding("authored drawing lacks an xdr:wsDr root".to_string())
-    })?;
+    crate::xlsx::shapes::parse_drawing_shapes(&xml)?
+        .ok_or_else(|| Error::Encoding("authored drawing lacks an xdr:wsDr root".to_string()))?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.
     crate::xlsb::drawing::parse_drawing_part(&bytes)?;
     Ok(bytes)
 }
 
-fn ensure_drawing_size(bytes: usize) -> XlsbResult<()> {
+fn ensure_drawing_size(bytes: usize) -> Result<()> {
     if bytes > MAX_DRAWING_XML_BYTES {
-        return Err(XlsbError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: MAX_DRAWING_XML_BYTES,
             found: bytes,
         });
@@ -169,11 +166,11 @@ fn ensure_drawing_size(bytes: usize) -> XlsbResult<()> {
     Ok(())
 }
 
-fn write_image_anchor(xml: &mut String, image: &Image, index: usize) -> XlsbResult<()> {
+fn write_image_anchor(xml: &mut String, image: &Image, index: usize) -> Result<()> {
     let anchor = image.anchor();
-    let object_id = index.checked_add(1).ok_or_else(|| {
-        XlsbError::InvalidFormula("worksheet picture object ID overflow".to_string())
-    })?;
+    let object_id = index
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormula("worksheet picture object ID overflow".to_string()))?;
     xml.push_str("<xdr:twoCellAnchor>");
     write!(
         xml,
@@ -183,7 +180,7 @@ fn write_image_anchor(xml: &mut String, image: &Image, index: usize) -> XlsbResu
         anchor.from_row,
         anchor.from_row_offset
     )
-    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    .map_err(|error| Error::Encoding(error.to_string()))?;
     write!(
         xml,
         "<xdr:to><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to>",
@@ -192,20 +189,20 @@ fn write_image_anchor(xml: &mut String, image: &Image, index: usize) -> XlsbResu
         anchor.to_row,
         anchor.to_row_offset
     )
-    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    .map_err(|error| Error::Encoding(error.to_string()))?;
     write!(
         xml,
         r#"<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{object_id}" name="Picture {object_id}""#
     )
-    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    .map_err(|error| Error::Encoding(error.to_string()))?;
     if let Some(description) = image.description() {
         write!(xml, r#" descr="{}""#, escape_xml(description))
-            .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+            .map_err(|error| Error::Encoding(error.to_string()))?;
     }
     write!(
         xml,
         r#"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId{object_id}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>"#
     )
-    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    .map_err(|error| Error::Encoding(error.to_string()))?;
     Ok(())
 }

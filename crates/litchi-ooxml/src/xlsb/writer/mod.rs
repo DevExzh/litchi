@@ -15,14 +15,14 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
+//! use litchi_ooxml::xlsb::writer::{WorkbookWriter, MutableWorksheet};
 //! use std::fs::File;
 //!
 //! // Create a new workbook
-//! let mut workbook = XlsbWorkbookWriter::new();
+//! let mut workbook = WorkbookWriter::new();
 //!
 //! // Create a worksheet
-//! let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+//! let mut sheet = MutableWorksheet::new("Sheet1");
 //! sheet.set_cell(0, 0, "Hello");
 //! sheet.set_cell(0, 1, 42.0);
 //! sheet.set_cell(1, 0, true);
@@ -78,5 +78,5 @@ pub use chartsheet::MutableChartSheet;
 pub use litchi_xlsb::pivot_view::Part;
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};
-pub use workbook::XlsbWorkbookWriter;
-pub use worksheet::{CellData, MutableXlsbWorksheet, SheetProtection};
+pub use workbook::WorkbookWriter;
+pub use worksheet::{CellData, MutableWorksheet, SheetProtection};

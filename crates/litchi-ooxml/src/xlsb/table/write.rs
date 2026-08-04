@@ -3,9 +3,9 @@
 //! This is the exact inverse of `parse.rs`: record order, payload layouts,
 //! nullable-string and DXFId encodings all mirror the reader so authored
 //! tables round-trip through `parse_table_part` and, at the package level,
-//! through `XlsbWorkbook::structured_tables`.
+//! through `Workbook::structured_tables`.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::table::model::{Column, Formula, StyleInfo, Table};
 use litchi_xlsb::raw::Writer;
 use litchi_xlsb::raw::kind as rt;
@@ -34,8 +34,8 @@ const FORMULA_ARRAY: u8 = 1 << 1;
 /// Leading blank field of `BrtList14` (MS-XLSB 2.4.705).
 const FRT_BLANK_LEN: usize = 4;
 
-fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn malformed(context: &str, detail: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: context.to_string(),
         val: detail.into(),
     }
@@ -157,7 +157,7 @@ fn style_client_payload(style: &StyleInfo) -> Vec<u8> {
 }
 
 /// Serialize one table into its complete table-part stream.
-pub(crate) fn write_table_part(table: &Table) -> XlsbResult<Vec<u8>> {
+pub(crate) fn write_table_part(table: &Table) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(256);
     let mut writer = Writer::new(&mut data);
     writer.write_record(rt::BEGIN_LIST, &list_payload(table))?;
@@ -198,7 +198,7 @@ pub(crate) fn write_table_part(table: &Table) -> XlsbResult<Vec<u8>> {
 pub(crate) fn write_list_parts<W: std::io::Write>(
     writer: &mut Writer<W>,
     rel_ids: &[String],
-) -> XlsbResult<()> {
+) -> Result<()> {
     let declared = u32::try_from(rel_ids.len())
         .map_err(|_| malformed("BrtBeginListParts", "table count overflow"))?;
     writer.write_record(rt::BEGIN_LIST_PARTS, &declared.to_le_bytes())?;

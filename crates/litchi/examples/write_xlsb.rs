@@ -1,11 +1,11 @@
-use litchi::ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut wb = XlsbWorkbookWriter::new();
+    let mut wb = WorkbookWriter::new();
 
     // Sheet1: per spec example
-    let mut sheet1 = MutableXlsbWorksheet::new("Sheet1");
+    let mut sheet1 = MutableWorksheet::new("Sheet1");
     // B4: "Number" => row=3, col=1
     sheet1.set_cell(3, 1, "Number");
     // B5: 1 => row=4, col=1
@@ -17,8 +17,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     wb.add_worksheet(sheet1);
 
     // Sheet2 and Sheet3 empty
-    wb.add_worksheet(MutableXlsbWorksheet::new("Sheet2"));
-    wb.add_worksheet(MutableXlsbWorksheet::new("Sheet3"));
+    wb.add_worksheet(MutableWorksheet::new("Sheet2"));
+    wb.add_worksheet(MutableWorksheet::new("Sheet3"));
 
     let file = File::create("target/example.xlsb")?;
     wb.save(file)?;

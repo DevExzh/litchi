@@ -4,7 +4,7 @@
 //! module adds the host-owned alignment and border representations around the
 //! canonical style values.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::styles::{
     Alignment, Border, BorderSide, BorderStyle, HorizontalAlignment, VerticalAlignment,
 };
@@ -48,7 +48,7 @@ impl Default for StylesTable {
 
 impl StylesTable {
     /// Load styles from a styles.bin payload.
-    pub fn from_bytes(bytes: &[u8]) -> XlsbResult<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         litchi_xlsb::styles::read(bytes)
             .map(Self::from_owner)
             .map_err(map_owner_error)
@@ -74,34 +74,34 @@ impl StylesTable {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn parse_font(data: &[u8]) -> XlsbResult<Font> {
+    pub(crate) fn parse_font(data: &[u8]) -> Result<Font> {
         litchi_xlsb::styles::parse_font(data).map_err(map_owner_error)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn parse_fill(data: &[u8]) -> XlsbResult<Fill> {
+    pub(crate) fn parse_fill(data: &[u8]) -> Result<Fill> {
         litchi_xlsb::styles::parse_fill(data).map_err(map_owner_error)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn parse_direct_color(data: &[u8], offset: usize) -> XlsbResult<Option<u32>> {
+    pub(crate) fn parse_direct_color(data: &[u8], offset: usize) -> Result<Option<u32>> {
         litchi_xlsb::styles::parse_direct_color(data, offset).map_err(map_owner_error)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn parse_border(data: &[u8]) -> XlsbResult<Border> {
+    pub(crate) fn parse_border(data: &[u8]) -> Result<Border> {
         litchi_xlsb::styles::parse_border(data)
             .map(from_owner_border)
             .map_err(map_owner_error)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn parse_num_fmt(data: &[u8]) -> XlsbResult<(u32, String)> {
+    pub(crate) fn parse_num_fmt(data: &[u8]) -> Result<(u32, String)> {
         litchi_xlsb::styles::parse_num_fmt(data).map_err(map_owner_error)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn parse_xf(data: &[u8]) -> XlsbResult<CellFormat> {
+    pub(crate) fn parse_xf(data: &[u8]) -> Result<CellFormat> {
         litchi_xlsb::styles::parse_cell_format(data)
             .map(from_owner_cell_format)
             .map_err(map_owner_error)
@@ -228,19 +228,17 @@ fn from_owner_side(value: litchi_xlsb::styles::BorderSide) -> BorderSide {
     }
 }
 
-fn map_owner_error(error: litchi_xlsb::styles::Error) -> XlsbError {
+fn map_owner_error(error: litchi_xlsb::styles::Error) -> Error {
     match error {
-        litchi_xlsb::styles::Error::Wire(error) => XlsbError::Wire(error),
+        litchi_xlsb::styles::Error::Wire(error) => Error::Wire(error),
         litchi_xlsb::styles::Error::InvalidLength { expected, found } => {
-            XlsbError::InvalidLength { expected, found }
+            Error::InvalidLength { expected, found }
         },
-        litchi_xlsb::styles::Error::Unrecognized { typ, val } => {
-            XlsbError::Unrecognized { typ, val }
-        },
+        litchi_xlsb::styles::Error::Unrecognized { typ, val } => Error::Unrecognized { typ, val },
         litchi_xlsb::styles::Error::Allocation { resource, source } => {
-            XlsbError::Allocation { resource, source }
+            Error::Allocation { resource, source }
         },
-        other => XlsbError::Unrecognized {
+        other => Error::Unrecognized {
             typ: "styles".to_string(),
             val: other.to_string(),
         },
@@ -350,16 +348,16 @@ mod tests {
     fn rejects_truncated_style_records_and_invalid_direct_color() {
         assert!(matches!(
             StylesTable::parse_font(&[0; 20]),
-            Err(XlsbError::InvalidLength { .. })
+            Err(Error::InvalidLength { .. })
         ));
         assert!(matches!(
             StylesTable::parse_fill(&[0; 67]),
-            Err(XlsbError::InvalidLength { .. })
+            Err(Error::InvalidLength { .. })
         ));
         let invalid = [4, 0, 0, 0, 1, 2, 3, 4];
         assert!(matches!(
             StylesTable::parse_direct_color(&invalid, 0),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 

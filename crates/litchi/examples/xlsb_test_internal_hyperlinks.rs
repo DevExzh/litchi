@@ -10,17 +10,17 @@
 //! ```
 
 use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
-use litchi::ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with an internal hyperlink (Source!A1 -> Target!B2)...");
 
-    let mut workbook = XlsbWorkbookWriter::new();
+    let mut workbook = WorkbookWriter::new();
 
     // Source sheet with a clickable cell.
-    let mut source = MutableXlsbWorksheet::new("Source");
+    let mut source = MutableWorksheet::new("Source");
     source.set_cell(0, 0, CellValue::String("Go to Target!B2".to_string()));
 
     // Internal hyperlink from A1 on "Source" to B2 on "Target". The writer
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(source);
 
     // Target sheet with a visible marker at B2.
-    let mut target = MutableXlsbWorksheet::new("Target");
+    let mut target = MutableWorksheet::new("Target");
     target.set_cell(1, 1, CellValue::String("You reached Target!B2".to_string()));
     workbook.add_worksheet(target);
 

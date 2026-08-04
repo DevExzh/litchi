@@ -1,6 +1,6 @@
 //! XLSB rich shared-string parsing.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::records::decode_string;
 use litchi_core::binary;
 
@@ -99,9 +99,9 @@ pub struct SharedString {
 }
 
 impl SharedString {
-    pub(crate) fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.is_empty() {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 1,
                 found: 0,
             });
@@ -111,7 +111,7 @@ impl SharedString {
         let (text, consumed) = decode_string(&data[1..])?;
         let text_len = text.encode_utf16().count();
         if text_len > 0x7FFF {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "RichStr text length".to_string(),
                 val: text_len.to_string(),
             });
@@ -122,12 +122,12 @@ impl SharedString {
             let count = Self::read_count(data, &mut offset, "StrRun")?;
             let byte_count = count
                 .checked_mul(4)
-                .ok_or_else(|| XlsbError::Encoding("StrRun byte count overflow".to_string()))?;
+                .ok_or_else(|| Error::Encoding("StrRun byte count overflow".to_string()))?;
             let end = offset
                 .checked_add(byte_count)
-                .ok_or_else(|| XlsbError::Encoding("StrRun offset overflow".to_string()))?;
+                .ok_or_else(|| Error::Encoding("StrRun offset overflow".to_string()))?;
             if end > data.len() {
-                return Err(XlsbError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: end,
                     found: data.len(),
                 });
@@ -139,7 +139,7 @@ impl SharedString {
                 if usize::from(character_index) >= text_len
                     || previous.is_some_and(|value| character_index <= value)
                 {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "StrRun ich".to_string(),
                         val: character_index.to_string(),
                     });
@@ -160,15 +160,15 @@ impl SharedString {
             let count = Self::read_count(data, &mut offset, "PhRun")?;
             let byte_count = count
                 .checked_mul(6)
-                .ok_or_else(|| XlsbError::Encoding("PhRun byte count overflow".to_string()))?;
+                .ok_or_else(|| Error::Encoding("PhRun byte count overflow".to_string()))?;
             let runs_end = offset
                 .checked_add(byte_count)
-                .ok_or_else(|| XlsbError::Encoding("PhRun offset overflow".to_string()))?;
-            let end = runs_end.checked_add(4).ok_or_else(|| {
-                XlsbError::Encoding("phonetic settings offset overflow".to_string())
-            })?;
+                .ok_or_else(|| Error::Encoding("PhRun offset overflow".to_string()))?;
+            let end = runs_end
+                .checked_add(4)
+                .ok_or_else(|| Error::Encoding("phonetic settings offset overflow".to_string()))?;
             if end > data.len() {
-                return Err(XlsbError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: end,
                     found: data.len(),
                 });
@@ -182,7 +182,7 @@ impl SharedString {
                 let base_character_count = binary::read_u16_le_at(chunk, 4)?;
                 let base_end = usize::from(base_character_index)
                     .checked_add(usize::from(base_character_count))
-                    .ok_or_else(|| XlsbError::Encoding("PhRun range overflow".to_string()))?;
+                    .ok_or_else(|| Error::Encoding("PhRun range overflow".to_string()))?;
                 if usize::from(phonetic_character_index) >= phonetic_len
                     || usize::from(base_character_index) >= text_len
                     || base_end > text_len
@@ -190,7 +190,7 @@ impl SharedString {
                     || previous_base_end
                         .is_some_and(|value| usize::from(base_character_index) < value)
                 {
-                    return Err(XlsbError::Unrecognized {
+                    return Err(Error::Unrecognized {
                         typ: "PhRun index".to_string(),
                         val: format!("{phonetic_character_index}/{base_character_index}"),
                     });
@@ -217,7 +217,7 @@ impl SharedString {
             None
         };
         if offset != data.len() {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "RichStr".to_string(),
                 val: format!("{} trailing bytes", data.len() - offset),
             });
@@ -229,12 +229,12 @@ impl SharedString {
         })
     }
 
-    fn read_count(data: &[u8], offset: &mut usize, context: &str) -> XlsbResult<usize> {
+    fn read_count(data: &[u8], offset: &mut usize, context: &str) -> Result<usize> {
         let end = offset
             .checked_add(4)
-            .ok_or_else(|| XlsbError::Encoding(format!("{context} count offset overflow")))?;
+            .ok_or_else(|| Error::Encoding(format!("{context} count offset overflow")))?;
         if end > data.len() {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
@@ -242,7 +242,7 @@ impl SharedString {
         let count = binary::read_u32_le_at(data, *offset)? as usize;
         *offset = end;
         if count > 0x7FFF {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: format!("{context} count"),
                 val: count.to_string(),
             });

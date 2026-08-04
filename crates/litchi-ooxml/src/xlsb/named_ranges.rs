@@ -8,9 +8,7 @@ pub use litchi_xlsb::named_ranges::{
     Definition, Error, MAX_RECORD_BYTES, Result, area3d_formula, parse, validate_name,
 };
 
-use crate::xlsb::error::XlsbError;
-
-impl From<litchi_xlsb::named_ranges::Error> for XlsbError {
+impl From<litchi_xlsb::named_ranges::Error> for crate::xlsb::error::Error {
     fn from(error: litchi_xlsb::named_ranges::Error) -> Self {
         let message = error.to_string();
         match error {

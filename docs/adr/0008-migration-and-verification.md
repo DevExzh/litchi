@@ -2206,7 +2206,7 @@ directions. XLSX validates every effective worksheet `appRef`, including queued
 worksheet mutations, against exactly one binding in candidate task panes
 before `put_task_panes`; `remove_task_panes` proves that no worksheet binding
 would dangle, while worksheet binding replacement validates against the
-current package graph. The new XLSB `XlsbWorkbook::{task_panes,
+current package graph. The new XLSB `xlsb::Workbook::{task_panes,
 put_task_panes, remove_task_panes}` facade applies the same rule to every
 binary worksheet `BrtWebExtension.appRef`; candidate task panes are rejected
 when a binary reference is missing or ambiguous, and removal is refused while
@@ -3842,7 +3842,7 @@ orchestration, and historical error/API paths as explicit adapters:
 - BIFF12 cell-formula buffers, RPN `Ptg` parsing and compilation, checked
   ranges, and array/shared formula records now live in `litchi-xlsb::formula`.
   Workbook link/name/table/pivot resolution and worksheet record orchestration
-  remain in `litchi-ooxml`; the host wrapper preserves its `XlsbError` API while
+  remain in `litchi-ooxml`; the host wrapper preserves its `xlsb::Error` API while
   delegating binary validation and serialization.
 
 The checked-in specification anchors for settings are `[MS-DOCX]` §§2.2.2 and
@@ -3962,7 +3962,7 @@ adapters:
   semantic validation models now live in `litchi-xlsb::data_validation`. The
   host keeps worksheet record traversal and text-formula compilation/writing,
   implements the owner formula-resolution and binary-formula bridges, and maps
-  owner failures to `XlsbError`.
+  owner failures to `xlsb::Error`.
 - SpreadsheetML workbook `metadataTypes`, `futureMetadata`, `cellMetadata`,
   `valueMetadata`, and inert extension XML now live in
   `litchi-xlsx::workbook_metadata`. The host keeps the workbook relationship,
@@ -4009,7 +4009,7 @@ adapters:
   `BrtEndSXView` boundary validation, bounded record scanning, and lossless
   stream retention now live in `litchi-xlsb::pivot_view`. The host retains
   workbook/sheet/package orchestration and maps owner failures to the
-  historical `XlsbError` API.
+  historical `xlsb::Error` API.
 - WordprocessingML smart-tag vocabulary values now live in
   `litchi-docx::settings`. The owner validates the checked client length
   domains while retaining empty-but-present attribute values; the host keeps
@@ -4498,7 +4498,7 @@ canonical facade exposes `Formatting`, `Rule`, `RuleType`, `Value`, `Scale`,
 `Bar`, `IconSet`, and the related record values without compatibility aliases
 or format-expanded spellings. The OOXML migration host no longer publishes a
 conditional-formatting forwarding module or writer codec; it retains worksheet
-record orchestration and maps owner failures into `XlsbError` at the host
+record orchestration and maps owner failures into `xlsb::Error` at the host
 error boundary.
 
 ## ODF namespace vocabulary extraction

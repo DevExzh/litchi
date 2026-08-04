@@ -4,11 +4,11 @@ use std::collections::TryReserveError;
 use std::fmt;
 
 /// Result type alias for XLSB operations
-pub type XlsbResult<T> = Result<T, XlsbError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during XLSB file parsing
 #[derive(Debug)]
-pub enum XlsbError {
+pub enum Error {
     /// I/O error
     Io(std::io::Error),
     /// XML parsing error
@@ -85,129 +85,129 @@ pub enum XlsbError {
     PasswordProtected,
 }
 
-impl fmt::Display for XlsbError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            XlsbError::Io(e) => write!(f, "I/O error: {}", e),
-            XlsbError::Xml(e) => write!(f, "XML error: {}", e),
-            XlsbError::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
-            XlsbError::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
-            XlsbError::MergedCell(e) => write!(f, "XLSB merged-cell error: {e}"),
-            XlsbError::Hyperlink(e) => write!(f, "XLSB hyperlink error: {e}"),
-            XlsbError::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
-            XlsbError::UnexpectedRecord { expected, found } => {
+            Error::Io(e) => write!(f, "I/O error: {}", e),
+            Error::Xml(e) => write!(f, "XML error: {}", e),
+            Error::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
+            Error::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
+            Error::MergedCell(e) => write!(f, "XLSB merged-cell error: {e}"),
+            Error::Hyperlink(e) => write!(f, "XLSB hyperlink error: {e}"),
+            Error::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
+            Error::UnexpectedRecord { expected, found } => {
                 write!(
                     f,
                     "Unexpected record type 0x{:04X}, expected 0x{:04X}",
                     found, expected
                 )
             },
-            XlsbError::InvalidLength { expected, found } => {
+            Error::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
             },
-            XlsbError::UnexpectedEndOfStream(context) => {
+            Error::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)
             },
-            XlsbError::InvalidFormula(msg) => {
+            Error::InvalidFormula(msg) => {
                 write!(f, "Invalid formula: {}", msg)
             },
-            XlsbError::InvalidCellReference(ref_str) => {
+            Error::InvalidCellReference(ref_str) => {
                 write!(f, "Invalid cell reference: {}", ref_str)
             },
-            XlsbError::WorksheetNotFound(name) => {
+            Error::WorksheetNotFound(name) => {
                 write!(f, "Worksheet '{}' not found", name)
             },
-            XlsbError::FileNotFound(file) => {
+            Error::FileNotFound(file) => {
                 write!(f, "File '{}' not found in ZIP", file)
             },
-            XlsbError::UnsupportedFeature(feature) => {
+            Error::UnsupportedFeature(feature) => {
                 write!(f, "Unsupported feature: {}", feature)
             },
-            XlsbError::Encoding(msg) => {
+            Error::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
             },
-            XlsbError::Allocation { resource, source } => {
+            Error::Allocation { resource, source } => {
                 write!(f, "allocation failed for {resource}: {source}")
             },
-            XlsbError::Drawing(error) => write!(f, "DrawingML error: {error}"),
-            XlsbError::Common(error) => write!(f, "shared OOXML error: {error}"),
-            XlsbError::Vba(error) => write!(f, "VBA error: {error}"),
+            Error::Drawing(error) => write!(f, "DrawingML error: {error}"),
+            Error::Common(error) => write!(f, "shared OOXML error: {error}"),
+            Error::Vba(error) => write!(f, "VBA error: {error}"),
             #[cfg(feature = "encryption")]
-            XlsbError::Crypto(error) => write!(f, "Office cryptography error: {error}"),
-            XlsbError::WideStringLength { expected, actual } => {
+            Error::Crypto(error) => write!(f, "Office cryptography error: {error}"),
+            Error::WideStringLength { expected, actual } => {
                 write!(
                     f,
                     "Wide string length mismatch: expected {}, actual {}",
                     expected, actual
                 )
             },
-            XlsbError::Unrecognized { typ, val } => {
+            Error::Unrecognized { typ, val } => {
                 write!(f, "Unrecognized {}: {}", typ, val)
             },
-            XlsbError::PasswordProtected => {
+            Error::PasswordProtected => {
                 write!(f, "Workbook is password protected")
             },
         }
     }
 }
 
-impl std::error::Error for XlsbError {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            XlsbError::Io(e) => Some(e),
-            XlsbError::Xml(e) => Some(e),
-            XlsbError::Wire(e) => Some(e),
-            XlsbError::Calc(e) => Some(e),
-            XlsbError::MergedCell(e) => Some(e),
-            XlsbError::Hyperlink(e) => Some(e),
-            XlsbError::Allocation { source, .. } => Some(source),
-            XlsbError::Drawing(e) => Some(e),
-            XlsbError::Common(e) => Some(e),
-            XlsbError::Vba(e) => Some(e),
+            Error::Io(e) => Some(e),
+            Error::Xml(e) => Some(e),
+            Error::Wire(e) => Some(e),
+            Error::Calc(e) => Some(e),
+            Error::MergedCell(e) => Some(e),
+            Error::Hyperlink(e) => Some(e),
+            Error::Allocation { source, .. } => Some(source),
+            Error::Drawing(e) => Some(e),
+            Error::Common(e) => Some(e),
+            Error::Vba(e) => Some(e),
             #[cfg(feature = "encryption")]
-            XlsbError::Crypto(e) => Some(e),
+            Error::Crypto(e) => Some(e),
             _ => None,
         }
     }
 }
 
-impl From<std::io::Error> for XlsbError {
+impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        XlsbError::Io(err)
+        Error::Io(err)
     }
 }
 
-impl From<quick_xml::Error> for XlsbError {
+impl From<quick_xml::Error> for Error {
     fn from(err: quick_xml::Error) -> Self {
-        XlsbError::Xml(err)
+        Error::Xml(err)
     }
 }
 
-impl From<litchi_xlsb::Error> for XlsbError {
+impl From<litchi_xlsb::Error> for Error {
     fn from(error: litchi_xlsb::Error) -> Self {
         Self::Wire(error)
     }
 }
 
-impl From<litchi_xlsb::calc::Error> for XlsbError {
+impl From<litchi_xlsb::calc::Error> for Error {
     fn from(error: litchi_xlsb::calc::Error) -> Self {
         Self::Calc(error)
     }
 }
 
-impl From<litchi_xlsb::merged_cells::Error> for XlsbError {
+impl From<litchi_xlsb::merged_cells::Error> for Error {
     fn from(error: litchi_xlsb::merged_cells::Error) -> Self {
         Self::MergedCell(error)
     }
 }
 
-impl From<litchi_xlsb::hyperlinks::Error> for XlsbError {
+impl From<litchi_xlsb::hyperlinks::Error> for Error {
     fn from(error: litchi_xlsb::hyperlinks::Error) -> Self {
         Self::Hyperlink(error)
     }
 }
 
-impl From<litchi_xlsb::conditional_formatting::Error> for XlsbError {
+impl From<litchi_xlsb::conditional_formatting::Error> for Error {
     fn from(error: litchi_xlsb::conditional_formatting::Error) -> Self {
         match error {
             litchi_xlsb::conditional_formatting::Error::InvalidLength { expected, found } => {
@@ -239,91 +239,89 @@ impl From<litchi_xlsb::conditional_formatting::Error> for XlsbError {
     }
 }
 
-impl From<litchi_core::binary::BinaryError> for XlsbError {
+impl From<litchi_core::binary::BinaryError> for Error {
     fn from(err: litchi_core::binary::BinaryError) -> Self {
-        XlsbError::Encoding(err.to_string())
+        Error::Encoding(err.to_string())
     }
 }
 
-impl From<litchi_drawingml::Error> for XlsbError {
+impl From<litchi_drawingml::Error> for Error {
     fn from(error: litchi_drawingml::Error) -> Self {
         Self::Drawing(error)
     }
 }
 
-impl From<litchi_ooxml_common::Error> for XlsbError {
+impl From<litchi_ooxml_common::Error> for Error {
     fn from(error: litchi_ooxml_common::Error) -> Self {
         Self::Common(error)
     }
 }
 
-impl From<litchi_vba::Error> for XlsbError {
+impl From<litchi_vba::Error> for Error {
     fn from(error: litchi_vba::Error) -> Self {
         Self::Vba(error)
     }
 }
 
 #[cfg(feature = "encryption")]
-impl From<litchi_crypto::ooxml::Error> for XlsbError {
+impl From<litchi_crypto::ooxml::Error> for Error {
     fn from(error: litchi_crypto::ooxml::Error) -> Self {
         Self::Crypto(error)
     }
 }
 
-impl From<litchi_opc::error::OpcError> for XlsbError {
+impl From<litchi_opc::error::OpcError> for Error {
     fn from(err: litchi_opc::error::OpcError) -> Self {
-        XlsbError::Encoding(format!("OPC error: {}", err))
+        Error::Encoding(format!("OPC error: {}", err))
     }
 }
 
-impl From<crate::error::OoxmlError> for XlsbError {
+impl From<crate::error::OoxmlError> for Error {
     fn from(err: crate::error::OoxmlError) -> Self {
         match err {
-            crate::error::OoxmlError::Opc(e) => XlsbError::Encoding(format!("OPC error: {}", e)),
-            crate::error::OoxmlError::Xml(msg) => {
-                XlsbError::Encoding(format!("XML error: {}", msg))
-            },
-            crate::error::OoxmlError::PartNotFound(path) => XlsbError::FileNotFound(path),
-            crate::error::OoxmlError::InvalidContentType { expected, got } => XlsbError::Encoding(
+            crate::error::OoxmlError::Opc(e) => Error::Encoding(format!("OPC error: {}", e)),
+            crate::error::OoxmlError::Xml(msg) => Error::Encoding(format!("XML error: {}", msg)),
+            crate::error::OoxmlError::PartNotFound(path) => Error::FileNotFound(path),
+            crate::error::OoxmlError::InvalidContentType { expected, got } => Error::Encoding(
                 format!("Invalid content type: expected {}, got {}", expected, got),
             ),
             crate::error::OoxmlError::InvalidUri(s) => {
-                XlsbError::Encoding(format!("Invalid URI: {}", s))
+                Error::Encoding(format!("Invalid URI: {}", s))
             },
             crate::error::OoxmlError::InvalidRelationship(msg) => {
-                XlsbError::Encoding(format!("Invalid relationship: {}", msg))
+                Error::Encoding(format!("Invalid relationship: {}", msg))
             },
-            crate::error::OoxmlError::InvalidFormat(msg) => XlsbError::Encoding(msg),
-            crate::error::OoxmlError::Drawing(err) => XlsbError::Encoding(err.to_string()),
-            crate::error::OoxmlError::Docx(err) => XlsbError::Encoding(err.to_string()),
-            crate::error::OoxmlError::Pptx(err) => XlsbError::Encoding(err.to_string()),
-            crate::error::OoxmlError::Xlsb(err) => XlsbError::Wire(err),
+            crate::error::OoxmlError::InvalidFormat(msg) => Error::Encoding(msg),
+            crate::error::OoxmlError::Drawing(err) => Error::Encoding(err.to_string()),
+            crate::error::OoxmlError::Docx(err) => Error::Encoding(err.to_string()),
+            crate::error::OoxmlError::Pptx(err) => Error::Encoding(err.to_string()),
+            crate::error::OoxmlError::Xlsb(err) => Error::Wire(err),
             crate::error::OoxmlError::Xlsx(litchi_xlsx::Error::Allocation { resource, source }) => {
-                XlsbError::Allocation { resource, source }
+                Error::Allocation { resource, source }
             },
-            crate::error::OoxmlError::Xlsx(err) => XlsbError::Encoding(err.to_string()),
+            crate::error::OoxmlError::Xlsx(err) => Error::Encoding(err.to_string()),
             #[cfg(feature = "encryption")]
-            crate::error::OoxmlError::Crypto(err) => XlsbError::Crypto(err),
-            crate::error::OoxmlError::Io(e) => XlsbError::Io(e),
-            crate::error::OoxmlError::Common(err) => XlsbError::Common(err),
-            crate::error::OoxmlError::Vba(err) => XlsbError::Vba(err),
+            crate::error::OoxmlError::Crypto(err) => Error::Crypto(err),
+            crate::error::OoxmlError::Io(e) => Error::Io(e),
+            crate::error::OoxmlError::Common(err) => Error::Common(err),
+            crate::error::OoxmlError::Vba(err) => Error::Vba(err),
             crate::error::OoxmlError::Allocation { resource, source } => {
-                XlsbError::Allocation { resource, source }
+                Error::Allocation { resource, source }
             },
             crate::error::OoxmlError::UnsafeEdit {
                 format,
                 operation,
                 reason,
-            } => XlsbError::UnsupportedFeature(format!(
+            } => Error::UnsupportedFeature(format!(
                 "unsafe {format} edit rejected during {operation}: {reason}"
             )),
-            crate::error::OoxmlError::Other(msg) => XlsbError::Encoding(msg),
+            crate::error::OoxmlError::Other(msg) => Error::Encoding(msg),
         }
     }
 }
 
-impl From<String> for XlsbError {
+impl From<String> for Error {
     fn from(err: String) -> Self {
-        XlsbError::Encoding(err)
+        Error::Encoding(err)
     }
 }

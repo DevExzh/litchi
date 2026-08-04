@@ -6,17 +6,17 @@
 //! known begin/end record pairs that carry no modelled data (XML column
 //! properties, FRT wrappers, ...) are skipped as balanced collections.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::walker::{RecordWalker, malformed};
 use litchi_xlsb::raw::{Cursor, kind as rt};
 
 trait CursorExt {
-    fn read_dxf_id(&mut self) -> XlsbResult<Option<u32>>;
+    fn read_dxf_id(&mut self) -> Result<Option<u32>>;
 }
 
 impl CursorExt for Cursor<'_> {
     /// Read a `DXFId`, mapping `0xFFFFFFFF` to `None` (MS-XLSB 2.5.38).
-    fn read_dxf_id(&mut self) -> XlsbResult<Option<u32>> {
+    fn read_dxf_id(&mut self) -> Result<Option<u32>> {
         Ok(match self.read_u32()? {
             NO_DXF => None,
             id => Some(id),
@@ -55,7 +55,7 @@ const FRT_BLANK_LEN: usize = 4;
 /// The stream must start with `BrtBeginList`. Records after `BrtEndList` are
 /// ignored. Unknown record types anywhere in the stream are skipped without
 /// failing.
-pub fn parse_table_part(data: &[u8]) -> XlsbResult<Table> {
+pub fn parse_table_part(data: &[u8]) -> Result<Table> {
     let mut walker = RecordWalker::new(data);
     let first = walker.required_begin(rt::BEGIN_LIST, "BrtBeginList")?;
     let mut table = parse_list_payload(first.payload())?;
@@ -70,7 +70,7 @@ pub fn parse_table_part(data: &[u8]) -> XlsbResult<Table> {
             other => walker.skip_unhandled(other, "Table stream")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream("BrtEndList".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndList".to_string()))
 }
 
 /// Extract the Table part relationship identifiers a worksheet declares in
@@ -78,7 +78,7 @@ pub fn parse_table_part(data: &[u8]) -> XlsbResult<Table> {
 ///
 /// Records outside the collection are ignored; the identifiers are returned
 /// verbatim and are never dereferenced.
-pub fn parse_table_part_rel_ids(data: &[u8]) -> XlsbResult<Vec<String>> {
+pub fn parse_table_part_rel_ids(data: &[u8]) -> Result<Vec<String>> {
     let mut walker = RecordWalker::new(data);
     let mut rel_ids = Vec::new();
     while let Some(record) = walker.next()? {
@@ -96,7 +96,7 @@ fn parse_list_parts(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
     rel_ids: &mut Vec<String>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtBeginListParts");
     let declared = cursor.read_u32()?;
     cursor.finish()?;
@@ -123,13 +123,11 @@ fn parse_list_parts(
             other => walker.skip_unhandled(other, "BrtBeginListParts collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndListParts".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndListParts".to_string()))
 }
 
 /// `BrtBeginList` payload (MS-XLSB 2.4.100).
-fn parse_list_payload(data: &[u8]) -> XlsbResult<Table> {
+fn parse_list_payload(data: &[u8]) -> Result<Table> {
     let mut cursor = Cursor::new(data, "BrtBeginList");
     let range = Range {
         first_row: cursor.read_u32()?,
@@ -188,7 +186,7 @@ fn parse_list_payload(data: &[u8]) -> XlsbResult<Table> {
 }
 
 /// `BrtBeginListCols` collection (MS-XLSB 2.4.102).
-fn parse_columns(walker: &mut RecordWalker<'_>, data: &[u8], table: &mut Table) -> XlsbResult<()> {
+fn parse_columns(walker: &mut RecordWalker<'_>, data: &[u8], table: &mut Table) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtBeginListCols");
     let declared = cursor.read_u32()?;
     cursor.finish()?;
@@ -211,13 +209,11 @@ fn parse_columns(walker: &mut RecordWalker<'_>, data: &[u8], table: &mut Table) 
             other => walker.skip_unhandled(other, "BrtBeginListCols collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndListCols".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndListCols".to_string()))
 }
 
 /// `BrtBeginListCol` collection (MS-XLSB 2.4.101).
-fn parse_column(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Column> {
+fn parse_column(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<Column> {
     let mut column = parse_column_payload(data)?;
     while let Some(record) = walker.next()? {
         match record.kind() {
@@ -231,13 +227,11 @@ fn parse_column(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Column
             other => walker.skip_unhandled(other, "BrtBeginListCol collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndListCol".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndListCol".to_string()))
 }
 
 /// `BrtBeginListCol` payload (MS-XLSB 2.4.101).
-fn parse_column_payload(data: &[u8]) -> XlsbResult<Column> {
+fn parse_column_payload(data: &[u8]) -> Result<Column> {
     let mut cursor = Cursor::new(data, "BrtBeginListCol");
     let id = cursor.read_u32()?;
     let totals_row_function = TotalsRowFunction::try_from(cursor.read_u32()?)?;
@@ -271,7 +265,7 @@ fn parse_column_payload(data: &[u8]) -> XlsbResult<Column> {
 
 /// `BrtListCCFmla`/`BrtListTrFmla` payload: a flag byte followed by a
 /// `ListParsedFormula` (MS-XLSB 2.4.706, 2.4.708, 2.5.98.11), stored verbatim.
-fn parse_formula(data: &[u8]) -> XlsbResult<Formula> {
+fn parse_formula(data: &[u8]) -> Result<Formula> {
     let mut cursor = Cursor::new(data, "BrtList formula");
     let flags = cursor.read_u8()?;
     let tokens = cursor.read_blob()?;
@@ -285,7 +279,7 @@ fn parse_formula(data: &[u8]) -> XlsbResult<Formula> {
 }
 
 /// `BrtTableStyleClient` payload (MS-XLSB 2.4.847).
-fn parse_style_client(data: &[u8]) -> XlsbResult<StyleInfo> {
+fn parse_style_client(data: &[u8]) -> Result<StyleInfo> {
     let mut cursor = Cursor::new(data, "BrtTableStyleClient");
     let flags = cursor.read_u16()?;
     let name = cursor.read_nullable_wide_string()?;
@@ -300,7 +294,7 @@ fn parse_style_client(data: &[u8]) -> XlsbResult<StyleInfo> {
 }
 
 /// `BrtList14` payload (MS-XLSB 2.4.705): table alternate text.
-fn parse_list14(data: &[u8], table: &mut Table) -> XlsbResult<()> {
+fn parse_list14(data: &[u8], table: &mut Table) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtList14");
     cursor.guard(FRT_BLANK_LEN)?;
     cursor.skip(FRT_BLANK_LEN)?;

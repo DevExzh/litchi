@@ -12,7 +12,6 @@
 //! user-shapes, and extension resources; external targets are never fetched.
 
 use crate::error::{OoxmlError, Result};
-use crate::xlsb::error::XlsbResult;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::Decoder;
 use quick_xml::XmlVersion;
@@ -232,7 +231,7 @@ fn limit(what: &str) -> OoxmlError {
 ///
 /// Markup-compatibility processing is applied so `mc:AlternateContent`
 /// fallbacks resolve before parsing. The root element must be `xdr:wsDr`.
-pub fn parse_drawing_part(xml_bytes: &[u8]) -> XlsbResult<Drawing> {
+pub fn parse_drawing_part(xml_bytes: &[u8]) -> crate::xlsb::error::Result<Drawing> {
     Ok(parse_drawing_part_xml(xml_bytes)?)
 }
 

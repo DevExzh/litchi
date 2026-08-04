@@ -4,7 +4,7 @@
 //! flag bits, optional-field presence flags, and collection counts all
 //! mirror the reader so authored cache definitions round-trip through
 //! `parse_pivot_cache_definition` and, at the package level, through
-//! `XlsbWorkbook::pivot_cache_definitions`.
+//! `Workbook::pivot_cache_definitions`.
 //!
 //! The serializer is lossless-or-refuse: model content that cannot be
 //! represented such that the reader recovers it verbatim is rejected with a
@@ -20,7 +20,7 @@
 //! - sources and consolidation sets that carry both a named range and a
 //!   cell range, or neither.
 
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::Result;
 use crate::xlsb::pivot::model::*;
 use crate::xlsb::walker::malformed;
 use litchi_xlsb::raw::Writer;
@@ -185,7 +185,7 @@ fn write_blob(data: &mut Vec<u8>, blob: &[u8]) {
     data.extend_from_slice(blob);
 }
 
-fn write_count(data: &mut Vec<u8>, count: usize, context: &'static str) -> XlsbResult<()> {
+fn write_count(data: &mut Vec<u8>, count: usize, context: &'static str) -> Result<()> {
     let count =
         u32::try_from(count).map_err(|_| malformed(context, "collection count overflow"))?;
     data.extend_from_slice(&count.to_le_bytes());
@@ -193,7 +193,7 @@ fn write_count(data: &mut Vec<u8>, count: usize, context: &'static str) -> XlsbR
 }
 
 /// Inverse of the reader's `non_negative_index`: `None` becomes `-1`.
-fn optional_index(value: Option<u32>, context: &'static str) -> XlsbResult<i32> {
+fn optional_index(value: Option<u32>, context: &'static str) -> Result<i32> {
     match value {
         Some(value) => i32::try_from(value).map_err(|_| malformed(context, "index overflow")),
         None => Ok(-1),
@@ -209,9 +209,7 @@ fn optional_index(value: Option<u32>, context: &'static str) -> XlsbResult<i32> 
 /// hierarchies, the tuple cache, calculated items and members, and the
 /// Excel 2013 extensions. Content that cannot round-trip through the reader
 /// is rejected; see the module documentation for the exact refusal rules.
-pub(crate) fn write_pivot_cache_definition(
-    definition: &PivotCacheDefinition,
-) -> XlsbResult<Vec<u8>> {
+pub(crate) fn write_pivot_cache_definition(definition: &PivotCacheDefinition) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(512);
     let mut writer = Writer::new(&mut data);
     writer.write_record(rt::BEGIN_PIVOT_CACHE_DEF, &definition_payload(definition))?;
@@ -345,7 +343,7 @@ fn definition_payload(definition: &PivotCacheDefinition) -> Vec<u8> {
 fn write_source<W: std::io::Write>(
     writer: &mut Writer<W>,
     source: &PivotCacheSource,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut payload = Vec::with_capacity(8);
     payload.extend_from_slice(&(source.source_type as u32).to_le_bytes());
     payload.extend_from_slice(&source.connection_id.unwrap_or(0).to_le_bytes());
@@ -373,7 +371,7 @@ fn check_name_or_range(
     named_range: &Option<String>,
     range: &Option<PivotCacheRange>,
     context: &'static str,
-) -> XlsbResult<()> {
+) -> Result<()> {
     if named_range.is_some() == range.is_some() {
         return Err(malformed(
             context,
@@ -384,7 +382,7 @@ fn check_name_or_range(
 }
 
 /// `BrtBeginPCDSRange` payload (MS-XLSB 2.4.167).
-fn worksheet_range_payload(source: &PivotCacheWorksheetSource) -> XlsbResult<Vec<u8>> {
+fn worksheet_range_payload(source: &PivotCacheWorksheetSource) -> Result<Vec<u8>> {
     check_name_or_range(&source.named_range, &source.range, "BrtBeginPCDSRange")?;
     let mut data = Vec::with_capacity(24);
     data.push(if source.named_range.is_some() {
@@ -423,7 +421,7 @@ fn worksheet_range_payload(source: &PivotCacheWorksheetSource) -> XlsbResult<Vec
 fn write_consolidation<W: std::io::Write>(
     writer: &mut Writer<W>,
     consolidation: &PivotCacheConsolidationSource,
-) -> XlsbResult<()> {
+) -> Result<()> {
     if consolidation.pages.len() > MAX_CONSOLIDATION_PAGES {
         return Err(malformed(
             "BrtBeginPCDSCPages",
@@ -477,7 +475,7 @@ fn write_consolidation<W: std::io::Write>(
 }
 
 /// `BrtBeginPCDSCSet` payload (MS-XLSB 2.4.154).
-fn consolidation_set_payload(set: &PivotCacheConsolidationSet) -> XlsbResult<Vec<u8>> {
+fn consolidation_set_payload(set: &PivotCacheConsolidationSet) -> Result<Vec<u8>> {
     check_name_or_range(&set.named_range, &set.range, "BrtBeginPCDSCSet")?;
     let mut data = Vec::with_capacity(32);
     for index in set.item_indexes {
@@ -508,10 +506,7 @@ fn consolidation_set_payload(set: &PivotCacheConsolidationSet) -> XlsbResult<Vec
 }
 
 /// `BrtBeginPCDField` collection (MS-XLSB 2.4.136).
-fn write_field<W: std::io::Write>(
-    writer: &mut Writer<W>,
-    field: &PivotCacheField,
-) -> XlsbResult<()> {
+fn write_field<W: std::io::Write>(writer: &mut Writer<W>, field: &PivotCacheField) -> Result<()> {
     writer.write_record(rt::BEGIN_PCD_FIELD, &field_payload(field)?)?;
     if !field.shared_items.items.is_empty() || field.shared_items.stats.is_some() {
         write_shared_items(writer, &field.shared_items)?;
@@ -528,7 +523,7 @@ fn write_field<W: std::io::Write>(
 }
 
 /// `BrtBeginPCDField` payload (MS-XLSB 2.4.136).
-fn field_payload(field: &PivotCacheField) -> XlsbResult<Vec<u8>> {
+fn field_payload(field: &PivotCacheField) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(32);
     let mut flags = 0u16;
     if field.server_based {
@@ -595,7 +590,7 @@ fn field_payload(field: &PivotCacheField) -> XlsbResult<Vec<u8>> {
 fn write_shared_items<W: std::io::Write>(
     writer: &mut Writer<W>,
     shared_items: &PivotCacheSharedItems,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let stats = shared_items.stats.as_ref().ok_or_else(|| {
         malformed(
             "BrtBeginPCDFAtbl",
@@ -616,7 +611,7 @@ fn write_shared_items<W: std::io::Write>(
 }
 
 /// `BrtBeginPCDFAtbl` payload (MS-XLSB 2.4.131).
-fn shared_items_stats_payload(stats: &PivotCacheSharedItemsStats) -> XlsbResult<Vec<u8>> {
+fn shared_items_stats_payload(stats: &PivotCacheSharedItemsStats) -> Result<Vec<u8>> {
     if stats.minimum.is_some() != stats.maximum.is_some() {
         return Err(malformed(
             "BrtBeginPCDFAtbl",
@@ -675,7 +670,7 @@ fn write_cache_item<W: std::io::Write>(
     value: &PivotCacheItemValue,
     additional: Option<&PivotCacheItemInfo>,
     context: &'static str,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let with_info = additional.is_some();
     let record_type = match (value, with_info) {
         (PivotCacheItemValue::Missing, false) => rt::PCDI_MISSING,
@@ -748,7 +743,7 @@ fn write_date_time(data: &mut Vec<u8>, value: &PivotCacheDateTime) {
 fn write_grouping<W: std::io::Write>(
     writer: &mut Writer<W>,
     grouping: &PivotCacheFieldGrouping,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut payload = Vec::with_capacity(8);
     payload.extend_from_slice(
         &optional_index(grouping.parent_field, "BrtBeginPCDFGroup")?.to_le_bytes(),
@@ -805,7 +800,7 @@ fn write_grouping<W: std::io::Write>(
 fn write_hierarchy<W: std::io::Write>(
     writer: &mut Writer<W>,
     hierarchy: &PivotCacheHierarchy,
-) -> XlsbResult<()> {
+) -> Result<()> {
     writer.write_record(rt::BEGIN_PCD_HIERARCHY, &hierarchy_payload(hierarchy)?)?;
 
     if !hierarchy.field_usage.is_empty() {
@@ -883,7 +878,7 @@ fn write_hierarchy<W: std::io::Write>(
 }
 
 /// `BrtBeginPCDHierarchy` payload (MS-XLSB 2.4.146).
-fn hierarchy_payload(hierarchy: &PivotCacheHierarchy) -> XlsbResult<Vec<u8>> {
+fn hierarchy_payload(hierarchy: &PivotCacheHierarchy) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(32);
     let mut flags1 = 0u16;
     if hierarchy.measure {
@@ -984,7 +979,7 @@ fn hierarchy_payload(hierarchy: &PivotCacheHierarchy) -> XlsbResult<Vec<u8>> {
 fn write_grouping_group<W: std::io::Write>(
     writer: &mut Writer<W>,
     group: &PivotCacheGroupingGroup,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut payload = Vec::with_capacity(24);
     payload.extend_from_slice(&group.group_number.to_le_bytes());
     payload.push(if group.parent_unique_name.is_some() {
@@ -1020,7 +1015,7 @@ fn write_grouping_group<W: std::io::Write>(
 fn write_tuple_cache<W: std::io::Write>(
     writer: &mut Writer<W>,
     cache: &PivotCacheTupleCache,
-) -> XlsbResult<()> {
+) -> Result<()> {
     writer.write_record(rt::BEGIN_PCDSD_TUPLE_CACHE, &[])?;
 
     let mut payload = Vec::with_capacity(4);
@@ -1071,7 +1066,7 @@ fn write_tuple_cache<W: std::io::Write>(
 fn write_calculated_item<W: std::io::Write>(
     writer: &mut Writer<W>,
     item: &CalculatedItem,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut payload = Vec::with_capacity(16);
     // reserved (4 bytes): MUST be -1.
     payload.extend_from_slice(&(-1i32).to_le_bytes());
@@ -1102,7 +1097,7 @@ fn write_calculated_item<W: std::io::Write>(
 }
 
 /// `BrtBeginPName` collection (MS-XLSB 2.4.176).
-fn write_name<W: std::io::Write>(writer: &mut Writer<W>, name: &PivotName) -> XlsbResult<()> {
+fn write_name<W: std::io::Write>(writer: &mut Writer<W>, name: &PivotName) -> Result<()> {
     let mut payload = Vec::with_capacity(8);
     payload.extend_from_slice(&name.field_index.to_le_bytes());
     payload.push(name.function as u8);
@@ -1139,7 +1134,7 @@ fn write_name<W: std::io::Write>(writer: &mut Writer<W>, name: &PivotName) -> Xl
 fn write_rule_filter<W: std::io::Write>(
     writer: &mut Writer<W>,
     filter: &PivotRuleFilter,
-) -> XlsbResult<()> {
+) -> Result<()> {
     if filter.item_types & !PR_FILTER_ITEM_TYPES_MASK != 0 {
         return Err(malformed(
             "BrtBeginPRFilter",
@@ -1173,7 +1168,7 @@ fn write_rule_filter<W: std::io::Write>(
 fn write_calculated_member<W: std::io::Write>(
     writer: &mut Writer<W>,
     member: &CalculatedMember,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut payload = Vec::with_capacity(24);
     let mut flags = 0u32;
     if member.member_name.is_some() {
@@ -1249,9 +1244,9 @@ fn pcd14_payload(ext14: &PivotCacheDefinitionExt14) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::error::XlsbError;
+    use crate::xlsb::error::Error;
     use crate::xlsb::pivot::parse_pivot_cache_definition;
-    use crate::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+    use crate::xlsb::writer::{MutableWorksheet, WorkbookWriter};
     use std::io::Cursor;
 
     fn field(name: &str) -> PivotCacheField {
@@ -1678,7 +1673,7 @@ mod tests {
         definition.fields = vec![broken];
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         // Shared items without statistics would fabricate an ATBL payload.
@@ -1694,7 +1689,7 @@ mod tests {
         definition.fields = vec![broken];
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         // Statistics with only one bound set.
@@ -1710,7 +1705,7 @@ mod tests {
         definition.fields = vec![broken];
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         // Index items inside grouping items.
@@ -1729,7 +1724,7 @@ mod tests {
         definition.fields = vec![broken];
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         // Index values inside tuple cache entries.
@@ -1742,7 +1737,7 @@ mod tests {
         };
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 
@@ -1771,7 +1766,7 @@ mod tests {
         };
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         // Neither a named range nor a cell range.
@@ -1792,7 +1787,7 @@ mod tests {
         };
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         // A consolidation set with no locator.
@@ -1818,7 +1813,7 @@ mod tests {
         };
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 
@@ -1845,7 +1840,7 @@ mod tests {
         };
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
 
         // Rule-filter item types exceeding the 13-bit mask.
@@ -1864,7 +1859,7 @@ mod tests {
         };
         assert!(matches!(
             write_pivot_cache_definition(&definition),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
     }
 
@@ -1888,8 +1883,8 @@ mod tests {
             ..PivotCacheDefinition::default()
         };
 
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
         let first_id = workbook.add_pivot_cache(&first).unwrap();
         let second_id = workbook.add_pivot_cache(&second).unwrap();
         assert_eq!(first_id, 1);
@@ -1897,7 +1892,7 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
-        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let reader = crate::xlsb::Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
         let definitions = reader.pivot_cache_definitions();
         assert_eq!(definitions.len(), 2);
@@ -1922,11 +1917,11 @@ mod tests {
         };
         broken.fields = vec![broken_field];
 
-        let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        let mut workbook = WorkbookWriter::new();
+        workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
         assert!(matches!(
             workbook.add_pivot_cache(&broken),
-            Err(XlsbError::Unrecognized { .. })
+            Err(Error::Unrecognized { .. })
         ));
         // The refused cache was not attached; a valid cache gets id 1.
         let valid = PivotCacheDefinition::default();

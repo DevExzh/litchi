@@ -7,7 +7,7 @@
 //! wrappers, server-format collections, ...) are skipped as balanced
 //! collections.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::pivot::model::*;
 use crate::xlsb::walker::{RecordWalker, malformed};
 use litchi_xlsb::raw::{Cursor, kind as rt};
@@ -158,7 +158,7 @@ const CONSOL_AUTO_PAGE: u16 = 1 << 0;
 /// The stream must start with `BrtBeginPivotCacheDef`. Records after
 /// `BrtEndPivotCacheDef` are ignored. Unknown record types anywhere in the
 /// stream are skipped without failing.
-pub fn parse_pivot_cache_definition(data: &[u8]) -> XlsbResult<PivotCacheDefinition> {
+pub fn parse_pivot_cache_definition(data: &[u8]) -> Result<PivotCacheDefinition> {
     let mut walker = RecordWalker::new(data);
     let first = walker.required_begin(rt::BEGIN_PIVOT_CACHE_DEF, "BrtBeginPivotCacheDef")?;
     let mut definition = parse_definition_payload(first.payload())?;
@@ -190,18 +190,18 @@ pub fn parse_pivot_cache_definition(data: &[u8]) -> XlsbResult<PivotCacheDefinit
             other => walker.skip_unhandled(other, "PivotCache definition stream")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPivotCacheDef".to_string(),
     ))
 }
 
 trait CursorExt {
-    fn read_range(&mut self) -> XlsbResult<PivotCacheRange>;
+    fn read_range(&mut self) -> Result<PivotCacheRange>;
 }
 
 impl CursorExt for Cursor<'_> {
     /// Read a `PivotCacheRange` (four signed 32-bit bounds).
-    fn read_range(&mut self) -> XlsbResult<PivotCacheRange> {
+    fn read_range(&mut self) -> Result<PivotCacheRange> {
         let first_row = self.read_i32()?;
         let last_row = self.read_i32()?;
         let first_column = self.read_i32()?;
@@ -216,7 +216,7 @@ impl CursorExt for Cursor<'_> {
 }
 
 /// `BrtBeginPivotCacheDef` payload (MS-XLSB 2.4.168).
-fn parse_definition_payload(data: &[u8]) -> XlsbResult<PivotCacheDefinition> {
+fn parse_definition_payload(data: &[u8]) -> Result<PivotCacheDefinition> {
     let mut cursor = Cursor::new(data, "BrtBeginPivotCacheDef");
     let version_last_refresh = cursor.read_u8()?;
     let version_refreshable_min = cursor.read_u8()?;
@@ -266,7 +266,7 @@ fn parse_definition_payload(data: &[u8]) -> XlsbResult<PivotCacheDefinition> {
 }
 
 /// `BrtBeginPCDSource` collection (MS-XLSB 2.4.166).
-fn parse_source(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotCacheSource> {
+fn parse_source(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotCacheSource> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDSource");
     let source_type = PivotCacheSourceType::try_from(cursor.read_u32()?)?;
     let connection_id = cursor.read_u32()?;
@@ -290,13 +290,11 @@ fn parse_source(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotC
             other => walker.skip_unhandled(other, "BrtBeginPCDSource collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDSource".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDSource".to_string()))
 }
 
 /// `BrtBeginPCDSRange` payload (MS-XLSB 2.4.167).
-fn parse_worksheet_range(data: &[u8]) -> XlsbResult<PivotCacheWorksheetSource> {
+fn parse_worksheet_range(data: &[u8]) -> Result<PivotCacheWorksheetSource> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDSRange");
     let flags0 = cursor.read_u8()?;
     let flags1 = cursor.read_u8()?;
@@ -331,7 +329,7 @@ fn parse_worksheet_range(data: &[u8]) -> XlsbResult<PivotCacheWorksheetSource> {
 fn parse_consolidation(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
-) -> XlsbResult<PivotCacheConsolidationSource> {
+) -> Result<PivotCacheConsolidationSource> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDSConsol");
     let flags = cursor.read_u16()?;
     cursor.finish()?;
@@ -348,16 +346,14 @@ fn parse_consolidation(
             other => walker.skip_unhandled(other, "BrtBeginPCDSConsol collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDSConsol".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDSConsol".to_string()))
 }
 
 /// `BrtBeginPCDSCSets` collection (MS-XLSB 2.4.155).
 fn parse_consolidation_sets(
     walker: &mut RecordWalker<'_>,
     consolidation: &mut PivotCacheConsolidationSource,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDSC_SETS => return Ok(()),
@@ -370,13 +366,11 @@ fn parse_consolidation_sets(
             other => walker.skip_unhandled(other, "BrtBeginPCDSCSets collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDSCSets".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDSCSets".to_string()))
 }
 
 /// `BrtBeginPCDSCSet` payload (MS-XLSB 2.4.154).
-fn parse_consolidation_set(data: &[u8]) -> XlsbResult<PivotCacheConsolidationSet> {
+fn parse_consolidation_set(data: &[u8]) -> Result<PivotCacheConsolidationSet> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDSCSet");
     let item_indexes = [
         cursor.read_u32()?,
@@ -417,7 +411,7 @@ fn parse_consolidation_set(data: &[u8]) -> XlsbResult<PivotCacheConsolidationSet
 fn parse_consolidation_pages(
     walker: &mut RecordWalker<'_>,
     consolidation: &mut PivotCacheConsolidationSource,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDSC_PAGES => return Ok(()),
@@ -428,15 +422,11 @@ fn parse_consolidation_pages(
             other => walker.skip_unhandled(other, "BrtBeginPCDSCPages collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDSCPages".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDSCPages".to_string()))
 }
 
 /// `BrtBeginPCDSCPage` collection (MS-XLSB 2.4.151).
-fn parse_consolidation_page(
-    walker: &mut RecordWalker<'_>,
-) -> XlsbResult<PivotCacheConsolidationPage> {
+fn parse_consolidation_page(walker: &mut RecordWalker<'_>) -> Result<PivotCacheConsolidationPage> {
     let mut page = PivotCacheConsolidationPage {
         item_names: Vec::new(),
     };
@@ -452,9 +442,7 @@ fn parse_consolidation_page(
             other => walker.skip_unhandled(other, "BrtBeginPCDSCPage collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDSCPage".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDSCPage".to_string()))
 }
 
 /// `BrtBeginPCDFields` collection (MS-XLSB 2.4.137).
@@ -462,7 +450,7 @@ fn parse_fields(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
     definition: &mut PivotCacheDefinition,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDFields");
     // `cFields` declares the field count; the actual records define the model.
     let _declared_fields = cursor.read_u32()?;
@@ -477,13 +465,11 @@ fn parse_fields(
             other => walker.skip_unhandled(other, "BrtBeginPCDFields collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDFields".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDFields".to_string()))
 }
 
 /// `BrtBeginPCDField` collection (MS-XLSB 2.4.136).
-fn parse_field(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotCacheField> {
+fn parse_field(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotCacheField> {
     let mut field = parse_field_payload(data)?;
     while let Some(record) = walker.next()? {
         match record.kind() {
@@ -498,13 +484,11 @@ fn parse_field(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotCa
             other => walker.skip_unhandled(other, "BrtBeginPCDField collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDField".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDField".to_string()))
 }
 
 /// `BrtBeginPCDField` payload (MS-XLSB 2.4.136).
-fn parse_field_payload(data: &[u8]) -> XlsbResult<PivotCacheField> {
+fn parse_field_payload(data: &[u8]) -> Result<PivotCacheField> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDField");
     let flags = cursor.read_u16()?;
     let number_format = match cursor.read_u32()? {
@@ -566,7 +550,7 @@ fn parse_field_payload(data: &[u8]) -> XlsbResult<PivotCacheField> {
 }
 
 /// `PivotParsedFormula` (MS-XLSB 2.5.98.15), stored verbatim.
-fn parse_pivot_formula(cursor: &mut Cursor<'_>) -> XlsbResult<PivotParsedFormulaData> {
+fn parse_pivot_formula(cursor: &mut Cursor<'_>) -> Result<PivotParsedFormulaData> {
     let tokens = cursor.read_blob()?;
     let extra = cursor.read_blob()?;
     Ok(PivotParsedFormulaData {
@@ -581,7 +565,7 @@ fn parse_shared_items(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
     shared_items: &mut PivotCacheSharedItems,
-) -> XlsbResult<()> {
+) -> Result<()> {
     shared_items.stats = Some(parse_shared_items_stats(data)?);
     while let Some(record) = walker.next()? {
         match record.kind() {
@@ -608,13 +592,11 @@ fn parse_shared_items(
             other => walker.skip_unhandled(other, "BrtBeginPCDFAtbl collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDFAtbl".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDFAtbl".to_string()))
 }
 
 /// `BrtBeginPCDFAtbl` payload (MS-XLSB 2.4.131).
-fn parse_shared_items_stats(data: &[u8]) -> XlsbResult<PivotCacheSharedItemsStats> {
+fn parse_shared_items_stats(data: &[u8]) -> Result<PivotCacheSharedItemsStats> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDFAtbl");
     let flags = cursor.read_u16()?;
     let item_count = cursor.read_u32()?;
@@ -649,7 +631,7 @@ fn parse_cache_item(
     record_type: litchi_xlsb::raw::Kind,
     data: &[u8],
     strict: bool,
-) -> XlsbResult<PivotCacheItem> {
+) -> Result<PivotCacheItem> {
     let mut cursor = Cursor::new(data, "BrtPCDI cache item");
     let value = match record_type {
         rt::PCDI_MISSING | rt::PCDIA_MISSING => PivotCacheItemValue::Missing,
@@ -666,7 +648,7 @@ fn parse_cache_item(
         },
         rt::PCDI_INDEX => PivotCacheItemValue::Index(cursor.read_u32()?),
         _ => {
-            return Err(XlsbError::UnexpectedRecord {
+            return Err(Error::UnexpectedRecord {
                 expected: rt::PCDI_MISSING.get(),
                 found: record_type.get(),
             });
@@ -692,7 +674,7 @@ fn parse_cache_item(
 }
 
 /// `PCDIDateTime` (MS-XLSB 2.5.101).
-fn read_date_time(cursor: &mut Cursor<'_>) -> XlsbResult<PivotCacheDateTime> {
+fn read_date_time(cursor: &mut Cursor<'_>) -> Result<PivotCacheDateTime> {
     Ok(PivotCacheDateTime {
         year: cursor.read_u16()?,
         month: cursor.read_u16()?,
@@ -704,7 +686,7 @@ fn read_date_time(cursor: &mut Cursor<'_>) -> XlsbResult<PivotCacheDateTime> {
 }
 
 /// `PCDIAddlInfo` (MS-XLSB 2.5.100).
-fn parse_item_info(cursor: &mut Cursor<'_>) -> XlsbResult<PivotCacheItemInfo> {
+fn parse_item_info(cursor: &mut Cursor<'_>) -> Result<PivotCacheItemInfo> {
     let flags = cursor.read_u16()?;
     let caption = if flags & ADDL_CAPTION != 0 {
         cursor.read_nullable_wide_string()?
@@ -726,7 +708,7 @@ fn parse_item_info(cursor: &mut Cursor<'_>) -> XlsbResult<PivotCacheItemInfo> {
 
 /// `BrtBeginPCDIRun` payload (MS-XLSB 2.4.147): a compact run of same-typed
 /// cache items.
-fn parse_item_run(data: &[u8], items: &mut Vec<PivotCacheItem>) -> XlsbResult<()> {
+fn parse_item_run(data: &[u8], items: &mut Vec<PivotCacheItem>) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDIRun");
     let operation = cursor.read_u16()?;
     let count = cursor.read_u32()?;
@@ -754,10 +736,7 @@ fn parse_item_run(data: &[u8], items: &mut Vec<PivotCacheItem>) -> XlsbResult<()
 }
 
 /// `BrtBeginPCDFGroup` collection (MS-XLSB 2.4.135).
-fn parse_grouping(
-    walker: &mut RecordWalker<'_>,
-    data: &[u8],
-) -> XlsbResult<PivotCacheFieldGrouping> {
+fn parse_grouping(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotCacheFieldGrouping> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDFGroup");
     let parent_field = non_negative_index(cursor.read_i32()?);
     let base_field = non_negative_index(cursor.read_i32()?);
@@ -785,9 +764,7 @@ fn parse_grouping(
             other => walker.skip_unhandled(other, "BrtBeginPCDFGroup collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDFGroup".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDFGroup".to_string()))
 }
 
 /// Interpret a spec `-1`-or-index field as an optional unsigned index.
@@ -796,7 +773,7 @@ fn non_negative_index(value: i32) -> Option<u32> {
 }
 
 /// `BrtBeginPCDFGRange` payload (MS-XLSB 2.4.134).
-fn parse_range_grouping(data: &[u8]) -> XlsbResult<PivotCacheRangeGrouping> {
+fn parse_range_grouping(data: &[u8]) -> Result<PivotCacheRangeGrouping> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDFGRange");
     let group_by = PivotCacheGroupBy::try_from(cursor.read_u8()?)?;
     let flags = cursor.read_u8()?;
@@ -816,9 +793,7 @@ fn parse_range_grouping(data: &[u8]) -> XlsbResult<PivotCacheRangeGrouping> {
 }
 
 /// `BrtBeginPCDFGDiscrete` collection (MS-XLSB 2.4.132).
-fn parse_discrete_grouping(
-    walker: &mut RecordWalker<'_>,
-) -> XlsbResult<PivotCacheDiscreteGrouping> {
+fn parse_discrete_grouping(walker: &mut RecordWalker<'_>) -> Result<PivotCacheDiscreteGrouping> {
     let mut grouping = PivotCacheDiscreteGrouping {
         item_indexes: Vec::new(),
     };
@@ -833,7 +808,7 @@ fn parse_discrete_grouping(
             other => walker.skip_unhandled(other, "BrtBeginPCDFGDiscrete collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDFGDiscrete".to_string(),
     ))
 }
@@ -842,7 +817,7 @@ fn parse_discrete_grouping(
 fn parse_grouping_items(
     walker: &mut RecordWalker<'_>,
     items: &mut Vec<PivotCacheItem>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDFG_ITEMS => return Ok(()),
@@ -867,9 +842,7 @@ fn parse_grouping_items(
             other => walker.skip_unhandled(other, "BrtBeginPCDFGItems collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDFGItems".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDFGItems".to_string()))
 }
 
 /// `BrtBeginPCDHierarchies` collection (MS-XLSB 2.4.145).
@@ -877,7 +850,7 @@ fn parse_hierarchies(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
     definition: &mut PivotCacheDefinition,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDHierarchies");
     let _declared_hierarchies = cursor.read_u32()?;
     cursor.finish()?;
@@ -891,13 +864,13 @@ fn parse_hierarchies(
             other => walker.skip_unhandled(other, "BrtBeginPCDHierarchies collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDHierarchies".to_string(),
     ))
 }
 
 /// `BrtBeginPCDHierarchy` collection (MS-XLSB 2.4.146).
-fn parse_hierarchy(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotCacheHierarchy> {
+fn parse_hierarchy(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotCacheHierarchy> {
     let mut hierarchy = parse_hierarchy_payload(data)?;
     while let Some(record) = walker.next()? {
         match record.kind() {
@@ -918,13 +891,13 @@ fn parse_hierarchy(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Piv
             other => walker.skip_unhandled(other, "BrtBeginPCDHierarchy collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDHierarchy".to_string(),
     ))
 }
 
 /// `BrtBeginPCDHierarchy` payload (MS-XLSB 2.4.146).
-fn parse_hierarchy_payload(data: &[u8]) -> XlsbResult<PivotCacheHierarchy> {
+fn parse_hierarchy_payload(data: &[u8]) -> Result<PivotCacheHierarchy> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDHierarchy");
     let flags1 = cursor.read_u16()?;
     let level_count = cursor.read_u32()?;
@@ -975,7 +948,7 @@ fn parse_hierarchy_payload(data: &[u8]) -> XlsbResult<PivotCacheHierarchy> {
     })
 }
 
-fn conditional_string(cursor: &mut Cursor<'_>, present: bool) -> XlsbResult<Option<String>> {
+fn conditional_string(cursor: &mut Cursor<'_>, present: bool) -> Result<Option<String>> {
     if present {
         Ok(Some(cursor.read_wide_string()?))
     } else {
@@ -984,7 +957,7 @@ fn conditional_string(cursor: &mut Cursor<'_>, present: bool) -> XlsbResult<Opti
 }
 
 /// `BrtBeginPCDHFieldsUsage` payload (MS-XLSB 2.4.138).
-fn parse_fields_usage(data: &[u8]) -> XlsbResult<Vec<i32>> {
+fn parse_fields_usage(data: &[u8]) -> Result<Vec<i32>> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDHFieldsUsage");
     let count = cursor.read_u32()?;
     let mut usage = Vec::new();
@@ -999,7 +972,7 @@ fn parse_fields_usage(data: &[u8]) -> XlsbResult<Vec<i32>> {
 fn parse_grouping_levels(
     walker: &mut RecordWalker<'_>,
     levels: &mut Vec<PivotCacheGroupingLevel>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDHG_LEVELS => return Ok(()),
@@ -1019,7 +992,7 @@ fn parse_grouping_levels(
             other => walker.skip_unhandled(other, "BrtBeginPCDHGLevels collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDHGLevels".to_string(),
     ))
 }
@@ -1028,7 +1001,7 @@ fn parse_grouping_levels(
 fn parse_grouping_groups(
     walker: &mut RecordWalker<'_>,
     groups: &mut Vec<PivotCacheGroupingGroup>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDHGL_GROUPS => return Ok(()),
@@ -1039,7 +1012,7 @@ fn parse_grouping_groups(
             other => walker.skip_unhandled(other, "BrtBeginPCDHGLGroups collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDHGLGroups".to_string(),
     ))
 }
@@ -1048,7 +1021,7 @@ fn parse_grouping_groups(
 fn parse_grouping_group(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
-) -> XlsbResult<PivotCacheGroupingGroup> {
+) -> Result<PivotCacheGroupingGroup> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDHGLGroup");
     let group_number = cursor.read_i32()?;
     let flags = cursor.read_u8()?;
@@ -1075,7 +1048,7 @@ fn parse_grouping_group(
             other => walker.skip_unhandled(other, "BrtBeginPCDHGLGroup collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDHGLGroup".to_string(),
     ))
 }
@@ -1084,7 +1057,7 @@ fn parse_grouping_group(
 fn parse_grouping_group_members(
     walker: &mut RecordWalker<'_>,
     members: &mut Vec<PivotCacheGroupingGroupMember>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDHGLG_MEMBERS => return Ok(()),
@@ -1102,13 +1075,13 @@ fn parse_grouping_group_members(
             other => walker.skip_unhandled(other, "BrtBeginPCDHGLGMembers collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDHGLGMembers".to_string(),
     ))
 }
 
 /// `BrtPCDH14` payload (MS-XLSB 2.4.726).
-fn parse_hierarchy_ext14(data: &[u8]) -> XlsbResult<PivotCacheHierarchyExt14> {
+fn parse_hierarchy_ext14(data: &[u8]) -> Result<PivotCacheHierarchyExt14> {
     let mut cursor = Cursor::new(data, "BrtPCDH14");
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
@@ -1130,7 +1103,7 @@ fn parse_hierarchy_ext14(data: &[u8]) -> XlsbResult<PivotCacheHierarchyExt14> {
 }
 
 /// `BrtBeginPCDSDTupleCache` collection (MS-XLSB 2.4.164).
-fn parse_tuple_cache(walker: &mut RecordWalker<'_>) -> XlsbResult<PivotCacheTupleCache> {
+fn parse_tuple_cache(walker: &mut RecordWalker<'_>) -> Result<PivotCacheTupleCache> {
     let mut cache = PivotCacheTupleCache::default();
     while let Some(record) = walker.next()? {
         match record.kind() {
@@ -1147,7 +1120,7 @@ fn parse_tuple_cache(walker: &mut RecordWalker<'_>) -> XlsbResult<PivotCacheTupl
             other => walker.skip_unhandled(other, "BrtBeginPCDSDTupleCache collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDSDTupleCache".to_string(),
     ))
 }
@@ -1156,7 +1129,7 @@ fn parse_tuple_cache(walker: &mut RecordWalker<'_>) -> XlsbResult<PivotCacheTupl
 fn parse_tuple_cache_entries(
     walker: &mut RecordWalker<'_>,
     entries: &mut Vec<PivotCacheItemValue>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDSDTC_ENTRIES => return Ok(()),
@@ -1173,7 +1146,7 @@ fn parse_tuple_cache_entries(
             other => walker.skip_unhandled(other, "BrtBeginPCDSDTCEntries collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDSDTCEntries".to_string(),
     ))
 }
@@ -1182,7 +1155,7 @@ fn parse_tuple_cache_entries(
 fn parse_tuple_cache_queries(
     walker: &mut RecordWalker<'_>,
     queries: &mut Vec<String>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDSDTC_QUERIES => return Ok(()),
@@ -1195,7 +1168,7 @@ fn parse_tuple_cache_queries(
             other => walker.skip_unhandled(other, "BrtBeginPCDSDTCQueries collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDSDTCQueries".to_string(),
     ))
 }
@@ -1204,7 +1177,7 @@ fn parse_tuple_cache_queries(
 fn parse_tuple_cache_sets(
     walker: &mut RecordWalker<'_>,
     sets: &mut Vec<PivotCacheTupleCacheSet>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDSDTC_SETS => return Ok(()),
@@ -1215,13 +1188,13 @@ fn parse_tuple_cache_sets(
             other => walker.skip_unhandled(other, "BrtBeginPCDSDTCSets collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDSDTCSets".to_string(),
     ))
 }
 
 /// `BrtBeginPCDSDTCSet` payload (MS-XLSB 2.4.162).
-fn parse_tuple_cache_set(data: &[u8]) -> XlsbResult<PivotCacheTupleCacheSet> {
+fn parse_tuple_cache_set(data: &[u8]) -> Result<PivotCacheTupleCacheSet> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDSDTCSet");
     let tuple_count = match cursor.read_u32()? {
         TUPLE_COUNT_UNKNOWN => None,
@@ -1246,7 +1219,7 @@ fn parse_calculated_items(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
     definition: &mut PivotCacheDefinition,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDCalcItems");
     let _declared_items = cursor.read_u32()?;
     cursor.finish()?;
@@ -1260,13 +1233,13 @@ fn parse_calculated_items(
             other => walker.skip_unhandled(other, "BrtBeginPCDCalcItems collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDCalcItems".to_string(),
     ))
 }
 
 /// `BrtBeginPCDCalcItem` collection (MS-XLSB 2.4.124).
-fn parse_calculated_item(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<CalculatedItem> {
+fn parse_calculated_item(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<CalculatedItem> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDCalcItem");
     // reserved (4 bytes): MUST be -1 and is ignored.
     cursor.guard(4)?;
@@ -1286,13 +1259,13 @@ fn parse_calculated_item(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResu
             other => walker.skip_unhandled(other, "BrtBeginPCDCalcItem collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDCalcItem".to_string(),
     ))
 }
 
 /// `BrtBeginPNames` collection (MS-XLSB 2.4.177).
-fn parse_names(walker: &mut RecordWalker<'_>, names: &mut Vec<PivotName>) -> XlsbResult<()> {
+fn parse_names(walker: &mut RecordWalker<'_>, names: &mut Vec<PivotName>) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_P_NAMES => return Ok(()),
@@ -1302,11 +1275,11 @@ fn parse_names(walker: &mut RecordWalker<'_>, names: &mut Vec<PivotName>) -> Xls
             other => walker.skip_unhandled(other, "BrtBeginPNames collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream("BrtEndPNames".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndPNames".to_string()))
 }
 
 /// `BrtBeginPName` collection (MS-XLSB 2.4.176).
-fn parse_name(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotName> {
+fn parse_name(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotName> {
     let mut cursor = Cursor::new(data, "BrtBeginPName");
     let field_index = cursor.read_u32()?;
     let function = PivotNameFunction::try_from(cursor.read_u8()?)?;
@@ -1328,14 +1301,11 @@ fn parse_name(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotNam
             other => walker.skip_unhandled(other, "BrtBeginPName collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream("BrtEndPName".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndPName".to_string()))
 }
 
 /// `BrtBeginPNPairs` collection (MS-XLSB 2.4.179).
-fn parse_name_pairs(
-    walker: &mut RecordWalker<'_>,
-    pairs: &mut Vec<PivotNamePair>,
-) -> XlsbResult<()> {
+fn parse_name_pairs(walker: &mut RecordWalker<'_>, pairs: &mut Vec<PivotNamePair>) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PN_PAIRS => return Ok(()),
@@ -1359,16 +1329,14 @@ fn parse_name_pairs(
             other => walker.skip_unhandled(other, "BrtBeginPNPairs collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPNPairs".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPNPairs".to_string()))
 }
 
 /// `BrtBeginPRFilters` collection (MS-XLSB 2.4.182).
 fn parse_rule_filters(
     walker: &mut RecordWalker<'_>,
     filters: &mut Vec<PivotRuleFilter>,
-) -> XlsbResult<()> {
+) -> Result<()> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PR_FILTERS => return Ok(()),
@@ -1378,13 +1346,11 @@ fn parse_rule_filters(
             other => walker.skip_unhandled(other, "BrtBeginPRFilters collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPRFilters".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPRFilters".to_string()))
 }
 
 /// `BrtBeginPRFilter` collection (MS-XLSB 2.4.180; `PRFilter` structure).
-fn parse_rule_filter(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotRuleFilter> {
+fn parse_rule_filter(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotRuleFilter> {
     let mut cursor = Cursor::new(data, "BrtBeginPRFilter");
     let field = cursor.read_i32()?;
     let _declared_items = cursor.read_u32()?;
@@ -1410,9 +1376,7 @@ fn parse_rule_filter(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<P
             other => walker.skip_unhandled(other, "BrtBeginPRFilter collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPRFilter".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPRFilter".to_string()))
 }
 
 /// `BrtBeginPCDCalcMems` collection (MS-XLSB 2.4.129).
@@ -1420,7 +1384,7 @@ fn parse_calculated_members(
     walker: &mut RecordWalker<'_>,
     data: &[u8],
     definition: &mut PivotCacheDefinition,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMems");
     let _declared_members = cursor.read_u32()?;
     cursor.finish()?;
@@ -1434,16 +1398,13 @@ fn parse_calculated_members(
             other => walker.skip_unhandled(other, "BrtBeginPCDCalcMems collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
+    Err(Error::UnexpectedEndOfStream(
         "BrtEndPCDCalcMems".to_string(),
     ))
 }
 
 /// `BrtBeginPCDCalcMem` collection (MS-XLSB 2.4.126; `PCDCalcMemCommon`, MS-XLSB 2.5.99).
-fn parse_calculated_member(
-    walker: &mut RecordWalker<'_>,
-    data: &[u8],
-) -> XlsbResult<CalculatedMember> {
+fn parse_calculated_member(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<CalculatedMember> {
     let mut member = parse_calculated_member_payload(data)?;
     while let Some(record) = walker.next()? {
         match record.kind() {
@@ -1455,13 +1416,11 @@ fn parse_calculated_member(
             other => walker.skip_unhandled(other, "BrtBeginPCDCalcMem collection")?,
         }
     }
-    Err(XlsbError::UnexpectedEndOfStream(
-        "BrtEndPCDCalcMem".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPCDCalcMem".to_string()))
 }
 
 /// `PCDCalcMemCommon` (MS-XLSB 2.5.99).
-fn parse_calculated_member_payload(data: &[u8]) -> XlsbResult<CalculatedMember> {
+fn parse_calculated_member_payload(data: &[u8]) -> Result<CalculatedMember> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMem");
     let flags = cursor.read_u32()?;
     let solve_order = cursor.read_i32()?;
@@ -1485,7 +1444,7 @@ fn parse_calculated_member_payload(data: &[u8]) -> XlsbResult<CalculatedMember> 
 }
 
 /// `BrtBeginPCDCalcMem14` payload (MS-XLSB 2.4.127).
-fn parse_calculated_member_ext14(data: &[u8]) -> XlsbResult<CalculatedMemberExt14> {
+fn parse_calculated_member_ext14(data: &[u8]) -> Result<CalculatedMemberExt14> {
     let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMem14");
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
@@ -1509,7 +1468,7 @@ fn parse_calculated_member_ext14(data: &[u8]) -> XlsbResult<CalculatedMemberExt1
 }
 
 /// `BrtBeginPCD14` payload (MS-XLSB 2.4.123).
-fn parse_pcd14(data: &[u8]) -> XlsbResult<PivotCacheDefinitionExt14> {
+fn parse_pcd14(data: &[u8]) -> Result<PivotCacheDefinitionExt14> {
     let mut cursor = Cursor::new(data, "BrtBeginPCD14");
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;

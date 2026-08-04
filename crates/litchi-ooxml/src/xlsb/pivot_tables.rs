@@ -1,6 +1,6 @@
 //! Pivot table support for XLSB
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use litchi_core::binary;
 
 /// Pivot field item
@@ -69,9 +69,9 @@ impl PivotLocation {
         }
     }
 
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 16 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 16,
                 found: data.len(),
             });
@@ -168,9 +168,9 @@ impl PivotFieldReference {
         self.field_index.to_le_bytes().to_vec()
     }
 
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
@@ -261,9 +261,9 @@ impl PivotTable {
         self.page_fields.push(field);
     }
 
-    pub fn parse_header(data: &[u8]) -> XlsbResult<(String, u32)> {
+    pub fn parse_header(data: &[u8]) -> Result<(String, u32)> {
         if data.len() < 8 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             });
@@ -288,7 +288,7 @@ impl PivotTable {
 }
 
 /// Read optional string from XLSB data
-fn read_optional_string(data: &[u8]) -> XlsbResult<(Option<String>, usize)> {
+fn read_optional_string(data: &[u8]) -> Result<(Option<String>, usize)> {
     if data.len() < 4 {
         return Ok((None, 0));
     }

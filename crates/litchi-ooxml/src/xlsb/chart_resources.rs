@@ -4,7 +4,7 @@
 //! relationship grammars as XLSX. This module validates, authors, and resolves
 //! those inert resources without opening linked targets or embedded payloads.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsx::{
     ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
     RelationshipTarget, WorksheetChart,
@@ -37,7 +37,7 @@ pub(crate) struct ResolvedChartGraph {
 }
 
 /// Validate a chart's complete package-resource model without mutating it.
-pub(crate) fn validate_chart_resources(chart: &WorksheetChart) -> XlsbResult<()> {
+pub(crate) fn validate_chart_resources(chart: &WorksheetChart) -> Result<()> {
     let (external_id, user_shapes_id) = validate_chart_resource_metadata(chart)?;
     validated_chart_xml(chart, external_id.as_deref(), user_shapes_id.as_deref())?;
     Ok(())
@@ -45,7 +45,7 @@ pub(crate) fn validate_chart_resources(chart: &WorksheetChart) -> XlsbResult<()>
 
 fn validate_chart_resource_metadata(
     chart: &WorksheetChart,
-) -> XlsbResult<(Option<String>, Option<String>)> {
+) -> Result<(Option<String>, Option<String>)> {
     if chart.chart.external_data.is_some() != chart.external_data_part.is_some() {
         return Err(invalid(
             "chart external-data metadata and package payload disagree",
@@ -136,7 +136,7 @@ fn validate_chart_resource_metadata(
 pub(crate) fn author_chart_graph(
     chart: &WorksheetChart,
     chart_index: usize,
-) -> XlsbResult<AuthoredChartGraph> {
+) -> Result<AuthoredChartGraph> {
     let (planned_external_id, planned_user_shapes_id) = validate_chart_resource_metadata(chart)?;
     let chart_name = format!("chart{chart_index}.xml");
     let mut chart_part = BlobPart::new(
@@ -242,7 +242,7 @@ pub(crate) fn author_chart_graph(
 pub(crate) fn parse_chart_resources(
     package: &OpcPackage,
     chart_part: &dyn Part,
-) -> XlsbResult<ResolvedChartGraph> {
+) -> Result<ResolvedChartGraph> {
     if chart_part.blob().len() > MAX_CHART_XML_BYTES {
         return Err(limit("chart XML bytes"));
     }
@@ -388,7 +388,7 @@ pub(crate) fn parse_chart_resources(
     })
 }
 
-fn validate_external_data(value: &ChartExternalDataPart, total: &mut usize) -> XlsbResult<()> {
+fn validate_external_data(value: &ChartExternalDataPart, total: &mut usize) -> Result<()> {
     validate_relationship_type(&value.relationship_type)?;
     let expected = crate::xlsx::chart::chart_external_data_content_type(&value.relationship_type)
         .ok_or_else(|| {
@@ -415,7 +415,7 @@ fn validate_external_data(value: &ChartExternalDataPart, total: &mut usize) -> X
     Ok(())
 }
 
-fn validate_user_shapes(value: &ChartUserShapesPart, total: &mut usize) -> XlsbResult<()> {
+fn validate_user_shapes(value: &ChartUserShapesPart, total: &mut usize) -> Result<()> {
     if value.xml.len() > MAX_USER_SHAPES_XML_BYTES {
         return Err(limit("chart user-shapes XML bytes"));
     }
@@ -441,7 +441,7 @@ fn validate_user_shapes(value: &ChartUserShapesPart, total: &mut usize) -> XlsbR
     Ok(())
 }
 
-fn validate_relationship(value: &Relationship, total: &mut usize) -> XlsbResult<()> {
+fn validate_relationship(value: &Relationship, total: &mut usize) -> Result<()> {
     validate_relationship_id(&value.relationship_id)?;
     validate_relationship_type(&value.relationship_type)?;
     match &value.target {
@@ -459,7 +459,7 @@ fn validate_embedded(
     content_type: &str,
     extension: &str,
     total: &mut usize,
-) -> XlsbResult<()> {
+) -> Result<()> {
     if data.len() > MAX_RESOURCE_BYTES {
         return Err(limit("individual chart resource bytes"));
     }
@@ -468,7 +468,7 @@ fn validate_embedded(
     add_resource_bytes(total, data.len())
 }
 
-fn validate_relationship_id(value: &str) -> XlsbResult<()> {
+fn validate_relationship_id(value: &str) -> Result<()> {
     if value.is_empty() || value.len() > MAX_RELATIONSHIP_ID_BYTES {
         return Err(invalid("invalid chart relationship ID length"));
     }
@@ -484,7 +484,7 @@ fn validate_relationship_id(value: &str) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_relationship_type(value: &str) -> XlsbResult<()> {
+fn validate_relationship_type(value: &str) -> Result<()> {
     if value.is_empty()
         || value.len() > MAX_RELATIONSHIP_TYPE_BYTES
         || !value.contains(':')
@@ -499,7 +499,7 @@ fn validate_relationship_type(value: &str) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_external_target(value: &str) -> XlsbResult<()> {
+fn validate_external_target(value: &str) -> Result<()> {
     if value.is_empty()
         || value.len() > MAX_EXTERNAL_TARGET_BYTES
         || value
@@ -511,7 +511,7 @@ fn validate_external_target(value: &str) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_extension(value: &str) -> XlsbResult<()> {
+fn validate_extension(value: &str) -> Result<()> {
     if value.is_empty()
         || value.len() > MAX_EXTENSION_BYTES
         || !value.bytes().all(|byte| byte.is_ascii_alphanumeric())
@@ -523,7 +523,7 @@ fn validate_extension(value: &str) -> XlsbResult<()> {
     Ok(())
 }
 
-fn add_resource_bytes(total: &mut usize, size: usize) -> XlsbResult<()> {
+fn add_resource_bytes(total: &mut usize, size: usize) -> Result<()> {
     if size > MAX_RESOURCE_BYTES {
         return Err(limit("individual chart resource bytes"));
     }
@@ -541,7 +541,7 @@ fn author_relationship_target(
     directory: &str,
     stem: &str,
     parts: &mut Vec<BlobPart>,
-) -> XlsbResult<(String, bool)> {
+) -> Result<(String, bool)> {
     match target {
         RelationshipTarget::Embedded {
             data,
@@ -562,7 +562,7 @@ fn author_relationship_target(
 
 fn planned_special_relationship_ids(
     chart: &WorksheetChart,
-) -> XlsbResult<(Option<String>, Option<String>)> {
+) -> Result<(Option<String>, Option<String>)> {
     let mut used = chart
         .additional_relationships
         .iter()
@@ -607,7 +607,7 @@ fn validated_chart_xml(
     chart: &WorksheetChart,
     external_data_id: Option<&str>,
     user_shapes_id: Option<&str>,
-) -> XlsbResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let xml = crate::xlsx::chart::generate_chart_xml_with_external_data_id(
         &chart.chart,
         external_data_id,
@@ -651,7 +651,7 @@ fn resolve_relationship(
     package: &OpcPackage,
     relationship: &litchi_opc::Relationship,
     total: &mut usize,
-) -> XlsbResult<Relationship> {
+) -> Result<Relationship> {
     validate_relationship_id(relationship.r_id())?;
     validate_relationship_type(relationship.reltype())?;
     let target = if relationship.is_external() {
@@ -681,18 +681,18 @@ fn resolve_relationship(
     })
 }
 
-fn validated_part_extension(uri: &PackURI) -> XlsbResult<String> {
+fn validated_part_extension(uri: &PackURI) -> Result<String> {
     let extension = uri.ext();
     validate_extension(extension)?;
     Ok(extension.to_string())
 }
 
-fn invalid(message: impl Into<String>) -> XlsbError {
-    XlsbError::InvalidFormula(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidFormula(message.into())
 }
 
-fn limit(what: &str) -> XlsbError {
-    XlsbError::InvalidFormula(format!(
+fn limit(what: &str) -> Error {
+    Error::InvalidFormula(format!(
         "{what} exceeds the XLSB chart-resource safety limit"
     ))
 }

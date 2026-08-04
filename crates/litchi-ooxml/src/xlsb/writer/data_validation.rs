@@ -32,7 +32,7 @@
 use crate::xlsb::data_validation::{
     DataValidationRecordKind, DataValidationSettings, Validation, validate_dval_list_formula,
 };
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::formula::{CellParsedFormula, FormulaCompiler};
 use crate::xlsb::writer::bin_range::{parse_range_list, write_bin_range_list};
 use litchi_xlsb::raw::Writer;
@@ -45,7 +45,7 @@ pub fn write_data_validations<W: Write>(
     validations: &[Validation],
     classic_settings: DataValidationSettings,
     extension14_settings: DataValidationSettings,
-) -> XlsbResult<()> {
+) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
     }
@@ -72,7 +72,7 @@ fn write_classic_collection<W: Write>(
     writer: &mut Writer<W>,
     validations: &[&Validation],
     settings: DataValidationSettings,
-) -> XlsbResult<()> {
+) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
     }
@@ -111,7 +111,7 @@ fn write_extension14_collection<W: Write>(
     writer: &mut Writer<W>,
     validations: &[&Validation],
     settings: DataValidationSettings,
-) -> XlsbResult<()> {
+) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
     }
@@ -134,7 +134,7 @@ fn write_extension14_collection<W: Write>(
 }
 
 /// Serialize a single [`Validation`] into the `BrtDVal` binary payload.
-fn serialize_data_validation(dv: &Validation) -> XlsbResult<Vec<u8>> {
+fn serialize_data_validation(dv: &Validation) -> Result<Vec<u8>> {
     let mut buf = Vec::with_capacity(128);
 
     // --- flags (u32) ---
@@ -243,7 +243,7 @@ fn write_biff12_formula(
     binary: Option<&CellParsedFormula>,
     formula: Option<&str>,
     string_list: bool,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let compiled;
     let binary = if let Some(binary) = binary {
         Some(binary)
@@ -269,7 +269,7 @@ fn write_biff12_formula(
     Ok(())
 }
 
-fn serialize_extension14_validation(dv: &Validation) -> XlsbResult<Vec<u8>> {
+fn serialize_extension14_validation(dv: &Validation) -> Result<Vec<u8>> {
     let ranges = parse_range_list(&dv.cell_ranges)?;
     let formula1 = compile_formula(
         dv.formula1_binary.as_ref(),
@@ -314,7 +314,7 @@ fn compile_formula(
     binary: Option<&CellParsedFormula>,
     formula: Option<&str>,
     string_list: bool,
-) -> XlsbResult<Option<CellParsedFormula>> {
+) -> Result<Option<CellParsedFormula>> {
     if let Some(binary) = binary {
         return Ok(Some(binary.clone()));
     }
@@ -349,14 +349,14 @@ fn common_flags(dv: &Validation) -> u32 {
     flags | (u32::from(dv.operator) << 20)
 }
 
-fn compile_string_list(text: &str) -> XlsbResult<CellParsedFormula> {
+fn compile_string_list(text: &str) -> Result<CellParsedFormula> {
     let value = text
         .strip_prefix('"')
         .and_then(|text| text.strip_suffix('"'))
         .unwrap_or(text);
     let length = value.encode_utf16().count();
     if length > 255 {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "inline validation string list has {length} UTF-16 units; maximum is 255 (use list_formula for BrtDValList)"
         )));
     }
@@ -368,7 +368,7 @@ fn compile_string_list(text: &str) -> XlsbResult<CellParsedFormula> {
     })
 }
 
-fn validate_rule(dv: &Validation) -> XlsbResult<()> {
+fn validate_rule(dv: &Validation) -> Result<()> {
     if dv.validation_type > 7 {
         return Err(invalid(format!(
             "validation type {} exceeds 7",
@@ -417,13 +417,13 @@ fn validate_rule(dv: &Validation) -> XlsbResult<()> {
     ] {
         if let Some(formula) = formula {
             if formula.rgce.is_empty() || formula.rgce.len() > 16_384 {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "{name} token length {} is outside 1..=16,384",
                     formula.rgce.len()
                 )));
             }
             if formula.rgcb.len() > u32::MAX as usize {
-                return Err(XlsbError::InvalidFormula(format!(
+                return Err(Error::InvalidFormula(format!(
                     "{name} ancillary stream is too large"
                 )));
             }
@@ -450,7 +450,7 @@ fn validate_rule(dv: &Validation) -> XlsbResult<()> {
         _ => (true, false),
     };
     if (first, second) != required {
-        return Err(XlsbError::InvalidFormula(format!(
+        return Err(Error::InvalidFormula(format!(
             "validation formula presence {first}/{second} does not match required {}/{}",
             required.0, required.1
         )));
@@ -478,8 +478,8 @@ fn validate_rule(dv: &Validation) -> XlsbResult<()> {
     Ok(())
 }
 
-fn invalid(value: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn invalid(value: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: "BrtDVal".to_string(),
         val: value.into(),
     }

@@ -8,7 +8,7 @@
 //! skipped as balanced collections.
 
 use crate::xlsb::connections::model::*;
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsb::walker::{RecordWalker, malformed};
 use litchi_xlsb::raw::{Cursor, kind as rt};
 
@@ -77,7 +77,7 @@ const PARAM_DATA_STRING: u32 = 2;
 const PARAM_DATA_BOOLEAN: u32 = 4;
 
 /// Parse the complete External Data Connections part.
-pub fn parse_connections_part(data: &[u8]) -> XlsbResult<Connections> {
+pub fn parse_connections_part(data: &[u8]) -> Result<Connections> {
     const CONTEXT: &str = "ExternalDataConnections";
     let mut walker = RecordWalker::new(data);
     let begin = walker.required_begin(rt::BEGIN_EXT_CONNECTIONS, CONTEXT)?;
@@ -86,7 +86,7 @@ pub fn parse_connections_part(data: &[u8]) -> XlsbResult<Connections> {
     let mut connections = Connections::default();
     loop {
         let Some(record) = walker.next()? else {
-            return Err(XlsbError::UnexpectedEndOfStream(CONTEXT.to_string()));
+            return Err(Error::UnexpectedEndOfStream(CONTEXT.to_string()));
         };
         match record.kind() {
             rt::BEGIN_EXT_CONNECTION => {
@@ -108,7 +108,7 @@ pub fn parse_connections_part(data: &[u8]) -> XlsbResult<Connections> {
 }
 
 /// Parse one `BrtBeginExtConnection` collection through its end record.
-fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Connection> {
+fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
     let mut connection = parse_ext_connection(data)?;
     loop {
@@ -139,7 +139,7 @@ fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Co
 }
 
 /// `BrtBeginExtConnection` payload (MS-XLSB 2.4.80).
-fn parse_ext_connection(data: &[u8]) -> XlsbResult<Connection> {
+fn parse_ext_connection(data: &[u8]) -> Result<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
     let mut cursor = Cursor::new(data, CONTEXT);
     let refreshed_version = cursor.read_u8()?;
@@ -221,7 +221,7 @@ fn parse_ext_connection(data: &[u8]) -> XlsbResult<Connection> {
 }
 
 /// `BrtBeginECDbProps` payload (MS-XLSB 2.4.61).
-fn parse_db_props(data: &[u8]) -> XlsbResult<DbProperties> {
+fn parse_db_props(data: &[u8]) -> Result<DbProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECDbProps");
     let command_type = CommandType::try_from(cursor.read_u32()?)?;
     let flags = cursor.read_u8()?;
@@ -246,7 +246,7 @@ fn parse_db_props(data: &[u8]) -> XlsbResult<DbProperties> {
 }
 
 /// `BrtBeginECOlapProps` payload (MS-XLSB 2.4.62).
-fn parse_olap_props(data: &[u8]) -> XlsbResult<OlapProperties> {
+fn parse_olap_props(data: &[u8]) -> Result<OlapProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECOlapProps");
     let flags = cursor.read_u8()?;
     let drillthrough_rows = cursor.read_u32()?;
@@ -271,7 +271,7 @@ fn parse_olap_props(data: &[u8]) -> XlsbResult<OlapProperties> {
 }
 
 /// `BrtBeginECWebProps` payload (MS-XLSB 2.4.71).
-fn parse_web_props(data: &[u8]) -> XlsbResult<WebProperties> {
+fn parse_web_props(data: &[u8]) -> Result<WebProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECWebProps");
     let html_format = match cursor.read_u8()? {
         0 => HtmlFormat::None,
@@ -315,7 +315,7 @@ fn parse_web_props(data: &[u8]) -> XlsbResult<WebProperties> {
 }
 
 /// Parse a `BrtBeginECParams` collection into the connection.
-fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> XlsbResult<()> {
+fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> Result<()> {
     const CONTEXT: &str = "BrtBeginECParams";
     loop {
         let record = walker.required(CONTEXT)?;
@@ -334,7 +334,7 @@ fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> X
 }
 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
-fn parse_param(data: &[u8]) -> XlsbResult<Parameter> {
+fn parse_param(data: &[u8]) -> Result<Parameter> {
     const CONTEXT: &str = "BrtBeginECParam";
     let mut cursor = Cursor::new(data, CONTEXT);
     let flags = cursor.read_u16()?;
@@ -399,7 +399,7 @@ fn parse_param(data: &[u8]) -> XlsbResult<Parameter> {
 }
 
 /// Parse a `BrtBeginEcWpTables` collection into the connection.
-fn parse_web_tables(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> XlsbResult<()> {
+fn parse_web_tables(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> Result<()> {
     const CONTEXT: &str = "BrtBeginEcWpTables";
     loop {
         let record = walker.required(CONTEXT)?;

@@ -1,6 +1,6 @@
 //! Typed worksheet image payloads used by XLSB Drawings parts.
 
-use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::error::{Error, Result};
 use crate::xlsx::ChartAnchor;
 use litchi_opc::constants::content_type as ct;
 use std::sync::Arc;
@@ -123,20 +123,20 @@ impl ImageFormat {
         }
     }
 
-    pub(crate) fn validate_payload(self, data: &[u8]) -> XlsbResult<()> {
+    pub(crate) fn validate_payload(self, data: &[u8]) -> Result<()> {
         if data.is_empty() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "worksheet image payload cannot be empty".to_string(),
             ));
         }
         if data.len() > MAX_XLSB_WORKSHEET_IMAGE_BYTES {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: MAX_XLSB_WORKSHEET_IMAGE_BYTES,
                 found: data.len(),
             });
         }
         if !self.has_matching_signature(data) {
-            return Err(XlsbError::Unrecognized {
+            return Err(Error::Unrecognized {
                 typ: "worksheet image payload".to_string(),
                 val: format!("bytes do not match declared {} format", self.extension()),
             });
@@ -160,7 +160,7 @@ impl Image {
         data: impl Into<Arc<[u8]>>,
         format: ImageFormat,
         anchor: ChartAnchor,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let image = Self {
             data: data.into(),
             format,
@@ -172,7 +172,7 @@ impl Image {
     }
 
     /// Attach alternative text used by assistive technology.
-    pub fn with_description(mut self, description: impl Into<String>) -> XlsbResult<Self> {
+    pub fn with_description(mut self, description: impl Into<String>) -> Result<Self> {
         self.description = Some(description.into());
         self.validate()?;
         Ok(self)
@@ -198,12 +198,12 @@ impl Image {
         self.description.as_deref()
     }
 
-    pub(crate) fn validate(&self) -> XlsbResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         crate::xlsx::chart::validate_chart_anchor(&self.anchor)?;
         self.format.validate_payload(&self.data)?;
         if let Some(description) = &self.description {
             if description.len() > MAX_XLSB_IMAGE_DESCRIPTION_BYTES {
-                return Err(XlsbError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: MAX_XLSB_IMAGE_DESCRIPTION_BYTES,
                     found: description.len(),
                 });
@@ -214,7 +214,7 @@ impl Image {
                     0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
                 )
             }) {
-                return Err(XlsbError::Encoding(
+                return Err(Error::Encoding(
                     "worksheet image description contains an invalid XML character".to_string(),
                 ));
             }

@@ -2,14 +2,14 @@
 
 #![allow(clippy::all)]
 
-use litchi::ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
+use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating minimal empty XLSB...");
 
-    let mut workbook = XlsbWorkbookWriter::new();
-    let sheet = MutableXlsbWorksheet::new("Sheet1");
+    let mut workbook = WorkbookWriter::new();
+    let sheet = MutableWorksheet::new("Sheet1");
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_empty.xlsb")?;

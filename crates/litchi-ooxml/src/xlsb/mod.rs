@@ -49,13 +49,13 @@
 //! ## Reading an XLSB File
 //!
 //! ```rust,no_run
-//! use litchi_ooxml::xlsb::XlsbWorkbook;
+//! use litchi_ooxml::xlsb::Workbook;
 //! use litchi_core::sheet::WorkbookTrait;
 //! use std::fs::File;
 //!
 //! // Open an XLSB file
 //! let file = File::open("workbook.xlsb")?;
-//! let workbook = XlsbWorkbook::new(file)?;
+//! let workbook = Workbook::new(file)?;
 //!
 //! // Access worksheets
 //! for name in workbook.worksheet_names() {
@@ -67,15 +67,15 @@
 //! ## Writing an XLSB File
 //!
 //! ```rust,no_run
-//! use litchi_ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
+//! use litchi_ooxml::xlsb::writer::{WorkbookWriter, MutableWorksheet};
 //! use litchi_ooxml::xlsb::merged_cells::MergedCell;
 //! use std::fs::File;
 //!
 //! // Create a new workbook
-//! let mut workbook = XlsbWorkbookWriter::new();
+//! let mut workbook = WorkbookWriter::new();
 //!
 //! // Create a worksheet
-//! let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+//! let mut sheet = MutableWorksheet::new("Sheet1");
 //! sheet.set_cell(0, 0, "Hello");
 //! sheet.set_cell(0, 1, "World");
 //! sheet.set_cell(1, 0, 42.0);
@@ -195,7 +195,7 @@ pub use drawing::{
     GraphicFrame, NonVisual, Object, Point, SheetDrawing, Size, parse_drawing_part,
 };
 pub use drawing_image::{Image, ImageFormat};
-pub use error::{XlsbError, XlsbResult};
+pub use error::{Error, Result};
 pub use external_link::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,
     Kind, Link, MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
@@ -232,12 +232,11 @@ pub use web_extension_bindings::{
     Binding, parse_xlsb_web_extension_bindings, validate_xlsb_web_extension_apprefs,
     write_xlsb_web_extension_bindings,
 };
-pub use workbook::XlsbWorkbook;
+pub use workbook::Workbook;
 pub use worksheet::{
     AutoFilter, ColumnInfo, RowInfo, SheetProtection, StrongProtection, Worksheet,
 };
 // Re-export writer types for convenience
 pub use writer::{
-    MutableChartSheet, MutableSharedStringsWriter, MutableXlsbWorksheet, StylesWriter,
-    XlsbWorkbookWriter,
+    MutableChartSheet, MutableSharedStringsWriter, MutableWorksheet, StylesWriter, WorkbookWriter,
 };

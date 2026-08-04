@@ -77,10 +77,10 @@ pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook
 #[cfg(feature = "ooxml")]
 pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(
     path: P,
-) -> Result<crate::ooxml::xlsb::XlsbWorkbook> {
+) -> Result<crate::ooxml::xlsb::Workbook> {
     use std::fs::File;
     let file = File::open(path)?;
-    let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(file)?;
+    let workbook = crate::ooxml::xlsb::Workbook::new(file)?;
     Ok(workbook)
 }
 
@@ -88,10 +88,10 @@ pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ooxml::xlsb::XlsbWorkbook> {
+pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ooxml::xlsb::Workbook> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
-    let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(cursor)?;
+    let workbook = crate::ooxml::xlsb::Workbook::new(cursor)?;
     Ok(workbook)
 }
 
@@ -113,7 +113,7 @@ pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(
 pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes.to_vec());
-    let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(cursor)?;
+    let workbook = crate::ooxml::xlsb::Workbook::new(cursor)?;
     Ok(Box::new(workbook))
 }
 
