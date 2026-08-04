@@ -14,6 +14,7 @@
 mod error;
 pub mod font;
 pub mod format;
+pub mod hyperlinks;
 pub mod laser;
 pub mod notes;
 pub mod shape;
@@ -24,3 +25,4 @@ pub mod transition;
 
 pub use error::{Error, Result};
 pub use format::{ImageFormat, TextFormat};
+pub use hyperlinks::Hyperlink;
