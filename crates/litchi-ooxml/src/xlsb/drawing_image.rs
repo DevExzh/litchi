@@ -32,7 +32,7 @@ pub const MAX_XLSB_IMAGE_DESCRIPTION_BYTES: usize = 32 * 1024;
 
 /// Image formats that can be embedded in an XLSB worksheet drawing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsbWorksheetImageFormat {
+pub enum ImageFormat {
     /// Windows bitmap.
     Bmp,
     /// Graphics Interchange Format.
@@ -53,7 +53,7 @@ pub enum XlsbWorksheetImageFormat {
     Wdp,
 }
 
-impl XlsbWorksheetImageFormat {
+impl ImageFormat {
     /// Canonical package filename extension.
     pub const fn extension(self) -> &'static str {
         match self {
@@ -147,18 +147,18 @@ impl XlsbWorksheetImageFormat {
 
 /// One image and its two-cell worksheet anchor.
 #[derive(Debug, Clone)]
-pub struct XlsbWorksheetImage {
+pub struct Image {
     data: Arc<[u8]>,
-    format: XlsbWorksheetImageFormat,
+    format: ImageFormat,
     anchor: ChartAnchor,
     description: Option<String>,
 }
 
-impl XlsbWorksheetImage {
+impl Image {
     /// Create and validate an embedded worksheet image.
     pub fn new(
         data: impl Into<Arc<[u8]>>,
-        format: XlsbWorksheetImageFormat,
+        format: ImageFormat,
         anchor: ChartAnchor,
     ) -> XlsbResult<Self> {
         let image = Self {
@@ -184,7 +184,7 @@ impl XlsbWorksheetImage {
     }
 
     /// Declared encoded image format.
-    pub const fn format(&self) -> XlsbWorksheetImageFormat {
+    pub const fn format(&self) -> ImageFormat {
         self.format
     }
 
@@ -301,31 +301,29 @@ mod tests {
         let mut emf = vec![0; EMF_SIGNATURE_OFFSET];
         emf.extend_from_slice(EMF_SIGNATURE);
         for (format, data) in [
-            (XlsbWorksheetImageFormat::Bmp, BMP_SIGNATURE),
-            (XlsbWorksheetImageFormat::Gif, GIF89A_SIGNATURE),
-            (XlsbWorksheetImageFormat::Jpeg, JPEG_SIGNATURE),
-            (XlsbWorksheetImageFormat::Png, PNG_SIGNATURE),
+            (ImageFormat::Bmp, BMP_SIGNATURE),
+            (ImageFormat::Gif, GIF89A_SIGNATURE),
+            (ImageFormat::Jpeg, JPEG_SIGNATURE),
+            (ImageFormat::Png, PNG_SIGNATURE),
             (
-                XlsbWorksheetImageFormat::Svg,
+                ImageFormat::Svg,
                 br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#,
             ),
-            (XlsbWorksheetImageFormat::Tiff, TIFF_LE_SIGNATURE),
-            (XlsbWorksheetImageFormat::Wmf, PLACEABLE_WMF_SIGNATURE),
-            (XlsbWorksheetImageFormat::Wdp, WDP_LE_SIGNATURE),
+            (ImageFormat::Tiff, TIFF_LE_SIGNATURE),
+            (ImageFormat::Wmf, PLACEABLE_WMF_SIGNATURE),
+            (ImageFormat::Wdp, WDP_LE_SIGNATURE),
         ] {
             assert_eq!(
-                XlsbWorksheetImageFormat::from_content_type(format.content_type()),
+                ImageFormat::from_content_type(format.content_type()),
                 Some(format)
             );
-            XlsbWorksheetImage::new(data.to_vec(), format, anchor()).unwrap();
+            Image::new(data.to_vec(), format, anchor()).unwrap();
         }
         assert_eq!(
-            XlsbWorksheetImageFormat::from_content_type(
-                XlsbWorksheetImageFormat::Emf.content_type()
-            ),
-            Some(XlsbWorksheetImageFormat::Emf)
+            ImageFormat::from_content_type(ImageFormat::Emf.content_type()),
+            Some(ImageFormat::Emf)
         );
-        XlsbWorksheetImage::new(emf, XlsbWorksheetImageFormat::Emf, anchor()).unwrap();
+        Image::new(emf, ImageFormat::Emf, anchor()).unwrap();
     }
 
     #[test]
@@ -336,10 +334,7 @@ mod tests {
             br#"<svg xmlns="http://www.w3.org/2000/svg">"#,
             br#"<html xmlns="http://www.w3.org/2000/svg"/>"#,
         ] {
-            assert!(
-                XlsbWorksheetImage::new(invalid.to_vec(), XlsbWorksheetImageFormat::Svg, anchor(),)
-                    .is_err()
-            );
+            assert!(Image::new(invalid.to_vec(), ImageFormat::Svg, anchor(),).is_err());
         }
     }
 }

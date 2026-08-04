@@ -43,7 +43,7 @@ const MAX_ANCHORED_OBJECTS: usize = 100_000;
 /// Cell anchor marker (`xdr:from` / `xdr:to`): a zero-based row/column plus
 /// an EMU offset into the cell (ISO/IEC 29500-1:2016 section 20.5.2.14).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbDrawingCellMarker {
+pub struct CellMarker {
     /// Zero-based column index (`xdr:col`).
     pub column: u32,
     /// EMU offset into the column (`xdr:colOff`).
@@ -56,7 +56,7 @@ pub struct XlsbDrawingCellMarker {
 
 /// EMU position (`xdr:pos`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbDrawingEmuPoint {
+pub struct Point {
     /// X coordinate in EMUs.
     pub x: i64,
     /// Y coordinate in EMUs.
@@ -65,7 +65,7 @@ pub struct XlsbDrawingEmuPoint {
 
 /// EMU extent (`xdr:ext`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbDrawingEmuSize {
+pub struct Size {
     /// Width in EMUs (`cx`).
     pub width: i64,
     /// Height in EMUs (`cy`).
@@ -74,14 +74,14 @@ pub struct XlsbDrawingEmuSize {
 
 /// How an object is anchored to the sheet grid.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsbDrawingAnchorKind {
+pub enum AnchorKind {
     /// Anchored between two cells, moving and sizing per `edit_as`
     /// (`xdr:twoCellAnchor`).
     TwoCell {
         /// Start marker.
-        from: XlsbDrawingCellMarker,
+        from: CellMarker,
         /// End marker.
-        to: XlsbDrawingCellMarker,
+        to: CellMarker,
         /// Resize behavior token (`editAs`: `twoCell`, `oneCell`, or
         /// `absolute`); `twoCell` when the attribute is absent.
         edit_as: Option<String>,
@@ -89,22 +89,22 @@ pub enum XlsbDrawingAnchorKind {
     /// Anchored at one cell with an explicit extent (`xdr:oneCellAnchor`).
     OneCell {
         /// Start marker.
-        from: XlsbDrawingCellMarker,
+        from: CellMarker,
         /// Object extent.
-        extent: XlsbDrawingEmuSize,
+        extent: Size,
     },
     /// Anchored at an absolute position (`xdr:absoluteAnchor`).
     Absolute {
         /// Object position.
-        position: XlsbDrawingEmuPoint,
+        position: Point,
         /// Object extent.
-        extent: XlsbDrawingEmuSize,
+        extent: Size,
     },
 }
 
 /// Non-visual identification shared by all drawing objects (`xdr:cNvPr`).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct XlsbDrawingNonVisual {
+pub struct NonVisual {
     /// Drawing object identifier (`id`); absent IDs surface as 0.
     pub id: u32,
     /// Drawing object name (`name`).
@@ -115,9 +115,9 @@ pub struct XlsbDrawingNonVisual {
 
 /// A graphic frame (`xdr:graphicFrame`) and the content it hosts.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsbDrawingGraphicFrame {
+pub struct GraphicFrame {
     /// Non-visual identification.
-    pub non_visual: XlsbDrawingNonVisual,
+    pub non_visual: NonVisual,
     /// `graphicData` content URI, for example [`CHART_GRAPHIC_DATA_URI`].
     pub content_uri: String,
     /// Relationship identifier carried by the hosted content (for example
@@ -125,7 +125,7 @@ pub struct XlsbDrawingGraphicFrame {
     pub rel_id: Option<String>,
 }
 
-impl XlsbDrawingGraphicFrame {
+impl GraphicFrame {
     /// Whether the hosted content is a DrawingML chart.
     pub fn is_chart(&self) -> bool {
         self.content_uri == CHART_GRAPHIC_DATA_URI
@@ -134,60 +134,60 @@ impl XlsbDrawingGraphicFrame {
 
 /// One anchored drawing object.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsbDrawingObject {
+pub enum Object {
     /// A shape (`xdr:sp`).
-    Shape(XlsbDrawingNonVisual),
+    Shape(NonVisual),
     /// A picture (`xdr:pic`).
     Picture {
         /// Non-visual identification.
-        non_visual: XlsbDrawingNonVisual,
+        non_visual: NonVisual,
         /// Relationship identifier of the image (`a:blip r:embed`), when
         /// declared; stored verbatim and never dereferenced.
         embed_rel_id: Option<String>,
     },
     /// A graphic frame hosting foreign content such as a chart
     /// (`xdr:graphicFrame`).
-    GraphicFrame(XlsbDrawingGraphicFrame),
+    GraphicFrame(GraphicFrame),
     /// A connection shape (`xdr:cxnSp`).
-    ConnectionShape(XlsbDrawingNonVisual),
+    ConnectionShape(NonVisual),
     /// A group shape (`xdr:grpSp`); nested objects are not inventoried.
-    GroupShape(XlsbDrawingNonVisual),
+    GroupShape(NonVisual),
 }
 
 /// One anchor and the object it anchors, in drawing order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsbDrawingAnchor {
+pub struct Anchor {
     /// How the object is anchored to the grid.
-    pub anchor: XlsbDrawingAnchorKind,
+    pub anchor: AnchorKind,
     /// The anchored object.
-    pub object: XlsbDrawingObject,
+    pub object: Object,
 }
 
 /// Inert inventory of one Drawings part.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsbDrawing {
+pub struct Drawing {
     /// Anchored objects in drawing order.
-    pub anchors: Vec<XlsbDrawingAnchor>,
+    pub anchors: Vec<Anchor>,
 }
 
 /// The drawing of one sheet plus the images and charts its objects reference.
 #[derive(Debug, Clone)]
-pub struct XlsbSheetDrawing {
+pub struct SheetDrawing {
     /// Zero-based sheet index in workbook sheet order.
     pub sheet_index: usize,
     /// Anchored-object inventory of the Drawings part.
-    pub drawing: XlsbDrawing,
+    pub drawing: Drawing,
     /// Typed charts resolved from chart graphic frames.
-    pub charts: Vec<XlsbEmbeddedChart>,
+    pub charts: Vec<EmbeddedChart>,
     /// Embedded image parts resolved from picture objects.
-    pub images: Vec<XlsbEmbeddedImage>,
+    pub images: Vec<EmbeddedImage>,
     /// Detailed standard DrawingML shapes, groups, and connectors.
     pub shapes: Vec<crate::xlsx::XlsxAnchoredObject>,
 }
 
 /// One embedded image part resolved through a drawing picture.
 #[derive(Debug, Clone)]
-pub struct XlsbEmbeddedImage {
+pub struct EmbeddedImage {
     /// Name of the hosting picture object (`xdr:cNvPr name`).
     pub picture_name: String,
     /// Optional picture alternative text (`xdr:cNvPr descr`).
@@ -195,14 +195,14 @@ pub struct XlsbEmbeddedImage {
     /// Relationship identifier from the drawing part to the image part.
     pub rel_id: String,
     /// Typed encoded image format.
-    pub format: crate::xlsb::drawing_image::XlsbWorksheetImageFormat,
+    pub format: crate::xlsb::drawing_image::ImageFormat,
     /// Exact encoded image bytes, shared when pictures reuse one Image part.
     pub data: std::sync::Arc<[u8]>,
 }
 
 /// One embedded chart part resolved through a drawing graphic frame.
 #[derive(Debug, Clone)]
-pub struct XlsbEmbeddedChart {
+pub struct EmbeddedChart {
     /// Name of the hosting graphic frame (`xdr:cNvPr name`).
     pub frame_name: String,
     /// Relationship identifier from the drawing part to the chart part;
@@ -232,11 +232,11 @@ fn limit(what: &str) -> OoxmlError {
 ///
 /// Markup-compatibility processing is applied so `mc:AlternateContent`
 /// fallbacks resolve before parsing. The root element must be `xdr:wsDr`.
-pub fn parse_drawing_part(xml_bytes: &[u8]) -> XlsbResult<XlsbDrawing> {
+pub fn parse_drawing_part(xml_bytes: &[u8]) -> XlsbResult<Drawing> {
     Ok(parse_drawing_part_xml(xml_bytes)?)
 }
 
-fn parse_drawing_part_xml(xml_bytes: &[u8]) -> Result<XlsbDrawing> {
+fn parse_drawing_part_xml(xml_bytes: &[u8]) -> Result<Drawing> {
     if xml_bytes.len() > MAX_DRAWING_XML_BYTES {
         return Err(limit("drawing part bytes"));
     }
@@ -277,7 +277,7 @@ impl MarkerField {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AnchorKind {
+enum ParsedAnchorKind {
     TwoCell,
     OneCell,
     Absolute,
@@ -324,8 +324,8 @@ impl PendingMarker {
         Ok(())
     }
 
-    fn finish(self, description: &str) -> Result<XlsbDrawingCellMarker> {
-        Ok(XlsbDrawingCellMarker {
+    fn finish(self, description: &str) -> Result<CellMarker> {
+        Ok(CellMarker {
             column: self
                 .column
                 .ok_or_else(|| invalid(format!("{description} is missing its column")))?,
@@ -353,7 +353,7 @@ enum ObjectKind {
 
 struct PendingObject {
     kind: ObjectKind,
-    non_visual: XlsbDrawingNonVisual,
+    non_visual: NonVisual,
     saw_non_visual: bool,
     embed_rel_id: Option<String>,
     content_uri: Option<String>,
@@ -364,7 +364,7 @@ impl PendingObject {
     fn new(kind: ObjectKind) -> Self {
         PendingObject {
             kind,
-            non_visual: XlsbDrawingNonVisual::default(),
+            non_visual: NonVisual::default(),
             saw_non_visual: false,
             embed_rel_id: None,
             content_uri: None,
@@ -422,38 +422,38 @@ impl PendingObject {
         Ok(())
     }
 
-    fn finish(self) -> XlsbDrawingObject {
+    fn finish(self) -> Object {
         match self.kind {
-            ObjectKind::Shape => XlsbDrawingObject::Shape(self.non_visual),
-            ObjectKind::Picture => XlsbDrawingObject::Picture {
+            ObjectKind::Shape => Object::Shape(self.non_visual),
+            ObjectKind::Picture => Object::Picture {
                 non_visual: self.non_visual,
                 embed_rel_id: self.embed_rel_id,
             },
-            ObjectKind::GraphicFrame => XlsbDrawingObject::GraphicFrame(XlsbDrawingGraphicFrame {
+            ObjectKind::GraphicFrame => Object::GraphicFrame(GraphicFrame {
                 non_visual: self.non_visual,
                 content_uri: self.content_uri.unwrap_or_default(),
                 rel_id: self.rel_id,
             }),
-            ObjectKind::ConnectionShape => XlsbDrawingObject::ConnectionShape(self.non_visual),
-            ObjectKind::GroupShape => XlsbDrawingObject::GroupShape(self.non_visual),
+            ObjectKind::ConnectionShape => Object::ConnectionShape(self.non_visual),
+            ObjectKind::GroupShape => Object::GroupShape(self.non_visual),
         }
     }
 }
 
 struct PendingAnchor {
-    kind: AnchorKind,
+    kind: ParsedAnchorKind,
     edit_as: Option<String>,
     from: Option<PendingMarker>,
     to: Option<PendingMarker>,
-    position: Option<XlsbDrawingEmuPoint>,
-    extent: Option<XlsbDrawingEmuSize>,
-    object: Option<XlsbDrawingObject>,
+    position: Option<Point>,
+    extent: Option<Size>,
+    object: Option<Object>,
 }
 
 impl PendingAnchor {
-    fn finish(self) -> Result<XlsbDrawingAnchor> {
+    fn finish(self) -> Result<Anchor> {
         let anchor = match self.kind {
-            AnchorKind::TwoCell => XlsbDrawingAnchorKind::TwoCell {
+            ParsedAnchorKind::TwoCell => AnchorKind::TwoCell {
                 from: self
                     .from
                     .ok_or_else(|| invalid("twoCellAnchor is missing its from marker"))?
@@ -464,7 +464,7 @@ impl PendingAnchor {
                     .finish("twoCellAnchor to marker")?,
                 edit_as: self.edit_as,
             },
-            AnchorKind::OneCell => XlsbDrawingAnchorKind::OneCell {
+            ParsedAnchorKind::OneCell => AnchorKind::OneCell {
                 from: self
                     .from
                     .ok_or_else(|| invalid("oneCellAnchor is missing its from marker"))?
@@ -473,7 +473,7 @@ impl PendingAnchor {
                     .extent
                     .ok_or_else(|| invalid("oneCellAnchor is missing its extent"))?,
             },
-            AnchorKind::Absolute => XlsbDrawingAnchorKind::Absolute {
+            ParsedAnchorKind::Absolute => AnchorKind::Absolute {
                 position: self
                     .position
                     .ok_or_else(|| invalid("absoluteAnchor is missing its position"))?,
@@ -485,19 +485,19 @@ impl PendingAnchor {
         let object = self
             .object
             .ok_or_else(|| invalid("drawing anchor has no object"))?;
-        Ok(XlsbDrawingAnchor { anchor, object })
+        Ok(Anchor { anchor, object })
     }
 }
 
 struct Parser {
-    anchors: Vec<XlsbDrawingAnchor>,
+    anchors: Vec<Anchor>,
     anchor: Option<PendingAnchor>,
     object: Option<PendingObject>,
     marker_text: String,
 }
 
 impl Parser {
-    fn parse(xml: &str) -> Result<XlsbDrawing> {
+    fn parse(xml: &str) -> Result<Drawing> {
         let mut reader = NsReader::from_reader(xml.as_bytes());
         reader.config_mut().trim_text(false);
         let mut parser = Parser {
@@ -530,7 +530,7 @@ impl Parser {
                     if !is_xdr_name(&namespace, element.name().local_name().as_ref(), b"wsDr") {
                         return Err(invalid("drawing part root is not xdr:wsDr"));
                     }
-                    return Ok(XlsbDrawing {
+                    return Ok(Drawing {
                         anchors: parser.anchors,
                     });
                 },
@@ -577,7 +577,7 @@ impl Parser {
                     if !closed_root {
                         return Err(invalid("drawing part is missing xdr:wsDr"));
                     }
-                    return Ok(XlsbDrawing {
+                    return Ok(Drawing {
                         anchors: parser.anchors,
                     });
                 },
@@ -613,9 +613,9 @@ impl Parser {
         match parent {
             Context::Root if xdr => {
                 let kind = match local {
-                    b"twoCellAnchor" => AnchorKind::TwoCell,
-                    b"oneCellAnchor" => AnchorKind::OneCell,
-                    b"absoluteAnchor" => AnchorKind::Absolute,
+                    b"twoCellAnchor" => ParsedAnchorKind::TwoCell,
+                    b"oneCellAnchor" => ParsedAnchorKind::OneCell,
+                    b"absoluteAnchor" => ParsedAnchorKind::Absolute,
                     _ => return Ok(Context::Other),
                 };
                 if self.anchor.is_some() {
@@ -624,7 +624,7 @@ impl Parser {
                 if self.anchors.len() >= MAX_ANCHORED_OBJECTS {
                     return Err(limit("anchored object count"));
                 }
-                let edit_as = if kind == AnchorKind::TwoCell {
+                let edit_as = if kind == ParsedAnchorKind::TwoCell {
                     unqualified_attribute_value(element, b"editAs", decoder)?
                 } else {
                     None
@@ -662,7 +662,7 @@ impl Parser {
                     if anchor.position.is_some() {
                         return Err(invalid("drawing anchor has duplicate positions"));
                     }
-                    anchor.position = Some(XlsbDrawingEmuPoint {
+                    anchor.position = Some(Point {
                         x: emu_attribute(element, b"x", decoder)?,
                         y: emu_attribute(element, b"y", decoder)?,
                     });
@@ -673,7 +673,7 @@ impl Parser {
                     if anchor.extent.is_some() {
                         return Err(invalid("drawing anchor has duplicate extents"));
                     }
-                    anchor.extent = Some(XlsbDrawingEmuSize {
+                    anchor.extent = Some(Size {
                         width: emu_attribute(element, b"cx", decoder)?,
                         height: emu_attribute(element, b"cy", decoder)?,
                     });

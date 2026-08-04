@@ -35,7 +35,7 @@ fn parses_two_cell_shape_anchor() {
     );
     let inventory = parse_drawing_part(&drawing(&body)).unwrap();
     assert_eq!(inventory.anchors.len(), 1);
-    let XlsbDrawingAnchorKind::TwoCell { from, to, edit_as } = &inventory.anchors[0].anchor else {
+    let AnchorKind::TwoCell { from, to, edit_as } = &inventory.anchors[0].anchor else {
         panic!("expected two-cell anchor");
     };
     assert_eq!(from.column, 0);
@@ -47,7 +47,7 @@ fn parses_two_cell_shape_anchor() {
     assert_eq!(edit_as.as_deref(), Some("oneCell"));
     assert_eq!(
         inventory.anchors[0].object,
-        XlsbDrawingObject::Shape(XlsbDrawingNonVisual {
+        Object::Shape(NonVisual {
             id: 1026,
             name: "shapetype_75".to_string(),
             description: None,
@@ -66,7 +66,7 @@ fn parses_one_cell_picture_anchor() {
     );
     let inventory = parse_drawing_part(&drawing(&body)).unwrap();
     assert_eq!(inventory.anchors.len(), 1);
-    let XlsbDrawingAnchorKind::OneCell { from, extent } = &inventory.anchors[0].anchor else {
+    let AnchorKind::OneCell { from, extent } = &inventory.anchors[0].anchor else {
         panic!("expected one-cell anchor");
     };
     assert_eq!(from.column, 2);
@@ -75,8 +75,8 @@ fn parses_one_cell_picture_anchor() {
     assert_eq!(extent.height, 914400);
     assert_eq!(
         inventory.anchors[0].object,
-        XlsbDrawingObject::Picture {
-            non_visual: XlsbDrawingNonVisual {
+        Object::Picture {
+            non_visual: NonVisual {
                 id: 3,
                 name: "Logo".to_string(),
                 description: Some("Company logo".to_string()),
@@ -96,12 +96,12 @@ fn parses_absolute_chart_graphic_frame() {
         <xdr:clientData/></xdr:absoluteAnchor>";
     let inventory = parse_drawing_part(&drawing(body)).unwrap();
     assert_eq!(inventory.anchors.len(), 1);
-    let XlsbDrawingAnchorKind::Absolute { position, extent } = &inventory.anchors[0].anchor else {
+    let AnchorKind::Absolute { position, extent } = &inventory.anchors[0].anchor else {
         panic!("expected absolute anchor");
     };
     assert_eq!(position.x, 0);
     assert_eq!(extent.width, 5000000);
-    let XlsbDrawingObject::GraphicFrame(frame) = &inventory.anchors[0].object else {
+    let Object::GraphicFrame(frame) = &inventory.anchors[0].object else {
         panic!("expected graphic frame");
     };
     assert_eq!(frame.non_visual.name, "Chart 1");
@@ -128,7 +128,7 @@ fn parses_connection_and_group_shapes() {
     assert_eq!(inventory.anchors.len(), 2);
     assert_eq!(
         inventory.anchors[0].object,
-        XlsbDrawingObject::ConnectionShape(XlsbDrawingNonVisual {
+        Object::ConnectionShape(NonVisual {
             id: 4,
             name: "Connector".to_string(),
             description: None,
@@ -138,7 +138,7 @@ fn parses_connection_and_group_shapes() {
     // inventoried.
     assert_eq!(
         inventory.anchors[1].object,
-        XlsbDrawingObject::GroupShape(XlsbDrawingNonVisual {
+        Object::GroupShape(NonVisual {
             id: 5,
             name: "Group".to_string(),
             description: None,
@@ -205,13 +205,13 @@ fn parses_real_fixture_workbook_drawing() {
     assert_eq!(drawing.drawing.anchors.len(), 1);
     assert_eq!(
         drawing.drawing.anchors[0].object,
-        XlsbDrawingObject::Shape(XlsbDrawingNonVisual {
+        Object::Shape(NonVisual {
             id: 1026,
             name: "shapetype_75".to_string(),
             description: None,
         })
     );
-    let XlsbDrawingAnchorKind::TwoCell { from, to, .. } = &drawing.drawing.anchors[0].anchor else {
+    let AnchorKind::TwoCell { from, to, .. } = &drawing.drawing.anchors[0].anchor else {
         panic!("expected two-cell anchor");
     };
     assert_eq!(from.row, 0);

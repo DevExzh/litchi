@@ -192,12 +192,10 @@ pub use chartsheet::{
 };
 pub use data_validation::{DataValidationRecordKind, DataValidationSettings, Validation};
 pub use drawing::{
-    CHART_GRAPHIC_DATA_URI, XlsbDrawing, XlsbDrawingAnchor, XlsbDrawingAnchorKind,
-    XlsbDrawingCellMarker, XlsbDrawingEmuPoint, XlsbDrawingEmuSize, XlsbDrawingGraphicFrame,
-    XlsbDrawingNonVisual, XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage,
-    XlsbSheetDrawing, parse_drawing_part,
+    Anchor, AnchorKind, CHART_GRAPHIC_DATA_URI, CellMarker, Drawing, EmbeddedChart, EmbeddedImage,
+    GraphicFrame, NonVisual, Object, Point, SheetDrawing, Size, parse_drawing_part,
 };
-pub use drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
+pub use drawing_image::{Image, ImageFormat};
 pub use error::{XlsbError, XlsbResult};
 pub use external_link::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,

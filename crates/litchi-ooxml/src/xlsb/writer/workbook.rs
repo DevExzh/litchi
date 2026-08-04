@@ -3066,7 +3066,7 @@ mod tests {
 
     #[test]
     fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
-        use crate::xlsb::drawing::XlsbDrawingAnchorKind;
+        use crate::xlsb::drawing::AnchorKind;
         use crate::xlsx::{ChartAnchor, WorksheetChart};
         use litchi_drawingml::chart::plot_area::TypeGroup;
 
@@ -3134,7 +3134,7 @@ mod tests {
             [TypeGroup::Pie(_)]
         ));
         match &drawing.drawing.anchors[0].anchor {
-            XlsbDrawingAnchorKind::TwoCell { from, to, edit_as } => {
+            AnchorKind::TwoCell { from, to, edit_as } => {
                 assert_eq!((from.column, from.row), (1, 1));
                 assert_eq!((from.column_offset, from.row_offset), (10, 20));
                 assert_eq!((to.column, to.row), (8, 15));
@@ -3480,9 +3480,7 @@ mod tests {
 
     #[test]
     fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
-        use crate::xlsb::{
-            XlsbDrawingAnchorKind, XlsbDrawingObject, XlsbWorksheetImage, XlsbWorksheetImageFormat,
-        };
+        use crate::xlsb::{AnchorKind, Image, ImageFormat, Object};
         use crate::xlsx::{
             ChartAnchor, Preset, WorksheetChart, XlsxDrawingObject, XlsxEmu, XlsxEmuExtent,
             XlsxEmuOffset, XlsxShapeAnchor,
@@ -3505,17 +3503,11 @@ mod tests {
         ];
 
         let png_anchor = ChartAnchor::with_offsets(1, 10, 2, 20, 5, 30, 8, 40);
-        let png =
-            XlsbWorksheetImage::new(PNG_1X1.to_vec(), XlsbWorksheetImageFormat::Png, png_anchor)
-                .unwrap()
-                .with_description("Logo & <mark>")
-                .unwrap();
-        let svg = XlsbWorksheetImage::new(
-            SVG.to_vec(),
-            XlsbWorksheetImageFormat::Svg,
-            ChartAnchor::new(6, 2, 9, 8),
-        )
-        .unwrap();
+        let png = Image::new(PNG_1X1.to_vec(), ImageFormat::Png, png_anchor)
+            .unwrap()
+            .with_description("Logo & <mark>")
+            .unwrap();
+        let svg = Image::new(SVG.to_vec(), ImageFormat::Svg, ChartAnchor::new(6, 2, 9, 8)).unwrap();
         let chart = WorksheetChart::line_chart(
             "Trend",
             "Pictures!$A$1:$A$2",
@@ -3548,9 +3540,9 @@ mod tests {
         let mut image_only = MutableXlsbWorksheet::new("Image only");
         image_only
             .add_image(
-                XlsbWorksheetImage::new(
+                Image::new(
                     GIF_1X1.to_vec(),
-                    XlsbWorksheetImageFormat::Gif,
+                    ImageFormat::Gif,
                     ChartAnchor::new(0, 0, 2, 3),
                 )
                 .unwrap(),
@@ -3566,13 +3558,13 @@ mod tests {
         let drawing = reader.sheet_drawing(0).expect("sheet drawing missing");
         assert_eq!(drawing.images.len(), 2);
         assert_eq!(drawing.charts.len(), 1);
-        assert_eq!(drawing.images[0].format, XlsbWorksheetImageFormat::Png);
+        assert_eq!(drawing.images[0].format, ImageFormat::Png);
         assert_eq!(drawing.images[0].data.as_ref(), PNG_1X1);
         assert_eq!(
             drawing.images[0].description.as_deref(),
             Some("Logo & <mark>")
         );
-        assert_eq!(drawing.images[1].format, XlsbWorksheetImageFormat::Svg);
+        assert_eq!(drawing.images[1].format, ImageFormat::Svg);
         assert_eq!(drawing.images[1].data.as_ref(), SVG);
         assert_eq!(drawing.images[0].rel_id, "rId1");
         assert_eq!(drawing.images[1].rel_id, "rId2");
@@ -3584,7 +3576,7 @@ mod tests {
         };
         assert_eq!(caption.non_visual.id, Some(4));
         match &drawing.drawing.anchors[0].anchor {
-            XlsbDrawingAnchorKind::TwoCell { from, to, .. } => {
+            AnchorKind::TwoCell { from, to, .. } => {
                 assert_eq!(
                     (from.column, from.column_offset, from.row, from.row_offset),
                     (1, 10, 2, 20)
@@ -3598,14 +3590,14 @@ mod tests {
         }
         assert!(matches!(
             &drawing.drawing.anchors[0].object,
-            XlsbDrawingObject::Picture {
+            Object::Picture {
                 embed_rel_id: Some(rel_id),
                 ..
             } if rel_id == "rId1"
         ));
         assert!(matches!(
             &drawing.drawing.anchors[2].object,
-            XlsbDrawingObject::GraphicFrame(frame)
+            Object::GraphicFrame(frame)
                 if frame.rel_id.as_deref() == Some("rId3")
         ));
         let second_drawing = reader
@@ -3613,10 +3605,7 @@ mod tests {
             .expect("image-only sheet drawing missing");
         assert_eq!(second_drawing.images.len(), 1);
         assert!(second_drawing.charts.is_empty());
-        assert_eq!(
-            second_drawing.images[0].format,
-            XlsbWorksheetImageFormat::Gif
-        );
+        assert_eq!(second_drawing.images[0].format, ImageFormat::Gif);
         assert_eq!(second_drawing.images[0].data.as_ref(), GIF_1X1);
 
         let package = reader.opc_package();
@@ -3638,37 +3627,37 @@ mod tests {
 
     #[test]
     fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
-        use crate::xlsb::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
+        use crate::xlsb::{Image, ImageFormat};
         use crate::xlsx::ChartAnchor;
 
         assert!(
-            XlsbWorksheetImage::new(
+            Image::new(
                 b"not a png".to_vec(),
-                XlsbWorksheetImageFormat::Png,
+                ImageFormat::Png,
                 ChartAnchor::new(0, 0, 1, 1),
             )
             .is_err()
         );
         assert!(
-            XlsbWorksheetImage::new(
+            Image::new(
                 b"<not-svg/>".to_vec(),
-                XlsbWorksheetImageFormat::Svg,
+                ImageFormat::Svg,
                 ChartAnchor::new(0, 0, 1, 1),
             )
             .is_err()
         );
         assert!(
-            XlsbWorksheetImage::new(
+            Image::new(
                 b"GIF89a".to_vec(),
-                XlsbWorksheetImageFormat::Gif,
+                ImageFormat::Gif,
                 ChartAnchor::new(2, 2, 1, 1),
             )
             .is_err()
         );
 
-        let valid = XlsbWorksheetImage::new(
+        let valid = Image::new(
             b"GIF89a".to_vec(),
-            XlsbWorksheetImageFormat::Gif,
+            ImageFormat::Gif,
             ChartAnchor::new(0, 0, 1, 1),
         )
         .unwrap();
@@ -3683,7 +3672,7 @@ mod tests {
         );
         assert_eq!(sheet.images().len(), 1);
         let removed = sheet.remove_image(0).unwrap();
-        assert_eq!(removed.format(), XlsbWorksheetImageFormat::Gif);
+        assert_eq!(removed.format(), ImageFormat::Gif);
         assert!(sheet.images().is_empty());
         assert!(sheet.remove_image(0).is_err());
         sheet.add_image(valid).unwrap();

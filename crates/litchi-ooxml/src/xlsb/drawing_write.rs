@@ -3,7 +3,7 @@
 //! XLSB reuses the ordinary SpreadsheetDrawing and DrawingML Chart XML
 //! grammars. Only the worksheet link is binary (`BrtDrawing`).
 
-use crate::xlsb::XlsbWorksheetImage;
+use crate::xlsb::Image;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsx::WorksheetChart;
 use crate::xlsx::writer::shape::{
@@ -44,7 +44,7 @@ pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> XlsbResult<Vec<u8>> 
 }
 
 pub(crate) fn serialize_drawing(
-    images: &[XlsbWorksheetImage],
+    images: &[Image],
     charts: &[WorksheetChart],
     shapes: &[XlsxShapeSpec],
     groups: &[XlsxGroupSpec],
@@ -171,11 +171,7 @@ fn ensure_drawing_size(bytes: usize) -> XlsbResult<()> {
     Ok(())
 }
 
-fn write_image_anchor(
-    xml: &mut String,
-    image: &XlsbWorksheetImage,
-    index: usize,
-) -> XlsbResult<()> {
+fn write_image_anchor(xml: &mut String, image: &Image, index: usize) -> XlsbResult<()> {
     let anchor = image.anchor();
     let object_id = index.checked_add(1).ok_or_else(|| {
         XlsbError::InvalidFormula("worksheet picture object ID overflow".to_string())

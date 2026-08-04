@@ -7,7 +7,7 @@
 //! expose sheet-level metadata only (code name, publish flag, tab color,
 //! views, protection, page setup, and drawing-part links) — the chart type
 //! and plot definition live in the linked `c:chartSpace` XML part and are
-//! surfaced through [`crate::xlsb::drawing::XlsbSheetDrawing`].
+//! surfaced through [`crate::xlsb::drawing::SheetDrawing`].
 //!
 //! All values are inert data snapshots: relationship identifiers, password
 //! verifiers, and hash data are stored verbatim and are never dereferenced,

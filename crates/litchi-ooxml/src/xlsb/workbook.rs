@@ -60,7 +60,7 @@ pub struct XlsbWorkbook {
     pivot_cache_definitions: Vec<(u32, crate::xlsb::pivot::PivotCacheDefinition)>,
     structured_tables: Vec<(usize, crate::xlsb::table::XlsbTable)>,
     chart_sheets: Vec<(usize, crate::xlsb::chartsheet::XlsbChartSheet)>,
-    sheet_drawings: Vec<crate::xlsb::drawing::XlsbSheetDrawing>,
+    sheet_drawings: Vec<crate::xlsb::drawing::SheetDrawing>,
     connections: Option<crate::xlsb::connections::XlsbConnections>,
 }
 
@@ -509,16 +509,13 @@ impl XlsbWorkbook {
     ///
     /// These are inert data snapshots. Internal image and chart parts are
     /// resolved during package loading; external targets are never fetched.
-    pub fn sheet_drawings(&self) -> &[crate::xlsb::drawing::XlsbSheetDrawing] {
+    pub fn sheet_drawings(&self) -> &[crate::xlsb::drawing::SheetDrawing] {
         &self.sheet_drawings
     }
 
     /// Look up the drawing inventory of one sheet, selected by zero-based
     /// sheet index; `None` when the sheet has no Drawings part.
-    pub fn sheet_drawing(
-        &self,
-        sheet_index: usize,
-    ) -> Option<&crate::xlsb::drawing::XlsbSheetDrawing> {
+    pub fn sheet_drawing(&self, sheet_index: usize) -> Option<&crate::xlsb::drawing::SheetDrawing> {
         self.sheet_drawings
             .iter()
             .find(|drawing| drawing.sheet_index == sheet_index)
@@ -531,10 +528,8 @@ impl XlsbWorkbook {
         &self,
         sheet_index: usize,
         drawing_part: &dyn litchi_opc::part::Part,
-    ) -> XlsbResult<crate::xlsb::drawing::XlsbSheetDrawing> {
-        use crate::xlsb::drawing::{
-            XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage, XlsbSheetDrawing,
-        };
+    ) -> XlsbResult<crate::xlsb::drawing::SheetDrawing> {
+        use crate::xlsb::drawing::{EmbeddedChart, EmbeddedImage, Object, SheetDrawing};
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
             crate::xlsb::error::XlsbError::Encoding(format!("Drawings part is not UTF-8: {error}"))
         })?;
@@ -545,7 +540,7 @@ impl XlsbWorkbook {
         let mut image_bytes = 0usize;
         let mut image_cache = HashMap::new();
         for anchor in &drawing.anchors {
-            if let XlsbDrawingObject::Picture {
+            if let Object::Picture {
                 non_visual,
                 embed_rel_id: Some(rel_id),
             } = &anchor.object
@@ -571,11 +566,9 @@ impl XlsbWorkbook {
                     }
                     let image_uri = relationship.target_partname()?;
                     let image_part = self.package.get_part(&image_uri)?;
-                    let Some(format) =
-                        crate::xlsb::drawing_image::XlsbWorksheetImageFormat::from_content_type(
-                            image_part.content_type(),
-                        )
-                    else {
+                    let Some(format) = crate::xlsb::drawing_image::ImageFormat::from_content_type(
+                        image_part.content_type(),
+                    ) else {
                         continue;
                     };
                     if images.len() >= crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES {
@@ -608,7 +601,7 @@ impl XlsbWorkbook {
                         image_cache.insert(image_uri, Arc::clone(&data));
                         data
                     };
-                    images.push(XlsbEmbeddedImage {
+                    images.push(EmbeddedImage {
                         picture_name: non_visual.name.clone(),
                         description: non_visual.description.clone(),
                         rel_id: rel_id.clone(),
@@ -618,7 +611,7 @@ impl XlsbWorkbook {
                 }
                 continue;
             }
-            let XlsbDrawingObject::GraphicFrame(frame) = &anchor.object else {
+            let Object::GraphicFrame(frame) = &anchor.object else {
                 continue;
             };
             let Some(rel_id) = &frame.rel_id else {
@@ -648,7 +641,7 @@ impl XlsbWorkbook {
             let chart_part = self.package.get_part(&relationship.target_partname()?)?;
             let graph =
                 crate::xlsb::chart_resources::parse_chart_resources(&self.package, chart_part)?;
-            charts.push(XlsbEmbeddedChart {
+            charts.push(EmbeddedChart {
                 frame_name: frame.non_visual.name.clone(),
                 rel_id: rel_id.clone(),
                 chart: graph.chart,
@@ -657,7 +650,7 @@ impl XlsbWorkbook {
                 additional_relationships: graph.additional_relationships,
             });
         }
-        Ok(XlsbSheetDrawing {
+        Ok(SheetDrawing {
             sheet_index,
             drawing,
             charts,

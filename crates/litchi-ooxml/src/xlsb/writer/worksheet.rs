@@ -150,7 +150,7 @@ pub struct MutableXlsbWorksheet {
     /// Typed DrawingML charts anchored on this sheet.
     charts: Vec<crate::xlsx::WorksheetChart>,
     /// Typed image parts anchored in the same Drawings part.
-    images: Vec<crate::xlsb::XlsbWorksheetImage>,
+    images: Vec<crate::xlsb::Image>,
     /// Cached sum of encoded image bytes for constant-time safety checks.
     image_bytes: usize,
     /// Top-level DrawingML shapes and text boxes.
@@ -1181,7 +1181,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Add a typed embedded image to this worksheet's Drawings part.
-    pub fn add_image(&mut self, image: crate::xlsb::XlsbWorksheetImage) -> XlsbResult<()> {
+    pub fn add_image(&mut self, image: crate::xlsb::Image) -> XlsbResult<()> {
         if self.images.len() >= crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES {
             return Err(XlsbError::InvalidFormula(
                 "worksheet image count exceeds the safety limit".to_string(),
@@ -1207,12 +1207,12 @@ impl MutableXlsbWorksheet {
     }
 
     /// Typed embedded images in drawing order.
-    pub fn images(&self) -> &[crate::xlsb::XlsbWorksheetImage] {
+    pub fn images(&self) -> &[crate::xlsb::Image] {
         &self.images
     }
 
     /// Remove one embedded image by drawing order.
-    pub fn remove_image(&mut self, index: usize) -> XlsbResult<crate::xlsb::XlsbWorksheetImage> {
+    pub fn remove_image(&mut self, index: usize) -> XlsbResult<crate::xlsb::Image> {
         if index >= self.images.len() {
             return Err(XlsbError::InvalidFormula(format!(
                 "image index {index} is out of bounds for {} images",

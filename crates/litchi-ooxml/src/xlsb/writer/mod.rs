@@ -58,7 +58,7 @@ pub(crate) mod bin_range;
 pub(crate) mod data_validation;
 
 // Re-export main types for public API
-pub use crate::xlsb::drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
+pub use crate::xlsb::drawing_image::{Image, ImageFormat};
 pub use crate::xlsb::external_link::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,
     Kind, Link, MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
