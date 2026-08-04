@@ -13,6 +13,7 @@
 
 mod error;
 pub mod font;
+pub mod format;
 pub mod laser;
 pub mod notes;
 pub mod shape;
@@ -22,3 +23,4 @@ pub mod time;
 pub mod transition;
 
 pub use error::{Error, Result};
+pub use format::{ImageFormat, TextFormat};
