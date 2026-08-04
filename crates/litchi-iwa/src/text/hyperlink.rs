@@ -82,7 +82,7 @@ pub(crate) fn add_text_hyperlink(
         },
     )?;
     staged.update_archive(&archive_name, |archive| {
-        archive.insert_object(hyperlink_object)
+        Ok(archive.insert_object(hyperlink_object)?)
     })?;
     set_package_last_object_identifier(&mut staged, identifier)?;
     let verified = roundtrip(&staged)?;

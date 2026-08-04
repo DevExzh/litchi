@@ -86,7 +86,9 @@ impl NumbersEditor {
         };
 
         let mut staged = self.package.clone();
-        staged.update_archive(&archive_name, |archive| archive.insert_object(cloned_sheet))?;
+        staged.update_archive(&archive_name, |archive| {
+            Ok(archive.insert_object(cloned_sheet)?)
+        })?;
         update_numbers_document(&mut staged, |document| {
             let matches = document
                 .sheets

@@ -4,7 +4,7 @@
 
 use super::storage::{TextStorage, parse_storage_archive};
 use crate::Result;
-use crate::archive::ArchiveObject;
+use crate::archive::{ArchiveObject, extract_text};
 use crate::bundle::Bundle;
 
 /// Text extractor for iWork documents
@@ -49,7 +49,7 @@ impl TextExtractor {
     /// Extract text from a single archive object
     pub fn extract_from_object(&self, object: &ArchiveObject) -> Result<TextStorage> {
         // Extract text from decoded messages
-        let text_lines = object.extract_text();
+        let text_lines = extract_text(object);
 
         if text_lines.is_empty() {
             return Ok(TextStorage::new());

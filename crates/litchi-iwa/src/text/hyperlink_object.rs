@@ -65,13 +65,13 @@ pub(super) fn new_hyperlink_object(
         }),
         url_ref: Some(target.as_str().to_owned()),
     };
-    ArchiveObject::new(
+    Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: HYPERLINK_MESSAGE_TYPE,
             data: hyperlink.encode_to_vec(),
         }],
-    )
+    )?)
 }
 
 pub(super) fn patch_hyperlink_target(

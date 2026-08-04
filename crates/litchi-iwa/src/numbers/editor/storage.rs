@@ -1482,10 +1482,10 @@ pub(super) fn set_rich_text(
     )?;
 
     package.update_archive(&entry.storage_archive, |archive| {
-        archive.insert_object(cloned_storage)
+        Ok(archive.insert_object(cloned_storage)?)
     })?;
     package.update_archive(&entry.payload_archive, |archive| {
-        archive.insert_object(cloned_payload)
+        Ok(archive.insert_object(cloned_payload)?)
     })?;
 
     let resolved = resolve_table_data_list(

@@ -99,13 +99,13 @@ pub(super) fn new_number_attachment_object(
             .as_ref()
             .map(|value| value.as_str().to_owned()),
     };
-    ArchiveObject::new(
+    Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: NUMBER_ATTACHMENT_MESSAGE_TYPE,
             data: attachment.encode_to_vec(),
         }],
-    )
+    )?)
 }
 
 pub(super) fn patch_number_attachment_settings(

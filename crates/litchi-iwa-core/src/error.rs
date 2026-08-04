@@ -23,14 +23,14 @@ pub enum LimitKind {
 impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
-            Self::ArchiveBytes => "archive bytes",
-            Self::Objects => "objects",
-            Self::Messages => "messages",
-            Self::MessagesPerObject => "messages per object",
-            Self::ObjectBytes => "object bytes",
-            Self::MessageBytes => "message bytes",
-            Self::HeaderBytes => "header bytes",
-            Self::MetadataItems => "metadata items",
+            Self::ArchiveBytes => "archive byte",
+            Self::Objects => "object",
+            Self::Messages => "message",
+            Self::MessagesPerObject => "per-object message",
+            Self::ObjectBytes => "object byte",
+            Self::MessageBytes => "message byte",
+            Self::HeaderBytes => "header byte",
+            Self::MetadataItems => "metadata item",
             Self::SnappyChunkBytes => "Snappy decompressed chunk bytes",
             Self::SnappyStreamBytes => "Snappy decompressed stream bytes",
             Self::SnappyCompressedChunkBytes => "Snappy compressed chunk bytes",

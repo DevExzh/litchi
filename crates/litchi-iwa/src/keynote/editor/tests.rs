@@ -2760,7 +2760,7 @@ fn slide_text_storage_updates_preserve_unknown_wire_and_restore_exactly() {
             let object = archive.object_mut(18).unwrap();
             let mut message = object.messages[0].clone();
             append_unknown_varint(&mut message.data, 99, 990);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -2825,14 +2825,14 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
                     data: slide.encode_to_vec(),
                 },
             )?;
-            archive.insert_object(object(
+            Ok(archive.insert_object(object(
                 19,
                 2011,
                 tswp::ShapeInfoArchive {
                     owned_storage: Some(reference(18)),
                     ..Default::default()
                 },
-            ))
+            ))?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -3127,7 +3127,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             owner.archive_info.message_infos[0]
                 .object_references
                 .push(17);
-            archive.insert_object(owner)
+            Ok(archive.insert_object(owner)?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -3319,7 +3319,7 @@ fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {
                 TEST_SOUNDTRACK_MODE_FIELD,
                 TEST_SOUNDTRACK_LOOP_MODE as u64,
             );
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -3346,7 +3346,7 @@ fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {
                 TEST_SHOW_SOUNDTRACK_FIELD,
                 &reference(TEST_SOUNDTRACK_ID).encode_to_vec(),
             )?;
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -4174,7 +4174,7 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
                     Ok(transition)
                 })?;
             append_unknown_varint(&mut data, 99, 990);
-            object
+            Ok(object
                 .replace_message(
                     0,
                     RawMessage {
@@ -4182,7 +4182,7 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
                         data,
                     },
                 )
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -4258,7 +4258,7 @@ fn show_update_rejects_duplicate_scalar_fields_transactionally() {
             let mut message = object.messages[0].clone();
             append_unknown_varint(&mut message.data, 8, 0);
             append_unknown_varint(&mut message.data, 8, 1);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -4278,7 +4278,7 @@ fn show_update_rejects_duplicate_mode_fields_transactionally() {
             let mut message = object.messages[0].clone();
             append_unknown_varint(&mut message.data, TEST_SHOW_MODE_FIELD, 0);
             append_unknown_varint(&mut message.data, TEST_SHOW_MODE_FIELD, 1);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
@@ -5663,14 +5663,14 @@ fn test_package_with_text_box() -> IWorkPackage {
             archive.insert_object(shape)?;
             archive.insert_object(object(21, 3097, Vec::new()))?;
             archive.insert_object(object(22, 3097, Vec::new()))?;
-            archive.insert_object(object(
+            Ok(archive.insert_object(object(
                 18,
                 2001,
                 StorageArchive {
                     text: vec!["Independent text box".to_owned()],
                     ..Default::default()
                 },
-            ))
+            ))?)
         })
         .unwrap();
     package
@@ -5928,7 +5928,7 @@ fn test_package_with_soundtrack() -> IWorkPackage {
             soundtrack.archive_info.message_infos[0]
                 .data_references
                 .extend(TEST_SOUNDTRACK_MEDIA_IDS);
-            archive.insert_object(soundtrack)
+            Ok(archive.insert_object(soundtrack)?)
         })
         .unwrap();
     package
@@ -6701,7 +6701,7 @@ fn test_package_with_slide_movie() -> IWorkPackage {
             chunk.archive_info.message_infos[0]
                 .object_references
                 .push(73);
-            archive.insert_object(chunk)
+            Ok(archive.insert_object(chunk)?)
         })
         .unwrap();
     crate::data_reference_registry::add_component_data_reference(

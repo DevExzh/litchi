@@ -100,13 +100,13 @@ pub(super) fn new_date_time_object(
             seconds: instant.reference_date_seconds(),
         }),
     };
-    ArchiveObject::new(
+    Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: DATE_TIME_MESSAGE_TYPE,
             data: field.encode_to_vec(),
         }],
-    )
+    )?)
 }
 
 pub(super) fn patch_date_time_settings(

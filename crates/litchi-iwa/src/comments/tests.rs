@@ -733,14 +733,14 @@ fn generated_author_is_not_confused_with_existing_native_author() {
                     .encode_to_vec(),
                 },
             )?;
-            archive.insert_object(object(
+            Ok(archive.insert_object(object(
                 41,
                 ANNOTATION_AUTHOR_MESSAGE_TYPE,
                 tsk::AnnotationAuthorArchive {
                     name: Some("Native author".to_owned()),
                     ..Default::default()
                 },
-            ))
+            ))?)
         })
         .unwrap();
     let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();

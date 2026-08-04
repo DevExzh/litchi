@@ -446,10 +446,10 @@ impl PackageLimits {
     }
 
     pub(crate) fn effective_archive_limits(self) -> Result<IwaArchiveLimits> {
-        self.iwa_archive_limits.with_archive_bytes(
+        Ok(self.iwa_archive_limits.with_archive_bytes(
             self.max_iwa_stream_bytes
                 .min(self.iwa_archive_limits.max_archive_bytes()),
-        )
+        )?)
     }
 
     fn snappy_limits(self) -> Result<SnappyLimits> {
@@ -807,7 +807,7 @@ impl IWorkPackage {
             &mut std::io::Cursor::new(compressed),
             self.limits.snappy_limits()?,
         )?;
-        Archive::parse_with_limits(stream.data(), archive_limits)
+        Ok(Archive::parse_with_limits(stream.data(), archive_limits)?)
     }
 
     /// Serialize and replace a parsed `.iwa` package member.

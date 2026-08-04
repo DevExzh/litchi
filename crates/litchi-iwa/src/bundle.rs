@@ -16,7 +16,7 @@ use std::sync::Arc;
 use plist::Value;
 use soapberry_zip::office::{ArchiveLimits as ZipArchiveLimits, ArchiveReader};
 
-use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject};
+use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, extract_text};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::zip_utils::parse_iwa_files_from_archive_with_limits;
 use crate::{Error, Result};
@@ -160,10 +160,10 @@ impl BundleLimits {
     }
 
     pub(crate) fn effective_archive_limits(self) -> Result<IwaArchiveLimits> {
-        self.iwa_archive_limits.with_archive_bytes(
+        Ok(self.iwa_archive_limits.with_archive_bytes(
             self.max_iwa_stream_bytes
                 .min(self.iwa_archive_limits.max_archive_bytes()),
-        )
+        )?)
     }
 
     pub(crate) fn snappy_limits(self) -> Result<SnappyLimits> {
@@ -1021,7 +1021,7 @@ impl Bundle {
 
         for (_, archive) in self.iter_archives() {
             for object in &archive.objects {
-                text_parts.extend(object.extract_text());
+                text_parts.extend(extract_text(object));
             }
         }
 

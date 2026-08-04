@@ -76,13 +76,13 @@ pub(super) fn new_bookmark_object(
         ranged: Some(RANGED_BOOKMARK),
         hidden: Some(settings.visibility.as_raw()),
     };
-    ArchiveObject::new(
+    Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: BOOKMARK_MESSAGE_TYPE,
             data: bookmark.encode_to_vec(),
         }],
-    )
+    )?)
 }
 
 pub(super) fn patch_bookmark_settings(

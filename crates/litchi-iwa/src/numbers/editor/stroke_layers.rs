@@ -314,7 +314,10 @@ pub(crate) fn set_cell_border(
                 data: layer.encode_to_vec(),
             }],
         )?;
-        package.update_archive(sidecar_archive, |archive| archive.insert_object(object))?;
+        package.update_archive(
+            sidecar_archive,
+            |archive| Ok(archive.insert_object(object)?),
+        )?;
         side.references_mut(&mut current).push(tsp::Reference {
             identifier,
             ..Default::default()

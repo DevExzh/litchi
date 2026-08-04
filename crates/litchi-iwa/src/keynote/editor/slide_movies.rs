@@ -542,7 +542,7 @@ impl KeynoteEditor {
                 clone_slide_object(object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
         let mut build_uuids = HashMap::with_capacity(builds.len());
@@ -563,7 +563,7 @@ impl KeynoteEditor {
                 )?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
             build_uuids.insert(build.object_id, new_build_uuid_and_seed().0);
         }
@@ -586,7 +586,7 @@ impl KeynoteEditor {
                     )?
                 };
                 staged.update_archive(&source.archive_name, |archive| {
-                    archive.insert_object(cloned)
+                    Ok(archive.insert_object(cloned)?)
                 })?;
             }
         }

@@ -863,7 +863,7 @@ fn promote_plain_cell(
             }],
         )?;
         object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
-        package.update_archive(&archive_name, |archive| archive.insert_object(object))?;
+        package.update_archive(&archive_name, |archive| Ok(archive.insert_object(object)?))?;
         attach_rich_text_table(package, &archive_name, table_id, list_id)?;
     }
 
@@ -900,7 +900,7 @@ fn promote_plain_cell(
         .push(storage_id);
     package.update_archive(&archive_name, |archive| {
         archive.insert_object(storage_object)?;
-        archive.insert_object(payload_object)
+        Ok(archive.insert_object(payload_object)?)
     })?;
 
     let locations = storage::object_locations(package)?;

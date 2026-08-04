@@ -408,7 +408,7 @@ fn move_style_object(
         Error::InvalidFormat(format!("disposable legend style {style_id} disappeared"))
     })?;
     package.update_archive(destination_archive_name, |archive| {
-        archive.insert_object(style)
+        Ok(archive.insert_object(style)?)
     })
 }
 

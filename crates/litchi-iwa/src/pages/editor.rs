@@ -2167,7 +2167,7 @@ impl PagesEditor {
                 })?;
                 clone_pages_drawable_graph_object(source_object, &remap)?
             };
-            staged.update_archive(&archive_name, |archive| archive.insert_object(cloned))?;
+            staged.update_archive(&archive_name, |archive| Ok(archive.insert_object(cloned)?))?;
         }
 
         let new_drawable_id = remap[&source.drawable_id];
@@ -2455,7 +2455,9 @@ impl PagesEditor {
                 })?;
                 clone_pages_section_graph_object(source_object, &remap, name)?
             };
-            staged.update_archive(&graph.archive_name, |archive| archive.insert_object(cloned))?;
+            staged.update_archive(&graph.archive_name, |archive| {
+                Ok(archive.insert_object(cloned)?)
+            })?;
         }
         let new_section_id = remap[&source_section_id];
         let last_identifier = remap.values().copied().max().ok_or_else(|| {

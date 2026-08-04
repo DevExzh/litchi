@@ -97,7 +97,7 @@ pub(crate) fn set_chart_arrangement(
                 "{drawable_label} chart {drawable_object_id} is missing"
             ))
         })?;
-        object
+        Ok(object
             .replace_message(
                 message_index,
                 RawMessage {
@@ -105,7 +105,7 @@ pub(crate) fn set_chart_arrangement(
                     data,
                 },
             )
-            .map(|_| ())
+            .map(|_| ())?)
     })
 }
 

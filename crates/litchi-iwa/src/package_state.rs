@@ -268,6 +268,7 @@ impl PackageState {
 fn clone_error(error: &Error) -> Error {
     match error {
         Error::Io(error) => Error::Io(std::io::Error::new(error.kind(), error.to_string())),
+        Error::IwaCore(error) => Error::IwaCore(error.clone()),
         Error::InvalidFormat(message) => Error::InvalidFormat(message.clone()),
         Error::Snappy(message) => Error::Snappy(message.clone()),
         Error::ProtobufDecode(error) => Error::ProtobufDecode(error.clone()),

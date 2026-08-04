@@ -427,8 +427,9 @@ impl PagesEditor {
                     })?;
                     clone_pages_drawable_graph_object(source_object, &remap)?
                 };
-                staged
-                    .update_archive(&group.archive_name, |archive| archive.insert_object(cloned))?;
+                staged.update_archive(&group.archive_name, |archive| {
+                    Ok(archive.insert_object(cloned)?)
+                })?;
             }
         }
         let root = root_document(&staged)?;

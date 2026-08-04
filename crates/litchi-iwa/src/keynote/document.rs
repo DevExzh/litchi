@@ -259,7 +259,7 @@ impl KeynoteDocument {
         let mut slide = KeynoteSlide::new(index);
 
         // Extract text content from the slide object
-        let text_parts = object.extract_text();
+        let text_parts = crate::archive::extract_text(object);
 
         if !text_parts.is_empty() {
             // First text part is typically the title or slide name
@@ -679,7 +679,7 @@ impl KeynoteDocument {
         // Extract show metadata from ShowArchive (message type 2 is KN.ShowArchive)
         let show_objects = self.state.bundle.find_objects_by_type(1101);
         if let Some((_archive_name, object)) = show_objects.first() {
-            let text_parts = object.extract_text();
+            let text_parts = crate::archive::extract_text(object);
             show.title = text_parts.first().cloned();
         }
 

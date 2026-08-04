@@ -221,7 +221,7 @@ pub(crate) fn set_chart_legend_frame(
                 "{drawable_label} chart {drawable_object_id} is missing"
             ))
         })?;
-        object
+        Ok(object
             .replace_message(
                 message_index,
                 RawMessage {
@@ -229,7 +229,7 @@ pub(crate) fn set_chart_legend_frame(
                     data,
                 },
             )
-            .map(|_| ())
+            .map(|_| ())?)
     })
 }
 

@@ -319,7 +319,7 @@ fn insert_named_style_in_archive(
     stylesheet.archive_info.message_infos[message_index]
         .object_references
         .push(style_id);
-    archive.insert_object(style)
+    Ok(archive.insert_object(style)?)
 }
 
 fn append_theme_preset(

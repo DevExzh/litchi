@@ -624,7 +624,7 @@ fn set_drawable_comment_in_package(
                 .object_references
                 .push(author_id);
         }
-        archive.insert_object(object)
+        Ok(archive.insert_object(object)?)
     })?;
     replace_drawable_comment_reference(package, application, &location, None, Some(storage_id))?;
     set_package_last_object_identifier(package, storage_id)?;
@@ -1198,7 +1198,7 @@ fn clone_comment_storage(
     clone.archive_info.message_infos[0] = source.archive_info.message_infos[0].clone();
     clone.archive_info.message_infos[0].length = u32::try_from(clone.messages[0].data.len())
         .map_err(|_| Error::Archive("comment payload exceeds the u32 format limit".to_owned()))?;
-    package.update_archive(archive_name, |archive| archive.insert_object(clone))
+    package.update_archive(archive_name, |archive| Ok(archive.insert_object(clone)?))
 }
 
 pub(crate) fn clone_comment_storage_exact(
@@ -1227,7 +1227,7 @@ pub(crate) fn clone_comment_storage_exact(
     let mut clone = ArchiveObject::new(new_storage_id, source.messages.clone())?;
     clone.archive_info.should_merge = source.archive_info.should_merge;
     clone.archive_info.message_infos = source.archive_info.message_infos.clone();
-    package.update_archive(&archive_name, |archive| archive.insert_object(clone))?;
+    package.update_archive(&archive_name, |archive| Ok(archive.insert_object(clone)?))?;
     Ok(archive_name)
 }
 
@@ -1259,7 +1259,7 @@ pub(crate) fn insert_comment_storage(
                 .object_references
                 .push(author_id);
         }
-        archive.insert_object(object)
+        Ok(archive.insert_object(object)?)
     })
 }
 
@@ -1660,7 +1660,7 @@ fn ensure_generated_annotation_author(
                 },
             )?;
         }
-        archive.insert_object(generated_annotation_author_object(author_id, &generated)?)
+        Ok(archive.insert_object(generated_annotation_author_object(author_id, &generated)?)?)
     })?;
     Ok((Some(author_id), Some(location.archive_name), true))
 }

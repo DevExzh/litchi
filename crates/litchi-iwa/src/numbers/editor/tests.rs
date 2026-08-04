@@ -451,7 +451,7 @@ fn malformed_text_box_ownership_and_external_references_fail_transactionally() {
             owner.archive_info.message_infos[0]
                 .object_references
                 .push(51);
-            archive.insert_object(owner)
+            Ok(archive.insert_object(owner)?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(externally_referenced).unwrap();
@@ -1675,14 +1675,14 @@ fn empty_native_author_storage_supports_cell_comment_creation() {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
-            archive.insert_object(ArchiveObject::new(
+            Ok(archive.insert_object(ArchiveObject::new(
                 90,
                 vec![RawMessage {
                     type_: 213,
                     data: crate::protobuf::tsk::AnnotationAuthorStorageArchive::default()
                         .encode_to_vec(),
                 }],
-            )?)
+            )?)?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -3039,13 +3039,13 @@ fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
                     },
                 )?;
             }
-            archive.insert_object(ArchiveObject::new(
+            Ok(archive.insert_object(ArchiveObject::new(
                 RANGE_TILE_ID,
                 vec![RawMessage {
                     type_: RANGE_TILE_MESSAGE_TYPE,
                     data: tile_data,
                 }],
-            )?)
+            )?)?)
         })
         .unwrap();
 
@@ -3312,9 +3312,9 @@ fn form_sheet_rename_preserves_unknown_outer_and_nested_fields() {
                 Ok(nested)
             })?;
             append_unknown_varint(&mut data, 99, 990);
-            object
+            Ok(object
                 .replace_message(0, RawMessage { type_: 3, data })
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -3350,7 +3350,7 @@ fn table_rename_rejects_duplicate_name_fields_transactionally() {
                 8,
                 b"Duplicate",
             )?;
-            object
+            Ok(object
                 .replace_message(
                     0,
                     RawMessage {
@@ -3358,7 +3358,7 @@ fn table_rename_rejects_duplicate_name_fields_transactionally() {
                         data,
                     },
                 )
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -3619,7 +3619,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
                 },
             )?;
             append_unknown_varint(&mut data, 98, 9_898);
-            layer
+            Ok(layer
                 .replace_message(
                     0,
                     RawMessage {
@@ -3627,7 +3627,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
                         data,
                     },
                 )
-                .map(drop)
+                .map(drop)?)
         })
         .unwrap();
 
@@ -3726,7 +3726,7 @@ fn table_row_insertion_splits_crossing_stroke_runs_without_normalizing_unknown_f
                     Ok(run)
                 },
             )?;
-            object
+            Ok(object
                 .replace_message(
                     0,
                     RawMessage {
@@ -3734,7 +3734,7 @@ fn table_row_insertion_splits_crossing_stroke_runs_without_normalizing_unknown_f
                         data,
                     },
                 )
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
 
@@ -6628,7 +6628,7 @@ fn table_sort_moves_rows_across_tile_boundaries() {
                     data: model.encode_to_vec(),
                 },
             )?;
-            archive.insert_object(ArchiveObject::new(
+            Ok(archive.insert_object(ArchiveObject::new(
                 31,
                 vec![RawMessage {
                     type_: 6002,
@@ -6644,7 +6644,7 @@ fn table_sort_moves_rows_across_tile_boundaries() {
                     }
                     .encode_to_vec(),
                 }],
-            )?)
+            )?)?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -7508,7 +7508,7 @@ fn sheet_list_crud_preserves_raw_references_and_restores_exact_component() {
                 &replacements,
             )?;
             append_unknown_varint(&mut data, 99, 990);
-            object
+            Ok(object
                 .replace_message(
                     0,
                     RawMessage {
@@ -7516,7 +7516,7 @@ fn sheet_list_crud_preserves_raw_references_and_restores_exact_component() {
                         data,
                     },
                 )
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -7562,7 +7562,7 @@ fn duplicate_sheet_references_fail_transactionally() {
             let first = crate::wire::repeated_length_delimited_payloads(&message.data, 1)?[0];
             let data =
                 crate::wire::append_repeated_length_delimited_field(&message.data, 1, first)?;
-            object
+            Ok(object
                 .replace_message(
                     0,
                     RawMessage {
@@ -7570,7 +7570,7 @@ fn duplicate_sheet_references_fail_transactionally() {
                         data,
                     },
                 )
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -7795,9 +7795,9 @@ fn form_sheet_table_create_delete_restores_unknown_reference_bytes() {
                 Ok(nested)
             })?;
             append_unknown_varint(&mut data, 99, 990);
-            object
+            Ok(object
                 .replace_message(0, RawMessage { type_: 3, data })
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -7892,7 +7892,7 @@ fn move_table_data_list_entries_to_segment(
             segment_object.archive_info.message_infos[0]
                 .object_references
                 .extend(references);
-            archive.insert_object(segment_object)
+            Ok(archive.insert_object(segment_object)?)
         })
         .unwrap();
 }
@@ -8495,7 +8495,7 @@ fn add_test_stroke_layer(
                     .object_references
                     .push(identifier);
             }
-            archive.insert_object(ArchiveObject::new(
+            Ok(archive.insert_object(ArchiveObject::new(
                 identifier,
                 vec![RawMessage {
                     type_: STROKE_LAYER_MESSAGE_TYPE,
@@ -8515,7 +8515,7 @@ fn add_test_stroke_layer(
                     }
                     .encode_to_vec(),
                 }],
-            )?)
+            )?)?)
         })
         .unwrap();
 }
@@ -8630,7 +8630,7 @@ fn add_test_app_native_topology_allocations(package: &mut IWorkPackage) {
             model.spill_owner = Some(tsce::SpillOwnerArchive {
                 owner_uid: tsp::Uuid { lower: 5, upper: 6 },
             });
-            object
+            Ok(object
                 .replace_message(
                     0,
                     RawMessage {
@@ -8638,7 +8638,7 @@ fn add_test_app_native_topology_allocations(package: &mut IWorkPackage) {
                         data: model.encode_to_vec(),
                     },
                 )
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
 }
@@ -8662,7 +8662,7 @@ fn add_test_spill_dependency(package: &mut IWorkPackage) {
                     },
                 }],
             });
-            object
+            Ok(object
                 .replace_message(
                     0,
                     RawMessage {
@@ -8670,7 +8670,7 @@ fn add_test_spill_dependency(package: &mut IWorkPackage) {
                         data: owner.encode_to_vec(),
                     },
                 )
-                .map(|_| ())
+                .map(|_| ())?)
         })
         .unwrap();
 }

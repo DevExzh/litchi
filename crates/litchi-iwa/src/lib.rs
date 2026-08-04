@@ -125,6 +125,8 @@
 //! - `pyiwa` - Python iWork format reader
 //! - `iWorkFileFormat` - Reverse-engineered format documentation
 
+use std::sync::Arc;
+
 // Core parsing modules
 pub mod archive;
 pub mod bundle;
@@ -215,10 +217,40 @@ pub use zip_utils::{
 };
 
 /// Error types for iWork parsing
+#[derive(Debug, Clone)]
+pub struct IwaCoreError(Arc<litchi_iwa_core::Error>);
+
+impl AsRef<litchi_iwa_core::Error> for IwaCoreError {
+    fn as_ref(&self) -> &litchi_iwa_core::Error {
+        self.0.as_ref()
+    }
+}
+
+impl From<litchi_iwa_core::Error> for IwaCoreError {
+    fn from(error: litchi_iwa_core::Error) -> Self {
+        Self(Arc::new(error))
+    }
+}
+
+impl std::fmt::Display for IwaCoreError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl std::error::Error for IwaCoreError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error(transparent)]
+    IwaCore(#[from] IwaCoreError),
 
     #[error("Invalid IWA format: {0}")]
     InvalidFormat(String),
@@ -244,3 +276,9 @@ pub enum Error {
 
 /// Result type alias
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<litchi_iwa_core::Error> for Error {
+    fn from(error: litchi_iwa_core::Error) -> Self {
+        Self::IwaCore(error.into())
+    }
+}

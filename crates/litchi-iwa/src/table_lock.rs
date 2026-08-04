@@ -143,7 +143,7 @@ fn set_table_lock_state_inner(
                 "{application} table drawable {drawable_object_id} is missing"
             ))
         })?;
-        object
+        Ok(object
             .replace_message(
                 message_index,
                 RawMessage {
@@ -151,7 +151,7 @@ fn set_table_lock_state_inner(
                     data,
                 },
             )
-            .map(|_| ())
+            .map(|_| ())?)
     })
 }
 

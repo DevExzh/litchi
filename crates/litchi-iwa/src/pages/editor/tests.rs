@@ -96,7 +96,7 @@ fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
             let object = archive.object_mut(1).unwrap();
             let mut message = object.messages[0].clone();
             message.data.extend_from_slice(&unknown);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
@@ -172,7 +172,7 @@ fn page_layout_rejects_duplicate_scalar_fields_transactionally() {
                     .extend(crate::varint::encode_varint((30 << 3) | 5));
                 message.data.extend(width.to_bits().to_le_bytes());
             }
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
@@ -602,7 +602,7 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
             let mut message = object.messages[0].clone();
             message.data.extend(crate::varint::encode_varint(17 << 3));
             message.data.push(0);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut malformed = PagesEditor::from_package(malformed).unwrap();
@@ -1298,7 +1298,7 @@ fn drawable_text_updates_preserve_unknown_wire_and_restore_exactly() {
             let object = archive.object_mut(65).unwrap();
             let mut message = object.messages[0].clone();
             append_unknown_varint(&mut message.data, 99, 990);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
@@ -1585,7 +1585,7 @@ fn text_box_graph_crud_preserves_unknown_fields_and_rejects_external_owners() {
             external.archive_info.message_infos[0]
                 .object_references
                 .push(65);
-            archive.insert_object(external)
+            Ok(archive.insert_object(external)?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();

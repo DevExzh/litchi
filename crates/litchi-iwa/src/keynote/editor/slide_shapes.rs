@@ -878,7 +878,7 @@ impl KeynoteEditor {
                 clone_slide_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 

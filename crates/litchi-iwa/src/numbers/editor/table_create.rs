@@ -175,7 +175,7 @@ pub(super) fn create_empty_table_graph(
 
     let source = package.clone();
     for (archive_name, object) in objects {
-        package.update_archive(&archive_name, |archive| archive.insert_object(object))?;
+        package.update_archive(&archive_name, |archive| Ok(archive.insert_object(object)?))?;
     }
     register_cloned_numbers_objects(package, &source, &locations, &remap)?;
     let parent_archive = locations

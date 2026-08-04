@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 30030)
+Total output lines: 3527
+
 Warning: truncated output (original token count: 31422)
 Total output lines: 3697
 
@@ -1783,13 +1786,7 @@ impl PagesEditor {
             )?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            verified.require_body_table(model_object_id)?;
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read one numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
+            verified.requ…30 tokens truncated… numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
         &mut self,
         model_object_id: u64,
         row: usize,
