@@ -27,6 +27,7 @@ fn map_numbering_error(error: litchi_docx::Error) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_docx::numbering::Format;
     use litchi_opc::PackURI;
     use litchi_opc::part::BlobPart;
 
