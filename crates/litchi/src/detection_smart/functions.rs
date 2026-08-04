@@ -147,15 +147,26 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
     let detected = (|| {
         reader.seek(SeekFrom::Start(0)).ok()?;
         let mut header = [0u8; 8];
-        reader.read_exact(&mut header).ok()?;
+        let mut header_len = 0;
+        while header_len < header.len() {
+            let read = reader.read(&mut header[header_len..]).ok()?;
+            if read == 0 {
+                break;
+            }
+            header_len += read;
+        }
 
-        if signature_matches(&header, utils::OLE2_SIGNATURE) {
+        if header_len >= utils::OLE2_SIGNATURE.len()
+            && signature_matches(&header[..header_len], utils::OLE2_SIGNATURE)
+        {
             reader.seek(SeekFrom::Start(0)).ok()?;
             return ole2::detect_ole2_format_from_reader(reader);
         }
 
         #[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
-        if signature_matches(&header[..4], utils::ZIP_SIGNATURE) {
+        if header_len >= utils::ZIP_SIGNATURE.len()
+            && signature_matches(&header[..header_len], utils::ZIP_SIGNATURE)
+        {
             #[cfg(feature = "ooxml")]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
@@ -186,12 +197,12 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         }
 
         #[cfg(feature = "odf")]
-        if header
+        if header[..header_len]
             .iter()
             .copied()
             .find(|byte| !byte.is_ascii_whitespace())
             == Some(b'<')
-            || header.starts_with(&[0xef, 0xbb, 0xbf])
+            || header[..header_len].starts_with(&[0xef, 0xbb, 0xbf])
         {
             reader.seek(SeekFrom::Start(0)).ok()?;
             if let Some(format) = odf::reader(reader) {
@@ -303,6 +314,18 @@ mod tests {
         let format = detect_file_format_from_bytes(&ole2_data);
         // Should return None because it's not a complete OLE file
         assert!(format.is_none());
+    }
+
+    #[test]
+    fn detects_short_rtf_reader_and_restores_cursor() {
+        let mut reader = std::io::Cursor::new(br#"{\rtf"#.to_vec());
+        reader.set_position(2);
+
+        assert_eq!(
+            detect_format_from_reader(&mut reader),
+            Some(FileFormat::Rtf)
+        );
+        assert_eq!(reader.position(), 2);
     }
 
     #[test]

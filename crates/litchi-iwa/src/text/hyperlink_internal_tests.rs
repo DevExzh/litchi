@@ -10,7 +10,7 @@ use crate::wire::{
 
 use super::*;
 use crate::text::hyperlink_storage::{
-    RangedObjectTable, SMART_FIELD_TABLE_FIELD, TABLE_ENTRIES_FIELD,
+    RangedObjectTable, SMART_FIELD_TABLE_FIELD, TABLE_ENTRIES_FIELD, locate_storage,
 };
 use prost::Message;
 

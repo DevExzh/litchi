@@ -131,6 +131,12 @@ class BoundaryPolicyTests(unittest.TestCase):
             violations,
         )
 
+    def test_pptx_drawingml_edge_is_canonical(self) -> None:
+        edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
+
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.migration_edges)
+
     def test_resolved_migration_edge_requires_policy_cleanup(self) -> None:
         snapshot = valid_snapshot(self.policy)
         edge = self.policy.migration_debt[0].edge

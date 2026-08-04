@@ -9,7 +9,7 @@ use crate::wire::{
 
 use super::*;
 use crate::text::bookmark_types::{TextBookmarkName, TextBookmarkSettings};
-use crate::text::hyperlink_storage::TABLE_ENTRIES_FIELD;
+use crate::text::hyperlink_storage::{TABLE_ENTRIES_FIELD, locate_storage};
 use prost::Message;
 
 const BOOKMARK_TABLE_FIELD: u32 = 15;

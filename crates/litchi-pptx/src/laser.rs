@@ -702,7 +702,7 @@ mod tests {
             Coordinate::emu(457_200).unwrap(),
         );
         let transitional =
-            crate::laser::write(&[point.clone()], Conformance::Transitional).unwrap();
+            crate::laser::write(std::slice::from_ref(&point), Conformance::Transitional).unwrap();
         let strict = crate::laser::write(&[point], Conformance::Strict).unwrap();
 
         assert!(transitional.contains(PRESENTATIONML_NAMESPACE));
