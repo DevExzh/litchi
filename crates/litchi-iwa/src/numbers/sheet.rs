@@ -2,7 +2,7 @@
 //!
 //! Sheets in Numbers documents contain multiple tables and other content.
 
-use super::table::NumbersTable;
+use super::table::{NumbersTable, map_table_error};
 
 /// Represents a sheet in a Numbers document
 #[derive(Debug, Clone)]
@@ -62,6 +62,23 @@ impl NumbersSheet {
             .map(|t| t.row_count() * t.column_count())
             .sum()
     }
+
+    /// Consume the archive adapter and return its dependency-free semantic
+    /// sheet.
+    ///
+    /// Table comments and other native sidecars are intentionally omitted;
+    /// callers that need them can continue using the adapter returned by
+    /// [`super::document::NumbersDocument::sheets`] during migration.
+    pub(crate) fn into_semantic(self) -> crate::Result<litchi_numbers::Sheet> {
+        let mut builder = litchi_numbers::sheet::Builder::new(self.name, self.index);
+        for table in self.tables {
+            let semantic = table.into_semantic()?;
+            builder
+                .push_table(semantic)
+                .map_err(|failure| map_table_error(failure.into_parts().0))?;
+        }
+        Ok(builder.finish())
+    }
 }
 
 #[cfg(test)]
@@ -119,5 +136,30 @@ mod tests {
         assert!(names.contains(&"Table1".to_string()));
         assert!(names.contains(&"Table2".to_string()));
         assert!(names.contains(&"Table3".to_string()));
+    }
+
+    #[test]
+    fn semantic_sheet_consumes_tables_without_rebuilding_cell_maps() {
+        let mut sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
+        let mut table = NumbersTable::new("Table1");
+        table.set_cell(1, 2, CellValue::Number(42.0));
+        assert!(table.set_column_headers(["A", "B", "C"]).is_ok());
+        sheet.add_table(table);
+
+        let semantic = sheet
+            .into_semantic()
+            .unwrap_or_else(|error| panic!("unexpected semantic conversion failure: {error}"));
+        assert_eq!(semantic.name(), "Sheet1");
+        assert_eq!(semantic.index(), 0);
+        assert_eq!(semantic.table_count(), 1);
+        let table = semantic
+            .table("Table1")
+            .unwrap_or_else(|| panic!("converted table is missing"));
+        assert_eq!(table.dimensions(), litchi_numbers::Dimensions::new(2, 3));
+        assert_eq!(
+            table.get(litchi_numbers::Position::new(1, 2)),
+            Some(&litchi_numbers::cell::Value::Number(42.0))
+        );
+        assert_eq!(table.column_headers().collect::<Vec<_>>(), ["A", "B", "C"]);
     }
 }

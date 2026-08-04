@@ -113,6 +113,15 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
                 snapshot_stats.total_objects,
                 specialized_stats.total_objects
             );
+            let semantic_sheets = specialized.semantic_sheets()?;
+            assert_eq!(semantic_sheets.len(), specialized_stats.sheet_count);
+            assert_eq!(
+                semantic_sheets
+                    .iter()
+                    .map(litchi_numbers::Sheet::table_count)
+                    .sum::<usize>(),
+                specialized_stats.table_count
+            );
         },
         Format::Keynote => {
             KeynoteEditor::open(path)?;

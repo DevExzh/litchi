@@ -288,6 +288,16 @@ impl NumbersTable {
         self.model.non_empty_cell_count()
     }
 
+    /// Consume the archive adapter and return its dependency-free semantic
+    /// table.
+    ///
+    /// Native comments are intentionally not part of this snapshot. They
+    /// remain available through the adapter while the document readers and
+    /// editors migrate to the canonical leaf model.
+    pub(crate) fn into_semantic(self) -> crate::Result<litchi_numbers::Table> {
+        self.model.finish().map_err(map_table_error)
+    }
+
     /// Move the materialized values and comments to another crate-internal
     /// table view without cloning either sparse map.
     pub(crate) fn into_parts(

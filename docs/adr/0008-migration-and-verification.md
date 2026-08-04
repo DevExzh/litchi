@@ -5767,9 +5767,10 @@ The IWA migration has now established a value-model seam. `litchi-iwa-text`
 owns `TextStorage`, `TextRun`, and borrowed `TextFragment` values; `litchi-pages`
 owns `Section` and `SectionType`; and `litchi-keynote` owns `Slide`, `Show`,
 build-animation, and transition values. The old implementations were removed
-from the monolith; only private, non-public type adapters remain where a
-concurrent reader migration still refers to the legacy local spelling. No
-archive, protobuf, or application decoder was moved into these value crates.
+from the extracted value owners, while the monolith still has migration
+adapters where existing reader/editor surfaces need archive-boundary context.
+These adapters are staged ownership work, not a compatibility API. No archive,
+protobuf, or application decoder was moved into these value crates.
 The adapters and the four corresponding `litchi-iwa` dependency edges are
 staged ownership work, not compatibility API; their exit is to move the owning
 readers before deleting the adapters. The Numbers value slice now owns
@@ -5778,7 +5779,7 @@ private adapter for the remaining reader/editor migration. The BNC wire slice
 now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
 CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
 the monolith retains only a private module alias plus its archive/protobuf
-callers. The combined Numbers leaf suite has 25 tests, the IWA suite has 1,498
+callers. The combined Numbers leaf suite has 26 tests, the IWA suite has 1,499
 tests, and the boundary check plus native Numbers smoke cover the extraction.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
@@ -5798,10 +5799,14 @@ table/sheet semantic slice is now extracted into dependency-free
 `litchi-numbers::table` and `litchi-numbers::sheet`: finished tables use compact
 coordinates and immutable boxed sparse storage, while builders provide
 fallible append/replace operations and checked ownership handoff. The IWA
-facade retains only the archive-boundary adapter and comment sidecar; dense
-views remain explicitly budgeted. The leaf suite has 25 tests, the IWA suite
-has 1,498 tests, and the generated Numbers round trip passes. Formula values
-and the Pages/Keynote reader boundaries remain the next ownership slices.
+reader now exposes `NumbersDocument::semantic_sheets`, which moves those
+finished tables into immutable leaf sheets without rebuilding cell maps; the
+legacy archive adapter remains available for comments and native sidecars
+during the staged reader migration. Dense views remain explicitly budgeted and
+reject ranges outside the declared extent. The leaf suite has 26 tests, the
+IWA suite has 1,499 tests, and the generated Numbers round trip passes. Formula
+values and the Pages/Keynote reader boundaries remain the next ownership
+slices.
 
 The IWA Numbers ingress adapter now protects the leaf ownership seam. It
 validates bounded dimensions before loading referenced data, rejects

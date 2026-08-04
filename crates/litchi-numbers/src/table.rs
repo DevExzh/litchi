@@ -561,7 +561,8 @@ impl Table {
     /// Returns [`Error::BudgetExceeded`] when the range area is larger than
     /// the supplied budget.
     pub fn grid(&self, range: Range, budget: GridBudget) -> Result<Grid<'_>> {
-        let requested = range.area().ok_or(Error::BudgetExceeded {
+        let checked_range = self.dimensions.range(range.start, range.end)?;
+        let requested = checked_range.area().ok_or(Error::BudgetExceeded {
             requested: usize::MAX,
             maximum: budget.max_cells,
         })?;
@@ -571,7 +572,10 @@ impl Table {
                 maximum: budget.max_cells,
             });
         }
-        Ok(Grid { table: self, range })
+        Ok(Grid {
+            table: self,
+            range: checked_range,
+        })
     }
 
     /// Consumes the table and returns its immutable sparse cells.
@@ -949,6 +953,17 @@ mod tests {
             .grid(range, GridBudget::new(4))
             .unwrap_or_else(|error| panic!("unexpected grid error: {error}"));
         assert_eq!(grid.iter().count(), 4);
+    }
+
+    #[test]
+    fn bounded_grid_rejects_ranges_outside_the_declared_extent() {
+        let table = Table::new("Test", Dimensions::new(2, 3));
+        let range = Range::new(Position::new(0, 0), Position::new(3, 3))
+            .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
+        assert!(matches!(
+            table.grid(range, GridBudget::new(usize::MAX)),
+            Err(Error::OutOfBounds { .. })
+        ));
     }
 
     #[test]

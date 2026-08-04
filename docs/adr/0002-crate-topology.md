@@ -111,8 +111,11 @@ compact checked coordinates and dimensions, half-open ranges, sparse cells,
 budgeted grid views, and the fallible builder-to-immutable-table transition;
 `sheet` owns the immutable table collection and duplicate-name validation.
 Neither module depends on archives, protobufs, comments, or application
-topology. The remaining Numbers formula and package owners follow the same
-downward-only extraction pattern.
+topology. `NumbersDocument::semantic_sheets` now provides the consuming IWA
+reader seam into the immutable `litchi_numbers::Sheet` model; it transfers
+finished sparse tables without rebuilding cell maps and intentionally leaves
+comments/native sidecars on the archive adapter. The remaining Numbers formula
+and package owners follow the same downward-only extraction pattern.
 
 The first Numbers wire seam is now `litchi-numbers::cell::wire`. It owns the
 dependency-free, byte-preserving BNC codec, stored-value and cached-scalar
@@ -121,8 +124,9 @@ trailing bytes for round trips. `litchi-iwa` retains archive traversal,
 protobuf integration, and package mutation, exposing the wire module only
 through a private migration adapter and converting its local error at that
 boundary. This is an ownership move, not a compatibility surface. The IWA
-reader now keeps a private mutable adapter around the leaf table builder while
-it carries format-owned comments and converts native archive values. It also
+reader now uses a mutable archive-boundary adapter around the leaf table
+builder while it carries format-owned comments and converts native archive
+values. It also
 retains the finite ingress profile: table rows, columns, addressable cells,
 and materialized sparse cells are bounded; tile keys and local/global
 coordinates are checked against those dimensions; and a tile reference must

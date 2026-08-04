@@ -196,6 +196,18 @@ impl NumbersDocument {
         Ok(sheets)
     }
 
+    /// Extract immutable, dependency-free semantic sheets.
+    ///
+    /// This is the canonical Numbers data-model boundary. Native comments
+    /// and other archive/editor sidecars remain available through
+    /// [`Self::sheets`] until their consumers migrate to dedicated adapters.
+    pub fn semantic_sheets(&self) -> Result<Vec<litchi_numbers::Sheet>> {
+        self.sheets()?
+            .into_iter()
+            .map(NumbersSheet::into_semantic)
+            .collect()
+    }
+
     /// Parse a single sheet from an object
     fn parse_sheet(
         &self,
