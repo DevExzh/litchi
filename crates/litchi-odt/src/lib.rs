@@ -69,12 +69,6 @@ pub use litchi_odf_common::{constants, coordinates, datatype, namespace};
 pub use litchi_odf_common::detect;
 pub mod odc;
 pub use litchi_odf_common::rdf;
-pub mod ods {
-    pub mod calculation;
-}
-pub use ods::calculation::{
-    CalculationIteration, CalculationNullDate, CalculationSettings, IterationStatus,
-};
 
 /// Typed values used by ODT table cells.
 #[derive(Debug, Clone, PartialEq)]

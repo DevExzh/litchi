@@ -4,7 +4,6 @@
     reason = "model codecs are retained for the package parser migration"
 )]
 
-mod calculation;
 mod conditional_format;
 mod consolidation;
 mod data_pilot;
@@ -24,9 +23,6 @@ mod tracked_changes;
 
 pub use litchi_odf_common::annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 
-pub use calculation::{
-    CalculationIteration, CalculationNullDate, CalculationSettings, IterationStatus,
-};
 pub use conditional_format::{
     ConditionalColorScale, ConditionalColorScaleEntry, ConditionalCustomIcon, ConditionalDataBar,
     ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType, ConditionalFormat,
@@ -43,6 +39,7 @@ pub use detective::{
 };
 pub use hyperlink::{CellHyperlink, HyperlinkActuate, HyperlinkShow};
 pub use label_range::{LabelRange, LabelRangeOrientation};
+pub use litchi_odf_common::calculation::{Iteration, IterationStatus, NullDate, Settings};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use named_expression::{
     FormulaNamespace, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,

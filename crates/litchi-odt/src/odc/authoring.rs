@@ -6,6 +6,7 @@ use super::semantic::{
 };
 use crate::{constants, core::PackageWriter};
 use litchi_core::{Error, Result};
+use litchi_odf_common::calculation::{Settings, write};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -317,7 +318,7 @@ pub struct ChartDefinition {
     pub plot_area: ChartPlotAreaSpec,
     pub cached_table: Option<ChartCachedTable>,
     /// Inert cached-formula recalculation metadata; never executed by this crate.
-    pub calculation_settings: Option<crate::CalculationSettings>,
+    pub calculation_settings: Option<Settings>,
     pub extensions: ChartExtensions,
 }
 
@@ -361,10 +362,7 @@ impl ChartDefinition {
             validate_table(table)?;
         }
         if self.calculation_settings.is_some() {
-            crate::ods::calculation::write_calculation_settings(
-                &mut String::new(),
-                self.calculation_settings.as_ref(),
-            )?;
+            write(&mut String::new(), self.calculation_settings.as_ref())?;
         }
         validate_extensions(&self.extensions)
     }
@@ -418,10 +416,7 @@ pub fn serialize_chart_content(definition: &ChartDefinition) -> Result<String> {
     }
     out.push_str("><office:body><office:chart>");
     write_definition(&mut out, definition, &namespaces)?;
-    crate::ods::calculation::write_calculation_settings(
-        &mut out,
-        definition.calculation_settings.as_ref(),
-    )?;
+    write(&mut out, definition.calculation_settings.as_ref())?;
     out.push_str("</office:chart></office:body></office:document-content>");
     Ok(out)
 }

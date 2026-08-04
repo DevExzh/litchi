@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod annotation;
+pub mod calculation;
 pub mod constants;
 pub mod coordinates;
 pub mod core;

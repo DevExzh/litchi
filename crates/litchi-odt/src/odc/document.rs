@@ -2,6 +2,7 @@
 
 use crate::{OpenDocumentFamily, OpenDocumentPackage};
 use litchi_core::{Error, Metadata, Result};
+use litchi_odf_common::calculation::{Settings, parse};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -201,8 +202,8 @@ impl ChartDocument {
     }
 
     /// Return inert calculation settings stored beside the chart.
-    pub fn calculation_settings(&self) -> Result<Option<crate::CalculationSettings>> {
-        crate::ods::calculation::parse_calculation_settings(&self.package.content_xml()?)
+    pub fn calculation_settings(&self) -> Result<Option<Settings>> {
+        parse(&self.package.content_xml()?)
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
