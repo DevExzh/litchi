@@ -47,6 +47,7 @@ pub mod views;
 pub mod volatile_dependencies;
 pub mod web;
 mod workbook;
+pub mod workbook_metadata;
 pub mod xml_maps;
 
 pub use active_x::{
@@ -204,4 +205,8 @@ pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
     Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Sheet, SheetEdit,
     SheetKind, SheetSelector, State, TabEdit, Visibility, Workbook,
+};
+pub use workbook_metadata::{
+    FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
+    OpaqueMetadataExtension, WorkbookMetadata,
 };
