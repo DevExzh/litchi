@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod active_x;
 pub mod auto_filter;
 pub mod calculation_properties;
 pub mod cell;
@@ -18,6 +19,7 @@ pub mod connections;
 pub mod data_consolidation;
 pub mod data_validation;
 mod error;
+pub mod external_links;
 pub mod formula;
 pub mod ignored_errors;
 pub mod layout;
@@ -46,6 +48,13 @@ pub mod web;
 mod workbook;
 pub mod xml_maps;
 
+pub use active_x::{
+    ActiveXControlSet, ActiveXDescriptor, ActiveXFont, ActiveXPicture, ActiveXProperty,
+    ActiveXPropertyObject, ControlProperties, LoadedActiveXControl, Marker, ObjectAnchor,
+    OpaqueActiveXBinary, OpaqueActiveXPreviewImage, Persistence, WorksheetControl,
+    WorksheetControls, load_from_worksheet, remove_from_worksheet, replace_on_worksheet,
+    replace_worksheet_controls_xml, store_on_worksheet,
+};
 pub use auto_filter::{
     AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,
     CustomFilters, DateGroupItem, DateTimeGrouping, DynamicFilter, DynamicFilterType,
@@ -97,6 +106,14 @@ pub use data_validation::{
 pub use error::{
     ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, RemoveBlock, RenameBlock,
     Result, RowEditBlock, TabEditBlock,
+};
+pub use external_links::{
+    ExternalCell, ExternalCellType, ExternalDdeItem, ExternalDdeLink, ExternalDdeValue,
+    ExternalDdeValueType, ExternalDdeValues, ExternalDefinedName, ExternalLinkConformance,
+    ExternalLinkEntry, ExternalLinkKind, ExternalOleItem, ExternalOleItemSource, ExternalOleLink,
+    ExternalOleTarget, ExternalRow, ExternalSheetData, ExternalWorkbookLink,
+    ExternalWorkbookTarget, build_external_link_part, build_external_link_part_with_conformance,
+    load_external_link,
 };
 pub use formula::Formula;
 pub use ignored_errors::{

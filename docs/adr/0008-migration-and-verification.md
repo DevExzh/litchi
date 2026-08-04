@@ -3866,6 +3866,48 @@ compilation because `pkg-config`/fontconfig is unavailable. This is functional
 and boundary evidence; native Office and performance evidence remain governed
 by the evidence levels below.
 
+## XLSX ActiveX, external links, and DOCX mail-merge owner follow-up
+
+The next owner batch moves three format-owned codec seams out of the
+migration host while retaining package traversal, relationship orchestration,
+and historical error/API paths as explicit adapters:
+
+- SpreadsheetML worksheet-control metadata, ActiveX descriptor/property XML,
+  and opaque persistence/preview resources now live in
+  `litchi-xlsx::active_x`. The owner enforces bounded XML and package
+  relationships but never resolves a CLSID, instantiates a control, decodes
+  persistence data, follows an external target, or executes code. The host
+  retains the worksheet graph and maps owner errors to `OoxmlError`.
+- SpreadsheetML external-link values, cached DDE/OLE/workbook data, and
+  bounded external-link XML now live in `litchi-xlsx::external_links`. The
+  host retains workbook collection and OPC part lifecycle operations, while
+  external targets remain inert relationship metadata.
+- WordprocessingML mail-merge settings, ODSO field maps, and recipient-data
+  XML now live in `litchi-docx::mail_merge`. The host retains settings-part
+  relationship/resource orchestration and the historical compatibility
+  facade; sources and recipient parts are never fetched, opened, or executed.
+
+The checked-in specification anchors are `[MS-XLSX]` §§2.1.1, 2.2.4.3,
+2.4.25, 2.4.89, 2.6.46, 2.6.215, and 2.6.227--2.6.228; `[MS-OE376]`
+§§2.1.18, 2.1.32, 3.4.1.1, and 3.6.1.1--3.6.2.1 for the spreadsheet
+control, external-workbook, and ActiveX relationship/profile variations; and
+`[MS-OE376]` §§2.1.367, 2.1.381, 2.1.384, 2.1.386, 3.1.1.3, and
+3.1.2.2.1.2--3.1.2.2.1.3 for mail-merge settings and recipient data. These
+anchors cover the stored models, strict/transitional namespaces, relationship
+validation, bounded cached values, and inert binary/base64 preservation
+implemented by this batch.
+
+The owner suites pass 244 DOCX and 360 XLSX unit tests; DOCX's doctest targets
+also pass. The complete `litchi-ooxml` package surface passes 1,593 host unit
+tests plus its integration and doctest targets. Owner all-feature all-target
+strict Clippy, host default all-target strict Clippy, formatting, diff, and
+the crate-boundary audit pass: 35 workspace packages, 107 internal dependency
+declarations, and the same 13 explicitly scheduled debt edges remain. Host
+all-features Clippy remains environment-blocked before compilation because
+`pkg-config`/fontconfig is unavailable. This is functional and boundary
+evidence; native Office and performance evidence remain governed by the
+evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

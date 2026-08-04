@@ -15,6 +15,7 @@ pub mod font;
 pub mod format;
 pub mod glossary;
 pub mod hyperlink;
+pub mod mail_merge;
 pub mod modern_comments;
 pub mod settings;
 pub mod statistics;
@@ -44,6 +45,12 @@ pub use field::{
 };
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 pub use hyperlink::Hyperlink;
+pub use mail_merge::{
+    MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
+    MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
+    MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
+    RECIPIENT_CONTENT_TYPE, parse_settings_mail_merge,
+};
 pub use modern_comments::{
     CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo, CommentReactionUser,
     ExtensibleComment, ModernCommentConformance, ModernCommentMetadata,
