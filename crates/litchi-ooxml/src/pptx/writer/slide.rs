@@ -888,7 +888,7 @@ impl MutableSlide {
     pub(crate) fn get_background_image(&self) -> Option<(&[u8], ImageFormat)> {
         self.background
             .as_ref()
-            .and_then(|bg| bg.get_image_data())
+            .and_then(|bg| bg.image_data())
             .map(|(data, &format)| (data, format))
     }
 
@@ -925,7 +925,7 @@ impl MutableSlide {
         // Add background if present (must come BEFORE spTree per OOXML spec)
         if let Some(ref background) = self.background {
             // For picture backgrounds, we need to get the relationship ID
-            let bg_rel_id = if background.get_image_data().is_some() {
+            let bg_rel_id = if background.image_data().is_some() {
                 // Get actual relationship ID from mapper
                 slide_index.and_then(|si| rel_mapper.and_then(|rm| rm.get_background_id(si)))
             } else {

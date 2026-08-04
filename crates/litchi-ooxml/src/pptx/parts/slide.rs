@@ -1035,7 +1035,7 @@ impl<'a> SlidePart<'a> {
     /// Parses the `<p:bg>` element from the slide XML.
     /// Returns `None` if no background is defined.
     pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
-        crate::pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes())
+        litchi_pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes()).map_err(Into::into)
     }
 }
 
@@ -1125,7 +1125,7 @@ impl<'a> SlideLayoutPart<'a> {
     /// Parses the p:bg element from the layout XML. Returns `None` when the
     /// layout has no local background.
     pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
-        crate::pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes())
+        litchi_pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes()).map_err(Into::into)
     }
 
     /// Get the underlying OPC part.
@@ -1217,7 +1217,7 @@ impl<'a> SlideMasterPart<'a> {
     /// Parses the p:bg element from the master XML. Returns `None` when the
     /// master has no local background.
     pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
-        crate::pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes())
+        litchi_pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes()).map_err(Into::into)
     }
 
     /// Get the typed slide-layout entries declared by this master.
