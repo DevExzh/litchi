@@ -547,6 +547,29 @@ fn unknown_header_fields_and_untouched_payloads_round_trip_byte_for_byte() -> Re
     Ok(())
 }
 
+#[test]
+fn parse_does_not_reserve_object_slots_from_payload_size() -> Result<(), Error> {
+    let archive = Archive {
+        objects: vec![ArchiveObject::new(
+            17,
+            vec![RawMessage {
+                type_: 300,
+                data: vec![0x5a; 64 * 1024],
+            }],
+        )?],
+    };
+    let encoded = archive.to_bytes()?;
+    let parsed = Archive::parse(&encoded)?;
+
+    assert_eq!(parsed.objects.len(), 1);
+    assert!(
+        parsed.objects.capacity() <= 4,
+        "object capacity grew from payload bytes: {}",
+        parsed.objects.capacity()
+    );
+    Ok(())
+}
+
 fn decode_test_varint(data: &[u8]) -> (usize, usize) {
     let mut value = 0usize;
     let mut shift = 0usize;

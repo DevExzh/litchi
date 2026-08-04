@@ -564,11 +564,11 @@ impl Archive {
             ));
         }
 
+        // Archive byte length is not an object-count hint: a single message
+        // may consume almost the entire input. Reserving one slot per input
+        // byte would turn a large object into a second, avoidable allocation
+        // spike. Grow the object list only as validated objects are found.
         let mut objects = Vec::new();
-        let initial_capacity = data.len().min(limits.max_objects());
-        objects
-            .try_reserve(initial_capacity)
-            .map_err(|_| Error::allocation("IWA archive objects", initial_capacity))?;
         let mut cursor = 0usize;
         let mut total_messages = 0usize;
         while cursor < data.len() {
