@@ -9,3 +9,13 @@
 
 /// Cell-level Numbers vocabulary.
 pub mod cell;
+/// Semantic sheet containers.
+pub mod sheet;
+/// Sparse semantic table vocabulary.
+pub mod table;
+
+pub use sheet::{Builder as SheetBuilder, Sheet};
+pub use table::{
+    Builder as TableBuilder, Cell, Dimensions, Error as TableError, Grid, GridBudget, InsertError,
+    InsertResult, Position, Range, Table, View,
+};

@@ -46,6 +46,7 @@ type FormulaOwnerKey = [u32; 4];
 type FormulaCategoryKey = [u64; 2];
 
 const TILE_MESSAGE_TYPE: u32 = 6_002;
+const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const MAX_TABLE_ROWS: usize = 1 << 20;
 const MAX_TABLE_COLUMNS: usize = 1 << 14;
 const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
@@ -222,29 +223,22 @@ impl<'a> TableDataExtractor<'a> {
     /// Extract all tables from the document
     pub fn extract_all_tables(&self) -> Result<Vec<NumbersTable>> {
         let mut tables = Vec::new();
+        let mut seen_objects = HashSet::new();
 
-        // Find all TableModelArchive objects (message type 6000 or 6001)
-        let table_entries = self.object_index.iter_entries_by_type(6000);
-        tables.extend(self.extract_tables_from_entries(table_entries)?);
-
-        let table_entries = self.object_index.iter_entries_by_type(6001);
-        tables.extend(self.extract_tables_from_entries(table_entries)?);
-
-        Ok(tables)
-    }
-
-    /// Extract tables from object index entries
-    fn extract_tables_from_entries<'entry, I>(&self, entries: I) -> Result<Vec<NumbersTable>>
-    where
-        I: IntoIterator<Item = &'entry crate::object_index::ObjectIndexEntry>,
-    {
-        let mut tables = Vec::new();
-
-        for entry in entries {
-            if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
-                && let Some(table) = self.extract_table_from_object(&resolved)?
-            {
-                tables.push(table);
+        // Real packages index TableModelArchive as 6001. Older generated
+        // fixtures may store the same payload under 6000, so the object
+        // adapter accepts 6000 only when its payload passes model extraction;
+        // a genuine TableInfoArchive is ignored rather than mis-decoded.
+        for message_type in [TABLE_MODEL_MESSAGE_TYPE, 6_000] {
+            for entry in self.object_index.iter_entries_by_type(message_type) {
+                if !seen_objects.insert(entry.id()) {
+                    continue;
+                }
+                if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
+                    && let Some(table) = self.extract_table_from_object(&resolved)?
+                {
+                    tables.push(table);
+                }
             }
         }
 
@@ -256,16 +250,35 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         object: &ResolvedObjectRef<'_>,
     ) -> Result<Option<NumbersTable>> {
-        // Find the TableModelArchive message
-        for msg in object.messages {
-            if msg.type_ == 6000 || msg.type_ == 6001 {
-                let table_model = tst::TableModelArchive::decode(&*msg.data).map_err(|error| {
-                    Error::InvalidFormat(format!(
-                        "Numbers table-model message {} is malformed: {error}",
-                        msg.type_
-                    ))
-                })?;
-                return self.parse_table_model(table_model).map(Some);
+        // Prefer the typed TableModelArchive message in real packages.
+        if let Some(message) = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+        {
+            let table_model = tst::TableModelArchive::decode(&*message.data).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers table-model message {} is malformed: {error}",
+                    message.type_
+                ))
+            })?;
+            return self.parse_table_model(table_model).map(Some);
+        }
+
+        // Protobuf is permissive, and legacy fixtures used 6000 for a model.
+        // Only return that fallback after the complete table extraction
+        // succeeds; a genuine TableInfoArchive has no cell data stores and is
+        // therefore skipped safely.
+        for message in object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == 6_000)
+        {
+            let Ok(table_model) = tst::TableModelArchive::decode(&*message.data) else {
+                continue;
+            };
+            if let Ok(table) = self.parse_table_model(table_model) {
+                return Ok(Some(table));
             }
         }
 
@@ -277,7 +290,7 @@ impl<'a> TableDataExtractor<'a> {
         let (row_count, column_count) =
             checked_table_dimensions(table_model.number_of_rows, table_model.number_of_columns)?;
         let mut table =
-            NumbersTable::with_dimensions(table_model.table_name.clone(), row_count, column_count);
+            NumbersTable::with_dimensions(table_model.table_name.clone(), row_count, column_count)?;
 
         // Extract string table for cell text values
         // string_table is a required field, not Optional
@@ -742,14 +755,14 @@ impl<'a> TableDataExtractor<'a> {
                 row_index,
                 column_index,
             )?;
-            table.set_cell(row_index, column_index, parsed.value);
+            table.try_set_cell(row_index, column_index, parsed.value)?;
             if let Some(identifier) = parsed.comment_identifier {
                 let comment = cell_tables.comments.get(&identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Numbers comment table has no entry {identifier} referenced by cell ({row_index}, {column_index})"
                     ))
                 })?;
-                table.set_comment(row_index, column_index, comment.clone());
+                table.try_set_comment(row_index, column_index, comment.clone())?;
             }
         }
 

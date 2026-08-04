@@ -5778,8 +5778,9 @@ private adapter for the remaining reader/editor migration. The BNC wire slice
 now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
 CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
 the monolith retains only a private module alias plus its archive/protobuf
-callers. Its 19 leaf tests, 1,494 IWA tests, boundary check, and native Numbers
-open/edit/save/reopen smoke cover the extraction. The BorderSide ownership slice
+callers. The combined Numbers leaf suite has 25 tests, the IWA suite has 1,498
+tests, and the boundary check plus native Numbers smoke cover the extraction.
+The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain
 concrete IWA types, and the former Numbers-owned enum and compatibility path
@@ -5790,21 +5791,35 @@ The physical IWA substrate slice is complete as well: raw schemas remain in
 use the allocation-conscious slice API. The core framing suite has 17 passing
 tests. The facade varint exit is now complete too: `varint.rs` was deleted,
 all callers use the common bounded implementation, and the IWA suite still
-passes 1,494 tests. The facade `WireField` representation and direct wire
+passes 1,498 tests. The facade `WireField` representation and direct wire
 mutation exit is complete without a compatibility shim; only the callback
-error boundary remains before `wire.rs` itself can be deleted. Next, finish
-that callback extraction, then harden and extract Numbers table/sheet/formula
-values and the Pages/Keynote reader boundaries.
+error boundary remains before `wire.rs` itself can be deleted. The Numbers
+table/sheet semantic slice is now extracted into dependency-free
+`litchi-numbers::table` and `litchi-numbers::sheet`: finished tables use compact
+coordinates and immutable boxed sparse storage, while builders provide
+fallible append/replace operations and checked ownership handoff. The IWA
+facade retains only the archive-boundary adapter and comment sidecar; dense
+views remain explicitly budgeted. The leaf suite has 25 tests, the IWA suite
+has 1,498 tests, and the generated Numbers round trip passes. Formula values
+and the Pages/Keynote reader boundaries remain the next ownership slices.
 
-The Numbers ingress hardening now precedes that ownership move. The table
-adapter validates bounded dimensions before loading referenced data, rejects
+The IWA Numbers ingress adapter now protects the leaf ownership seam. It
+validates bounded dimensions before loading referenced data, rejects
 duplicate or out-of-range tile keys and coordinates, requires one typed tile
 payload, and maps allocation failures and finite table/cell budgets through
 the shared structured error type. Offset decoding is sparse and single-pass
 after a no-allocation shape/count scan; it never reserves from the archive's
 untrusted `cell_count` alone. Focused malformed-input tests cover dimension,
 coordinate, duplicate, odd-buffer, sparse-sentinel, descending-offset, and
-allocation-amplification cases.
+allocation-amplification cases. The extractor distinguishes native type `6000`
+TableInfoArchive metadata from type `6001` TableModelArchive cell payloads, so
+metadata records cannot be mis-decoded as table models.
+
+A fresh ZIP-valid generated artifact opened and rendered its 3×3 bordered table
+in Numbers and Keynote, including the expected `Numbers` and `Keynote` cell
+values. Pages reported the generated package as damaged; the warning was
+dismissed without repair, so Pages native opening remains a tracked limitation
+of this fixture rather than a claimed success.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains

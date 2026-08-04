@@ -103,12 +103,16 @@ their removal is a staged ownership exit, not a public compatibility layer.
 The Numbers migration continues with table, formula, and sheet ownership, with
 no peer dependency between the three concrete crates.
 
-The Numbers migration now begins with `litchi-numbers::cell`, whose concise
-`Value`, `Type`, and `Update` vocabulary is dependency-free. The IWA reader
-uses a private migration adapter for its still-moving implementation files;
-the canonical values are exposed only from the new leaf crate, and no archive
-or protobuf code crosses into it. The remaining Numbers table, formula, sheet,
-and package owners follow the same downward-only extraction pattern.
+The Numbers migration now begins with dependency-free `litchi-numbers::cell`,
+whose concise `Value`, `Type`, and `Update` vocabulary is shared by the
+Numbers reader and the structured facade through a private adapter. The first
+table/sheet semantic slice now also lives in `litchi-numbers`: `table` owns
+compact checked coordinates and dimensions, half-open ranges, sparse cells,
+budgeted grid views, and the fallible builder-to-immutable-table transition;
+`sheet` owns the immutable table collection and duplicate-name validation.
+Neither module depends on archives, protobufs, comments, or application
+topology. The remaining Numbers formula and package owners follow the same
+downward-only extraction pattern.
 
 The first Numbers wire seam is now `litchi-numbers::cell::wire`. It owns the
 dependency-free, byte-preserving BNC codec, stored-value and cached-scalar
@@ -116,18 +120,18 @@ views, data-format identifiers, and decimal128 codec; it preserves unknown
 trailing bytes for round trips. `litchi-iwa` retains archive traversal,
 protobuf integration, and package mutation, exposing the wire module only
 through a private migration adapter and converting its local error at that
-boundary. This is an ownership move, not a compatibility surface. The next
-Numbers slice remains the table/sheet/formula model, while the wire owner can
-later add borrowed decoding and compact field storage without reopening the
-archive boundary.
-Before that semantic move, the IWA adapter enforces a finite Numbers ingress
-profile: table rows, columns, addressable cells, and materialized sparse cells
-are bounded; tile keys and local/global coordinates are checked against those
-dimensions; and a tile reference must resolve to exactly one typed `6002`
-payload. Sparse offset ranges are decoded into one fallibly reserved vector,
-with count, slot, storage, and monotonicity checks performed before allocation.
-These limits belong temporarily to the adapter and will move with the table
-owner; they are not a dense-grid compatibility promise.
+boundary. This is an ownership move, not a compatibility surface. The IWA
+reader now keeps a private mutable adapter around the leaf table builder while
+it carries format-owned comments and converts native archive values. It also
+retains the finite ingress profile: table rows, columns, addressable cells,
+and materialized sparse cells are bounded; tile keys and local/global
+coordinates are checked against those dimensions; and a tile reference must
+resolve to exactly one typed `6002` payload. A native `6000` TableInfoArchive is
+metadata only; cell extraction consumes the typed `6001` TableModelArchive.
+Sparse offset ranges are decoded into one fallibly reserved vector, with
+count, slot, storage, and monotonicity checks performed before allocation.
+These limits belong temporarily to the adapter and are not a dense-grid
+compatibility promise.
 
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
