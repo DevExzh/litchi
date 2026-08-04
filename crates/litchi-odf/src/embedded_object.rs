@@ -1,8 +1,8 @@
 //! Inert semantic discovery of embedded ODF and OLE objects.
 
-use crate::OdfImageFrame;
+use crate::ImageFrame;
 use crate::elements::xml::namespaced_attribute;
-use crate::media::{is_linked_href, resolve_package_path};
+use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
@@ -107,7 +107,7 @@ pub struct OdfEmbeddedObject {
     pub part: OdfEmbeddedObjectPart,
     pub kind: OdfEmbeddedObjectKind,
     pub source: OdfEmbeddedObjectSource,
-    pub frame: Option<OdfImageFrame>,
+    pub frame: Option<ImageFrame>,
     pub xml_id: Option<String>,
     pub class_id: Option<String>,
     pub notify_on_update_of_ranges: Option<String>,
@@ -138,7 +138,7 @@ struct NamedContext {
 
 struct FrameState {
     depth: usize,
-    frame: OdfImageFrame,
+    frame: ImageFrame,
     object_indices: Vec<usize>,
 }
 
@@ -164,7 +164,7 @@ struct ObjectBuilder {
     depth: usize,
     kind: OdfEmbeddedObjectKind,
     href: Option<String>,
-    frame: Option<OdfImageFrame>,
+    frame: Option<ImageFrame>,
     xml_id: Option<String>,
     class_id: Option<String>,
     notify_on_update_of_ranges: Option<String>,
@@ -959,8 +959,8 @@ fn parse_frame(
     element: &BytesStart<'_>,
     pages: &[NamedContext],
     sheets: &[NamedContext],
-) -> Result<OdfImageFrame> {
-    Ok(OdfImageFrame {
+) -> Result<ImageFrame> {
+    Ok(ImageFrame {
         name: attribute(reader, element, DRAW_NAMESPACE, b"name")?,
         xml_id: attribute(reader, element, XML_NAMESPACE, b"id")?,
         title: None,

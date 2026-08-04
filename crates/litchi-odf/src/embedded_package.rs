@@ -6,9 +6,10 @@ use crate::embedded_chart::{
     splice, unused_object_root,
 };
 use crate::{
-    OdfEmbeddedObjectKind, OdfEmbeddedObjectPart, OdfEmbeddedObjectSource, OdfImagePart,
-    OdfImageSource, OdfInlineObjectRoot, constants,
+    ImagePart, ImageSource, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart, OdfEmbeddedObjectSource,
+    OdfInlineObjectRoot, constants,
 };
+use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
@@ -232,7 +233,7 @@ fn build_resource(
     let mut directories = Vec::new();
     let body = match &resource.source {
         OdfEmbeddedResourceSource::Linked { href } => {
-            if !crate::media::is_linked_href(href) {
+            if !is_linked_href(href) {
                 return invalid(
                     "linked resources must use an external, fragment, or otherwise inert target",
                 );
@@ -551,7 +552,7 @@ fn validate_payload(len: usize) -> Result<()> {
 }
 
 fn validate_relative_path(path: &str) -> Result<String> {
-    let path = crate::media::resolve_package_path(path)?;
+    let path = resolve_package_path(path)?;
     if path.is_empty() || path.ends_with('/') || path.starts_with("META-INF/") || path == "mimetype"
     {
         return invalid("invalid embedded subdocument file path");
@@ -564,7 +565,7 @@ fn validate_available_path(
     path: &str,
     replacing: Option<&StoredLocation>,
 ) -> Result<String> {
-    let path = crate::media::resolve_package_path(path)?;
+    let path = resolve_package_path(path)?;
     if path.is_empty() || path.ends_with('/') || protected_path(&path) {
         return invalid("invalid embedded package file path");
     }
@@ -580,7 +581,7 @@ fn validate_available_root(
     root: &str,
     replacing: Option<&StoredLocation>,
 ) -> Result<String> {
-    let mut root = crate::media::resolve_package_path(root)?;
+    let mut root = resolve_package_path(root)?;
     if root.is_empty() || protected_path(&root) {
         return invalid("invalid embedded subdocument root");
     }
@@ -710,9 +711,9 @@ fn selected_locations(
             .collect()),
         ResourceTarget::Image => Ok(scan_images(package, content, styles)?
             .into_iter()
-            .filter(|image| image.part == OdfImagePart::Content)
+            .filter(|image| image.part == ImagePart::Content)
             .map(|image| match image.source {
-                OdfImageSource::PackagePart { path, .. } => Some(StoredLocation::File(path)),
+                ImageSource::PackagePart { path, .. } => Some(StoredLocation::File(path)),
                 _ => None,
             })
             .collect()),
@@ -786,7 +787,7 @@ fn cleanup(
     let images = crate::media::scan_packaged_images(content, styles, has_file, media_type)?;
     let referenced = match old {
         StoredLocation::File(path) => objects.iter().any(|object| matches!(&object.source, OdfEmbeddedObjectSource::PackageFile { path: candidate, .. } if candidate == path))
-            || images.iter().any(|image| matches!(&image.source, OdfImageSource::PackagePart { path: candidate, .. } if candidate == path)),
+            || images.iter().any(|image| matches!(&image.source, ImageSource::PackagePart { path: candidate, .. } if candidate == path)),
         StoredLocation::Directory(root) => objects.iter().any(|object| matches!(&object.source, OdfEmbeddedObjectSource::PackageSubdocument { root_path, .. } if root_path == root)),
     };
     if referenced {
@@ -825,7 +826,7 @@ fn scan_images(
     package: &OwnedPackage,
     content: &str,
     styles: Option<&str>,
-) -> Result<Vec<crate::OdfImage>> {
+) -> Result<Vec<crate::Image>> {
     let archive = package.package()?;
     crate::media::scan_packaged_images(
         content,

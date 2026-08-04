@@ -528,7 +528,7 @@ pub use list_style::{
 };
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
-pub use media::{OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource};
+pub use media::{Image, ImageFrame, ImagePart, ImageSource};
 pub use notes_configuration::{
     OdfFootnotePosition, OdfNoteClass, OdfNoteNumberingScope, OdfNotesConfiguration,
     OdfNotesConfigurations, parse_notes_configurations, remove_notes_configuration_xml,

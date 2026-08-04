@@ -1,19 +1,19 @@
 use litchi_odf::{
-    CellValue, MutableSpreadsheet, OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource,
-    OdfLength, OpenDocumentPackage, OwnedPackage, Spreadsheet, SpreadsheetBuilder,
+    CellValue, Image, ImageFrame, ImagePart, ImageSource, MutableSpreadsheet, OdfLength,
+    OpenDocumentPackage, OwnedPackage, Spreadsheet, SpreadsheetBuilder,
 };
 use std::io::{Cursor, Write};
 
 const PNG_PAYLOAD: &[u8] = b"\x89PNG\r\n\x1a\nfake-png-payload";
 const GIF_PAYLOAD: &[u8] = b"GIF89afake-gif-payload";
 
-fn linked_image(href: &str) -> OdfImage {
-    OdfImage {
-        part: OdfImagePart::Content,
-        source: OdfImageSource::Linked {
+fn linked_image(href: &str) -> Image {
+    Image {
+        part: ImagePart::Content,
+        source: ImageSource::Linked {
             href: href.to_string(),
         },
-        frame: Some(OdfImageFrame {
+        frame: Some(ImageFrame {
             name: Some("Revenue & forecast".to_string()),
             title: Some("Quarterly chart".to_string()),
             description: Some("External preview; never fetched".to_string()),
@@ -21,7 +21,7 @@ fn linked_image(href: &str) -> OdfImage {
             y: Some("-0.5cm".to_string()),
             width: Some("5cm".to_string()),
             height: Some("30mm".to_string()),
-            ..OdfImageFrame::default()
+            ..ImageFrame::default()
         }),
         xml_id: Some("image-1".to_string()),
         filter_name: None,
@@ -59,7 +59,7 @@ fn builder_and_mutable_round_trip_inert_sheet_images() {
     );
     assert!(matches!(
         &image.source,
-        OdfImageSource::Linked { href } if href == "https://example.invalid/chart.png?no-fetch"
+        ImageSource::Linked { href } if href == "https://example.invalid/chart.png?no-fetch"
     ));
     assert!(spreadsheet.image_bytes(&image).unwrap().is_none());
 
@@ -82,7 +82,7 @@ fn parses_libreoffice_table_shapes_references_alternatives_and_invalid_forms() {
     let image = parsed.sheets().unwrap()[0].images()[0].clone();
     assert_eq!(image.frame.as_ref().unwrap().name.as_deref(), Some("img1"));
     assert_eq!(image.frame.as_ref().unwrap().width.as_deref(), Some("5cm"));
-    assert!(matches!(&image.source, OdfImageSource::Linked { href } if href.contains("192.0.2.1")));
+    assert!(matches!(&image.source, ImageSource::Linked { href } if href.contains("192.0.2.1")));
 
     for body in [
         r#"<table:shapes/><table:shapes/>"#,
@@ -107,7 +107,7 @@ fn parses_libreoffice_table_shapes_references_alternatives_and_invalid_forms() {
     );
     assert_eq!(images[0].frame, images[1].frame);
     assert!(
-        matches!(&images[1].source, OdfImageSource::Linked { href } if href == "Pictures/fallback.png")
+        matches!(&images[1].source, ImageSource::Linked { href } if href == "Pictures/fallback.png")
     );
     let mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
     let mut reparsed = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
@@ -226,7 +226,7 @@ fn insert_image_round_trips_discoverable_package_pictures() {
         Some("'Live Data'.B2")
     );
     assert!(
-        matches!(&data_frames[0].source, OdfImageSource::PackagePart { path, .. } if path == &first)
+        matches!(&data_frames[0].source, ImageSource::PackagePart { path, .. } if path == &first)
     );
     // Payloads resolve through the inert package-part accessor.
     assert_eq!(

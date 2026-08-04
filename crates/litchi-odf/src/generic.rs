@@ -148,7 +148,7 @@ impl FlatOpenDocument {
     }
 
     /// Discover inline and inert linked images in the flat document.
-    pub fn images(&self) -> Result<Vec<crate::OdfImage>> {
+    pub fn images(&self) -> Result<Vec<crate::Image>> {
         crate::media::scan_flat_images(&self.xml)
     }
 
@@ -552,7 +552,7 @@ impl OpenDocumentPackage {
     }
 
     /// Discover referenced, inline, missing, and inert linked images.
-    pub fn images(&self) -> Result<Vec<crate::OdfImage>> {
+    pub fn images(&self) -> Result<Vec<crate::Image>> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let package = self.package.package()?;
@@ -730,12 +730,10 @@ impl OpenDocumentPackage {
 
     /// Return bytes only for inline or verified package-contained images.
     /// Linked images remain inert and are never fetched.
-    pub fn image_bytes(&self, image: &crate::OdfImage) -> Result<Option<Vec<u8>>> {
+    pub fn image_bytes(&self, image: &crate::Image) -> Result<Option<Vec<u8>>> {
         match &image.source {
-            crate::OdfImageSource::Inline { bytes, .. } => Ok(Some(bytes.clone())),
-            crate::OdfImageSource::PackagePart { path, .. } => {
-                self.package.get_file(path).map(Some)
-            },
+            crate::ImageSource::Inline { bytes, .. } => Ok(Some(bytes.clone())),
+            crate::ImageSource::PackagePart { path, .. } => self.package.get_file(path).map(Some),
             _ => Ok(None),
         }
     }

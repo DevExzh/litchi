@@ -40,7 +40,7 @@ pub struct Sheet {
     /// Inert LibreOffice `calcext` sparkline groups attached to the sheet.
     pub sparkline_groups: Vec<super::SparklineGroup>,
     /// Inert images anchored in the sheet's `table:shapes` container.
-    pub images: Vec<crate::OdfImage>,
+    pub images: Vec<crate::Image>,
     /// General drawing shapes anchored in the sheet's `table:shapes` container.
     pub shapes: Vec<super::SheetShape>,
     /// Sheet protection metadata and edit permissions.
@@ -119,7 +119,7 @@ impl Sheet {
     }
 
     /// Get inert images anchored at sheet level.
-    pub fn images(&self) -> &[crate::OdfImage] {
+    pub fn images(&self) -> &[crate::Image] {
         &self.images
     }
 

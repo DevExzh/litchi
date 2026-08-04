@@ -1,7 +1,7 @@
 use litchi_odf::{
-    Document, OdfEmbeddedObjectSource, OdfEmbeddedResource, OdfEmbeddedResourceFile,
-    OdfEmbeddedResourceKind, OdfEmbeddedResourceSource, OdfImageSource, OwnedPackage,
-    PackageWriter, Presentation, Spreadsheet, constants,
+    Document, ImageSource, OdfEmbeddedObjectSource, OdfEmbeddedResource, OdfEmbeddedResourceFile,
+    OdfEmbeddedResourceKind, OdfEmbeddedResourceSource, OwnedPackage, PackageWriter, Presentation,
+    Spreadsheet, constants,
 };
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -199,7 +199,7 @@ fn ods_and_odp_image_package_and_inline_mutation() {
     let png = packaged(OdfEmbeddedResourceKind::Image, b"\x89PNG\r\n", "image/png");
     assert_eq!(sheet.add_embedded_resource("Sheet1", &png).unwrap(), 0);
     assert!(
-        matches!(&sheet.images().unwrap()[0].source, OdfImageSource::PackagePart { path, manifest_media_type: Some(media), .. } if path == "Pictures/Image_1.png" && media == "image/png")
+        matches!(&sheet.images().unwrap()[0].source, ImageSource::PackagePart { path, manifest_media_type: Some(media), .. } if path == "Pictures/Image_1.png" && media == "image/png")
     );
     let inline = OdfEmbeddedResource {
         kind: OdfEmbeddedResourceKind::Image,
@@ -213,7 +213,7 @@ fn ods_and_odp_image_package_and_inline_mutation() {
     };
     sheet.replace_embedded_image(0, &inline).unwrap();
     assert!(
-        matches!(&sheet.images().unwrap()[0].source, OdfImageSource::Inline { bytes, .. } if bytes == b"inline")
+        matches!(&sheet.images().unwrap()[0].source, ImageSource::Inline { bytes, .. } if bytes == b"inline")
     );
     assert!(
         !OwnedPackage::from_bytes(sheet.to_bytes().unwrap())
@@ -233,7 +233,7 @@ fn ods_and_odp_image_package_and_inline_mutation() {
     slides.move_embedded_image(1, 0).unwrap();
     assert!(matches!(
         &slides.images().unwrap()[0].source,
-        OdfImageSource::Inline { .. }
+        ImageSource::Inline { .. }
     ));
     slides.remove_embedded_image(0).unwrap();
     slides.remove_embedded_image(0).unwrap();

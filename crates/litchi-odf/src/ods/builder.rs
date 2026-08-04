@@ -1812,7 +1812,7 @@ impl SpreadsheetBuilder {
     }
 
     /// Add an inert image to the current sheet's `table:shapes` container.
-    pub fn add_sheet_image(&mut self, image: crate::OdfImage) -> Result<&mut Self> {
+    pub fn add_sheet_image(&mut self, image: crate::Image) -> Result<&mut Self> {
         if self.sheets.is_empty() {
             self.add_sheet("Sheet1")?;
         }
@@ -1828,7 +1828,7 @@ impl SpreadsheetBuilder {
     }
 
     /// Remove an inert image from the current sheet.
-    pub fn remove_sheet_image(&mut self, index: usize) -> Option<crate::OdfImage> {
+    pub fn remove_sheet_image(&mut self, index: usize) -> Option<crate::Image> {
         let sheet = self.sheets.last_mut()?;
         (index < sheet.images.len()).then(|| sheet.images.remove(index))
     }
@@ -1841,7 +1841,7 @@ impl SpreadsheetBuilder {
     pub fn append_sheet_image_alternative(
         &mut self,
         primary_image_index: usize,
-        image: crate::OdfImage,
+        image: crate::Image,
     ) -> Result<&mut Self> {
         if self.sheets.is_empty() {
             self.add_sheet("Sheet1")?;
@@ -1859,7 +1859,7 @@ impl SpreadsheetBuilder {
         &mut self,
         primary_image_index: usize,
         alternative_index: usize,
-        image: crate::OdfImage,
+        image: crate::Image,
     ) -> Result<&mut Self> {
         if self.sheets.is_empty() {
             self.add_sheet("Sheet1")?;
@@ -1907,7 +1907,7 @@ impl SpreadsheetBuilder {
         &mut self,
         primary_image_index: usize,
         alternative_index: usize,
-    ) -> Result<crate::OdfImage> {
+    ) -> Result<crate::Image> {
         let sheet = self.sheets.last_mut().ok_or_else(|| {
             litchi_core::Error::InvalidFormat("spreadsheet has no current sheet".to_string())
         })?;
@@ -2417,11 +2417,11 @@ mod tests {
     };
     use tempfile::tempdir;
 
-    fn alternative_test_image(source: crate::OdfImageSource) -> crate::OdfImage {
-        crate::OdfImage {
-            part: crate::OdfImagePart::Content,
+    fn alternative_test_image(source: crate::ImageSource) -> crate::Image {
+        crate::Image {
+            part: crate::ImagePart::Content,
             source,
-            frame: Some(crate::OdfImageFrame {
+            frame: Some(crate::ImageFrame {
                 name: Some("hero".to_string()),
                 width: Some("3cm".to_string()),
                 height: Some("2cm".to_string()),
@@ -3509,14 +3509,14 @@ mod tests {
         let mut builder = SpreadsheetBuilder::new();
         builder.add_sheet("Pictures").unwrap();
         builder
-            .add_sheet_image(alternative_test_image(crate::OdfImageSource::Linked {
+            .add_sheet_image(alternative_test_image(crate::ImageSource::Linked {
                 href: "https://example.test/primary.svg".to_string(),
             }))
             .unwrap();
         builder
             .append_sheet_image_alternative(
                 0,
-                alternative_test_image(crate::OdfImageSource::Inline {
+                alternative_test_image(crate::ImageSource::Inline {
                     bytes: vec![1, 2, 3, 4],
                     ignored_href: Some("ignored.png".to_string()),
                 }),
@@ -3526,16 +3526,13 @@ mod tests {
             .insert_sheet_image_alternative(
                 0,
                 1,
-                alternative_test_image(crate::OdfImageSource::Linked {
+                alternative_test_image(crate::ImageSource::Linked {
                     href: "https://example.test/fallback.webp".to_string(),
                 }),
             )
             .unwrap();
         let removed = builder.remove_sheet_image_alternative(0, 1).unwrap();
-        assert!(matches!(
-            removed.source,
-            crate::OdfImageSource::Linked { .. }
-        ));
+        assert!(matches!(removed.source, crate::ImageSource::Linked { .. }));
 
         let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
         let sheets = spreadsheet.sheets().unwrap();
@@ -3546,7 +3543,7 @@ mod tests {
         assert_eq!(images[0].frame, images[1].frame);
         assert!(matches!(
             images[0].source,
-            crate::OdfImageSource::Linked { .. }
+            crate::ImageSource::Linked { .. }
         ));
         assert_eq!(images[1].inline_bytes(), Some(&[1, 2, 3, 4][..]));
     }
@@ -3556,14 +3553,14 @@ mod tests {
         let mut builder = SpreadsheetBuilder::new();
         builder.add_sheet("Pictures").unwrap();
         builder
-            .add_sheet_image(alternative_test_image(crate::OdfImageSource::Linked {
+            .add_sheet_image(alternative_test_image(crate::ImageSource::Linked {
                 href: "primary.svg".to_string(),
             }))
             .unwrap();
         builder
             .append_sheet_image_alternative(
                 0,
-                alternative_test_image(crate::OdfImageSource::Linked {
+                alternative_test_image(crate::ImageSource::Linked {
                     href: "fallback.png".to_string(),
                 }),
             )
@@ -3574,7 +3571,7 @@ mod tests {
             builder
                 .append_sheet_image_alternative(
                     1,
-                    alternative_test_image(crate::OdfImageSource::Linked {
+                    alternative_test_image(crate::ImageSource::Linked {
                         href: "wrong-group.png".to_string(),
                     }),
                 )
@@ -3585,13 +3582,13 @@ mod tests {
                 .insert_sheet_image_alternative(
                     0,
                     0,
-                    alternative_test_image(crate::OdfImageSource::Linked {
+                    alternative_test_image(crate::ImageSource::Linked {
                         href: "wrong-index.png".to_string(),
                     }),
                 )
                 .is_err()
         );
-        let mut wrong_frame = alternative_test_image(crate::OdfImageSource::Linked {
+        let mut wrong_frame = alternative_test_image(crate::ImageSource::Linked {
             href: "wrong-frame.png".to_string(),
         });
         wrong_frame.frame.as_mut().unwrap().width = Some("4cm".to_string());
@@ -3600,7 +3597,7 @@ mod tests {
                 .append_sheet_image_alternative(0, wrong_frame)
                 .is_err()
         );
-        let mut no_frame = alternative_test_image(crate::OdfImageSource::Linked {
+        let mut no_frame = alternative_test_image(crate::ImageSource::Linked {
             href: "no-frame.png".to_string(),
         });
         no_frame.frame = None;

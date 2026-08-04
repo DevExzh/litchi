@@ -1849,7 +1849,7 @@ impl MutableSpreadsheet {
     }
 
     /// Add an inert image to a sheet's `table:shapes` container.
-    pub fn add_sheet_image(&mut self, sheet_index: usize, image: crate::OdfImage) -> Result<()> {
+    pub fn add_sheet_image(&mut self, sheet_index: usize, image: crate::Image) -> Result<()> {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
         })?;
@@ -1946,14 +1946,14 @@ impl MutableSpreadsheet {
 
         let name = format!("Image {}", self.next_frame_number);
         let address = sheet_anchor_address(&self.sheets[sheet_index].name, row, col);
-        let image_model = crate::OdfImage {
-            part: crate::OdfImagePart::Content,
-            source: crate::OdfImageSource::PackagePart {
+        let image_model = crate::Image {
+            part: crate::ImagePart::Content,
+            source: crate::ImageSource::PackagePart {
                 href: path.clone(),
                 path: path.clone(),
                 manifest_media_type: None,
             },
-            frame: Some(crate::OdfImageFrame {
+            frame: Some(crate::ImageFrame {
                 name: Some(name),
                 anchor_type: Some("cell".to_string()),
                 width: Some(width.as_str().to_string()),
@@ -1983,7 +1983,7 @@ impl MutableSpreadsheet {
         &mut self,
         sheet_index: usize,
         image_index: usize,
-    ) -> Result<crate::OdfImage> {
+    ) -> Result<crate::Image> {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
         })?;
@@ -2000,7 +2000,7 @@ impl MutableSpreadsheet {
         &mut self,
         sheet_index: usize,
         primary_image_index: usize,
-        image: crate::OdfImage,
+        image: crate::Image,
     ) -> Result<()> {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
@@ -2017,7 +2017,7 @@ impl MutableSpreadsheet {
         sheet_index: usize,
         primary_image_index: usize,
         alternative_index: usize,
-        image: crate::OdfImage,
+        image: crate::Image,
     ) -> Result<()> {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
@@ -2037,7 +2037,7 @@ impl MutableSpreadsheet {
         sheet_index: usize,
         primary_image_index: usize,
         alternative_index: usize,
-    ) -> Result<crate::OdfImage> {
+    ) -> Result<crate::Image> {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
         })?;
@@ -2612,13 +2612,13 @@ impl Default for MutableSpreadsheet {
 }
 
 /// Return the `xlink:href` of a sheet image, regardless of source kind.
-fn sheet_image_href(image: &crate::OdfImage) -> Option<&str> {
+fn sheet_image_href(image: &crate::Image) -> Option<&str> {
     match &image.source {
-        crate::OdfImageSource::Inline { ignored_href, .. } => ignored_href.as_deref(),
-        crate::OdfImageSource::PackagePart { href, .. }
-        | crate::OdfImageSource::MissingPackagePart { href, .. }
-        | crate::OdfImageSource::Linked { href } => Some(href.as_str()),
-        crate::OdfImageSource::Missing => None,
+        crate::ImageSource::Inline { ignored_href, .. } => ignored_href.as_deref(),
+        crate::ImageSource::PackagePart { href, .. }
+        | crate::ImageSource::MissingPackagePart { href, .. }
+        | crate::ImageSource::Linked { href } => Some(href.as_str()),
+        crate::ImageSource::Missing => None,
     }
 }
 
@@ -2677,11 +2677,11 @@ mod tests {
         ValidationScriptEventListener,
     };
 
-    fn mutable_alternative_test_image(source: crate::OdfImageSource) -> crate::OdfImage {
-        crate::OdfImage {
-            part: crate::OdfImagePart::Content,
+    fn mutable_alternative_test_image(source: crate::ImageSource) -> crate::Image {
+        crate::Image {
+            part: crate::ImagePart::Content,
             source,
-            frame: Some(crate::OdfImageFrame {
+            frame: Some(crate::ImageFrame {
                 name: Some("mutable-hero".to_string()),
                 width: Some("5cm".to_string()),
                 height: Some("4cm".to_string()),
@@ -3308,11 +3308,9 @@ mod tests {
         let mut builder = SpreadsheetBuilder::new();
         builder.add_sheet("Pictures").unwrap();
         builder
-            .add_sheet_image(mutable_alternative_test_image(
-                crate::OdfImageSource::Linked {
-                    href: "https://example.test/primary.svg".to_string(),
-                },
-            ))
+            .add_sheet_image(mutable_alternative_test_image(crate::ImageSource::Linked {
+                href: "https://example.test/primary.svg".to_string(),
+            }))
             .unwrap();
         let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
@@ -3321,7 +3319,7 @@ mod tests {
             .append_sheet_image_alternative(
                 0,
                 0,
-                mutable_alternative_test_image(crate::OdfImageSource::Inline {
+                mutable_alternative_test_image(crate::ImageSource::Inline {
                     bytes: vec![9, 8, 7],
                     ignored_href: None,
                 }),
@@ -3332,16 +3330,13 @@ mod tests {
                 0,
                 0,
                 1,
-                mutable_alternative_test_image(crate::OdfImageSource::Linked {
+                mutable_alternative_test_image(crate::ImageSource::Linked {
                     href: "https://example.test/intermediate.webp".to_string(),
                 }),
             )
             .unwrap();
         let removed = mutable.remove_sheet_image_alternative(0, 0, 1).unwrap();
-        assert!(matches!(
-            removed.source,
-            crate::OdfImageSource::Linked { .. }
-        ));
+        assert!(matches!(removed.source, crate::ImageSource::Linked { .. }));
 
         let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         let sheets = output.sheets().unwrap();
@@ -3352,7 +3347,7 @@ mod tests {
         assert_eq!(images[0].frame, images[1].frame);
         assert!(matches!(
             images[0].source,
-            crate::OdfImageSource::Linked { .. }
+            crate::ImageSource::Linked { .. }
         ));
         assert_eq!(images[1].inline_bytes(), Some(&[9, 8, 7][..]));
     }
@@ -3362,11 +3357,9 @@ mod tests {
         let mut builder = SpreadsheetBuilder::new();
         builder.add_sheet("Pictures").unwrap();
         builder
-            .add_sheet_image(mutable_alternative_test_image(
-                crate::OdfImageSource::Linked {
-                    href: "primary.svg".to_string(),
-                },
-            ))
+            .add_sheet_image(mutable_alternative_test_image(crate::ImageSource::Linked {
+                href: "primary.svg".to_string(),
+            }))
             .unwrap();
         let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
         let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
@@ -3374,7 +3367,7 @@ mod tests {
             .append_sheet_image_alternative(
                 0,
                 0,
-                mutable_alternative_test_image(crate::OdfImageSource::Linked {
+                mutable_alternative_test_image(crate::ImageSource::Linked {
                     href: "fallback.png".to_string(),
                 }),
             )
@@ -3386,7 +3379,7 @@ mod tests {
                 .append_sheet_image_alternative(
                     9,
                     0,
-                    mutable_alternative_test_image(crate::OdfImageSource::Linked {
+                    mutable_alternative_test_image(crate::ImageSource::Linked {
                         href: "wrong-sheet.png".to_string(),
                     }),
                 )
@@ -3397,14 +3390,14 @@ mod tests {
                 .append_sheet_image_alternative(
                     0,
                     1,
-                    mutable_alternative_test_image(crate::OdfImageSource::Linked {
+                    mutable_alternative_test_image(crate::ImageSource::Linked {
                         href: "wrong-group.png".to_string(),
                     }),
                 )
                 .is_err()
         );
         assert!(mutable.remove_sheet_image_alternative(0, 0, 0).is_err());
-        let mut wrong_frame = mutable_alternative_test_image(crate::OdfImageSource::Linked {
+        let mut wrong_frame = mutable_alternative_test_image(crate::ImageSource::Linked {
             href: "wrong-frame.png".to_string(),
         });
         wrong_frame.frame.as_mut().unwrap().height = Some("6cm".to_string());

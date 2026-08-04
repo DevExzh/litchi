@@ -1,14 +1,17 @@
-//! Semantic image discovery shared by packaged and flat OpenDocument families.
+//! Bounded XML scanning and package-path safety for image media.
 
 use crate::elements::xml::namespaced_attribute;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
+use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
+
+use super::{Image, ImageFrame, ImagePart, ImageSource};
 
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -26,96 +29,6 @@ const MAX_TOTAL_INLINE_IMAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ACCESSIBILITY_TEXT_BYTES: usize = 64 * 1024;
 const MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES: usize = 8 * 1024 * 1024;
 
-/// XML part containing an image occurrence.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum OdfImagePart {
-    Content,
-    Styles,
-    FlatDocument,
-}
-
-/// The inert source of an OpenDocument image.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum OdfImageSource {
-    /// Base64 data stored in an `office:binary-data` child.
-    Inline {
-        bytes: Vec<u8>,
-        /// An href present on the parent is ignored by ODF when inline data exists.
-        ignored_href: Option<String>,
-    },
-    /// A verified file in the same OpenDocument package.
-    PackagePart {
-        href: String,
-        path: String,
-        manifest_media_type: Option<String>,
-    },
-    /// A safe package path which is referenced but absent from the archive.
-    MissingPackagePart { href: String, resolved_path: String },
-    /// An inert external, filesystem, fragment, query-bearing, or flat-document link.
-    Linked { href: String },
-    /// A malformed producer omitted both href and inline data.
-    Missing,
-}
-
-/// Drawing-frame context for an image or embedded-object occurrence.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct OdfImageFrame {
-    pub name: Option<String>,
-    pub xml_id: Option<String>,
-    /// Short alternative title from a direct `svg:title` child.
-    pub title: Option<String>,
-    /// Prose alternative description from a direct `svg:desc` child.
-    pub description: Option<String>,
-    pub anchor_type: Option<String>,
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub width: Option<String>,
-    pub height: Option<String>,
-    /// Cell address anchoring the frame's bottom-right corner
-    /// (`table:end-cell-address`, spreadsheets only).
-    pub end_cell_address: Option<String>,
-    pub page_name: Option<String>,
-    pub sheet_name: Option<String>,
-    /// Whether this frame is a direct child of a spreadsheet `table:shapes` container.
-    pub sheet_shape: bool,
-}
-
-/// One `draw:image` occurrence and its safely classified source.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfImage {
-    pub part: OdfImagePart,
-    pub source: OdfImageSource,
-    pub frame: Option<OdfImageFrame>,
-    pub xml_id: Option<String>,
-    pub filter_name: Option<String>,
-    pub declared_media_type: Option<String>,
-    pub link_type: Option<String>,
-    pub show: Option<String>,
-    pub actuate: Option<String>,
-    /// Zero-based position among alternative images in the same frame.
-    pub alternative_index: usize,
-}
-
-impl OdfImage {
-    /// Return inline bytes without copying, if this is an inline image.
-    pub fn inline_bytes(&self) -> Option<&[u8]> {
-        match &self.source {
-            OdfImageSource::Inline { bytes, .. } => Some(bytes),
-            _ => None,
-        }
-    }
-
-    /// Return the resolved package path, if this references an existing package part.
-    pub fn package_path(&self) -> Option<&str> {
-        match &self.source {
-            OdfImageSource::PackagePart { path, .. } => Some(path),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 struct PackageLookup<'a> {
     has_file: &'a dyn Fn(&str) -> bool,
@@ -125,7 +38,7 @@ struct PackageLookup<'a> {
 #[derive(Clone)]
 struct FrameState {
     depth: usize,
-    frame: OdfImageFrame,
+    frame: ImageFrame,
     image_count: usize,
     image_indices: Vec<usize>,
 }
@@ -150,7 +63,7 @@ struct NamedContext {
 struct ImageBuilder {
     depth: usize,
     href: Option<String>,
-    frame: Option<OdfImageFrame>,
+    frame: Option<ImageFrame>,
     xml_id: Option<String>,
     filter_name: Option<String>,
     declared_media_type: Option<String>,
@@ -168,7 +81,7 @@ pub(crate) fn scan_packaged_images(
     styles_xml: Option<&str>,
     has_file: impl Fn(&str) -> bool,
     media_type: impl Fn(&str) -> Option<String>,
-) -> Result<Vec<OdfImage>> {
+) -> Result<Vec<Image>> {
     let lookup = PackageLookup {
         has_file: &has_file,
         media_type: &media_type,
@@ -178,7 +91,7 @@ pub(crate) fn scan_packaged_images(
     let mut accessibility_bytes = 0usize;
     scan_xml(
         content_xml,
-        OdfImagePart::Content,
+        ImagePart::Content,
         Some(lookup),
         &mut images,
         &mut inline_bytes,
@@ -187,7 +100,7 @@ pub(crate) fn scan_packaged_images(
     if let Some(styles_xml) = styles_xml {
         scan_xml(
             styles_xml,
-            OdfImagePart::Styles,
+            ImagePart::Styles,
             Some(lookup),
             &mut images,
             &mut inline_bytes,
@@ -197,13 +110,13 @@ pub(crate) fn scan_packaged_images(
     Ok(images)
 }
 
-pub(crate) fn scan_flat_images(xml: &str) -> Result<Vec<OdfImage>> {
+pub(crate) fn scan_flat_images(xml: &str) -> Result<Vec<Image>> {
     let mut images = Vec::new();
     let mut inline_bytes = 0usize;
     let mut accessibility_bytes = 0usize;
     scan_xml(
         xml,
-        OdfImagePart::FlatDocument,
+        ImagePart::FlatDocument,
         None,
         &mut images,
         &mut inline_bytes,
@@ -212,13 +125,13 @@ pub(crate) fn scan_flat_images(xml: &str) -> Result<Vec<OdfImage>> {
     Ok(images)
 }
 
-pub(crate) fn scan_content_images(xml: &str) -> Result<Vec<OdfImage>> {
+pub(crate) fn scan_content_images(xml: &str) -> Result<Vec<Image>> {
     let mut images = Vec::new();
     let mut inline_bytes = 0usize;
     let mut accessibility_bytes = 0usize;
     scan_xml(
         xml,
-        OdfImagePart::Content,
+        ImagePart::Content,
         None,
         &mut images,
         &mut inline_bytes,
@@ -229,9 +142,9 @@ pub(crate) fn scan_content_images(xml: &str) -> Result<Vec<OdfImage>> {
 
 fn scan_xml(
     xml: &str,
-    part: OdfImagePart,
+    part: ImagePart,
     package: Option<PackageLookup<'_>>,
-    images: &mut Vec<OdfImage>,
+    images: &mut Vec<Image>,
     total_inline_bytes: &mut usize,
     total_accessibility_bytes: &mut usize,
 ) -> Result<()> {
@@ -626,8 +539,8 @@ fn parse_frame(
     pages: &[NamedContext],
     sheets: &[NamedContext],
     sheet_shape: bool,
-) -> Result<OdfImageFrame> {
-    Ok(OdfImageFrame {
+) -> Result<ImageFrame> {
+    Ok(ImageFrame {
         name: attribute(reader, element, DRAW_NAMESPACE, b"name")?,
         xml_id: attribute(reader, element, XML_NAMESPACE, b"id")?,
         title: None,
@@ -811,10 +724,10 @@ fn append_inline(image: &mut ImageBuilder, value: &str) -> Result<()> {
 
 fn finish_image(
     image: ImageBuilder,
-    part: OdfImagePart,
+    part: ImagePart,
     package: Option<PackageLookup<'_>>,
     total_inline_bytes: &mut usize,
-) -> Result<OdfImage> {
+) -> Result<Image> {
     let source = if image.inline_present {
         let mut compact = Vec::with_capacity(image.inline_encoded.len());
         for byte in image.inline_encoded.bytes() {
@@ -844,24 +757,24 @@ fn finish_image(
                 "total inline image data exceeds {MAX_TOTAL_INLINE_IMAGE_BYTES} bytes"
             )));
         }
-        OdfImageSource::Inline {
+        ImageSource::Inline {
             bytes,
             ignored_href: image.href.clone(),
         }
     } else if let Some(href) = image.href.clone().filter(|href| !href.is_empty()) {
         match package {
-            None => OdfImageSource::Linked { href },
-            Some(_) if is_linked_href(&href) => OdfImageSource::Linked { href },
+            None => ImageSource::Linked { href },
+            Some(_) if is_linked_href(&href) => ImageSource::Linked { href },
             Some(package) => {
                 let path = resolve_package_path(&href)?;
                 if (package.has_file)(&path) {
-                    OdfImageSource::PackagePart {
+                    ImageSource::PackagePart {
                         href,
                         manifest_media_type: (package.media_type)(&path),
                         path,
                     }
                 } else {
-                    OdfImageSource::MissingPackagePart {
+                    ImageSource::MissingPackagePart {
                         href,
                         resolved_path: path,
                     }
@@ -869,10 +782,10 @@ fn finish_image(
             },
         }
     } else {
-        OdfImageSource::Missing
+        ImageSource::Missing
     };
 
-    Ok(OdfImage {
+    Ok(Image {
         part,
         source,
         frame: image.frame,
@@ -884,109 +797,6 @@ fn finish_image(
         actuate: image.actuate,
         alternative_index: image.alternative_index,
     })
-}
-
-pub(crate) fn is_linked_href(href: &str) -> bool {
-    if href.starts_with('/')
-        || href.starts_with('\\')
-        || href.starts_with('#')
-        || href.contains('\\')
-        || href.contains('?')
-        || href.contains('#')
-    {
-        return true;
-    }
-    let Some(colon) = href.find(':') else {
-        return false;
-    };
-    let scheme = &href[..colon];
-    !scheme.is_empty()
-        && scheme.as_bytes()[0].is_ascii_alphabetic()
-        && scheme
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
-}
-
-pub(crate) fn resolve_package_path(href: &str) -> Result<String> {
-    let decoded = percent_decode(href)?;
-    if decoded.starts_with('/') || decoded.contains('\\') {
-        return Err(Error::InvalidFormat(format!(
-            "unsafe package image href '{href}'"
-        )));
-    }
-    let mut segments = Vec::new();
-    for segment in decoded.split('/') {
-        if segment.is_empty() || segment == "." {
-            continue;
-        }
-        if segment == ".." {
-            if segments.pop().is_none() {
-                return Err(Error::InvalidFormat(format!(
-                    "package image href escapes the package root: '{href}'"
-                )));
-            }
-            continue;
-        }
-        if segment
-            .chars()
-            .any(|character| character == '\0' || character.is_control())
-        {
-            return Err(Error::InvalidFormat(format!(
-                "invalid character in package image href '{href}'"
-            )));
-        }
-        segments.push(segment);
-    }
-    if segments.is_empty() {
-        return Err(Error::InvalidFormat(format!(
-            "package image href has no file path: '{href}'"
-        )));
-    }
-    let path = segments.join("/");
-    if path == "mimetype" || path == "META-INF" || path.starts_with("META-INF/") {
-        return Err(Error::InvalidFormat(format!(
-            "package image href targets an administrative entry: '{href}'"
-        )));
-    }
-    Ok(path)
-}
-
-fn percent_decode(value: &str) -> Result<String> {
-    let bytes = value.as_bytes();
-    let mut decoded = Vec::with_capacity(bytes.len());
-    let mut index = 0usize;
-    while index < bytes.len() {
-        if bytes[index] != b'%' {
-            decoded.push(bytes[index]);
-            index += 1;
-            continue;
-        }
-        if index + 2 >= bytes.len() {
-            return Err(Error::InvalidFormat(format!(
-                "invalid percent escape in package image href '{value}'"
-            )));
-        }
-        let high = hex_value(bytes[index + 1]);
-        let low = hex_value(bytes[index + 2]);
-        let (Some(high), Some(low)) = (high, low) else {
-            return Err(Error::InvalidFormat(format!(
-                "invalid percent escape in package image href '{value}'"
-            )));
-        };
-        decoded.push((high << 4) | low);
-        index += 3;
-    }
-    String::from_utf8(decoded)
-        .map_err(|_| Error::InvalidFormat("package image href is not valid UTF-8".to_string()))
-}
-
-fn hex_value(byte: u8) -> Option<u8> {
-    match byte {
-        b'0'..=b'9' => Some(byte - b'0'),
-        b'a'..=b'f' => Some(byte - b'a' + 10),
-        b'A'..=b'F' => Some(byte - b'A' + 10),
-        _ => None,
-    }
 }
 
 fn attribute(

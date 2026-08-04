@@ -1,6 +1,6 @@
 use litchi_odf::{
-    Document, FlatOpenDocument, OdfImagePart, OdfImageSource, OpenDocumentFamily,
-    OpenDocumentPackage, Presentation, Spreadsheet,
+    Document, FlatOpenDocument, ImagePart, ImageSource, OpenDocumentFamily, OpenDocumentPackage,
+    Presentation, Spreadsheet,
 };
 use std::io::{Cursor, Write};
 use zip::CompressionMethod;
@@ -44,11 +44,11 @@ fn libreoffice_flat_links_are_typed_and_remain_inert_across_families() {
         assert_eq!(document.family(), family);
         let images = document.images().unwrap();
         assert_eq!(images.len(), 1);
-        assert_eq!(images[0].part, OdfImagePart::FlatDocument);
+        assert_eq!(images[0].part, ImagePart::FlatDocument);
         assert_eq!(images[0].actuate.as_deref(), Some("onLoad"));
         assert!(matches!(
             &images[0].source,
-            OdfImageSource::Linked { href }
+            ImageSource::Linked { href }
                 if href == "http://192.0.2.1:12345/tracking-pixel.png"
         ));
         let frame = images[0].frame.as_ref().unwrap();
@@ -130,7 +130,7 @@ fn inline_data_wins_and_unsafe_package_traversal_is_rejected() {
     let document = FlatOpenDocument::from_bytes(inline.into_bytes()).unwrap();
     assert!(matches!(
         &document.images().unwrap()[0].source,
-        OdfImageSource::Inline { ignored_href: Some(href), .. }
+        ImageSource::Inline { ignored_href: Some(href), .. }
             if href == "http://192.0.2.1/ignored.png"
     ));
 
@@ -286,15 +286,15 @@ fn accessibility_text_limits_are_enforced_per_field_and_in_aggregate() {
     assert!(document.images().is_err());
 }
 
-fn assert_packaged_image(image: &litchi_odf::OdfImage) {
-    assert_eq!(image.part, OdfImagePart::Content);
+fn assert_packaged_image(image: &litchi_odf::Image) {
+    assert_eq!(image.part, ImagePart::Content);
     assert_eq!(
         image.frame.as_ref().unwrap().name.as_deref(),
         Some("Image1")
     );
     assert!(matches!(
         &image.source,
-        OdfImageSource::PackagePart {
+        ImageSource::PackagePart {
             href,
             path,
             manifest_media_type: Some(media_type),

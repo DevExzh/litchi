@@ -9,6 +9,7 @@ use crate::document_scripts::{
 };
 use crate::embedded_chart::{Addition, rebuild_package};
 use litchi_core::{Error, Result};
+use litchi_odf_common::package::resolve_package_path;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::{NsReader, Reader};
@@ -449,7 +450,7 @@ fn validate_inert_href(href: &str) -> Result<()> {
     if href.starts_with('#') || href.starts_with("//") || uri_scheme(href).is_some() {
         return Ok(());
     }
-    let _ = crate::media::resolve_package_path(href)?;
+    let _ = resolve_package_path(href)?;
     Ok(())
 }
 
@@ -480,7 +481,7 @@ fn resource_is_referenced(content: &str, path: &str) -> Result<bool> {
             if !href.starts_with('#')
                 && !href.starts_with("//")
                 && uri_scheme(&href).is_none()
-                && crate::media::resolve_package_path(&href)? == path
+                && resolve_package_path(&href)? == path
             {
                 return Ok(true);
             }
@@ -610,7 +611,7 @@ fn safe_script_path(path: &str, expected: Option<OdfScriptResourceKind>) -> Resu
     if path.len() > MAX_VALUE_BYTES {
         return invalid("script resource path exceeds limit");
     }
-    let path = crate::media::resolve_package_path(path)?;
+    let path = resolve_package_path(path)?;
     if path.is_empty()
         || path.ends_with('/')
         || path == "mimetype"

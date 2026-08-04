@@ -7,8 +7,10 @@
 
 mod codec;
 mod model;
+mod path;
 #[cfg(test)]
 mod tests;
 
 pub use codec::{is_media_path, parse_manifest, read_manifest};
 pub use model::{Archive, Entry, Manifest};
+pub use path::{is_linked_href, resolve_package_path};

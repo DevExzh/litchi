@@ -3,7 +3,7 @@
 //! through the packaged read APIs after save and reopen.
 
 use litchi_odf::{
-    MutablePresentation, OdfImageSource, OdfLength, OpenDocumentPackage, OwnedPackage, Presentation,
+    ImageSource, MutablePresentation, OdfLength, OpenDocumentPackage, OwnedPackage, Presentation,
 };
 
 const PNG_PAYLOAD: &[u8] = b"\x89PNG\r\n\x1a\nfake-png-payload";
@@ -69,9 +69,7 @@ fn insert_image_round_trips_discoverable_package_pictures() {
         scanned[1].frame.as_ref().unwrap().page_name.as_deref(),
         Some("page2")
     );
-    assert!(
-        matches!(&scanned[0].source, OdfImageSource::PackagePart { path, .. } if path == &first)
-    );
+    assert!(matches!(&scanned[0].source, ImageSource::PackagePart { path, .. } if path == &first));
     assert_eq!(
         generic.image_bytes(&scanned[0]).unwrap().as_deref(),
         Some(PNG_PAYLOAD)

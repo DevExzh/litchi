@@ -313,7 +313,7 @@ pub(crate) fn sheet_shapes_have_event_listeners(shapes: &[SheetShape]) -> bool {
 /// Write a sheet's `table:shapes` container with images and general shapes.
 pub(crate) fn write_table_shapes(
     out: &mut String,
-    images: &[crate::OdfImage],
+    images: &[crate::Image],
     shapes: &[SheetShape],
 ) -> Result<()> {
     if images.is_empty() && shapes.is_empty() {

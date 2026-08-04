@@ -2,8 +2,9 @@
 
 use crate::core::OwnedPackage;
 use crate::embedded_chart::{Addition, rebuild_package, splice};
-use crate::{constants, media};
+use crate::constants;
 use litchi_core::{Error, Result};
+use litchi_odf_common::package::resolve_package_path;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -635,7 +636,7 @@ fn unused_path(package: &OwnedPackage) -> Result<String> {
     invalid("no collision-free RDF metadata path is available")
 }
 fn safe_path(value: &str) -> Result<String> {
-    let path = media::resolve_package_path(value)?;
+    let path = resolve_package_path(value)?;
     if path.is_empty()
         || path.ends_with('/')
         || path == "mimetype"

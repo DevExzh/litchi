@@ -3987,7 +3987,7 @@ pub(crate) struct SheetBuilder {
     scenario: Option<SheetScenario>,
     conditional_formats: Vec<ConditionalFormat>,
     sparkline_groups: Vec<super::SparklineGroup>,
-    images: Vec<crate::OdfImage>,
+    images: Vec<crate::Image>,
     cell_count: usize,
     /// Runs of empty rows read but not yet materialised, in document order.
     deferred_rows: Vec<(Row, usize)>,

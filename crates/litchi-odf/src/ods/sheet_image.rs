@@ -10,10 +10,10 @@ const MAX_INLINE_BYTES: usize = 16 * 1_048_576;
 const MAX_TOTAL_INLINE_BYTES: usize = 64 * 1_048_576;
 
 pub(crate) fn normalize_sheet_image(
-    mut image: crate::OdfImage,
+    mut image: crate::Image,
     sheet_name: &str,
-) -> Result<crate::OdfImage> {
-    image.part = crate::OdfImagePart::Content;
+) -> Result<crate::Image> {
+    image.part = crate::ImagePart::Content;
     image.alternative_index = 0;
     let frame = image
         .frame
@@ -26,8 +26,8 @@ pub(crate) fn normalize_sheet_image(
     Ok(image)
 }
 
-pub(crate) fn validate_sheet_image(image: &crate::OdfImage) -> Result<()> {
-    if image.part != crate::OdfImagePart::Content {
+pub(crate) fn validate_sheet_image(image: &crate::Image) -> Result<()> {
+    if image.part != crate::ImagePart::Content {
         return invalid("sheet image must belong to content.xml");
     }
     let frame = image
@@ -73,7 +73,7 @@ pub(crate) fn validate_sheet_image(image: &crate::OdfImage) -> Result<()> {
         return invalid("sheet draw:image xlink:actuate must be onLoad");
     }
     match &image.source {
-        crate::OdfImageSource::Inline {
+        crate::ImageSource::Inline {
             bytes,
             ignored_href,
         } => {
@@ -84,25 +84,25 @@ pub(crate) fn validate_sheet_image(image: &crate::OdfImage) -> Result<()> {
                 validate_text(href, "ignored xlink:href", true)?;
             }
         },
-        crate::OdfImageSource::PackagePart { href, .. }
-        | crate::OdfImageSource::MissingPackagePart { href, .. }
-        | crate::OdfImageSource::Linked { href } => {
+        crate::ImageSource::PackagePart { href, .. }
+        | crate::ImageSource::MissingPackagePart { href, .. }
+        | crate::ImageSource::Linked { href } => {
             validate_text(href, "xlink:href", false)?;
         },
-        crate::OdfImageSource::Missing => return invalid("sheet image requires a source"),
+        crate::ImageSource::Missing => return invalid("sheet image requires a source"),
     }
     Ok(())
 }
 
-pub(crate) fn validate_sheet_images(images: &[crate::OdfImage]) -> Result<()> {
+pub(crate) fn validate_sheet_images(images: &[crate::Image]) -> Result<()> {
     if images.len() > MAX_IMAGES_PER_SHEET {
         return invalid(format!("sheet exceeds {MAX_IMAGES_PER_SHEET} images"));
     }
-    let mut previous: Option<&crate::OdfImage> = None;
+    let mut previous: Option<&crate::Image> = None;
     let mut total_inline_bytes = 0usize;
     for image in images {
         validate_sheet_image(image)?;
-        if let crate::OdfImageSource::Inline { bytes, .. } = &image.source {
+        if let crate::ImageSource::Inline { bytes, .. } = &image.source {
             total_inline_bytes = total_inline_bytes.checked_add(bytes.len()).ok_or_else(|| {
                 Error::InvalidFormat("total inline sheet image data size overflow".to_string())
             })?;
@@ -133,7 +133,7 @@ pub(crate) fn validate_sheet_images(images: &[crate::OdfImage]) -> Result<()> {
     Ok(())
 }
 
-fn validate_sheet_images_for_sheet(images: &[crate::OdfImage], sheet_name: &str) -> Result<()> {
+fn validate_sheet_images_for_sheet(images: &[crate::Image], sheet_name: &str) -> Result<()> {
     validate_sheet_images(images)?;
     if images.iter().any(|image| {
         image
@@ -147,7 +147,7 @@ fn validate_sheet_images_for_sheet(images: &[crate::OdfImage], sheet_name: &str)
     Ok(())
 }
 
-fn frame_group_end(images: &[crate::OdfImage], primary_image_index: usize) -> Result<usize> {
+fn frame_group_end(images: &[crate::Image], primary_image_index: usize) -> Result<usize> {
     let primary = images.get(primary_image_index).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "sheet image group index {primary_image_index} out of bounds"
@@ -165,11 +165,11 @@ fn frame_group_end(images: &[crate::OdfImage], primary_image_index: usize) -> Re
 }
 
 pub(crate) fn insert_sheet_image_alternative(
-    images: &mut Vec<crate::OdfImage>,
+    images: &mut Vec<crate::Image>,
     sheet_name: &str,
     primary_image_index: usize,
     alternative_index: usize,
-    image: crate::OdfImage,
+    image: crate::Image,
 ) -> Result<()> {
     validate_sheet_images_for_sheet(images, sheet_name)?;
     if images.len() >= MAX_IMAGES_PER_SHEET {
@@ -204,10 +204,10 @@ pub(crate) fn insert_sheet_image_alternative(
 }
 
 pub(crate) fn append_sheet_image_alternative(
-    images: &mut Vec<crate::OdfImage>,
+    images: &mut Vec<crate::Image>,
     sheet_name: &str,
     primary_image_index: usize,
-    image: crate::OdfImage,
+    image: crate::Image,
 ) -> Result<()> {
     validate_sheet_images_for_sheet(images, sheet_name)?;
     let group_end = frame_group_end(images, primary_image_index)?;
@@ -221,11 +221,11 @@ pub(crate) fn append_sheet_image_alternative(
 }
 
 pub(crate) fn remove_sheet_image_alternative(
-    images: &mut Vec<crate::OdfImage>,
+    images: &mut Vec<crate::Image>,
     sheet_name: &str,
     primary_image_index: usize,
     alternative_index: usize,
-) -> Result<crate::OdfImage> {
+) -> Result<crate::Image> {
     validate_sheet_images_for_sheet(images, sheet_name)?;
     let group_end = frame_group_end(images, primary_image_index)?;
     let group_len = group_end - primary_image_index;
@@ -248,10 +248,7 @@ pub(crate) fn remove_sheet_image_alternative(
     Ok(removed)
 }
 
-pub(crate) fn write_sheet_images_content(
-    out: &mut String,
-    images: &[crate::OdfImage],
-) -> Result<()> {
+pub(crate) fn write_sheet_images_content(out: &mut String, images: &[crate::Image]) -> Result<()> {
     if images.is_empty() {
         return Ok(());
     }
@@ -289,18 +286,18 @@ pub(crate) fn write_sheet_images_content(
         attribute(out, "draw:filter-name", image.filter_name.as_deref());
         attribute(out, "draw:mime-type", image.declared_media_type.as_deref());
         let href = match &image.source {
-            crate::OdfImageSource::Inline { ignored_href, .. } => ignored_href.as_deref(),
-            crate::OdfImageSource::PackagePart { href, .. }
-            | crate::OdfImageSource::MissingPackagePart { href, .. }
-            | crate::OdfImageSource::Linked { href } => Some(href.as_str()),
-            crate::OdfImageSource::Missing => None,
+            crate::ImageSource::Inline { ignored_href, .. } => ignored_href.as_deref(),
+            crate::ImageSource::PackagePart { href, .. }
+            | crate::ImageSource::MissingPackagePart { href, .. }
+            | crate::ImageSource::Linked { href } => Some(href.as_str()),
+            crate::ImageSource::Missing => None,
         };
         attribute(out, "xlink:href", href);
         attribute(out, "xlink:type", image.link_type.as_deref());
         attribute(out, "xlink:show", image.show.as_deref());
         attribute(out, "xlink:actuate", image.actuate.as_deref());
         match &image.source {
-            crate::OdfImageSource::Inline { bytes, .. } => {
+            crate::ImageSource::Inline { bytes, .. } => {
                 out.push_str("><office:binary-data>");
                 out.push_str(&BASE64_STANDARD.encode(bytes));
                 out.push_str("</office:binary-data></draw:image>");
@@ -365,13 +362,13 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 mod tests {
     use super::*;
 
-    fn image(alternative_index: usize, href: &str) -> crate::OdfImage {
-        crate::OdfImage {
-            part: crate::OdfImagePart::Content,
-            source: crate::OdfImageSource::Linked {
+    fn image(alternative_index: usize, href: &str) -> crate::Image {
+        crate::Image {
+            part: crate::ImagePart::Content,
+            source: crate::ImageSource::Linked {
                 href: href.to_string(),
             },
-            frame: Some(crate::OdfImageFrame {
+            frame: Some(crate::ImageFrame {
                 name: Some("alternatives".to_string()),
                 sheet_name: Some("Sheet1".to_string()),
                 sheet_shape: true,
