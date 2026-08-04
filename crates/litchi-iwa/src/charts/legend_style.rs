@@ -49,60 +49,63 @@ pub(crate) fn legend_style_slot(
     drawable_object_id: u64,
     drawable_label: &str,
 ) -> Result<LegendStyleSlot> {
-    let chart_archive = package.archive(chart_archive_name)?;
-    let chart_object = chart_archive.object(drawable_object_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} is missing"
-        ))
-    })?;
-    let mut chart_messages = chart_object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == CHART_MESSAGE_TYPE);
-    let Some(chart_message) = chart_messages.next() else {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
-        )));
-    };
-    if chart_messages.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
-        )));
-    }
-    let chart = IWorkChartArchive::decode(chart_message.data.as_slice())?;
-    let style_id = chart
-        .chart
-        .as_ref()
-        .and_then(|payload| payload.legend_style.as_ref())
-        .map(|reference| reference.identifier)
-        .filter(|identifier| *identifier != 0)
-        .ok_or_else(|| {
+    let style_id = package.with_parsed_archive(chart_archive_name, |chart_archive| {
+        let chart_object = chart_archive.object(drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "{drawable_label} chart {drawable_object_id} has no legend style"
+                "{drawable_label} chart {drawable_object_id} is missing"
             ))
         })?;
-    let archive_name = unique_chart_object_archive_name(package, style_id, "legend style object")?;
-    let archive = package.archive(&archive_name)?;
-    let style_object = archive.object(style_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "{drawable_label} chart legend style {style_id} is missing"
-        ))
+        let mut chart_messages = chart_object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == CHART_MESSAGE_TYPE);
+        let Some(chart_message) = chart_messages.next() else {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
+            )));
+        };
+        if chart_messages.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
+            )));
+        }
+        let chart = IWorkChartArchive::decode(chart_message.data.as_slice())?;
+        chart
+            .chart
+            .as_ref()
+            .and_then(|payload| payload.legend_style.as_ref())
+            .map(|reference| reference.identifier)
+            .filter(|identifier| *identifier != 0)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "{drawable_label} chart {drawable_object_id} has no legend style"
+                ))
+            })
     })?;
-    let mut messages = style_object
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_, message)| message.type_ == LEGEND_STYLE_MESSAGE_TYPE);
-    let Some((message_index, _)) = messages.next() else {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart legend style {style_id} must have exactly one legend-style payload"
-        )));
-    };
-    if messages.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart legend style {style_id} must have exactly one legend-style payload"
-        )));
-    }
+    let archive_name = unique_chart_object_archive_name(package, style_id, "legend style object")?;
+    let message_index = package.with_parsed_archive(&archive_name, |archive| {
+        let style_object = archive.object(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{drawable_label} chart legend style {style_id} is missing"
+            ))
+        })?;
+        let mut messages = style_object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LEGEND_STYLE_MESSAGE_TYPE);
+        let Some((message_index, _)) = messages.next() else {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart legend style {style_id} must have exactly one legend-style payload"
+            )));
+        };
+        if messages.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart legend style {style_id} must have exactly one legend-style payload"
+            )));
+        }
+        Ok(message_index)
+    })?;
     Ok(LegendStyleSlot {
         archive_name,
         object_id: style_id,
@@ -125,23 +128,24 @@ impl LegendStyleSlot {
         package: &IWorkPackage,
         read: impl FnOnce(&[u8]) -> Result<T>,
     ) -> Result<T> {
-        let archive = package.archive(&self.archive_name)?;
-        let object = archive.object(self.object_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("legend style {} is missing", self.object_id))
-        })?;
-        let message = object.messages.get(self.message_index).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "legend style {} message index changed unexpectedly",
-                self.object_id
-            ))
-        })?;
-        if message.type_ != LEGEND_STYLE_MESSAGE_TYPE {
-            return Err(Error::InvalidFormat(format!(
-                "legend style {} message type changed unexpectedly",
-                self.object_id
-            )));
-        }
-        read(message.data.as_slice())
+        package.with_parsed_archive(&self.archive_name, |archive| {
+            let object = archive.object(self.object_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("legend style {} is missing", self.object_id))
+            })?;
+            let message = object.messages.get(self.message_index).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "legend style {} message index changed unexpectedly",
+                    self.object_id
+                ))
+            })?;
+            if message.type_ != LEGEND_STYLE_MESSAGE_TYPE {
+                return Err(Error::InvalidFormat(format!(
+                    "legend style {} message type changed unexpectedly",
+                    self.object_id
+                )));
+            }
+            read(message.data.as_slice())
+        })
     }
 
     /// Disconnect a shared or preset legend style before mutating it.
