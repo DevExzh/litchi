@@ -7,7 +7,7 @@ use super::notes::{NoteDescriptor, SpeakerNotes};
 use crate::animation::{ShapeAnimation, SlideAnimationExtension};
 use crate::consts::PptRecordType;
 use crate::odraw::{FrameKind, ShapeExt as _};
-use crate::slide_extension::PowerPoint12SlideExtension;
+use crate::slide_extension::SlideExtension;
 use crate::slide_round_trip::PowerPoint12SlideRoundTripMetadata;
 use crate::slide_sync::PowerPointSlideSyncInfo;
 use crate::transition::{TransitionInfo, parse_transition};
@@ -44,7 +44,7 @@ pub struct Slide<'doc> {
     /// Lazily parsed PowerPoint 2002 slide animation extension.
     animation_extension: OnceCell<Option<SlideAnimationExtension>>,
     /// Lazily parsed PowerPoint 12 slide/master round-trip metadata.
-    powerpoint12_extension: OnceCell<PowerPoint12SlideExtension>,
+    powerpoint12_extension: OnceCell<SlideExtension>,
     /// Lazily parsed, inert slide-library synchronization metadata.
     sync_info: OnceCell<Option<PowerPointSlideSyncInfo>>,
     /// Lazily parsed direct PowerPoint 12 slide round-trip metadata.
@@ -389,9 +389,9 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return PowerPoint 12 slide/master round-trip metadata from `___PPT12`.
-    pub fn powerpoint12_extension(&self) -> Result<&PowerPoint12SlideExtension> {
+    pub fn powerpoint12_extension(&self) -> Result<&SlideExtension> {
         self.powerpoint12_extension
-            .get_or_try_init(|| PowerPoint12SlideExtension::parse(&self.record))
+            .get_or_try_init(|| SlideExtension::parse(&self.record))
     }
 
     /// Return inert PowerPoint 12 slide-library synchronization metadata.
@@ -486,7 +486,7 @@ impl<'doc> Slide<'doc> {
         }
 
         use super::super::shapes::*;
-        use crate::slide_extension::PowerPointHeaderFooterPlaceholder;
+        use crate::slide_extension::HeaderFooterPlaceholder;
         use litchi_odraw::shape::Kind;
 
         let shape_id = escher_shape.id();
@@ -520,10 +520,10 @@ impl<'doc> Slide<'doc> {
             powerpoint12_shape_metadata.and_then(|metadata| metadata.header_footer)
         {
             let placeholder_type = match header_footer {
-                PowerPointHeaderFooterPlaceholder::Date => PlaceholderType::DateAndTime,
-                PowerPointHeaderFooterPlaceholder::SlideNumber => PlaceholderType::SlideNumber,
-                PowerPointHeaderFooterPlaceholder::Footer => PlaceholderType::Footer,
-                PowerPointHeaderFooterPlaceholder::Header => PlaceholderType::Header,
+                HeaderFooterPlaceholder::Date => PlaceholderType::DateAndTime,
+                HeaderFooterPlaceholder::SlideNumber => PlaceholderType::SlideNumber,
+                HeaderFooterPlaceholder::Footer => PlaceholderType::Footer,
+                HeaderFooterPlaceholder::Header => PlaceholderType::Header,
             };
             let mut properties = shape::ShapeProperties {
                 id: shape_id,
@@ -1868,8 +1868,7 @@ mod tests {
     fn powerpoint12_header_footer_placeholder_is_exposed_with_new_identity() {
         use crate::shapes::{PlaceholderSize, PlaceholderType};
         use crate::{
-            PowerPoint12PlaceholderMetadata, PowerPointHeaderFooterPlaceholder,
-            PowerPointNewPlaceholder,
+            HeaderFooterPlaceholder, NewPlaceholder, ShapeMetadata,
         };
 
         let records = [
@@ -1893,17 +1892,17 @@ mod tests {
         assert_eq!(placeholder.index(), None);
         assert_eq!(
             shapes[0].powerpoint12_shape_metadata(),
-            Some(&PowerPoint12PlaceholderMetadata {
-                header_footer: Some(PowerPointHeaderFooterPlaceholder::Header),
-                new_placeholder: Some(PowerPointNewPlaceholder::Picture),
-                ..PowerPoint12PlaceholderMetadata::default()
+            Some(&ShapeMetadata {
+                header_footer: Some(HeaderFooterPlaceholder::Header),
+                new_placeholder: Some(NewPlaceholder::Picture),
+                ..ShapeMetadata::default()
             })
         );
     }
 
     #[test]
     fn legacy_placeholder_identity_precedes_powerpoint12_round_trip_identity() {
-        use crate::PowerPointHeaderFooterPlaceholder;
+        use crate::HeaderFooterPlaceholder;
         use crate::shapes::PlaceholderType;
 
         let footer = record_bytes(0, 0, 0x0420, &[9]);
@@ -1923,13 +1922,13 @@ mod tests {
             shapes[0]
                 .powerpoint12_shape_metadata()
                 .and_then(|metadata| metadata.header_footer),
-            Some(PowerPointHeaderFooterPlaceholder::Footer)
+            Some(HeaderFooterPlaceholder::Footer)
         );
     }
 
     #[test]
     fn new_placeholder_identity_is_inert_on_non_placeholder_shapes() {
-        use crate::PowerPointNewPlaceholder;
+        use crate::NewPlaceholder;
 
         let picture = record_bytes(0, 0, 0x0bdd, &[26]);
         let doc_data = vec![0u8; 32];
@@ -1947,7 +1946,7 @@ mod tests {
             shapes[0]
                 .powerpoint12_shape_metadata()
                 .and_then(|metadata| metadata.new_placeholder),
-            Some(PowerPointNewPlaceholder::Picture)
+            Some(NewPlaceholder::Picture)
         );
     }
 
@@ -1993,13 +1992,13 @@ mod tests {
 
     #[test]
     fn accepts_every_powerpoint12_placeholder_identity() {
-        use crate::{PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder};
+        use crate::{HeaderFooterPlaceholder, NewPlaceholder};
 
         for (id, expected) in [
-            (7, PowerPointHeaderFooterPlaceholder::Date),
-            (8, PowerPointHeaderFooterPlaceholder::SlideNumber),
-            (9, PowerPointHeaderFooterPlaceholder::Footer),
-            (10, PowerPointHeaderFooterPlaceholder::Header),
+            (7, HeaderFooterPlaceholder::Date),
+            (8, HeaderFooterPlaceholder::SlideNumber),
+            (9, HeaderFooterPlaceholder::Footer),
+            (10, HeaderFooterPlaceholder::Header),
         ] {
             let atom = record_bytes(0, 0, 0x0420, &[id]);
             let drawing = create_round_trip_placeholder_escher_drawing(202, &atom);
@@ -2014,8 +2013,8 @@ mod tests {
         }
 
         for (id, expected) in [
-            (25, PowerPointNewPlaceholder::VerticalObject),
-            (26, PowerPointNewPlaceholder::Picture),
+            (25, NewPlaceholder::VerticalObject),
+            (26, NewPlaceholder::Picture),
         ] {
             let atom = record_bytes(0, 0, 0x0bdd, &[id]);
             let drawing = create_round_trip_placeholder_escher_drawing(1, &atom);
@@ -2032,7 +2031,7 @@ mod tests {
 
     #[test]
     fn exposes_powerpoint12_shape_id_and_custom_layout_checksums() {
-        use crate::PowerPointShapeChecksums;
+        use crate::ShapeChecksums;
 
         let mut checksums = Vec::new();
         checksums.extend_from_slice(&0u32.to_le_bytes());
@@ -2057,7 +2056,7 @@ mod tests {
         assert_eq!(metadata.shape_id, Some(u32::MAX));
         assert_eq!(
             metadata.custom_layout_checksums,
-            Some(PowerPointShapeChecksums {
+            Some(ShapeChecksums {
                 shape: 0,
                 text: u32::MAX,
             })

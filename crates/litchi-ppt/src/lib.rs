@@ -309,9 +309,8 @@ pub use shape_programmable_tags::{
     PowerPointShapeStringTag, PowerPointShapeStyleAtom,
 };
 pub use slide_extension::{
-    PowerPoint12PlaceholderMetadata, PowerPoint12ShapeMetadata, PowerPoint12SlideExtension,
-    PowerPointHeaderFooterDefaults, PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder,
-    PowerPointShapeChecksums,
+    HeaderFooterDefaults, HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata,
+    SlideExtension,
 };
 pub use slide_round_trip::{
     PowerPoint12SlideRoundTripMetadata, PowerPointAnimationPackage, PowerPointColorMapping,

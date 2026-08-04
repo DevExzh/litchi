@@ -155,7 +155,7 @@ pub trait ShapeExt {
     ) -> Result<Option<super::PowerPointPlaceholderAtom>>;
 
     /// Parses PowerPoint 12 shape round-trip metadata.
-    fn powerpoint12_shape_metadata(&self) -> Result<Option<super::PowerPoint12ShapeMetadata>>;
+    fn powerpoint12_shape_metadata(&self) -> Result<Option<super::ShapeMetadata>>;
 
     /// Parses inert shape programmable tags with default limits.
     fn programmable_tags(&self) -> Result<Option<super::PowerPointShapeProgrammableTags>>;
@@ -256,10 +256,9 @@ impl ShapeExt for Shape<'_> {
         )
     }
 
-    fn powerpoint12_shape_metadata(&self) -> Result<Option<super::PowerPoint12ShapeMetadata>> {
+    fn powerpoint12_shape_metadata(&self) -> Result<Option<super::ShapeMetadata>> {
         use super::{
-            PowerPoint12ShapeMetadata, PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder,
-            PowerPointShapeChecksums,
+            HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata,
         };
         use crate::consts::PptRecordType;
 
@@ -268,7 +267,7 @@ impl ShapeExt for Shape<'_> {
         };
         validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
 
-        let mut metadata = PowerPoint12ShapeMetadata::default();
+        let mut metadata = ShapeMetadata::default();
         let mut found = false;
         let mut offset = 0usize;
         let mut records = 0u32;
@@ -285,10 +284,10 @@ impl ShapeExt for Shape<'_> {
                     }
                     validate_round_trip_atom(&record, "RoundTripHFPlaceholder12Atom", 1)?;
                     metadata.header_footer = Some(match record.data[0] {
-                        7 => PowerPointHeaderFooterPlaceholder::Date,
-                        8 => PowerPointHeaderFooterPlaceholder::SlideNumber,
-                        9 => PowerPointHeaderFooterPlaceholder::Footer,
-                        10 => PowerPointHeaderFooterPlaceholder::Header,
+                        7 => HeaderFooterPlaceholder::Date,
+                        8 => HeaderFooterPlaceholder::SlideNumber,
+                        9 => HeaderFooterPlaceholder::Footer,
+                        10 => HeaderFooterPlaceholder::Header,
                         _ => {
                             return Err(corrupted(
                                 "RoundTripHFPlaceholder12Atom has an invalid placeholder ID",
@@ -305,8 +304,8 @@ impl ShapeExt for Shape<'_> {
                     }
                     validate_round_trip_atom(&record, "RoundTripNewPlaceholderId12Atom", 1)?;
                     metadata.new_placeholder = Some(match record.data[0] {
-                        25 => PowerPointNewPlaceholder::VerticalObject,
-                        26 => PowerPointNewPlaceholder::Picture,
+                        25 => NewPlaceholder::VerticalObject,
+                        26 => NewPlaceholder::Picture,
                         _ => {
                             return Err(corrupted(
                                 "RoundTripNewPlaceholderId12Atom has an invalid placeholder ID",
@@ -341,7 +340,7 @@ impl ShapeExt for Shape<'_> {
                         "RoundTripShapeCheckSumForCustomLayouts12Atom",
                         8,
                     )?;
-                    metadata.custom_layout_checksums = Some(PowerPointShapeChecksums {
+                    metadata.custom_layout_checksums = Some(ShapeChecksums {
                         shape: u32::from_le_bytes([
                             record.data[0],
                             record.data[1],

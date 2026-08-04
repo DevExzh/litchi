@@ -9,7 +9,7 @@ use crate::consts::PptRecordType;
 /// MS-PPT stores these flags on main, title, handout, and notes masters. They are defaults for
 /// new slides rather than the resolved visibility of placeholders on an existing slide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointHeaderFooterDefaults {
+pub struct HeaderFooterDefaults {
     /// Include a date placeholder in the footer of new slides.
     pub include_date: bool,
     /// Include a footer placeholder on new slides.
@@ -22,7 +22,7 @@ pub struct PowerPointHeaderFooterDefaults {
 
 /// Header or footer placeholder identity retained for PowerPoint 12 round trips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointHeaderFooterPlaceholder {
+pub enum HeaderFooterPlaceholder {
     /// Master date placeholder (`PT_MasterDate`).
     Date,
     /// Master slide- or page-number placeholder (`PT_MasterSlideNumber`).
@@ -35,7 +35,7 @@ pub enum PowerPointHeaderFooterPlaceholder {
 
 /// Placeholder identities added by PowerPoint 12 and retained for round trips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointNewPlaceholder {
+pub enum NewPlaceholder {
     /// Vertical object placeholder (`PT_VerticalObject`).
     VerticalObject,
     /// Picture placeholder (`PT_Picture`).
@@ -44,7 +44,7 @@ pub enum PowerPointNewPlaceholder {
 
 /// Application-defined checksums retained for PowerPoint 12 custom-layout round trips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointShapeChecksums {
+pub struct ShapeChecksums {
     /// Checksum used to detect changes to OfficeArt shape properties.
     pub shape: u32,
     /// Checksum used to detect changes to the shape's text body.
@@ -56,28 +56,25 @@ pub struct PowerPointShapeChecksums {
 /// MS-PPT recommends ignoring these compatibility atoms while preserving them. The legacy
 /// `PlaceholderAtom`, when present, remains authoritative for the resolved placeholder type.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct PowerPoint12ShapeMetadata {
+pub struct ShapeMetadata {
     /// Header/footer identity from `RoundTripHFPlaceholder12Atom`.
-    pub header_footer: Option<PowerPointHeaderFooterPlaceholder>,
+    pub header_footer: Option<HeaderFooterPlaceholder>,
     /// New identity from `RoundTripNewPlaceholderId12Atom`.
-    pub new_placeholder: Option<PowerPointNewPlaceholder>,
+    pub new_placeholder: Option<NewPlaceholder>,
     /// Shape identifier from `RoundTripShapeId12Atom`.
     pub shape_id: Option<u32>,
     /// Application-defined shape and text checksums for custom layouts.
-    pub custom_layout_checksums: Option<PowerPointShapeChecksums>,
+    pub custom_layout_checksums: Option<ShapeChecksums>,
 }
-
-/// Compatibility name for [`PowerPoint12ShapeMetadata`].
-pub type PowerPoint12PlaceholderMetadata = PowerPoint12ShapeMetadata;
 
 /// Metadata stored in a `___PPT12` slide programmable-tag extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPoint12SlideExtension {
+pub struct SlideExtension {
     /// Optional header and footer defaults for a master slide.
-    pub header_footer_defaults: Option<PowerPointHeaderFooterDefaults>,
+    pub header_footer_defaults: Option<HeaderFooterDefaults>,
 }
 
-impl PowerPoint12SlideExtension {
+impl SlideExtension {
     /// Discover and parse slide metadata from every `___PPT12` programmable tag below `root`.
     pub fn parse(root: &PptRecord) -> Result<Self> {
         let mut extension = Self::default();
@@ -103,7 +100,7 @@ impl PowerPoint12SlideExtension {
                     "RoundTripHeaderFooterDefaults12Atom has nonzero reserved bits".to_string(),
                 ));
             }
-            extension.header_footer_defaults = Some(PowerPointHeaderFooterDefaults {
+            extension.header_footer_defaults = Some(HeaderFooterDefaults {
                 include_date: flags & 0x01 != 0,
                 include_footer: flags & 0x02 != 0,
                 include_header: flags & 0x04 != 0,
@@ -157,10 +154,10 @@ mod tests {
         let defaults = record_bytes(0, 0, 0x0424, &[0b1011]);
         let document = root(vec![prog_tags_record(12, &defaults)]);
 
-        let parsed = PowerPoint12SlideExtension::parse(&document).unwrap();
+        let parsed = SlideExtension::parse(&document).unwrap();
         assert_eq!(
             parsed.header_footer_defaults,
-            Some(PowerPointHeaderFooterDefaults {
+            Some(HeaderFooterDefaults {
                 include_date: true,
                 include_footer: true,
                 include_header: false,
@@ -170,8 +167,8 @@ mod tests {
 
         let wrong_version = root(vec![prog_tags_record(11, &defaults)]);
         assert_eq!(
-            PowerPoint12SlideExtension::parse(&wrong_version).unwrap(),
-            PowerPoint12SlideExtension::default()
+            SlideExtension::parse(&wrong_version).unwrap(),
+            SlideExtension::default()
         );
     }
 
@@ -184,12 +181,12 @@ mod tests {
             record_bytes(0, 0, 0x0424, &[0x10]),
         ] {
             let document = root(vec![prog_tags_record(12, &malformed)]);
-            assert!(PowerPoint12SlideExtension::parse(&document).is_err());
+            assert!(SlideExtension::parse(&document).is_err());
         }
 
         let defaults = record_bytes(0, 0, 0x0424, &[0]);
         let duplicate = [defaults.clone(), defaults].concat();
         let document = root(vec![prog_tags_record(12, &duplicate)]);
-        assert!(PowerPoint12SlideExtension::parse(&document).is_err());
+        assert!(SlideExtension::parse(&document).is_err());
     }
 }

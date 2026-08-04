@@ -6,7 +6,7 @@ use super::picture::PictureShape;
 use super::shape::{Shape, ShapeType};
 use super::{AutoShape, Placeholder, TextBox};
 use crate::package::Result;
-use crate::slide_extension::PowerPoint12ShapeMetadata;
+use crate::slide_extension::ShapeMetadata;
 
 /// Represents any shape on a slide using an enum for zero-cost abstraction.
 ///
@@ -197,7 +197,7 @@ where
     }
 
     /// Return inert PowerPoint 12 placeholder metadata retained for round trips.
-    pub fn powerpoint12_shape_metadata(&self) -> Option<&PowerPoint12ShapeMetadata> {
+    pub fn powerpoint12_shape_metadata(&self) -> Option<&ShapeMetadata> {
         match self {
             ShapeEnum::TextBox(shape) => shape.properties().powerpoint12_shape_metadata.as_ref(),
             ShapeEnum::Placeholder(shape) => {
@@ -235,7 +235,7 @@ pub struct TableShape {
     width: i32,
     /// Height
     height: i32,
-    powerpoint12_shape_metadata: Option<PowerPoint12ShapeMetadata>,
+    powerpoint12_shape_metadata: Option<ShapeMetadata>,
 }
 
 impl TableShape {
@@ -313,7 +313,7 @@ impl TableShape {
 
     pub(crate) fn set_powerpoint12_shape_metadata(
         &mut self,
-        metadata: Option<PowerPoint12ShapeMetadata>,
+        metadata: Option<ShapeMetadata>,
     ) {
         self.powerpoint12_shape_metadata = metadata;
     }
@@ -336,7 +336,7 @@ pub struct GroupShape<'a> {
     width: i32,
     /// Height
     height: i32,
-    powerpoint12_shape_metadata: Option<PowerPoint12ShapeMetadata>,
+    powerpoint12_shape_metadata: Option<ShapeMetadata>,
 }
 
 impl<'a> GroupShape<'a> {
@@ -398,7 +398,7 @@ impl<'a> GroupShape<'a> {
 
     pub(crate) fn set_powerpoint12_shape_metadata(
         &mut self,
-        metadata: Option<PowerPoint12ShapeMetadata>,
+        metadata: Option<ShapeMetadata>,
     ) {
         self.powerpoint12_shape_metadata = metadata;
     }
@@ -424,7 +424,7 @@ pub struct LineShape {
     width: i32,
     /// Line color
     color: Option<u32>,
-    powerpoint12_shape_metadata: Option<PowerPoint12ShapeMetadata>,
+    powerpoint12_shape_metadata: Option<ShapeMetadata>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -489,7 +489,7 @@ impl LineShape {
 
     pub(crate) fn set_powerpoint12_shape_metadata(
         &mut self,
-        metadata: Option<PowerPoint12ShapeMetadata>,
+        metadata: Option<ShapeMetadata>,
     ) {
         self.powerpoint12_shape_metadata = metadata;
     }
