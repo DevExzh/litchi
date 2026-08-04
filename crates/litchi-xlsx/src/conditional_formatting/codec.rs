@@ -1,484 +1,56 @@
-//! Immutable SpreadsheetML conditional-formatting and differential-style models.
+//! Bounded SpreadsheetML/MCE codec and differential-format association.
 
 use crate::color::Rgb;
 use crate::{Error, Result};
+
+use super::model::{
+    Association, Axis, Color, ColorRole, ColorScale, Component, DataBar, Differential,
+    DifferentialRef, Direction, Formatting, IconSet, IconSet14, Icons, Kind, NamedColor,
+    NumberFormat, Operator, Payload, Period, Range, Rule, Source, Value, ValueKind,
+};
+
 use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
+
 use quick_xml::encoding::Decoder;
+
 use quick_xml::events::{BytesStart, Event};
+
 use quick_xml::name::ResolveResult;
+
 use quick_xml::reader::NsReader;
+
 use quick_xml::{Writer, XmlVersion};
-use smallvec::SmallVec;
+
 use std::collections::{HashMap, HashSet};
+
+use smallvec::SmallVec;
 use std::fmt;
-use std::str::FromStr;
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+
 const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
+
 const XM: &[u8] = b"http://schemas.microsoft.com/office/excel/2006/main";
+
 const MAX_FORMULA_BYTES: usize = 1024 * 1024;
+
 const MAX_FRAGMENT_BYTES: usize = 16 * 1024 * 1024;
+
 const MAX_RULES: usize = 1_000_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u8)]
-pub enum ConditionalFormattingSource {
-    Core,
-    Office2010,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CellRangeRef(String);
-
-impl CellRangeRef {
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// Error returned when a closed conditional-formatting token is invalid.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TokenError {
-    domain: &'static str,
-    token: Box<str>,
-}
-
-impl TokenError {
-    /// Construct a token error for a closed SpreadsheetML vocabulary.
-    #[must_use]
-    pub fn new(domain: &'static str, token: &str) -> Self {
-        Self {
-            domain,
-            token: token.into(),
-        }
-    }
-
-    #[must_use]
-    pub const fn domain(&self) -> &'static str {
-        self.domain
-    }
-
-    #[must_use]
-    pub fn token(&self) -> &str {
-        &self.token
-    }
-}
-
-impl fmt::Display for TokenError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "invalid SpreadsheetML {} token '{}'",
-            self.domain, self.token
-        )
-    }
-}
-
-impl std::error::Error for TokenError {}
-
-macro_rules! token_enum {
-    ($(#[$meta:meta])* pub enum $name:ident, $domain:literal { $($variant:ident => $token:literal),+ $(,)? }) => {
-        $(#[$meta])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[repr(u8)]
-        pub enum $name { $($variant),+ }
-
-        impl $name {
-            #[must_use]
-            pub const fn as_str(self) -> &'static str {
-                match self { $(Self::$variant => $token),+ }
-            }
-        }
-
-        impl FromStr for $name {
-            type Err = TokenError;
-
-            fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
-                match value {
-                    $($token => Ok(Self::$variant),)+
-                    _ => Err(TokenError::new($domain, value)),
-                }
-            }
-        }
-
-        impl fmt::Display for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str(self.as_str())
-            }
-        }
-    };
-}
-
-token_enum! {
-    /// Conditional-formatting rule kind (`ST_CfType`).
-    pub enum Kind, "conditional-formatting rule kind" {
-        Expression => "expression",
-        CellIs => "cellIs",
-        ColorScale => "colorScale",
-        DataBar => "dataBar",
-        IconSet => "iconSet",
-        Top10 => "top10",
-        UniqueValues => "uniqueValues",
-        DuplicateValues => "duplicateValues",
-        ContainsText => "containsText",
-        NotContainsText => "notContainsText",
-        BeginsWith => "beginsWith",
-        EndsWith => "endsWith",
-        ContainsBlanks => "containsBlanks",
-        NotContainsBlanks => "notContainsBlanks",
-        ContainsErrors => "containsErrors",
-        NotContainsErrors => "notContainsErrors",
-        TimePeriod => "timePeriod",
-        AboveAverage => "aboveAverage",
-    }
-}
-
-token_enum! {
-    /// Cell comparison operator (`ST_ConditionalFormattingOperator`).
-    pub enum Operator, "conditional-formatting operator" {
-        LessThan => "lessThan",
-        LessThanOrEqual => "lessThanOrEqual",
-        Equal => "equal",
-        NotEqual => "notEqual",
-        GreaterThanOrEqual => "greaterThanOrEqual",
-        GreaterThan => "greaterThan",
-        Between => "between",
-        NotBetween => "notBetween",
-        ContainsText => "containsText",
-        NotContains => "notContains",
-        BeginsWith => "beginsWith",
-        EndsWith => "endsWith",
-    }
-}
-
-token_enum! {
-    /// Conditional-formatting value-object kind (core and x14 `ST_CfvoType`).
-    pub enum ValueKind, "conditional-formatting value kind" {
-        Number => "num",
-        Percent => "percent",
-        Max => "max",
-        Min => "min",
-        Formula => "formula",
-        Percentile => "percentile",
-        AutoMin => "autoMin",
-        AutoMax => "autoMax",
-    }
-}
-
-impl ValueKind {
-    #[must_use]
-    pub const fn is_core(self) -> bool {
-        !matches!(self, Self::AutoMin | Self::AutoMax)
-    }
-}
-
-token_enum! {
-    /// Relative date period (`ST_TimePeriod`).
-    pub enum Period, "conditional-formatting time period" {
-        Today => "today",
-        Yesterday => "yesterday",
-        Tomorrow => "tomorrow",
-        Last7Days => "last7Days",
-        ThisMonth => "thisMonth",
-        LastMonth => "lastMonth",
-        NextMonth => "nextMonth",
-        ThisWeek => "thisWeek",
-        LastWeek => "lastWeek",
-        NextWeek => "nextWeek",
-    }
-}
-
-token_enum! {
-    /// Office 2010 data-bar direction (`x14:ST_DataBarDirection`).
-    pub enum Direction, "data-bar direction" {
-        Context => "context",
-        LeftToRight => "leftToRight",
-        RightToLeft => "rightToLeft",
-    }
-}
-
-token_enum! {
-    /// Office 2010 data-bar axis position (`x14:ST_DataBarAxisPosition`).
-    pub enum Axis, "data-bar axis position" {
-        Automatic => "automatic",
-        Middle => "middle",
-        None => "none",
-    }
-}
-
-token_enum! {
-    /// Conditional-formatting color element role.
-    pub enum ColorRole, "conditional-formatting color role" {
-        Color => "color",
-        Fill => "fillColor",
-        Border => "borderColor",
-        NegativeFill => "negativeFillColor",
-        NegativeBorder => "negativeBorderColor",
-        Axis => "axisColor",
-    }
-}
-
-token_enum! {
-    /// Core SpreadsheetML icon set (`ST_IconSetType`).
-    pub enum IconSet, "core icon set" {
-        ThreeArrows => "3Arrows",
-        ThreeArrowsGray => "3ArrowsGray",
-        ThreeFlags => "3Flags",
-        ThreeTrafficLights1 => "3TrafficLights1",
-        ThreeTrafficLights2 => "3TrafficLights2",
-        ThreeSigns => "3Signs",
-        ThreeSymbols => "3Symbols",
-        ThreeSymbols2 => "3Symbols2",
-        FourArrows => "4Arrows",
-        FourArrowsGray => "4ArrowsGray",
-        FourRedToBlack => "4RedToBlack",
-        FourRating => "4Rating",
-        FourTrafficLights => "4TrafficLights",
-        FiveArrows => "5Arrows",
-        FiveArrowsGray => "5ArrowsGray",
-        FiveRating => "5Rating",
-        FiveQuarters => "5Quarters",
-    }
-}
-
-impl IconSet {
-    #[must_use]
-    pub const fn len(self) -> u8 {
-        match self {
-            Self::ThreeArrows
-            | Self::ThreeArrowsGray
-            | Self::ThreeFlags
-            | Self::ThreeTrafficLights1
-            | Self::ThreeTrafficLights2
-            | Self::ThreeSigns
-            | Self::ThreeSymbols
-            | Self::ThreeSymbols2 => 3,
-            Self::FourArrows
-            | Self::FourArrowsGray
-            | Self::FourRedToBlack
-            | Self::FourRating
-            | Self::FourTrafficLights => 4,
-            Self::FiveArrows | Self::FiveArrowsGray | Self::FiveRating | Self::FiveQuarters => 5,
-        }
-    }
-
-    #[must_use]
-    pub const fn is_empty(self) -> bool {
-        false
-    }
-}
-
-token_enum! {
-    /// Office 2010 icon set (`x14:ST_IconSetType`).
-    pub enum IconSet14, "Office 2010 icon set" {
-        ThreeArrows => "3Arrows",
-        ThreeArrowsGray => "3ArrowsGray",
-        ThreeFlags => "3Flags",
-        ThreeTrafficLights1 => "3TrafficLights1",
-        ThreeTrafficLights2 => "3TrafficLights2",
-        ThreeSigns => "3Signs",
-        ThreeSymbols => "3Symbols",
-        ThreeSymbols2 => "3Symbols2",
-        FourArrows => "4Arrows",
-        FourArrowsGray => "4ArrowsGray",
-        FourRedToBlack => "4RedToBlack",
-        FourRating => "4Rating",
-        FourTrafficLights => "4TrafficLights",
-        FiveArrows => "5Arrows",
-        FiveArrowsGray => "5ArrowsGray",
-        FiveRating => "5Rating",
-        FiveQuarters => "5Quarters",
-        ThreeStars => "3Stars",
-        ThreeTriangles => "3Triangles",
-        FiveBoxes => "5Boxes",
-        NoIcons => "NoIcons",
-    }
-}
-
-impl IconSet14 {
-    #[must_use]
-    pub const fn len(self) -> Option<u8> {
-        match self {
-            Self::ThreeArrows
-            | Self::ThreeArrowsGray
-            | Self::ThreeFlags
-            | Self::ThreeTrafficLights1
-            | Self::ThreeTrafficLights2
-            | Self::ThreeSigns
-            | Self::ThreeSymbols
-            | Self::ThreeSymbols2
-            | Self::ThreeStars
-            | Self::ThreeTriangles => Some(3),
-            Self::FourArrows
-            | Self::FourArrowsGray
-            | Self::FourRedToBlack
-            | Self::FourRating
-            | Self::FourTrafficLights => Some(4),
-            Self::FiveArrows
-            | Self::FiveArrowsGray
-            | Self::FiveRating
-            | Self::FiveQuarters
-            | Self::FiveBoxes => Some(5),
-            Self::NoIcons => None,
-        }
-    }
-
-    #[must_use]
-    pub const fn is_empty(self) -> bool {
-        matches!(self, Self::NoIcons)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SpreadsheetColor {
-    pub rgb: Option<Rgb>,
-    pub indexed: Option<u32>,
-    pub theme: Option<u32>,
-    pub tint: Option<f64>,
-    pub automatic: Option<bool>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConditionalFormatValue {
-    pub kind: ValueKind,
-    pub value: Option<String>,
-    pub formula: Option<String>,
-    pub greater_than_or_equal: bool,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ColorScale {
-    pub thresholds: Vec<ConditionalFormatValue>,
-    pub colors: Vec<SpreadsheetColor>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct NamedColor {
-    pub role: ColorRole,
-    pub color: SpreadsheetColor,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DataBar {
-    pub thresholds: Vec<ConditionalFormatValue>,
-    pub colors: Vec<NamedColor>,
-    pub min_length: u32,
-    pub max_length: u32,
-    pub show_value: bool,
-    pub border: bool,
-    pub gradient: bool,
-    pub direction: Direction,
-    pub axis_position: Axis,
-}
-
-/// Typed icon-set payload whose vocabulary is carried by `S`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Icons<S> {
-    pub set: S,
-    pub thresholds: Vec<ConditionalFormatValue>,
-    pub show_value: bool,
-    pub percent: bool,
-    pub reverse: bool,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConditionalFormatPayload {
-    ColorScale(ColorScale),
-    DataBar(DataBar),
-    IconSet(Icons<IconSet>),
-    IconSet14(Icons<IconSet14>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DifferentialFormatComponent {
-    raw_xml: Box<[u8]>,
-}
-
-impl DifferentialFormatComponent {
-    pub fn raw_xml(&self) -> &[u8] {
-        &self.raw_xml
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DifferentialNumberFormat {
-    pub id: u32,
-    pub code: String,
-    pub raw_xml: Box<[u8]>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DifferentialFormat {
-    pub number_format: Option<DifferentialNumberFormat>,
-    pub font: Option<DifferentialFormatComponent>,
-    pub fill: Option<DifferentialFormatComponent>,
-    pub border: Option<DifferentialFormatComponent>,
-    pub alignment: Option<DifferentialFormatComponent>,
-    pub protection: Option<DifferentialFormatComponent>,
-    pub extensions: Vec<DifferentialFormatComponent>,
-    raw_xml: Box<[u8]>,
-}
-
-impl DifferentialFormat {
-    pub fn raw_xml(&self) -> &[u8] {
-        &self.raw_xml
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DifferentialFormatRef {
-    StylesIndex(u32),
-    Inline(DifferentialFormat),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExtensionAssociation {
-    Independent,
-    EnhancesCore { priority: i32 },
-    UnmatchedIgnored,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConditionalFormattingRule {
-    pub source: ConditionalFormattingSource,
-    pub rule_type: Option<Kind>,
-    pub priority: Option<i32>,
-    pub differential_format: Option<DifferentialFormatRef>,
-    pub formulas: SmallVec<[String; 3]>,
-    pub stop_if_true: bool,
-    pub above_average: bool,
-    pub equal_average: bool,
-    pub percent: bool,
-    pub bottom: bool,
-    pub operator: Option<Operator>,
-    pub text: Option<String>,
-    pub time_period: Option<Period>,
-    pub rank: Option<u32>,
-    pub standard_deviations: Option<i32>,
-    pub payload: Option<ConditionalFormatPayload>,
-    pub extension_id: Option<String>,
-    pub extension_association: ExtensionAssociation,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConditionalFormatting {
-    pub ranges: Vec<CellRangeRef>,
-    pub pivot: bool,
-    pub rules: Vec<ConditionalFormattingRule>,
-}
-
 #[derive(Debug)]
-struct Captured {
-    source: ConditionalFormattingSource,
-    prefix: Vec<u8>,
-    bytes: Vec<u8>,
+pub(crate) struct Captured {
+    pub(crate) source: Source,
+    pub(crate) prefix: Vec<u8>,
+    pub(crate) bytes: Vec<u8>,
 }
 
 pub fn parse_conditional_formattings(
     xml: &[u8],
     differential_format_count: usize,
-) -> Result<Vec<ConditionalFormatting>> {
+) -> Result<Vec<Formatting>> {
     let mut capabilities = MceCapabilities::default();
     capabilities.preserve_extension_element(ExpandedName {
         namespace: String::from_utf8_lossy(X14).into_owned(),
@@ -504,7 +76,7 @@ pub fn parse_conditional_formattings(
     Ok(values)
 }
 
-pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<DifferentialFormat>> {
+pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
     let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let Some(fragment) = capture_first(processed.as_ref(), CORE, STRICT, b"dxfs")? else {
         return Ok(Vec::new());
@@ -584,9 +156,9 @@ pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<DifferentialFormat>>
 }
 
 /// In-flight capture state for a single `conditionalFormatting` element.
-type CaptureState = Option<(usize, ConditionalFormattingSource, Vec<u8>, Writer<Vec<u8>>)>;
+type CaptureState = Option<(usize, Source, Vec<u8>, Writer<Vec<u8>>)>;
 
-fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>> {
+pub(crate) fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>> {
     let mut reader = NsReader::from_reader(xml);
     let mut values = Vec::new();
     let mut capture: CaptureState = None;
@@ -619,9 +191,9 @@ fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>> {
                     && (spreadsheet(&namespace) || exact(&namespace, X14)) =>
             {
                 let source = if exact(&namespace, X14) {
-                    ConditionalFormattingSource::Office2010
+                    Source::Office2010
                 } else {
-                    ConditionalFormattingSource::Core
+                    Source::Core
                 };
                 let prefix = prefix(element.name().as_ref());
                 let mut writer = Writer::new(Vec::new());
@@ -635,9 +207,9 @@ fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>> {
                     && (spreadsheet(&namespace) || exact(&namespace, X14)) =>
             {
                 let source = if exact(&namespace, X14) {
-                    ConditionalFormattingSource::Office2010
+                    Source::Office2010
                 } else {
-                    ConditionalFormattingSource::Core
+                    Source::Core
                 };
                 let prefix = prefix(element.name().as_ref());
                 let mut writer = Writer::new(Vec::new());
@@ -663,7 +235,7 @@ fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>> {
     Ok(values)
 }
 
-fn parse_container(fragment: &Captured) -> Result<ConditionalFormatting> {
+fn parse_container(fragment: &Captured) -> Result<Formatting> {
     let wrapped = wrap(&fragment.prefix, &fragment.bytes);
     let mut reader = NsReader::from_reader(wrapped.as_slice());
     let mut ranges = Vec::new();
@@ -741,28 +313,24 @@ fn parse_container(fragment: &Captured) -> Result<ConditionalFormatting> {
             Event::Start(element) => {
                 depth += 1;
                 if element.local_name().as_ref() == b"conditionalFormatting"
-                    && ((fragment.source == ConditionalFormattingSource::Core
-                        && spreadsheet(&namespace))
-                        || (fragment.source == ConditionalFormattingSource::Office2010
-                            && exact(&namespace, X14)))
+                    && ((fragment.source == Source::Core && spreadsheet(&namespace))
+                        || (fragment.source == Source::Office2010 && exact(&namespace, X14)))
                 {
-                    if fragment.source == ConditionalFormattingSource::Core {
+                    if fragment.source == Source::Core {
                         let raw = required_attr(&element, b"sqref", decoder)?;
                         ranges = parse_sqref(&raw)?;
                         pivot = optional_bool(&element, b"pivot", decoder)?.unwrap_or(false);
                     }
                 } else if element.local_name().as_ref() == b"cfRule"
-                    && ((fragment.source == ConditionalFormattingSource::Core
-                        && spreadsheet(&namespace))
-                        || (fragment.source == ConditionalFormattingSource::Office2010
-                            && exact(&namespace, X14)))
+                    && ((fragment.source == Source::Core && spreadsheet(&namespace))
+                        || (fragment.source == Source::Office2010 && exact(&namespace, X14)))
                 {
                     let mut writer = Writer::new(Vec::new());
                     writer
                         .write_event(Event::Start(element))
                         .map_err(xml_error)?;
                     capture = Some((1, Vec::new(), writer));
-                } else if fragment.source == ConditionalFormattingSource::Office2010
+                } else if fragment.source == Source::Office2010
                     && exact(&namespace, XM)
                     && element.local_name().as_ref() == b"sqref"
                 {
@@ -781,10 +349,8 @@ fn parse_container(fragment: &Captured) -> Result<ConditionalFormatting> {
             },
             Event::Empty(element)
                 if element.local_name().as_ref() == b"cfRule"
-                    && ((fragment.source == ConditionalFormattingSource::Core
-                        && spreadsheet(&namespace))
-                        || (fragment.source == ConditionalFormattingSource::Office2010
-                            && exact(&namespace, X14))) =>
+                    && ((fragment.source == Source::Core && spreadsheet(&namespace))
+                        || (fragment.source == Source::Office2010 && exact(&namespace, X14))) =>
             {
                 let mut writer = Writer::new(Vec::new());
                 writer
@@ -821,37 +387,27 @@ fn parse_container(fragment: &Captured) -> Result<ConditionalFormatting> {
     if ranges.is_empty() {
         return Err(invalid("conditionalFormatting has no sqref"));
     }
-    Ok(ConditionalFormatting {
+    Ok(Formatting {
         ranges,
         pivot,
         rules,
     })
 }
 
-fn parse_rule(
-    raw: &[u8],
-    source: ConditionalFormattingSource,
-) -> Result<ConditionalFormattingRule> {
+fn parse_rule(raw: &[u8], source: Source) -> Result<Rule> {
     if raw.len() > MAX_FRAGMENT_BYTES {
         return Err(invalid("conditional-formatting rule is too large"));
     }
-    let wrapped = wrap(
-        if source == ConditionalFormattingSource::Core {
-            b""
-        } else {
-            b"x14"
-        },
-        raw,
-    );
+    let wrapped = wrap(if source == Source::Core { b"" } else { b"x14" }, raw);
     let inline_dxf = capture_first(&wrapped, CORE, STRICT, b"dxf")?
         .map(|value| parse_dxf(&value.bytes))
         .transpose()?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
-    let mut rule = ConditionalFormattingRule {
+    let mut rule = Rule {
         source,
         rule_type: None,
         priority: None,
-        differential_format: inline_dxf.map(DifferentialFormatRef::Inline),
+        differential_format: inline_dxf.map(DifferentialRef::Inline),
         formulas: SmallVec::new(),
         stop_if_true: false,
         above_average: true,
@@ -865,7 +421,7 @@ fn parse_rule(
         standard_deviations: None,
         payload: None,
         extension_id: None,
-        extension_association: ExtensionAssociation::Independent,
+        extension_association: Association::Independent,
     };
     let mut depth = 0usize;
     let mut text_target: Option<(usize, TextTarget, String)> = None;
@@ -882,9 +438,8 @@ fn parse_rule(
                 depth += 1;
                 let name = element.local_name();
                 if name.as_ref() == b"cfRule"
-                    && ((source == ConditionalFormattingSource::Core && spreadsheet(&namespace))
-                        || (source == ConditionalFormattingSource::Office2010
-                            && exact(&namespace, X14)))
+                    && ((source == Source::Core && spreadsheet(&namespace))
+                        || (source == Source::Office2010 && exact(&namespace, X14)))
                 {
                     parse_rule_attributes(&element, decoder, &mut rule)?;
                 } else if (spreadsheet(&namespace) && name.as_ref() == b"formula")
@@ -987,7 +542,7 @@ fn parse_rule(
             _ => {},
         }
     }
-    if source == ConditionalFormattingSource::Core && rule.priority.is_none() {
+    if source == Source::Core && rule.priority.is_none() {
         return Err(invalid("core cfRule is missing priority"));
     }
     if let Some(index) = optional_u32_from_raw(raw, b"dxfId")? {
@@ -996,7 +551,7 @@ fn parse_rule(
                 "cfRule has indexed and inline differential formats",
             ));
         }
-        rule.differential_format = Some(DifferentialFormatRef::StylesIndex(index));
+        rule.differential_format = Some(DifferentialRef::StylesIndex(index));
     }
     rule.payload = payload.finish()?;
     validate_rule_shape(&rule)?;
@@ -1006,7 +561,7 @@ fn parse_rule(
 fn parse_rule_attributes(
     element: &BytesStart<'_>,
     decoder: Decoder,
-    rule: &mut ConditionalFormattingRule,
+    rule: &mut Rule,
 ) -> Result<()> {
     rule.rule_type = optional_attr(element, b"type", decoder)?
         .map(|value| {
@@ -1071,10 +626,10 @@ enum PayloadKind {
 }
 
 struct PayloadBuilder {
-    source: ConditionalFormattingSource,
+    source: Source,
     active: Option<PayloadKind>,
     seen: Option<PayloadKind>,
-    thresholds: Vec<ConditionalFormatValue>,
+    thresholds: Vec<Value>,
     colors: Vec<NamedColor>,
     data_attrs: Option<(u32, u32, bool, bool, bool, Direction, Axis)>,
     icon_attrs: Option<IconAttrs>,
@@ -1086,7 +641,7 @@ enum IconAttrs {
 }
 
 impl PayloadBuilder {
-    fn new(source: ConditionalFormattingSource) -> Self {
+    fn new(source: Source) -> Self {
         Self {
             source,
             active: None,
@@ -1119,7 +674,7 @@ impl PayloadBuilder {
             let gradient = optional_bool(element, b"gradient", decoder)?;
             let direction = optional_attr(element, b"direction", decoder)?;
             let axis = optional_attr(element, b"axisPosition", decoder)?;
-            if self.source == ConditionalFormattingSource::Core
+            if self.source == Source::Core
                 && (border.is_some() || gradient.is_some() || direction.is_some() || axis.is_some())
             {
                 return Err(invalid("core dataBar contains Office 2010-only attributes"));
@@ -1147,14 +702,14 @@ impl PayloadBuilder {
             let percent = optional_bool(element, b"percent", decoder)?.unwrap_or(true);
             let reverse = optional_bool(element, b"reverse", decoder)?.unwrap_or(false);
             self.icon_attrs = Some(match self.source {
-                ConditionalFormattingSource::Core => IconAttrs::Core(
+                Source::Core => IconAttrs::Core(
                     raw.parse::<IconSet>()
                         .map_err(|error| invalid(error.to_string()))?,
                     show,
                     percent,
                     reverse,
                 ),
-                ConditionalFormattingSource::Office2010 => IconAttrs::Office2010(
+                Source::Office2010 => IconAttrs::Office2010(
                     raw.parse::<IconSet14>()
                         .map_err(|error| invalid(error.to_string()))?,
                     show,
@@ -1179,12 +734,12 @@ impl PayloadBuilder {
         let kind = raw
             .parse::<ValueKind>()
             .map_err(|error| invalid(error.to_string()))?;
-        if self.source == ConditionalFormattingSource::Core && !kind.is_core() {
+        if self.source == Source::Core && !kind.is_core() {
             return Err(invalid(format!(
                 "core conditional formatting does not support CFVO kind '{raw}'"
             )));
         }
-        self.thresholds.push(ConditionalFormatValue {
+        self.thresholds.push(Value {
             kind,
             value: optional_attr(element, b"val", decoder)?,
             formula: None,
@@ -1208,7 +763,7 @@ impl PayloadBuilder {
             .map_err(xml_error)?
             .parse::<ColorRole>()
             .map_err(|error| invalid(error.to_string()))?;
-        if self.source == ConditionalFormattingSource::Core && role != ColorRole::Color {
+        if self.source == Source::Core && role != ColorRole::Color {
             return Err(invalid(format!(
                 "core conditional formatting does not support '{}' colors",
                 role.as_str()
@@ -1216,7 +771,7 @@ impl PayloadBuilder {
         }
         self.colors.push(NamedColor {
             role,
-            color: SpreadsheetColor {
+            color: Color {
                 rgb: optional_attr(element, b"rgb", decoder)?
                     .map(|value| {
                         value
@@ -1234,7 +789,7 @@ impl PayloadBuilder {
         });
         Ok(())
     }
-    fn finish(self) -> Result<Option<ConditionalFormatPayload>> {
+    fn finish(self) -> Result<Option<Payload>> {
         if self.active.is_some() {
             return Err(invalid("unterminated visual payload"));
         }
@@ -1246,7 +801,7 @@ impl PayloadBuilder {
                         "color scale thresholds and colors must have matching cardinality of at least two",
                     ));
                 }
-                Some(ConditionalFormatPayload::ColorScale(ColorScale {
+                Some(Payload::ColorScale(ColorScale {
                     thresholds: self.thresholds,
                     colors: self.colors.into_iter().map(|value| value.color).collect(),
                 }))
@@ -1258,7 +813,7 @@ impl PayloadBuilder {
                 let (min, max, show, border, gradient, direction, axis) = self
                     .data_attrs
                     .ok_or_else(|| invalid("data-bar payload has no attributes"))?;
-                Some(ConditionalFormatPayload::DataBar(DataBar {
+                Some(Payload::DataBar(DataBar {
                     thresholds: self.thresholds,
                     colors: self.colors,
                     min_length: min,
@@ -1280,7 +835,7 @@ impl PayloadBuilder {
                             "icon-set threshold count does not match its icon cardinality",
                         ));
                     }
-                    Some(ConditionalFormatPayload::IconSet(Icons {
+                    Some(Payload::IconSet(Icons {
                         set,
                         thresholds: self.thresholds,
                         show_value: show,
@@ -1298,7 +853,7 @@ impl PayloadBuilder {
                             "Office 2010 icon-set threshold count does not match its icon cardinality",
                         ));
                     }
-                    Some(ConditionalFormatPayload::IconSet14(Icons {
+                    Some(Payload::IconSet14(Icons {
                         set,
                         thresholds: self.thresholds,
                         show_value: show,
@@ -1311,14 +866,11 @@ impl PayloadBuilder {
     }
 }
 
-fn validate_rule_shape(rule: &ConditionalFormattingRule) -> Result<()> {
+fn validate_rule_shape(rule: &Rule) -> Result<()> {
     match (&rule.rule_type, &rule.payload) {
-        (Some(Kind::ColorScale), Some(ConditionalFormatPayload::ColorScale(_)))
-        | (Some(Kind::DataBar), Some(ConditionalFormatPayload::DataBar(_)))
-        | (
-            Some(Kind::IconSet),
-            Some(ConditionalFormatPayload::IconSet(_) | ConditionalFormatPayload::IconSet14(_)),
-        ) => {},
+        (Some(Kind::ColorScale), Some(Payload::ColorScale(_)))
+        | (Some(Kind::DataBar), Some(Payload::DataBar(_)))
+        | (Some(Kind::IconSet), Some(Payload::IconSet(_) | Payload::IconSet14(_))) => {},
         (Some(Kind::ColorScale | Kind::DataBar | Kind::IconSet), _) => {
             return Err(invalid(
                 "visual cfRule type is missing its matching payload",
@@ -1327,14 +879,10 @@ fn validate_rule_shape(rule: &ConditionalFormattingRule) -> Result<()> {
         (_, Some(_)) => return Err(invalid("non-visual cfRule contains a visual payload")),
         _ => {},
     }
-    if matches!(rule.payload, Some(ConditionalFormatPayload::IconSet14(_)))
-        && rule.source != ConditionalFormattingSource::Office2010
-    {
+    if matches!(rule.payload, Some(Payload::IconSet14(_))) && rule.source != Source::Office2010 {
         return Err(invalid("Office 2010 icon set used in a core rule"));
     }
-    if matches!(rule.payload, Some(ConditionalFormatPayload::IconSet(_)))
-        && rule.source != ConditionalFormattingSource::Core
-    {
+    if matches!(rule.payload, Some(Payload::IconSet(_))) && rule.source != Source::Core {
         return Err(invalid("core icon set used in an Office 2010 rule"));
     }
     if matches!(
@@ -1347,7 +895,7 @@ fn validate_rule_shape(rule: &ConditionalFormattingRule) -> Result<()> {
     Ok(())
 }
 
-fn validate_and_associate(values: &mut [ConditionalFormatting], dxf_count: usize) -> Result<()> {
+fn validate_and_associate(values: &mut [Formatting], dxf_count: usize) -> Result<()> {
     let mut priorities = HashSet::new();
     let mut ids = HashMap::new();
     for (ci, container) in values.iter().enumerate() {
@@ -1359,14 +907,14 @@ fn validate_and_associate(values: &mut [ConditionalFormatting], dxf_count: usize
                     "duplicate conditional-formatting priority {priority}"
                 )));
             }
-            if let Some(DifferentialFormatRef::StylesIndex(id)) = rule.differential_format
+            if let Some(DifferentialRef::StylesIndex(id)) = rule.differential_format
                 && id as usize >= dxf_count
             {
                 return Err(invalid(format!(
                     "conditional-formatting dxfId {id} is out of range"
                 )));
             }
-            if rule.source == ConditionalFormattingSource::Core
+            if rule.source == Source::Core
                 && let Some(id) = rule.extension_id.as_ref()
             {
                 ids.insert(id.clone(), (ci, ri, rule.priority));
@@ -1375,13 +923,13 @@ fn validate_and_associate(values: &mut [ConditionalFormatting], dxf_count: usize
     }
     for container in values.iter_mut() {
         for rule in &mut container.rules {
-            if rule.source == ConditionalFormattingSource::Office2010 && rule.priority.is_none() {
+            if rule.source == Source::Office2010 && rule.priority.is_none() {
                 rule.extension_association =
                     match rule.extension_id.as_ref().and_then(|id| ids.get(id)) {
-                        Some((_, _, Some(priority))) => ExtensionAssociation::EnhancesCore {
+                        Some((_, _, Some(priority))) => Association::EnhancesCore {
                             priority: *priority,
                         },
-                        _ => ExtensionAssociation::UnmatchedIgnored,
+                        _ => Association::UnmatchedIgnored,
                     };
             }
         }
@@ -1389,14 +937,14 @@ fn validate_and_associate(values: &mut [ConditionalFormatting], dxf_count: usize
     Ok(())
 }
 
-fn parse_dxf(raw: &[u8]) -> Result<DifferentialFormat> {
+fn parse_dxf(raw: &[u8]) -> Result<Differential> {
     let fragment = Captured {
-        source: ConditionalFormattingSource::Core,
+        source: Source::Core,
         prefix: Vec::new(),
         bytes: raw.to_vec(),
     };
     let wrapped = wrap(&fragment.prefix, &fragment.bytes);
-    let mut value = DifferentialFormat {
+    let mut value = Differential {
         raw_xml: raw.to_vec().into_boxed_slice(),
         ..Default::default()
     };
@@ -1428,7 +976,7 @@ fn parse_dxf(raw: &[u8]) -> Result<DifferentialFormat> {
                 if let Event::Start(ref e) | Event::Empty(ref e) = event
                     && e.local_name().as_ref() == b"numFmt"
                 {
-                    value.number_format = Some(DifferentialNumberFormat {
+                    value.number_format = Some(NumberFormat {
                         id: required_attr(e, b"numFmtId", decoder)?
                             .parse()
                             .map_err(|_| invalid("invalid dxf numFmtId"))?,
@@ -1442,7 +990,7 @@ fn parse_dxf(raw: &[u8]) -> Result<DifferentialFormat> {
                 }
             }
         } else {
-            let component = DifferentialFormatComponent {
+            let component = Component {
                 raw_xml: component.bytes.into_boxed_slice(),
             };
             match name {
@@ -1481,7 +1029,7 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
                     .take()
                     .ok_or_else(|| invalid("missing XML fragment capture state"))?;
                 out.push(Captured {
-                    source: ConditionalFormattingSource::Core,
+                    source: Source::Core,
                     prefix,
                     bytes: writer.into_inner(),
                 });
@@ -1506,7 +1054,7 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
                 let mut w = Writer::new(Vec::new());
                 w.write_event(Event::Empty(e)).map_err(xml_error)?;
                 out.push(Captured {
-                    source: ConditionalFormattingSource::Core,
+                    source: Source::Core,
                     prefix: p,
                     bytes: w.into_inner(),
                 });
@@ -1560,7 +1108,7 @@ fn is_color_element(name: &[u8]) -> bool {
     )
 }
 
-fn parse_sqref(raw: &str) -> Result<Vec<CellRangeRef>> {
+fn parse_sqref(raw: &str) -> Result<Vec<Range>> {
     if raw.trim().is_empty() {
         return Err(invalid("conditionalFormatting sqref is empty"));
     }
@@ -1576,7 +1124,7 @@ fn parse_sqref(raw: &str) -> Result<Vec<CellRangeRef>> {
                     "invalid conditional-formatting range '{area}'"
                 )));
             }
-            Ok(CellRangeRef(area.to_owned()))
+            Ok(Range::from_raw(area.to_owned()))
         })
         .collect()
 }
@@ -1730,210 +1278,4 @@ fn xml_error(error: impl fmt::Display) -> Error {
 }
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use litchi_opc::PackURI;
-    use std::mem::size_of;
-
-    fn fixture(
-        relative: &str,
-        sheet: u32,
-    ) -> (Vec<DifferentialFormat>, Vec<ConditionalFormatting>) {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
-            .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
-        let styles_uri = PackURI::new("/xl/styles.xml").expect("valid styles URI");
-        let styles_bytes = package
-            .blob_for(&styles_uri)
-            .unwrap_or_else(|error| panic!("failed to read styles in {relative}: {error}"));
-        let differential_formats = parse_differential_formats(&styles_bytes)
-            .unwrap_or_else(|error| panic!("failed to parse styles in {relative}: {error}"));
-        let sheet_uri =
-            PackURI::new(format!("/xl/worksheets/sheet{sheet}.xml")).expect("valid sheet URI");
-        let sheet_bytes = package
-            .blob_for(&sheet_uri)
-            .unwrap_or_else(|error| panic!("failed to read sheet1 in {relative}: {error}"));
-        let values = parse_conditional_formattings(&sheet_bytes, differential_formats.len())
-            .unwrap_or_else(|error| {
-                panic!("failed to parse conditional formatting in {relative}: {error}")
-            });
-        (differential_formats, values)
-    }
-
-    #[test]
-    fn parses_core_payloads_and_differential_reference() {
-        let xml=br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1:A3 C1"><cfRule type="colorScale" priority="1"><colorScale><cfvo type="min"/><cfvo type="max"/><color rgb="FFFF0000"/><color theme="2" tint="0.5"/></colorScale></cfRule><cfRule type="cellIs" priority="2" dxfId="0" operator="between" stopIfTrue="1"><formula>1</formula><formula><![CDATA[2]]></formula></cfRule></conditionalFormatting></worksheet>"#;
-        let values = parse_conditional_formattings(xml, 1).unwrap();
-        assert_eq!(values[0].ranges.len(), 2);
-        assert_eq!(values[0].rules.len(), 2);
-        assert_eq!(values[0].rules[1].formulas.as_slice(), ["1", "2"]);
-        assert!(values[0].rules[1].stop_if_true);
-        let encoded=br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1"><formula>$B$3&gt;5</formula></cfRule></conditionalFormatting></worksheet>"#;
-        let captured = capture_conditional_formatting(encoded).unwrap();
-        assert!(
-            String::from_utf8_lossy(&captured[0].bytes).contains("&gt;"),
-            "first capture was {:?}",
-            String::from_utf8_lossy(&captured[0].bytes)
-        );
-        let values = parse_conditional_formattings(encoded, 0).unwrap();
-        assert_eq!(values[0].rules[0].formulas.as_slice(), ["$B$3>5"]);
-        let extension=br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:conditionalFormattings><x14:conditionalFormatting><x14:cfRule type="futureThing"><x14:futurePayload/></x14:cfRule><xm:sqref>A1</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></worksheet>"#;
-        assert!(parse_conditional_formattings(extension, 0).is_err());
-    }
-
-    #[test]
-    fn fixed_domains_are_compact_exact_and_strict() {
-        assert_eq!(size_of::<Kind>(), 1);
-        assert_eq!(size_of::<Operator>(), 1);
-        assert_eq!(size_of::<ValueKind>(), 1);
-        assert_eq!(size_of::<Period>(), 1);
-        assert_eq!(size_of::<Direction>(), 1);
-        assert_eq!(size_of::<Axis>(), 1);
-        assert_eq!(size_of::<ColorRole>(), 1);
-        assert_eq!(size_of::<IconSet>(), 1);
-        assert_eq!(size_of::<IconSet14>(), 1);
-
-        assert_eq!("cellIs".parse::<Kind>(), Ok(Kind::CellIs));
-        assert_eq!("between".parse::<Operator>(), Ok(Operator::Between));
-        assert_eq!("last7Days".parse::<Period>(), Ok(Period::Last7Days));
-        assert_eq!(
-            "rightToLeft".parse::<Direction>(),
-            Ok(Direction::RightToLeft)
-        );
-        assert_eq!("middle".parse::<Axis>(), Ok(Axis::Middle));
-        assert_eq!(
-            "negativeFillColor".parse::<ColorRole>(),
-            Ok(ColorRole::NegativeFill)
-        );
-        assert_eq!("5Rating".parse::<IconSet>(), Ok(IconSet::FiveRating));
-        assert_eq!("3Stars".parse::<IconSet14>(), Ok(IconSet14::ThreeStars));
-        assert!("futureThing".parse::<Kind>().is_err());
-        assert!("3Stars".parse::<IconSet>().is_err());
-        assert!("FF00Aa10".parse::<Rgb>().is_ok());
-        assert!("00AA10".parse::<Rgb>().is_err());
-    }
-
-    #[test]
-    fn office_2010_icon_sets_are_distinct_from_core_sets() {
-        let x14 = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:conditionalFormattings><x14:conditionalFormatting><x14:cfRule type="iconSet"><x14:iconSet iconSet="3Stars"><x14:cfvo type="autoMin"><xm:f>0</xm:f></x14:cfvo><x14:cfvo type="percent"><xm:f>33</xm:f></x14:cfvo><x14:cfvo type="autoMax"><xm:f>67</xm:f></x14:cfvo></x14:iconSet></x14:cfRule><xm:sqref>A1:A3</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></worksheet>"#;
-        let values = parse_conditional_formattings(x14, 0).unwrap();
-        let Some(ConditionalFormatPayload::IconSet14(icons)) = &values[0].rules[0].payload else {
-            panic!("expected a typed Office 2010 icon set")
-        };
-        assert_eq!(icons.set, IconSet14::ThreeStars);
-        assert_eq!(icons.thresholds.len(), 3);
-        assert_eq!(icons.thresholds[0].kind, ValueKind::AutoMin);
-        assert_eq!(icons.thresholds[0].formula.as_deref(), Some("0"));
-
-        let core = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1"><iconSet iconSet="3Stars"><cfvo type="min"/><cfvo type="percent" val="33"/><cfvo type="max"/></iconSet></cfRule></conditionalFormatting></worksheet>"#;
-        assert!(parse_conditional_formattings(core, 0).is_err());
-
-        let core_auto = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1"><iconSet iconSet="3Arrows"><cfvo type="autoMin"/><cfvo type="percent" val="33"/><cfvo type="max"/></iconSet></cfRule></conditionalFormatting></worksheet>"#;
-        assert!(parse_conditional_formattings(core_auto, 0).is_err());
-    }
-
-    #[test]
-    fn rejects_malformed_and_dangerous_content() {
-        let duplicate=br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1"/></conditionalFormatting><conditionalFormatting sqref="B1"><cfRule type="expression" priority="1"/></conditionalFormatting></worksheet>"#;
-        assert!(parse_conditional_formattings(duplicate, 0).is_err());
-        let dangling=br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1" dxfId="2"/></conditionalFormatting></worksheet>"#;
-        assert!(parse_conditional_formattings(dangling, 0).is_err());
-        assert!(parse_conditional_formattings(br#"<!DOCTYPE x><worksheet/>"#, 0).is_err());
-    }
-
-    #[test]
-    fn parses_poi_and_libreoffice_conditional_formatting_fixtures() {
-        let fixtures = [
-            (
-                "test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx",
-                1,
-            ),
-            ("test-data/ooxml/xlsx/test_conditional_formatting.xlsx", 1),
-            (
-                "test-data/ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx",
-                1,
-            ),
-            ("test-data/ooxml/xlsx/conditional_fmt_origin.xlsx", 1),
-            ("test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx", 1),
-            (
-                "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx",
-                2,
-            ),
-            (
-                "test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx",
-                1,
-            ),
-        ];
-        let mut parsed = Vec::new();
-        for (relative, sheet) in fixtures {
-            let value = fixture(relative, sheet);
-            assert!(
-                !value.1.is_empty(),
-                "no conditional formatting in {relative}"
-            );
-            parsed.push(value);
-        }
-
-        assert!(
-            parsed[0]
-                .1
-                .iter()
-                .flat_map(|value| &value.rules)
-                .any(|rule| matches!(
-                    rule.payload,
-                    Some(
-                        ConditionalFormatPayload::ColorScale(_)
-                            | ConditionalFormatPayload::DataBar(_)
-                            | ConditionalFormatPayload::IconSet(_)
-                            | ConditionalFormatPayload::IconSet14(_)
-                    )
-                ))
-        );
-        let formulas: Vec<_> = parsed[1]
-            .1
-            .iter()
-            .flat_map(|value| &value.rules)
-            .flat_map(|rule| &rule.formulas)
-            .map(String::as_str)
-            .collect();
-        assert!(
-            formulas.iter().any(|formula| formula.contains("$B$3>5")),
-            "opaque formulas were {formulas:?}"
-        );
-        assert!(parsed[2].1.iter().any(|value| value.ranges.len() >= 3));
-        assert!(
-            parsed[2]
-                .1
-                .iter()
-                .flat_map(|value| &value.rules)
-                .flat_map(|rule| &rule.formulas)
-                .any(|formula| formula.contains("B2"))
-        );
-        assert!(
-            parsed[3]
-                .1
-                .iter()
-                .flat_map(|value| &value.rules)
-                .flat_map(|rule| &rule.formulas)
-                .any(|formula| formula == "NOT(ISERROR(SEARCH(\"BAC\",B1)))")
-        );
-        let mut priorities: Vec<_> = parsed[4]
-            .1
-            .iter()
-            .flat_map(|value| &value.rules)
-            .filter_map(|rule| rule.priority)
-            .collect();
-        priorities.sort_unstable();
-        assert!(priorities.windows(2).all(|pair| pair[0] < pair[1]));
-        assert!(!parsed[5].0.is_empty());
-        assert!(
-            parsed[6]
-                .0
-                .iter()
-                .any(|format| format.number_format.is_some())
-        );
-    }
 }

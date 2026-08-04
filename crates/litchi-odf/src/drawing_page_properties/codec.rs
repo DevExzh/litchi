@@ -1,7 +1,7 @@
-//! Complete typed ODF `style:drawing-page-properties` support.
+//! Bounded XML parsing and lossless mutation for drawing-page styles.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage};
-use litchi_core::{Error, Result, xml::escape_xml};
+use super::model::*;
+use litchi_core::{Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -18,6 +18,11 @@ const SMIL: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0"
 const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const MAX_XML: usize = 32 * 1024 * 1024;
+const MAX_ATTRIBUTES: usize = 64;
+const MAX_DEPTH: usize = 128;
+const MAX_STYLES: usize = 65_536;
+const MAX_TOTAL: usize = 16 * 1024 * 1024;
 const OFFICE_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const DRAW_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -25,333 +30,8 @@ const PRESENTATION_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:presentatio
 const SMIL_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0";
 const SVG_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const XLINK_NS: &str = "http://www.w3.org/1999/xlink";
-const MAX_XML: usize = 32 * 1024 * 1024;
-const MAX_VALUE: usize = 1024 * 1024;
-const MAX_ATTRIBUTES: usize = 64;
-const MAX_DEPTH: usize = 128;
-const MAX_STYLES: usize = 65_536;
-const MAX_TOTAL: usize = 16 * 1024 * 1024;
 
-fn bad(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
-}
-fn safe(value: &str, name: &str, empty: bool) -> Result<()> {
-    if (!empty && value.is_empty()) || value.len() > MAX_VALUE || value.chars().any(|c| matches!(c, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}' | '\u{fffe}' | '\u{ffff}')) {
-        return Err(bad(format!("invalid {name}")));
-    }
-    Ok(())
-}
-fn ncname(value: &str, name: &str, empty: bool) -> Result<()> {
-    safe(value, name, empty)?;
-    if value.is_empty() && empty {
-        return Ok(());
-    }
-    let mut chars = value.chars();
-    let first = chars.next().ok_or_else(|| bad(format!("invalid {name}")))?;
-    if !(first == '_' || first.is_alphabetic())
-        || chars.any(|c| !(c == '_' || c == '-' || c == '.' || c.is_alphanumeric()))
-    {
-        return Err(bad(format!("invalid {name}")));
-    }
-    Ok(())
-}
-fn decimal(value: &str, signed: bool) -> bool {
-    let value = if signed {
-        value.strip_prefix('-').unwrap_or(value)
-    } else {
-        value
-    };
-    if value.is_empty() {
-        return false;
-    }
-    let mut split = value.split('.');
-    let left = split.next().unwrap_or_default();
-    let right = split.next();
-    if split.next().is_some() {
-        return false;
-    }
-    match right {
-        None => !left.is_empty() && left.bytes().all(|b| b.is_ascii_digit()),
-        Some(right) => {
-            (!left.is_empty() || !right.is_empty())
-                && left.bytes().all(|b| b.is_ascii_digit())
-                && right.bytes().all(|b| b.is_ascii_digit())
-        },
-    }
-}
-fn percent(value: &str) -> bool {
-    value.strip_suffix('%').is_some_and(|x| decimal(x, true))
-}
-fn zero_to_hundred_percent(value: &str) -> bool {
-    let Some(number) = value.strip_suffix('%') else {
-        return false;
-    };
-    if !decimal(number, false) {
-        return false;
-    }
-    number.parse::<f64>().is_ok_and(|number| number <= 100.0)
-}
-fn length(value: &str) -> bool {
-    ["cm", "mm", "in", "pt", "pc", "px"]
-        .iter()
-        .any(|unit| value.strip_suffix(unit).is_some_and(|x| decimal(x, true)))
-}
-fn duration(value: &str) -> bool {
-    let value = value.strip_prefix('-').unwrap_or(value);
-    let Some(mut rest) = value.strip_prefix('P') else {
-        return false;
-    };
-    if rest.is_empty() {
-        return false;
-    }
-    let mut any = false;
-    let mut time = false;
-    let mut last = 0u8;
-    while !rest.is_empty() {
-        if rest.starts_with('T') {
-            if time {
-                return false;
-            }
-            time = true;
-            last = 0;
-            rest = &rest[1..];
-            if rest.is_empty() {
-                return false;
-            }
-            continue;
-        }
-        let number_end = rest
-            .find(|c: char| !c.is_ascii_digit() && c != '.')
-            .unwrap_or(rest.len());
-        if number_end == 0 || number_end == rest.len() {
-            return false;
-        }
-        let number = &rest[..number_end];
-        let marker = rest.as_bytes()[number_end] as char;
-        let rank = match (time, marker) {
-            (false, 'Y') => 1,
-            (false, 'M') => 2,
-            (false, 'D') => 3,
-            (true, 'H') => 1,
-            (true, 'M') => 2,
-            (true, 'S') => 3,
-            _ => return false,
-        };
-        if rank <= last
-            || (marker != 'S'
-                && (number.contains('.') || !number.bytes().all(|b| b.is_ascii_digit())))
-            || (marker == 'S' && !decimal(number, false))
-        {
-            return false;
-        }
-        last = rank;
-        any = true;
-        rest = &rest[number_end + 1..];
-    }
-    any
-}
-
-macro_rules! lexical {
-    ($name:ident, $validator:expr, $label:literal, $empty:expr) => {
-        #[derive(Debug, Clone, PartialEq, Eq)]
-        pub struct $name(String);
-        impl $name {
-            pub fn new(value: impl Into<String>) -> Result<Self> {
-                let value = value.into();
-                safe(&value, $label, $empty)?;
-                if !($validator)(&value) {
-                    return Err(bad(concat!("invalid ", $label)));
-                }
-                Ok(Self(value))
-            }
-            pub fn as_str(&self) -> &str {
-                &self.0
-            }
-        }
-    };
-}
-
-lexical!(
-    DrawingPageColor,
-    |x: &str| x.len() == 7 && x.starts_with('#') && x[1..].bytes().all(|b| b.is_ascii_hexdigit()),
-    "ODF color",
-    false
-);
-lexical!(DrawingPagePercent, percent, "ODF percentage", false);
-lexical!(
-    DrawingPageLengthOrPercent,
-    |x: &str| length(x) || percent(x),
-    "ODF length or percentage",
-    false
-);
-lexical!(
-    DrawingPageDuration,
-    duration,
-    "presentation:duration",
-    false
-);
-lexical!(
-    DrawingPageStyleNameRef,
-    |x: &str| ncname(x, "style name reference", true).is_ok(),
-    "style name reference",
-    true
-);
-lexical!(
-    DrawingPageNonNegativeInteger,
-    |x: &str| !x.is_empty() && x.bytes().all(|b| b.is_ascii_digit()),
-    "non-negative integer",
-    false
-);
-
-macro_rules! keyword_enum {
-    ($name:ident { $($variant:ident => $value:literal),+ $(,)? }) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub enum $name { $($variant),+ }
-        impl $name {
-            fn parse(value:&str)->Result<Self>{match value{$($value=>Ok(Self::$variant),)+_=>Err(bad(concat!("invalid ",stringify!($name))))}}
-            fn xml(self)->&'static str{match self{$(Self::$variant=>$value),+}}
-        }
-    };
-}
-keyword_enum!(DrawingPageFill { None=>"none", Solid=>"solid", Bitmap=>"bitmap", Gradient=>"gradient", Hatch=>"hatch" });
-keyword_enum!(DrawingPageRepeat { NoRepeat=>"no-repeat", Repeat=>"repeat", Stretch=>"stretch" });
-keyword_enum!(DrawingPageImageRefPoint { TopLeft=>"top-left", Top=>"top", TopRight=>"top-right", Left=>"left", Center=>"center", Right=>"right", BottomLeft=>"bottom-left", Bottom=>"bottom", BottomRight=>"bottom-right" });
-keyword_enum!(DrawingPageTileDirection { Horizontal=>"horizontal", Vertical=>"vertical" });
-keyword_enum!(DrawingPageFillRule { Nonzero=>"nonzero", Evenodd=>"evenodd" });
-keyword_enum!(DrawingPageTransitionType { Manual=>"manual", Automatic=>"automatic", SemiAutomatic=>"semi-automatic" });
-keyword_enum!(DrawingPageTransitionSpeed { Slow=>"slow", Medium=>"medium", Fast=>"fast" });
-keyword_enum!(DrawingPageTransitionDirection { Forward=>"forward", Reverse=>"reverse" });
-keyword_enum!(DrawingPageVisibility { Visible=>"visible", Hidden=>"hidden" });
-keyword_enum!(DrawingPageBackgroundSize { Full=>"full", Border=>"border" });
-keyword_enum!(DrawingPageSoundShow { New=>"new", Replace=>"replace" });
-
-const TRANSITION_STYLES: &[&str] = &[
-    "none",
-    "fade-from-left",
-    "fade-from-top",
-    "fade-from-right",
-    "fade-from-bottom",
-    "fade-from-upperleft",
-    "fade-from-upperright",
-    "fade-from-lowerleft",
-    "fade-from-lowerright",
-    "move-from-left",
-    "move-from-top",
-    "move-from-right",
-    "move-from-bottom",
-    "move-from-upperleft",
-    "move-from-upperright",
-    "move-from-lowerleft",
-    "move-from-lowerright",
-    "uncover-to-left",
-    "uncover-to-top",
-    "uncover-to-right",
-    "uncover-to-bottom",
-    "uncover-to-upperleft",
-    "uncover-to-upperright",
-    "uncover-to-lowerleft",
-    "uncover-to-lowerright",
-    "fade-to-center",
-    "fade-from-center",
-    "vertical-stripes",
-    "horizontal-stripes",
-    "clockwise",
-    "counterclockwise",
-    "open-vertical",
-    "open-horizontal",
-    "close-vertical",
-    "close-horizontal",
-    "wavyline-from-left",
-    "wavyline-from-top",
-    "wavyline-from-right",
-    "wavyline-from-bottom",
-    "spiralin-left",
-    "spiralin-right",
-    "spiralout-left",
-    "spiralout-right",
-    "roll-from-top",
-    "roll-from-left",
-    "roll-from-right",
-    "roll-from-bottom",
-    "stretch-from-left",
-    "stretch-from-top",
-    "stretch-from-right",
-    "stretch-from-bottom",
-    "vertical-lines",
-    "horizontal-lines",
-    "dissolve",
-    "random",
-    "vertical-checkerboard",
-    "horizontal-checkerboard",
-    "interlocking-horizontal-left",
-    "interlocking-horizontal-right",
-    "interlocking-vertical-top",
-    "interlocking-vertical-bottom",
-    "fly-away",
-    "open",
-    "close",
-    "melt",
-];
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DrawingPageTransitionStyle(String);
-impl DrawingPageTransitionStyle {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        if !TRANSITION_STYLES.contains(&value.as_str()) {
-            return Err(bad("invalid presentation:transition-style"));
-        }
-        Ok(Self(value))
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DrawingPageTileRepeatOffset {
-    pub percentage: String,
-    pub direction: DrawingPageTileDirection,
-}
-impl DrawingPageTileRepeatOffset {
-    pub fn new(percentage: impl Into<String>, direction: DrawingPageTileDirection) -> Result<Self> {
-        let percentage = percentage.into();
-        if !zero_to_hundred_percent(&percentage) {
-            return Err(bad("invalid draw:tile-repeat-offset percentage"));
-        }
-        Ok(Self {
-            percentage,
-            direction,
-        })
-    }
-}
-
-/// Inert `presentation:sound`; no link is loaded or executed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DrawingPageSound {
-    pub href: String,
-    pub play_full: Option<bool>,
-    pub actuate_on_request: bool,
-    pub show: Option<DrawingPageSoundShow>,
-    pub xml_id: Option<String>,
-}
-impl DrawingPageSound {
-    pub fn new(href: impl Into<String>) -> Result<Self> {
-        let value = Self {
-            href: href.into(),
-            play_full: None,
-            actuate_on_request: false,
-            show: None,
-            xml_id: None,
-        };
-        value.validate()?;
-        Ok(value)
-    }
-    pub fn validate(&self) -> Result<()> {
-        safe(&self.href, "xlink:href", true)?;
-        if let Some(id) = &self.xml_id {
-            ncname(id, "xml:id", false)?
-        }
-        Ok(())
-    }
+impl Sound {
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut xml = format!(
@@ -375,58 +55,7 @@ impl DrawingPageSound {
     }
 }
 
-/// Complete `style:drawing-page-properties` value.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DrawingPageStyleProperties {
-    pub fill: Option<DrawingPageFill>,
-    pub fill_color: Option<DrawingPageColor>,
-    pub secondary_fill_color: Option<DrawingPageColor>,
-    pub fill_gradient_name: Option<DrawingPageStyleNameRef>,
-    pub gradient_step_count: Option<DrawingPageNonNegativeInteger>,
-    pub fill_hatch_name: Option<DrawingPageStyleNameRef>,
-    pub fill_hatch_solid: Option<bool>,
-    pub fill_image_name: Option<DrawingPageStyleNameRef>,
-    pub repeat: Option<DrawingPageRepeat>,
-    pub fill_image_width: Option<DrawingPageLengthOrPercent>,
-    pub fill_image_height: Option<DrawingPageLengthOrPercent>,
-    pub fill_image_ref_point_x: Option<DrawingPagePercent>,
-    pub fill_image_ref_point_y: Option<DrawingPagePercent>,
-    pub fill_image_ref_point: Option<DrawingPageImageRefPoint>,
-    pub tile_repeat_offset: Option<DrawingPageTileRepeatOffset>,
-    pub opacity: Option<DrawingPagePercent>,
-    pub opacity_name: Option<DrawingPageStyleNameRef>,
-    pub fill_rule: Option<DrawingPageFillRule>,
-    pub transition_type: Option<DrawingPageTransitionType>,
-    pub transition_style: Option<DrawingPageTransitionStyle>,
-    pub transition_speed: Option<DrawingPageTransitionSpeed>,
-    pub smil_type: Option<String>,
-    pub smil_subtype: Option<String>,
-    pub direction: Option<DrawingPageTransitionDirection>,
-    pub fade_color: Option<DrawingPageColor>,
-    pub duration: Option<DrawingPageDuration>,
-    pub visibility: Option<DrawingPageVisibility>,
-    pub background_size: Option<DrawingPageBackgroundSize>,
-    pub background_objects_visible: Option<bool>,
-    pub background_visible: Option<bool>,
-    pub display_header: Option<bool>,
-    pub display_footer: Option<bool>,
-    pub display_page_number: Option<bool>,
-    pub display_date_time: Option<bool>,
-    pub sound: Option<DrawingPageSound>,
-}
-impl DrawingPageStyleProperties {
-    pub fn validate(&self) -> Result<()> {
-        if let Some(value) = &self.smil_type {
-            safe(value, "smil:type", true)?
-        }
-        if let Some(value) = &self.smil_subtype {
-            safe(value, "smil:subtype", true)?
-        }
-        if let Some(value) = &self.sound {
-            value.validate()?
-        }
-        Ok(())
-    }
+impl StyleProperties {
     pub fn from_xml_fragment(fragment: &str) -> Result<Self> {
         let xml = format!(
             r#"<office:document xmlns:office="{OFFICE_NS}" xmlns:style="{STYLE_NS}"><office:styles><style:style style:name="fragment" style:family="drawing-page">{fragment}</style:style></office:styles></office:document>"#
@@ -449,31 +78,29 @@ impl DrawingPageStyleProperties {
                 }
             };
         }
-        attr!(self.fill, "draw:fill", |v: DrawingPageFill| v.xml());
-        attr!(
-            self.fill_color.as_ref(),
-            "draw:fill-color",
-            |v: &DrawingPageColor| v.as_str().to_owned()
-        );
+        attr!(self.fill, "draw:fill", |v: Fill| v.xml());
+        attr!(self.fill_color.as_ref(), "draw:fill-color", |v: &Color| v
+            .as_str()
+            .to_owned());
         attr!(
             self.secondary_fill_color.as_ref(),
             "draw:secondary-fill-color",
-            |v: &DrawingPageColor| v.as_str().to_owned()
+            |v: &Color| v.as_str().to_owned()
         );
         attr!(
             self.fill_gradient_name.as_ref(),
             "draw:fill-gradient-name",
-            |v: &DrawingPageStyleNameRef| v.as_str().to_owned()
+            |v: &StyleNameRef| v.as_str().to_owned()
         );
         attr!(
             self.gradient_step_count.as_ref(),
             "draw:gradient-step-count",
-            |v: &DrawingPageNonNegativeInteger| v.as_str().to_owned()
+            |v: &NonNegativeInteger| v.as_str().to_owned()
         );
         attr!(
             self.fill_hatch_name.as_ref(),
             "draw:fill-hatch-name",
-            |v: &DrawingPageStyleNameRef| v.as_str().to_owned()
+            |v: &StyleNameRef| v.as_str().to_owned()
         );
         attr!(
             self.fill_hatch_solid,
@@ -483,33 +110,33 @@ impl DrawingPageStyleProperties {
         attr!(
             self.fill_image_name.as_ref(),
             "draw:fill-image-name",
-            |v: &DrawingPageStyleNameRef| v.as_str().to_owned()
+            |v: &StyleNameRef| v.as_str().to_owned()
         );
-        attr!(self.repeat, "style:repeat", |v: DrawingPageRepeat| v.xml());
+        attr!(self.repeat, "style:repeat", |v: Repeat| v.xml());
         attr!(
             self.fill_image_width.as_ref(),
             "draw:fill-image-width",
-            |v: &DrawingPageLengthOrPercent| v.as_str().to_owned()
+            |v: &LengthOrPercent| v.as_str().to_owned()
         );
         attr!(
             self.fill_image_height.as_ref(),
             "draw:fill-image-height",
-            |v: &DrawingPageLengthOrPercent| v.as_str().to_owned()
+            |v: &LengthOrPercent| v.as_str().to_owned()
         );
         attr!(
             self.fill_image_ref_point_x.as_ref(),
             "draw:fill-image-ref-point-x",
-            |v: &DrawingPagePercent| v.as_str().to_owned()
+            |v: &Percent| v.as_str().to_owned()
         );
         attr!(
             self.fill_image_ref_point_y.as_ref(),
             "draw:fill-image-ref-point-y",
-            |v: &DrawingPagePercent| v.as_str().to_owned()
+            |v: &Percent| v.as_str().to_owned()
         );
         attr!(
             self.fill_image_ref_point,
             "draw:fill-image-ref-point",
-            |v: DrawingPageImageRefPoint| v.xml()
+            |v: ImageRefPoint| v.xml()
         );
         if let Some(value) = &self.tile_repeat_offset {
             xml.push_str(&format!(
@@ -518,32 +145,29 @@ impl DrawingPageStyleProperties {
                 value.direction.xml()
             ))
         }
-        attr!(
-            self.opacity.as_ref(),
-            "draw:opacity",
-            |v: &DrawingPagePercent| v.as_str().to_owned()
-        );
+        attr!(self.opacity.as_ref(), "draw:opacity", |v: &Percent| v
+            .as_str()
+            .to_owned());
         attr!(
             self.opacity_name.as_ref(),
             "draw:opacity-name",
-            |v: &DrawingPageStyleNameRef| v.as_str().to_owned()
+            |v: &StyleNameRef| v.as_str().to_owned()
         );
-        attr!(self.fill_rule, "svg:fill-rule", |v: DrawingPageFillRule| v
-            .xml());
+        attr!(self.fill_rule, "svg:fill-rule", |v: FillRule| v.xml());
         attr!(
             self.transition_type,
             "presentation:transition-type",
-            |v: DrawingPageTransitionType| v.xml()
+            |v: TransitionType| v.xml()
         );
         attr!(
             self.transition_style.as_ref(),
             "presentation:transition-style",
-            |v: &DrawingPageTransitionStyle| v.as_str().to_owned()
+            |v: &TransitionStyle| v.as_str().to_owned()
         );
         attr!(
             self.transition_speed,
             "presentation:transition-speed",
-            |v: DrawingPageTransitionSpeed| v.xml()
+            |v: TransitionSpeed| v.xml()
         );
         if let Some(value) = &self.smil_type {
             xml.push_str(&format!(r#" smil:type="{}""#, escape_xml(value)))
@@ -554,27 +178,25 @@ impl DrawingPageStyleProperties {
         attr!(
             self.direction,
             "smil:direction",
-            |v: DrawingPageTransitionDirection| v.xml()
+            |v: TransitionDirection| v.xml()
         );
-        attr!(
-            self.fade_color.as_ref(),
-            "smil:fadeColor",
-            |v: &DrawingPageColor| v.as_str().to_owned()
-        );
+        attr!(self.fade_color.as_ref(), "smil:fadeColor", |v: &Color| v
+            .as_str()
+            .to_owned());
         attr!(
             self.duration.as_ref(),
             "presentation:duration",
-            |v: &DrawingPageDuration| v.as_str().to_owned()
+            |v: &Duration| v.as_str().to_owned()
         );
         attr!(
             self.visibility,
             "presentation:visibility",
-            |v: DrawingPageVisibility| v.xml()
+            |v: Visibility| v.xml()
         );
         attr!(
             self.background_size,
             "draw:background-size",
-            |v: DrawingPageBackgroundSize| v.xml()
+            |v: BackgroundSize| v.xml()
         );
         attr!(
             self.background_objects_visible,
@@ -617,52 +239,7 @@ impl DrawingPageStyleProperties {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DrawingPageStyle {
-    pub name: Option<String>,
-    pub parent_style_name: Option<String>,
-    pub is_default_style: bool,
-    pub properties: Option<DrawingPageStyleProperties>,
-}
-impl DrawingPageStyle {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<DrawingPageStyleProperties>,
-    ) -> Result<Self> {
-        let value = Self {
-            name: Some(name.into()),
-            parent_style_name: None,
-            is_default_style: false,
-            properties,
-        };
-        value.validate()?;
-        Ok(value)
-    }
-    pub fn default_style(properties: Option<DrawingPageStyleProperties>) -> Self {
-        Self {
-            name: None,
-            parent_style_name: None,
-            is_default_style: true,
-            properties,
-        }
-    }
-    pub fn validate(&self) -> Result<()> {
-        match (&self.name, self.is_default_style) {
-            (Some(value), false) => ncname(value, "drawing-page style name", false)?,
-            (None, true) => {},
-            _ => return Err(bad("invalid drawing-page style identity")),
-        }
-        if let Some(value) = &self.parent_style_name {
-            if self.is_default_style {
-                return Err(bad("default drawing-page style cannot have a parent"));
-            }
-            ncname(value, "parent drawing-page style name", false)?
-        }
-        if let Some(value) = &self.properties {
-            value.validate()?
-        }
-        Ok(())
-    }
+impl Style {
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let tag = if self.is_default_style {
@@ -689,20 +266,6 @@ impl DrawingPageStyle {
             xml.push_str("/>")
         }
         Ok(xml)
-    }
-}
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DrawingPageStyleSet {
-    pub styles: Vec<DrawingPageStyle>,
-}
-impl DrawingPageStyleSet {
-    pub fn get(&self, name: &str) -> Option<&DrawingPageStyle> {
-        self.styles
-            .iter()
-            .find(|style| style.name.as_deref() == Some(name))
-    }
-    pub fn default_style(&self) -> Option<&DrawingPageStyle> {
-        self.styles.iter().find(|style| style.is_default_style)
     }
 }
 
@@ -786,12 +349,12 @@ fn header(
     version: XmlVersion,
     start: &BytesStart<'_>,
     default: bool,
-) -> Result<Option<DrawingPageStyle>> {
+) -> Result<Option<Style>> {
     let mut attrs = attrs(reader, version, start)?;
     if take(&mut attrs, Ns::Style, b"family").as_deref() != Some("drawing-page") {
         return Ok(None);
     }
-    let style = DrawingPageStyle {
+    let style = Style {
         name: take(&mut attrs, Ns::Style, b"name"),
         parent_style_name: take(&mut attrs, Ns::Style, b"parent-style-name"),
         is_default_style: default,
@@ -804,47 +367,47 @@ fn parse_properties(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<DrawingPageStyleProperties> {
+) -> Result<StyleProperties> {
     let mut a = attrs(reader, version, start)?;
-    let value = DrawingPageStyleProperties {
-        fill: enum_value(take(&mut a, Ns::Draw, b"fill"), DrawingPageFill::parse)?,
+    let value = StyleProperties {
+        fill: enum_value(take(&mut a, Ns::Draw, b"fill"), Fill::parse)?,
         fill_color: take(&mut a, Ns::Draw, b"fill-color")
-            .map(DrawingPageColor::new)
+            .map(Color::new)
             .transpose()?,
         secondary_fill_color: take(&mut a, Ns::Draw, b"secondary-fill-color")
-            .map(DrawingPageColor::new)
+            .map(Color::new)
             .transpose()?,
         fill_gradient_name: take(&mut a, Ns::Draw, b"fill-gradient-name")
-            .map(DrawingPageStyleNameRef::new)
+            .map(StyleNameRef::new)
             .transpose()?,
         gradient_step_count: take(&mut a, Ns::Draw, b"gradient-step-count")
-            .map(DrawingPageNonNegativeInteger::new)
+            .map(NonNegativeInteger::new)
             .transpose()?,
         fill_hatch_name: take(&mut a, Ns::Draw, b"fill-hatch-name")
-            .map(DrawingPageStyleNameRef::new)
+            .map(StyleNameRef::new)
             .transpose()?,
         fill_hatch_solid: take(&mut a, Ns::Draw, b"fill-hatch-solid")
             .map(|v| boolean(&v))
             .transpose()?,
         fill_image_name: take(&mut a, Ns::Draw, b"fill-image-name")
-            .map(DrawingPageStyleNameRef::new)
+            .map(StyleNameRef::new)
             .transpose()?,
-        repeat: enum_value(take(&mut a, Ns::Style, b"repeat"), DrawingPageRepeat::parse)?,
+        repeat: enum_value(take(&mut a, Ns::Style, b"repeat"), Repeat::parse)?,
         fill_image_width: take(&mut a, Ns::Draw, b"fill-image-width")
-            .map(DrawingPageLengthOrPercent::new)
+            .map(LengthOrPercent::new)
             .transpose()?,
         fill_image_height: take(&mut a, Ns::Draw, b"fill-image-height")
-            .map(DrawingPageLengthOrPercent::new)
+            .map(LengthOrPercent::new)
             .transpose()?,
         fill_image_ref_point_x: take(&mut a, Ns::Draw, b"fill-image-ref-point-x")
-            .map(DrawingPagePercent::new)
+            .map(Percent::new)
             .transpose()?,
         fill_image_ref_point_y: take(&mut a, Ns::Draw, b"fill-image-ref-point-y")
-            .map(DrawingPagePercent::new)
+            .map(Percent::new)
             .transpose()?,
         fill_image_ref_point: enum_value(
             take(&mut a, Ns::Draw, b"fill-image-ref-point"),
-            DrawingPageImageRefPoint::parse,
+            ImageRefPoint::parse,
         )?,
         tile_repeat_offset: take(&mut a, Ns::Draw, b"tile-repeat-offset")
             .map(|v| {
@@ -858,52 +421,46 @@ fn parse_properties(
                 if parts.next().is_some() {
                     return Err(bad("invalid draw:tile-repeat-offset"));
                 }
-                DrawingPageTileRepeatOffset::new(
-                    percentage,
-                    DrawingPageTileDirection::parse(direction)?,
-                )
+                TileRepeatOffset::new(percentage, TileDirection::parse(direction)?)
             })
             .transpose()?,
         opacity: take(&mut a, Ns::Draw, b"opacity")
-            .map(DrawingPagePercent::new)
+            .map(Percent::new)
             .transpose()?,
         opacity_name: take(&mut a, Ns::Draw, b"opacity-name")
-            .map(DrawingPageStyleNameRef::new)
+            .map(StyleNameRef::new)
             .transpose()?,
-        fill_rule: enum_value(
-            take(&mut a, Ns::Svg, b"fill-rule"),
-            DrawingPageFillRule::parse,
-        )?,
+        fill_rule: enum_value(take(&mut a, Ns::Svg, b"fill-rule"), FillRule::parse)?,
         transition_type: enum_value(
             take(&mut a, Ns::Presentation, b"transition-type"),
-            DrawingPageTransitionType::parse,
+            TransitionType::parse,
         )?,
         transition_style: take(&mut a, Ns::Presentation, b"transition-style")
-            .map(DrawingPageTransitionStyle::new)
+            .map(TransitionStyle::new)
             .transpose()?,
         transition_speed: enum_value(
             take(&mut a, Ns::Presentation, b"transition-speed"),
-            DrawingPageTransitionSpeed::parse,
+            TransitionSpeed::parse,
         )?,
         smil_type: take(&mut a, Ns::Smil, b"type"),
         smil_subtype: take(&mut a, Ns::Smil, b"subtype"),
         direction: enum_value(
             take(&mut a, Ns::Smil, b"direction"),
-            DrawingPageTransitionDirection::parse,
+            TransitionDirection::parse,
         )?,
         fade_color: take(&mut a, Ns::Smil, b"fadeColor")
-            .map(DrawingPageColor::new)
+            .map(Color::new)
             .transpose()?,
         duration: take(&mut a, Ns::Presentation, b"duration")
-            .map(DrawingPageDuration::new)
+            .map(Duration::new)
             .transpose()?,
         visibility: enum_value(
             take(&mut a, Ns::Presentation, b"visibility"),
-            DrawingPageVisibility::parse,
+            Visibility::parse,
         )?,
         background_size: enum_value(
             take(&mut a, Ns::Draw, b"background-size"),
-            DrawingPageBackgroundSize::parse,
+            BackgroundSize::parse,
         )?,
         background_objects_visible: take(&mut a, Ns::Presentation, b"background-objects-visible")
             .map(|v| boolean(&v))
@@ -937,7 +494,7 @@ fn parse_sound(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<DrawingPageSound> {
+) -> Result<Sound> {
     let mut a = attrs(reader, version, start)?;
     if take(&mut a, Ns::Xlink, b"type").as_deref() != Some("simple") {
         return Err(bad("presentation:sound requires xlink:type=\"simple\""));
@@ -948,10 +505,7 @@ fn parse_sound(
     if actuate.as_deref().is_some_and(|v| v != "onRequest") {
         return Err(bad("invalid presentation:sound xlink:actuate"));
     }
-    let show = enum_value(
-        take(&mut a, Ns::Xlink, b"show"),
-        DrawingPageSoundShow::parse,
-    )?;
+    let show = enum_value(take(&mut a, Ns::Xlink, b"show"), SoundShow::parse)?;
     let play_full = take(&mut a, Ns::Presentation, b"play-full")
         .map(|v| boolean(&v))
         .transpose()?;
@@ -961,7 +515,7 @@ fn parse_sound(
             "unknown presentation:sound attribute or wrong namespace",
         ));
     }
-    let value = DrawingPageSound {
+    let value = Sound {
         href,
         play_full,
         actuate_on_request: actuate.is_some(),
@@ -974,16 +528,12 @@ fn parse_sound(
 
 struct Active {
     depth: usize,
-    style: DrawingPageStyle,
+    style: Style,
     seen: bool,
     properties_depth: Option<usize>,
     sound_depth: Option<usize>,
 }
-fn push_style(
-    out: &mut Vec<DrawingPageStyle>,
-    style: DrawingPageStyle,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(out: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if out.len() >= MAX_STYLES
         || out.iter().any(|value| {
             value.name == style.name && value.is_default_style == style.is_default_style
@@ -999,7 +549,7 @@ fn push_style(
     Ok(())
 }
 /// Parse direct drawing-page styles from `office:styles` and `office:automatic-styles`.
-pub fn parse_drawing_page_style_properties(xml: &str) -> Result<DrawingPageStyleSet> {
+pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
@@ -1168,7 +718,7 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<DrawingPageStyle
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(DrawingPageStyleSet { styles: out })
+    Ok(Styles { styles: out })
 }
 
 #[derive(Default)]
@@ -1204,10 +754,7 @@ fn expand_span(xml: &str, span: &Span, value: &str) -> Result<String> {
     ))
 }
 /// Losslessly replace, insert, or remove one existing drawing-page style's property element.
-pub fn set_drawing_page_style_properties_xml(
-    xml: &str,
-    requested: &DrawingPageStyle,
-) -> Result<String> {
+pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -1343,7 +890,7 @@ pub fn set_drawing_page_style_properties_xml(
     let replacement = requested
         .properties
         .as_ref()
-        .map(DrawingPageStyleProperties::to_xml_fragment)
+        .map(StyleProperties::to_xml_fragment)
         .transpose()?;
     if let Some(properties) = &spans.properties {
         return Ok(replace_span(
@@ -1361,98 +908,4 @@ pub fn set_drawing_page_style_properties_xml(
     let mut out = xml.to_owned();
     out.insert_str(spans.style.end_start, &replacement);
     Ok(out)
-}
-
-impl OpenDocumentPackage {
-    pub fn drawing_page_style_properties(&self) -> Result<DrawingPageStyleSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(Default::default()),
-            |xml| parse_drawing_page_style_properties(&xml),
-        )
-    }
-}
-impl FlatOpenDocument {
-    pub fn drawing_page_style_properties(&self) -> Result<DrawingPageStyleSet> {
-        parse_drawing_page_style_properties(self.xml())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    const HEAD: &str = r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:automatic-styles>"#;
-    fn doc(body: &str) -> String {
-        format!("{HEAD}{body}</office:automatic-styles></office:document>")
-    }
-    #[test]
-    fn complete_family_round_trips() {
-        let xml = doc(
-            r##"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties draw:fill="gradient" draw:fill-color="#A0b1C2" draw:secondary-fill-color="#010203" draw:fill-gradient-name="g1" draw:gradient-step-count="00012" draw:fill-hatch-name="h1" draw:fill-hatch-solid="true" draw:fill-image-name="" style:repeat="stretch" draw:fill-image-width="0cm" draw:fill-image-height="-.5%" draw:fill-image-ref-point-x="-12.5%" draw:fill-image-ref-point-y=".5%" draw:fill-image-ref-point="bottom-right" draw:tile-repeat-offset="100.0% vertical" draw:opacity="120%" draw:opacity-name="o1" svg:fill-rule="evenodd" presentation:transition-type="semi-automatic" presentation:transition-style="melt" presentation:transition-speed="fast" smil:type="fade &amp; dissolve" smil:subtype="crossfade" smil:direction="reverse" smil:fadeColor="#aB09fF" presentation:duration="P1Y2M3DT4H5M6.50S" presentation:visibility="hidden" draw:background-size="border" presentation:background-objects-visible="false" presentation:background-visible="true" presentation:display-header="false" presentation:display-footer="true" presentation:display-page-number="false" presentation:display-date-time="true"><presentation:sound xlink:type="simple" xlink:href="https://example.invalid/a&amp;b.ogg" xlink:actuate="onRequest" xlink:show="new" presentation:play-full="true" xml:id="sound_1"/></style:drawing-page-properties></style:style>"##,
-        );
-        let set = parse_drawing_page_style_properties(&xml).unwrap();
-        let p = set.get("dp1").unwrap().properties.as_ref().unwrap();
-        assert_eq!(p.gradient_step_count.as_ref().unwrap().as_str(), "00012");
-        assert_eq!(
-            p.sound.as_ref().unwrap().href,
-            "https://example.invalid/a&b.ogg"
-        );
-        let fragment = p.to_xml_fragment().unwrap();
-        assert_eq!(
-            DrawingPageStyleProperties::from_xml_fragment(&fragment).unwrap(),
-            *p
-        )
-    }
-    #[test]
-    fn parses_real_libreoffice_remote_background_without_loading_it() {
-        let xml = include_str!(
-            "../../../test-data/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp"
-        );
-        let set = parse_drawing_page_style_properties(xml).unwrap();
-        let p = set.get("dp1").unwrap().properties.as_ref().unwrap();
-        assert_eq!(p.fill, Some(DrawingPageFill::Bitmap));
-        assert_eq!(p.fill_image_name.as_ref().unwrap().as_str(), "remote_bg");
-        assert_eq!(p.repeat, Some(DrawingPageRepeat::Stretch))
-    }
-    #[test]
-    fn lossless_replace_insert_and_remove() {
-        let original = doc(
-            "<!--keep--><style:style style:name=\"a\" style:family=\"drawing-page\"><x:keep xmlns:x=\"urn:keep\"/></style:style><style:style style:name=\"b\" style:family=\"drawing-page\"><style:drawing-page-properties draw:fill=\"none\"/></style:style>",
-        );
-        let mut a = DrawingPageStyle::named(
-            "a",
-            Some(DrawingPageStyleProperties {
-                fill: Some(DrawingPageFill::Solid),
-                ..Default::default()
-            }),
-        )
-        .unwrap();
-        let inserted = set_drawing_page_style_properties_xml(&original, &a).unwrap();
-        assert!(inserted.contains("<!--keep--><style:style"));
-        assert!(inserted.contains("<x:keep xmlns:x=\"urn:keep\"/><style:drawing-page-properties"));
-        a.properties = None;
-        let removed_a = set_drawing_page_style_properties_xml(&inserted, &a).unwrap();
-        assert_eq!(removed_a, original);
-        let b = DrawingPageStyle::named("b", None).unwrap();
-        let removed = set_drawing_page_style_properties_xml(&removed_a, &b).unwrap();
-        assert!(!removed.contains("draw:fill=\"none\""));
-        assert!(removed.contains("<!--keep-->"))
-    }
-    #[test]
-    fn rejects_malformed_namespaces_lexicals_duplicates_and_children() {
-        let cases = [
-            r#"<style:style style:name="a" style:family="drawing-page"><style:drawing-page-properties presentation:display-header="1"/></style:style>"#,
-            r##"<style:style style:name="a" style:family="drawing-page"><style:drawing-page-properties draw:fill-color="#fff"/></style:style>"##,
-            r#"<style:style style:name="a" style:family="drawing-page"><style:drawing-page-properties draw:tile-repeat-offset="101% horizontal"/></style:style>"#,
-            r#"<style:style style:name="a" style:family="drawing-page"><style:drawing-page-properties draw:fill="none" draw:fill="solid"/></style:style>"#,
-            r#"<style:style style:name="a" style:family="drawing-page"><style:drawing-page-properties><draw:sound/></style:drawing-page-properties></style:style>"#,
-            r#"<style:style style:name="a" style:family="drawing-page"><draw:drawing-page-properties/></style:style>"#,
-            r#"<style:style style:name="a" style:family="drawing-page"><style:drawing-page-properties><presentation:sound xlink:type="simple" xlink:href="x"><presentation:sound xlink:type="simple" xlink:href="y"/></presentation:sound></style:drawing-page-properties></style:style>"#,
-        ];
-        for case in cases {
-            assert!(
-                parse_drawing_page_style_properties(&doc(case)).is_err(),
-                "accepted {case}"
-            )
-        }
-    }
 }
