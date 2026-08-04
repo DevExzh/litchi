@@ -21,8 +21,18 @@ fn package_wrappers_discover_local_task_panes_without_activation() {
     install_task_panes(docx.opc_package_mut());
     assert_task_pane(docx.task_panes().unwrap().unwrap());
 
+    let xlsx_directory = tempfile::tempdir().unwrap();
+    let xlsx_path = xlsx_directory.path().join("raw-edit-source.xlsx");
     let mut xlsx = litchi_ooxml::xlsx::Workbook::create().unwrap();
-    install_task_panes(xlsx.opc_package_mut());
+    xlsx.save(&xlsx_path).unwrap();
+    let mut xlsx = litchi_ooxml::xlsx::Workbook::open(&xlsx_path).unwrap();
+    xlsx.edit_opc(|opc| {
+        install_task_panes(opc);
+        Ok(())
+    })
+    .unwrap();
+    xlsx.save(&xlsx_path).unwrap();
+    let xlsx = litchi_ooxml::xlsx::Workbook::open(&xlsx_path).unwrap();
     assert_task_pane(xlsx.task_panes().unwrap().unwrap());
 
     let mut pptx = litchi_ooxml::pptx::Package::new().unwrap();

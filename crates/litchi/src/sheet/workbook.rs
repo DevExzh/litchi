@@ -162,6 +162,17 @@ impl Workbook {
                 (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)
             },
 
+            #[cfg(feature = "odf")]
+            DetectedFormat::FlatOdf(litchi_core::detection::FileFormat::Ods, data) => {
+                let flat = litchi_odf::FlatSpreadsheet::from_bytes(data)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                let metadata = flat.spreadsheet().metadata().unwrap_or_default();
+                (
+                    WorkbookImpl::FlatOds(std::cell::RefCell::new(flat)),
+                    metadata,
+                )
+            },
+
             // Handle mismatched formats
             #[allow(unreachable_patterns)]
             _ => {
@@ -222,6 +233,16 @@ impl Workbook {
                 Ok(sheets.iter().map(|s| s.name.clone()).collect())
             },
 
+            #[cfg(feature = "odf")]
+            WorkbookImpl::FlatOds(flat_ref) => {
+                let mut flat = flat_ref.borrow_mut();
+                let sheets = flat
+                    .spreadsheet_mut()
+                    .sheets()
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                Ok(sheets.iter().map(|s| s.name.clone()).collect())
+            },
+
             #[cfg(any(feature = "xls", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
@@ -261,6 +282,15 @@ impl Workbook {
             WorkbookImpl::Ods(ods_ref) => {
                 let mut ods = ods_ref.borrow_mut();
                 let count = ods
+                    .sheet_count()
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                Ok(count)
+            },
+            #[cfg(feature = "odf")]
+            WorkbookImpl::FlatOds(flat_ref) => {
+                let mut flat = flat_ref.borrow_mut();
+                let count = flat
+                    .spreadsheet_mut()
                     .sheet_count()
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 Ok(count)
@@ -525,6 +555,14 @@ impl Workbook {
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
             },
 
+            #[cfg(feature = "odf")]
+            WorkbookImpl::FlatOds(flat_ref) => {
+                let mut flat = flat_ref.borrow_mut();
+                flat.spreadsheet_mut()
+                    .text()
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+            },
+
             #[cfg(any(feature = "xls", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
@@ -612,6 +650,55 @@ impl Workbook {
         }
 
         metadata
+    }
+}
+
+#[cfg(all(test, feature = "odf"))]
+mod flat_ods_dispatch_tests {
+    use super::Workbook;
+    use litchi_core::detection::FileFormat;
+
+    const FLAT_ODS: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    office:version="1.3"
+    office:mimetype="application/vnd.oasis.opendocument.spreadsheet">
+  <office:body>
+    <office:spreadsheet>
+      <table:table table:name="Sheet1">
+        <table:table-row>
+          <table:table-cell office:value-type="string"><text:p>value</text:p></table:table-cell>
+        </table:table-row>
+      </table:table>
+    </office:spreadsheet>
+  </office:body>
+</office:document>"#;
+
+    #[test]
+    fn flat_ods_detection_and_public_open_agree() {
+        assert_eq!(
+            crate::detection_smart::detect_file_format_from_bytes(FLAT_ODS),
+            Some(FileFormat::Ods)
+        );
+        assert!(matches!(
+            crate::detection_smart::detect_format_smart(FLAT_ODS.to_vec()),
+            Some(crate::detection_smart::DetectedFormat::FlatOdf(
+                FileFormat::Ods,
+                _
+            ))
+        ));
+
+        let workbook = Workbook::from_bytes(FLAT_ODS.to_vec()).expect("flat ODS should open");
+        assert_eq!(workbook.worksheet_names().unwrap(), ["Sheet1"]);
+        assert_eq!(workbook.worksheet_count().unwrap(), 1);
+        assert_eq!(workbook.text().unwrap(), "value");
+
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), FLAT_ODS).unwrap();
+        let opened = Workbook::open(file.path()).expect("flat ODS path should open");
+        assert_eq!(opened.worksheet_names().unwrap(), ["Sheet1"]);
     }
 }
 

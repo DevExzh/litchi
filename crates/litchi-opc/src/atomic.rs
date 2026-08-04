@@ -27,6 +27,18 @@ pub fn replace_with<E>(
 where
     E: From<OpcError>,
 {
+    replace_with_impl(path, write, sync_parent)
+}
+
+fn replace_with_impl<E, S>(
+    path: &Path,
+    write: impl FnOnce(&mut File) -> std::result::Result<(), E>,
+    sync: S,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: FnOnce(&Path) -> io::Result<()>,
+{
     if path.file_name().is_none() {
         return Err(E::from(invalid_path(
             "package destination must name a file",
@@ -62,7 +74,7 @@ where
         .persist(path)
         .map_err(|error| OpcError::IoError(error.error))
         .map_err(E::from)?;
-    sync_parent(parent).map_err(E::from)?;
+    sync(parent).map_err(|source| E::from(OpcError::Committed { source }))?;
     Ok(())
 }
 
@@ -81,7 +93,7 @@ fn destination_permissions(path: &Path) -> Result<Option<Permissions>> {
 }
 
 #[cfg(unix)]
-fn sync_parent(parent: &Path) -> Result<()> {
+fn sync_parent(parent: &Path) -> io::Result<()> {
     match File::open(parent).and_then(|directory| directory.sync_all()) {
         Ok(()) => Ok(()),
         Err(error)
@@ -92,12 +104,12 @@ fn sync_parent(parent: &Path) -> Result<()> {
         {
             Ok(())
         },
-        Err(error) => Err(error.into()),
+        Err(error) => Err(error),
     }
 }
 
 #[cfg(not(unix))]
-fn sync_parent(_parent: &Path) -> Result<()> {
+fn sync_parent(_parent: &Path) -> io::Result<()> {
     Ok(())
 }
 
@@ -172,6 +184,37 @@ mod tests {
         })
         .expect("atomic replacement");
 
+        assert_eq!(fs::read(destination).expect("read destination"), b"new");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_sync_failure_reports_that_replacement_already_committed() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.xlsx");
+        fs::write(&destination, b"old").expect("seed destination");
+
+        let result = replace_with_impl::<TypedError, _>(
+            &destination,
+            |temporary| {
+                temporary
+                    .write_all(b"new")
+                    .map_err(|error| TypedError::Opc(OpcError::IoError(error)))?;
+                Ok(())
+            },
+            |_parent| {
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "injected directory sync failure",
+                ))
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(TypedError::Opc(OpcError::Committed { source }))
+                if source.kind() == io::ErrorKind::PermissionDenied
+        ));
         assert_eq!(fs::read(destination).expect("read destination"), b"new");
     }
 

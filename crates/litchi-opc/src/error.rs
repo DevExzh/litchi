@@ -74,6 +74,17 @@ pub enum OpcError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// The destination was atomically replaced, but its parent directory
+    /// could not be synchronized. Callers must not blindly retry as if the
+    /// old destination were still present.
+    #[error(
+        "package destination was replaced but directory durability could not be confirmed: {source}"
+    )]
+    Committed {
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("incomplete OPC output after {written} byte(s): {source}")]
     IncompleteOutput {
         written: u64,

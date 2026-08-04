@@ -692,9 +692,12 @@ impl IWorkPackage {
     /// before serialization, so an oversized direct mutation cannot be
     /// published accidentally.
     pub fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
-        let position = self.entry_position(normalize_entry_name(name))?;
+        let name = normalize_entry_name(name);
+        let position = self.entry_position(name)?;
         self.mark_mutated();
-        Some(&mut Arc::make_mut(&mut self.state).entries[position].1)
+        let state = Arc::make_mut(&mut self.state);
+        state.invalidate_archive(name);
+        Some(&mut state.entries[position].1)
     }
 
     /// Create or replace a package member.
@@ -709,10 +712,9 @@ impl IWorkPackage {
         let position = self.entry_position(&name);
         self.validate_entry_update(position, &data)?;
         if let Some(position) = position {
-            let previous = std::mem::replace(
-                &mut Arc::make_mut(&mut self.state).entries[position].1,
-                data,
-            );
+            let state = Arc::make_mut(&mut self.state);
+            let previous = std::mem::replace(&mut state.entries[position].1, data);
+            state.invalidate_archive(&name);
             self.mark_mutated();
             return Ok(Some(previous));
         }
@@ -734,6 +736,33 @@ impl IWorkPackage {
     /// Parse a compressed `.iwa` package member.
     pub fn archive(&self, name: &str) -> Result<Archive> {
         let normalized = normalize_entry_name(name);
+        self.parse_archive(normalized)
+    }
+
+    /// Borrow a parsed `.iwa` package member through a bounded read cache.
+    ///
+    /// The callback never observes package-owned mutable state. A single
+    /// parsed archive is retained per copy-on-write package state, which
+    /// avoids repeating decompression and archive parsing for hot metadata
+    /// lookups without retaining every component's expanded representation.
+    pub(crate) fn with_parsed_archive<T, F>(&self, name: &str, read: F) -> Result<T>
+    where
+        F: FnOnce(&Archive) -> Result<T>,
+    {
+        let archive = self.parsed_archive(name)?;
+        read(&archive)
+    }
+
+    pub(crate) fn parsed_archive(&self, name: &str) -> Result<Arc<Archive>> {
+        let normalized = normalize_entry_name(name);
+        if let Some(archive) = self.state.cached_archive(normalized) {
+            return Ok(archive);
+        }
+        let archive = Arc::new(self.parse_archive(normalized)?);
+        Ok(self.state.cache_archive(normalized, archive))
+    }
+
+    fn parse_archive(&self, normalized: &str) -> Result<Archive> {
         if !normalized.ends_with(".iwa") {
             return Err(Error::Bundle(format!(
                 "Package entry {normalized} is not an IWA component"
@@ -1464,6 +1493,38 @@ mod tests {
             Some(b"plist".to_vec())
         );
         assert_eq!(reparsed.entry_names().next(), Some("Index/Document.iwa"));
+    }
+
+    #[test]
+    fn parsed_archive_cache_reuses_reads_and_invalidates_copy_on_write_mutations() {
+        let mut package = IWorkPackage::new();
+        let original = archive();
+        package
+            .replace_archive("Index/Document.iwa", &original)
+            .unwrap();
+
+        let first = package.parsed_archive("Index/Document.iwa").unwrap();
+        let second = package.parsed_archive("Index/Document.iwa").unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert!(first.object(1).is_some());
+
+        let mut edited = package.clone();
+        let mut replacement = archive();
+        replacement.objects[0].archive_info.identifier = Some(2);
+        edited
+            .replace_archive("Index/Document.iwa", &replacement)
+            .unwrap();
+
+        let edited_archive = edited.parsed_archive("Index/Document.iwa").unwrap();
+        assert!(!Arc::ptr_eq(&first, &edited_archive));
+        assert!(edited_archive.object(2).is_some());
+        assert!(
+            package
+                .parsed_archive("Index/Document.iwa")
+                .is_ok_and(|archive| {
+                    Arc::ptr_eq(&first, &archive) && archive.object(1).is_some()
+                })
+        );
     }
 
     #[test]

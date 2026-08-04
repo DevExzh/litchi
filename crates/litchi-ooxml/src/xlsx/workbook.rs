@@ -1543,10 +1543,60 @@ impl Workbook {
         &self.package
     }
 
-    /// Get mutable OPC access, dropping signatures that would become stale.
-    pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
+    /// Get mutable OPC access for XLSX-internal package adapters.
+    ///
+    /// Public callers must use [`Self::edit_opc`], which stages a structural
+    /// candidate and reparses the complete XLSX host before publication.
+    #[allow(dead_code)]
+    pub(crate) fn opc_package_mut(&mut self) -> &mut OpcPackage {
         self.package.unsign();
         &mut self.package
+    }
+
+    /// Transactionally edit the current plaintext OPC graph.
+    ///
+    /// The closure receives a structural candidate whose built-in part
+    /// payloads share immutable `Arc` storage. Returning an error, producing
+    /// an invalid XLSX host graph, or unwinding leaves this workbook unchanged.
+    /// A successful raw edit disables the legacy writer so later materialized
+    /// saves cannot erase the published package mutation.
+    pub fn edit_opc<T>(
+        &mut self,
+        edit: impl FnOnce(&mut OpcPackage) -> SheetResult<T>,
+    ) -> SheetResult<T> {
+        self.ensure_opc_current("edit_opc")?;
+
+        // Built-in OPC payloads are Arc-backed. Custom Part implementations
+        // retain their own clone and interior-mutability policy.
+        let mut candidate = self.package.clone();
+        candidate.unsign();
+        let value = edit(&mut candidate)?;
+
+        // Reparse all XLSX-owned state before publishing. This validates the
+        // main workbook relationship, workbook/worksheet XML, shared strings,
+        // styles, external links, calculation-chain topology, and core
+        // properties without exposing a partially edited host.
+        let validated = Self::new(candidate.clone())?;
+        self.package = candidate;
+        self.workbook_uri = validated.workbook_uri;
+        self.worksheets = validated.worksheets;
+        self.worksheet_names = validated.worksheet_names;
+        self.active_sheet_index = validated.active_sheet_index;
+        self.shared_strings = validated.shared_strings;
+        self.styles = validated.styles;
+        self.mutable_data = None;
+        self.writer_is_fresh = false;
+        self.properties = validated.properties;
+        self.is_1904_date_system = validated.is_1904_date_system;
+        self.calculation_properties = validated.calculation_properties;
+        self.chain = validated.chain;
+        self.chain_conformance = validated.chain_conformance;
+        self.external_links = validated.external_links;
+        self.defined_names = validated.defined_names;
+        self.worksheet_protection_mutations.clear();
+        self.worksheet_data_validation_mutations.clear();
+        self.worksheet_web_binding_mutations.clear();
+        Ok(value)
     }
 
     /// Return whether this workbook contains package signatures.
@@ -2512,6 +2562,48 @@ impl Workbook {
                 reason: "the source workbook was encrypted; use save_reencrypted or save_plain",
             }));
         }
+        Ok(())
+    }
+
+    fn ensure_opc_current(&self, operation: &'static str) -> SheetResult<()> {
+        #[cfg(feature = "encryption")]
+        if self.source_encryption.is_some() {
+            return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation,
+                reason: "raw OPC editing would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
+            }));
+        }
+
+        if self
+            .mutable_data
+            .as_ref()
+            .is_some_and(MutableWorkbookData::is_modified)
+        {
+            return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation,
+                reason: "the legacy writer has unmaterialized workbook changes; use a managed save or to_encrypted first",
+            }));
+        }
+        if self.properties.is_dirty() {
+            return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation,
+                reason: "core properties have unmaterialized changes; use a managed save or to_encrypted first",
+            }));
+        }
+        if !self.worksheet_protection_mutations.is_empty()
+            || !self.worksheet_data_validation_mutations.is_empty()
+            || !self.worksheet_web_binding_mutations.is_empty()
+        {
+            return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation,
+                reason: "worksheet overlays have unmaterialized changes; use a managed save first",
+            }));
+        }
+
         Ok(())
     }
 
@@ -4723,6 +4815,83 @@ mod tests {
         ChartUserShapesRelationshipTarget, Mention, Person, PersonList, ProtectionPasswordVerifier,
         StrongProtectionPasswordVerifier, Table, TableColumn, ThreadedComment, WorksheetChart,
     };
+
+    #[test]
+    fn raw_opc_edit_rejects_invalid_candidate_without_publishing() {
+        let mut created = Workbook::create().unwrap();
+        let initial = created
+            .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
+            .unwrap();
+        let mut workbook = Workbook::new(OpcPackage::from_bytes(&initial).unwrap()).unwrap();
+        let workbook_uri = workbook.workbook_uri.clone();
+        let original = workbook.package.get_part(&workbook_uri).unwrap().blob_arc();
+
+        let error = workbook
+            .edit_opc(|candidate| {
+                assert!(candidate.remove_part(&workbook_uri));
+                Ok(())
+            })
+            .expect_err("an XLSX candidate without its main part must be rejected");
+        assert!(!error.to_string().is_empty());
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            &workbook.package.get_part(&workbook_uri).unwrap().blob_arc()
+        ));
+        assert!(workbook.write_with(|_| Ok(())).is_ok());
+    }
+
+    #[test]
+    fn raw_opc_edit_callback_failure_keeps_the_source_graph_retryable() {
+        let mut created = Workbook::create().unwrap();
+        let initial = created
+            .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
+            .unwrap();
+        let mut workbook = Workbook::new(OpcPackage::from_bytes(&initial).unwrap()).unwrap();
+        let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        let original = workbook
+            .package
+            .get_part(&worksheet_uri)
+            .unwrap()
+            .blob_arc();
+
+        let error = workbook
+            .edit_opc(|candidate| {
+                candidate
+                    .get_part_mut(&worksheet_uri)?
+                    .set_blob(b"<worksheet".to_vec());
+                Err::<(), _>("injected raw edit failure".into())
+            })
+            .expect_err("the callback error must not publish its candidate");
+        assert!(error.to_string().contains("injected raw edit failure"));
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            &workbook
+                .package
+                .get_part(&worksheet_uri)
+                .unwrap()
+                .blob_arc()
+        ));
+        assert!(workbook.write_with(|_| Ok(())).is_ok());
+    }
+
+    #[test]
+    fn raw_opc_edit_rejects_unmaterialized_writer_state() {
+        let mut workbook = Workbook::create().unwrap();
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "managed edit");
+
+        let error = workbook
+            .edit_opc(|_| Ok(()))
+            .expect_err("raw editing must not race a pending legacy-writer edit");
+        assert!(
+            error
+                .to_string()
+                .contains("unmaterialized workbook changes")
+        );
+        assert!(workbook.worksheet_mut(0).is_ok());
+    }
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"

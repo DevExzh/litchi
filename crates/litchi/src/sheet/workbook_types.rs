@@ -32,6 +32,9 @@ pub(super) enum WorkbookImpl {
     // OpenDocument Spreadsheet
     #[cfg(feature = "odf")]
     Ods(std::cell::RefCell<litchi_odf::Spreadsheet>),
+    // Flat OpenDocument Spreadsheet (`.fods`) with its lossless source wrapper
+    #[cfg(feature = "odf")]
+    FlatOds(std::cell::RefCell<litchi_odf::FlatSpreadsheet>),
 
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "xls", feature = "ooxml"))]

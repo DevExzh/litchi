@@ -17,22 +17,20 @@ pub(crate) const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 pub(crate) fn next_object_identifier(package: &IWorkPackage) -> Result<u64> {
     let mut maximum = 0u64;
     for name in package.iwa_entry_names() {
-        for object in package.archive(name)?.objects {
-            let identifier = object.archive_info.identifier.ok_or_else(|| {
-                Error::Archive(format!("Object in {name} has no archive identifier"))
-            })?;
-            maximum = maximum.max(identifier);
-        }
+        package.with_parsed_archive(name, |archive| {
+            for object in &archive.objects {
+                let identifier = object.archive_info.identifier.ok_or_else(|| {
+                    Error::Archive(format!("Object in {name} has no archive identifier"))
+                })?;
+                maximum = maximum.max(identifier);
+            }
+            Ok(())
+        })?;
     }
-    if package.contains_entry(PACKAGE_METADATA_ENTRY) {
-        let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-        let (object_index, message_index) = package_metadata_location(&archive)?;
-        let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-            archive.objects[object_index].messages[message_index]
-                .data
-                .as_slice(),
-        )?;
-        maximum = maximum.max(package_metadata_object_identifier_maximum(&metadata));
+    if let Some(metadata_maximum) = with_package_metadata(package, |metadata| {
+        Ok(package_metadata_object_identifier_maximum(metadata))
+    })? {
+        maximum = maximum.max(metadata_maximum);
     }
     maximum
         .checked_add(1)
@@ -77,45 +75,18 @@ fn package_metadata_object_identifier_maximum(
 }
 
 pub(crate) fn package_last_object_identifier(package: &IWorkPackage) -> Result<Option<u64>> {
-    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
-        return Ok(None);
-    }
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let (object_index, message_index) = package_metadata_location(&archive)?;
-    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-        archive.objects[object_index].messages[message_index]
-            .data
-            .as_slice(),
-    )?;
-    Ok(Some(metadata.last_object_identifier))
+    with_package_metadata(package, |metadata| Ok(metadata.last_object_identifier))
 }
 
 pub(crate) fn package_save_token(package: &IWorkPackage) -> Result<Option<u64>> {
-    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
-        return Ok(None);
-    }
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let (object_index, message_index) = package_metadata_location(&archive)?;
-    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-        archive.objects[object_index].messages[message_index]
-            .data
-            .as_slice(),
-    )?;
-    Ok(metadata.save_token)
+    with_package_metadata(package, |metadata| Ok(metadata.save_token)).map(|value| value.flatten())
 }
 
 pub(crate) fn package_has_data_metadata_map(package: &IWorkPackage) -> Result<bool> {
-    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
-        return Ok(false);
-    }
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let (object_index, message_index) = package_metadata_location(&archive)?;
-    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-        archive.objects[object_index].messages[message_index]
-            .data
-            .as_slice(),
-    )?;
-    Ok(metadata.data_metadata_map.is_some())
+    Ok(
+        with_package_metadata(package, |metadata| Ok(metadata.data_metadata_map.is_some()))?
+            .unwrap_or(false),
+    )
 }
 
 pub(crate) fn set_package_last_object_identifier(
@@ -151,73 +122,59 @@ pub(crate) fn component_identifier_for_entry(
     package: &IWorkPackage,
     entry_name: &str,
 ) -> Result<Option<u64>> {
-    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
-        return Ok(None);
-    }
     let locator = entry_name
         .strip_prefix("Index/")
         .and_then(|name| name.strip_suffix(".iwa"))
         .ok_or_else(|| Error::InvalidFormat(format!("invalid IWA component name {entry_name}")))?;
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let (object_index, message_index) = package_metadata_location(&archive)?;
-    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-        archive.objects[object_index].messages[message_index]
-            .data
-            .as_slice(),
-    )?;
-    let matches = metadata
-        .components
-        .iter()
-        .filter(|component| {
-            component
-                .locator
-                .as_deref()
-                .unwrap_or(&component.preferred_locator)
-                == locator
-        })
-        .map(|component| component.identifier)
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [] => Ok(None),
-        [identifier] => Ok(Some(*identifier)),
-        _ => Err(Error::InvalidFormat(format!(
-            "PackageMetadata contains multiple components for {entry_name}"
-        ))),
-    }
+    with_package_metadata(package, |metadata| {
+        let matches = metadata
+            .components
+            .iter()
+            .filter(|component| {
+                component
+                    .locator
+                    .as_deref()
+                    .unwrap_or(&component.preferred_locator)
+                    == locator
+            })
+            .map(|component| component.identifier)
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [] => Ok(None),
+            [identifier] => Ok(Some(*identifier)),
+            _ => Err(Error::InvalidFormat(format!(
+                "PackageMetadata contains multiple components for {entry_name}"
+            ))),
+        }
+    })
+    .map(|value| value.flatten())
 }
 
 pub(crate) fn component_identifier_for_object_uuid(
     package: &IWorkPackage,
     object_identifier: u64,
 ) -> Result<Option<u64>> {
-    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
-        return Ok(None);
-    }
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let (object_index, message_index) = package_metadata_location(&archive)?;
-    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-        archive.objects[object_index].messages[message_index]
-            .data
-            .as_slice(),
-    )?;
-    let matches = metadata
-        .components
-        .iter()
-        .filter(|component| {
-            component
-                .object_uuid_map_entries
-                .iter()
-                .any(|entry| entry.identifier == object_identifier)
-        })
-        .map(|component| component.identifier)
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [] => Ok(None),
-        [identifier] => Ok(Some(*identifier)),
-        _ => Err(Error::InvalidFormat(format!(
-            "Object {object_identifier} is registered in multiple package components"
-        ))),
-    }
+    with_package_metadata(package, |metadata| {
+        let matches = metadata
+            .components
+            .iter()
+            .filter(|component| {
+                component
+                    .object_uuid_map_entries
+                    .iter()
+                    .any(|entry| entry.identifier == object_identifier)
+            })
+            .map(|component| component.identifier)
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [] => Ok(None),
+            [identifier] => Ok(Some(*identifier)),
+            _ => Err(Error::InvalidFormat(format!(
+                "Object {object_identifier} is registered in multiple package components"
+            ))),
+        }
+    })
+    .map(|value| value.flatten())
 }
 
 pub(crate) fn clone_component_registration(
@@ -875,36 +832,46 @@ pub(crate) fn component_uuid_identifiers(
     package: &IWorkPackage,
     component_identifier: u64,
 ) -> Result<Option<HashSet<u64>>> {
+    with_package_metadata(package, |metadata| {
+        let components = metadata
+            .components
+            .iter()
+            .filter(|component| component.identifier == component_identifier)
+            .collect::<Vec<_>>();
+        if components.len() != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "PackageMetadata must contain exactly one component {component_identifier}"
+            )));
+        }
+        let mut identifiers = HashSet::new();
+        for entry in &components[0].object_uuid_map_entries {
+            if !identifiers.insert(entry.identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "Component {component_identifier} UUID map duplicates object {}",
+                    entry.identifier
+                )));
+            }
+        }
+        Ok(identifiers)
+    })
+}
+
+fn with_package_metadata<T, F>(package: &IWorkPackage, read: F) -> Result<Option<T>>
+where
+    F: FnOnce(&crate::protobuf::tsp::PackageMetadata) -> Result<T>,
+{
     if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
         return Ok(None);
     }
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let (object_index, message_index) = package_metadata_location(&archive)?;
-    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-        archive.objects[object_index].messages[message_index]
-            .data
-            .as_slice(),
-    )?;
-    let components = metadata
-        .components
-        .iter()
-        .filter(|component| component.identifier == component_identifier)
-        .collect::<Vec<_>>();
-    if components.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "PackageMetadata must contain exactly one component {component_identifier}"
-        )));
-    }
-    let mut identifiers = HashSet::new();
-    for entry in &components[0].object_uuid_map_entries {
-        if !identifiers.insert(entry.identifier) {
-            return Err(Error::InvalidFormat(format!(
-                "Component {component_identifier} UUID map duplicates object {}",
-                entry.identifier
-            )));
-        }
-    }
-    Ok(Some(identifiers))
+    package.with_parsed_archive(PACKAGE_METADATA_ENTRY, |archive| {
+        let (object_index, message_index) = package_metadata_location(archive)?;
+        let metadata = crate::protobuf::tsp::PackageMetadata::decode(
+            archive.objects[object_index].messages[message_index]
+                .data
+                .as_slice(),
+        )?;
+        read(&metadata).map(Some)
+    })
 }
 
 fn fresh_unique_uuid(existing: &mut HashSet<(u64, u64)>) -> crate::protobuf::tsp::Uuid {
@@ -1099,22 +1066,25 @@ pub(crate) fn release_package_identifier_suffix(
     }
     let mut maximum_remaining = 0u64;
     for name in package.iwa_entry_names() {
-        for object in package.archive(name)?.objects {
-            let identifier = object.archive_info.identifier.ok_or_else(|| {
-                Error::Archive(format!("Object in {name} has no archive identifier"))
-            })?;
-            if identifier == last {
-                return Err(Error::InvalidFormat(format!(
-                    "Cannot release PackageMetadata identifier {last}: the object remains"
-                )));
+        package.with_parsed_archive(name, |archive| {
+            for object in &archive.objects {
+                let identifier = object.archive_info.identifier.ok_or_else(|| {
+                    Error::Archive(format!("Object in {name} has no archive identifier"))
+                })?;
+                if identifier == last {
+                    return Err(Error::InvalidFormat(format!(
+                        "Cannot release PackageMetadata identifier {last}: the object remains"
+                    )));
+                }
+                if identifier > last {
+                    return Err(Error::InvalidFormat(format!(
+                        "Cannot release PackageMetadata identifier suffix: object {identifier} remains"
+                    )));
+                }
+                maximum_remaining = maximum_remaining.max(identifier);
             }
-            if identifier > last {
-                return Err(Error::InvalidFormat(format!(
-                    "Cannot release PackageMetadata identifier suffix: object {identifier} remains"
-                )));
-            }
-            maximum_remaining = maximum_remaining.max(identifier);
-        }
+            Ok(())
+        })?;
     }
     last = maximum_remaining;
     set_package_last_object_identifier(package, last)

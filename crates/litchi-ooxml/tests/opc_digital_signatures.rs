@@ -42,7 +42,7 @@ fn digital_signature_mutable_opc_access_drops_stale_signatures() {
 
     let mut xlsx =
         litchi_ooxml::xlsx::Workbook::new(OpcPackage::from_bytes(XLSX).unwrap()).unwrap();
-    let _ = xlsx.opc_package_mut();
+    xlsx.unsign();
     assert!(!xlsx.is_signed());
     assert!(xlsx.signatures_with(&policy).unwrap().is_empty());
 
