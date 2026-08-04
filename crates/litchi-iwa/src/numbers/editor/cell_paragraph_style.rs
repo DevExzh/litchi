@@ -1291,6 +1291,7 @@ fn text_style_key(
     .map(|data| BncCell::parse(&data).map(|cell| cell.text_style_identifier()))
     .transpose()
     .map(Option::flatten)
+    .map_err(Into::into)
 }
 
 fn style_entry(
@@ -1421,6 +1422,7 @@ fn read_bnc(
         column,
     )?
     .map_or_else(|| Ok(BncCell::minimal()), |data| BncCell::parse(&data))
+    .map_err(Into::into)
 }
 
 fn write_text_style_key(

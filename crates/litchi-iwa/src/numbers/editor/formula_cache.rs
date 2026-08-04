@@ -1171,6 +1171,7 @@ fn read_cell(
         .as_deref()
         .map(BncCell::parse)
         .transpose()
+        .map_err(Into::into)
 }
 
 #[derive(Debug, Default)]

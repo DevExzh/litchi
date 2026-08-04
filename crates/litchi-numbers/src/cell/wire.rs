@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::{Error, Result};
+use std::fmt;
 
 const BNC_VERSION: u8 = 5;
 const BNC_PREFIX_LEN: usize = 8;
@@ -21,46 +21,97 @@ const DECIMAL128_COEFFICIENT_BITS: u32 = 113;
 const DECIMAL128_SIGN_BIT: u32 = 127;
 const SECONDS_PER_DAY: f64 = 86_400.0;
 
-pub(crate) const DECIMAL_FLAG: u32 = 0x000001;
-pub(crate) const NUMBER_FLAG: u32 = 0x000002;
-pub(crate) const DATE_FLAG: u32 = 0x000004;
-pub(crate) const STRING_FLAG: u32 = 0x000008;
-pub(crate) const RICH_TEXT_FLAG: u32 = 0x000010;
-pub(crate) const STYLE_FLAG: u32 = 0x000020;
-pub(crate) const TEXT_STYLE_FLAG: u32 = 0x000040;
-pub(crate) const CONDITIONAL_STYLE_FLAG: u32 = 0x000080;
-pub(crate) const CONDITIONAL_STYLE_APPLIED_RULE_FLAG: u32 = 0x000100;
-pub(crate) const FORMULA_FLAG: u32 = 0x000200;
-const CONTROL_CELL_SPEC_FLAG: u32 = 0x000400;
-pub(crate) const FORMULA_ERROR_FLAG: u32 = 0x000800;
-pub(crate) const COMMENT_FLAG: u32 = 0x080000;
-const CELL_FORMAT_KIND_FLAG: u32 = 0x001000;
-const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x002000;
-const CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x004000;
-const DATE_TIME_FORMAT_IDENTIFIER_FLAG: u32 = 0x008000;
-const DURATION_FORMAT_IDENTIFIER_FLAG: u32 = 0x010000;
-const TEXT_FORMAT_IDENTIFIER_FLAG: u32 = 0x020000;
-const CHECKBOX_FORMAT_IDENTIFIER_FLAG: u32 = 0x040000;
+pub const DECIMAL_FLAG: u32 = 0x0000_0001;
+pub const NUMBER_FLAG: u32 = 0x0000_0002;
+pub const DATE_FLAG: u32 = 0x0000_0004;
+pub const STRING_FLAG: u32 = 0x0000_0008;
+pub const RICH_TEXT_FLAG: u32 = 0x0000_0010;
+pub const STYLE_FLAG: u32 = 0x0000_0020;
+pub const TEXT_STYLE_FLAG: u32 = 0x0000_0040;
+pub const CONDITIONAL_STYLE_FLAG: u32 = 0x0000_0080;
+pub const CONDITIONAL_STYLE_APPLIED_RULE_FLAG: u32 = 0x0000_0100;
+pub const FORMULA_FLAG: u32 = 0x0000_0200;
+const CONTROL_CELL_SPEC_FLAG: u32 = 0x0000_0400;
+pub const FORMULA_ERROR_FLAG: u32 = 0x0000_0800;
+pub const COMMENT_FLAG: u32 = 0x0008_0000;
+const CELL_FORMAT_KIND_FLAG: u32 = 0x0000_1000;
+const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_2000;
+const CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_4000;
+const DATE_TIME_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_8000;
+const DURATION_FORMAT_IDENTIFIER_FLAG: u32 = 0x0001_0000;
+const TEXT_FORMAT_IDENTIFIER_FLAG: u32 = 0x0002_0000;
+const CHECKBOX_FORMAT_IDENTIFIER_FLAG: u32 = 0x0004_0000;
 const EXPLICIT_FORMAT_FLAGS_START: usize = 6;
 const EXPLICIT_FORMAT_FLAGS_END: usize = 8;
-pub(crate) const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
-pub(crate) const EXPLICIT_CURRENCY_FORMAT: u16 = 0x0803;
-pub(crate) const EXPLICIT_DATE_TIME_FORMAT: u16 = 0x0008;
-pub(crate) const EXPLICIT_DURATION_FORMAT: u16 = 0x0005;
-pub(crate) const EXPLICIT_CHECKBOX_FORMAT: u16 = 0x0020;
-pub(crate) const EXPLICIT_TEXT_FORMAT: u16 = 0x0080;
-pub(crate) const EXPLICIT_CONVERTED_TEXT_FORMAT: u16 =
-    EXPLICIT_TEXT_FORMAT | EXPLICIT_DECIMAL_FORMAT;
-pub(crate) const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
-pub(crate) const CURRENCY_CELL_FORMAT_KIND: u32 = 2;
-pub(crate) const DATE_TIME_CELL_FORMAT_KIND: u32 = 3;
-pub(crate) const DURATION_CELL_FORMAT_KIND: u32 = 4;
-pub(crate) const CHECKBOX_CELL_FORMAT_KIND: u32 = 6;
-pub(crate) const STAR_RATING_CELL_FORMAT_KIND: u32 = DECIMAL_CELL_FORMAT_KIND;
-pub(crate) const TEXT_CELL_FORMAT_KIND: u32 = 5;
+pub const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
+pub const EXPLICIT_CURRENCY_FORMAT: u16 = 0x0803;
+pub const EXPLICIT_DATE_TIME_FORMAT: u16 = 0x0008;
+pub const EXPLICIT_DURATION_FORMAT: u16 = 0x0005;
+pub const EXPLICIT_CHECKBOX_FORMAT: u16 = 0x0020;
+pub const EXPLICIT_TEXT_FORMAT: u16 = 0x0080;
+pub const EXPLICIT_CONVERTED_TEXT_FORMAT: u16 = EXPLICIT_TEXT_FORMAT | EXPLICIT_DECIMAL_FORMAT;
+pub const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
+pub const CURRENCY_CELL_FORMAT_KIND: u32 = 2;
+pub const DATE_TIME_CELL_FORMAT_KIND: u32 = 3;
+pub const DURATION_CELL_FORMAT_KIND: u32 = 4;
+pub const CHECKBOX_CELL_FORMAT_KIND: u32 = 6;
+pub const STAR_RATING_CELL_FORMAT_KIND: u32 = DECIMAL_CELL_FORMAT_KIND;
+pub const TEXT_CELL_FORMAT_KIND: u32 = 5;
+
+const VALUE_FLAGS: u32 = DECIMAL_FLAG
+    | NUMBER_FLAG
+    | DATE_FLAG
+    | STRING_FLAG
+    | RICH_TEXT_FLAG
+    | FORMULA_FLAG
+    | FORMULA_ERROR_FLAG;
+
+pub const FIELD_LAYOUT: &[(u32, usize)] = &[
+    (0x0000_0001, 16),
+    (0x0000_0002, 8),
+    (0x0000_0004, 8),
+    (0x0000_0008, 4),
+    (0x0000_0010, 4),
+    (0x0000_0020, 4),
+    (0x0000_0040, 4),
+    (0x0000_0080, 4),
+    (0x0000_0100, 4),
+    (0x0000_0200, 4),
+    (0x0000_0400, 4),
+    (0x0000_0800, 4),
+    (0x0000_1000, 4),
+    (0x0000_2000, 4),
+    (0x0000_4000, 4),
+    (0x0000_8000, 4),
+    (0x0001_0000, 4),
+    (0x0002_0000, 4),
+    (0x0004_0000, 4),
+    (0x0008_0000, 4),
+    (0x0010_0000, 4),
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error {
+    InvalidFormat(String),
+    ParseError(String),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidFormat(message) | Self::ParseError(message) => {
+                formatter.write_str(message)
+            },
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CellDataFormatKind {
+pub enum CellDataFormatKind {
     NumberOrPercentage,
     Currency,
     DateTime,
@@ -73,47 +124,15 @@ pub(crate) enum CellDataFormatKind {
     PopUpMenu,
 }
 
-const VALUE_FLAGS: u32 = DECIMAL_FLAG
-    | NUMBER_FLAG
-    | DATE_FLAG
-    | STRING_FLAG
-    | RICH_TEXT_FLAG
-    | FORMULA_FLAG
-    | FORMULA_ERROR_FLAG;
-
-pub(crate) const FIELD_LAYOUT: &[(u32, usize)] = &[
-    (0x000001, 16),
-    (0x000002, 8),
-    (0x000004, 8),
-    (0x000008, 4),
-    (0x000010, 4),
-    (0x000020, 4),
-    (0x000040, 4),
-    (0x000080, 4),
-    (0x000100, 4),
-    (0x000200, 4),
-    (0x000400, 4),
-    (0x000800, 4),
-    (0x001000, 4),
-    (0x002000, 4),
-    (0x004000, 4),
-    (0x008000, 4),
-    (0x010000, 4),
-    (0x020000, 4),
-    (0x040000, 4),
-    (0x080000, 4),
-    (0x100000, 4),
-];
-
 #[derive(Debug, Clone)]
-pub(crate) struct BncCell {
+pub struct BncCell {
     prefix: [u8; BNC_PREFIX_LEN],
     fields: BTreeMap<u32, Vec<u8>>,
     tail: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum StoredValue {
+pub enum StoredValue {
     Empty,
     Number,
     Text(u32),
@@ -127,7 +146,7 @@ pub(crate) enum StoredValue {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum CachedScalar {
+pub enum CachedScalar {
     Number(f64),
     Boolean(bool),
     Date(f64),
@@ -136,7 +155,13 @@ pub(crate) enum CachedScalar {
 }
 
 impl BncCell {
-    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+    /// Parses one Numbers BNC cell while retaining unknown trailing bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell is truncated, uses an unsupported
+    /// version, or contains an unknown field flag.
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < BNC_HEADER_LEN {
             return Err(Error::ParseError(
                 "Truncated Numbers BNC cell header".to_string(),
@@ -185,7 +210,9 @@ impl BncCell {
         })
     }
 
-    pub(crate) fn minimal() -> Self {
+    /// Creates the smallest writable BNC cell.
+    #[must_use]
+    pub fn minimal() -> Self {
         let mut prefix = [0; BNC_PREFIX_LEN];
         prefix[0] = BNC_VERSION;
         Self {
@@ -195,7 +222,7 @@ impl BncCell {
         }
     }
 
-    pub(crate) fn stored_value(&self) -> StoredValue {
+    pub fn stored_value(&self) -> StoredValue {
         if let Some(identifier) = self.u32_field(FORMULA_FLAG) {
             return StoredValue::Formula(identifier);
         }
@@ -222,7 +249,13 @@ impl BncCell {
         }
     }
 
-    pub(crate) fn set_number(&mut self, value: f64) -> Result<()> {
+    /// Replaces the cell value with a number using its current data format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is non-finite or cannot be encoded as a
+    /// Numbers decimal value.
+    pub fn set_number(&mut self, value: f64) -> Result<()> {
         if !value.is_finite() {
             return Err(Error::ParseError(
                 "Numbers cells cannot store a non-finite numeric value".to_string(),
@@ -240,7 +273,13 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn set_plain_number(&mut self, value: f64) -> Result<()> {
+    /// Replaces the cell value with a plain numeric BNC value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is non-finite or cannot be encoded as a
+    /// Numbers decimal value.
+    pub fn set_plain_number(&mut self, value: f64) -> Result<()> {
         if !value.is_finite() {
             return Err(Error::ParseError(
                 "Numbers cells cannot store a non-finite numeric value".to_string(),
@@ -254,7 +293,7 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn set_boolean(&mut self, value: bool) {
+    pub fn set_boolean(&mut self, value: bool) {
         self.replace_value(
             CELL_TYPE_BOOLEAN,
             NUMBER_FLAG,
@@ -262,7 +301,12 @@ impl BncCell {
         );
     }
 
-    pub(crate) fn set_duration(&mut self, value: f64) -> Result<()> {
+    /// Replaces the cell value with a duration measured in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is non-finite.
+    pub fn set_duration(&mut self, value: f64) -> Result<()> {
         if !value.is_finite() {
             return Err(Error::ParseError(
                 "Numbers cells cannot store a non-finite duration".to_string(),
@@ -276,7 +320,12 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn set_date(&mut self, value: f64) -> Result<()> {
+    /// Replaces the cell value with a date/time serial value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is non-finite.
+    pub fn set_date(&mut self, value: f64) -> Result<()> {
         if !value.is_finite() {
             return Err(Error::ParseError(
                 "Numbers cells cannot store a non-finite date".to_string(),
@@ -286,7 +335,7 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn set_string(&mut self, identifier: u32) {
+    pub fn set_string(&mut self, identifier: u32) {
         self.replace_value(
             CELL_TYPE_TEXT,
             STRING_FLAG,
@@ -294,7 +343,7 @@ impl BncCell {
         );
     }
 
-    pub(crate) fn set_rich_text(&mut self, identifier: u32) {
+    pub fn set_rich_text(&mut self, identifier: u32) {
         self.replace_value(
             CELL_TYPE_RICH_TEXT_OR_NUMBER,
             RICH_TEXT_FLAG,
@@ -302,7 +351,7 @@ impl BncCell {
         );
     }
 
-    pub(crate) fn set_formula_reference(&mut self, identifier: u32) {
+    pub fn set_formula_reference(&mut self, identifier: u32) {
         // Formula references coexist with the cached result value and its cell
         // type in app-generated BNC. The caller seeds a numeric cache before
         // attaching the formula when the target cell was empty.
@@ -316,7 +365,13 @@ impl BncCell {
         self.fields.remove(&FORMULA_ERROR_FLAG);
     }
 
-    pub(crate) fn cached_scalar(&self) -> Result<Option<CachedScalar>> {
+    /// Reads the cached scalar value retained alongside a formula.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a numeric field has an invalid byte width or a
+    /// decimal128 field cannot be decoded.
+    pub fn cached_scalar(&self) -> Result<Option<CachedScalar>> {
         let scalar = match self.prefix[1] {
             CELL_TYPE_NUMBER | CELL_TYPE_RICH_TEXT_OR_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => self
                 .fields
@@ -354,7 +409,13 @@ impl BncCell {
         Ok(scalar)
     }
 
-    pub(crate) fn set_formula_cached_number(&mut self, value: f64) -> Result<()> {
+    /// Replaces a formula's cached result with a number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell has no formula or `value` is not a
+    /// finite Numbers value.
+    pub fn set_formula_cached_number(&mut self, value: f64) -> Result<()> {
         let formula = self.formula_identifier()?;
         self.set_number(value)?;
         self.fields
@@ -362,7 +423,12 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn set_formula_cached_boolean(&mut self, value: bool) -> Result<()> {
+    /// Replaces a formula's cached result with a boolean.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell has no formula.
+    pub fn set_formula_cached_boolean(&mut self, value: bool) -> Result<()> {
         let formula = self.formula_identifier()?;
         self.set_boolean(value);
         self.fields
@@ -370,47 +436,56 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn formula_error_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn formula_error_identifier(&self) -> Option<u32> {
         self.u32_field(FORMULA_ERROR_FLAG)
     }
 
-    pub(crate) fn comment_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn comment_identifier(&self) -> Option<u32> {
         self.u32_field(COMMENT_FLAG)
     }
 
-    pub(crate) fn style_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn style_identifier(&self) -> Option<u32> {
         self.u32_field(STYLE_FLAG)
     }
 
-    pub(crate) fn text_style_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn text_style_identifier(&self) -> Option<u32> {
         self.u32_field(TEXT_STYLE_FLAG)
     }
 
-    pub(crate) fn conditional_style_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn conditional_style_identifier(&self) -> Option<u32> {
         self.u32_field(CONDITIONAL_STYLE_FLAG)
     }
 
-    pub(crate) fn conditional_style_applied_rule(&self) -> Option<u32> {
+    #[must_use]
+    pub fn conditional_style_applied_rule(&self) -> Option<u32> {
         self.u32_field(CONDITIONAL_STYLE_APPLIED_RULE_FLAG)
     }
 
-    pub(crate) fn explicit_format_flags(&self) -> u16 {
-        u16::from_le_bytes(
-            self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
-                .try_into()
-                .expect("fixed BNC prefix range"),
-        )
+    #[must_use]
+    pub fn explicit_format_flags(&self) -> u16 {
+        u16::from_le_bytes([
+            self.prefix[EXPLICIT_FORMAT_FLAGS_START],
+            self.prefix[EXPLICIT_FORMAT_FLAGS_START + 1],
+        ])
     }
 
-    pub(crate) fn cell_format_kind(&self) -> Option<u32> {
+    #[must_use]
+    pub fn cell_format_kind(&self) -> Option<u32> {
         self.u32_field(CELL_FORMAT_KIND_FLAG)
     }
 
-    pub(crate) fn control_cell_spec_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn control_cell_spec_identifier(&self) -> Option<u32> {
         self.u32_field(CONTROL_CELL_SPEC_FLAG)
     }
 
-    pub(crate) fn format_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn format_identifier(&self) -> Option<u32> {
         match self.cell_format_kind() {
             Some(CURRENCY_CELL_FORMAT_KIND) => self.u32_field(CURRENCY_FORMAT_IDENTIFIER_FLAG),
             Some(DATE_TIME_CELL_FORMAT_KIND) => self.u32_field(DATE_TIME_FORMAT_IDENTIFIER_FLAG),
@@ -421,16 +496,24 @@ impl BncCell {
         }
     }
 
-    pub(crate) fn secondary_format_identifier(&self) -> Option<u32> {
+    #[must_use]
+    pub fn secondary_format_identifier(&self) -> Option<u32> {
         match self.cell_format_kind() {
-            Some(CURRENCY_CELL_FORMAT_KIND) | Some(DURATION_CELL_FORMAT_KIND) => {
+            Some(CURRENCY_CELL_FORMAT_KIND | DURATION_CELL_FORMAT_KIND) => {
                 self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG)
             },
             _ => None,
         }
     }
 
-    pub(crate) fn set_data_format_identifier(
+    /// Applies a Numbers data format and its identifier to the cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an interactive format has no control-cell
+    /// identifier, when a non-interactive format has one, or when a text
+    /// format would discard a non-text scalar.
+    pub fn set_data_format_identifier(
         &mut self,
         identifier: u32,
         kind: CellDataFormatKind,
@@ -593,10 +676,10 @@ impl BncCell {
                 (EXPLICIT_TEXT_FORMAT, TEXT_CELL_FORMAT_KIND)
             },
         };
-        if let Some(control_identifier) = control_identifier {
+        if let Some(control_identifier_value) = control_identifier {
             self.fields.insert(
                 CONTROL_CELL_SPEC_FLAG,
-                control_identifier.to_le_bytes().to_vec(),
+                control_identifier_value.to_le_bytes().to_vec(),
             );
         }
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
@@ -606,7 +689,7 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn clear_explicit_format(&mut self) {
+    pub fn clear_explicit_format(&mut self) {
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END].fill(0);
         self.fields.remove(&CELL_FORMAT_KIND_FLAG);
         self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
@@ -638,13 +721,14 @@ impl BncCell {
         }
         let formula_identifier = self.u32_field(FORMULA_FLAG);
         match (kind, self.cached_scalar()?) {
-            (CellDataFormatKind::Checkbox, Some(CachedScalar::Number(value))) => {
-                self.set_boolean(value != 0.0);
-            },
-            (CellDataFormatKind::Checkbox, Some(CachedScalar::Date(value))) => {
-                self.set_boolean(value != 0.0);
-            },
-            (CellDataFormatKind::Checkbox, Some(CachedScalar::Duration(value))) => {
+            (
+                CellDataFormatKind::Checkbox,
+                Some(
+                    CachedScalar::Number(value)
+                    | CachedScalar::Date(value)
+                    | CachedScalar::Duration(value),
+                ),
+            ) => {
                 self.set_boolean(value != 0.0);
             },
             (CellDataFormatKind::Checkbox, None) => self.set_boolean(false),
@@ -693,60 +777,58 @@ impl BncCell {
         Ok(())
     }
 
-    pub(crate) fn set_style_identifier(&mut self, identifier: Option<u32>) {
-        if let Some(identifier) = identifier {
+    pub fn set_style_identifier(&mut self, identifier: Option<u32>) {
+        if let Some(identifier_value) = identifier {
             self.fields
-                .insert(STYLE_FLAG, identifier.to_le_bytes().to_vec());
+                .insert(STYLE_FLAG, identifier_value.to_le_bytes().to_vec());
         } else {
             self.fields.remove(&STYLE_FLAG);
         }
     }
 
-    pub(crate) fn set_text_style_identifier(&mut self, identifier: Option<u32>) {
-        if let Some(identifier) = identifier {
+    pub fn set_text_style_identifier(&mut self, identifier: Option<u32>) {
+        if let Some(identifier_value) = identifier {
             self.fields
-                .insert(TEXT_STYLE_FLAG, identifier.to_le_bytes().to_vec());
+                .insert(TEXT_STYLE_FLAG, identifier_value.to_le_bytes().to_vec());
         } else {
             self.fields.remove(&TEXT_STYLE_FLAG);
         }
     }
 
-    pub(crate) fn set_comment_identifier(&mut self, identifier: Option<u32>) {
-        if let Some(identifier) = identifier {
+    pub fn set_comment_identifier(&mut self, identifier: Option<u32>) {
+        if let Some(identifier_value) = identifier {
             self.fields
-                .insert(COMMENT_FLAG, identifier.to_le_bytes().to_vec());
+                .insert(COMMENT_FLAG, identifier_value.to_le_bytes().to_vec());
         } else {
             self.fields.remove(&COMMENT_FLAG);
         }
     }
 
-    pub(crate) fn set_conditional_style(
-        &mut self,
-        identifier: Option<u32>,
-        applied_rule: Option<u32>,
-    ) {
-        if let Some(identifier) = identifier {
-            self.fields
-                .insert(CONDITIONAL_STYLE_FLAG, identifier.to_le_bytes().to_vec());
+    pub fn set_conditional_style(&mut self, identifier: Option<u32>, applied_rule: Option<u32>) {
+        if let Some(identifier_value) = identifier {
+            self.fields.insert(
+                CONDITIONAL_STYLE_FLAG,
+                identifier_value.to_le_bytes().to_vec(),
+            );
         } else {
             self.fields.remove(&CONDITIONAL_STYLE_FLAG);
         }
-        if let Some(applied_rule) = applied_rule {
+        if let Some(applied_rule_value) = applied_rule {
             self.fields.insert(
                 CONDITIONAL_STYLE_APPLIED_RULE_FLAG,
-                applied_rule.to_le_bytes().to_vec(),
+                applied_rule_value.to_le_bytes().to_vec(),
             );
         } else {
             self.fields.remove(&CONDITIONAL_STYLE_APPLIED_RULE_FLAG);
         }
     }
 
-    pub(crate) fn clear_value_preserving_metadata(&mut self) {
+    pub fn clear_value_preserving_metadata(&mut self) {
         self.prefix[1] = CELL_TYPE_EMPTY;
         self.fields.retain(|field, _| VALUE_FLAGS & field == 0);
     }
 
-    pub(crate) fn encode(&self) -> Vec<u8> {
+    pub fn encode(&self) -> Vec<u8> {
         let flags = self.fields.keys().fold(0u32, |mask, flag| mask | flag);
         let field_len = self.fields.values().map(Vec::len).sum::<usize>();
         let mut output = Vec::with_capacity(BNC_HEADER_LEN + field_len + self.tail.len());
@@ -784,7 +866,7 @@ impl BncCell {
 fn read_f64_le(data: &[u8]) -> Result<f64> {
     let bytes: [u8; 8] = data
         .try_into()
-        .map_err(|_| Error::ParseError("Expected an eight-byte Numbers field".to_owned()))?;
+        .map_err(|_error| Error::ParseError("Expected an eight-byte Numbers field".to_owned()))?;
     Ok(f64::from_le_bytes(bytes))
 }
 
@@ -798,7 +880,12 @@ fn spreadsheet_days_to_seconds(days: f64) -> Result<f64> {
     Ok(seconds)
 }
 
-pub(crate) fn read_decimal128_le(data: &[u8]) -> Result<f64> {
+/// Decodes a little-endian IEEE 754 decimal128 value from a Numbers field.
+///
+/// # Errors
+///
+/// Returns an error when `data` is not exactly one decimal128 value.
+pub fn read_decimal128_le(data: &[u8]) -> Result<f64> {
     if data.len() != 16 {
         return Err(Error::ParseError(
             "Expected a sixteen-byte Numbers decimal128 field".to_owned(),
@@ -820,7 +907,12 @@ pub(crate) fn read_decimal128_le(data: &[u8]) -> Result<f64> {
 /// Encode the finite `f64`'s shortest round-tripping decimal spelling into
 /// the little-endian IEEE 754 decimal128 layout used by Numbers BNC cells and
 /// formula AST compatibility fields.
-pub(crate) fn decimal128_le(value: f64) -> Result<[u8; 16]> {
+///
+/// # Errors
+///
+/// Returns an error when `value` is non-finite, its coefficient exceeds the
+/// decimal128 precision, or its exponent cannot be represented.
+pub fn decimal128_le(value: f64) -> Result<[u8; 16]> {
     if !value.is_finite() {
         return Err(Error::ParseError(
             "Numbers cannot encode a non-finite decimal value".to_owned(),
@@ -843,42 +935,45 @@ pub(crate) fn decimal128_le(value: f64) -> Result<[u8; 16]> {
             "Could not encode Numbers decimal {spelling:?}"
         )));
     }
-    let fractional_digits = mantissa
+    let fractional_digit_count = mantissa
         .split_once('.')
         .map_or(0usize, |(_, fraction)| fraction.len());
-    let mut digits = mantissa
+    let mut digit_bytes = mantissa
         .bytes()
         .filter(|byte| *byte != b'.')
         .collect::<Vec<_>>();
-    while digits.len() > 1 && digits.first() == Some(&b'0') {
-        digits.remove(0);
+    while digit_bytes.len() > 1 && digit_bytes.first() == Some(&b'0') {
+        digit_bytes.remove(0);
     }
     let mut trailing_zeroes = 0i32;
-    while digits.len() > 1 && digits.last() == Some(&b'0') {
-        digits.pop();
+    while digit_bytes.len() > 1 && digit_bytes.last() == Some(&b'0') {
+        digit_bytes.pop();
         trailing_zeroes += 1;
     }
-    let digits = std::str::from_utf8(&digits)
-        .map_err(|_| Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}")))?;
-    let coefficient = digits
-        .parse::<u128>()
-        .map_err(|_| Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}")))?;
+    let digit_text = std::str::from_utf8(&digit_bytes).map_err(|_error| {
+        Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}"))
+    })?;
+    let coefficient = digit_text.parse::<u128>().map_err(|_error| {
+        Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}"))
+    })?;
     if coefficient >= (1u128 << DECIMAL128_COEFFICIENT_BITS) {
         return Err(Error::ParseError(
             "Numbers decimal coefficient exceeds 113 bits".to_owned(),
         ));
     }
-    let fractional_digits = i32::try_from(fractional_digits)
-        .map_err(|_| Error::ParseError("Numbers decimal exponent overflow".to_owned()))?;
+    let fractional_digits_i32 = i32::try_from(fractional_digit_count)
+        .map_err(|_error| Error::ParseError("Numbers decimal exponent overflow".to_owned()))?;
     let exponent = explicit_exponent
-        .checked_sub(fractional_digits)
-        .and_then(|value| value.checked_add(trailing_zeroes))
+        .checked_sub(fractional_digits_i32)
+        .and_then(|exponent_value| exponent_value.checked_add(trailing_zeroes))
         .ok_or_else(|| Error::ParseError("Numbers decimal exponent overflow".to_owned()))?;
     let biased_exponent = exponent
         .checked_add(DECIMAL128_EXPONENT_BIAS)
-        .filter(|value| (0..=0x3fff).contains(value))
+        .filter(|exponent_value| (0..=0x3fff).contains(exponent_value))
         .ok_or_else(|| Error::ParseError("Numbers decimal exponent is out of range".to_owned()))?;
-    let mut encoded = coefficient | ((biased_exponent as u128) << DECIMAL128_COEFFICIENT_BITS);
+    let biased_exponent_u128 = u128::try_from(biased_exponent)
+        .map_err(|_error| Error::ParseError("Numbers decimal exponent is negative".to_owned()))?;
+    let mut encoded = coefficient | (biased_exponent_u128 << DECIMAL128_COEFFICIENT_BITS);
     if negative {
         encoded |= 1u128 << DECIMAL128_SIGN_BIT;
     }

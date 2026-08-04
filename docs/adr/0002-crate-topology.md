@@ -87,6 +87,17 @@ the canonical values are exposed only from the new leaf crate, and no archive
 or protobuf code crosses into it. The remaining Numbers table, formula, sheet,
 and package owners follow the same downward-only extraction pattern.
 
+The first Numbers wire seam is now `litchi-numbers::cell::wire`. It owns the
+dependency-free, byte-preserving BNC codec, stored-value and cached-scalar
+views, data-format identifiers, and decimal128 codec; it preserves unknown
+trailing bytes for round trips. `litchi-iwa` retains archive traversal,
+protobuf integration, and package mutation, exposing the wire module only
+through a private migration adapter and converting its local error at that
+boundary. This is an ownership move, not a compatibility surface. The next
+Numbers slice remains the table/sheet/formula model, while the wire owner can
+later add borrowed decoding and compact field storage without reopening the
+archive boundary.
+
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
 `plot_area`, `reader`, and `writer`; the public codec verbs are the short

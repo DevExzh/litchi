@@ -38,10 +38,21 @@ pub mod sheet;
 pub mod table;
 pub mod table_extractor;
 
-mod bnc;
+pub(crate) use litchi_numbers::cell::wire as bnc;
 mod formula_owner;
 mod function_map;
 mod table_uid_map;
+
+impl From<litchi_numbers::cell::wire::Error> for crate::Error {
+    fn from(error: litchi_numbers::cell::wire::Error) -> Self {
+        match error {
+            litchi_numbers::cell::wire::Error::InvalidFormat(message) => {
+                Self::InvalidFormat(message)
+            },
+            litchi_numbers::cell::wire::Error::ParseError(message) => Self::ParseError(message),
+        }
+    }
+}
 
 pub(crate) use cell::CellValue;
 pub use creation::NumbersDocumentBuilder;

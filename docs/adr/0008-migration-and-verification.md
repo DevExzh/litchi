@@ -5749,9 +5749,14 @@ The adapters and the three corresponding `litchi-iwa` dependency edges are
 staged ownership work, not compatibility API; their exit is to move the owning
 readers before deleting the adapters. The Numbers value slice now owns
 `litchi-numbers::cell::{Value, Type, Update}` and leaves only a monolith-local
-private adapter for the remaining reader/editor migration. The next slice
-should extract Numbers table/sheet/formula values and then migrate the
-Pages/Keynote reader boundaries.
+private adapter for the remaining reader/editor migration. The BNC wire slice
+now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
+CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
+the monolith retains only a private module alias plus its archive/protobuf
+callers. Its 19 leaf tests, 1,508 IWA tests, boundary check, and native Numbers
+open/edit/save/reopen smoke cover the extraction. The next slice should extract
+Numbers table/sheet/formula values and then migrate the Pages/Keynote reader
+boundaries.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
