@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod calc;
+pub mod date_utils;
 pub mod raw;
 
 pub use raw::Error;
