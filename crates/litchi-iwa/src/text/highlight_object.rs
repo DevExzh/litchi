@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use prost::Message;
 
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{IWorkCommentUuid, fresh_comment_storage_uuid, insert_comment_storage};
 use crate::protobuf::{tsd, tsp, tswp};
 use crate::wire::patch_length_delimited_field;
@@ -114,16 +114,26 @@ fn validate_uuid(identifier: u64, uuid: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn validate_annotation_graph(
     package: &IWorkPackage,
     archive_name: &str,
     identifier: u64,
     object: &ArchiveObject,
 ) -> Result<Option<AnnotationGraph>> {
+    let archive = package.archive(archive_name)?;
+    validate_annotation_graph_in_archive(&archive, identifier, object)
+}
+
+pub(super) fn validate_annotation_graph_in_archive(
+    archive: &Archive,
+    identifier: u64,
+    object: &ArchiveObject,
+) -> Result<Option<AnnotationGraph>> {
     let Some(comment_storage_id) = validate_highlight_object(identifier, object)? else {
         return Ok(None);
     };
-    let root = validate_comment_node(package, archive_name, identifier, comment_storage_id)?;
+    let root = validate_comment_node(archive, identifier, comment_storage_id)?;
     if root.body.is_empty() && !root.reply_ids.is_empty() {
         return Err(Error::InvalidFormat(format!(
             "plain highlight {identifier} unexpectedly owns comment replies"
@@ -138,7 +148,7 @@ pub(super) fn validate_annotation_graph(
                 "text annotation {identifier} has a cyclic or duplicate reply {reply_id}"
             )));
         }
-        let reply = validate_comment_node(package, archive_name, identifier, reply_id)?;
+        let reply = validate_comment_node(archive, identifier, reply_id)?;
         if reply.body.is_empty() || !reply.reply_ids.is_empty() {
             return Err(Error::InvalidFormat(format!(
                 "text annotation {identifier} reply {reply_id} must be nonempty and cannot own nested replies"
@@ -181,12 +191,10 @@ pub(super) fn validate_plain_highlight_graph(
 }
 
 fn validate_comment_node(
-    package: &IWorkPackage,
-    archive_name: &str,
+    archive: &Archive,
     annotation_id: u64,
     storage_id: u64,
 ) -> Result<CommentNode> {
-    let archive = package.archive(archive_name)?;
     let object = archive.object(storage_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} references missing comment storage {storage_id}"
