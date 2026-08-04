@@ -231,12 +231,7 @@ pub use sheet_protection::{
     replace_worksheet_protection, validate_worksheet_protection_metadata,
     write_worksheet_protection,
 };
-pub use sheet_view::{
-    PivotAreaType, PivotSelectionAxis, WorksheetCellReference, WorksheetPanePosition,
-    WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,
-    WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
-    WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
-};
+pub use sheet_view::parse_worksheet_views;
 pub use slicer_cache::{
     SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, SlicerCacheData,
     SlicerCacheDataKind, SlicerCacheDefinition, SlicerCacheExtensionList, SlicerCachePivotTable,

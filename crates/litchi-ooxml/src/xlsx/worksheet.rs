@@ -25,7 +25,7 @@ use super::data_validation::{Collection, Validation, parse_data_validation_colle
 use super::drawing::parse_drawing_xml;
 use super::format::{CellFill, CellFont, CellFormat};
 use super::header_footer::{Settings, parse_worksheet_header_footer};
-use super::named_sheet_view::{Views, discover_named_sheet_views};
+use super::named_sheet_view::{self, discover_named_sheet_views};
 use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
 use super::query_table::{
@@ -42,7 +42,7 @@ use super::sheet_protection::{
     WorksheetProtectedRange, WorksheetProtection, WorksheetProtectionMetadata,
     parse_worksheet_protection,
 };
-use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
+use super::sheet_view::{self, parse_worksheet_views};
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::table::{Table, parse_table_xml};
@@ -210,9 +210,9 @@ pub struct Worksheet<'a> {
     /// Sheet view settings for each workbook window.
     sheet_views: Vec<SheetView>,
     /// Complete immutable worksheet-view collection.
-    sheet_view_collection: Option<WorksheetViewCollection>,
+    sheet_view_collection: Option<sheet_view::Views>,
     /// Static Named Sheet Views part associated with this worksheet.
-    named_sheet_views: Option<Views>,
+    named_sheet_views: Option<named_sheet_view::Views>,
     /// Static worksheet protection and editable-range metadata.
     protection_metadata: WorksheetProtectionMetadata,
     /// Static worksheet header/footer settings.
@@ -1554,12 +1554,12 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Complete immutable worksheet-view collection, with schema defaults applied.
-    pub fn sheet_view_collection(&self) -> Option<&WorksheetViewCollection> {
+    pub fn sheet_view_collection(&self) -> Option<&sheet_view::Views> {
         self.sheet_view_collection.as_ref()
     }
 
     /// Static Named Sheet Views associated with this worksheet.
-    pub fn named_sheet_views(&self) -> Option<&Views> {
+    pub fn named_sheet_views(&self) -> Option<&named_sheet_view::Views> {
         self.named_sheet_views.as_ref()
     }
 

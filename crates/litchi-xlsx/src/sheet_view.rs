@@ -17,12 +17,12 @@ const MAX_PIVOT_AREA_MARKUP: usize = 1024 * 1024;
 const MAX_RELATIONSHIP_ID_BYTES: usize = 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetViewType {
+pub enum ViewType {
     Normal,
     PageBreakPreview,
     PageLayout,
 }
-impl WorksheetViewType {
+impl ViewType {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "normal" => Ok(Self::Normal),
@@ -34,13 +34,13 @@ impl WorksheetViewType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetPanePosition {
+pub enum PanePosition {
     BottomRight,
     TopRight,
     BottomLeft,
     TopLeft,
 }
-impl WorksheetPanePosition {
+impl PanePosition {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "bottomRight" => Ok(Self::BottomRight),
@@ -53,12 +53,12 @@ impl WorksheetPanePosition {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetPaneState {
+pub enum PaneState {
     Split,
     Frozen,
     FrozenSplit,
 }
-impl WorksheetPaneState {
+impl PaneState {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "split" => Ok(Self::Split),
@@ -118,35 +118,35 @@ impl PivotAreaType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetCellReference(String);
-impl WorksheetCellReference {
+pub struct CellReference(String);
+impl CellReference {
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetRangeReference(String);
-impl WorksheetRangeReference {
+pub struct RangeReference(String);
+impl RangeReference {
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetViewSqref(Vec<WorksheetRangeReference>);
-impl WorksheetViewSqref {
-    pub fn ranges(&self) -> &[WorksheetRangeReference] {
+pub struct Sqref(Vec<RangeReference>);
+impl Sqref {
+    pub fn ranges(&self) -> &[RangeReference] {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetViewExtension {
+pub struct Extension {
     uri: String,
     markup: Vec<u8>,
 }
-impl WorksheetViewExtension {
+impl Extension {
     pub fn uri(&self) -> &str {
         &self.uri
     }
@@ -157,55 +157,55 @@ impl WorksheetViewExtension {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorksheetViewPane {
+pub struct Pane {
     x_split: Option<f64>,
     y_split: Option<f64>,
-    top_left_cell: Option<WorksheetCellReference>,
-    active_pane: WorksheetPanePosition,
-    state: WorksheetPaneState,
+    top_left_cell: Option<CellReference>,
+    active_pane: PanePosition,
+    state: PaneState,
 }
-impl WorksheetViewPane {
+impl Pane {
     pub fn x_split(&self) -> Option<f64> {
         self.x_split
     }
     pub fn y_split(&self) -> Option<f64> {
         self.y_split
     }
-    pub fn top_left_cell(&self) -> Option<&WorksheetCellReference> {
+    pub fn top_left_cell(&self) -> Option<&CellReference> {
         self.top_left_cell.as_ref()
     }
-    pub fn active_pane(&self) -> WorksheetPanePosition {
+    pub fn active_pane(&self) -> PanePosition {
         self.active_pane
     }
-    pub fn state(&self) -> WorksheetPaneState {
+    pub fn state(&self) -> PaneState {
         self.state
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetViewSelection {
-    pane: WorksheetPanePosition,
-    active_cell: WorksheetCellReference,
+pub struct Selection {
+    pane: PanePosition,
+    active_cell: CellReference,
     active_cell_id: u32,
-    sqref: WorksheetViewSqref,
+    sqref: Sqref,
 }
-impl WorksheetViewSelection {
-    pub fn pane(&self) -> WorksheetPanePosition {
+impl Selection {
+    pub fn pane(&self) -> PanePosition {
         self.pane
     }
-    pub fn active_cell(&self) -> &WorksheetCellReference {
+    pub fn active_cell(&self) -> &CellReference {
         &self.active_cell
     }
     pub fn active_cell_id(&self) -> u32 {
         self.active_cell_id
     }
-    pub fn sqref(&self) -> &WorksheetViewSqref {
+    pub fn sqref(&self) -> &Sqref {
         &self.sqref
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetPivotArea {
+pub struct PivotArea {
     field: Option<i32>,
     area_type: PivotAreaType,
     data_only: bool,
@@ -214,13 +214,13 @@ pub struct WorksheetPivotArea {
     grand_column: bool,
     cache_index: bool,
     outline: bool,
-    offset: Option<WorksheetRangeReference>,
+    offset: Option<RangeReference>,
     collapsed_levels_are_subtotals: bool,
     axis: Option<PivotSelectionAxis>,
     field_position: Option<u32>,
     markup: Vec<u8>,
 }
-impl WorksheetPivotArea {
+impl PivotArea {
     pub fn field(&self) -> Option<i32> {
         self.field
     }
@@ -245,7 +245,7 @@ impl WorksheetPivotArea {
     pub fn outline(&self) -> bool {
         self.outline
     }
-    pub fn offset(&self) -> Option<&WorksheetRangeReference> {
+    pub fn offset(&self) -> Option<&RangeReference> {
         self.offset.as_ref()
     }
     pub fn collapsed_levels_are_subtotals(&self) -> bool {
@@ -264,8 +264,8 @@ impl WorksheetPivotArea {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetPivotSelection {
-    pane: WorksheetPanePosition,
+pub struct PivotSelection {
+    pane: PanePosition,
     show_header: bool,
     label: bool,
     data: bool,
@@ -282,10 +282,10 @@ pub struct WorksheetPivotSelection {
     previous_column: u32,
     click: u32,
     relationship_id: Option<String>,
-    area: WorksheetPivotArea,
+    area: PivotArea,
 }
-impl WorksheetPivotSelection {
-    pub fn pane(&self) -> WorksheetPanePosition {
+impl PivotSelection {
+    pub fn pane(&self) -> PanePosition {
         self.pane
     }
     pub fn show_header(&self) -> bool {
@@ -336,13 +336,13 @@ impl WorksheetPivotSelection {
     pub fn relationship_id(&self) -> Option<&str> {
         self.relationship_id.as_deref()
     }
-    pub fn area(&self) -> &WorksheetPivotArea {
+    pub fn area(&self) -> &PivotArea {
         &self.area
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorksheetViewDefinition {
+pub struct View {
     workbook_view_id: u32,
     window_protection: bool,
     show_formulas: bool,
@@ -355,19 +355,19 @@ pub struct WorksheetViewDefinition {
     show_outline_symbols: bool,
     default_grid_color: bool,
     show_white_space: bool,
-    view_type: WorksheetViewType,
-    top_left_cell: Option<WorksheetCellReference>,
+    view_type: ViewType,
+    top_left_cell: Option<CellReference>,
     color_id: u32,
     zoom_scale: u16,
     zoom_scale_normal: u16,
     zoom_scale_sheet_layout_view: u16,
     zoom_scale_page_layout_view: u16,
-    pane: Option<WorksheetViewPane>,
-    selections: Vec<WorksheetViewSelection>,
-    pivot_selections: Vec<WorksheetPivotSelection>,
-    extensions: Vec<WorksheetViewExtension>,
+    pane: Option<Pane>,
+    selections: Vec<Selection>,
+    pivot_selections: Vec<PivotSelection>,
+    extensions: Vec<Extension>,
 }
-impl WorksheetViewDefinition {
+impl View {
     pub fn workbook_view_id(&self) -> u32 {
         self.workbook_view_id
     }
@@ -404,10 +404,10 @@ impl WorksheetViewDefinition {
     pub fn show_white_space(&self) -> bool {
         self.show_white_space
     }
-    pub fn view_type(&self) -> WorksheetViewType {
+    pub fn view_type(&self) -> ViewType {
         self.view_type
     }
-    pub fn top_left_cell(&self) -> Option<&WorksheetCellReference> {
+    pub fn top_left_cell(&self) -> Option<&CellReference> {
         self.top_left_cell.as_ref()
     }
     pub fn color_id(&self) -> u32 {
@@ -425,30 +425,30 @@ impl WorksheetViewDefinition {
     pub fn zoom_scale_page_layout_view(&self) -> u16 {
         self.zoom_scale_page_layout_view
     }
-    pub fn pane(&self) -> Option<&WorksheetViewPane> {
+    pub fn pane(&self) -> Option<&Pane> {
         self.pane.as_ref()
     }
-    pub fn selections(&self) -> &[WorksheetViewSelection] {
+    pub fn selections(&self) -> &[Selection] {
         &self.selections
     }
-    pub fn pivot_selections(&self) -> &[WorksheetPivotSelection] {
+    pub fn pivot_selections(&self) -> &[PivotSelection] {
         &self.pivot_selections
     }
-    pub fn extensions(&self) -> &[WorksheetViewExtension] {
+    pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorksheetViewCollection {
-    views: Vec<WorksheetViewDefinition>,
-    extensions: Vec<WorksheetViewExtension>,
+pub struct Views {
+    views: Vec<View>,
+    extensions: Vec<Extension>,
 }
-impl WorksheetViewCollection {
-    pub fn views(&self) -> &[WorksheetViewDefinition] {
+impl Views {
+    pub fn views(&self) -> &[View] {
         &self.views
     }
-    pub fn extensions(&self) -> &[WorksheetViewExtension] {
+    pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
 }
@@ -471,8 +471,8 @@ enum Owner {
     View,
 }
 enum CapturePayload {
-    PivotArea(WorksheetPivotArea),
-    Extension(Owner, WorksheetViewExtension),
+    PivotArea(PivotArea),
+    Extension(Owner, Extension),
 }
 struct Capture {
     depth: usize,
@@ -483,8 +483,8 @@ struct Capture {
 
 struct Parser {
     stack: Vec<Context>,
-    collection: Option<WorksheetViewCollection>,
-    current_view: Option<WorksheetViewDefinition>,
+    collection: Option<Views>,
+    current_view: Option<View>,
     current_pivot: Option<PivotBuilder>,
     capture: Option<Capture>,
     seen_collection: bool,
@@ -493,7 +493,7 @@ struct Parser {
     retained: usize,
 }
 struct PivotBuilder {
-    pane: WorksheetPanePosition,
+    pane: PanePosition,
     show_header: bool,
     label: bool,
     data: bool,
@@ -510,11 +510,11 @@ struct PivotBuilder {
     previous_column: u32,
     click: u32,
     relationship_id: Option<String>,
-    area: Option<WorksheetPivotArea>,
+    area: Option<PivotArea>,
 }
 
 /// Parse the worksheet's single `sheetViews` collection without resolving UI state or relationships.
-pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<WorksheetViewCollection>> {
+pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Views>> {
     let processed =
         process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
@@ -763,7 +763,7 @@ impl Parser {
         }
         self.seen_collection = true;
         self.sheet_views_phase = 0;
-        self.collection = Some(WorksheetViewCollection {
+        self.collection = Some(Views {
             views: Vec::new(),
             extensions: Vec::new(),
         });
@@ -893,7 +893,7 @@ impl Parser {
             .as_mut()
             .ok_or_else(|| invalid("pivotSelection outside sheetView"))?
             .pivot_selections
-            .push(WorksheetPivotSelection {
+            .push(PivotSelection {
                 pane: value.pane,
                 show_header: value.show_header,
                 label: value.label,
@@ -915,7 +915,7 @@ impl Parser {
             });
         Ok(())
     }
-    fn add_extension(&mut self, owner: Owner, extension: WorksheetViewExtension) -> Result<()> {
+    fn add_extension(&mut self, owner: Owner, extension: Extension) -> Result<()> {
         match owner {
             Owner::Collection => self
                 .collection
@@ -994,8 +994,8 @@ impl Parser {
     }
 }
 
-fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetViewDefinition> {
-    Ok(WorksheetViewDefinition {
+fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<View> {
+    Ok(View {
         workbook_view_id: required_u32(element, b"workbookViewId", decoder)?,
         window_protection: bool_attr(element, b"windowProtection", decoder)?.unwrap_or(false),
         show_formulas: bool_attr(element, b"showFormulas", decoder)?.unwrap_or(false),
@@ -1008,7 +1008,7 @@ fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetVie
         show_outline_symbols: bool_attr(element, b"showOutlineSymbols", decoder)?.unwrap_or(true),
         default_grid_color: bool_attr(element, b"defaultGridColor", decoder)?.unwrap_or(true),
         show_white_space: bool_attr(element, b"showWhiteSpace", decoder)?.unwrap_or(true),
-        view_type: WorksheetViewType::parse(
+        view_type: ViewType::parse(
             attr(element, b"view", decoder)?
                 .as_deref()
                 .unwrap_or("normal"),
@@ -1038,36 +1038,36 @@ fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetVie
         }
     })
 }
-fn parse_pane(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetViewPane> {
-    Ok(WorksheetViewPane {
+fn parse_pane(element: &BytesStart<'_>, decoder: Decoder) -> Result<Pane> {
+    Ok(Pane {
         x_split: nonnegative_f64(element, b"xSplit", decoder)?,
         y_split: nonnegative_f64(element, b"ySplit", decoder)?,
         top_left_cell: optional_cell(element, b"topLeftCell", decoder)?,
-        active_pane: WorksheetPanePosition::parse(
+        active_pane: PanePosition::parse(
             attr(element, b"activePane", decoder)?
                 .as_deref()
                 .unwrap_or("topLeft"),
         )?,
-        state: WorksheetPaneState::parse(
+        state: PaneState::parse(
             attr(element, b"state", decoder)?
                 .as_deref()
                 .unwrap_or("split"),
         )?,
     })
 }
-fn parse_selection(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetViewSelection> {
-    let active_cell = optional_cell(element, b"activeCell", decoder)?
-        .unwrap_or(WorksheetCellReference("A1".into()));
+fn parse_selection(element: &BytesStart<'_>, decoder: Decoder) -> Result<Selection> {
+    let active_cell =
+        optional_cell(element, b"activeCell", decoder)?.unwrap_or(CellReference("A1".into()));
     let sqref = match attr(element, b"sqref", decoder)? {
         Some(value) => parse_sqref(&value)?,
-        None => WorksheetViewSqref(vec![WorksheetRangeReference("A1".into())]),
+        None => Sqref(vec![RangeReference("A1".into())]),
     };
     let active_cell_id = optional_u32(element, b"activeCellId", decoder)?.unwrap_or(0);
     if active_cell_id as usize >= sqref.0.len() {
         return Err(invalid("worksheet-view activeCellId is outside sqref"));
     }
-    Ok(WorksheetViewSelection {
-        pane: WorksheetPanePosition::parse(
+    Ok(Selection {
+        pane: PanePosition::parse(
             attr(element, b"pane", decoder)?
                 .as_deref()
                 .unwrap_or("topLeft"),
@@ -1087,7 +1087,7 @@ fn parse_pivot(
         validate_relationship_id(value)?;
     }
     Ok(PivotBuilder {
-        pane: WorksheetPanePosition::parse(
+        pane: PanePosition::parse(
             attr(element, b"pane", decoder)?
                 .as_deref()
                 .unwrap_or("topLeft"),
@@ -1113,8 +1113,8 @@ fn parse_pivot(
         area: None,
     })
 }
-fn parse_pivot_area(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetPivotArea> {
-    Ok(WorksheetPivotArea {
+fn parse_pivot_area(element: &BytesStart<'_>, decoder: Decoder) -> Result<PivotArea> {
+    Ok(PivotArea {
         field: optional_i32(element, b"field", decoder)?,
         area_type: PivotAreaType::parse(
             attr(element, b"type", decoder)?
@@ -1143,13 +1143,13 @@ fn parse_pivot_area(element: &BytesStart<'_>, decoder: Decoder) -> Result<Worksh
         markup: Vec::new(),
     })
 }
-fn parse_extension(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetViewExtension> {
+fn parse_extension(element: &BytesStart<'_>, decoder: Decoder) -> Result<Extension> {
     let uri = attr(element, b"uri", decoder)?
         .ok_or_else(|| invalid("worksheet-view ext requires uri"))?;
     if uri.is_empty() || uri.len() > 1024 {
         return Err(invalid("invalid worksheet-view extension URI"));
     }
-    Ok(WorksheetViewExtension {
+    Ok(Extension {
         uri,
         markup: Vec::new(),
     })
@@ -1256,11 +1256,11 @@ fn optional_cell(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: Decoder,
-) -> Result<Option<WorksheetCellReference>> {
+) -> Result<Option<CellReference>> {
     attr(element, name, decoder)?
         .map(|v| {
             validate_cell(&v)?;
-            Ok(WorksheetCellReference(v))
+            Ok(CellReference(v))
         })
         .transpose()
 }
@@ -1272,7 +1272,7 @@ fn validate_cell(value: &str) -> Result<()> {
         .map(|_| ())
         .map_err(Error::from)
 }
-fn parse_range(value: &str) -> Result<WorksheetRangeReference> {
+fn parse_range(value: &str) -> Result<RangeReference> {
     if value.is_empty() || value.split(':').count() > 2 {
         return Err(invalid(format!("invalid worksheet range '{value}'")));
     }
@@ -1284,9 +1284,9 @@ fn parse_range(value: &str) -> Result<WorksheetRangeReference> {
     if let Some(end) = parts.next() {
         validate_cell(end)?;
     }
-    Ok(WorksheetRangeReference(value.into()))
+    Ok(RangeReference(value.into()))
 }
-fn parse_sqref(value: &str) -> Result<WorksheetViewSqref> {
+fn parse_sqref(value: &str) -> Result<Sqref> {
     let mut ranges = Vec::new();
     for token in value.split_whitespace() {
         if ranges.len() >= MAX_SELECTION_RANGES {
@@ -1297,7 +1297,7 @@ fn parse_sqref(value: &str) -> Result<WorksheetViewSqref> {
     if ranges.is_empty() {
         return Err(invalid("worksheet-view sqref is empty"));
     }
-    Ok(WorksheetViewSqref(ranges))
+    Ok(Sqref(ranges))
 }
 fn validate_relationship_id(value: &str) -> Result<()> {
     if value.is_empty()
@@ -1340,7 +1340,7 @@ mod tests {
     use litchi_opc::{OpcPackage, PackURI};
     const T: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
-    fn fixture(bytes: &[u8]) -> WorksheetViewCollection {
+    fn fixture(bytes: &[u8]) -> Views {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
@@ -1360,7 +1360,7 @@ mod tests {
         let view = &lo.views()[0];
         assert_eq!(view.selections().len(), 4);
         assert_eq!(view.pane().unwrap().x_split(), Some(5.0));
-        assert_eq!(view.pane().unwrap().state(), WorksheetPaneState::Frozen);
+        assert_eq!(view.pane().unwrap().state(), PaneState::Frozen);
     }
 
     #[test]
@@ -1371,7 +1371,7 @@ mod tests {
         let collection = parse_worksheet_views(xml.as_bytes()).unwrap().unwrap();
         let view = &collection.views()[0];
         assert!(view.show_grid_lines());
-        assert_eq!(view.view_type(), WorksheetViewType::Normal);
+        assert_eq!(view.view_type(), ViewType::Normal);
         assert_eq!(view.zoom_scale_normal(), 0);
         assert_eq!(view.selections()[0].sqref().ranges().len(), 2);
         let pivot = &view.pivot_selections()[0];
