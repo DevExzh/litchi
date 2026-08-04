@@ -1,19 +1,19 @@
 use litchi_ods::{
-    MutableSpreadsheet, Spreadsheet, SpreadsheetCellContentChange, SpreadsheetChangeAcceptance,
-    SpreadsheetChangeCutOff, SpreadsheetChangeDimension, SpreadsheetChangeInfo,
-    SpreadsheetChangeMetadata, SpreadsheetDeletion, SpreadsheetInsertion, SpreadsheetMovement,
-    SpreadsheetNestedDeletion, SpreadsheetTrackedCell, SpreadsheetTrackedCellAddress,
-    SpreadsheetTrackedCellValue, SpreadsheetTrackedChange, SpreadsheetTrackedChanges,
-    SpreadsheetTrackedRangeAddress,
+    MutableSpreadsheet, Spreadsheet, ContentChange, ChangeAcceptance,
+    CutOff, ChangeDimension, ChangeInfo,
+    Metadata, Deletion, Insertion, Movement,
+    NestedDeletion, Cell, CellAddress,
+    CellValue, Change, Changes,
+    RangeAddress,
 };
 use std::num::NonZeroUsize;
 
-fn metadata(id: &str) -> SpreadsheetChangeMetadata {
-    SpreadsheetChangeMetadata {
+fn metadata(id: &str) -> Metadata {
+    Metadata {
         id: id.to_string(),
-        acceptance: SpreadsheetChangeAcceptance::Pending,
+        acceptance: ChangeAcceptance::Pending,
         rejecting_change_id: None,
-        info: SpreadsheetChangeInfo {
+        info: ChangeInfo {
             creator: Some("Zoë & 李".to_string()),
             date: Some("2026-07-19T08:00:00Z".to_string()),
             comments: vec!["before < after & \"quoted\"".to_string()],
@@ -23,19 +23,19 @@ fn metadata(id: &str) -> SpreadsheetChangeMetadata {
     }
 }
 
-fn address(table: i64, column: i64, row: i64) -> SpreadsheetTrackedCellAddress {
-    SpreadsheetTrackedCellAddress { table, column, row }
+fn address(table: i64, column: i64, row: i64) -> CellAddress {
+    CellAddress { table, column, row }
 }
 
-fn previous_cell() -> SpreadsheetTrackedCell {
-    SpreadsheetTrackedCell {
+fn previous_cell() -> Cell {
+    Cell {
         address: Some("Sheet1.A1".to_string()),
         style_name: Some("Historical & Style".to_string()),
         matrix_covered: false,
         formula: Some("of:=SUM([.A1:.A2])".to_string()),
         matrix_columns: NonZeroUsize::new(2),
         matrix_rows: NonZeroUsize::new(1),
-        value: SpreadsheetTrackedCellValue::Currency {
+        value: CellValue::Currency {
             value: 12.5,
             code: "CNY".to_string(),
         },
@@ -43,68 +43,68 @@ fn previous_cell() -> SpreadsheetTrackedCell {
     }
 }
 
-fn complete_change_set() -> SpreadsheetTrackedChanges {
-    let insertion = SpreadsheetTrackedChange::Insertion(SpreadsheetInsertion {
+fn complete_change_set() -> Changes {
+    let insertion = Change::Insertion(Insertion {
         metadata: metadata("ct1"),
-        dimension: SpreadsheetChangeDimension::Row,
+        dimension: ChangeDimension::Row,
         position: 1,
         count: NonZeroUsize::new(2).unwrap(),
         table: Some(0),
     });
 
     let mut deletion_metadata = metadata("ct2");
-    deletion_metadata.acceptance = SpreadsheetChangeAcceptance::Accepted;
+    deletion_metadata.acceptance = ChangeAcceptance::Accepted;
     deletion_metadata.dependencies.push("ct1".to_string());
     deletion_metadata
         .deletions
-        .push(SpreadsheetNestedDeletion::CellContent {
+        .push(NestedDeletion::CellContent {
             change_id: Some("ct1".to_string()),
             address: Some(address(0, 0, 0)),
             cell: Some(previous_cell()),
         });
     deletion_metadata
         .deletions
-        .push(SpreadsheetNestedDeletion::Change {
+        .push(NestedDeletion::Change {
             change_id: Some("ct1".to_string()),
         });
-    let deletion = SpreadsheetTrackedChange::Deletion(SpreadsheetDeletion {
+    let deletion = Change::Deletion(Deletion {
         metadata: deletion_metadata,
-        dimension: SpreadsheetChangeDimension::Column,
+        dimension: ChangeDimension::Column,
         position: 3,
         table: Some(0),
         multi_deletion_spanned: Some(1),
         cut_offs: vec![
-            SpreadsheetChangeCutOff::Insertion {
+            CutOff::Insertion {
                 change_id: "ct1".to_string(),
                 position: 1,
             },
-            SpreadsheetChangeCutOff::MovementPoint { position: 2 },
-            SpreadsheetChangeCutOff::MovementRange { start: 3, end: 5 },
+            CutOff::MovementPoint { position: 2 },
+            CutOff::MovementRange { start: 3, end: 5 },
         ],
     });
 
     let mut movement_metadata = metadata("ct3");
-    movement_metadata.acceptance = SpreadsheetChangeAcceptance::Rejected;
+    movement_metadata.acceptance = ChangeAcceptance::Rejected;
     movement_metadata.dependencies.push("ct2".to_string());
-    let movement = SpreadsheetTrackedChange::Movement(SpreadsheetMovement {
+    let movement = Change::Movement(Movement {
         metadata: movement_metadata,
-        source: SpreadsheetTrackedRangeAddress::Range {
+        source: RangeAddress::Range {
             start: address(0, 0, 0),
             end: address(0, 2, 3),
         },
-        target: SpreadsheetTrackedRangeAddress::Cell(address(0, 4, 5)),
+        target: RangeAddress::Cell(address(0, 4, 5)),
     });
 
     let mut cell_metadata = metadata("ct4");
     cell_metadata.dependencies.push("ct3".to_string());
-    let cell = SpreadsheetTrackedChange::CellContent(SpreadsheetCellContentChange {
+    let cell = Change::CellContent(ContentChange {
         metadata: cell_metadata,
         address: address(0, 6, 7),
         previous_change_id: Some("ct1".to_string()),
         previous: previous_cell(),
     });
 
-    SpreadsheetTrackedChanges {
+    Changes {
         enabled: true,
         changes: vec![insertion, deletion, movement, cell],
     }
@@ -137,7 +137,7 @@ fn authors_every_variant_and_reopens_the_package() {
     let reopened = reopened.tracked_changes().unwrap();
     assert!(reopened.enabled);
     assert_eq!(reopened.changes.len(), 4);
-    let SpreadsheetTrackedChange::CellContent(cell) = &reopened.changes[3] else {
+    let Change::CellContent(cell) = &reopened.changes[3] else {
         panic!("expected cell-content change");
     };
     assert_eq!(
@@ -152,9 +152,9 @@ fn mutations_are_atomic_when_references_or_cycles_are_invalid() {
     let mut mutable = MutableSpreadsheet::new();
     mutable.set_tracked_changes(complete_change_set()).unwrap();
 
-    let duplicate = SpreadsheetTrackedChange::Insertion(SpreadsheetInsertion {
+    let duplicate = Change::Insertion(Insertion {
         metadata: metadata("ct1"),
-        dimension: SpreadsheetChangeDimension::Table,
+        dimension: ChangeDimension::Table,
         position: 0,
         count: NonZeroUsize::new(1).unwrap(),
         table: None,
@@ -172,19 +172,19 @@ fn mutations_are_atomic_when_references_or_cycles_are_invalid() {
     first.dependencies.push("b".to_string());
     let mut second = metadata("b");
     second.dependencies.push("a".to_string());
-    let cyclic = SpreadsheetTrackedChanges {
+    let cyclic = Changes {
         enabled: true,
         changes: vec![
-            SpreadsheetTrackedChange::Insertion(SpreadsheetInsertion {
+            Change::Insertion(Insertion {
                 metadata: first,
-                dimension: SpreadsheetChangeDimension::Row,
+                dimension: ChangeDimension::Row,
                 position: 0,
                 count: NonZeroUsize::new(1).unwrap(),
                 table: Some(0),
             }),
-            SpreadsheetTrackedChange::Insertion(SpreadsheetInsertion {
+            Change::Insertion(Insertion {
                 metadata: second,
-                dimension: SpreadsheetChangeDimension::Row,
+                dimension: ChangeDimension::Row,
                 position: 1,
                 count: NonZeroUsize::new(1).unwrap(),
                 table: Some(0),
@@ -201,21 +201,21 @@ fn mutations_are_atomic_when_references_or_cycles_are_invalid() {
 #[test]
 fn rejects_invalid_positions_values_and_unknown_references() {
     let mut changes = complete_change_set();
-    let SpreadsheetTrackedChange::Insertion(insertion) = &mut changes.changes[0] else {
+    let Change::Insertion(insertion) = &mut changes.changes[0] else {
         unreachable!();
     };
     insertion.position = -1;
     assert!(changes.validate().is_err());
 
     let mut changes = complete_change_set();
-    let SpreadsheetTrackedChange::CellContent(cell) = &mut changes.changes[3] else {
+    let Change::CellContent(cell) = &mut changes.changes[3] else {
         unreachable!();
     };
-    cell.previous.value = SpreadsheetTrackedCellValue::Number(f64::NAN);
+    cell.previous.value = CellValue::Number(f64::NAN);
     assert!(changes.validate().is_err());
 
     let mut changes = complete_change_set();
-    let SpreadsheetTrackedChange::Deletion(deletion) = &mut changes.changes[1] else {
+    let Change::Deletion(deletion) = &mut changes.changes[1] else {
         unreachable!();
     };
     deletion.metadata.dependencies.push("unknown".to_string());

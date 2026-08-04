@@ -20,7 +20,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// Whether a recorded spreadsheet change is pending, accepted, or rejected.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SpreadsheetChangeAcceptance {
+pub enum ChangeAcceptance {
     Accepted,
     Rejected,
     #[default]
@@ -29,7 +29,7 @@ pub enum SpreadsheetChangeAcceptance {
 
 /// The structural unit affected by a row, column, or table insertion/deletion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SpreadsheetChangeDimension {
+pub enum ChangeDimension {
     Row,
     Column,
     Table,
@@ -37,7 +37,7 @@ pub enum SpreadsheetChangeDimension {
 
 /// Author, date, and comments stored for one change.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SpreadsheetChangeInfo {
+pub struct ChangeInfo {
     pub creator: Option<String>,
     pub date: Option<String>,
     pub comments: Vec<String>,
@@ -45,7 +45,7 @@ pub struct SpreadsheetChangeInfo {
 
 /// Integer table/row/column coordinates used by the change-tracking vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SpreadsheetTrackedCellAddress {
+pub struct CellAddress {
     pub table: i64,
     pub column: i64,
     pub row: i64,
@@ -53,17 +53,17 @@ pub struct SpreadsheetTrackedCellAddress {
 
 /// A single cell or rectangular source/target range used by a movement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SpreadsheetTrackedRangeAddress {
-    Cell(SpreadsheetTrackedCellAddress),
+pub enum RangeAddress {
+    Cell(CellAddress),
     Range {
-        start: SpreadsheetTrackedCellAddress,
-        end: SpreadsheetTrackedCellAddress,
+        start: CellAddress,
+        end: CellAddress,
     },
 }
 
 /// Typed scalar value preserved by `table:change-track-table-cell`.
 #[derive(Clone, Debug, PartialEq)]
-pub enum SpreadsheetTrackedCellValue {
+pub enum CellValue {
     Empty,
     Boolean(bool),
     Number(f64),
@@ -76,7 +76,7 @@ pub enum SpreadsheetTrackedCellValue {
 
 /// Former cell state embedded in a tracked change.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpreadsheetTrackedCell {
+pub struct Cell {
     pub address: Option<String>,
     /// Style associated with the historical cell value.
     pub style_name: Option<String>,
@@ -84,17 +84,17 @@ pub struct SpreadsheetTrackedCell {
     pub formula: Option<String>,
     pub matrix_columns: Option<NonZeroUsize>,
     pub matrix_rows: Option<NonZeroUsize>,
-    pub value: SpreadsheetTrackedCellValue,
+    pub value: CellValue,
     pub display_text: String,
 }
 
 /// A deletion nested inside another tracked change.
 #[derive(Clone, Debug, PartialEq)]
-pub enum SpreadsheetNestedDeletion {
+pub enum NestedDeletion {
     CellContent {
         change_id: Option<String>,
-        address: Option<SpreadsheetTrackedCellAddress>,
-        cell: Option<SpreadsheetTrackedCell>,
+        address: Option<CellAddress>,
+        cell: Option<Cell>,
     },
     Change {
         change_id: Option<String>,
@@ -103,7 +103,7 @@ pub enum SpreadsheetNestedDeletion {
 
 /// A location removed from a previously tracked insertion or movement.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SpreadsheetChangeCutOff {
+pub enum CutOff {
     Insertion { change_id: String, position: i64 },
     MovementPoint { position: i64 },
     MovementRange { start: i64, end: i64 },
@@ -111,20 +111,20 @@ pub enum SpreadsheetChangeCutOff {
 
 /// Metadata common to every top-level spreadsheet change.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpreadsheetChangeMetadata {
+pub struct Metadata {
     pub id: String,
-    pub acceptance: SpreadsheetChangeAcceptance,
+    pub acceptance: ChangeAcceptance,
     pub rejecting_change_id: Option<String>,
-    pub info: SpreadsheetChangeInfo,
+    pub info: ChangeInfo,
     pub dependencies: Vec<String>,
-    pub deletions: Vec<SpreadsheetNestedDeletion>,
+    pub deletions: Vec<NestedDeletion>,
 }
 
 /// A tracked row, column, or table insertion.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpreadsheetInsertion {
-    pub metadata: SpreadsheetChangeMetadata,
-    pub dimension: SpreadsheetChangeDimension,
+pub struct Insertion {
+    pub metadata: Metadata,
+    pub dimension: ChangeDimension,
     pub position: i64,
     pub count: NonZeroUsize,
     pub table: Option<i64>,
@@ -132,43 +132,43 @@ pub struct SpreadsheetInsertion {
 
 /// A tracked row, column, or table deletion.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpreadsheetDeletion {
-    pub metadata: SpreadsheetChangeMetadata,
-    pub dimension: SpreadsheetChangeDimension,
+pub struct Deletion {
+    pub metadata: Metadata,
+    pub dimension: ChangeDimension,
     pub position: i64,
     pub table: Option<i64>,
     pub multi_deletion_spanned: Option<i64>,
-    pub cut_offs: Vec<SpreadsheetChangeCutOff>,
+    pub cut_offs: Vec<CutOff>,
 }
 
 /// A tracked cell or range movement.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpreadsheetMovement {
-    pub metadata: SpreadsheetChangeMetadata,
-    pub source: SpreadsheetTrackedRangeAddress,
-    pub target: SpreadsheetTrackedRangeAddress,
+pub struct Movement {
+    pub metadata: Metadata,
+    pub source: RangeAddress,
+    pub target: RangeAddress,
 }
 
 /// A tracked replacement of one cell's content.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpreadsheetCellContentChange {
-    pub metadata: SpreadsheetChangeMetadata,
-    pub address: SpreadsheetTrackedCellAddress,
+pub struct ContentChange {
+    pub metadata: Metadata,
+    pub address: CellAddress,
     pub previous_change_id: Option<String>,
-    pub previous: SpreadsheetTrackedCell,
+    pub previous: Cell,
 }
 
 /// One top-level spreadsheet change in document order.
 #[derive(Clone, Debug, PartialEq)]
-pub enum SpreadsheetTrackedChange {
-    Insertion(SpreadsheetInsertion),
-    Deletion(SpreadsheetDeletion),
-    Movement(SpreadsheetMovement),
-    CellContent(SpreadsheetCellContentChange),
+pub enum Change {
+    Insertion(Insertion),
+    Deletion(Deletion),
+    Movement(Movement),
+    CellContent(ContentChange),
 }
 
-impl SpreadsheetTrackedChange {
-    pub fn metadata(&self) -> &SpreadsheetChangeMetadata {
+impl Change {
+    pub fn metadata(&self) -> &Metadata {
         match self {
             Self::Insertion(value) => &value.metadata,
             Self::Deletion(value) => &value.metadata,
@@ -180,9 +180,9 @@ impl SpreadsheetTrackedChange {
 
 /// Spreadsheet-wide tracked-change state and ordered change records.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct SpreadsheetTrackedChanges {
+pub struct Changes {
     pub enabled: bool,
-    pub changes: Vec<SpreadsheetTrackedChange>,
+    pub changes: Vec<Change>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -216,7 +216,7 @@ struct Node {
     content: Vec<Content>,
 }
 
-pub(crate) fn parse_tracked_changes(xml: &str) -> Result<Option<SpreadsheetTrackedChanges>> {
+pub(crate) fn parse_tracked_changes(xml: &str) -> Result<Option<Changes>> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -530,7 +530,7 @@ fn add_semantic_leaf_text(node: &mut Node, aggregate: &mut usize) -> Result<()> 
     Ok(())
 }
 
-fn parse_root(root: &Node) -> Result<SpreadsheetTrackedChanges> {
+fn parse_root(root: &Node) -> Result<Changes> {
     reject_attributes(root, &[(Namespace::Table, "track-changes")])?;
     require_whitespace(root)?;
     let enabled = attribute(root, Namespace::Table, "track-changes")
@@ -544,12 +544,10 @@ fn parse_root(root: &Node) -> Result<SpreadsheetTrackedChanges> {
             continue;
         }
         let change = match child.local.as_str() {
-            "insertion" => SpreadsheetTrackedChange::Insertion(parse_insertion(child)?),
-            "deletion" => SpreadsheetTrackedChange::Deletion(parse_deletion(child)?),
-            "movement" => SpreadsheetTrackedChange::Movement(parse_movement(child)?),
-            "cell-content-change" => {
-                SpreadsheetTrackedChange::CellContent(parse_cell_content_change(child)?)
-            },
+            "insertion" => Change::Insertion(parse_insertion(child)?),
+            "deletion" => Change::Deletion(parse_deletion(child)?),
+            "movement" => Change::Movement(parse_movement(child)?),
+            "cell-content-change" => Change::CellContent(parse_cell_content_change(child)?),
             _ => return unexpected_child(child, "table:tracked-changes"),
         };
         changes.push(change);
@@ -563,16 +561,16 @@ fn parse_root(root: &Node) -> Result<SpreadsheetTrackedChanges> {
             )));
         }
     }
-    Ok(SpreadsheetTrackedChanges { enabled, changes })
+    Ok(Changes { enabled, changes })
 }
 
-fn parse_insertion(node: &Node) -> Result<SpreadsheetInsertion> {
+fn parse_insertion(node: &Node) -> Result<Insertion> {
     reject_attributes(
         node,
         &common_attributes(&["type", "position", "count", "table"]),
     )?;
     reject_children(node, &["dependencies", "deletions"], true)?;
-    Ok(SpreadsheetInsertion {
+    Ok(Insertion {
         metadata: parse_metadata(node)?,
         dimension: parse_dimension(required_attribute(node, Namespace::Table, "type")?)?,
         position: parse_i64(
@@ -592,7 +590,7 @@ fn parse_insertion(node: &Node) -> Result<SpreadsheetInsertion> {
     })
 }
 
-fn parse_deletion(node: &Node) -> Result<SpreadsheetDeletion> {
+fn parse_deletion(node: &Node) -> Result<Deletion> {
     reject_attributes(
         node,
         &common_attributes(&["type", "position", "table", "multi-deletion-spanned"]),
@@ -602,7 +600,7 @@ fn parse_deletion(node: &Node) -> Result<SpreadsheetDeletion> {
         .map(parse_cut_offs)
         .transpose()?
         .unwrap_or_default();
-    Ok(SpreadsheetDeletion {
+    Ok(Deletion {
         metadata: parse_metadata(node)?,
         dimension: parse_dimension(required_attribute(node, Namespace::Table, "type")?)?,
         position: parse_i64(
@@ -619,7 +617,7 @@ fn parse_deletion(node: &Node) -> Result<SpreadsheetDeletion> {
     })
 }
 
-fn parse_movement(node: &Node) -> Result<SpreadsheetMovement> {
+fn parse_movement(node: &Node) -> Result<Movement> {
     reject_attributes(node, &common_attributes(&[]))?;
     reject_children(
         node,
@@ -631,7 +629,7 @@ fn parse_movement(node: &Node) -> Result<SpreadsheetMovement> {
         ],
         true,
     )?;
-    Ok(SpreadsheetMovement {
+    Ok(Movement {
         metadata: parse_metadata(node)?,
         source: parse_range(required_child(
             node,
@@ -646,7 +644,7 @@ fn parse_movement(node: &Node) -> Result<SpreadsheetMovement> {
     })
 }
 
-fn parse_cell_content_change(node: &Node) -> Result<SpreadsheetCellContentChange> {
+fn parse_cell_content_change(node: &Node) -> Result<ContentChange> {
     reject_attributes(node, &common_attributes(&[]))?;
     reject_children(
         node,
@@ -657,7 +655,7 @@ fn parse_cell_content_change(node: &Node) -> Result<SpreadsheetCellContentChange
     reject_attributes(previous, &[(Namespace::Table, "id")])?;
     reject_children(previous, &["change-track-table-cell"], false)?;
     let previous_cell = required_child(previous, Namespace::Table, "change-track-table-cell")?;
-    Ok(SpreadsheetCellContentChange {
+    Ok(ContentChange {
         metadata: parse_metadata(node)?,
         address: parse_cell_address(required_child(node, Namespace::Table, "cell-address")?)?,
         previous_change_id: attribute(previous, Namespace::Table, "id").map(str::to_string),
@@ -665,7 +663,7 @@ fn parse_cell_content_change(node: &Node) -> Result<SpreadsheetCellContentChange
     })
 }
 
-fn parse_metadata(node: &Node) -> Result<SpreadsheetChangeMetadata> {
+fn parse_metadata(node: &Node) -> Result<Metadata> {
     let id = required_attribute(node, Namespace::Table, "id")?.to_string();
     ensure_nonempty(&id, "table:id")?;
     let info = parse_change_info(required_child(node, Namespace::Office, "change-info")?)?;
@@ -677,7 +675,7 @@ fn parse_metadata(node: &Node) -> Result<SpreadsheetChangeMetadata> {
         .map(parse_nested_deletions)
         .transpose()?
         .unwrap_or_default();
-    Ok(SpreadsheetChangeMetadata {
+    Ok(Metadata {
         id,
         acceptance: attribute(node, Namespace::Table, "acceptance-state")
             .map(parse_acceptance)
@@ -691,7 +689,7 @@ fn parse_metadata(node: &Node) -> Result<SpreadsheetChangeMetadata> {
     })
 }
 
-fn parse_change_info(node: &Node) -> Result<SpreadsheetChangeInfo> {
+fn parse_change_info(node: &Node) -> Result<ChangeInfo> {
     reject_attributes(node, &[])?;
     require_whitespace(node)?;
     let creator = optional_child(node, Namespace::Dc, "creator")?
@@ -711,7 +709,7 @@ fn parse_change_info(node: &Node) -> Result<SpreadsheetChangeInfo> {
             reject_known_child(child, "office:change-info")?;
         }
     }
-    Ok(SpreadsheetChangeInfo {
+    Ok(ChangeInfo {
         creator,
         date,
         comments,
@@ -743,7 +741,7 @@ fn parse_dependencies(node: &Node) -> Result<Vec<String>> {
     Ok(dependencies)
 }
 
-fn parse_nested_deletions(node: &Node) -> Result<Vec<SpreadsheetNestedDeletion>> {
+fn parse_nested_deletions(node: &Node) -> Result<Vec<NestedDeletion>> {
     reject_attributes(node, &[])?;
     require_whitespace(node)?;
     let mut result = Vec::new();
@@ -756,7 +754,7 @@ fn parse_nested_deletions(node: &Node) -> Result<Vec<SpreadsheetNestedDeletion>>
             "cell-content-deletion" => {
                 reject_attributes(child, &[(Namespace::Table, "id")])?;
                 reject_children(child, &["cell-address", "change-track-table-cell"], false)?;
-                result.push(SpreadsheetNestedDeletion::CellContent {
+                result.push(NestedDeletion::CellContent {
                     change_id: attribute(child, Namespace::Table, "id").map(str::to_string),
                     address: optional_child(child, Namespace::Table, "cell-address")?
                         .map(parse_cell_address)
@@ -769,7 +767,7 @@ fn parse_nested_deletions(node: &Node) -> Result<Vec<SpreadsheetNestedDeletion>>
             "change-deletion" => {
                 reject_attributes(child, &[(Namespace::Table, "id")])?;
                 reject_children(child, &[], false)?;
-                result.push(SpreadsheetNestedDeletion::Change {
+                result.push(NestedDeletion::Change {
                     change_id: attribute(child, Namespace::Table, "id").map(str::to_string),
                 });
             },
@@ -784,7 +782,7 @@ fn parse_nested_deletions(node: &Node) -> Result<Vec<SpreadsheetNestedDeletion>>
     Ok(result)
 }
 
-fn parse_cut_offs(node: &Node) -> Result<Vec<SpreadsheetChangeCutOff>> {
+fn parse_cut_offs(node: &Node) -> Result<Vec<CutOff>> {
     reject_attributes(node, &[])?;
     require_whitespace(node)?;
     let mut result = Vec::new();
@@ -807,7 +805,7 @@ fn parse_cut_offs(node: &Node) -> Result<Vec<SpreadsheetChangeCutOff>> {
                     &[(Namespace::Table, "id"), (Namespace::Table, "position")],
                 )?;
                 reject_children(child, &[], false)?;
-                result.push(SpreadsheetChangeCutOff::Insertion {
+                result.push(CutOff::Insertion {
                     change_id: required_attribute(child, Namespace::Table, "id")?.to_string(),
                     position: parse_i64(
                         required_attribute(child, Namespace::Table, "position")?,
@@ -829,7 +827,7 @@ fn parse_cut_offs(node: &Node) -> Result<Vec<SpreadsheetChangeCutOff>> {
                 let start = attribute(child, Namespace::Table, "start-position");
                 let end = attribute(child, Namespace::Table, "end-position");
                 let cut_off = match (position, start, end) {
-                    (Some(value), None, None) => SpreadsheetChangeCutOff::MovementPoint {
+                    (Some(value), None, None) => CutOff::MovementPoint {
                         position: parse_i64(value, "table:position")?,
                     },
                     (None, Some(start), Some(end)) => {
@@ -840,7 +838,7 @@ fn parse_cut_offs(node: &Node) -> Result<Vec<SpreadsheetChangeCutOff>> {
                                 "movement cut-off start must precede end".to_string(),
                             ));
                         }
-                        SpreadsheetChangeCutOff::MovementRange { start, end }
+                        CutOff::MovementRange { start, end }
                     },
                     _ => {
                         return Err(Error::InvalidFormat(
@@ -861,7 +859,7 @@ fn parse_cut_offs(node: &Node) -> Result<Vec<SpreadsheetChangeCutOff>> {
     Ok(result)
 }
 
-fn parse_range(node: &Node) -> Result<SpreadsheetTrackedRangeAddress> {
+fn parse_range(node: &Node) -> Result<RangeAddress> {
     reject_attributes(
         node,
         &[
@@ -888,22 +886,20 @@ fn parse_range(node: &Node) -> Result<SpreadsheetTrackedRangeAddress> {
     ]
     .map(|name| attribute(node, Namespace::Table, name));
     if cell.iter().all(Option::is_some) && range.iter().all(Option::is_none) {
-        return Ok(SpreadsheetTrackedRangeAddress::Cell(
-            SpreadsheetTrackedCellAddress {
-                table: parse_i64(cell[0].expect("present"), "table:table")?,
-                column: parse_i64(cell[1].expect("present"), "table:column")?,
-                row: parse_i64(cell[2].expect("present"), "table:row")?,
-            },
-        ));
+        return Ok(RangeAddress::Cell(CellAddress {
+            table: parse_i64(cell[0].expect("present"), "table:table")?,
+            column: parse_i64(cell[1].expect("present"), "table:column")?,
+            row: parse_i64(cell[2].expect("present"), "table:row")?,
+        }));
     }
     if cell.iter().all(Option::is_none) && range.iter().all(Option::is_some) {
-        return Ok(SpreadsheetTrackedRangeAddress::Range {
-            start: SpreadsheetTrackedCellAddress {
+        return Ok(RangeAddress::Range {
+            start: CellAddress {
                 table: parse_i64(range[0].expect("present"), "table:start-table")?,
                 column: parse_i64(range[1].expect("present"), "table:start-column")?,
                 row: parse_i64(range[2].expect("present"), "table:start-row")?,
             },
-            end: SpreadsheetTrackedCellAddress {
+            end: CellAddress {
                 table: parse_i64(range[3].expect("present"), "table:end-table")?,
                 column: parse_i64(range[4].expect("present"), "table:end-column")?,
                 row: parse_i64(range[5].expect("present"), "table:end-row")?,
@@ -915,7 +911,7 @@ fn parse_range(node: &Node) -> Result<SpreadsheetTrackedRangeAddress> {
     ))
 }
 
-fn parse_cell_address(node: &Node) -> Result<SpreadsheetTrackedCellAddress> {
+fn parse_cell_address(node: &Node) -> Result<CellAddress> {
     reject_attributes(
         node,
         &[
@@ -925,7 +921,7 @@ fn parse_cell_address(node: &Node) -> Result<SpreadsheetTrackedCellAddress> {
         ],
     )?;
     reject_children(node, &[], false)?;
-    Ok(SpreadsheetTrackedCellAddress {
+    Ok(CellAddress {
         table: parse_i64(
             required_attribute(node, Namespace::Table, "table")?,
             "table:table",
@@ -941,7 +937,7 @@ fn parse_cell_address(node: &Node) -> Result<SpreadsheetTrackedCellAddress> {
     })
 }
 
-fn parse_tracked_cell(node: &Node) -> Result<SpreadsheetTrackedCell> {
+fn parse_tracked_cell(node: &Node) -> Result<Cell> {
     reject_attributes(
         node,
         &[
@@ -980,33 +976,33 @@ fn parse_tracked_cell(node: &Node) -> Result<SpreadsheetTrackedCell> {
         ));
     }
     let value = match value_type {
-        None => SpreadsheetTrackedCellValue::Empty,
-        Some("boolean") => SpreadsheetTrackedCellValue::Boolean(parse_bool(
+        None => CellValue::Empty,
+        Some("boolean") => CellValue::Boolean(parse_bool(
             required_attribute(node, Namespace::Office, "boolean-value")?,
             "office:boolean-value",
         )?),
-        Some("float") => SpreadsheetTrackedCellValue::Number(parse_f64(
+        Some("float") => CellValue::Number(parse_f64(
             required_attribute(node, Namespace::Office, "value")?,
             "office:value",
         )?),
-        Some("percentage") => SpreadsheetTrackedCellValue::Percentage(parse_f64(
+        Some("percentage") => CellValue::Percentage(parse_f64(
             required_attribute(node, Namespace::Office, "value")?,
             "office:value",
         )?),
-        Some("currency") => SpreadsheetTrackedCellValue::Currency {
+        Some("currency") => CellValue::Currency {
             value: parse_f64(
                 required_attribute(node, Namespace::Office, "value")?,
                 "office:value",
             )?,
             code: required_attribute(node, Namespace::Office, "currency")?.to_string(),
         },
-        Some("date") => SpreadsheetTrackedCellValue::Date(
-            required_attribute(node, Namespace::Office, "date-value")?.to_string(),
-        ),
-        Some("time") => SpreadsheetTrackedCellValue::Time(
-            required_attribute(node, Namespace::Office, "time-value")?.to_string(),
-        ),
-        Some("string") => SpreadsheetTrackedCellValue::Text(
+        Some("date") => {
+            CellValue::Date(required_attribute(node, Namespace::Office, "date-value")?.to_string())
+        },
+        Some("time") => {
+            CellValue::Time(required_attribute(node, Namespace::Office, "time-value")?.to_string())
+        },
+        Some("string") => CellValue::Text(
             attribute(node, Namespace::Office, "string-value")
                 .unwrap_or(&display_text)
                 .to_string(),
@@ -1017,7 +1013,7 @@ fn parse_tracked_cell(node: &Node) -> Result<SpreadsheetTrackedCell> {
             )));
         },
     };
-    Ok(SpreadsheetTrackedCell {
+    Ok(Cell {
         address: attribute(node, Namespace::Table, "cell-address").map(str::to_string),
         style_name: attribute(node, Namespace::Table, "style-name").map(str::to_string),
         matrix_covered: attribute(node, Namespace::Table, "matrix-covered")
@@ -1032,7 +1028,7 @@ fn parse_tracked_cell(node: &Node) -> Result<SpreadsheetTrackedCell> {
     })
 }
 
-impl SpreadsheetTrackedChanges {
+impl Changes {
     /// Validate references, dependency ordering and values before authoring.
     pub fn validate(&self) -> Result<()> {
         if self.changes.len() > MAX_NODES {
@@ -1055,11 +1051,11 @@ impl SpreadsheetTrackedChanges {
                 .ok_or_else(|| Error::InvalidFormat("tracked-change node count overflow".into()))?;
             validate_tracked_metadata(metadata, &mut aggregate)?;
             match change {
-                SpreadsheetTrackedChange::Insertion(value) => {
+                Change::Insertion(value) => {
                     validate_tracked_position(value.position, "insertion position")?;
                     validate_optional_tracked_position(value.table, "insertion table")?;
                 },
-                SpreadsheetTrackedChange::Deletion(value) => {
+                Change::Deletion(value) => {
                     validate_tracked_position(value.position, "deletion position")?;
                     validate_optional_tracked_position(value.table, "deletion table")?;
                     validate_optional_tracked_position(
@@ -1069,7 +1065,7 @@ impl SpreadsheetTrackedChanges {
                     nodes = nodes.saturating_add(value.cut_offs.len());
                     for cut_off in &value.cut_offs {
                         match cut_off {
-                            SpreadsheetChangeCutOff::Insertion {
+                            CutOff::Insertion {
                                 change_id,
                                 position,
                             } => {
@@ -1081,10 +1077,10 @@ impl SpreadsheetTrackedChanges {
                                 )?;
                                 validate_tracked_position(*position, "insertion cut-off position")?;
                             },
-                            SpreadsheetChangeCutOff::MovementPoint { position } => {
+                            CutOff::MovementPoint { position } => {
                                 validate_tracked_position(*position, "movement cut-off position")?;
                             },
-                            SpreadsheetChangeCutOff::MovementRange { start, end } => {
+                            CutOff::MovementRange { start, end } => {
                                 validate_tracked_position(*start, "movement cut-off start")?;
                                 validate_tracked_position(*end, "movement cut-off end")?;
                                 if start >= end {
@@ -1096,12 +1092,12 @@ impl SpreadsheetTrackedChanges {
                         }
                     }
                 },
-                SpreadsheetTrackedChange::Movement(value) => {
+                Change::Movement(value) => {
                     validate_tracked_range(&value.source)?;
                     validate_tracked_range(&value.target)?;
                     nodes = nodes.saturating_add(2);
                 },
-                SpreadsheetTrackedChange::CellContent(value) => {
+                Change::CellContent(value) => {
                     validate_tracked_address(&value.address)?;
                     validate_tracked_cell(&value.previous, &mut aggregate)?;
                     if let Some(id) = &value.previous_change_id {
@@ -1123,19 +1119,19 @@ impl SpreadsheetTrackedChanges {
             }
             for deletion in &metadata.deletions {
                 let id = match deletion {
-                    SpreadsheetNestedDeletion::CellContent { change_id, .. }
-                    | SpreadsheetNestedDeletion::Change { change_id } => change_id.as_deref(),
+                    NestedDeletion::CellContent { change_id, .. }
+                    | NestedDeletion::Change { change_id } => change_id.as_deref(),
                 };
                 validate_tracked_reference(id, &ids)?;
             }
-            if let SpreadsheetTrackedChange::Deletion(value) = change {
+            if let Change::Deletion(value) = change {
                 for cut_off in &value.cut_offs {
-                    if let SpreadsheetChangeCutOff::Insertion { change_id, .. } = cut_off {
+                    if let CutOff::Insertion { change_id, .. } = cut_off {
                         validate_tracked_reference(Some(change_id), &ids)?;
                     }
                 }
             }
-            if let SpreadsheetTrackedChange::CellContent(value) = change {
+            if let Change::CellContent(value) = change {
                 validate_tracked_reference(value.previous_change_id.as_deref(), &ids)?;
             }
         }
@@ -1155,10 +1151,7 @@ impl SpreadsheetTrackedChanges {
     }
 }
 
-pub(crate) fn write_tracked_changes(
-    output: &mut String,
-    changes: Option<&SpreadsheetTrackedChanges>,
-) -> Result<()> {
+pub(crate) fn write_tracked_changes(output: &mut String, changes: Option<&Changes>) -> Result<()> {
     if let Some(changes) = changes {
         changes.validate()?;
         write_tracked_changes_unchecked(output, changes);
@@ -1196,16 +1189,16 @@ fn validate_optional_tracked_position(value: Option<i64>, label: &str) -> Result
     value.map_or(Ok(()), |value| validate_tracked_position(value, label))
 }
 
-fn validate_tracked_address(address: &SpreadsheetTrackedCellAddress) -> Result<()> {
+fn validate_tracked_address(address: &CellAddress) -> Result<()> {
     validate_tracked_position(address.table, "tracked cell table")?;
     validate_tracked_position(address.column, "tracked cell column")?;
     validate_tracked_position(address.row, "tracked cell row")
 }
 
-fn validate_tracked_range(range: &SpreadsheetTrackedRangeAddress) -> Result<()> {
+fn validate_tracked_range(range: &RangeAddress) -> Result<()> {
     match range {
-        SpreadsheetTrackedRangeAddress::Cell(address) => validate_tracked_address(address),
-        SpreadsheetTrackedRangeAddress::Range { start, end } => {
+        RangeAddress::Cell(address) => validate_tracked_address(address),
+        RangeAddress::Range { start, end } => {
             validate_tracked_address(start)?;
             validate_tracked_address(end)?;
             if (start.table, start.row, start.column) > (end.table, end.row, end.column) {
@@ -1216,7 +1209,7 @@ fn validate_tracked_range(range: &SpreadsheetTrackedRangeAddress) -> Result<()> 
     }
 }
 
-fn validate_tracked_cell(cell: &SpreadsheetTrackedCell, aggregate: &mut usize) -> Result<()> {
+fn validate_tracked_cell(cell: &Cell, aggregate: &mut usize) -> Result<()> {
     for (value, label) in [
         (cell.address.as_deref(), "tracked cell address"),
         (cell.style_name.as_deref(), "tracked cell style name"),
@@ -1233,21 +1226,16 @@ fn validate_tracked_cell(cell: &SpreadsheetTrackedCell, aggregate: &mut usize) -
         aggregate,
     )?;
     match &cell.value {
-        SpreadsheetTrackedCellValue::Number(value)
-        | SpreadsheetTrackedCellValue::Percentage(value)
-            if !value.is_finite() =>
-        {
+        CellValue::Number(value) | CellValue::Percentage(value) if !value.is_finite() => {
             return tracked_invalid("tracked cell numeric value must be finite");
         },
-        SpreadsheetTrackedCellValue::Currency { value, code } => {
+        CellValue::Currency { value, code } => {
             if !value.is_finite() {
                 return tracked_invalid("tracked cell currency value must be finite");
             }
             validate_tracked_string(code, "tracked cell currency code", false, aggregate)?;
         },
-        SpreadsheetTrackedCellValue::Date(value)
-        | SpreadsheetTrackedCellValue::Time(value)
-        | SpreadsheetTrackedCellValue::Text(value) => {
+        CellValue::Date(value) | CellValue::Time(value) | CellValue::Text(value) => {
             validate_tracked_string(value, "tracked cell value", true, aggregate)?;
         },
         _ => {},
@@ -1255,10 +1243,7 @@ fn validate_tracked_cell(cell: &SpreadsheetTrackedCell, aggregate: &mut usize) -
     Ok(())
 }
 
-fn validate_tracked_metadata(
-    metadata: &SpreadsheetChangeMetadata,
-    aggregate: &mut usize,
-) -> Result<()> {
+fn validate_tracked_metadata(metadata: &Metadata, aggregate: &mut usize) -> Result<()> {
     if let Some(id) = &metadata.rejecting_change_id {
         validate_tracked_string(id, "rejecting change id", false, aggregate)?;
     }
@@ -1286,7 +1271,7 @@ fn validate_tracked_metadata(
     }
     for deletion in &metadata.deletions {
         match deletion {
-            SpreadsheetNestedDeletion::CellContent {
+            NestedDeletion::CellContent {
                 change_id,
                 address,
                 cell,
@@ -1304,7 +1289,7 @@ fn validate_tracked_metadata(
                     return tracked_invalid("cell-content-deletion requires an address or cell");
                 }
             },
-            SpreadsheetNestedDeletion::Change { change_id } => {
+            NestedDeletion::Change { change_id } => {
                 if let Some(id) = change_id {
                     validate_tracked_string(id, "nested change deletion id", false, aggregate)?;
                 }
@@ -1330,7 +1315,7 @@ fn validate_tracked_reference(
 
 fn visit_tracked_dependencies(
     index: usize,
-    changes: &[SpreadsheetTrackedChange],
+    changes: &[Change],
     ids: &std::collections::HashMap<&str, usize>,
     states: &mut [u8],
 ) -> Result<()> {
@@ -1347,13 +1332,13 @@ fn visit_tracked_dependencies(
     Ok(())
 }
 
-fn write_tracked_changes_unchecked(output: &mut String, changes: &SpreadsheetTrackedChanges) {
+fn write_tracked_changes_unchecked(output: &mut String, changes: &Changes) {
     output.push_str("<table:tracked-changes table:track-changes=\"");
     output.push_str(if changes.enabled { "true" } else { "false" });
     output.push_str("\">");
     for change in &changes.changes {
         match change {
-            SpreadsheetTrackedChange::Insertion(value) => {
+            Change::Insertion(value) => {
                 output.push_str("<table:insertion");
                 write_common_tracked_attributes(output, &value.metadata);
                 push_tracked_attr(output, "table:type", tracked_dimension(value.dimension));
@@ -1368,7 +1353,7 @@ fn write_tracked_changes_unchecked(output: &mut String, changes: &SpreadsheetTra
                 write_tracked_metadata(output, &value.metadata);
                 output.push_str("</table:insertion>");
             },
-            SpreadsheetTrackedChange::Deletion(value) => {
+            Change::Deletion(value) => {
                 output.push_str("<table:deletion");
                 write_common_tracked_attributes(output, &value.metadata);
                 push_tracked_attr(output, "table:type", tracked_dimension(value.dimension));
@@ -1384,7 +1369,7 @@ fn write_tracked_changes_unchecked(output: &mut String, changes: &SpreadsheetTra
                 write_tracked_cut_offs(output, &value.cut_offs);
                 output.push_str("</table:deletion>");
             },
-            SpreadsheetTrackedChange::Movement(value) => {
+            Change::Movement(value) => {
                 output.push_str("<table:movement");
                 write_common_tracked_attributes(output, &value.metadata);
                 output.push('>');
@@ -1393,7 +1378,7 @@ fn write_tracked_changes_unchecked(output: &mut String, changes: &SpreadsheetTra
                 write_tracked_range(output, "target-range-address", &value.target);
                 output.push_str("</table:movement>");
             },
-            SpreadsheetTrackedChange::CellContent(value) => {
+            Change::CellContent(value) => {
                 output.push_str("<table:cell-content-change");
                 write_common_tracked_attributes(output, &value.metadata);
                 output.push('>');
@@ -1412,15 +1397,15 @@ fn write_tracked_changes_unchecked(output: &mut String, changes: &SpreadsheetTra
     output.push_str("</table:tracked-changes>");
 }
 
-fn write_common_tracked_attributes(output: &mut String, metadata: &SpreadsheetChangeMetadata) {
+fn write_common_tracked_attributes(output: &mut String, metadata: &Metadata) {
     push_tracked_attr(output, "table:id", &metadata.id);
     push_tracked_attr(
         output,
         "table:acceptance-state",
         match metadata.acceptance {
-            SpreadsheetChangeAcceptance::Accepted => "accepted",
-            SpreadsheetChangeAcceptance::Rejected => "rejected",
-            SpreadsheetChangeAcceptance::Pending => "pending",
+            ChangeAcceptance::Accepted => "accepted",
+            ChangeAcceptance::Rejected => "rejected",
+            ChangeAcceptance::Pending => "pending",
         },
     );
     if let Some(id) = &metadata.rejecting_change_id {
@@ -1428,7 +1413,7 @@ fn write_common_tracked_attributes(output: &mut String, metadata: &SpreadsheetCh
     }
 }
 
-fn write_tracked_metadata(output: &mut String, metadata: &SpreadsheetChangeMetadata) {
+fn write_tracked_metadata(output: &mut String, metadata: &Metadata) {
     output.push_str("<office:change-info>");
     if let Some(value) = &metadata.info.creator {
         write_tracked_text(output, "dc:creator", value);
@@ -1453,7 +1438,7 @@ fn write_tracked_metadata(output: &mut String, metadata: &SpreadsheetChangeMetad
         output.push_str("<table:deletions>");
         for deletion in &metadata.deletions {
             match deletion {
-                SpreadsheetNestedDeletion::CellContent {
+                NestedDeletion::CellContent {
                     change_id,
                     address,
                     cell,
@@ -1471,7 +1456,7 @@ fn write_tracked_metadata(output: &mut String, metadata: &SpreadsheetChangeMetad
                     }
                     output.push_str("</table:cell-content-deletion>");
                 },
-                SpreadsheetNestedDeletion::Change { change_id } => {
+                NestedDeletion::Change { change_id } => {
                     output.push_str("<table:change-deletion");
                     if let Some(id) = change_id {
                         push_tracked_attr(output, "table:id", id);
@@ -1484,28 +1469,28 @@ fn write_tracked_metadata(output: &mut String, metadata: &SpreadsheetChangeMetad
     }
 }
 
-fn write_tracked_cut_offs(output: &mut String, cut_offs: &[SpreadsheetChangeCutOff]) {
+fn write_tracked_cut_offs(output: &mut String, cut_offs: &[CutOff]) {
     if cut_offs.is_empty() {
         return;
     }
     output.push_str("<table:cut-offs>");
     for value in cut_offs {
         output.push_str(match value {
-            SpreadsheetChangeCutOff::Insertion { .. } => "<table:insertion-cut-off",
+            CutOff::Insertion { .. } => "<table:insertion-cut-off",
             _ => "<table:movement-cut-off",
         });
         match value {
-            SpreadsheetChangeCutOff::Insertion {
+            CutOff::Insertion {
                 change_id,
                 position,
             } => {
                 push_tracked_attr(output, "table:id", change_id);
                 push_tracked_i64(output, "table:position", *position);
             },
-            SpreadsheetChangeCutOff::MovementPoint { position } => {
+            CutOff::MovementPoint { position } => {
                 push_tracked_i64(output, "table:position", *position);
             },
-            SpreadsheetChangeCutOff::MovementRange { start, end } => {
+            CutOff::MovementRange { start, end } => {
                 push_tracked_i64(output, "table:start-position", *start);
                 push_tracked_i64(output, "table:end-position", *end);
             },
@@ -1515,14 +1500,12 @@ fn write_tracked_cut_offs(output: &mut String, cut_offs: &[SpreadsheetChangeCutO
     output.push_str("</table:cut-offs>");
 }
 
-fn write_tracked_range(output: &mut String, name: &str, range: &SpreadsheetTrackedRangeAddress) {
+fn write_tracked_range(output: &mut String, name: &str, range: &RangeAddress) {
     output.push_str("<table:");
     output.push_str(name);
     match range {
-        SpreadsheetTrackedRangeAddress::Cell(value) => {
-            write_tracked_address_attrs(output, "", value)
-        },
-        SpreadsheetTrackedRangeAddress::Range { start, end } => {
+        RangeAddress::Cell(value) => write_tracked_address_attrs(output, "", value),
+        RangeAddress::Range { start, end } => {
             write_tracked_address_attrs(output, "start-", start);
             write_tracked_address_attrs(output, "end-", end);
         },
@@ -1530,24 +1513,20 @@ fn write_tracked_range(output: &mut String, name: &str, range: &SpreadsheetTrack
     output.push_str("/>");
 }
 
-fn write_tracked_address(output: &mut String, name: &str, value: &SpreadsheetTrackedCellAddress) {
+fn write_tracked_address(output: &mut String, name: &str, value: &CellAddress) {
     output.push_str("<table:");
     output.push_str(name);
     write_tracked_address_attrs(output, "", value);
     output.push_str("/>");
 }
 
-fn write_tracked_address_attrs(
-    output: &mut String,
-    prefix: &str,
-    value: &SpreadsheetTrackedCellAddress,
-) {
+fn write_tracked_address_attrs(output: &mut String, prefix: &str, value: &CellAddress) {
     push_tracked_i64(output, &format!("table:{prefix}table"), value.table);
     push_tracked_i64(output, &format!("table:{prefix}column"), value.column);
     push_tracked_i64(output, &format!("table:{prefix}row"), value.row);
 }
 
-fn write_tracked_cell(output: &mut String, cell: &SpreadsheetTrackedCell) {
+fn write_tracked_cell(output: &mut String, cell: &Cell) {
     output.push_str("<table:change-track-table-cell");
     for (name, value) in [
         ("table:cell-address", cell.address.as_deref()),
@@ -1576,8 +1555,8 @@ fn write_tracked_cell(output: &mut String, cell: &SpreadsheetTrackedCell) {
         );
     }
     match &cell.value {
-        SpreadsheetTrackedCellValue::Empty => {},
-        SpreadsheetTrackedCellValue::Boolean(value) => {
+        CellValue::Empty => {},
+        CellValue::Boolean(value) => {
             push_tracked_attr(output, "office:value-type", "boolean");
             push_tracked_attr(
                 output,
@@ -1585,21 +1564,15 @@ fn write_tracked_cell(output: &mut String, cell: &SpreadsheetTrackedCell) {
                 if *value { "true" } else { "false" },
             );
         },
-        SpreadsheetTrackedCellValue::Number(value) => write_tracked_number(output, "float", *value),
-        SpreadsheetTrackedCellValue::Percentage(value) => {
-            write_tracked_number(output, "percentage", *value)
-        },
-        SpreadsheetTrackedCellValue::Currency { value, code } => {
+        CellValue::Number(value) => write_tracked_number(output, "float", *value),
+        CellValue::Percentage(value) => write_tracked_number(output, "percentage", *value),
+        CellValue::Currency { value, code } => {
             write_tracked_number(output, "currency", *value);
             push_tracked_attr(output, "office:currency", code);
         },
-        SpreadsheetTrackedCellValue::Date(value) => {
-            write_tracked_value(output, "date", "office:date-value", value)
-        },
-        SpreadsheetTrackedCellValue::Time(value) => {
-            write_tracked_value(output, "time", "office:time-value", value)
-        },
-        SpreadsheetTrackedCellValue::Text(value) => {
+        CellValue::Date(value) => write_tracked_value(output, "date", "office:date-value", value),
+        CellValue::Time(value) => write_tracked_value(output, "time", "office:time-value", value),
+        CellValue::Text(value) => {
             write_tracked_value(output, "string", "office:string-value", value)
         },
     }
@@ -1624,11 +1597,11 @@ fn write_tracked_value(output: &mut String, value_type: &str, name: &str, value:
     push_tracked_attr(output, name, value);
 }
 
-fn tracked_dimension(value: SpreadsheetChangeDimension) -> &'static str {
+fn tracked_dimension(value: ChangeDimension) -> &'static str {
     match value {
-        SpreadsheetChangeDimension::Row => "row",
-        SpreadsheetChangeDimension::Column => "column",
-        SpreadsheetChangeDimension::Table => "table",
+        ChangeDimension::Row => "row",
+        ChangeDimension::Column => "column",
+        ChangeDimension::Table => "table",
     }
 }
 
@@ -1686,22 +1659,22 @@ fn common_attributes(extra: &[&'static str]) -> Vec<(Namespace, &'static str)> {
     attributes
 }
 
-fn parse_acceptance(value: &str) -> Result<SpreadsheetChangeAcceptance> {
+fn parse_acceptance(value: &str) -> Result<ChangeAcceptance> {
     match value {
-        "accepted" => Ok(SpreadsheetChangeAcceptance::Accepted),
-        "rejected" => Ok(SpreadsheetChangeAcceptance::Rejected),
-        "pending" => Ok(SpreadsheetChangeAcceptance::Pending),
+        "accepted" => Ok(ChangeAcceptance::Accepted),
+        "rejected" => Ok(ChangeAcceptance::Rejected),
+        "pending" => Ok(ChangeAcceptance::Pending),
         _ => Err(Error::InvalidFormat(format!(
             "invalid table:acceptance-state '{value}'"
         ))),
     }
 }
 
-fn parse_dimension(value: &str) -> Result<SpreadsheetChangeDimension> {
+fn parse_dimension(value: &str) -> Result<ChangeDimension> {
     match value {
-        "row" => Ok(SpreadsheetChangeDimension::Row),
-        "column" => Ok(SpreadsheetChangeDimension::Column),
-        "table" => Ok(SpreadsheetChangeDimension::Table),
+        "row" => Ok(ChangeDimension::Row),
+        "column" => Ok(ChangeDimension::Column),
+        "table" => Ok(ChangeDimension::Table),
         _ => Err(Error::InvalidFormat(format!(
             "invalid tracked-change table:type '{value}'"
         ))),
@@ -2012,7 +1985,7 @@ mod tests {
     const PREFIX: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><office:body><office:spreadsheet>"#;
     const SUFFIX: &str = "</office:spreadsheet></office:body></office:document-content>";
 
-    fn parse(fragment: &str) -> Result<Option<SpreadsheetTrackedChanges>> {
+    fn parse(fragment: &str) -> Result<Option<Changes>> {
         parse_tracked_changes(&format!("{PREFIX}{fragment}{SUFFIX}"))
     }
 
@@ -2027,35 +2000,26 @@ mod tests {
         let tracked = parse(xml).unwrap().unwrap();
         assert!(tracked.enabled);
         assert_eq!(tracked.changes.len(), 4);
-        let SpreadsheetTrackedChange::Insertion(insertion) = &tracked.changes[0] else {
+        let Change::Insertion(insertion) = &tracked.changes[0] else {
             panic!("expected insertion")
         };
         assert_eq!(insertion.count.get(), 3);
         assert_eq!(insertion.metadata.info.comments, ["insert"]);
-        let SpreadsheetTrackedChange::Deletion(deletion) = &tracked.changes[1] else {
+        let Change::Deletion(deletion) = &tracked.changes[1] else {
             panic!("expected deletion")
         };
         assert_eq!(deletion.cut_offs.len(), 2);
         assert_eq!(deletion.metadata.deletions.len(), 2);
-        let SpreadsheetTrackedChange::Movement(movement) = &tracked.changes[2] else {
+        let Change::Movement(movement) = &tracked.changes[2] else {
             panic!("expected movement")
         };
-        assert!(matches!(
-            movement.source,
-            SpreadsheetTrackedRangeAddress::Range { .. }
-        ));
-        let SpreadsheetTrackedChange::CellContent(change) = &tracked.changes[3] else {
+        assert!(matches!(movement.source, RangeAddress::Range { .. }));
+        let Change::CellContent(change) = &tracked.changes[3] else {
             panic!("expected cell change")
         };
-        assert_eq!(
-            change.metadata.acceptance,
-            SpreadsheetChangeAcceptance::Accepted
-        );
+        assert_eq!(change.metadata.acceptance, ChangeAcceptance::Accepted);
         assert_eq!(change.metadata.info.comments, ["A & B"]);
-        assert_eq!(
-            change.previous.value,
-            SpreadsheetTrackedCellValue::Text("old".into())
-        );
+        assert_eq!(change.previous.value, CellValue::Text("old".into()));
     }
 
     #[test]
@@ -2093,7 +2057,7 @@ mod tests {
             changes
                 .changes
                 .iter()
-                .all(|change| matches!(change, SpreadsheetTrackedChange::CellContent(_)))
+                .all(|change| matches!(change, Change::CellContent(_)))
         );
 
         let protected_path = root.join(
