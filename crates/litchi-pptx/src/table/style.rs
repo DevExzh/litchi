@@ -797,6 +797,13 @@ fn inspect_graph(package: &OpcPackage) -> Result<Graph> {
         });
     }
     if let Some(attachment) = &selected {
+        if package.iter_parts().any(|part| {
+            part.content_type() == ct::PML_TABLE_STYLES && part.partname() != &attachment.part
+        }) {
+            return Err(invalid(
+                "orphan table-style part exists outside the presentation relationship",
+            ));
+        }
         validate_inbound(package, &presentation_name, attachment)?;
     } else if package
         .iter_parts()
@@ -1581,6 +1588,39 @@ mod tests {
 
         assert!(load(&package).is_err());
         assert!(remove(&mut package).is_err());
+        assert_eq!(package.part_count(), part_count);
+        assert_eq!(
+            package.get_part(&presentation).unwrap().rels().len(),
+            rel_count
+        );
+    }
+
+    #[test]
+    fn orphan_catalog_is_rejected_even_when_another_catalog_is_attached() {
+        let mut package = synthetic(
+            ct::PML_PRESENTATION_MAIN,
+            Conformance::Transitional,
+            Some(default_xml().as_bytes()),
+        );
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/ppt/orphanTableStyles.xml").unwrap(),
+            ct::PML_TABLE_STYLES.into(),
+            default_xml().as_bytes().to_vec(),
+        )));
+        let part_count = package.part_count();
+        let presentation = package.main_document_part().unwrap().partname().clone();
+        let rel_count = package.get_part(&presentation).unwrap().rels().len();
+
+        assert!(present(&package).is_err());
+        assert!(load(&package).is_err());
+        assert!(remove(&mut package).is_err());
+        assert!(
+            put(
+                &mut package,
+                List::new(Conformance::Transitional, Id::parse(DEFAULT).unwrap()),
+            )
+            .is_err()
+        );
         assert_eq!(package.part_count(), part_count);
         assert_eq!(
             package.get_part(&presentation).unwrap().rels().len(),
