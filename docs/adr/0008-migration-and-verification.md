@@ -3884,8 +3884,9 @@ and historical error/API paths as explicit adapters:
   external targets remain inert relationship metadata.
 - WordprocessingML mail-merge settings, ODSO field maps, and recipient-data
   XML now live in `litchi-docx::mail_merge`. The host retains settings-part
-  relationship/resource orchestration and the historical compatibility
-  facade; sources and recipient parts are never fetched, opened, or executed.
+  relationship/resource orchestration, maps owner errors at the host boundary,
+  and exposes no duplicate semantic model or compatibility aliases; sources
+  and recipient parts are never fetched, opened, or executed.
 
 The checked-in specification anchors are `[MS-XLSX]` §§2.1.1, 2.2.4.3,
 2.4.25, 2.4.89, 2.6.46, 2.6.215, and 2.6.227--2.6.228; `[MS-OE376]`
@@ -4091,8 +4092,9 @@ and legacy representation conversion:
   existing host types.
 - `litchi-xlsx::threaded_comments` owns concise `Comment`, `Comments`,
   `Person`, `People`, `Mention`, and graph models plus bounded XML parsing,
-  writing, and cross-reference validation. The host retains package graph CRUD
-  and relationship lifecycle operations under the historical public names.
+  writing, and cross-reference validation. The host retains only package graph
+  CRUD and relationship lifecycle operations; semantic values are available
+  from the owner module and no prefix-expanded aliases are retained.
 
 The checked-in specification anchors are `[MS-OE376]` §§2.1.277--2.1.291 and
 2.1.580 for numbering domains and limits; `[MS-XLSB]` §§2.3.7, 2.4.12,
@@ -4201,8 +4203,9 @@ format crates and one genuinely shared OOXML owner:
 
 - `litchi-docx::mail_merge` is layered as `model.rs`, `codec.rs`, and
   `package.rs`. `Conformance`, `Settings`, `FieldMap`, `Recipient`, and
-  related contextual values are canonical; historical `MailMerge*` names are
-  aliases. Mail-merge sources and recipient parts remain inert.
+  related contextual values are canonical and exposed only from the owner; no
+  `MailMerge*` compatibility aliases or prefix-expanded facade types remain.
+  Mail-merge sources and recipient parts remain inert.
 - `litchi-pptx::presentation_properties` is layered as `model.rs`, `codec.rs`,
   and `package.rs`. `Properties`, `HtmlPublish`, `Web`, `Print`, `Show`, and
   related values are canonical; historical `Presentation*` and `*Properties`
@@ -4512,6 +4515,34 @@ alias. The ODF facade exposes the common module at its short `namespace` path,
 and the canonical names remain prefix-free. Namespace constants, mappings, and
 focused model tests now live with the common owner. This extraction makes no
 new ODF conformance claim and does not change package or manifest ownership.
+
+## ODF media, metadata, and common package-path layering
+
+The ODF owner now has two additional semantic folders. Image discovery and
+safe source classification live under
+`litchi-odf::media/{mod,model,codec}.rs` with canonical `Image`, `ImageFrame`,
+`ImagePart`, and `ImageSource` values. The old `OdfImage*` spellings were
+removed; packaged, flat, embedded-object, and spreadsheet consumers use the
+same owner model without duplicate wrappers.
+
+The ODF-neutral archive path rules live under
+`litchi-odf-common::package::path`, alongside the archive and manifest owner.
+`is_linked_href` and `resolve_package_path` are shared by image, embedded
+object, RDF, and script package owners, so path normalization and traversal
+protection are implemented once. The format crate retains family-specific
+media classification and package orchestration.
+
+Core metadata is layered as
+`litchi-odf::core::metadata/{mod,model,codec,tests}.rs`. `Metadata` is the
+canonical contextual value; the prior `OdfMetadata` spelling is not retained.
+The model owns conversion to `litchi_core::Metadata`, while the codec owns
+bounded `meta.xml` parsing, deterministic serialization, and source patching.
+Package and document-family consumers now use that owner directly.
+
+Focused verification for this slice passes 1,097 ODF unit tests, the image and
+embedded-package integration targets, and the ODF common-package suite. No
+new ODF specification or native Office claim is made by these structural
+refactors.
 
 ## Evidence levels
 

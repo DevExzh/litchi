@@ -46,6 +46,14 @@ concrete Word, presentation, and spreadsheet crates also depend on their neutral
 vocabulary crate. `litchi-drawingml` may depend on `litchi-sheet` for neutral
 chart data references; no concrete spreadsheet crate may depend on another.
 
+`litchi-odf-common` owns ODF-neutral package, manifest, namespace, and safe
+archive-path vocabulary. `litchi-odf` owns document-family orchestration and
+format-specific codecs, while its semantic owners are layered beneath their
+contextual module paths. ODF consumers use canonical names such as
+`metadata::Metadata` and `media::Image`; the concrete crate does not recreate
+common archive-path or namespace logic and does not retain prefix-expanded
+compatibility aliases.
+
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
 `plot_area`, `reader`, and `writer`; the public codec verbs are the short
