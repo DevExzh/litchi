@@ -136,56 +136,56 @@ macro_rules! lexical {
     };
 }
 lexical!(
-    ChartNonNegativeLength,
+    NonNegativeLength,
     nonnegative_length,
     "chart non-negative length",
     false
 );
-lexical!(ChartInteger, integer, "chart integer", false);
+lexical!(Integer, integer, "chart integer", false);
 lexical!(
-    ChartPositiveInteger,
+    PositiveInteger,
     positive_integer,
     "chart positive integer",
     false
 );
 lexical!(
-    ChartNonNegativeInteger,
+    NonNegativeInteger,
     nonnegative_integer,
     "chart non-negative integer",
     false
 );
-lexical!(ChartPercent, percent, "chart percentage", false);
-lexical!(ChartDouble, double, "chart double", false);
-lexical!(ChartAngle, |_: &str| true, "chart angle", true);
+lexical!(Percent, percent, "chart percentage", false);
+lexical!(Double, double, "chart double", false);
+lexical!(Angle, |_: &str| true, "chart angle", true);
 
 macro_rules! keyword_enum{($name:ident{$($variant:ident=>$value:literal),+$(,)?})=>{#[derive(Debug,Clone,Copy,PartialEq,Eq)]pub enum $name{$($variant),+}impl $name{fn parse(value:&str)->Result<Self>{match value{$($value=>Ok(Self::$variant),)+_=>Err(bad(concat!("invalid ",stringify!($name))))}}fn xml(self)->&'static str{match self{$(Self::$variant=>$value),+}}}};}
-keyword_enum!(ChartSymbolType{None=>"none",Automatic=>"automatic",NamedSymbol=>"named-symbol",Image=>"image"});
-keyword_enum!(ChartSymbolName{Square=>"square",Diamond=>"diamond",ArrowDown=>"arrow-down",ArrowUp=>"arrow-up",ArrowRight=>"arrow-right",ArrowLeft=>"arrow-left",BowTie=>"bow-tie",Hourglass=>"hourglass",Circle=>"circle",Star=>"star",X=>"x",Plus=>"plus",Asterisk=>"asterisk",HorizontalBar=>"horizontal-bar",VerticalBar=>"vertical-bar"});
-keyword_enum!(ChartInterpolation{None=>"none",CubicSpline=>"cubic-spline",BSpline=>"b-spline"});
-keyword_enum!(ChartSolidType{Cuboid=>"cuboid",Cylinder=>"cylinder",Cone=>"cone",Pyramid=>"pyramid"});
-keyword_enum!(ChartEmptyCellTreatment{UseZero=>"use-zero",LeaveGap=>"leave-gap",Ignore=>"ignore"});
-keyword_enum!(ChartLabelArrangement{SideBySide=>"side-by-side",StaggerEven=>"stagger-even",StaggerOdd=>"stagger-odd"});
-keyword_enum!(ChartDirection{Ltr=>"ltr",Ttb=>"ttb"});
-keyword_enum!(ChartDataLabelNumber{None=>"none",Value=>"value",Percentage=>"percentage",ValueAndPercentage=>"value-and-percentage"});
-keyword_enum!(ChartLabelPosition{AvoidOverlap=>"avoid-overlap",Center=>"center",Top=>"top",TopRight=>"top-right",Right=>"right",BottomRight=>"bottom-right",Bottom=>"bottom",BottomLeft=>"bottom-left",Left=>"left",TopLeft=>"top-left",Inside=>"inside",Outside=>"outside",NearOrigin=>"near-origin"});
-keyword_enum!(ChartErrorCategory{None=>"none",Variance=>"variance",StandardDeviation=>"standard-deviation",Percentage=>"percentage",ErrorMargin=>"error-margin",Constant=>"constant",StandardError=>"standard-error",CellRange=>"cell-range"});
-keyword_enum!(ChartSeriesSource{Columns=>"columns",Rows=>"rows"});
-keyword_enum!(ChartRegressionType{None=>"none",Linear=>"linear",Logarithmic=>"logarithmic",Exponential=>"exponential",Power=>"power"});
-keyword_enum!(ChartAxisLabelPosition{NearAxis=>"near-axis",NearAxisOtherSide=>"near-axis-other-side",OutsideStart=>"outside-start",OutsideEnd=>"outside-end"});
-keyword_enum!(ChartTickMarkPosition{AtLabels=>"at-labels",AtAxis=>"at-axis",AtLabelsAndAxis=>"at-labels-and-axis"});
+keyword_enum!(SymbolType{None=>"none",Automatic=>"automatic",NamedSymbol=>"named-symbol",Image=>"image"});
+keyword_enum!(SymbolName{Square=>"square",Diamond=>"diamond",ArrowDown=>"arrow-down",ArrowUp=>"arrow-up",ArrowRight=>"arrow-right",ArrowLeft=>"arrow-left",BowTie=>"bow-tie",Hourglass=>"hourglass",Circle=>"circle",Star=>"star",X=>"x",Plus=>"plus",Asterisk=>"asterisk",HorizontalBar=>"horizontal-bar",VerticalBar=>"vertical-bar"});
+keyword_enum!(Interpolation{None=>"none",CubicSpline=>"cubic-spline",BSpline=>"b-spline"});
+keyword_enum!(SolidType{Cuboid=>"cuboid",Cylinder=>"cylinder",Cone=>"cone",Pyramid=>"pyramid"});
+keyword_enum!(EmptyCellTreatment{UseZero=>"use-zero",LeaveGap=>"leave-gap",Ignore=>"ignore"});
+keyword_enum!(LabelArrangement{SideBySide=>"side-by-side",StaggerEven=>"stagger-even",StaggerOdd=>"stagger-odd"});
+keyword_enum!(Direction{Ltr=>"ltr",Ttb=>"ttb"});
+keyword_enum!(DataLabelNumber{None=>"none",Value=>"value",Percentage=>"percentage",ValueAndPercentage=>"value-and-percentage"});
+keyword_enum!(LabelPosition{AvoidOverlap=>"avoid-overlap",Center=>"center",Top=>"top",TopRight=>"top-right",Right=>"right",BottomRight=>"bottom-right",Bottom=>"bottom",BottomLeft=>"bottom-left",Left=>"left",TopLeft=>"top-left",Inside=>"inside",Outside=>"outside",NearOrigin=>"near-origin"});
+keyword_enum!(ErrorCategory{None=>"none",Variance=>"variance",StandardDeviation=>"standard-deviation",Percentage=>"percentage",ErrorMargin=>"error-margin",Constant=>"constant",StandardError=>"standard-error",CellRange=>"cell-range"});
+keyword_enum!(SeriesSource{Columns=>"columns",Rows=>"rows"});
+keyword_enum!(RegressionType{None=>"none",Linear=>"linear",Logarithmic=>"logarithmic",Exponential=>"exponential",Power=>"power"});
+keyword_enum!(AxisLabelPosition{NearAxis=>"near-axis",NearAxisOtherSide=>"near-axis-other-side",OutsideStart=>"outside-start",OutsideEnd=>"outside-end"});
+keyword_enum!(TickMarkPosition{AtLabels=>"at-labels",AtAxis=>"at-axis",AtLabelsAndAxis=>"at-labels-and-axis"});
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ChartAxisPosition {
+pub enum AxisPosition {
     Start,
     End,
-    Value(ChartDouble),
+    Value(Double),
 }
-impl ChartAxisPosition {
+impl AxisPosition {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "start" => Ok(Self::Start),
             "end" => Ok(Self::End),
-            _ => Ok(Self::Value(ChartDouble::new(value)?)),
+            _ => Ok(Self::Value(Double::new(value)?)),
         }
     }
     fn xml(&self) -> &str {
@@ -199,10 +199,10 @@ impl ChartAxisPosition {
 
 /// Inert image marker reference. The URI is never fetched.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSymbolImage {
+pub struct SymbolImage {
     pub href: String,
 }
-impl ChartSymbolImage {
+impl SymbolImage {
     pub fn new(href: impl Into<String>) -> Result<Self> {
         let value = Self { href: href.into() };
         value.validate()?;
@@ -222,10 +222,10 @@ impl ChartSymbolImage {
 
 /// Inert, bounded `text:p` XML inside `chart:label-separator`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartLabelSeparator {
+pub struct LabelSeparator {
     paragraph_xml: String,
 }
-impl ChartLabelSeparator {
+impl LabelSeparator {
     pub fn new_text(text: &str) -> Result<Self> {
         safe(text, "chart label separator text", true)?;
         Self::from_paragraph_xml(format!(
@@ -328,41 +328,41 @@ fn validate_paragraph(xml: &str) -> Result<()> {
 
 /// All 66 attributes and both children allowed by `style:chart-properties`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartStyleProperties {
+pub struct StyleProperties {
     pub scale_text: Option<bool>,
     pub three_dimensional: Option<bool>,
     pub deep: Option<bool>,
     pub right_angled_axes: Option<bool>,
-    pub symbol_type: Option<ChartSymbolType>,
-    pub symbol_name: Option<ChartSymbolName>,
-    pub symbol_image: Option<ChartSymbolImage>,
-    pub symbol_width: Option<ChartNonNegativeLength>,
-    pub symbol_height: Option<ChartNonNegativeLength>,
+    pub symbol_type: Option<SymbolType>,
+    pub symbol_name: Option<SymbolName>,
+    pub symbol_image: Option<SymbolImage>,
+    pub symbol_width: Option<NonNegativeLength>,
+    pub symbol_height: Option<NonNegativeLength>,
     pub sort_by_x_values: Option<bool>,
     pub vertical: Option<bool>,
     pub connect_bars: Option<bool>,
-    pub gap_width: Option<ChartInteger>,
-    pub overlap: Option<ChartInteger>,
+    pub gap_width: Option<Integer>,
+    pub overlap: Option<Integer>,
     pub group_bars_per_axis: Option<bool>,
     pub japanese_candle_stick: Option<bool>,
-    pub interpolation: Option<ChartInterpolation>,
-    pub spline_order: Option<ChartPositiveInteger>,
-    pub spline_resolution: Option<ChartPositiveInteger>,
-    pub pie_offset: Option<ChartNonNegativeInteger>,
-    pub angle_offset: Option<ChartAngle>,
-    pub hole_size: Option<ChartPercent>,
+    pub interpolation: Option<Interpolation>,
+    pub spline_order: Option<PositiveInteger>,
+    pub spline_resolution: Option<PositiveInteger>,
+    pub pie_offset: Option<NonNegativeInteger>,
+    pub angle_offset: Option<Angle>,
+    pub hole_size: Option<Percent>,
     pub lines: Option<bool>,
-    pub solid_type: Option<ChartSolidType>,
+    pub solid_type: Option<SolidType>,
     pub stacked: Option<bool>,
     pub percentage: Option<bool>,
-    pub treat_empty_cells: Option<ChartEmptyCellTreatment>,
+    pub treat_empty_cells: Option<EmptyCellTreatment>,
     pub link_data_style_to_source: Option<bool>,
     pub logarithmic: Option<bool>,
-    pub maximum: Option<ChartDouble>,
-    pub minimum: Option<ChartDouble>,
-    pub origin: Option<ChartDouble>,
-    pub interval_major: Option<ChartDouble>,
-    pub interval_minor_divisor: Option<ChartPositiveInteger>,
+    pub maximum: Option<Double>,
+    pub minimum: Option<Double>,
+    pub origin: Option<Double>,
+    pub interval_major: Option<Double>,
+    pub interval_minor_divisor: Option<PositiveInteger>,
     pub tick_marks_major_inner: Option<bool>,
     pub tick_marks_major_outer: Option<bool>,
     pub tick_marks_minor_inner: Option<bool>,
@@ -371,41 +371,41 @@ pub struct ChartStyleProperties {
     pub display_label: Option<bool>,
     pub text_overlap: Option<bool>,
     pub line_break: Option<bool>,
-    pub label_arrangement: Option<ChartLabelArrangement>,
-    pub direction: Option<ChartDirection>,
-    pub rotation_angle: Option<ChartAngle>,
-    pub data_label_number: Option<ChartDataLabelNumber>,
+    pub label_arrangement: Option<LabelArrangement>,
+    pub direction: Option<Direction>,
+    pub rotation_angle: Option<Angle>,
+    pub data_label_number: Option<DataLabelNumber>,
     pub data_label_text: Option<bool>,
     pub data_label_symbol: Option<bool>,
-    pub label_separator: Option<ChartLabelSeparator>,
-    pub label_position: Option<ChartLabelPosition>,
-    pub label_position_negative: Option<ChartLabelPosition>,
+    pub label_separator: Option<LabelSeparator>,
+    pub label_position: Option<LabelPosition>,
+    pub label_position_negative: Option<LabelPosition>,
     pub visible: Option<bool>,
     pub auto_position: Option<bool>,
     pub auto_size: Option<bool>,
     pub mean_value: Option<bool>,
-    pub error_category: Option<ChartErrorCategory>,
-    pub error_percentage: Option<ChartDouble>,
-    pub error_margin: Option<ChartDouble>,
-    pub error_lower_limit: Option<ChartDouble>,
-    pub error_upper_limit: Option<ChartDouble>,
+    pub error_category: Option<ErrorCategory>,
+    pub error_percentage: Option<Double>,
+    pub error_margin: Option<Double>,
+    pub error_lower_limit: Option<Double>,
+    pub error_upper_limit: Option<Double>,
     pub error_upper_indicator: Option<bool>,
     pub error_lower_indicator: Option<bool>,
-    pub series_source: Option<ChartSeriesSource>,
-    pub regression_type: Option<ChartRegressionType>,
-    pub axis_position: Option<ChartAxisPosition>,
-    pub axis_label_position: Option<ChartAxisLabelPosition>,
-    pub tick_mark_position: Option<ChartTickMarkPosition>,
+    pub series_source: Option<SeriesSource>,
+    pub regression_type: Option<RegressionType>,
+    pub axis_position: Option<AxisPosition>,
+    pub axis_label_position: Option<AxisLabelPosition>,
+    pub tick_mark_position: Option<TickMarkPosition>,
     pub include_hidden_cells: Option<bool>,
 }
-impl ChartStyleProperties {
+impl StyleProperties {
     pub fn validate(&self) -> Result<()> {
         match self.symbol_type {
-            Some(ChartSymbolType::NamedSymbol)
+            Some(SymbolType::NamedSymbol)
                 if self.symbol_name.is_some() && self.symbol_image.is_none() => {},
-            Some(ChartSymbolType::Image)
+            Some(SymbolType::Image)
                 if self.symbol_image.is_some() && self.symbol_name.is_none() => {},
-            Some(ChartSymbolType::None | ChartSymbolType::Automatic)
+            Some(SymbolType::None | SymbolType::Automatic)
                 if self.symbol_name.is_none() && self.symbol_image.is_none() => {},
             None if self.symbol_name.is_none() && self.symbol_image.is_none() => {},
             _ => {
@@ -458,104 +458,91 @@ impl ChartStyleProperties {
         b!(self.three_dimensional, "chart:three-dimensional");
         b!(self.deep, "chart:deep");
         b!(self.right_angled_axes, "chart:right-angled-axes");
-        a!(
-            self.symbol_type,
-            "chart:symbol-type",
-            |v: ChartSymbolType| v.xml()
-        );
-        a!(
-            self.symbol_name,
-            "chart:symbol-name",
-            |v: ChartSymbolName| v.xml()
-        );
+        a!(self.symbol_type, "chart:symbol-type", |v: SymbolType| v
+            .xml());
+        a!(self.symbol_name, "chart:symbol-name", |v: SymbolName| v
+            .xml());
         a!(
             self.symbol_width.as_ref(),
             "chart:symbol-width",
-            |v: &ChartNonNegativeLength| v.as_str().to_owned()
+            |v: &NonNegativeLength| v.as_str().to_owned()
         );
         a!(
             self.symbol_height.as_ref(),
             "chart:symbol-height",
-            |v: &ChartNonNegativeLength| v.as_str().to_owned()
+            |v: &NonNegativeLength| v.as_str().to_owned()
         );
         b!(self.sort_by_x_values, "chart:sort-by-x-values");
         b!(self.vertical, "chart:vertical");
         b!(self.connect_bars, "chart:connect-bars");
-        a!(
-            self.gap_width.as_ref(),
-            "chart:gap-width",
-            |v: &ChartInteger| v.as_str().to_owned()
-        );
-        a!(
-            self.overlap.as_ref(),
-            "chart:overlap",
-            |v: &ChartInteger| v.as_str().to_owned()
-        );
+        a!(self.gap_width.as_ref(), "chart:gap-width", |v: &Integer| v
+            .as_str()
+            .to_owned());
+        a!(self.overlap.as_ref(), "chart:overlap", |v: &Integer| v
+            .as_str()
+            .to_owned());
         b!(self.group_bars_per_axis, "chart:group-bars-per-axis");
         b!(self.japanese_candle_stick, "chart:japanese-candle-stick");
         a!(
             self.interpolation,
             "chart:interpolation",
-            |v: ChartInterpolation| v.xml()
+            |v: Interpolation| v.xml()
         );
         a!(
             self.spline_order.as_ref(),
             "chart:spline-order",
-            |v: &ChartPositiveInteger| v.as_str().to_owned()
+            |v: &PositiveInteger| v.as_str().to_owned()
         );
         a!(
             self.spline_resolution.as_ref(),
             "chart:spline-resolution",
-            |v: &ChartPositiveInteger| v.as_str().to_owned()
+            |v: &PositiveInteger| v.as_str().to_owned()
         );
         a!(
             self.pie_offset.as_ref(),
             "chart:pie-offset",
-            |v: &ChartNonNegativeInteger| v.as_str().to_owned()
+            |v: &NonNegativeInteger| v.as_str().to_owned()
         );
         a!(
             self.angle_offset.as_ref(),
             "chart:angle-offset",
-            |v: &ChartAngle| escape_xml(v.as_str())
+            |v: &Angle| escape_xml(v.as_str())
         );
-        a!(
-            self.hole_size.as_ref(),
-            "chart:hole-size",
-            |v: &ChartPercent| v.as_str().to_owned()
-        );
+        a!(self.hole_size.as_ref(), "chart:hole-size", |v: &Percent| v
+            .as_str()
+            .to_owned());
         b!(self.lines, "chart:lines");
-        a!(self.solid_type, "chart:solid-type", |v: ChartSolidType| v
-            .xml());
+        a!(self.solid_type, "chart:solid-type", |v: SolidType| v.xml());
         b!(self.stacked, "chart:stacked");
         b!(self.percentage, "chart:percentage");
         a!(
             self.treat_empty_cells,
             "chart:treat-empty-cells",
-            |v: ChartEmptyCellTreatment| v.xml()
+            |v: EmptyCellTreatment| v.xml()
         );
         b!(
             self.link_data_style_to_source,
             "chart:link-data-style-to-source"
         );
         b!(self.logarithmic, "chart:logarithmic");
-        a!(self.maximum.as_ref(), "chart:maximum", |v: &ChartDouble| v
+        a!(self.maximum.as_ref(), "chart:maximum", |v: &Double| v
             .as_str()
             .to_owned());
-        a!(self.minimum.as_ref(), "chart:minimum", |v: &ChartDouble| v
+        a!(self.minimum.as_ref(), "chart:minimum", |v: &Double| v
             .as_str()
             .to_owned());
-        a!(self.origin.as_ref(), "chart:origin", |v: &ChartDouble| v
+        a!(self.origin.as_ref(), "chart:origin", |v: &Double| v
             .as_str()
             .to_owned());
         a!(
             self.interval_major.as_ref(),
             "chart:interval-major",
-            |v: &ChartDouble| v.as_str().to_owned()
+            |v: &Double| v.as_str().to_owned()
         );
         a!(
             self.interval_minor_divisor.as_ref(),
             "chart:interval-minor-divisor",
-            |v: &ChartPositiveInteger| v.as_str().to_owned()
+            |v: &PositiveInteger| v.as_str().to_owned()
         );
         b!(self.tick_marks_major_inner, "chart:tick-marks-major-inner");
         b!(self.tick_marks_major_outer, "chart:tick-marks-major-outer");
@@ -568,31 +555,30 @@ impl ChartStyleProperties {
         a!(
             self.label_arrangement,
             "chart:label-arrangement",
-            |v: ChartLabelArrangement| v.xml()
+            |v: LabelArrangement| v.xml()
         );
-        a!(self.direction, "style:direction", |v: ChartDirection| v
-            .xml());
+        a!(self.direction, "style:direction", |v: Direction| v.xml());
         a!(
             self.rotation_angle.as_ref(),
             "style:rotation-angle",
-            |v: &ChartAngle| escape_xml(v.as_str())
+            |v: &Angle| escape_xml(v.as_str())
         );
         a!(
             self.data_label_number,
             "chart:data-label-number",
-            |v: ChartDataLabelNumber| v.xml()
+            |v: DataLabelNumber| v.xml()
         );
         b!(self.data_label_text, "chart:data-label-text");
         b!(self.data_label_symbol, "chart:data-label-symbol");
         a!(
             self.label_position,
             "chart:label-position",
-            |v: ChartLabelPosition| v.xml()
+            |v: LabelPosition| v.xml()
         );
         a!(
             self.label_position_negative,
             "chart:label-position-negative",
-            |v: ChartLabelPosition| v.xml()
+            |v: LabelPosition| v.xml()
         );
         b!(self.visible, "chart:visible");
         b!(self.auto_position, "chart:auto-position");
@@ -601,54 +587,54 @@ impl ChartStyleProperties {
         a!(
             self.error_category,
             "chart:error-category",
-            |v: ChartErrorCategory| v.xml()
+            |v: ErrorCategory| v.xml()
         );
         a!(
             self.error_percentage.as_ref(),
             "chart:error-percentage",
-            |v: &ChartDouble| v.as_str().to_owned()
+            |v: &Double| v.as_str().to_owned()
         );
         a!(
             self.error_margin.as_ref(),
             "chart:error-margin",
-            |v: &ChartDouble| v.as_str().to_owned()
+            |v: &Double| v.as_str().to_owned()
         );
         a!(
             self.error_lower_limit.as_ref(),
             "chart:error-lower-limit",
-            |v: &ChartDouble| v.as_str().to_owned()
+            |v: &Double| v.as_str().to_owned()
         );
         a!(
             self.error_upper_limit.as_ref(),
             "chart:error-upper-limit",
-            |v: &ChartDouble| v.as_str().to_owned()
+            |v: &Double| v.as_str().to_owned()
         );
         b!(self.error_upper_indicator, "chart:error-upper-indicator");
         b!(self.error_lower_indicator, "chart:error-lower-indicator");
         a!(
             self.series_source,
             "chart:series-source",
-            |v: ChartSeriesSource| v.xml()
+            |v: SeriesSource| v.xml()
         );
         a!(
             self.regression_type,
             "chart:regression-type",
-            |v: ChartRegressionType| v.xml()
+            |v: RegressionType| v.xml()
         );
         a!(
             self.axis_position.as_ref(),
             "chart:axis-position",
-            |v: &ChartAxisPosition| v.xml().to_owned()
+            |v: &AxisPosition| v.xml().to_owned()
         );
         a!(
             self.axis_label_position,
             "chart:axis-label-position",
-            |v: ChartAxisLabelPosition| v.xml()
+            |v: AxisLabelPosition| v.xml()
         );
         a!(
             self.tick_mark_position,
             "chart:tick-mark-position",
-            |v: ChartTickMarkPosition| v.xml()
+            |v: TickMarkPosition| v.xml()
         );
         b!(self.include_hidden_cells, "chart:include-hidden-cells");
         if self.symbol_image.is_some() || self.label_separator.is_some() {
@@ -668,17 +654,14 @@ impl ChartStyleProperties {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartStyleRecord {
+pub struct StyleRecord {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ChartStyleProperties>,
+    pub properties: Option<StyleProperties>,
 }
-impl ChartStyleRecord {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<ChartStyleProperties>,
-    ) -> Result<Self> {
+impl StyleRecord {
+    pub fn named(name: impl Into<String>, properties: Option<StyleProperties>) -> Result<Self> {
         let value = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -688,7 +671,7 @@ impl ChartStyleRecord {
         value.validate()?;
         Ok(value)
     }
-    pub fn default_style(properties: Option<ChartStyleProperties>) -> Self {
+    pub fn default_style(properties: Option<StyleProperties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -741,16 +724,16 @@ impl ChartStyleRecord {
     }
 }
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartStylePropertiesSet {
-    pub styles: Vec<ChartStyleRecord>,
+pub struct StylePropertiesSet {
+    pub styles: Vec<StyleRecord>,
 }
-impl ChartStylePropertiesSet {
-    pub fn get(&self, name: &str) -> Option<&ChartStyleRecord> {
+impl StylePropertiesSet {
+    pub fn get(&self, name: &str) -> Option<&StyleRecord> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ChartStyleRecord> {
+    pub fn default_style(&self) -> Option<&StyleRecord> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -828,12 +811,12 @@ fn header(
     version: XmlVersion,
     start: &BytesStart<'_>,
     default: bool,
-) -> Result<Option<ChartStyleRecord>> {
+) -> Result<Option<StyleRecord>> {
     let mut a = attrs(reader, version, start)?;
     if take(&mut a, Ns::Style, b"family").as_deref() != Some("chart") {
         return Ok(None);
     }
-    let style = ChartStyleRecord {
+    let style = StyleRecord {
         name: take(&mut a, Ns::Style, b"name"),
         parent_style_name: take(&mut a, Ns::Style, b"parent-style-name"),
         is_default_style: default,
@@ -846,7 +829,7 @@ fn properties(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ChartStyleProperties> {
+) -> Result<StyleProperties> {
     let mut a = attrs(reader, version, start)?;
     macro_rules! b {
         ($n:literal) => {
@@ -855,83 +838,74 @@ fn properties(
                 .transpose()?
         };
     }
-    let value = ChartStyleProperties {
+    let value = StyleProperties {
         scale_text: b!(b"scale-text"),
         three_dimensional: b!(b"three-dimensional"),
         deep: b!(b"deep"),
         right_angled_axes: b!(b"right-angled-axes"),
-        symbol_type: e(
-            take(&mut a, Ns::Chart, b"symbol-type"),
-            ChartSymbolType::parse,
-        )?,
-        symbol_name: e(
-            take(&mut a, Ns::Chart, b"symbol-name"),
-            ChartSymbolName::parse,
-        )?,
+        symbol_type: e(take(&mut a, Ns::Chart, b"symbol-type"), SymbolType::parse)?,
+        symbol_name: e(take(&mut a, Ns::Chart, b"symbol-name"), SymbolName::parse)?,
         symbol_image: None,
         symbol_width: take(&mut a, Ns::Chart, b"symbol-width")
-            .map(ChartNonNegativeLength::new)
+            .map(NonNegativeLength::new)
             .transpose()?,
         symbol_height: take(&mut a, Ns::Chart, b"symbol-height")
-            .map(ChartNonNegativeLength::new)
+            .map(NonNegativeLength::new)
             .transpose()?,
         sort_by_x_values: b!(b"sort-by-x-values"),
         vertical: b!(b"vertical"),
         connect_bars: b!(b"connect-bars"),
         gap_width: take(&mut a, Ns::Chart, b"gap-width")
-            .map(ChartInteger::new)
+            .map(Integer::new)
             .transpose()?,
         overlap: take(&mut a, Ns::Chart, b"overlap")
-            .map(ChartInteger::new)
+            .map(Integer::new)
             .transpose()?,
         group_bars_per_axis: b!(b"group-bars-per-axis"),
         japanese_candle_stick: b!(b"japanese-candle-stick"),
         interpolation: e(
             take(&mut a, Ns::Chart, b"interpolation"),
-            ChartInterpolation::parse,
+            Interpolation::parse,
         )?,
         spline_order: take(&mut a, Ns::Chart, b"spline-order")
-            .map(ChartPositiveInteger::new)
+            .map(PositiveInteger::new)
             .transpose()?,
         spline_resolution: take(&mut a, Ns::Chart, b"spline-resolution")
-            .map(ChartPositiveInteger::new)
+            .map(PositiveInteger::new)
             .transpose()?,
         pie_offset: take(&mut a, Ns::Chart, b"pie-offset")
-            .map(ChartNonNegativeInteger::new)
+            .map(NonNegativeInteger::new)
             .transpose()?,
         angle_offset: take(&mut a, Ns::Chart, b"angle-offset")
-            .map(ChartAngle::new)
+            .map(Angle::new)
             .transpose()?,
         hole_size: take(&mut a, Ns::Chart, b"hole-size")
-            .map(ChartPercent::new)
+            .map(Percent::new)
             .transpose()?,
         lines: b!(b"lines"),
-        solid_type: e(
-            take(&mut a, Ns::Chart, b"solid-type"),
-            ChartSolidType::parse,
-        )?,
+        solid_type: e(take(&mut a, Ns::Chart, b"solid-type"), SolidType::parse)?,
         stacked: b!(b"stacked"),
         percentage: b!(b"percentage"),
         treat_empty_cells: e(
             take(&mut a, Ns::Chart, b"treat-empty-cells"),
-            ChartEmptyCellTreatment::parse,
+            EmptyCellTreatment::parse,
         )?,
         link_data_style_to_source: b!(b"link-data-style-to-source"),
         logarithmic: b!(b"logarithmic"),
         maximum: take(&mut a, Ns::Chart, b"maximum")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         minimum: take(&mut a, Ns::Chart, b"minimum")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         origin: take(&mut a, Ns::Chart, b"origin")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         interval_major: take(&mut a, Ns::Chart, b"interval-major")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         interval_minor_divisor: take(&mut a, Ns::Chart, b"interval-minor-divisor")
-            .map(ChartPositiveInteger::new)
+            .map(PositiveInteger::new)
             .transpose()?,
         tick_marks_major_inner: b!(b"tick-marks-major-inner"),
         tick_marks_major_outer: b!(b"tick-marks-major-outer"),
@@ -945,26 +919,26 @@ fn properties(
             .transpose()?,
         label_arrangement: e(
             take(&mut a, Ns::Chart, b"label-arrangement"),
-            ChartLabelArrangement::parse,
+            LabelArrangement::parse,
         )?,
-        direction: e(take(&mut a, Ns::Style, b"direction"), ChartDirection::parse)?,
+        direction: e(take(&mut a, Ns::Style, b"direction"), Direction::parse)?,
         rotation_angle: take(&mut a, Ns::Style, b"rotation-angle")
-            .map(ChartAngle::new)
+            .map(Angle::new)
             .transpose()?,
         data_label_number: e(
             take(&mut a, Ns::Chart, b"data-label-number"),
-            ChartDataLabelNumber::parse,
+            DataLabelNumber::parse,
         )?,
         data_label_text: b!(b"data-label-text"),
         data_label_symbol: b!(b"data-label-symbol"),
         label_separator: None,
         label_position: e(
             take(&mut a, Ns::Chart, b"label-position"),
-            ChartLabelPosition::parse,
+            LabelPosition::parse,
         )?,
         label_position_negative: e(
             take(&mut a, Ns::Chart, b"label-position-negative"),
-            ChartLabelPosition::parse,
+            LabelPosition::parse,
         )?,
         visible: b!(b"visible"),
         auto_position: b!(b"auto-position"),
@@ -972,40 +946,40 @@ fn properties(
         mean_value: b!(b"mean-value"),
         error_category: e(
             take(&mut a, Ns::Chart, b"error-category"),
-            ChartErrorCategory::parse,
+            ErrorCategory::parse,
         )?,
         error_percentage: take(&mut a, Ns::Chart, b"error-percentage")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         error_margin: take(&mut a, Ns::Chart, b"error-margin")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         error_lower_limit: take(&mut a, Ns::Chart, b"error-lower-limit")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         error_upper_limit: take(&mut a, Ns::Chart, b"error-upper-limit")
-            .map(ChartDouble::new)
+            .map(Double::new)
             .transpose()?,
         error_upper_indicator: b!(b"error-upper-indicator"),
         error_lower_indicator: b!(b"error-lower-indicator"),
         series_source: e(
             take(&mut a, Ns::Chart, b"series-source"),
-            ChartSeriesSource::parse,
+            SeriesSource::parse,
         )?,
         regression_type: e(
             take(&mut a, Ns::Chart, b"regression-type"),
-            ChartRegressionType::parse,
+            RegressionType::parse,
         )?,
         axis_position: take(&mut a, Ns::Chart, b"axis-position")
-            .map(|v| ChartAxisPosition::parse(&v))
+            .map(|v| AxisPosition::parse(&v))
             .transpose()?,
         axis_label_position: e(
             take(&mut a, Ns::Chart, b"axis-label-position"),
-            ChartAxisLabelPosition::parse,
+            AxisLabelPosition::parse,
         )?,
         tick_mark_position: e(
             take(&mut a, Ns::Chart, b"tick-mark-position"),
-            ChartTickMarkPosition::parse,
+            TickMarkPosition::parse,
         )?,
         include_hidden_cells: b!(b"include-hidden-cells"),
     };
@@ -1020,7 +994,7 @@ fn symbol_image(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ChartSymbolImage> {
+) -> Result<SymbolImage> {
     let mut a = attrs(reader, version, start)?;
     let href = take(&mut a, Ns::Xlink, b"href")
         .ok_or_else(|| bad("chart:symbol-image requires xlink:href"))?;
@@ -1029,7 +1003,7 @@ fn symbol_image(
             "unknown chart:symbol-image attribute or wrong namespace",
         ));
     }
-    ChartSymbolImage::new(href)
+    SymbolImage::new(href)
 }
 fn no_attrs(
     reader: &NsReader<&[u8]>,
@@ -1050,7 +1024,7 @@ fn boundary(xml: &str, end: usize) -> Result<usize> {
 
 struct Active {
     depth: usize,
-    style: ChartStyleRecord,
+    style: StyleRecord,
     seen: bool,
     property_depth: Option<usize>,
     symbol_depth: Option<usize>,
@@ -1058,7 +1032,7 @@ struct Active {
     paragraph_depth: Option<usize>,
     paragraph_start: Option<usize>,
 }
-fn push(out: &mut Vec<ChartStyleRecord>, style: ChartStyleRecord, total: &mut usize) -> Result<()> {
+fn push(out: &mut Vec<StyleRecord>, style: StyleRecord, total: &mut usize) -> Result<()> {
     if out.len() >= MAX_STYLES
         || out.iter().any(|value| {
             value.name == style.name && value.is_default_style == style.is_default_style
@@ -1074,7 +1048,7 @@ fn push(out: &mut Vec<ChartStyleRecord>, style: ChartStyleRecord, total: &mut us
     Ok(())
 }
 /// Parse direct chart-family styles in standard style containers.
-pub fn parse_chart_style_properties(xml: &str) -> Result<ChartStylePropertiesSet> {
+pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
@@ -1264,7 +1238,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<ChartStylePropertiesSet
                             return Err(bad("duplicate text:p in chart:label-separator"));
                         }
                         value.style.properties.as_mut().unwrap().label_separator =
-                            Some(ChartLabelSeparator::from_paragraph_xml(&xml[begin..end])?)
+                            Some(LabelSeparator::from_paragraph_xml(&xml[begin..end])?)
                     } else if value.property_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:chart-properties child"));
                     }
@@ -1297,7 +1271,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<ChartStylePropertiesSet
                     if value.paragraph_depth == Some(depth) {
                         let begin = value.paragraph_start.take().unwrap();
                         value.style.properties.as_mut().unwrap().label_separator =
-                            Some(ChartLabelSeparator::from_paragraph_xml(&xml[begin..end])?);
+                            Some(LabelSeparator::from_paragraph_xml(&xml[begin..end])?);
                         value.paragraph_depth = None
                     }
                     if value.symbol_depth == Some(depth) {
@@ -1342,7 +1316,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<ChartStylePropertiesSet
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ChartStylePropertiesSet { styles: out })
+    Ok(StylePropertiesSet { styles: out })
 }
 
 #[derive(Default)]
@@ -1371,7 +1345,7 @@ fn expand(xml: &str, span: &Span, value: &str) -> Result<String> {
     ))
 }
 /// Losslessly replace, insert, or remove one existing chart style property element.
-pub fn set_chart_style_properties_xml(xml: &str, requested: &ChartStyleRecord) -> Result<String> {
+pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -1505,7 +1479,7 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &ChartStyleRecord) -
     let replacement = requested
         .properties
         .as_ref()
-        .map(ChartStyleProperties::to_xml_fragment)
+        .map(StyleProperties::to_xml_fragment)
         .transpose()?;
     if let Some(properties) = &spans.properties {
         return Ok(replace(
@@ -1526,7 +1500,7 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &ChartStyleRecord) -
 }
 
 impl OpenDocumentPackage {
-    pub fn chart_style_properties(&self) -> Result<ChartStylePropertiesSet> {
+    pub fn chart_style_properties(&self) -> Result<StylePropertiesSet> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
             |xml| parse_chart_style_properties(&xml),
@@ -1534,7 +1508,7 @@ impl OpenDocumentPackage {
     }
 }
 impl FlatOpenDocument {
-    pub fn chart_style_properties(&self) -> Result<ChartStylePropertiesSet> {
+    pub fn chart_style_properties(&self) -> Result<StylePropertiesSet> {
         parse_chart_style_properties(self.xml())
     }
 }
@@ -1560,7 +1534,7 @@ mod tests {
         );
         let fragment = value.to_xml_fragment().unwrap();
         assert_eq!(
-            ChartStyleProperties::from_xml_fragment(&fragment).unwrap(),
+            StyleProperties::from_xml_fragment(&fragment).unwrap(),
             *value
         )
     }
@@ -1576,20 +1550,17 @@ mod tests {
         let set = parse_chart_style_properties(&doc(&fixture[begin..end])).unwrap();
         let value = set.get("ch3").unwrap().properties.as_ref().unwrap();
         assert_eq!(value.stacked, Some(true));
-        assert_eq!(value.series_source, Some(ChartSeriesSource::Rows));
-        assert_eq!(
-            value.treat_empty_cells,
-            Some(ChartEmptyCellTreatment::LeaveGap)
-        )
+        assert_eq!(value.series_source, Some(SeriesSource::Rows));
+        assert_eq!(value.treat_empty_cells, Some(EmptyCellTreatment::LeaveGap))
     }
     #[test]
     fn lossless_replace_insert_remove() {
         let original = doc(
             "<!--keep--><style:style style:name=\"a\" style:family=\"chart\"><x:k xmlns:x=\"urn:k\"/></style:style><style:style style:name=\"b\" style:family=\"chart\"><style:chart-properties chart:lines=\"true\"/></style:style>",
         );
-        let mut a = ChartStyleRecord::named(
+        let mut a = StyleRecord::named(
             "a",
-            Some(ChartStyleProperties {
+            Some(StyleProperties {
                 stacked: Some(true),
                 ..Default::default()
             }),
@@ -1600,7 +1571,7 @@ mod tests {
         a.properties = None;
         let restored = set_chart_style_properties_xml(&inserted, &a).unwrap();
         assert_eq!(restored, original);
-        let b = ChartStyleRecord::named("b", None).unwrap();
+        let b = StyleRecord::named("b", None).unwrap();
         let removed = set_chart_style_properties_xml(&restored, &b).unwrap();
         assert!(!removed.contains("chart:lines=\"true\""));
         assert!(removed.contains("<!--keep-->"))

@@ -128,15 +128,16 @@ pub use auto_mark_file::AlphabeticalIndexAutoMarkFile;
 pub use bibliography_configuration::{
     BibliographyConfiguration, BibliographyField, BibliographySortKey,
 };
-#[allow(unused_imports, reason = "ODT facade exposes style geometry semantics")]
+#[allow(
+    unused_imports,
+    reason = "ODT facade exposes unambiguous chart property semantics"
+)]
 pub use chart_properties::{
-    ChartAngle, ChartAxisLabelPosition, ChartAxisPosition, ChartDataLabelNumber, ChartDirection,
-    ChartDouble, ChartEmptyCellTreatment, ChartErrorCategory, ChartInteger, ChartInterpolation,
-    ChartLabelArrangement, ChartLabelPosition, ChartLabelSeparator, ChartNonNegativeInteger,
-    ChartNonNegativeLength, ChartPercent, ChartPositiveInteger, ChartRegressionType,
-    ChartSeriesSource, ChartSolidType, ChartStyleProperties, ChartStylePropertiesSet,
-    ChartStyleRecord, ChartSymbolImage, ChartSymbolName, ChartSymbolType, ChartTickMarkPosition,
-    parse_chart_style_properties, set_chart_style_properties_xml,
+    Angle, AxisLabelPosition, AxisPosition, DataLabelNumber, Direction, Double, EmptyCellTreatment,
+    ErrorCategory, Integer, Interpolation, LabelArrangement, LabelPosition, LabelSeparator,
+    PositiveInteger, RegressionType, SeriesSource, SolidType, StylePropertiesSet, StyleRecord,
+    SymbolImage, SymbolName, SymbolType, TickMarkPosition, parse_chart_style_properties,
+    set_chart_style_properties_xml,
 };
 #[allow(
     unused_imports,
