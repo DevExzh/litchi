@@ -1,15 +1,15 @@
 //! Slide implementation for PowerPoint presentations.
 
-use super::types::{PptSlideData, PptxSlideData};
+use super::types::{LegacySlideData, SlideData};
 use litchi_core::Result;
 
 /// A slide in a PowerPoint presentation.
 #[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
 pub enum Slide {
     /// Legacy PPT slide with extracted data
-    Ppt(PptSlideData),
+    Ppt(LegacySlideData),
     /// Modern PPTX slide with extracted data
-    Pptx(PptxSlideData),
+    Pptx(SlideData),
     /// Apple Keynote slide
     #[cfg(feature = "iwa")]
     Keynote(crate::iwa::keynote::KeynoteSlide),

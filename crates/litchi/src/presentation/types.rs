@@ -11,16 +11,16 @@ use crate::ppt;
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
 
-/// Extracted data from a PPTX slide (to avoid lifetime issues).
+/// Extracted data from a modern presentation slide (to avoid lifetime issues).
 #[derive(Debug, Clone)]
-pub struct PptxSlideData {
+pub struct SlideData {
     pub text: String,
     pub name: Option<String>,
 }
 
-/// Extracted data from a PPT slide (to avoid lifetime issues).
+/// Extracted data from a legacy presentation slide (to avoid lifetime issues).
 #[derive(Debug, Clone)]
-pub struct PptSlideData {
+pub struct LegacySlideData {
     pub text: String,
     pub slide_number: usize,
     pub shape_count: usize,

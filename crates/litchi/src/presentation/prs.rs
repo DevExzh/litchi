@@ -335,7 +335,7 @@ impl Presentation {
         match &self.inner {
             #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(pres) => {
-                use super::types::PptSlideData;
+                use super::types::LegacySlideData;
                 // Extract slide data to avoid lifetime issues
                 let ppt_slides = pres.slides().map_err(Error::from)?;
                 ppt_slides
@@ -344,7 +344,7 @@ impl Presentation {
                         let text = s.text().map_err(Error::from)?.to_string();
                         let slide_number = s.slide_number();
                         let shape_count = s.shape_count().unwrap_or(0);
-                        Ok(Slide::Ppt(PptSlideData {
+                        Ok(Slide::Ppt(LegacySlideData {
                             text,
                             slide_number,
                             shape_count,
@@ -354,7 +354,7 @@ impl Presentation {
             },
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => {
-                use super::types::PptxSlideData;
+                use super::types::SlideData;
                 let pres = package.presentation().map_err(Error::from)?;
                 let slides = pres.slides().map_err(Error::from)?;
                 // Extract slide data immediately to avoid lifetime issues
@@ -363,7 +363,7 @@ impl Presentation {
                     .map(|s| {
                         let text = s.text().map_err(Error::from)?;
                         let name = Some(s.name().map_err(Error::from)?);
-                        Ok(Slide::Pptx(PptxSlideData { text, name }))
+                        Ok(Slide::Pptx(SlideData { text, name }))
                     })
                     .collect()
             },
