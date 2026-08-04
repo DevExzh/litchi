@@ -23,7 +23,7 @@ pub mod styles;
 
 pub use raw::Error;
 
-pub use pivot_view::PivotTableViewPart;
+pub use pivot_view::{Part, PivotTableViewPart};
 
 pub use data_validation::{
     DataValidation, DataValidationRecordKind, DataValidationSettings, FormulaBinary,
