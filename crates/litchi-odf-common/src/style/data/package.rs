@@ -1,7 +1,6 @@
-//! Lossless XML mutation and package/flat-document accessors.
+//! Lossless XML mutation and neutral package accessors.
 
 use super::*;
-use crate::{FlatOpenDocument, OpenDocumentPackage};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
@@ -63,6 +62,21 @@ pub fn remove_data_style_xml(xml: &str, section: Section, name: &str) -> Result<
     let (target, _) = find_style_span(xml, section, name)?;
     let target = target.ok_or_else(|| bad("target data style does not exist"))?;
     Ok(format!("{}{}", &xml[..target.start], &xml[target.end..]))
+}
+
+/// Parse data styles from the two XML parts of a regular ODF package.
+pub fn parse_package(styles_xml: Option<&str>, content_xml: &str) -> Result<Styles> {
+    let mut output = Styles::default();
+    if let Some(styles) = styles_xml {
+        output.append(parse_data_styles_xml(styles, Part::Styles)?)?;
+    }
+    output.append(parse_data_styles_xml(content_xml, Part::Content)?)?;
+    Ok(output)
+}
+
+/// Parse data styles from a flat XML document.
+pub fn parse_flat(xml: &str) -> Result<Styles> {
+    parse_data_styles_xml(xml, Part::Flat)
 }
 
 fn document_version(xml: &str) -> Result<Version> {
@@ -250,24 +264,4 @@ fn find_style_span(
         return invalid("internal data-style section mismatch");
     }
     Ok((target, container))
-}
-
-impl OpenDocumentPackage {
-    /// Inspect data styles from `styles.xml` and `content.xml`.
-    pub fn data_styles(&self) -> Result<Styles> {
-        let mut output = Styles::default();
-        if let Some(styles) = self.styles_xml()? {
-            output.append(parse_data_styles_xml(&styles, Part::Styles)?)?;
-        }
-        let content = self.content_xml()?;
-        output.append(parse_data_styles_xml(&content, Part::Content)?)?;
-        Ok(output)
-    }
-}
-
-impl FlatOpenDocument {
-    /// Inspect data styles from both containers in a flat document.
-    pub fn data_styles(&self) -> Result<Styles> {
-        parse_data_styles_xml(self.xml(), Part::Flat)
-    }
 }

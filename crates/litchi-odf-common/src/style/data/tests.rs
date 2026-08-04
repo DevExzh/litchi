@@ -58,7 +58,7 @@ fn reads_libreoffice_12_aliases_but_writes_them_only_as_standard_13() {
 #[test]
 fn parses_yielddisc_n122_n126_n170() {
     let fixture = include_str!(
-        "../../../../test-data/libreoffice-core/sc/qa/unit/data/functions/financial/fods/yielddisc.fods"
+        "../../../../../test-data/libreoffice-core/sc/qa/unit/data/functions/financial/fods/yielddisc.fods"
     );
     fn style<'a>(fixture: &'a str, marker: &str, close: &str) -> &'a str {
         let begin = fixture.find(marker).unwrap();

@@ -16,3 +16,4 @@ pub mod namespace;
 pub mod package;
 pub mod rdf;
 pub mod signature;
+pub mod style;

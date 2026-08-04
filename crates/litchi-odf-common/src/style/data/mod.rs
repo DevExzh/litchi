@@ -1,5 +1,8 @@
-//! ODF data-style owner layered by model, token grammar, bounded XML codec,
-//! and package/flat-document accessors.
+//! Shared ODF data-style grammar.
+//!
+//! The public facade is intentionally small: semantic models and bounded XML
+//! operations are exposed here, while token parsing and XML traversal remain
+//! implementation layers below it.
 
 mod codec;
 mod model;
@@ -40,7 +43,7 @@ pub use model::{
     NumberToken, Part, Scientific, Seconds, Section, ShortLong, Style, Styles, TextProperties,
     Token, TransliterationStyle, Version, WeekOfYear,
 };
-pub use package::{remove_data_style_xml, set_data_style_xml};
+pub use package::{parse_flat, parse_package, remove_data_style_xml, set_data_style_xml};
 
 pub(crate) use codec::{
     Attribute, Frame, Node, collect_attributes, decode, direct_style_section, ensure_empty_node,
