@@ -1649,7 +1649,7 @@ impl Settings {
                 "web-settings XML exceeds {MAX_XML_BYTES} bytes"
             )));
         }
-        let xml = litchi_ooxml_common::mce::process_part(part)?;
+        let xml = process_web_xml(part.blob())?;
         let (settings, conformance) = Self::parse_xml(xml.as_ref())?;
         validate_frame_relationships(part, &settings, conformance)?;
         Ok((settings, conformance))
@@ -1777,8 +1777,23 @@ impl Settings {
 
 /// Parse bounded web-settings XML without resolving frame relationships.
 pub fn parse(xml: &[u8]) -> Result<(Settings, Conformance)> {
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+    let processed = process_web_xml(xml)?;
     Settings::parse_xml(processed.as_ref())
+}
+
+fn process_web_xml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
+    let limits = litchi_ooxml_common::MceLimits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        ..litchi_ooxml_common::MceLimits::default()
+    };
+    litchi_ooxml_common::process_markup_compatibility(
+        xml,
+        &litchi_ooxml_common::MceCapabilities::default(),
+        &limits,
+    )
+    .map(|output| output.xml)
+    .map_err(Error::from)
 }
 
 /// Serialize a checked web-settings model.
@@ -4098,6 +4113,21 @@ mod tests {
         let result = std::panic::catch_unwind(|| Settings::parse_xml(xml.as_bytes()));
         assert!(result.is_ok());
         assert!(result.unwrap().is_err());
+    }
+
+    #[test]
+    fn mce_preprocessing_respects_web_settings_xml_bound() {
+        let prefix = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">"#;
+        let suffix = b"</w:webSettings>";
+        let mut xml = Vec::with_capacity(MAX_XML_BYTES + suffix.len() + 1);
+        xml.extend_from_slice(prefix);
+        xml.resize(MAX_XML_BYTES + 1, b' ');
+        xml.extend_from_slice(suffix);
+
+        assert!(matches!(
+            parse(&xml),
+            Err(Error::Mce(litchi_ooxml_common::MceError::LimitExceeded(_)))
+        ));
     }
 
     #[test]
