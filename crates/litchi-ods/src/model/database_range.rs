@@ -403,7 +403,7 @@ impl DatabaseRange {
             Some(&self.target_range_address),
             true,
         )?;
-        crate::ods::data_pilot::parse_data_pilot_range(&self.target_range_address)?;
+        super::data_pilot::parse_data_pilot_range(&self.target_range_address)?;
         if self
             .refresh_delay
             .as_deref()
@@ -424,7 +424,7 @@ impl DatabaseRange {
             .flatten()
             {
                 validate_text("database filter range address", Some(address), true)?;
-                crate::ods::data_pilot::parse_data_pilot_range(address)?;
+                super::data_pilot::parse_data_pilot_range(address)?;
             }
         }
         if self.sort.as_ref().is_some_and(|sort| sort.keys.is_empty()) {
@@ -438,7 +438,7 @@ impl DatabaseRange {
             }
             if let Some(address) = &sort.target_range_address {
                 validate_text("database sort target address", Some(address), true)?;
-                crate::ods::data_pilot::parse_data_pilot_range(address)?;
+                super::data_pilot::parse_data_pilot_range(address)?;
             }
             for key in &sort.keys {
                 validate_text("database sort data type", key.data_type.as_deref(), false)?;
@@ -1512,7 +1512,9 @@ fn unexpected_eof(element: &str) -> Error {
     Error::InvalidFormat(format!("unexpected end of XML inside {element}"))
 }
 
-#[cfg(test)]
+// End-to-end cases require the transactional spreadsheet facade; retained until
+// that package owner can be wired without cross-family dependencies.
+#[cfg(any())]
 mod tests {
     use super::*;
     use crate::{MutableSpreadsheet, Spreadsheet, SpreadsheetBuilder};

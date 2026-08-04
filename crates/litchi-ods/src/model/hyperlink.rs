@@ -5,9 +5,47 @@
 //! carried by the mandatory `xlink:href` attribute, while the visible link
 //! text is the character content of the element.
 
-use crate::elements::text::{TextHyperlinkActuate, TextHyperlinkShow};
 use litchi_core::{Error, Result, xml::escape_xml};
 use std::ops::Range;
+
+/// Window behavior requested by an inert cell hyperlink.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HyperlinkShow {
+    New,
+    Replace,
+}
+
+impl HyperlinkShow {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::New => "new",
+            Self::Replace => "replace",
+        }
+    }
+
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value {
+            "new" => Some(Self::New),
+            "replace" => Some(Self::Replace),
+            _ => None,
+        }
+    }
+}
+
+/// Activation behavior requested by an inert cell hyperlink.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HyperlinkActuate {
+    OnRequest,
+}
+
+impl HyperlinkActuate {
+    pub(crate) const fn as_str(self) -> &'static str {
+        "onRequest"
+    }
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        (value == "onRequest").then_some(Self::OnRequest)
+    }
+}
 
 /// An inert hyperlink represented by a `text:a` element inside cell content.
 ///
@@ -32,9 +70,9 @@ pub struct CellHyperlink {
     /// Optional `office:target-frame-name` attribute.
     pub target_frame_name: Option<String>,
     /// Optional `xlink:show` behavior.
-    pub show: Option<TextHyperlinkShow>,
+    pub show: Option<HyperlinkShow>,
     /// Optional explicit `xlink:actuate` behavior.
-    pub actuate: Option<TextHyperlinkActuate>,
+    pub actuate: Option<HyperlinkActuate>,
     /// Optional `text:style-name` applied to the unvisited link.
     pub style_name: Option<String>,
     /// Optional `text:visited-style-name` applied to the visited link.
@@ -209,8 +247,8 @@ mod tests {
         link.name = Some("example-link".to_string());
         link.title = Some("Example & more".to_string());
         link.target_frame_name = Some("_blank".to_string());
-        link.show = Some(TextHyperlinkShow::New);
-        link.actuate = Some(TextHyperlinkActuate::OnRequest);
+        link.show = Some(HyperlinkShow::New);
+        link.actuate = Some(HyperlinkActuate::OnRequest);
         link.style_name = Some("Internet_20_link".to_string());
         link.visited_style_name = Some("Visited_20_Internet_20_link".to_string());
         link.validate().unwrap();

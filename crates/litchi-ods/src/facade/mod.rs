@@ -3,7 +3,7 @@
 use litchi_core::Result;
 use std::path::Path;
 
-pub use crate::authoring::SpreadsheetBuilder;
+pub use crate::authoring::{MutableSpreadsheet, SpreadsheetBuilder};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 
 /// Immutable ODS document facade.

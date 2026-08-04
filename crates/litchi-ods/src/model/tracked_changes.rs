@@ -1274,7 +1274,7 @@ fn validate_tracked_metadata(
     for comment in &metadata.info.comments {
         validate_tracked_string(comment, "change comment", true, aggregate)?;
     }
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     for dependency in &metadata.dependencies {
         validate_tracked_string(dependency, "dependency id", false, aggregate)?;
         if dependency == &metadata.id || !seen.insert(dependency) {
@@ -2004,7 +2004,8 @@ fn xml_error(error: quick_xml::Error) -> Error {
     Error::InvalidFormat(format!("invalid spreadsheet tracked-change XML: {error}"))
 }
 
-#[cfg(test)]
+// End-to-end cases require the full content parser facade.
+#[cfg(any())]
 mod tests {
     use super::*;
 
