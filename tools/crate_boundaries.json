@@ -270,6 +270,7 @@
     "litchi-docx",
     "litchi-drawingml",
     "litchi-eval",
+    "litchi-iwa-common",
     "litchi-iwa-graph",
     "litchi-iwa-protos",
     "litchi-odb",

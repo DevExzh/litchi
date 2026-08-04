@@ -346,11 +346,11 @@ pub fn patch_varint_field(
     };
     require_wire_type(&field, 0, "varint")?;
     match replacement {
-        Some(replacement_value) => replace_existing_scalar_field(
-            data,
-            &field,
-            &crate::varint::encode_varint(replacement_value),
-        ),
+        Some(replacement_value) => {
+            let mut buffer = [0u8; crate::varint::MAX_BYTES];
+            let encoded = crate::varint::encode_varint_to_buffer(replacement_value, &mut buffer);
+            replace_existing_scalar_field(data, &field, encoded)
+        },
         None => remove_fields(data, vec![field]),
     }
 }

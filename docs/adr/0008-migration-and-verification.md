@@ -4437,6 +4437,11 @@ document-model implementation was moved into a common crate. The workspace
 now also contains `litchi-iwa-common`, which owns only dependency-neutral,
 bounded IWA varint and wire primitives; concrete Pages, Numbers, and Keynote
 object-model logic remains in the format crates while the migration proceeds.
+The migration exit for this family is deletion of the duplicate facade-local
+`wire.rs` and `varint.rs` kernels, with no public compatibility shim. Until
+all callers have moved, focused owner adapters may remain private, but they
+must preserve bounded-input policy and must not make the common structured
+wire errors untyped by accident.
 
 Checked-in anchors are `[MS-OE376]` §§2.1.444--2.1.462 for Word frameset/web
 settings behavior and §2.1.1170 for PowerPoint programmable tags; `[MS-XLSX]`

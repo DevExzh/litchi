@@ -1,5 +1,9 @@
 //! Bounded protobuf wire mutations that retain untouched fields byte-for-byte.
 
+use litchi_iwa_common::varint::{
+    decode_varint_from_bytes, encode_varint_into, encode_varint_to_buffer,
+};
+
 use crate::{Error, Result};
 
 #[derive(Debug, Clone, Copy)]
@@ -17,7 +21,7 @@ pub(crate) fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
     let mut offset = 0usize;
     while offset < data.len() {
         let start = offset;
-        let (key, key_length) = crate::varint::decode_varint_from_bytes(&data[offset..])
+        let (key, key_length) = decode_varint_from_bytes(&data[offset..])
             .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
         offset = offset
             .checked_add(key_length)
@@ -33,10 +37,9 @@ pub(crate) fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
         let mut payload_start = offset;
         match wire_type {
             0 => {
-                let (_, length) = crate::varint::decode_varint_from_bytes(&data[offset..])
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid protobuf varint value: {error}"))
-                    })?;
+                let (_, length) = decode_varint_from_bytes(&data[offset..]).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protobuf varint value: {error}"))
+                })?;
                 offset = offset.checked_add(length).ok_or_else(|| {
                     Error::InvalidFormat("protobuf varint offset overflow".to_owned())
                 })?;
@@ -48,7 +51,7 @@ pub(crate) fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
             },
             2 => {
                 let (length, prefix_length) =
-                    crate::varint::decode_varint_from_bytes(&data[offset..]).map_err(|error| {
+                    decode_varint_from_bytes(&data[offset..]).map_err(|error| {
                         Error::InvalidFormat(format!("invalid protobuf length: {error}"))
                     })?;
                 offset = offset.checked_add(prefix_length).ok_or_else(|| {
@@ -239,19 +242,12 @@ pub(crate) fn patch_varint_field(
             return Ok(data.to_vec());
         };
         let mut output = data.to_vec();
-        append_scalar_field(
-            &mut output,
-            field_number,
-            0,
-            &crate::varint::encode_varint(replacement),
-        )?;
+        append_varint_field(&mut output, field_number, replacement)?;
         return Ok(output);
     };
     require_wire_type(&field, 0, "varint")?;
     match replacement {
-        Some(replacement) => {
-            replace_existing_scalar_field(data, &field, &crate::varint::encode_varint(replacement))
-        },
+        Some(replacement) => replace_existing_varint_field(data, &field, replacement),
         None => remove_fields(data, vec![field]),
     }
 }
@@ -403,11 +399,12 @@ pub(crate) fn rewrite_repeated_length_delimited_fields(
         output.extend_from_slice(&data[copied..field.start]);
         if let Some(replacement) = replacements.get(index) {
             output.extend_from_slice(&data[field.start..field.key_end]);
-            output.extend(crate::varint::encode_varint(
+            encode_varint_into(
+                &mut output,
                 u64::try_from(replacement.len()).map_err(|_| {
                     Error::InvalidFormat("protobuf replacement exceeds u64".to_owned())
                 })?,
-            ));
+            );
             output.extend_from_slice(replacement);
         }
         copied = field.end;
@@ -432,10 +429,10 @@ pub(crate) fn repeated_varint_values(data: &[u8], field_number: u32) -> Result<V
         .filter(|field| field.number == field_number)
         .map(|field| {
             require_wire_type(&field, 0, "varint")?;
-            let (value, length) =
-                crate::varint::decode_varint_from_bytes(&data[field.key_end..field.end]).map_err(
-                    |error| Error::InvalidFormat(format!("invalid protobuf varint value: {error}")),
-                )?;
+            let (value, length) = decode_varint_from_bytes(&data[field.key_end..field.end])
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protobuf varint value: {error}"))
+                })?;
             if field.key_end + length != field.end {
                 return Err(Error::InvalidFormat(format!(
                     "protobuf field {field_number} has trailing varint bytes"
@@ -464,12 +461,7 @@ pub(crate) fn rewrite_repeated_varint_fields(
     if matches.is_empty() {
         let mut output = data.to_vec();
         for &replacement in replacements {
-            append_scalar_field(
-                &mut output,
-                field_number,
-                0,
-                &crate::varint::encode_varint(replacement),
-            )?;
+            append_varint_field(&mut output, field_number, replacement)?;
         }
         return Ok(output);
     }
@@ -484,17 +476,12 @@ pub(crate) fn rewrite_repeated_varint_fields(
         output.extend_from_slice(&data[copied..field.start]);
         if let Some(&replacement) = replacements.get(index) {
             output.extend_from_slice(&data[field.start..field.key_end]);
-            output.extend(crate::varint::encode_varint(replacement));
+            encode_varint_into(&mut output, replacement);
         }
         copied = field.end;
         if index + 1 == matches.len() {
             for &replacement in &replacements[matches.len().min(replacements.len())..] {
-                append_scalar_field(
-                    &mut output,
-                    field_number,
-                    0,
-                    &crate::varint::encode_varint(replacement),
-                )?;
+                append_varint_field(&mut output, field_number, replacement)?;
             }
         }
     }
@@ -757,13 +744,13 @@ pub(crate) fn append_length_delimited_field(
     field_number: u32,
     payload: &[u8],
 ) -> Result<()> {
-    output.extend(crate::varint::encode_varint(
-        (u64::from(field_number) << 3) | 2,
-    ));
-    output.extend(crate::varint::encode_varint(
+    validate_field_number(field_number)?;
+    encode_varint_into(output, (u64::from(field_number) << 3) | 2);
+    encode_varint_into(
+        output,
         u64::try_from(payload.len())
             .map_err(|_| Error::InvalidFormat("protobuf replacement exceeds u64".to_owned()))?,
-    ));
+    );
     output.extend_from_slice(payload);
     Ok(())
 }
@@ -773,12 +760,10 @@ pub(crate) fn append_varint_field(
     field_number: u32,
     value: u64,
 ) -> Result<()> {
-    append_scalar_field(
-        output,
-        field_number,
-        0,
-        &crate::varint::encode_varint(value),
-    )
+    validate_field_number(field_number)?;
+    encode_varint_into(output, u64::from(field_number) << 3);
+    encode_varint_into(output, value);
+    Ok(())
 }
 
 fn append_scalar_field(
@@ -787,15 +772,21 @@ fn append_scalar_field(
     wire_type: u8,
     payload: &[u8],
 ) -> Result<()> {
+    validate_field_number(field_number)?;
+    encode_varint_into(
+        output,
+        (u64::from(field_number) << 3) | u64::from(wire_type),
+    );
+    output.extend_from_slice(payload);
+    Ok(())
+}
+
+fn validate_field_number(field_number: u32) -> Result<()> {
     if field_number == 0 || field_number > 0x1fff_ffff {
         return Err(Error::InvalidFormat(format!(
             "invalid protobuf field number {field_number}"
         )));
     }
-    output.extend(crate::varint::encode_varint(
-        (u64::from(field_number) << 3) | u64::from(wire_type),
-    ));
-    output.extend_from_slice(payload);
     Ok(())
 }
 
@@ -814,13 +805,24 @@ fn replace_existing_length_delimited_field(
     );
     output.extend_from_slice(&data[..field.start]);
     output.extend_from_slice(&data[field.start..field.key_end]);
-    output.extend(crate::varint::encode_varint(
+    encode_varint_into(
+        &mut output,
         u64::try_from(replacement.len())
             .map_err(|_| Error::InvalidFormat("protobuf replacement exceeds u64".to_owned()))?,
-    ));
+    );
     output.extend_from_slice(replacement);
     output.extend_from_slice(&data[field.end..]);
     Ok(output)
+}
+
+fn replace_existing_varint_field(
+    data: &[u8],
+    field: &WireField,
+    replacement: u64,
+) -> Result<Vec<u8>> {
+    let mut buffer = [0u8; litchi_iwa_common::varint::MAX_BYTES];
+    let encoded = encode_varint_to_buffer(replacement, &mut buffer);
+    replace_existing_scalar_field(data, field, encoded)
 }
 
 fn replace_existing_scalar_field(
@@ -916,6 +918,37 @@ mod tests {
         let without_fixed = patch_fixed32_field(&without_varint, 30, true, None).unwrap();
         let restored = patch_fixed64_field(&without_fixed, 31, true, None).unwrap();
         assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn varint_rewrites_cover_full_u64_range() {
+        let original = varint_field(7, 0);
+        let replaced = patch_varint_field(&original, 7, true, Some(u64::MAX)).unwrap();
+        assert_eq!(repeated_varint_values(&replaced, 7).unwrap(), [u64::MAX]);
+
+        let appended = rewrite_repeated_varint_fields(&original, 7, &[127, 128, u64::MAX]).unwrap();
+        assert_eq!(
+            repeated_varint_values(&appended, 7).unwrap(),
+            [127, 128, u64::MAX]
+        );
+    }
+
+    #[test]
+    fn append_rejects_invalid_fields_without_mutating_output() {
+        let prefix = varint_field(9, 1);
+        let mut output = prefix.clone();
+
+        assert!(append_length_delimited_field(&mut output, 0, b"x").is_err());
+        assert_eq!(output, prefix);
+
+        assert!(append_length_delimited_field(&mut output, 0x2000_0000, b"x").is_err());
+        assert_eq!(output, prefix);
+
+        append_length_delimited_field(&mut output, 0x1fff_ffff, b"x").unwrap();
+        assert_eq!(
+            parse_wire_fields(&output).unwrap().last().unwrap().number,
+            0x1fff_ffff
+        );
     }
 
     #[test]
