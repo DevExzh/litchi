@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa::table_cell_conditional_highlight::{
@@ -11,6 +11,7 @@ use litchi_iwa::table_cell_conditional_highlight::{
     TableCellConditionalHighlightDateRange, TableCellConditionalHighlightRule,
     TableCellConditionalHighlightStyle,
 };
+use litchi_numbers::cell::Value as CellValue;
 
 const DATE_ROW: usize = 1;
 const FIRST_DATE_COLUMN: usize = 1;

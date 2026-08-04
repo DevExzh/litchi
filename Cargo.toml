@@ -120,6 +120,7 @@ litchi-iwa-text     = { version = "0.0.1", path = "crates/litchi-iwa-text" }
 litchi-iwa-protos   = { version = "0.0.1", path = "crates/litchi-iwa-protos" }
 litchi-keynote      = { version = "0.0.1", path = "crates/litchi-keynote" }
 litchi-markdown     = { version = "0.0.1", path = "crates/litchi-markdown" }
+litchi-numbers      = { version = "0.0.1", path = "crates/litchi-numbers" }
 litchi-odb          = { version = "0.0.1", path = "crates/litchi-odb" }
 litchi-odc          = { version = "0.0.1", path = "crates/litchi-odc" }
 litchi-pages        = { version = "0.0.1", path = "crates/litchi-pages" }

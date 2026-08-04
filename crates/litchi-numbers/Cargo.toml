@@ -1,0 +1,14 @@
+[package]
+name        = "litchi-numbers"
+description = "Numbers semantic value models and spreadsheet capabilities."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::numbers::{CellValue, NumbersDocument, NumbersEditor};
+use litchi_iwa::numbers::{NumbersDocument, NumbersEditor};
+use litchi_numbers::cell::Value as CellValue;
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

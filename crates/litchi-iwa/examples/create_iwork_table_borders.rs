@@ -3,12 +3,13 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::numbers::editor::table::cell::BorderSide;
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth,
 };
+use litchi_numbers::cell::Value as CellValue;
 const ROW: usize = 1;
 const COLUMN: usize = 1;
 const SIDES: [BorderSide; 4] = [

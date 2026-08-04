@@ -5747,8 +5747,11 @@ concurrent reader migration still refers to the legacy local spelling. No
 archive, protobuf, or application decoder was moved into these value crates.
 The adapters and the three corresponding `litchi-iwa` dependency edges are
 staged ownership work, not compatibility API; their exit is to move the owning
-readers before deleting the adapters. The next equivalent slice should extract
-Numbers values and then migrate the Pages/Keynote reader boundaries.
+readers before deleting the adapters. The Numbers value slice now owns
+`litchi-numbers::cell::{Value, Type, Update}` and leaves only a monolith-local
+private adapter for the remaining reader/editor migration. The next slice
+should extract Numbers table/sheet/formula values and then migrate the
+Pages/Keynote reader boundaries.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains

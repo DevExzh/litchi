@@ -88,6 +88,7 @@
       "litchi-iwa-protos",
       "litchi-iwa-text",
       "litchi-keynote",
+      "litchi-numbers",
       "litchi-pages",
       "soapberry-zip"
     ],
@@ -104,6 +105,7 @@
     "litchi-markdown": [
       "litchi-core"
     ],
+    "litchi-numbers": [],
     "litchi-odb": [
       "litchi-core",
       "litchi-odf-common"
@@ -286,6 +288,7 @@
     "litchi-iwa-protos",
     "litchi-iwa-text",
     "litchi-keynote",
+    "litchi-numbers",
     "litchi-odb",
     "litchi-odc",
     "litchi-odf-common",

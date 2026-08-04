@@ -1,9 +1,10 @@
 //! Create a Numbers spreadsheet without an input document or template.
 
 use litchi_iwa::numbers::{
-    CellValue, FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocumentBuilder,
-    NumbersTableHeaderCount, NumbersTableHeaderSettings, TableCellUpdate, TableRowInsertion,
+    FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocumentBuilder,
+    NumbersTableHeaderCount, NumbersTableHeaderSettings, TableRowInsertion,
 };
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()

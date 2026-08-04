@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 30027)
+Total output lines: 3524
+
 Warning: truncated output (original token count: 30030)
 Total output lines: 3527
 
@@ -1785,8 +1788,7 @@ impl PagesEditor {
                 paragraph,
             )?;
         if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            verified.requ…30 tokens truncated… numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
+          …27 tokens truncated… numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
         &mut self,
         model_object_id: u64,
         row: usize,

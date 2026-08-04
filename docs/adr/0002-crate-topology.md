@@ -80,6 +80,13 @@ their removal is a staged ownership exit, not a public compatibility layer.
 Numbers remains the next format-leaf migration, with no peer dependency between
 the three concrete crates.
 
+The Numbers migration now begins with `litchi-numbers::cell`, whose concise
+`Value`, `Type`, and `Update` vocabulary is dependency-free. The IWA reader
+uses a private migration adapter for its still-moving implementation files;
+the canonical values are exposed only from the new leaf crate, and no archive
+or protobuf code crosses into it. The remaining Numbers table, formula, sheet,
+and package owners follow the same downward-only extraction pattern.
+
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
 `plot_area`, `reader`, and `writer`; the public codec verbs are the short

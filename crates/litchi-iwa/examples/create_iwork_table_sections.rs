@@ -8,15 +8,15 @@ use litchi_iwa::keynote::{
     KeynoteTableRowInsertion,
 };
 use litchi_iwa::numbers::{
-    CellValue, NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    TableCellUpdate, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
-    TableRowInsertion,
+    NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
+    TableColumnDeletion, TableColumnInsertion, TableRowDeletion, TableRowInsertion,
 };
 use litchi_iwa::pages::{
     PagesDocumentBuilder, PagesTableColumnDeletion, PagesTableColumnInsertion,
     PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableRowDeletion, PagesTableRowInsertion,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 4;

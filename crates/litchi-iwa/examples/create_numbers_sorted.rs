@@ -1,10 +1,11 @@
 //! Create and physically sort a Numbers table without an input document.
 
 use litchi_iwa::numbers::{
-    CellValue, NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
+    NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRule, TableCellUpdate,
+    NumbersTableSortRule,
 };
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()

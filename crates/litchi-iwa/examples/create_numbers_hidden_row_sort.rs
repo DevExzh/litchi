@@ -3,11 +3,12 @@
 use std::path::PathBuf;
 
 use litchi_iwa::numbers::{
-    CellValue, NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
+    NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRule, TableCellUpdate,
+    NumbersTableSortRule,
 };
 use litchi_iwa::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(

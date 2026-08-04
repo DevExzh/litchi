@@ -3,13 +3,14 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
     TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
 };
+use litchi_numbers::cell::Value as CellValue;
 
 const HIGHLIGHT_ROW: usize = 1;
 const HIGHLIGHT_COLUMN: usize = 1;

@@ -1,6 +1,7 @@
 //! Create a source-built Numbers workbook with cells across sparse tile boundaries.
 
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, TableCellUpdate};
+use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()

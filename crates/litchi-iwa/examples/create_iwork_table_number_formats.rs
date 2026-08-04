@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
+use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
@@ -21,6 +21,7 @@ use litchi_iwa::table_cell_data_format::{
     TableCellSliderRange, TableCellStarRatingFormat, TableCellStepperFormat, TableCellStepperRange,
     TableCellThousandsSeparator,
 };
+use litchi_numbers::cell::Value as CellValue;
 
 const ROW: usize = 1;
 const NUMBER_COLUMN: usize = 1;

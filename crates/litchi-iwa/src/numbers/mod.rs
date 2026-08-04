@@ -29,7 +29,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub mod cell;
+pub(crate) mod cell;
 pub mod creation;
 pub mod document;
 pub mod editor;
@@ -43,7 +43,7 @@ mod formula_owner;
 mod function_map;
 mod table_uid_map;
 
-pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue, TableCellUpdate};
+pub(crate) use cell::CellValue;
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
@@ -77,6 +77,7 @@ pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
+pub use litchi_numbers::cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, Type, Update, Value};
 pub use sheet::NumbersSheet;
 pub use table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
 pub use table_extractor::TableDataExtractor;

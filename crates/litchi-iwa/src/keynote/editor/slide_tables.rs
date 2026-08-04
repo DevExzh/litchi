@@ -47,9 +47,9 @@ const TABLE_GEOMETRY_FLAGS: u32 = 3;
 const TABLE_ANGLE_DEGREES: f32 = 0.0;
 
 /// Strongly typed value stored in a Keynote table cell.
-pub type KeynoteTableCellValue = crate::numbers::CellValue;
+pub type KeynoteTableCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Keynote table-cell batch.
-pub type KeynoteTableCellUpdate = crate::numbers::TableCellUpdate;
+pub type KeynoteTableCellUpdate = litchi_numbers::cell::Update;
 /// Section-relative row deletion shared by native iWork tables.
 pub type KeynoteTableRowDeletion = crate::numbers::TableRowDeletion;
 /// Section-relative column deletion shared by native iWork tables.

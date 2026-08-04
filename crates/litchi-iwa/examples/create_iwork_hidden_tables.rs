@@ -5,12 +5,13 @@ use std::path::{Path, PathBuf};
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableAxisIndex, KeynoteTableHiddenAxes,
 };
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor, TableCellUpdate};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{
     PagesDocumentBuilder, PagesEditor, PagesTableAxisIndex, PagesTableHiddenAxes,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 3;
