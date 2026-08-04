@@ -2,7 +2,7 @@
 //!
 //! The owner is layered by responsibility: semantic declarations in
 //! model, bounded XML/MCE conversion in codec, and OPC relationship
-//! operations in package. Historical prefixed names are aliases only.
+//! operations in package.
 
 mod codec;
 mod model;
@@ -17,21 +17,6 @@ pub use package::{
     discover_named_sheet_views, load_worksheet_named_sheet_views,
     remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views,
 };
-
-pub type NamedSheetViewGuid = Guid;
-pub type NamedSheetViewRange = Range;
-pub type NamedSheetViewMarkup = Markup;
-pub type NamedSheetViewDifferentialFormat = DifferentialFormat;
-pub type NamedSheetViewExtension = Extension;
-pub type NamedSheetViewSortConditionKind = SortConditionKind;
-pub type NamedSheetViewIconSet = IconSet;
-pub type NamedSheetViewSortCondition = SortCondition;
-pub type NamedSheetViewSortRule = SortRule;
-pub type NamedSheetViewSortRules = SortRules;
-pub type NamedSheetViewColumnFilter = ColumnFilter;
-pub type NamedSheetViewFilter = Filter;
-pub type NamedSheetView = View;
-pub type NamedSheetViews = Views;
 
 pub(crate) const NSV: &[u8] =
     b"http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews";

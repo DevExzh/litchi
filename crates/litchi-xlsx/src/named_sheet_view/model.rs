@@ -1,7 +1,7 @@
 //! Semantic SpreadsheetML named-sheet-view model.
 //!
-//! The owner module supplies the contextual namespace; historical
-//! prefixed names remain aliases in mod.rs.
+//! The owner module supplies the contextual namespace, so its semantic types
+//! use concise names without repeating the module prefix.
 
 use crate::auto_filter::FilterColumnDefinition;
 use crate::error::Result;
