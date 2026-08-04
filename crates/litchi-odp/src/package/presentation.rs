@@ -3,10 +3,8 @@
 use crate::codec::Parser;
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use crate::model::{
-    MediaReference, PresentationDeclarations, PresentationPageLayouts,
-    PresentationPageMetadataCollection, PresentationSettings, Slide,
-    parse_presentation_declarations, parse_presentation_page_layouts,
-    parse_presentation_page_metadata, parse_presentation_settings,
+    Declarations, Layouts, MediaReference, PageMetadataCollection, Settings, Slide, declaration,
+    page_layout, page_metadata, settings,
 };
 use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
@@ -177,25 +175,25 @@ impl Presentation {
     }
 
     /// Inspect inert slide-show settings and ordered custom shows.
-    pub fn settings(&self) -> Result<Option<PresentationSettings>> {
-        parse_presentation_settings(self.content.xml_content())
+    pub fn settings(&self) -> Result<Option<Settings>> {
+        settings::parse(self.content.xml_content())
     }
 
     /// Inspect inert header, footer, date-time, and page-binding declarations.
-    pub fn declarations(&self) -> Result<PresentationDeclarations> {
-        parse_presentation_declarations(self.content.xml_content())
+    pub fn declarations(&self) -> Result<Declarations> {
+        declaration::parse(self.content.xml_content())
     }
 
     /// Inspect static page names, IDs, and layout/master references.
-    pub fn page_metadata(&self) -> Result<PresentationPageMetadataCollection> {
-        parse_presentation_page_metadata(self.content.xml_content())
+    pub fn page_metadata(&self) -> Result<PageMetadataCollection> {
+        page_metadata::parse(self.content.xml_content())
     }
 
     /// Inspect named presentation page layouts and their typed placeholders.
-    pub fn page_layouts(&self) -> Result<PresentationPageLayouts> {
+    pub fn page_layouts(&self) -> Result<Layouts> {
         match self.styles.as_ref() {
-            Some(styles) => parse_presentation_page_layouts(styles.xml_content()),
-            None => Ok(PresentationPageLayouts::default()),
+            Some(styles) => page_layout::parse(styles.xml_content()),
+            None => Ok(Layouts::default()),
         }
     }
 
@@ -353,7 +351,7 @@ impl Presentation {
     /// # Note
     ///
     /// Full presentation modification support is planned for future releases. For now,
-    /// to modify a presentation, use `PresentationBuilder` to create a new one with
+    /// to modify a presentation, use `Builder` to create a new one with
     /// the desired content.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let bytes = self.to_bytes()?;

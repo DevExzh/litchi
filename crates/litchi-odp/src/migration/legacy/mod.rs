@@ -25,7 +25,7 @@
 //! - ✅ Inert shape hyperlinks, presentation actions, and script bindings
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
-//! - ✅ `PresentationBuilder::new()` - Create new presentations
+//! - ✅ `Builder::new()` - Create new presentations
 //! - ✅ `add_slide()` - Add slides
 //! - ✅ `add_shape()` - Add shapes (text boxes, rectangles, etc.)
 //! - ✅ `set_slide_layout()` - Set slide layout
@@ -71,35 +71,35 @@ mod transition;
 pub(crate) use parser::OdpParser;
 
 pub use action::{
-    DrawingHyperlink, HyperlinkShow, PresentationAction, PresentationEffect,
-    PresentationEffectDirection, PresentationEventListener, ScriptEventListener,
+    DrawingHyperlink, HyperlinkShow, Action, Effect,
+    EffectDirection, EventListener, ScriptEventListener,
     ShapeEventListener,
 };
 pub use animation::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
 };
-pub use builder::PresentationBuilder;
+pub use builder::Builder;
 pub use declaration::{
-    PresentationDateTimeDeclaration, PresentationDateTimeSource, PresentationDeclarationBinding,
-    PresentationDeclarationTarget, PresentationDeclarations, PresentationTextDeclaration,
-    parse_presentation_declarations,
+    DateTimeDeclaration, DateTimeSource, DeclarationBinding,
+    DeclarationTarget, Declarations, TextDeclaration,
+    parse_declarations,
 };
-pub use layout_master_mutation::PresentationMasterPage;
+pub use layout_master_mutation::MasterPage;
 pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
 pub use page_layout_definition::{
-    PresentationMeasure, PresentationMeasureUnit, PresentationPageLayout, PresentationPageLayouts,
-    PresentationPlaceholder, PresentationPlaceholderClass, parse_presentation_page_layouts,
-    remove_presentation_page_layout_xml, set_presentation_page_layout_xml,
+    Measure, Unit, PageLayout, Layouts,
+    Placeholder, PlaceholderClass, parse_page_layouts,
+    remove_page_layout_xml, set_page_layout_xml,
 };
 pub use page_metadata::{
-    PresentationPageMetadata, PresentationPageMetadataCollection, parse_presentation_page_metadata,
+    PageMetadata, PageMetadataCollection, parse_page_metadata,
 };
 pub use presentation::Presentation;
 pub use settings::{
-    CustomPresentationShow, PresentationFeatureState, PresentationSettings,
-    parse_presentation_settings,
+    CustomShow, FeatureState, Settings,
+    parse_settings,
 };
 pub use slide::{
     DrawingAttribute, DrawingAttributeNamespace, DrawingShapeKind, EnhancedGeometry,

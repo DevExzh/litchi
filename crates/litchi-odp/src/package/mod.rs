@@ -1,3 +1,3 @@
-mod presentation;
+pub mod presentation;
 
 pub use presentation::Presentation;

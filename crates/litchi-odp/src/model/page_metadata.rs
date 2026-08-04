@@ -21,13 +21,13 @@ const MAX_NAVIGATION_IDS: usize = 65_536;
 
 /// Static attributes of one `draw:page` in slide order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationPageMetadata {
+pub struct PageMetadata {
     /// Zero-based slide index.
     pub slide_index: usize,
     pub name: Option<String>,
     pub style_name: Option<String>,
     pub master_page_name: Option<String>,
-    pub presentation_page_layout_name: Option<String>,
+    pub page_layout_name: Option<String>,
     /// Legacy ODF `draw:id`.
     pub draw_id: Option<String>,
     /// XML `xml:id`, which supersedes `draw:id` when both are present.
@@ -38,7 +38,7 @@ pub struct PresentationPageMetadata {
     pub navigation_order: Vec<String>,
 }
 
-impl PresentationPageMetadata {
+impl PageMetadata {
     /// Create empty metadata for a zero-based slide index.
     pub fn new(slide_index: usize) -> Self {
         Self {
@@ -46,7 +46,7 @@ impl PresentationPageMetadata {
             name: None,
             style_name: None,
             master_page_name: None,
-            presentation_page_layout_name: None,
+            page_layout_name: None,
             draw_id: None,
             xml_id: None,
             href: None,
@@ -60,7 +60,7 @@ impl PresentationPageMetadata {
             (self.style_name.as_deref(), "draw:style-name"),
             (self.master_page_name.as_deref(), "draw:master-page-name"),
             (
-                self.presentation_page_layout_name.as_deref(),
+                self.page_layout_name.as_deref(),
                 "presentation:presentation-page-layout-name",
             ),
             (self.href.as_deref(), "xlink:href"),
@@ -100,25 +100,25 @@ impl PresentationPageMetadata {
 
 /// Ordered static page metadata for an ODP presentation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PresentationPageMetadataCollection {
-    pages: Vec<PresentationPageMetadata>,
+pub struct PageMetadataCollection {
+    pages: Vec<PageMetadata>,
 }
 
-impl PresentationPageMetadataCollection {
+impl PageMetadataCollection {
     /// Create and validate an ordered page metadata collection.
-    pub fn new(pages: Vec<PresentationPageMetadata>) -> Result<Self> {
+    pub fn new(pages: Vec<PageMetadata>) -> Result<Self> {
         let value = Self { pages };
         value.validate()?;
         Ok(value)
     }
 
     /// Return pages in slide order.
-    pub fn pages(&self) -> &[PresentationPageMetadata] {
+    pub fn pages(&self) -> &[PageMetadata] {
         &self.pages
     }
 
     /// Return metadata for a zero-based slide index.
-    pub fn page(&self, slide_index: usize) -> Option<&PresentationPageMetadata> {
+    pub fn page(&self, slide_index: usize) -> Option<&PageMetadata> {
         self.pages
             .binary_search_by_key(&slide_index, |value| value.slide_index)
             .ok()
@@ -174,7 +174,7 @@ impl PresentationPageMetadataCollection {
 
 /// Return the exact page names emitted for the current slide sequence.
 pub(crate) fn effective_page_names(
-    metadata: Option<&PresentationPageMetadataCollection>,
+    metadata: Option<&PageMetadataCollection>,
     slide_count: usize,
 ) -> Result<Vec<String>> {
     if slide_count > MAX_PAGES {
@@ -200,10 +200,10 @@ pub(crate) fn effective_page_names(
     reason = "used by the pending transactional authoring layer"
 )]
 pub(crate) fn metadata_after_page_insert(
-    metadata: Option<&PresentationPageMetadataCollection>,
+    metadata: Option<&PageMetadataCollection>,
     slide_count: usize,
     insert_index: usize,
-) -> Result<PresentationPageMetadataCollection> {
+) -> Result<PageMetadataCollection> {
     if insert_index > slide_count {
         return Err(invalid(
             "presentation page insertion index is out of bounds",
@@ -240,16 +240,16 @@ pub(crate) fn metadata_after_page_insert(
         let mut page = metadata
             .and_then(|value| value.page(old_index))
             .cloned()
-            .unwrap_or_else(|| PresentationPageMetadata::new(new_index));
+            .unwrap_or_else(|| PageMetadata::new(new_index));
         page.slide_index = new_index;
         page.name.get_or_insert_with(|| old_name.clone());
         pages.push(page);
     }
-    let mut inserted = PresentationPageMetadata::new(insert_index);
+    let mut inserted = PageMetadata::new(insert_index);
     inserted.name = Some(new_name);
     pages.push(inserted);
     pages.sort_by_key(|page| page.slide_index);
-    PresentationPageMetadataCollection::new(pages)
+    PageMetadataCollection::new(pages)
 }
 
 /// Materialize stable names and remove one page metadata record.
@@ -258,10 +258,10 @@ pub(crate) fn metadata_after_page_insert(
     reason = "used by the pending transactional authoring layer"
 )]
 pub(crate) fn metadata_after_page_remove(
-    metadata: Option<&PresentationPageMetadataCollection>,
+    metadata: Option<&PageMetadataCollection>,
     slide_count: usize,
     remove_index: usize,
-) -> Result<Option<PresentationPageMetadataCollection>> {
+) -> Result<Option<PageMetadataCollection>> {
     if remove_index >= slide_count {
         return Err(invalid("presentation page removal index is out of bounds"));
     }
@@ -281,7 +281,7 @@ pub(crate) fn metadata_after_page_remove(
         let mut page = metadata
             .and_then(|value| value.page(old_index))
             .cloned()
-            .unwrap_or_else(|| PresentationPageMetadata::new(new_index));
+            .unwrap_or_else(|| PageMetadata::new(new_index));
         page.slide_index = new_index;
         page.name.get_or_insert_with(|| old_name.clone());
         pages.push(page);
@@ -289,7 +289,7 @@ pub(crate) fn metadata_after_page_remove(
     if pages.is_empty() {
         Ok(None)
     } else {
-        PresentationPageMetadataCollection::new(pages).map(Some)
+        PageMetadataCollection::new(pages).map(Some)
     }
 }
 
@@ -301,7 +301,7 @@ fn fallback_page_name(slide_index: usize) -> Result<String> {
 }
 
 /// Parse static metadata from direct `draw:page` children.
-pub fn parse_presentation_page_metadata(xml: &str) -> Result<PresentationPageMetadataCollection> {
+pub fn parse(xml: &str) -> Result<PageMetadataCollection> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation page metadata XML exceeds 8 MiB"));
     }
@@ -360,11 +360,11 @@ pub fn parse_presentation_page_metadata(xml: &str) -> Result<PresentationPageMet
         }
         buffer.clear();
     }
-    PresentationPageMetadataCollection::new(pages)
+    PageMetadataCollection::new(pages)
 }
 
 pub(crate) fn write_page_attributes(
-    metadata: Option<&PresentationPageMetadataCollection>,
+    metadata: Option<&PageMetadataCollection>,
     slide_index: usize,
     fallback_style_name: &str,
 ) -> Result<String> {
@@ -390,7 +390,7 @@ pub(crate) fn write_page_attributes(
             .unwrap_or("Default"),
     );
     if let Some(page) = page {
-        if let Some(value) = &page.presentation_page_layout_name {
+        if let Some(value) = &page.page_layout_name {
             write_attribute(
                 &mut output,
                 "presentation:presentation-page-layout-name",
@@ -421,8 +421,8 @@ fn parse_page(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     slide_index: usize,
-) -> Result<PresentationPageMetadata> {
-    let mut page = PresentationPageMetadata::new(slide_index);
+) -> Result<PageMetadata> {
+    let mut page = PageMetadata::new(slide_index);
     for attribute in element.attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
@@ -441,7 +441,7 @@ fn parse_page(
             (ResolveResult::Bound(found), b"presentation-page-layout-name")
                 if found == Namespace(PRESENTATION_NAMESPACE) =>
             {
-                &mut page.presentation_page_layout_name
+                &mut page.page_layout_name
             },
             (ResolveResult::Bound(found), b"id") if found == Namespace(DRAW_NAMESPACE) => {
                 &mut page.draw_id
@@ -563,18 +563,18 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Presentation, PresentationBuilder};
+    use crate::{Builder, Presentation};
 
     const PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:presentation>"#;
     const SUFFIX: &str = "</o:presentation></o:body></o:document-content>";
 
-    fn metadata() -> PresentationPageMetadataCollection {
-        PresentationPageMetadataCollection::new(vec![PresentationPageMetadata {
+    fn metadata() -> PageMetadataCollection {
+        PageMetadataCollection::new(vec![PageMetadata {
             slide_index: 0,
             name: Some("Quarterly Review".to_string()),
             style_name: Some("dp1".to_string()),
             master_page_name: Some("Corporate Master".to_string()),
-            presentation_page_layout_name: Some("TitleAndBody".to_string()),
+            page_layout_name: Some("TitleAndBody".to_string()),
             draw_id: Some("page-id-1".to_string()),
             xml_id: Some("page-id-1".to_string()),
             href: Some("../Templates/master.odp#page1".to_string()),
@@ -588,13 +588,13 @@ mod tests {
         let xml = format!(
             r#"{PREFIX}<d:page d:name="Quarterly Review" d:style-name="dp1" d:master-page-name="Corporate Master" p:presentation-page-layout-name="TitleAndBody" d:id="page-id-1" xml:id="page-id-1" x:href="../Templates/master.odp#page1" d:nav-order="title1 body1"/>{SUFFIX}"#
         );
-        assert_eq!(parse_presentation_page_metadata(&xml).unwrap(), metadata());
+        assert_eq!(parse(&xml).unwrap(), metadata());
     }
 
     #[test]
     fn builder_round_trips_page_metadata() {
         let metadata = metadata();
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         builder.add_slide_with_title("Title", "Body").unwrap();
         builder.set_page_metadata(Some(metadata.clone())).unwrap();
         let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
@@ -611,12 +611,9 @@ mod tests {
             r#"<d:page d:name=""/>"#,
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
-            assert!(
-                parse_presentation_page_metadata(&xml).is_err(),
-                "accepted {xml}"
-            );
+            assert!(parse(&xml).is_err(), "accepted {xml}");
         }
         let active = format!("{PREFIX}<!DOCTYPE x><d:page/>{SUFFIX}");
-        assert!(parse_presentation_page_metadata(&active).is_err());
+        assert!(parse(&active).is_err());
     }
 }

@@ -44,7 +44,7 @@ pub struct HandoutMaster {
     /// Required `style:page-layout-name` of the handout page layout.
     pub page_layout_name: String,
     /// Optional `presentation:presentation-page-layout-name`.
-    pub presentation_page_layout_name: Option<String>,
+    pub page_layout_name: Option<String>,
     /// Optional `draw:style-name` of the handout drawing style.
     pub drawing_style_name: Option<String>,
     /// Optional `presentation:use-header-name` header declaration reference.
@@ -121,7 +121,7 @@ pub fn parse_handout_master(xml: &str) -> Result<Option<HandoutMaster>> {
                     active = Some((
                         HandoutMaster {
                             page_layout_name,
-                            presentation_page_layout_name: namespaced_attr(
+                            page_layout_name: namespaced_attr(
                                 &reader,
                                 &element,
                                 PRESENTATION,
@@ -171,7 +171,7 @@ pub fn parse_handout_master(xml: &str) -> Result<Option<HandoutMaster>> {
                     )?;
                 return Ok(Some(HandoutMaster {
                     page_layout_name,
-                    presentation_page_layout_name: namespaced_attr(
+                    page_layout_name: namespaced_attr(
                         &reader,
                         &element,
                         PRESENTATION,
@@ -285,7 +285,7 @@ mod tests {
         let master = parse_handout_master(STYLES).unwrap().unwrap();
         assert_eq!(master.page_layout_name, "PM0");
         assert_eq!(
-            master.presentation_page_layout_name.as_deref(),
+            master.page_layout_name.as_deref(),
             Some("AL0T26")
         );
         assert_eq!(master.drawing_style_name.as_deref(), Some("Mdp2"));

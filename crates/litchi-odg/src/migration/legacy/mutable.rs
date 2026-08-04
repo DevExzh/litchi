@@ -6,7 +6,7 @@ use super::{
 use crate::Shape;
 use crate::constants;
 use crate::core::{MetaXmlPatch, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml};
-use crate::odp::{DrawingAttributeNamespace, PresentationBuilder};
+use crate::odp::{Builder, DrawingAttributeNamespace};
 use litchi_core::{Error, Metadata, Result, xml::escape_xml};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -905,7 +905,7 @@ fn serialize_page(page: &DrawingPage) -> Result<String> {
         xml.push_str("</draw:layer-set>");
     }
     for (index, shape) in page.shapes().iter().enumerate() {
-        xml.push_str(&PresentationBuilder::generate_shape_xml(shape, index)?);
+        xml.push_str(&Builder::generate_shape_xml(shape, index)?);
     }
     xml.push_str("</draw:page>");
     Ok(xml)

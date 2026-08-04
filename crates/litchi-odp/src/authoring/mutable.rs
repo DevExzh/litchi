@@ -5,7 +5,7 @@
 
 use crate::core::{MetaXmlPatch, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml};
 use crate::animation::validate_animation_roots;
-use crate::content_source::PresentationContentSource;
+use crate::codec::content_source::ContentSource;
 use crate::legacy_animation::validate_legacy_animation_root;
 use crate::media::{EmbeddedMedia, embed_media, validate_package_media_path};
 use crate::{MediaReference, Presentation, Shape, Slide};
@@ -21,7 +21,7 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi_odf::{Presentation, MutablePresentation};
+/// use litchi_odp::{Presentation, MutablePresentation};
 ///
 /// # fn main() -> litchi_core::Result<()> {
 /// // Open an existing presentation
@@ -53,23 +53,23 @@ pub struct MutablePresentation {
     /// Monotonic counter for authored frame names (1-based).
     next_frame_number: usize,
     /// Inert slide-show settings and custom shows.
-    settings: Option<crate::PresentationSettings>,
+    settings: Option<crate::Settings>,
     /// Inert header/footer/date-time declarations and page bindings.
-    declarations: Option<crate::PresentationDeclarations>,
+    declarations: Option<crate::Declarations>,
     /// Static page names, IDs, and layout/master references.
-    page_metadata: Option<crate::PresentationPageMetadataCollection>,
+    page_metadata: Option<crate::PageMetadataCollection>,
     /// Verbatim fragments of the source `content.xml`, when one was opened.
     ///
     /// Slides the caller never touched are re-emitted from these fragments so
     /// constructs outside the model — nested tables, image text alternatives,
     /// automatic styles, font declarations — survive a save.
-    content_source: Option<PresentationContentSource>,
+    content_source: Option<ContentSource>,
     /// Slides exactly as parsed, used to detect which pages are still pristine.
     source_slides: Vec<Slide>,
     /// Declarations exactly as parsed; changing them rewrites every page.
-    source_declarations: Option<crate::PresentationDeclarations>,
+    source_declarations: Option<crate::Declarations>,
     /// Page metadata exactly as parsed; changing it rewrites every page.
-    source_page_metadata: Option<crate::PresentationPageMetadataCollection>,
+    source_page_metadata: Option<crate::PageMetadataCollection>,
 }
 
 /// Largest source slide count that is linearly rescanned for a match.
@@ -116,7 +116,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::{Presentation, MutablePresentation};
+    /// use litchi_odp::{Presentation, MutablePresentation};
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("slides.odp")?;
@@ -133,7 +133,7 @@ impl MutablePresentation {
         let mimetype = "application/vnd.oasis.opendocument.presentation".to_string();
 
         let styles_xml = presentation.styles_xml().map(str::to_owned);
-        let content_source = PresentationContentSource::parse(presentation.content_xml())?;
+        let content_source = ContentSource::parse(presentation.content_xml())?;
         let source_package = Some(presentation.into_package());
 
         let declarations = (!declarations.is_empty()).then_some(declarations);
@@ -170,7 +170,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// let presentation = MutablePresentation::new();
     /// ```
@@ -257,19 +257,19 @@ impl MutablePresentation {
     }
 
     /// Return the inert slide-show settings.
-    pub fn settings(&self) -> Option<&crate::PresentationSettings> {
+    pub fn settings(&self) -> Option<&crate::Settings> {
         self.settings.as_ref()
     }
 
     /// Mutably access inert slide-show settings.
-    pub fn settings_mut(&mut self) -> Option<&mut crate::PresentationSettings> {
+    pub fn settings_mut(&mut self) -> Option<&mut crate::Settings> {
         self.settings.as_mut()
     }
 
     /// Set or clear validated slide-show settings without executing them.
     pub fn set_settings(
         &mut self,
-        settings: Option<crate::PresentationSettings>,
+        settings: Option<crate::Settings>,
     ) -> Result<()> {
         if let Some(settings) = &settings {
             settings.validate()?;
@@ -279,19 +279,19 @@ impl MutablePresentation {
     }
 
     /// Return inert presentation declarations and page bindings.
-    pub fn declarations(&self) -> Option<&crate::PresentationDeclarations> {
+    pub fn declarations(&self) -> Option<&crate::Declarations> {
         self.declarations.as_ref()
     }
 
     /// Mutably access presentation declarations and page bindings.
-    pub fn declarations_mut(&mut self) -> Option<&mut crate::PresentationDeclarations> {
+    pub fn declarations_mut(&mut self) -> Option<&mut crate::Declarations> {
         self.declarations.as_mut()
     }
 
     /// Set or clear validated presentation declarations and page bindings.
     pub fn set_declarations(
         &mut self,
-        declarations: Option<crate::PresentationDeclarations>,
+        declarations: Option<crate::Declarations>,
     ) -> Result<()> {
         if let Some(declarations) = &declarations {
             declarations.validate()?;
@@ -301,21 +301,21 @@ impl MutablePresentation {
     }
 
     /// Return static page names, IDs, and layout/master references.
-    pub fn page_metadata(&self) -> Option<&crate::PresentationPageMetadataCollection> {
+    pub fn page_metadata(&self) -> Option<&crate::PageMetadataCollection> {
         self.page_metadata.as_ref()
     }
 
     /// Mutably access static page metadata.
     pub fn page_metadata_mut(
         &mut self,
-    ) -> Option<&mut crate::PresentationPageMetadataCollection> {
+    ) -> Option<&mut crate::PageMetadataCollection> {
         self.page_metadata.as_mut()
     }
 
     /// Set or clear validated static page metadata.
     pub fn set_page_metadata(
         &mut self,
-        metadata: Option<crate::PresentationPageMetadataCollection>,
+        metadata: Option<crate::PageMetadataCollection>,
     ) -> Result<()> {
         if let Some(metadata) = &metadata {
             metadata.validate()?;
@@ -376,7 +376,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -411,7 +411,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -432,7 +432,7 @@ impl MutablePresentation {
                 Some(&candidate_metadata),
                 self.slides.len() + 1,
             )?;
-            super::settings::validate_presentation_page_references(
+            super::settings::validate_page_references(
                 self.settings.as_ref(),
                 &candidate_names,
             )?;
@@ -473,7 +473,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -504,7 +504,7 @@ impl MutablePresentation {
                 candidate_metadata.as_ref(),
                 self.slides.len() - 1,
             )?;
-            super::settings::validate_presentation_page_references(
+            super::settings::validate_page_references(
                 self.settings.as_ref(),
                 &candidate_names,
             )?;
@@ -537,7 +537,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -565,7 +565,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -590,7 +590,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::{MutablePresentation, Shape};
+    /// use litchi_odp::{MutablePresentation, Shape};
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -627,7 +627,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::{MutablePresentation, OdfLength};
+    /// use litchi_odp::{MutablePresentation, OdfLength};
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -716,7 +716,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -750,7 +750,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -896,7 +896,7 @@ impl MutablePresentation {
             self.page_metadata.as_ref(),
             self.slides.len(),
         )?;
-        super::settings::validate_presentation_page_references(
+        super::settings::validate_page_references(
             self.settings.as_ref(),
             &page_names,
         )?;
@@ -921,7 +921,7 @@ impl MutablePresentation {
             let declaration_attributes = super::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::PresentationDeclarationTarget::Slide,
+                crate::DeclarationTarget::Slide,
             );
             let _ = page_num;
             body.push_str("<draw:page");
@@ -956,7 +956,7 @@ impl MutablePresentation {
 
             // Add shapes
             for (shape_idx, shape) in slide.shapes.iter().enumerate() {
-                body.push_str(&super::builder::PresentationBuilder::generate_shape_xml(
+                body.push_str(&super::builder::Builder::generate_shape_xml(
                     shape, shape_idx,
                 )?);
             }
@@ -971,10 +971,10 @@ impl MutablePresentation {
             let notes_attributes = super::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::PresentationDeclarationTarget::Notes,
+                crate::DeclarationTarget::Notes,
             );
             body.push_str(&super::declaration::apply_notes_binding(
-                super::builder::PresentationBuilder::generate_notes_xml(slide.notes.as_deref()),
+                super::builder::Builder::generate_notes_xml(slide.notes.as_deref()),
                 &notes_attributes,
             )?);
 
@@ -984,7 +984,7 @@ impl MutablePresentation {
         if let Some(source) = &self.content_source {
             source.write_trailing_extras(&mut body);
         }
-        body.push_str(&super::settings::write_presentation_settings(
+        body.push_str(&super::settings::write(
             self.settings.as_ref(),
         )?);
 
@@ -1091,7 +1091,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -1111,7 +1111,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::MutablePresentation;
+    /// use litchi_odp::MutablePresentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
@@ -1162,8 +1162,8 @@ mod tests {
     use super::*;
     use crate::{
         AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-        DrawingHyperlink, LegacyAnimationKind, LegacyAnimationNode, PresentationAction,
-        PresentationBuilder, PresentationEventListener, ScriptEventListener, ShapeEventListener,
+        DrawingHyperlink, LegacyAnimationKind, LegacyAnimationNode, Action,
+        Builder, EventListener, ScriptEventListener, ShapeEventListener,
     };
 
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles><office:marker>preserve-me</office:marker></office:styles></office:document-styles>"#;
@@ -1411,7 +1411,7 @@ mod tests {
             legacy_animation: None,
             shapes: Vec::new(),
         };
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         builder.add_slide_element(slide).unwrap();
         let built = builder.build().unwrap();
         let presentation = Presentation::from_bytes(built).unwrap();
@@ -1459,7 +1459,7 @@ mod tests {
     fn mutable_presentation_preserves_and_adds_embedded_media() {
         const ORIGINAL: &[u8] = b"original-video";
         const ADDED: &[u8] = b"added-audio";
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         let original = builder
             .embed_media("Media/original.mp4", ORIGINAL, "video/mp4")
             .unwrap();
@@ -1546,7 +1546,7 @@ mod tests {
         ));
         root.add_child(show).unwrap();
 
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_slide_element(Slide {
                 title: None,
@@ -1588,12 +1588,12 @@ mod tests {
             ))
             .unwrap();
         shape
-            .add_event_listener(ShapeEventListener::Presentation(Box::new(
-                PresentationEventListener::new("dom:click", PresentationAction::NextPage).unwrap(),
+            .add_event_listener(ShapeEventListener::Action(Box::new(
+                EventListener::new("dom:click", Action::NextPage).unwrap(),
             )))
             .unwrap();
 
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_slide_element(Slide {
                 title: None,
@@ -1643,4 +1643,3 @@ mod tests {
         assert_eq!(frame.image_href(), Some("Pictures/fallback.png"));
     }
 }
-

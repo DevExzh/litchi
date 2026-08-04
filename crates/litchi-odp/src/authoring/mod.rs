@@ -1,3 +1,3 @@
-mod builder;
+pub mod builder;
 
-pub use builder::PresentationBuilder;
+pub use builder::Builder;

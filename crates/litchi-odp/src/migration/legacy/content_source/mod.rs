@@ -1,6 +1,6 @@
 //! Verbatim retention of a presentation's original `content.xml` skeleton.
 //!
-//! [`MutablePresentation`](crate::odp::MutablePresentation) models only the
+//! [`MutablePresentation`](crate::MutablePresentation) models only the
 //! subset of ODF drawing content it understands. Regenerating `content.xml`
 //! purely from that model discards every construct outside the model — nested
 //! `table:table` shapes, `draw:image` text alternatives, custom shape trees,
@@ -123,7 +123,7 @@ enum AutomaticStylesSite {
 /// All accessors borrow from the retained source text, so re-emitting an
 /// untouched slide costs no allocation beyond the output buffer.
 #[derive(Debug, Clone)]
-pub(super) struct PresentationContentSource {
+pub(super) struct ContentSource {
     /// Complete original `content.xml` text.
     xml: String,
     /// Everything before the `office:document-content` start tag.
@@ -154,7 +154,7 @@ pub(super) struct PresentationContentSource {
     has_byte_order_mark: bool,
 }
 
-impl PresentationContentSource {
+impl ContentSource {
     /// Split a presentation `content.xml` into verbatim fragments.
     ///
     /// Returns `Ok(None)` when the stream does not have the expected
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn retains_pages_prologue_and_style_names() {
-        let source = PresentationContentSource::parse(CONTENT)
+        let source = ContentSource::parse(CONTENT)
             .unwrap()
             .expect("presentation skeleton");
         assert_eq!(source.page_count(), 1);
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn splices_generated_styles_into_existing_container() {
-        let source = PresentationContentSource::parse(CONTENT)
+        let source = ContentSource::parse(CONTENT)
             .unwrap()
             .expect("presentation skeleton");
         let mut output = String::new();
@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn creates_container_when_absent() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let mut output = String::new();
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn expands_self_closing_container() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:automatic-styles/><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let mut output = String::new();
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn appends_missing_namespace_bindings() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let tag = source.root_start_tag("", true).unwrap();
@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn rejects_conflicting_prefix_binding() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:example:not-drawing"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let error = source.root_start_tag("", true).unwrap_err().to_string();
@@ -438,13 +438,13 @@ mod tests {
     #[test]
     fn rejects_non_presentation_root() {
         let xml = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#;
-        assert!(PresentationContentSource::parse(xml).is_err());
+        assert!(ContentSource::parse(xml).is_err());
     }
 
     #[test]
     fn reports_unmodelled_presentation_children() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><office:body><office:presentation><draw:custom draw:name="x"/><draw:page/><presentation:settings/><draw:other/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let mut leading = String::new();

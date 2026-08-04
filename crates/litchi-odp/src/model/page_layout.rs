@@ -23,7 +23,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 /// Standard placeholder role from the ODF `presentation-classes` vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum PresentationPlaceholderClass {
+pub enum PlaceholderClass {
     Title,
     Outline,
     Subtitle,
@@ -42,7 +42,7 @@ pub enum PresentationPlaceholderClass {
     PageNumber,
 }
 
-impl PresentationPlaceholderClass {
+impl PlaceholderClass {
     fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "title" => Self::Title,
@@ -94,7 +94,7 @@ impl PresentationPlaceholderClass {
 /// Unit accepted by ODF presentation placeholder coordinates and extents.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum PresentationMeasureUnit {
+pub enum Unit {
     Centimeter,
     Millimeter,
     Inch,
@@ -104,7 +104,7 @@ pub enum PresentationMeasureUnit {
     Percent,
 }
 
-impl PresentationMeasureUnit {
+impl Unit {
     const fn suffix(self) -> &'static str {
         match self {
             Self::Centimeter => "cm",
@@ -120,13 +120,13 @@ impl PresentationMeasureUnit {
 
 /// A finite ODF length or percentage with a typed unit.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PresentationMeasure {
+pub struct Measure {
     value: f64,
-    unit: PresentationMeasureUnit,
+    unit: Unit,
 }
 
-impl PresentationMeasure {
-    pub fn new(value: f64, unit: PresentationMeasureUnit) -> Result<Self> {
+impl Measure {
+    pub fn new(value: f64, unit: Unit) -> Result<Self> {
         if !value.is_finite() {
             return invalid("presentation measure must be finite");
         }
@@ -137,26 +137,26 @@ impl PresentationMeasure {
         self.value
     }
 
-    pub const fn unit(self) -> PresentationMeasureUnit {
+    pub const fn unit(self) -> Unit {
         self.unit
     }
 }
 
-impl FromStr for PresentationMeasure {
+impl FromStr for Measure {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         let (number, unit) = if let Some(number) = value.strip_suffix('%') {
-            (number, PresentationMeasureUnit::Percent)
+            (number, Unit::Percent)
         } else if value.len() >= 2 {
             let (number, suffix) = value.split_at(value.len() - 2);
             let unit = match suffix {
-                "cm" => PresentationMeasureUnit::Centimeter,
-                "mm" => PresentationMeasureUnit::Millimeter,
-                "in" => PresentationMeasureUnit::Inch,
-                "pt" => PresentationMeasureUnit::Point,
-                "pc" => PresentationMeasureUnit::Pica,
-                "px" => PresentationMeasureUnit::Pixel,
+                "cm" => Unit::Centimeter,
+                "mm" => Unit::Millimeter,
+                "in" => Unit::Inch,
+                "pt" => Unit::Point,
+                "pc" => Unit::Pica,
+                "px" => Unit::Pixel,
                 _ => return invalid(format!("invalid presentation measure '{value}'")),
             };
             (number, unit)
@@ -171,7 +171,7 @@ impl FromStr for PresentationMeasure {
     }
 }
 
-impl fmt::Display for PresentationMeasure {
+impl fmt::Display for Measure {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = if self.value == 0.0 { 0.0 } else { self.value };
         write!(formatter, "{}{}", value, self.unit.suffix())
@@ -180,21 +180,21 @@ impl fmt::Display for PresentationMeasure {
 
 /// One required placeholder rectangle in a named presentation page layout.
 #[derive(Clone, Debug, PartialEq)]
-pub struct PresentationPlaceholder {
-    pub class: PresentationPlaceholderClass,
-    pub x: PresentationMeasure,
-    pub y: PresentationMeasure,
-    pub width: PresentationMeasure,
-    pub height: PresentationMeasure,
+pub struct Placeholder {
+    pub class: PlaceholderClass,
+    pub x: Measure,
+    pub y: Measure,
+    pub width: Measure,
+    pub height: Measure,
 }
 
-impl PresentationPlaceholder {
+impl Placeholder {
     pub fn new(
-        class: PresentationPlaceholderClass,
-        x: PresentationMeasure,
-        y: PresentationMeasure,
-        width: PresentationMeasure,
-        height: PresentationMeasure,
+        class: PlaceholderClass,
+        x: Measure,
+        y: Measure,
+        width: Measure,
+        height: Measure,
     ) -> Self {
         Self {
             class,
@@ -208,13 +208,13 @@ impl PresentationPlaceholder {
 
 /// A named custom presentation layout and its ordered placeholders.
 #[derive(Clone, Debug, PartialEq)]
-pub struct PresentationPageLayout {
+pub struct PageLayout {
     pub name: String,
     pub display_name: Option<String>,
-    pub placeholders: Vec<PresentationPlaceholder>,
+    pub placeholders: Vec<Placeholder>,
 }
 
-impl PresentationPageLayout {
+impl PageLayout {
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -248,12 +248,12 @@ impl PresentationPageLayout {
 
 /// Ordered presentation page-layout definitions from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct PresentationPageLayouts {
-    pub layouts: Vec<PresentationPageLayout>,
+pub struct Layouts {
+    pub layouts: Vec<PageLayout>,
 }
 
-impl PresentationPageLayouts {
-    pub fn get(&self, name: &str) -> Option<&PresentationPageLayout> {
+impl Layouts {
+    pub fn get(&self, name: &str) -> Option<&PageLayout> {
         self.layouts.iter().find(|layout| layout.name == name)
     }
 
@@ -309,7 +309,7 @@ struct Frame {
 
 struct ActiveLayout {
     depth: usize,
-    value: PresentationPageLayout,
+    value: PageLayout,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -325,9 +325,9 @@ enum NamespaceKind {
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse page-layout definitions from an ODF styles or flat-document XML part.
-pub fn parse_presentation_page_layouts(xml: &str) -> Result<PresentationPageLayouts> {
+pub fn parse(xml: &str) -> Result<Layouts> {
     if !xml.contains("presentation-page-layout") {
-        return Ok(PresentationPageLayouts::default());
+        return Ok(Layouts::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("presentation page-layout XML exceeds 64 MiB");
@@ -338,7 +338,7 @@ pub fn parse_presentation_page_layouts(xml: &str) -> Result<PresentationPageLayo
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveLayout> = None;
-    let mut layouts = PresentationPageLayouts::default();
+    let mut layouts = Layouts::default();
 
     loop {
         let (resolved, event) = reader
@@ -459,15 +459,12 @@ fn ensure_location(stack: &[Frame]) -> Result<()> {
     Ok(())
 }
 
-fn parse_layout(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<PresentationPageLayout> {
+fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<PageLayout> {
     let mut attributes = attributes(reader, element)?;
     let name = take_required(&mut attributes, NamespaceKind::Style, "name", "style:name")?;
     let display_name = attributes.remove(&(NamespaceKind::Style, "display-name".to_string()));
     reject_attributes(&attributes, "style:presentation-page-layout")?;
-    let value = PresentationPageLayout {
+    let value = PageLayout {
         name,
         display_name,
         placeholders: Vec::new(),
@@ -476,12 +473,9 @@ fn parse_layout(
     Ok(value)
 }
 
-fn parse_placeholder(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<PresentationPlaceholder> {
+fn parse_placeholder(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Placeholder> {
     let mut attributes = attributes(reader, element)?;
-    let class = PresentationPlaceholderClass::parse(&take_required(
+    let class = PlaceholderClass::parse(&take_required(
         &mut attributes,
         NamespaceKind::Presentation,
         "object",
@@ -492,14 +486,10 @@ fn parse_placeholder(
     let width = take_measure(&mut attributes, "width", "svg:width")?;
     let height = take_measure(&mut attributes, "height", "svg:height")?;
     reject_attributes(&attributes, "presentation:placeholder")?;
-    Ok(PresentationPlaceholder::new(class, x, y, width, height))
+    Ok(Placeholder::new(class, x, y, width, height))
 }
 
-fn take_measure(
-    attributes: &mut Attributes,
-    local: &str,
-    context: &str,
-) -> Result<PresentationMeasure> {
+fn take_measure(attributes: &mut Attributes, local: &str, context: &str) -> Result<Measure> {
     take_required(attributes, NamespaceKind::Svg, local, context)?.parse()
 }
 
@@ -593,7 +583,7 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
 }
 
 fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
-    parse_presentation_page_layouts(xml)?;
+    parse(xml)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -691,10 +681,7 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
 }
 
 /// Insert or replace one page-layout definition while preserving unrelated XML bytes.
-pub fn set_presentation_page_layout_xml(
-    xml: &str,
-    layout: &PresentationPageLayout,
-) -> Result<String> {
+pub fn set_xml(xml: &str, layout: &PageLayout) -> Result<String> {
     layout.validate()?;
     let (target, styles_site) = mutation_sites(xml, &layout.name)?;
     let fragment = layout.to_xml_fragment()?;
@@ -728,7 +715,7 @@ pub fn set_presentation_page_layout_xml(
 }
 
 /// Remove one page-layout definition while preserving unrelated XML bytes.
-pub fn remove_presentation_page_layout_xml(xml: &str, name: &str) -> Result<String> {
+pub fn remove_xml(xml: &str, name: &str) -> Result<String> {
     validate_ncname(name, "presentation page-layout name")?;
     let (target, _) = mutation_sites(xml, name)?;
     let Some(span) = target else {
@@ -737,7 +724,7 @@ pub fn remove_presentation_page_layout_xml(xml: &str, name: &str) -> Result<Stri
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-fn write_layout(output: &mut String, layout: &PresentationPageLayout, standalone: bool) {
+fn write_layout(output: &mut String, layout: &PageLayout, standalone: bool) {
     output.push_str("<style:presentation-page-layout");
     if standalone {
         output.push_str(
@@ -865,23 +852,17 @@ mod tests {
         let xml = format!(
             r#"{PREFIX}<style:presentation-page-layout style:name="TitleBody" style:display-name="Title &amp; body"><presentation:placeholder presentation:object="title" svg:x="5%" svg:y="1.25cm" svg:width="90%" svg:height="3cm"/><presentation:placeholder presentation:object="outline" svg:x="2cm" svg:y="-0.5cm" svg:width="20cm" svg:height="12cm"/></style:presentation-page-layout>{SUFFIX}"#
         );
-        let layouts = parse_presentation_page_layouts(&xml).unwrap();
+        let layouts = parse(&xml).unwrap();
         assert_eq!(layouts.layouts.len(), 1);
         assert_eq!(
             layouts.layouts[0].display_name.as_deref(),
             Some("Title & body")
         );
-        assert_eq!(
-            layouts.layouts[0].placeholders[0].x.unit(),
-            PresentationMeasureUnit::Percent
-        );
+        assert_eq!(layouts.layouts[0].placeholders[0].x.unit(), Unit::Percent);
         assert_eq!(layouts.layouts[0].placeholders[1].y.value(), -0.5);
 
         let serialized = layouts.to_xml().unwrap();
-        assert_eq!(
-            parse_presentation_page_layouts(&serialized).unwrap(),
-            layouts
-        );
+        assert_eq!(parse(&serialized).unwrap(), layouts);
     }
 
     #[test]
@@ -894,13 +875,10 @@ mod tests {
             r#"<style:presentation-page-layout style:name="x"/><style:presentation-page-layout style:name="x"/>"#,
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
-            assert!(
-                parse_presentation_page_layouts(&xml).is_err(),
-                "accepted {body}"
-            );
+            assert!(parse(&xml).is_err(), "accepted {body}");
         }
         let misplaced = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:automatic-styles><style:presentation-page-layout style:name="x"/></office:automatic-styles></office:document-styles>"#.to_string();
-        assert!(parse_presentation_page_layouts(&misplaced).is_err());
+        assert!(parse(&misplaced).is_err());
     }
 
     #[test]
@@ -910,42 +888,36 @@ mod tests {
         let Ok(xml) = std::fs::read_to_string(path) else {
             return;
         };
-        let layouts = parse_presentation_page_layouts(&xml).unwrap();
+        let layouts = parse(&xml).unwrap();
         assert_eq!(layouts.layouts.len(), 2);
         assert_eq!(layouts.layouts[0].placeholders.len(), 6);
         assert_eq!(layouts.layouts[1].placeholders.len(), 2);
-        assert_eq!(
-            parse_presentation_page_layouts(&layouts.to_xml().unwrap())
-                .unwrap()
-                .layouts
-                .len(),
-            2
-        );
+        assert_eq!(parse(&layouts.to_xml().unwrap()).unwrap().layouts.len(), 2);
     }
 
     #[test]
     fn exhausts_classes_and_geometry_lexicals() {
         let classes = [
-            PresentationPlaceholderClass::Title,
-            PresentationPlaceholderClass::Outline,
-            PresentationPlaceholderClass::Subtitle,
-            PresentationPlaceholderClass::Text,
-            PresentationPlaceholderClass::Graphic,
-            PresentationPlaceholderClass::Object,
-            PresentationPlaceholderClass::Chart,
-            PresentationPlaceholderClass::Table,
-            PresentationPlaceholderClass::OrganizationChart,
-            PresentationPlaceholderClass::Page,
-            PresentationPlaceholderClass::Notes,
-            PresentationPlaceholderClass::Handout,
-            PresentationPlaceholderClass::Header,
-            PresentationPlaceholderClass::Footer,
-            PresentationPlaceholderClass::DateTime,
-            PresentationPlaceholderClass::PageNumber,
+            PlaceholderClass::Title,
+            PlaceholderClass::Outline,
+            PlaceholderClass::Subtitle,
+            PlaceholderClass::Text,
+            PlaceholderClass::Graphic,
+            PlaceholderClass::Object,
+            PlaceholderClass::Chart,
+            PlaceholderClass::Table,
+            PlaceholderClass::OrganizationChart,
+            PlaceholderClass::Page,
+            PlaceholderClass::Notes,
+            PlaceholderClass::Handout,
+            PlaceholderClass::Header,
+            PlaceholderClass::Footer,
+            PlaceholderClass::DateTime,
+            PlaceholderClass::PageNumber,
         ];
-        let mut layout = PresentationPageLayout::new("_all.classes").unwrap();
+        let mut layout = PageLayout::new("_all.classes").unwrap();
         for class in classes {
-            layout.placeholders.push(PresentationPlaceholder::new(
+            layout.placeholders.push(Placeholder::new(
                 class,
                 "-.5cm".parse().unwrap(),
                 "1.cm".parse().unwrap(),
@@ -953,7 +925,7 @@ mod tests {
                 "-2px".parse().unwrap(),
             ));
         }
-        let parsed = parse_presentation_page_layouts(&format!(
+        let parsed = parse(&format!(
             "{PREFIX}{}{SUFFIX}",
             layout.to_xml_fragment().unwrap()
         ))
@@ -961,37 +933,28 @@ mod tests {
         assert_eq!(parsed.layouts[0].placeholders.len(), 16);
         assert_eq!(
             parsed.layouts[0].placeholders[15].class,
-            PresentationPlaceholderClass::PageNumber
+            PlaceholderClass::PageNumber
         );
         for value in [".5cm", "1.cm", "-.5%", "-0px", "01.00pt"] {
-            assert!(
-                value.parse::<PresentationMeasure>().is_ok(),
-                "rejected {value}"
-            );
+            assert!(value.parse::<Measure>().is_ok(), "rejected {value}");
         }
         for value in [".", ".cm", "+1cm", "1e2cm", "1 cm", "NaNcm"] {
-            assert!(
-                value.parse::<PresentationMeasure>().is_err(),
-                "accepted {value}"
-            );
+            assert!(value.parse::<Measure>().is_err(), "accepted {value}");
         }
     }
 
     #[test]
     fn rejects_identity_duplicates_and_caps() {
         for name in ["", "1layout", "bad:name", "two words"] {
-            assert!(
-                PresentationPageLayout::new(name).is_err(),
-                "accepted {name}"
-            );
+            assert!(PageLayout::new(name).is_err(), "accepted {name}");
         }
         let aliased_duplicate = format!(
             r#"{PREFIX}<style:presentation-page-layout xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="a" s:name="b"/>{SUFFIX}"#
         );
-        assert!(parse_presentation_page_layouts(&aliased_duplicate).is_err());
-        let mut capped = PresentationPageLayout::new("cap").unwrap();
-        let placeholder = PresentationPlaceholder::new(
-            PresentationPlaceholderClass::Text,
+        assert!(parse(&aliased_duplicate).is_err());
+        let mut capped = PageLayout::new("cap").unwrap();
+        let placeholder = Placeholder::new(
+            PlaceholderClass::Text,
             "0cm".parse().unwrap(),
             "0cm".parse().unwrap(),
             "1cm".parse().unwrap(),
@@ -999,38 +962,32 @@ mod tests {
         );
         capped.placeholders = vec![placeholder; MAX_PLACEHOLDERS + 1];
         assert!(capped.validate().is_err());
-        assert!(PresentationPageLayout::new("x".repeat(MAX_VALUE_BYTES + 1)).is_err());
+        assert!(PageLayout::new("x".repeat(MAX_VALUE_BYTES + 1)).is_err());
     }
 
     #[test]
     fn losslessly_inserts_replaces_and_removes() {
         let original = format!(r#"{PREFIX}<!--keep--><style:style style:name="other"/>{SUFFIX}"#);
-        let mut layout = PresentationPageLayout::new("layout1").unwrap();
+        let mut layout = PageLayout::new("layout1").unwrap();
         layout.display_name = Some("First".to_string());
-        let inserted = set_presentation_page_layout_xml(&original, &layout).unwrap();
+        let inserted = set_xml(&original, &layout).unwrap();
         assert!(inserted.contains(
             "<!--keep--><style:style style:name=\"other\"/><style:presentation-page-layout"
         ));
         layout.display_name = Some("Replacement".to_string());
-        let replaced = set_presentation_page_layout_xml(&inserted, &layout).unwrap();
+        let replaced = set_xml(&inserted, &layout).unwrap();
         assert!(replaced.contains("style:display-name=\"Replacement\""));
         assert!(!replaced.contains("style:display-name=\"First\""));
-        assert_eq!(
-            remove_presentation_page_layout_xml(&replaced, "layout1").unwrap(),
-            original
-        );
-        assert_eq!(
-            remove_presentation_page_layout_xml(&original, "missing").unwrap(),
-            original
-        );
+        assert_eq!(remove_xml(&replaced, "layout1").unwrap(), original);
+        assert_eq!(remove_xml(&original, "missing").unwrap(), original);
     }
 
     #[test]
     fn builder_writes_page_layouts() {
-        let mut builder = crate::PresentationBuilder::new();
-        let mut layout = PresentationPageLayout::new("builder_layout").unwrap();
-        layout.placeholders.push(PresentationPlaceholder::new(
-            PresentationPlaceholderClass::Title,
+        let mut builder = crate::Builder::new();
+        let mut layout = PageLayout::new("builder_layout").unwrap();
+        layout.placeholders.push(Placeholder::new(
+            PlaceholderClass::Title,
             "1cm".parse().unwrap(),
             "2cm".parse().unwrap(),
             "20cm".parse().unwrap(),

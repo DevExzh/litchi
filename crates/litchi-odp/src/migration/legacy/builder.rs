@@ -3,13 +3,13 @@
 //! This module provides a builder pattern for creating new ODP presentations from scratch.
 
 use crate::core::{OdfStructure, PackageWriter};
-use crate::odp::MediaReference;
-use crate::odp::Slide;
-use crate::odp::action::write_event_listeners;
-use crate::odp::animation::validate_animation_roots;
-use crate::odp::legacy_animation::validate_legacy_animation_root;
-use crate::odp::media::{EmbeddedMedia, embed_media};
-use crate::odp::slide::validate_z_index;
+use crate::MediaReference;
+use crate::Slide;
+use crate::model::action::write_event_listeners;
+use crate::model::animation::validate_animation_roots;
+use crate::model::legacy_animation::validate_legacy_animation_root;
+use crate::model::media::{EmbeddedMedia, embed_media};
+use crate::model::slide::validate_z_index;
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -22,24 +22,24 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi_odf::PresentationBuilder;
+/// use litchi_odp::Builder;
 ///
 /// # fn main() -> litchi_core::Result<()> {
-/// let mut builder = PresentationBuilder::new();
+/// let mut builder = Builder::new();
 /// builder.add_slide_with_title("Welcome", "This is my presentation")?;
 /// builder.add_slide_with_title("Slide 2", "More content here")?;
 /// builder.save("presentation.odp")?;
 /// # Ok(())
 /// # }
 /// ```
-pub struct PresentationBuilder {
+pub struct Builder {
     slides: Vec<Slide>,
     metadata: Metadata,
     media_files: BTreeMap<String, EmbeddedMedia>,
-    settings: Option<crate::odp::PresentationSettings>,
-    declarations: Option<crate::odp::PresentationDeclarations>,
-    page_metadata: Option<crate::odp::PresentationPageMetadataCollection>,
-    page_layouts: crate::odp::PresentationPageLayouts,
+    settings: Option<crate::Settings>,
+    declarations: Option<crate::Declarations>,
+    page_metadata: Option<crate::PageMetadataCollection>,
+    page_layouts: crate::Layouts,
 }
 
 fn encode_text_content(text: &str) -> String {
@@ -114,7 +114,7 @@ fn push_optional_attribute(output: &mut String, name: &str, value: Option<&str>)
 
 fn push_drawing_attributes(
     output: &mut String,
-    attributes: &[crate::odp::DrawingAttribute],
+    attributes: &[crate::DrawingAttribute],
 ) -> Result<()> {
     let mut names = BTreeSet::new();
     for attribute in attributes {
@@ -134,10 +134,10 @@ fn push_drawing_attributes(
 }
 
 fn validate_drawing_shape_parent(
-    kind: crate::odp::DrawingShapeKind,
-    parent: Option<crate::odp::DrawingShapeKind>,
+    kind: crate::DrawingShapeKind,
+    parent: Option<crate::DrawingShapeKind>,
 ) -> Result<()> {
-    use crate::odp::DrawingShapeKind;
+    use crate::DrawingShapeKind;
 
     match parent {
         None if kind.is_three_dimensional() && kind != DrawingShapeKind::ThreeDimensionalScene => {
@@ -165,8 +165,8 @@ fn validate_drawing_shape_parent(
     }
 }
 
-fn validate_three_dimensional_child_order(children: &[crate::odp::Shape]) -> Result<()> {
-    use crate::odp::DrawingShapeKind;
+fn validate_three_dimensional_child_order(children: &[crate::Shape]) -> Result<()> {
+    use crate::DrawingShapeKind;
 
     let mut object_seen = false;
     for child in children {
@@ -189,10 +189,10 @@ fn validate_three_dimensional_child_order(children: &[crate::odp::Shape]) -> Res
 }
 
 fn validate_required_three_dimensional_attributes(
-    kind: crate::odp::DrawingShapeKind,
-    attributes: &[crate::odp::DrawingAttribute],
+    kind: crate::DrawingShapeKind,
+    attributes: &[crate::DrawingAttribute],
 ) -> Result<()> {
-    use crate::odp::{DrawingAttributeNamespace, DrawingShapeKind};
+    use crate::{DrawingAttributeNamespace, DrawingShapeKind};
 
     let has = |namespace, local_name| {
         attributes.iter().any(|attribute| {
@@ -328,14 +328,14 @@ pub(super) fn push_transition_style(target: &mut String, slide: &Slide, index: u
     target.push_str(&output);
 }
 
-impl Default for PresentationBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl PresentationBuilder {
-    fn generate_enhanced_geometry_xml(geometry: &crate::odp::EnhancedGeometry) -> Result<String> {
+impl Builder {
+    fn generate_enhanced_geometry_xml(geometry: &crate::EnhancedGeometry) -> Result<String> {
         if geometry.children.len() > 65_536 {
             return Err(litchi_core::Error::InvalidFormat(
                 "enhanced geometry exceeds 65536 equations and handles".to_string(),
@@ -350,16 +350,16 @@ impl PresentationBuilder {
         output.push('>');
         let mut handle_seen = false;
         for child in &geometry.children {
-            if child.kind == crate::odp::EnhancedGeometryChildKind::Equation && handle_seen {
+            if child.kind == crate::EnhancedGeometryChildKind::Equation && handle_seen {
                 return Err(litchi_core::Error::InvalidFormat(
                     "draw:equation cannot follow draw:handle".to_string(),
                 ));
             }
-            if child.kind == crate::odp::EnhancedGeometryChildKind::Handle {
+            if child.kind == crate::EnhancedGeometryChildKind::Handle {
                 handle_seen = true;
             }
             if child.attributes.iter().any(|attribute| {
-                attribute.namespace != crate::odp::DrawingAttributeNamespace::Drawing
+                attribute.namespace != crate::DrawingAttributeNamespace::Drawing
             }) {
                 return Err(litchi_core::Error::InvalidFormat(format!(
                     "{} attributes must use the drawing namespace",
@@ -380,9 +380,9 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::PresentationBuilder;
+    /// use litchi_odp::Builder;
     ///
-    /// let builder = PresentationBuilder::new();
+    /// let builder = Builder::new();
     /// ```
     pub fn new() -> Self {
         Self {
@@ -392,19 +392,19 @@ impl PresentationBuilder {
             settings: None,
             declarations: None,
             page_metadata: None,
-            page_layouts: crate::odp::PresentationPageLayouts::default(),
+            page_layouts: crate::Layouts::default(),
         }
     }
 
     /// Return validated page-layout definitions that will be written to `styles.xml`.
-    pub fn page_layouts(&self) -> &crate::odp::PresentationPageLayouts {
+    pub fn page_layouts(&self) -> &crate::Layouts {
         &self.page_layouts
     }
 
     /// Replace all custom page-layout definitions written by this builder.
     pub fn set_page_layouts(
         &mut self,
-        layouts: crate::odp::PresentationPageLayouts,
+        layouts: crate::Layouts,
     ) -> Result<&mut Self> {
         layouts.validate()?;
         self.page_layouts = layouts;
@@ -414,7 +414,7 @@ impl PresentationBuilder {
     /// Add one custom page layout without changing existing builder behavior.
     pub fn add_page_layout(
         &mut self,
-        layout: crate::odp::PresentationPageLayout,
+        layout: crate::PageLayout,
     ) -> Result<&mut Self> {
         let mut layouts = self.page_layouts.clone();
         layouts.layouts.push(layout);
@@ -424,14 +424,14 @@ impl PresentationBuilder {
     }
 
     /// Return the inert slide-show settings.
-    pub fn settings(&self) -> Option<&crate::odp::PresentationSettings> {
+    pub fn settings(&self) -> Option<&crate::Settings> {
         self.settings.as_ref()
     }
 
     /// Set or clear validated slide-show settings without executing them.
     pub fn set_settings(
         &mut self,
-        settings: Option<crate::odp::PresentationSettings>,
+        settings: Option<crate::Settings>,
     ) -> Result<&mut Self> {
         if let Some(settings) = &settings {
             settings.validate()?;
@@ -441,14 +441,14 @@ impl PresentationBuilder {
     }
 
     /// Return inert presentation declarations and page bindings.
-    pub fn declarations(&self) -> Option<&crate::odp::PresentationDeclarations> {
+    pub fn declarations(&self) -> Option<&crate::Declarations> {
         self.declarations.as_ref()
     }
 
     /// Set or clear validated presentation declarations and page bindings.
     pub fn set_declarations(
         &mut self,
-        declarations: Option<crate::odp::PresentationDeclarations>,
+        declarations: Option<crate::Declarations>,
     ) -> Result<&mut Self> {
         if let Some(declarations) = &declarations {
             declarations.validate()?;
@@ -458,14 +458,14 @@ impl PresentationBuilder {
     }
 
     /// Return static page names, IDs, and layout/master references.
-    pub fn page_metadata(&self) -> Option<&crate::odp::PresentationPageMetadataCollection> {
+    pub fn page_metadata(&self) -> Option<&crate::PageMetadataCollection> {
         self.page_metadata.as_ref()
     }
 
     /// Set or clear validated static page metadata.
     pub fn set_page_metadata(
         &mut self,
-        metadata: Option<crate::odp::PresentationPageMetadataCollection>,
+        metadata: Option<crate::PageMetadataCollection>,
     ) -> Result<&mut Self> {
         if let Some(metadata) = &metadata {
             metadata.validate()?;
@@ -506,10 +506,10 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::PresentationBuilder;
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = PresentationBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_slide_with_title("Introduction", "Welcome to our presentation")?;
     /// # Ok(())
     /// # }
@@ -538,10 +538,10 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::PresentationBuilder;
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = PresentationBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_slide("Simple slide content")?;
     /// # Ok(())
     /// # }
@@ -570,10 +570,10 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::{PresentationBuilder, Slide, Shape};
+    /// use litchi_odp::{Builder, Slide, Shape};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = PresentationBuilder::new();
+    /// let mut builder = Builder::new();
     /// let slide = Slide {
     ///     title: Some("Custom Slide".to_string()),
     ///     text: "Custom content".to_string(),
@@ -595,19 +595,19 @@ impl PresentationBuilder {
     }
 
     /// Generate XML for a shape
-    pub(crate) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> Result<String> {
+    pub(crate) fn generate_shape_xml(shape: &crate::Shape, idx: usize) -> Result<String> {
         let mut node_count = 0usize;
         Self::generate_shape_xml_at_depth(shape, idx, 0, None, &mut node_count)
     }
 
     fn generate_shape_xml_at_depth(
-        shape: &crate::odp::Shape,
+        shape: &crate::Shape,
         idx: usize,
         depth: usize,
-        parent_kind: Option<crate::odp::DrawingShapeKind>,
+        parent_kind: Option<crate::DrawingShapeKind>,
         node_count: &mut usize,
     ) -> Result<String> {
-        use crate::odp::DrawingShapeKind;
+        use crate::DrawingShapeKind;
         use litchi_core::ShapeType;
 
         if depth > 64 {
@@ -708,16 +708,16 @@ impl PresentationBuilder {
         let mut drawing_attribute_names = BTreeSet::new();
         for attribute in &shape.drawing_attributes {
             let modeled = match attribute.namespace {
-                crate::odp::DrawingAttributeNamespace::Drawing => matches!(
+                crate::DrawingAttributeNamespace::Drawing => matches!(
                     attribute.local_name.as_str(),
                     "name" | "style-name" | "layer" | "z-index" | "transform"
                 ),
-                crate::odp::DrawingAttributeNamespace::Svg => matches!(
+                crate::DrawingAttributeNamespace::Svg => matches!(
                     attribute.local_name.as_str(),
                     "x" | "y" | "width" | "height" | "x1" | "y1" | "x2" | "y2"
                 ),
-                crate::odp::DrawingAttributeNamespace::Dr3d
-                | crate::odp::DrawingAttributeNamespace::Table => false,
+                crate::DrawingAttributeNamespace::Dr3d
+                | crate::DrawingAttributeNamespace::Table => false,
             };
             if modeled {
                 return Err(litchi_core::Error::InvalidFormat(format!(
@@ -1051,7 +1051,7 @@ impl PresentationBuilder {
             self.page_metadata.as_ref(),
             self.slides.len(),
         )?;
-        super::settings::validate_presentation_page_references(
+        super::settings::validate_page_references(
             self.settings.as_ref(),
             &page_names,
         )?;
@@ -1069,7 +1069,7 @@ impl PresentationBuilder {
             let declaration_attributes = super::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::odp::PresentationDeclarationTarget::Slide,
+                crate::DeclarationTarget::Slide,
             );
             body.push_str("<draw:page");
             body.push_str(&page_attributes);
@@ -1113,7 +1113,7 @@ impl PresentationBuilder {
             let notes_attributes = super::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::odp::PresentationDeclarationTarget::Notes,
+                crate::DeclarationTarget::Notes,
             );
             body.push_str(&super::declaration::apply_notes_binding(
                 Self::generate_notes_xml(slide.notes.as_deref()),
@@ -1123,7 +1123,7 @@ impl PresentationBuilder {
             body.push_str("</draw:page>");
         }
 
-        body.push_str(&super::settings::write_presentation_settings(
+        body.push_str(&super::settings::write(
             self.settings.as_ref(),
         )?);
 
@@ -1199,10 +1199,10 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::PresentationBuilder;
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = PresentationBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_slide("Slide content")?;
     /// let bytes = builder.build()?;
     /// # Ok(())
@@ -1221,7 +1221,7 @@ impl PresentationBuilder {
         // Add styles.xml
         let mut styles_xml = OdfStructure::default_styles_xml();
         for layout in &self.page_layouts.layouts {
-            styles_xml = crate::odp::set_presentation_page_layout_xml(&styles_xml, layout)?;
+            styles_xml = crate::set_page_layout_xml(&styles_xml, layout)?;
         }
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 
@@ -1246,10 +1246,10 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::PresentationBuilder;
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = PresentationBuilder::new();
+    /// let mut builder = Builder::new();
     /// builder.add_slide("Slide content")?;
     /// builder.save("output.odp")?;
     /// # Ok(())
@@ -1266,9 +1266,9 @@ impl PresentationBuilder {
 mod tests {
     use super::*;
     use crate::core::OwnedPackage;
-    use crate::odp::{
-        DrawingHyperlink, HyperlinkShow, MediaParameter, Presentation, PresentationAction,
-        PresentationEffect, PresentationEventListener, ScriptEventListener, Shape,
+    use crate::{
+        DrawingHyperlink, HyperlinkShow, MediaParameter, Presentation, Action,
+        Effect, EventListener, ScriptEventListener, Shape,
         ShapeEventListener, TransitionDirection, TransitionSound, TransitionSoundShow,
         TransitionSpeed, TransitionStyle, TransitionType,
     };
@@ -1279,13 +1279,13 @@ mod tests {
         let mut rectangle = Shape::new();
         rectangle.name = Some("Box & label".to_string());
         rectangle.text = "Visible <text>".to_string();
-        let rectangle_xml = PresentationBuilder::generate_shape_xml(&rectangle, 0).unwrap();
+        let rectangle_xml = Builder::generate_shape_xml(&rectangle, 0).unwrap();
         assert!(rectangle_xml.starts_with("<draw:rect"));
         assert!(rectangle_xml.contains("Visible &lt;text&gt;"));
 
         let mut connector = Shape::new();
         connector.shape_type = ShapeType::Connector;
-        let connector_xml = PresentationBuilder::generate_shape_xml(&connector, 1).unwrap();
+        let connector_xml = Builder::generate_shape_xml(&connector, 1).unwrap();
         assert!(connector_xml.starts_with("<draw:connector"));
     }
 
@@ -1293,64 +1293,64 @@ mod tests {
     fn writes_explicit_drawing_kinds_and_escaped_geometry_attributes() {
         let mut shape = Shape::new();
         shape.name = Some("Ellipse".to_string());
-        shape.drawing_kind = Some(crate::odp::DrawingShapeKind::Ellipse);
+        shape.drawing_kind = Some(crate::DrawingShapeKind::Ellipse);
         shape.drawing_attributes.push(
-            crate::odp::DrawingAttribute::new(
-                crate::odp::DrawingAttributeNamespace::Drawing,
+            crate::DrawingAttribute::new(
+                crate::DrawingAttributeNamespace::Drawing,
                 "kind",
                 "section & arc",
             )
             .unwrap(),
         );
         shape.drawing_attributes.push(
-            crate::odp::DrawingAttribute::new(
-                crate::odp::DrawingAttributeNamespace::Svg,
+            crate::DrawingAttribute::new(
+                crate::DrawingAttributeNamespace::Svg,
                 "rx",
                 "2cm",
             )
             .unwrap(),
         );
-        let xml = PresentationBuilder::generate_shape_xml(&shape, 0).unwrap();
+        let xml = Builder::generate_shape_xml(&shape, 0).unwrap();
         assert!(xml.starts_with("<draw:ellipse"));
         assert!(xml.contains(r#"draw:kind="section &amp; arc""#));
         assert!(xml.contains(r#"svg:rx="2cm""#));
         assert!(!xml.contains("svg:x="));
 
         shape.shape_type = ShapeType::Line;
-        assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
+        assert!(Builder::generate_shape_xml(&shape, 0).is_err());
 
         shape.shape_type = ShapeType::AutoShape;
         shape.drawing_attributes.push(
-            crate::odp::DrawingAttribute::new(
-                crate::odp::DrawingAttributeNamespace::Svg,
+            crate::DrawingAttribute::new(
+                crate::DrawingAttributeNamespace::Svg,
                 "rx",
                 "3cm",
             )
             .unwrap(),
         );
-        assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
+        assert!(Builder::generate_shape_xml(&shape, 0).is_err());
 
         let mut reserved = Shape::new();
         reserved.drawing_attributes.push(
-            crate::odp::DrawingAttribute::new(
-                crate::odp::DrawingAttributeNamespace::Drawing,
+            crate::DrawingAttribute::new(
+                crate::DrawingAttributeNamespace::Drawing,
                 "name",
                 "duplicate",
             )
             .unwrap(),
         );
-        assert!(PresentationBuilder::generate_shape_xml(&reserved, 0).is_err());
+        assert!(Builder::generate_shape_xml(&reserved, 0).is_err());
     }
 
     #[test]
     fn validates_three_dimensional_scene_hierarchy_and_light_order() {
-        use crate::odp::DrawingShapeKind;
+        use crate::DrawingShapeKind;
 
         let mut light = Shape::new();
         light.drawing_kind = Some(DrawingShapeKind::ThreeDimensionalLight);
         light.drawing_attributes.push(
-            crate::odp::DrawingAttribute::new(
-                crate::odp::DrawingAttributeNamespace::Dr3d,
+            crate::DrawingAttribute::new(
+                crate::DrawingAttributeNamespace::Dr3d,
                 "direction",
                 "(0 0 -1)",
             )
@@ -1363,7 +1363,7 @@ mod tests {
         scene.shape_type = ShapeType::Group;
         scene.drawing_kind = Some(DrawingShapeKind::ThreeDimensionalScene);
         scene.children = vec![light.clone(), cube.clone()];
-        let xml = PresentationBuilder::generate_shape_xml(&scene, 0).unwrap();
+        let xml = Builder::generate_shape_xml(&scene, 0).unwrap();
         assert!(xml.starts_with("<dr3d:scene"));
         assert!(xml.contains("<dr3d:light"));
         assert!(xml.contains("<dr3d:cube"));
@@ -1371,17 +1371,17 @@ mod tests {
         let mut missing_direction = Shape::new();
         missing_direction.drawing_kind = Some(DrawingShapeKind::ThreeDimensionalLight);
         scene.children = vec![missing_direction];
-        assert!(PresentationBuilder::generate_shape_xml(&scene, 0).is_err());
+        assert!(Builder::generate_shape_xml(&scene, 0).is_err());
 
         scene.children = vec![cube.clone(), light];
-        assert!(PresentationBuilder::generate_shape_xml(&scene, 0).is_err());
-        assert!(PresentationBuilder::generate_shape_xml(&cube, 0).is_err());
+        assert!(Builder::generate_shape_xml(&scene, 0).is_err());
+        assert!(Builder::generate_shape_xml(&cube, 0).is_err());
 
         let mut group = Shape::new();
         group.shape_type = ShapeType::Group;
         group.drawing_kind = Some(DrawingShapeKind::Group);
         group.children.push(cube);
-        assert!(PresentationBuilder::generate_shape_xml(&group, 0).is_err());
+        assert!(Builder::generate_shape_xml(&group, 0).is_err());
     }
 
     #[test]
@@ -1396,7 +1396,7 @@ mod tests {
         shape.presentation_placeholder = Some(true);
         shape.presentation_user_transformed = Some(false);
 
-        let xml = PresentationBuilder::generate_shape_xml(&shape, 0).unwrap();
+        let xml = Builder::generate_shape_xml(&shape, 0).unwrap();
         assert!(xml.contains(r#"draw:layer="foreground &amp; controls""#));
         assert!(xml.contains(r#"draw:z-index="184467440737095516160""#));
         assert!(xml.contains(r#"draw:transform="rotate (0.5)""#));
@@ -1411,7 +1411,7 @@ mod tests {
         assert!(shape.set_z_index(Some("-12".to_string())).is_err());
 
         shape.z_index = Some("not-an-integer".to_string());
-        assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
+        assert!(Builder::generate_shape_xml(&shape, 0).is_err());
     }
 
     #[test]
@@ -1423,7 +1423,7 @@ mod tests {
         ] {
             let mut shape = Shape::new();
             shape.shape_type = shape_type;
-            assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
+            assert!(Builder::generate_shape_xml(&shape, 0).is_err());
         }
     }
 
@@ -1435,32 +1435,32 @@ mod tests {
 
         let mut inner = Shape::new();
         inner.shape_type = ShapeType::Group;
-        inner.drawing_kind = Some(crate::odp::DrawingShapeKind::Group);
+        inner.drawing_kind = Some(crate::DrawingShapeKind::Group);
         inner.children.push(leaf.clone());
 
         let mut outer = Shape::new();
         outer.shape_type = ShapeType::Group;
-        outer.drawing_kind = Some(crate::odp::DrawingShapeKind::Group);
+        outer.drawing_kind = Some(crate::DrawingShapeKind::Group);
         outer.name = Some("Outer".to_string());
         outer.children.push(inner);
 
-        let xml = PresentationBuilder::generate_shape_xml(&outer, 0).unwrap();
+        let xml = Builder::generate_shape_xml(&outer, 0).unwrap();
         assert_eq!(xml.matches("<draw:g").count(), 2);
         assert!(xml.contains("<draw:rect"));
         assert!(xml.contains("Nested text"));
 
         leaf.children.push(Shape::new());
-        assert!(PresentationBuilder::generate_shape_xml(&leaf, 0).is_err());
+        assert!(Builder::generate_shape_xml(&leaf, 0).is_err());
 
         let mut too_deep = Shape::new();
         for _ in 0..66 {
             let mut parent = Shape::new();
             parent.shape_type = ShapeType::Group;
-            parent.drawing_kind = Some(crate::odp::DrawingShapeKind::Group);
+            parent.drawing_kind = Some(crate::DrawingShapeKind::Group);
             parent.children.push(too_deep);
             too_deep = parent;
         }
-        assert!(PresentationBuilder::generate_shape_xml(&too_deep, 0).is_err());
+        assert!(Builder::generate_shape_xml(&too_deep, 0).is_err());
     }
 
     #[test]
@@ -1473,7 +1473,7 @@ mod tests {
 
     #[test]
     fn transition_configuration_round_trips_through_a_package() {
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         builder.add_slide("Transition slide").unwrap();
         let transition = builder.slides[0].transition_mut();
         transition
@@ -1517,7 +1517,7 @@ mod tests {
     #[test]
     fn embeds_and_round_trips_inert_presentation_media() {
         const VIDEO: &[u8] = b"test-video-payload";
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         let mut media = builder
             .embed_media("Media/demo.mp4", VIDEO, "video/mp4")
             .unwrap();
@@ -1579,8 +1579,8 @@ mod tests {
             .unwrap();
 
         let mut action =
-            PresentationEventListener::new("dom:click", PresentationAction::Sound).unwrap();
-        action.effect = Some(PresentationEffect::new("fade").unwrap());
+            EventListener::new("dom:click", Action::Sound).unwrap();
+        action.effect = Some(Effect::new("fade").unwrap());
         action.speed = Some(TransitionSpeed::Fast);
         let mut sound = TransitionSound::new("Sounds/click.ogg");
         sound.play_full = Some(true);
@@ -1603,10 +1603,10 @@ mod tests {
             ))
             .unwrap();
         shape
-            .add_event_listener(ShapeEventListener::Presentation(Box::new(action)))
+            .add_event_listener(ShapeEventListener::Action(Box::new(action)))
             .unwrap();
 
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         builder
             .add_slide_element(Slide {
                 title: None,
@@ -1631,16 +1631,16 @@ mod tests {
         let parsed = &slides[0].shapes[0];
         assert_eq!(parsed.hyperlink(), Some(&hyperlink));
         assert_eq!(parsed.event_listeners().len(), 2);
-        let ShapeEventListener::Presentation(action) = &parsed.event_listeners()[1] else {
+        let ShapeEventListener::Action(action) = &parsed.event_listeners()[1] else {
             panic!("expected presentation action");
         };
-        assert_eq!(action.action, PresentationAction::Sound);
+        assert_eq!(action.action, Action::Sound);
         assert_eq!(action.sound.as_ref().unwrap().href, "Sounds/click.ogg");
     }
 
     #[test]
     fn rejects_unsafe_or_duplicate_embedded_media_paths() {
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         assert!(
             builder
                 .embed_media("../escape.mp4", [], "video/mp4")

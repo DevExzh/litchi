@@ -1,8 +1,8 @@
-use litchi_odp::{Presentation, PresentationBuilder};
+use litchi_odp::{Builder, Presentation};
 
 #[test]
 fn builder_and_presentation_facade_round_trip() {
-    let mut builder = PresentationBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_slide_with_title("Welcome", "Hello from ODP")
         .unwrap();
@@ -15,7 +15,7 @@ fn builder_and_presentation_facade_round_trip() {
 
 #[test]
 fn presentation_facade_reports_empty_packages_without_slides() {
-    let bytes = PresentationBuilder::new().build().unwrap();
+    let bytes = Builder::new().build().unwrap();
     let presentation = Presentation::from_bytes(bytes).unwrap();
     assert_eq!(presentation.slide_count().unwrap(), 0);
     assert_eq!(presentation.text().unwrap(), "");

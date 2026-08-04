@@ -1,12 +1,12 @@
 //! Lossless custom slide-layout and slide-master editing for packaged ODP files.
 
 use super::page_layout_definition::{
-    parse_presentation_page_layouts, remove_presentation_page_layout_xml,
-    set_presentation_page_layout_xml,
+    parse_page_layouts, remove_page_layout_xml,
+    set_page_layout_xml,
 };
-use super::{Presentation, PresentationPageLayout};
+use super::{Presentation, PageLayout};
 use crate::core::PackageWriter;
-use crate::odt::MasterPage;
+use crate::odt::MasterPage as SharedMasterPage;
 use crate::odt::header_footer::parse_master_pages;
 use litchi_core::{Error, Result};
 use quick_xml::events::{BytesStart, Event};
@@ -31,22 +31,22 @@ const MAX_NAME: usize = 4_096;
 /// shapes, backgrounds, regions, notes, animations, and extensions remain in
 /// `master_page.xml` and are preserved when the definition is edited.
 #[derive(Clone, Debug)]
-pub struct PresentationMasterPage {
-    pub master_page: MasterPage,
-    pub presentation_page_layout_name: Option<String>,
+pub struct MasterPage {
+    pub master_page: SharedMasterPage,
+    pub page_layout_name: Option<String>,
     pub header_name: Option<String>,
     pub footer_name: Option<String>,
     pub date_time_name: Option<String>,
 }
 
-impl PresentationMasterPage {
+impl MasterPage {
     pub fn new(name: impl Into<String>, page_layout_name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         let page_layout_name = page_layout_name.into();
         validate_name(&name, "master page name")?;
         validate_name(&page_layout_name, "page layout name")?;
         Ok(Self {
-            master_page: MasterPage {
+            master_page: SharedMasterPage {
                 name: name.clone(),
                 display_name: None,
                 page_layout_name: Some(page_layout_name),
@@ -59,7 +59,7 @@ impl PresentationMasterPage {
                     escape_attr(&name)
                 ),
             },
-            presentation_page_layout_name: None,
+            page_layout_name: None,
             header_name: None,
             footer_name: None,
             date_time_name: None,
@@ -90,7 +90,7 @@ impl PresentationMasterPage {
                 "next master name",
             ),
             (
-                self.presentation_page_layout_name.as_deref(),
+                self.page_layout_name.as_deref(),
                 "presentation page layout name",
             ),
             (self.header_name.as_deref(), "header declaration name"),
@@ -141,7 +141,7 @@ impl PresentationMasterPage {
             Change::new(
                 PRESENTATION,
                 "presentation-page-layout-name",
-                self.presentation_page_layout_name.as_deref(),
+                self.page_layout_name.as_deref(),
                 "presentation",
             ),
             Change::new(
@@ -176,11 +176,11 @@ impl PresentationMasterPage {
 }
 
 impl Presentation {
-    pub fn presentation_master_pages(&self) -> Result<Vec<PresentationMasterPage>> {
+    pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         masters_from_xml(required_styles(self)?)
     }
 
-    pub fn add_presentation_page_layout(&mut self, layout: &PresentationPageLayout) -> Result<()> {
+    pub fn add_page_layout(&mut self, layout: &PageLayout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "presentation-page-layout", STYLE, "name")?
@@ -191,13 +191,13 @@ impl Presentation {
                 layout.name
             ));
         }
-        let styles = set_presentation_page_layout_xml(&styles, layout)?;
+        let styles = set_page_layout_xml(&styles, layout)?;
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn replace_presentation_page_layout(
+    pub fn replace_page_layout(
         &mut self,
-        layout: &PresentationPageLayout,
+        layout: &PageLayout,
     ) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
@@ -209,11 +209,11 @@ impl Presentation {
                 layout.name
             ));
         }
-        let styles = set_presentation_page_layout_xml(&styles, layout)?;
+        let styles = set_page_layout_xml(&styles, layout)?;
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn remove_presentation_page_layout(
+    pub fn remove_page_layout(
         &mut self,
         name: &str,
         replacement: Option<&str>,
@@ -249,11 +249,11 @@ impl Presentation {
             name,
             replacement,
         )?;
-        styles = remove_presentation_page_layout_xml(&styles, name)?;
+        styles = remove_page_layout_xml(&styles, name)?;
         self.commit_design(styles, content)
     }
 
-    pub fn reorder_presentation_page_layouts(&mut self, names: &[String]) -> Result<()> {
+    pub fn reorder_page_layouts(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
             STYLE,
@@ -265,7 +265,7 @@ impl Presentation {
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn add_presentation_master_page(&mut self, master: &PresentationMasterPage) -> Result<()> {
+    pub fn add_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "master-page", STYLE, "name")?.contains_key(master.name()) {
@@ -275,9 +275,9 @@ impl Presentation {
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn replace_presentation_master_page(
+    pub fn replace_master_page(
         &mut self,
-        master: &PresentationMasterPage,
+        master: &MasterPage,
     ) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
@@ -289,7 +289,7 @@ impl Presentation {
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn remove_presentation_master_page(
+    pub fn remove_master_page(
         &mut self,
         name: &str,
         replacement: Option<&str>,
@@ -333,7 +333,7 @@ impl Presentation {
         self.commit_design(styles, content)
     }
 
-    pub fn reorder_presentation_master_pages(&mut self, names: &[String]) -> Result<()> {
+    pub fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
             STYLE,
@@ -830,7 +830,7 @@ fn rewrite_attr(
     apply(xml, edits)
 }
 
-fn masters_from_xml(xml: &str) -> Result<Vec<PresentationMasterPage>> {
+fn masters_from_xml(xml: &str) -> Result<Vec<MasterPage>> {
     let parsed = parse_master_pages(xml)?;
     if parsed.len() > MAX_DEFINITIONS {
         return invalid("ODP styles exceed 65536 master pages");
@@ -848,9 +848,9 @@ fn masters_from_xml(xml: &str) -> Result<Vec<PresentationMasterPage>> {
             return invalid("parsed master XML is not a single master page");
         }
         let root = roots[0];
-        let model = PresentationMasterPage {
+        let model = MasterPage {
             master_page,
-            presentation_page_layout_name: attr(
+            page_layout_name: attr(
                 root,
                 PRESENTATION,
                 "presentation-page-layout-name",
@@ -867,7 +867,7 @@ fn masters_from_xml(xml: &str) -> Result<Vec<PresentationMasterPage>> {
 }
 
 fn validate_references(styles: &str, content: &str) -> Result<()> {
-    parse_presentation_page_layouts(styles)?;
+    parse_page_layouts(styles)?;
     let layouts: HashSet<String> =
         definitions(styles, STYLE, "presentation-page-layout", STYLE, "name")?
             .into_keys()
@@ -925,7 +925,7 @@ fn validate_references(styles: &str, content: &str) -> Result<()> {
             "next master page",
         )?;
         require(
-            master.presentation_page_layout_name.as_deref(),
+            master.page_layout_name.as_deref(),
             &layouts,
             "master presentation page layout",
         )?;
@@ -1142,4 +1142,3 @@ fn error(message: impl Into<String>) -> Error {
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(error(message))
 }
-

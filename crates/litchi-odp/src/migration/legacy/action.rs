@@ -79,7 +79,7 @@ fn invalid(name: &str, value: &str) -> Error {
 ///
 /// Litchi preserves these requests as metadata and never invokes them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PresentationAction {
+pub enum Action {
     None,
     PreviousPage,
     NextPage,
@@ -95,7 +95,7 @@ pub enum PresentationAction {
     LastVisitedPage,
 }
 
-impl PresentationAction {
+impl Action {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
@@ -141,9 +141,9 @@ impl PresentationAction {
 
 /// Visual effect used by a presentation event action.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationEffect(String);
+pub struct Effect(String);
 
-impl PresentationEffect {
+impl Effect {
     /// Create a schema-defined presentation effect.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
@@ -167,9 +167,9 @@ impl PresentationEffect {
 
 /// Direction used by a presentation event effect.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationEffectDirection(String);
+pub struct EffectDirection(String);
 
-impl PresentationEffectDirection {
+impl EffectDirection {
     /// Create a schema-defined presentation effect direction.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
@@ -193,11 +193,11 @@ impl PresentationEffectDirection {
 
 /// Inert presentation action metadata attached to a shape event.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationEventListener {
+pub struct EventListener {
     pub event_name: String,
-    pub action: PresentationAction,
-    pub effect: Option<PresentationEffect>,
-    pub direction: Option<PresentationEffectDirection>,
+    pub action: Action,
+    pub effect: Option<Effect>,
+    pub direction: Option<EffectDirection>,
     pub speed: Option<TransitionSpeed>,
     pub start_scale: Option<String>,
     /// Optional action target. Its serialized XLink type is always `simple`.
@@ -208,9 +208,9 @@ pub struct PresentationEventListener {
     pub sound: Option<TransitionSound>,
 }
 
-impl PresentationEventListener {
+impl EventListener {
     /// Create a presentation action binding.
-    pub fn new(event_name: impl Into<String>, action: PresentationAction) -> Result<Self> {
+    pub fn new(event_name: impl Into<String>, action: Action) -> Result<Self> {
         let event_name = event_name.into();
         validate_bounded_xml_value(&event_name, "presentation event name")?;
         Ok(Self {
@@ -320,7 +320,7 @@ impl ScriptEventListener {
 /// An inert event listener attached to a drawing shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShapeEventListener {
-    Presentation(Box<PresentationEventListener>),
+    Action(Box<EventListener>),
     Script(ScriptEventListener),
 }
 
@@ -509,7 +509,7 @@ pub(crate) fn validate_event_listeners(listeners: &[ShapeEventListener]) -> Resu
     }
     for listener in listeners {
         match listener {
-            ShapeEventListener::Presentation(listener) => listener.validate()?,
+            ShapeEventListener::Action(listener) => listener.validate()?,
             ShapeEventListener::Script(listener) => listener.validate()?,
         }
     }
@@ -543,7 +543,7 @@ pub(crate) fn write_event_listeners(
                 }
                 output.push_str("/>");
             },
-            ShapeEventListener::Presentation(listener) => {
+            ShapeEventListener::Action(listener) => {
                 output.push_str("<presentation:event-listener");
                 push_attribute(output, "script:event-name", &listener.event_name);
                 push_attribute(output, "presentation:action", listener.action.as_str());
@@ -661,15 +661,15 @@ mod tests {
 
     #[test]
     fn exposes_all_schema_effect_values() {
-        for value in PresentationAction::supported_values() {
-            assert_eq!(PresentationAction::parse(value).unwrap().as_str(), *value);
+        for value in Action::supported_values() {
+            assert_eq!(Action::parse(value).unwrap().as_str(), *value);
         }
-        for value in PresentationEffect::supported_values() {
-            assert_eq!(PresentationEffect::new(*value).unwrap().as_str(), *value);
+        for value in Effect::supported_values() {
+            assert_eq!(Effect::new(*value).unwrap().as_str(), *value);
         }
-        for value in PresentationEffectDirection::supported_values() {
+        for value in EffectDirection::supported_values() {
             assert_eq!(
-                PresentationEffectDirection::new(*value).unwrap().as_str(),
+                EffectDirection::new(*value).unwrap().as_str(),
                 *value
             );
         }
@@ -684,7 +684,7 @@ mod tests {
         assert!(listener.validate().is_err());
 
         let mut action =
-            PresentationEventListener::new("dom:click", PresentationAction::FadeOut).unwrap();
+            EventListener::new("dom:click", Action::FadeOut).unwrap();
         action.start_scale = Some("fifty".to_string());
         assert!(action.validate().is_err());
     }
@@ -692,10 +692,10 @@ mod tests {
     #[test]
     fn serializes_event_metadata_without_executing_it() {
         let mut action =
-            PresentationEventListener::new("dom:click", PresentationAction::Execute).unwrap();
+            EventListener::new("dom:click", Action::Execute).unwrap();
         action.href = Some("https://example.invalid/app".to_string());
         action.show_embed = true;
-        let listeners = vec![ShapeEventListener::Presentation(Box::new(action))];
+        let listeners = vec![ShapeEventListener::Action(Box::new(action))];
         let mut xml = String::new();
         write_event_listeners(&mut xml, &listeners).unwrap();
         assert!(xml.contains("presentation:action=\"execute\""));

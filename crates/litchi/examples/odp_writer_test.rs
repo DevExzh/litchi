@@ -13,7 +13,7 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::{Metadata, ShapeType};
 #[cfg(feature = "odf")]
-use litchi::odf::{PresentationBuilder, Shape, Slide};
+use litchi::odf::{Builder, Shape, Slide};
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
@@ -25,8 +25,8 @@ fn main() -> Result<()> {
         output_file
     );
 
-    // Create a new presentation using PresentationBuilder
-    let mut builder = PresentationBuilder::new();
+    // Create a new presentation using the ODP builder.
+    let mut builder = Builder::new();
 
     // Set document metadata
     println!("✅ Setting metadata...");
@@ -118,7 +118,7 @@ fn main() -> Result<()> {
     builder.add_slide_with_title(
         "Usage Example",
         "Creating a presentation with litchi:\n\n\
-        let mut builder = PresentationBuilder::new();\n\
+        let mut builder = Builder::new();\n\
         builder.add_slide_with_title(\n\
             \"My Slide\",\n\
             \"Slide content here\"\n\

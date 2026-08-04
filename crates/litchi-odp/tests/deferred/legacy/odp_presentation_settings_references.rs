@@ -1,30 +1,30 @@
 use litchi_odp::{
-    CustomPresentationShow, MutablePresentation, Presentation, PresentationBuilder,
-    PresentationPageMetadata, PresentationPageMetadataCollection, PresentationSettings,
+    CustomShow, MutablePresentation, Presentation, Builder,
+    PageMetadata, PageMetadataCollection, Settings,
 };
 
-fn settings(start: &str, pages: &[&str]) -> PresentationSettings {
-    PresentationSettings {
+fn settings(start: &str, pages: &[&str]) -> Settings {
+    Settings {
         start_page: Some(start.to_string()),
         show: Some("Review".to_string()),
         custom_shows: vec![
-            CustomPresentationShow::new(
+            CustomShow::new(
                 "Review",
                 pages.iter().map(|value| (*value).to_string()).collect(),
             )
             .unwrap(),
         ],
-        ..PresentationSettings::default()
+        ..Settings::default()
     }
 }
 
-fn metadata(names: &[&str]) -> PresentationPageMetadataCollection {
-    PresentationPageMetadataCollection::new(
+fn metadata(names: &[&str]) -> PageMetadataCollection {
+    PageMetadataCollection::new(
         names
             .iter()
             .enumerate()
             .map(|(slide_index, name)| {
-                let mut page = PresentationPageMetadata::new(slide_index);
+                let mut page = PageMetadata::new(slide_index);
                 page.name = Some((*name).to_string());
                 page
             })
@@ -35,28 +35,28 @@ fn metadata(names: &[&str]) -> PresentationPageMetadataCollection {
 
 #[test]
 fn builder_rejects_dangling_and_ambiguous_references_but_allows_repeats() {
-    let mut builder = PresentationBuilder::new();
+    let mut builder = Builder::new();
     builder.add_slide("one").unwrap();
     builder
         .set_settings(Some(settings("missing", &["page1"])))
         .unwrap();
     assert!(builder.build().is_err());
 
-    let mut builder = PresentationBuilder::new();
+    let mut builder = Builder::new();
     builder.add_slide("one").unwrap();
     builder
         .set_settings(Some(settings("page1", &["missing"])))
         .unwrap();
     assert!(builder.build().is_err());
 
-    let mut builder = PresentationBuilder::new();
+    let mut builder = Builder::new();
     builder.add_slide("one").unwrap();
     builder
         .set_settings(Some(settings("page1", &["page1", "page1"])))
         .unwrap();
     assert!(builder.build().is_ok());
 
-    let mut builder = PresentationBuilder::new();
+    let mut builder = Builder::new();
     builder.add_slide("one").unwrap();
     builder
         .set_page_metadata(Some(metadata(&["duplicate"])))
@@ -73,7 +73,7 @@ fn builder_rejects_dangling_and_ambiguous_references_but_allows_repeats() {
 
 #[test]
 fn direct_settings_and_metadata_edits_fail_only_at_final_serialization() {
-    let mut builder = PresentationBuilder::new();
+    let mut builder = Builder::new();
     builder.add_slide("one").unwrap().add_slide("two").unwrap();
     builder
         .set_settings(Some(settings("page2", &["page2"])))
@@ -145,7 +145,7 @@ fn fallback_insert_remove_preserves_identity_and_rejects_referenced_removal() {
 
 #[test]
 fn explicit_metadata_reindexes_without_losing_page_identity() {
-    let mut builder = PresentationBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_slide("alpha")
         .unwrap()
@@ -155,7 +155,7 @@ fn explicit_metadata_reindexes_without_losing_page_identity() {
     let mut records = pages.pages().to_vec();
     records[1].xml_id = Some("beta-id".to_string());
     records[1].draw_id = Some("beta-id".to_string());
-    pages = PresentationPageMetadataCollection::new(records).unwrap();
+    pages = PageMetadataCollection::new(records).unwrap();
     builder.set_page_metadata(Some(pages)).unwrap();
     builder
         .set_settings(Some(settings("Beta", &["Alpha", "Beta"])))
@@ -184,7 +184,7 @@ fn libreoffice_and_odfpy_lexical_fixtures_parse_save_and_reopen() {
         include_str!("fixtures/libreoffice-presentation-settings.xml"),
         include_str!("fixtures/odfpy-presentation-settings.xml"),
     ] {
-        let parsed = litchi_odp::parse_presentation_settings(fixture)
+        let parsed = litchi_odp::parse_settings(fixture)
             .unwrap()
             .unwrap();
         assert_eq!(parsed.custom_shows[0].pages.len(), 3);
@@ -198,7 +198,7 @@ fn libreoffice_and_odfpy_lexical_fixtures_parse_save_and_reopen() {
         } else {
             ["One", "Two", "Three"]
         };
-        let mut builder = PresentationBuilder::new();
+        let mut builder = Builder::new();
         for name in page_names {
             builder.add_slide(name).unwrap();
         }

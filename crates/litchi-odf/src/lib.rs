@@ -61,7 +61,9 @@ pub use litchi_odi::{Image, ImageBuilder};
 #[cfg(feature = "odm")]
 pub use litchi_odm::{Master, MasterBuilder};
 #[cfg(feature = "odp")]
-pub use litchi_odp::{Presentation, PresentationBuilder};
+pub use litchi_odp::Presentation;
+#[cfg(all(feature = "odp", not(feature = "formula")))]
+pub use litchi_odp::Builder;
 #[cfg(feature = "ods")]
 pub use litchi_ods::{Spreadsheet, SpreadsheetBuilder};
 #[cfg(feature = "odt")]

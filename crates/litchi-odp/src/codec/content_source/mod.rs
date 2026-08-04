@@ -123,7 +123,7 @@ enum AutomaticStylesSite {
 /// All accessors borrow from the retained source text, so re-emitting an
 /// untouched slide costs no allocation beyond the output buffer.
 #[derive(Debug, Clone)]
-pub(super) struct PresentationContentSource {
+pub struct ContentSource {
     /// Complete original `content.xml` text.
     xml: String,
     /// Everything before the `office:document-content` start tag.
@@ -154,13 +154,13 @@ pub(super) struct PresentationContentSource {
     has_byte_order_mark: bool,
 }
 
-impl PresentationContentSource {
+impl ContentSource {
     /// Split a presentation `content.xml` into verbatim fragments.
     ///
     /// Returns `Ok(None)` when the stream does not have the expected
     /// presentation shape, letting the caller fall back to full regeneration
     /// rather than failing a save.
-    pub(super) fn parse(xml: &str) -> Result<Option<Self>> {
+    pub fn parse(xml: &str) -> Result<Option<Self>> {
         if xml.len() > MAX_XML_BYTES {
             return Err(invalid(format!(
                 "presentation content.xml exceeds {MAX_XML_BYTES} bytes"
@@ -178,7 +178,7 @@ impl PresentationContentSource {
 
     /// Append the byte-order mark, XML declaration, and any other markup that
     /// precedes the root element.
-    pub(super) fn write_prolog(&self, output: &mut String) {
+    pub fn write_prolog(&self, output: &mut String) {
         if self.has_byte_order_mark {
             output.push_str(BYTE_ORDER_MARK);
         }
@@ -186,12 +186,12 @@ impl PresentationContentSource {
     }
 
     /// Number of slides retained from the source document.
-    pub(super) fn page_count(&self) -> usize {
+    pub fn page_count(&self) -> usize {
         self.pages.len()
     }
 
     /// The verbatim `draw:page` element at `index`, when it exists.
-    pub(super) fn page(&self, index: usize) -> Option<&str> {
+    pub fn page(&self, index: usize) -> Option<&str> {
         self.pages.get(index).map(|span| self.slice(*span))
     }
 
@@ -202,11 +202,7 @@ impl PresentationContentSource {
     /// Fails when synthesised markup is present and the source binds one of the
     /// prefixes this crate emits to a different namespace, because reusing that
     /// prefix would silently change the meaning of the generated elements.
-    pub(super) fn root_start_tag(
-        &self,
-        extra_attributes: &str,
-        synthesised: bool,
-    ) -> Result<String> {
+    pub fn root_start_tag(&self, extra_attributes: &str, synthesised: bool) -> Result<String> {
         let base = self.slice(self.root_open);
         let mut output = String::with_capacity(base.len() + extra_attributes.len() + 64);
         output.push_str(base);
@@ -237,13 +233,13 @@ impl PresentationContentSource {
     }
 
     /// Whether `name` is already declared inside `office:automatic-styles`.
-    pub(super) fn defines_style(&self, name: &str) -> bool {
+    pub fn defines_style(&self, name: &str) -> bool {
         self.style_names.contains(name)
     }
 
     /// Emit the retained prologue with `generated_styles` spliced into
     /// `office:automatic-styles`.
-    pub(super) fn write_prologue(&self, output: &mut String, generated_styles: &str) {
+    pub fn write_prologue(&self, output: &mut String, generated_styles: &str) {
         output.push_str(self.slice(self.prologue_head));
         match self.styles_site {
             AutomaticStylesSite::Content => output.push_str(generated_styles),
@@ -275,12 +271,12 @@ impl PresentationContentSource {
     }
 
     /// The `office:body` start tag, verbatim.
-    pub(super) fn body_start_tag(&self) -> &str {
+    pub fn body_start_tag(&self) -> &str {
         self.slice(self.body_open)
     }
 
     /// The `office:presentation` start tag, verbatim.
-    pub(super) fn presentation_start_tag(&self) -> &str {
+    pub fn presentation_start_tag(&self) -> &str {
         self.slice(self.presentation_open)
     }
 
@@ -289,7 +285,7 @@ impl PresentationContentSource {
     /// The qualified names are taken from the retained start tags so a document
     /// that binds the `office` namespace to a non-conventional prefix still
     /// round-trips.
-    pub(super) fn close_tags(&self) -> String {
+    pub fn close_tags(&self) -> String {
         let root = qname_of(self.slice(self.root_open));
         let body = qname_of(self.slice(self.body_open));
         let presentation = qname_of(self.slice(self.presentation_open));
@@ -305,14 +301,14 @@ impl PresentationContentSource {
     }
 
     /// Append unmodelled presentation children that precede the first slide.
-    pub(super) fn write_leading_extras(&self, output: &mut String) {
+    pub fn write_leading_extras(&self, output: &mut String) {
         for span in &self.leading_extras {
             output.push_str(self.slice(*span));
         }
     }
 
     /// Append unmodelled presentation children that follow the last slide.
-    pub(super) fn write_trailing_extras(&self, output: &mut String) {
+    pub fn write_trailing_extras(&self, output: &mut String) {
         for span in &self.trailing_extras {
             output.push_str(self.slice(*span));
         }
@@ -344,7 +340,7 @@ mod tests {
 
     #[test]
     fn retains_pages_prologue_and_style_names() {
-        let source = PresentationContentSource::parse(CONTENT)
+        let source = ContentSource::parse(CONTENT)
             .unwrap()
             .expect("presentation skeleton");
         assert_eq!(source.page_count(), 1);
@@ -363,7 +359,7 @@ mod tests {
 
     #[test]
     fn splices_generated_styles_into_existing_container() {
-        let source = PresentationContentSource::parse(CONTENT)
+        let source = ContentSource::parse(CONTENT)
             .unwrap()
             .expect("presentation skeleton");
         let mut output = String::new();
@@ -377,7 +373,7 @@ mod tests {
     #[test]
     fn creates_container_when_absent() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let mut output = String::new();
@@ -393,7 +389,7 @@ mod tests {
     #[test]
     fn expands_self_closing_container() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:automatic-styles/><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let mut output = String::new();
@@ -410,7 +406,7 @@ mod tests {
     #[test]
     fn appends_missing_namespace_bindings() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let tag = source.root_start_tag("", true).unwrap();
@@ -428,7 +424,7 @@ mod tests {
     #[test]
     fn rejects_conflicting_prefix_binding() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:example:not-drawing"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let error = source.root_start_tag("", true).unwrap_err().to_string();
@@ -438,13 +434,13 @@ mod tests {
     #[test]
     fn rejects_non_presentation_root() {
         let xml = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#;
-        assert!(PresentationContentSource::parse(xml).is_err());
+        assert!(ContentSource::parse(xml).is_err());
     }
 
     #[test]
     fn reports_unmodelled_presentation_children() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><office:body><office:presentation><draw:custom draw:name="x"/><draw:page/><presentation:settings/><draw:other/></office:presentation></office:body></office:document-content>"#;
-        let source = PresentationContentSource::parse(xml)
+        let source = ContentSource::parse(xml)
             .unwrap()
             .expect("presentation skeleton");
         let mut leading = String::new();
@@ -455,4 +451,3 @@ mod tests {
         assert_eq!(trailing, "<draw:other/>");
     }
 }
-

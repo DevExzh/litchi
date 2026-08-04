@@ -2,14 +2,14 @@
 //!
 //! The scanner walks `content.xml` once and remembers where the root element,
 //! the prologue, the automatic-style container, and each `draw:page` begin and
-//! end, so [`PresentationContentSource`](super::PresentationContentSource) can
+//! end, so [`ContentSource`](super::ContentSource) can
 //! slice them back out verbatim.
 
 use super::{
     AUTOMATIC_STYLES_ELEMENT, AutomaticStylesSite, BODY_CHILD_DEPTH, BODY_ELEMENT,
     DECLARATION_ELEMENTS, DOCUMENT_CONTENT_ELEMENT, DRAW_NAMESPACE, MAX_DEPTH, MAX_PAGES,
     MAX_STYLE_NAMES, OFFICE_NAMESPACE, PAGE_ELEMENT, PRESENTATION_CHILD_DEPTH,
-    PRESENTATION_ELEMENT, PRESENTATION_NAMESPACE, PROLOGUE_DEPTH, PresentationContentSource,
+    PRESENTATION_ELEMENT, PRESENTATION_NAMESPACE, PROLOGUE_DEPTH, ContentSource,
     SETTINGS_ELEMENT, STYLE_ELEMENT, STYLE_NAME_ATTRIBUTE, STYLE_NAMESPACE, XMLNS_DEFAULT,
     XMLNS_PREFIX, XmlSpan, invalid,
 };
@@ -320,7 +320,7 @@ impl<'input> Scanner<'input> {
         self,
         xml: &str,
         has_byte_order_mark: bool,
-    ) -> Option<PresentationContentSource> {
+    ) -> Option<ContentSource> {
         let root_open = self.root_open?;
         let body_open = self.body_open?;
         let presentation_open = self.presentation_open?;
@@ -338,7 +338,7 @@ impl<'input> Scanner<'input> {
             AutomaticStylesSite::Empty { span, .. } => span.end,
             _ => splice,
         };
-        Some(PresentationContentSource {
+        Some(ContentSource {
             xml: xml.to_owned(),
             prolog: XmlSpan {
                 start: 0,

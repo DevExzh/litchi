@@ -7,8 +7,8 @@ use super::{
     DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind,
     EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind, HyperlinkShow,
     LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
-    MediaShow, PresentationAction, PresentationEffect, PresentationEffectDirection,
-    PresentationEventListener, ScriptEventListener, Shape, ShapeEventListener, Slide,
+    MediaShow, Action, Effect, EffectDirection,
+    EventListener, ScriptEventListener, Shape, ShapeEventListener, Slide,
     SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
     TransitionStyle, TransitionType,
 };
@@ -97,9 +97,9 @@ enum OdpElement {
     EnhancedEquation,
     EnhancedHandle,
     EventListeners,
-    PresentationEventListener,
+    EventListener,
     ScriptEventListener,
-    PresentationSound,
+    Sound,
     TextParagraph,
     TextSpace,
     TextTab,
@@ -326,9 +326,9 @@ impl OdpParser {
             if local_name == b"notes" {
                 OdpElement::Notes
             } else if local_name == b"event-listener" {
-                OdpElement::PresentationEventListener
+                OdpElement::EventListener
             } else if local_name == b"sound" {
-                OdpElement::PresentationSound
+                OdpElement::Sound
             } else {
                 LegacyAnimationKind::from_local_name(local_name)
                     .map(OdpElement::LegacyAnimation)
@@ -1170,7 +1170,7 @@ impl OdpParser {
     fn presentation_event_listener(
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,
-    ) -> Result<PresentationEventListener> {
+    ) -> Result<EventListener> {
         let event_name = Self::required_attr(
             reader,
             element,
@@ -1178,19 +1178,19 @@ impl OdpParser {
             b"event-name",
             "script:event-name",
         )?;
-        let action = PresentationAction::parse(&Self::required_attr(
+        let action = Action::parse(&Self::required_attr(
             reader,
             element,
             PRESENTATION_NAMESPACE,
             b"action",
             "presentation:action",
         )?)?;
-        let mut listener = PresentationEventListener::new(event_name, action)?;
+        let mut listener = EventListener::new(event_name, action)?;
         listener.effect = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"effect")?
-            .map(PresentationEffect::new)
+            .map(Effect::new)
             .transpose()?;
         listener.direction = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"direction")?
-            .map(PresentationEffectDirection::new)
+            .map(EffectDirection::new)
             .transpose()?;
         listener.speed = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"speed")?
             .map(|value| TransitionSpeed::parse(&value))
@@ -1271,10 +1271,10 @@ impl OdpParser {
         }
     }
 
-    fn parse_presentation_listener_body(
+    fn parse_listener_body(
         reader: &mut NsReader<&[u8]>,
-        mut listener: PresentationEventListener,
-    ) -> Result<PresentationEventListener> {
+        mut listener: EventListener,
+    ) -> Result<EventListener> {
         let mut buffer = Vec::new();
         loop {
             let (namespace, event) = reader
@@ -1370,11 +1370,11 @@ impl OdpParser {
                     }
                     let listener = Self::presentation_event_listener(reader, element)?;
                     let listener = if matches!(event, Event::Start(_)) {
-                        Self::parse_presentation_listener_body(reader, listener)?
+                        Self::parse_listener_body(reader, listener)?
                     } else {
                         listener
                     };
-                    listeners.push(ShapeEventListener::Presentation(Box::new(listener)));
+                    listeners.push(ShapeEventListener::Action(Box::new(listener)));
                 },
                 Event::End(ref end)
                     if Self::is_namespace(&namespace, OFFICE_NAMESPACE)
@@ -2035,9 +2035,9 @@ impl OdpParser {
                             builder.event_listeners_seen = true;
                         },
                         OdpElement::EventListeners
-                        | OdpElement::PresentationEventListener
+                        | OdpElement::EventListener
                         | OdpElement::ScriptEventListener
-                        | OdpElement::PresentationSound
+                        | OdpElement::Sound
                             if in_slide =>
                         {
                             return Err(Error::InvalidFormat(
@@ -2406,9 +2406,9 @@ impl OdpParser {
                             builder.event_listeners_seen = true;
                         },
                         OdpElement::EventListeners
-                        | OdpElement::PresentationEventListener
+                        | OdpElement::EventListener
                         | OdpElement::ScriptEventListener
-                        | OdpElement::PresentationSound
+                        | OdpElement::Sound
                             if in_slide =>
                         {
                             return Err(Error::InvalidFormat(
@@ -2879,19 +2879,19 @@ mod tests {
         for (index, (shape, expected_kind)) in shapes.iter().zip(expected).enumerate() {
             assert_eq!(shape.drawing_kind(), Some(expected_kind));
             let regenerated =
-                crate::odp::PresentationBuilder::generate_shape_xml(shape, index).unwrap();
+                crate::Builder::generate_shape_xml(shape, index).unwrap();
             assert!(regenerated.starts_with(&format!("<{}", expected_kind.element_name())));
             assert!(!regenerated.contains("draw:layer="));
         }
-        let ellipse = crate::odp::PresentationBuilder::generate_shape_xml(&shapes[1], 1).unwrap();
+        let ellipse = crate::Builder::generate_shape_xml(&shapes[1], 1).unwrap();
         assert!(ellipse.contains(r#"draw:kind="section""#));
         assert!(ellipse.contains(r#"draw:start-angle="30""#));
         assert!(ellipse.contains(r#"svg:rx="2cm""#));
-        let path = crate::odp::PresentationBuilder::generate_shape_xml(&shapes[3], 3).unwrap();
+        let path = crate::Builder::generate_shape_xml(&shapes[3], 3).unwrap();
         assert!(path.contains(r#"svg:viewBox="0 0 100 100""#));
         assert!(path.contains(r#"svg:d="M 0 0 L 100 100""#));
         let connector =
-            crate::odp::PresentationBuilder::generate_shape_xml(&shapes[10], 10).unwrap();
+            crate::Builder::generate_shape_xml(&shapes[10], 10).unwrap();
         assert!(connector.contains(r#"draw:type="curve""#));
         assert!(connector.contains(r#"draw:start-shape="a""#));
         let custom = &shapes[12];
@@ -2910,7 +2910,7 @@ mod tests {
             geometry.children()[1].kind(),
             EnhancedGeometryChildKind::Handle
         );
-        let regenerated = crate::odp::PresentationBuilder::generate_shape_xml(custom, 12).unwrap();
+        let regenerated = crate::Builder::generate_shape_xml(custom, 12).unwrap();
         assert!(regenerated.contains("<draw:enhanced-geometry"));
         assert!(regenerated.contains(r#"dr3d:projection="perspective""#));
         assert!(regenerated.contains(r#"draw:formula="$0 * 2 &amp; 21600""#));
@@ -2970,7 +2970,7 @@ mod tests {
             nested.children[2].drawing_kind(),
             Some(DrawingShapeKind::ThreeDimensionalRotate)
         );
-        let regenerated = crate::odp::PresentationBuilder::generate_shape_xml(scene, 0).unwrap();
+        let regenerated = crate::Builder::generate_shape_xml(scene, 0).unwrap();
         assert!(regenerated.starts_with("<dr3d:scene"));
         assert!(regenerated.contains(r#"dr3d:projection="perspective""#));
         assert!(regenerated.contains(r#"dr3d:direction="(0 0 -1)""#));
@@ -3312,7 +3312,7 @@ mod tests {
             group.children()[0].hyperlink().map(DrawingHyperlink::href),
             Some("https://example.test/group-child")
         );
-        let regenerated = crate::odp::PresentationBuilder::generate_shape_xml(group, 0).unwrap();
+        let regenerated = crate::Builder::generate_shape_xml(group, 0).unwrap();
         assert!(regenerated.starts_with(r#"<draw:g draw:name="Group">"#));
         assert!(regenerated.contains("<draw:rect"));
         assert!(regenerated.contains("<draw:a"));
@@ -3532,10 +3532,10 @@ mod tests {
             macro_listener.macro_name.as_deref(),
             Some("Standard.Module1.Main")
         );
-        let ShapeEventListener::Presentation(action) = &shape.event_listeners()[2] else {
+        let ShapeEventListener::Action(action) = &shape.event_listeners()[2] else {
             panic!("expected presentation listener");
         };
-        assert_eq!(action.action, PresentationAction::Show);
+        assert_eq!(action.action, Action::Show);
         assert_eq!(action.effect.as_ref().unwrap().as_str(), "fade");
         assert_eq!(action.direction.as_ref().unwrap().as_str(), "from-left");
         assert_eq!(action.speed, Some(TransitionSpeed::Fast));

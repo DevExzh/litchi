@@ -18,14 +18,14 @@ const MAX_CUSTOM_SHOW_PAGES: usize = 65_536;
 
 /// Schema-defined on/off state used by presentation features.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PresentationFeatureState {
+pub enum FeatureState {
     /// The feature is enabled.
     Enabled,
     /// The feature is disabled.
     Disabled,
 }
 
-impl PresentationFeatureState {
+impl FeatureState {
     fn parse(attribute: &str, value: &str) -> Result<Self> {
         match value {
             "enabled" => Ok(Self::Enabled),
@@ -46,14 +46,14 @@ impl PresentationFeatureState {
 
 /// One named custom slide show in document order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CustomPresentationShow {
+pub struct CustomShow {
     /// Unique custom-show name.
     pub name: String,
     /// Ordered drawing-page names.
     pub pages: Vec<String>,
 }
 
-impl CustomPresentationShow {
+impl CustomShow {
     /// Create a validated custom show.
     pub fn new(name: impl Into<String>, pages: Vec<String>) -> Result<Self> {
         let value = Self {
@@ -70,8 +70,8 @@ impl CustomPresentationShow {
 /// These values are retained and written but are never used to launch or control
 /// a slide show.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PresentationSettings {
-    pub animations: Option<PresentationFeatureState>,
+pub struct Settings {
+    pub animations: Option<FeatureState>,
     pub endless: Option<bool>,
     pub force_manual: Option<bool>,
     pub full_screen: Option<bool>,
@@ -87,12 +87,12 @@ pub struct PresentationSettings {
     pub start_page: Option<String>,
     pub start_with_navigator: Option<bool>,
     pub stay_on_top: Option<bool>,
-    pub transition_on_click: Option<PresentationFeatureState>,
+    pub transition_on_click: Option<FeatureState>,
     /// Named custom shows in document order.
-    pub custom_shows: Vec<CustomPresentationShow>,
+    pub custom_shows: Vec<CustomShow>,
 }
 
-impl PresentationSettings {
+impl Settings {
     /// Validate all settings and cross-references.
     pub fn validate(&self) -> Result<()> {
         if let Some(pause) = &self.pause {
@@ -149,8 +149,8 @@ impl PresentationSettings {
 
 /// Validate page-name references against the names that will be emitted on
 /// direct `draw:page` children.
-pub(crate) fn validate_presentation_page_references(
-    settings: Option<&PresentationSettings>,
+pub(crate) fn validate_page_references(
+    settings: Option<&Settings>,
     page_names: &[String],
 ) -> Result<()> {
     let Some(settings) = settings else {
@@ -192,7 +192,7 @@ pub(crate) fn validate_presentation_page_references(
 }
 
 pub(crate) fn settings_reference_page(
-    settings: Option<&PresentationSettings>,
+    settings: Option<&Settings>,
     page_name: &str,
 ) -> bool {
     settings.is_some_and(|settings| {
@@ -205,7 +205,7 @@ pub(crate) fn settings_reference_page(
 }
 
 /// Parse the single direct `presentation:settings` child, if present.
-pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSettings>> {
+pub fn parse_settings(xml: &str) -> Result<Option<Settings>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation settings XML exceeds 8 MiB"));
     }
@@ -218,7 +218,7 @@ pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSetti
     let mut show_depth = None;
     let mut found_presentation = false;
     let mut found_settings = false;
-    let mut settings = PresentationSettings::default();
+    let mut settings = Settings::default();
 
     loop {
         match reader.read_event_into(&mut buffer).map_err(xml_error)? {
@@ -333,8 +333,8 @@ pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSetti
 }
 
 /// Serialize validated presentation settings in schema order.
-pub(crate) fn write_presentation_settings(
-    settings: Option<&PresentationSettings>,
+pub(crate) fn write(
+    settings: Option<&Settings>,
 ) -> Result<String> {
     let Some(settings) = settings else {
         return Ok(String::new());
@@ -390,7 +390,7 @@ pub(crate) fn write_presentation_settings(
 fn parse_settings_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    settings: &mut PresentationSettings,
+    settings: &mut Settings,
 ) -> Result<()> {
     let mut seen = HashSet::new();
     for attribute in element.attributes() {
@@ -417,7 +417,7 @@ fn parse_settings_attributes(
         validate_text(&value, local, true)?;
         match local {
             "animations" => {
-                settings.animations = Some(PresentationFeatureState::parse(local, &value)?)
+                settings.animations = Some(FeatureState::parse(local, &value)?)
             },
             "endless" => settings.endless = Some(parse_bool(local, &value)?),
             "force-manual" => settings.force_manual = Some(parse_bool(local, &value)?),
@@ -439,7 +439,7 @@ fn parse_settings_attributes(
             },
             "stay-on-top" => settings.stay_on_top = Some(parse_bool(local, &value)?),
             "transition-on-click" => {
-                settings.transition_on_click = Some(PresentationFeatureState::parse(local, &value)?)
+                settings.transition_on_click = Some(FeatureState::parse(local, &value)?)
             },
             _ => {
                 return Err(invalid(format!(
@@ -454,7 +454,7 @@ fn parse_settings_attributes(
 fn parse_custom_show(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<CustomPresentationShow> {
+) -> Result<CustomShow> {
     let mut name = None;
     let mut pages = None;
     for attribute in element.attributes() {
@@ -480,7 +480,7 @@ fn parse_custom_show(
             _ => return Err(invalid("unsupported presentation:show attribute")),
         }
     }
-    CustomPresentationShow::new(
+    CustomShow::new(
         name.ok_or_else(|| invalid("presentation:show requires presentation:name"))?,
         pages.ok_or_else(|| invalid("presentation:show requires presentation:pages"))?,
     )
@@ -505,7 +505,7 @@ fn parse_pages(value: &str) -> Result<Vec<String>> {
     Ok(pages)
 }
 
-fn validate_custom_show(show: &CustomPresentationShow) -> Result<()> {
+fn validate_custom_show(show: &CustomShow) -> Result<()> {
     validate_text(&show.name, "presentation:name", false)?;
     if show.pages.is_empty() {
         return Err(invalid(
@@ -662,7 +662,7 @@ fn write_bool(output: &mut String, name: &str, value: Option<bool>) {
     }
 }
 
-fn write_state(output: &mut String, name: &str, value: Option<PresentationFeatureState>) {
+fn write_state(output: &mut String, name: &str, value: Option<FeatureState>) {
     if let Some(value) = value {
         write_text(output, name, Some(value.as_str()));
     }
@@ -689,7 +689,7 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MutablePresentation, Presentation, PresentationBuilder};
+    use crate::{MutablePresentation, Presentation, Builder};
 
     const PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><o:body><o:presentation>"#;
     const SUFFIX: &str = "</o:presentation></o:body></o:document-content>";
@@ -699,18 +699,18 @@ mod tests {
         let xml = format!(
             r#"{PREFIX}<p:settings p:animations="disabled" p:endless="1" p:force-manual="false" p:full-screen="true" p:mouse-as-pen="false" p:mouse-visible="true" p:pause="PT1M2.5S" p:show="Short" p:show-end-of-presentation-slide="true" p:show-logo="false" p:start-page="page1" p:start-with-navigator="true" p:stay-on-top="false" p:transition-on-click="enabled"><p:show p:name="Short" p:pages="page1,page3"/></p:settings>{SUFFIX}"#
         );
-        let settings = parse_presentation_settings(&xml).unwrap().unwrap();
+        let settings = parse_settings(&xml).unwrap().unwrap();
         assert_eq!(
             settings.animations,
-            Some(PresentationFeatureState::Disabled)
+            Some(FeatureState::Disabled)
         );
         assert_eq!(settings.pause.as_deref(), Some("PT1M2.5S"));
         assert_eq!(settings.custom_shows[0].pages, ["page1", "page3"]);
-        let written = write_presentation_settings(Some(&settings)).unwrap();
+        let written = write(Some(&settings)).unwrap();
         assert!(written.contains("presentation:animations=\"disabled\""));
         assert!(written.contains("presentation:pages=\"page1,page3\""));
         assert_eq!(
-            parse_presentation_settings(&format!("{PREFIX}{written}{SUFFIX}"))
+            parse_settings(&format!("{PREFIX}{written}{SUFFIX}"))
                 .unwrap()
                 .unwrap(),
             settings
@@ -719,16 +719,16 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_round_trip_inert_settings() {
-        let mut settings = PresentationSettings {
+        let mut settings = Settings {
             endless: Some(true),
             pause: Some("PT15S".to_string()),
             show: Some("Executive".to_string()),
-            ..PresentationSettings::default()
+            ..Settings::default()
         };
         settings
             .custom_shows
-            .push(CustomPresentationShow::new("Executive", vec!["page1".to_string()]).unwrap());
-        let mut builder = PresentationBuilder::new();
+            .push(CustomShow::new("Executive", vec!["page1".to_string()]).unwrap());
+        let mut builder = Builder::new();
         builder.set_settings(Some(settings.clone())).unwrap();
         builder.add_slide_with_title("Title", "Body").unwrap();
         let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
@@ -754,13 +754,13 @@ mod tests {
                 r#"{PREFIX}<p:settings><p:show p:name="x" p:pages="page1"><p:show p:name="nested" p:pages="page2"/></p:show></p:settings>{SUFFIX}"#
             ),
         ] {
-            assert!(parse_presentation_settings(&xml).is_err(), "accepted {xml}");
+            assert!(parse_settings(&xml).is_err(), "accepted {xml}");
         }
         let outside = format!(
             r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><p:settings/>{PREFIX}{SUFFIX}</o:document-content>"#
         );
-        assert!(parse_presentation_settings(&outside).is_err());
+        assert!(parse_settings(&outside).is_err());
         let active = format!(r#"{PREFIX}<!DOCTYPE x><p:settings/>{SUFFIX}"#);
-        assert!(parse_presentation_settings(&active).is_err());
+        assert!(parse_settings(&active).is_err());
     }
 }

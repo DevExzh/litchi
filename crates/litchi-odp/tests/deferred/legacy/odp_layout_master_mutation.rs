@@ -1,21 +1,21 @@
 use litchi_odp::{
-    Presentation, PresentationMasterPage, PresentationMeasure, PresentationPageLayout,
-    PresentationPlaceholder, PresentationPlaceholderClass, constants,
+    Presentation, MasterPage, Measure, PageLayout,
+    Placeholder, PlaceholderClass, constants,
 };
 use std::io::{Cursor, Read, Write};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive};
 
-fn measure(value: &str) -> PresentationMeasure {
+fn measure(value: &str) -> Measure {
     value.parse().unwrap()
 }
 
-fn layout(name: &str, width: &str) -> PresentationPageLayout {
-    PresentationPageLayout {
+fn layout(name: &str, width: &str) -> PageLayout {
+    PageLayout {
         name: name.to_string(),
         display_name: Some(format!("{name} display")),
-        placeholders: vec![PresentationPlaceholder {
-            class: PresentationPlaceholderClass::Title,
+        placeholders: vec![Placeholder {
+            class: PlaceholderClass::Title,
             x: measure("1cm"),
             y: measure("1cm"),
             width: measure(width),
@@ -28,18 +28,18 @@ fn layout(name: &str, width: &str) -> PresentationPageLayout {
 fn packaged_layout_master_roundtrip_reassignment_reorder_and_unknown_xml() {
     let mut presentation = Presentation::from_bytes(host_package()).unwrap();
     presentation
-        .add_presentation_page_layout(&layout("layout-a", "20cm"))
+        .add_page_layout(&layout("layout-a", "20cm"))
         .unwrap();
     presentation
-        .add_presentation_page_layout(&layout("layout-b", "18cm"))
+        .add_page_layout(&layout("layout-b", "18cm"))
         .unwrap();
-    let mut first = PresentationMasterPage::new("master-a", "physical").unwrap();
+    let mut first = MasterPage::new("master-a", "physical").unwrap();
     first.master_page.drawing_style_name = Some("page-style".to_string());
-    first.presentation_page_layout_name = Some("layout-a".to_string());
+    first.page_layout_name = Some("layout-a".to_string());
     first.master_page.xml = first.master_page.xml.replace("/>", "><draw:rect xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" draw:name=\"kept-master-shape\"/></style:master-page>");
-    presentation.add_presentation_master_page(&first).unwrap();
+    presentation.add_master_page(&first).unwrap();
     presentation
-        .add_presentation_master_page(&PresentationMasterPage::new("master-b", "physical").unwrap())
+        .add_master_page(&MasterPage::new("master-b", "physical").unwrap())
         .unwrap();
     presentation
         .assign_slide_master_page(0, Some("master-a"))
@@ -48,16 +48,16 @@ fn packaged_layout_master_roundtrip_reassignment_reorder_and_unknown_xml() {
         .assign_slide_page_layout(0, Some("layout-a"))
         .unwrap();
     presentation
-        .reorder_presentation_page_layouts(&["layout-b".to_string(), "layout-a".to_string()])
+        .reorder_page_layouts(&["layout-b".to_string(), "layout-a".to_string()])
         .unwrap();
     presentation
-        .reorder_presentation_master_pages(&["master-b".to_string(), "master-a".to_string()])
+        .reorder_master_pages(&["master-b".to_string(), "master-a".to_string()])
         .unwrap();
     presentation
-        .remove_presentation_page_layout("layout-a", Some("layout-b"))
+        .remove_page_layout("layout-a", Some("layout-b"))
         .unwrap();
     presentation
-        .remove_presentation_master_page("master-a", Some("master-b"))
+        .remove_master_page("master-a", Some("master-b"))
         .unwrap();
     let bytes = presentation.to_bytes().unwrap();
     let content = zip_text(&bytes, "content.xml");
@@ -73,7 +73,7 @@ fn packaged_layout_master_roundtrip_reassignment_reorder_and_unknown_xml() {
     assert_eq!(
         Presentation::from_bytes(bytes)
             .unwrap()
-            .presentation_master_pages()
+            .master_pages()
             .unwrap()
             .len(),
         1
@@ -84,21 +84,21 @@ fn packaged_layout_master_roundtrip_reassignment_reorder_and_unknown_xml() {
 fn malformed_geometry_active_content_missing_refs_and_bad_reorder_are_atomic() {
     let mut presentation = Presentation::from_bytes(host_package()).unwrap();
     presentation
-        .add_presentation_page_layout(&layout("signed", "-1cm"))
+        .add_page_layout(&layout("signed", "-1cm"))
         .unwrap();
     let before = presentation.to_bytes().unwrap();
-    assert!("NaNcm".parse::<PresentationMeasure>().is_err());
-    assert!("infinity%".parse::<PresentationMeasure>().is_err());
+    assert!("NaNcm".parse::<Measure>().is_err());
+    assert!("infinity%".parse::<Measure>().is_err());
     assert!(
         format!("{}cm", "9".repeat(65_537))
-            .parse::<PresentationMeasure>()
+            .parse::<Measure>()
             .is_err()
     );
     let mut oversized = layout("valid", "1cm");
     oversized.name = "x".repeat(4_097);
     assert!(
         presentation
-            .add_presentation_page_layout(&oversized)
+            .add_page_layout(&oversized)
             .is_err()
     );
     assert_eq!(presentation.to_bytes().unwrap(), before);
@@ -108,17 +108,17 @@ fn malformed_geometry_active_content_missing_refs_and_bad_reorder_are_atomic() {
             .is_err()
     );
     assert_eq!(presentation.to_bytes().unwrap(), before);
-    let mut scripted = PresentationMasterPage::new("scripted", "physical").unwrap();
+    let mut scripted = MasterPage::new("scripted", "physical").unwrap();
     scripted.master_page.xml = scripted.master_page.xml.replace("/>", "><script:event-listener xmlns:script=\"urn:oasis:names:tc:opendocument:xmlns:script:1.0\"/></style:master-page>");
     assert!(
         presentation
-            .add_presentation_master_page(&scripted)
+            .add_master_page(&scripted)
             .is_err()
     );
     assert_eq!(presentation.to_bytes().unwrap(), before);
     assert!(
         presentation
-            .reorder_presentation_page_layouts(&["unknown".to_string()])
+            .reorder_page_layouts(&["unknown".to_string()])
             .is_err()
     );
     assert_eq!(presentation.to_bytes().unwrap(), before);

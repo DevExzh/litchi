@@ -8,7 +8,7 @@
 //! image and embedded-object models and are never represented here.
 
 use super::sheet_image::{validate_length, validate_text};
-use crate::odp::{DrawingAttribute, DrawingAttributeNamespace, PresentationBuilder};
+use crate::odp::{Builder, DrawingAttribute, DrawingAttributeNamespace};
 use litchi_core::{Error, Result, ShapeType};
 
 /// Safety limit for shapes stored in one sheet's `table:shapes` container.
@@ -347,7 +347,7 @@ pub(crate) fn write_table_shapes(
                 push(TABLE_BACKGROUND, value.to_string())?;
             }
         }
-        out.push_str(&PresentationBuilder::generate_shape_xml(&shape, index)?);
+        out.push_str(&Builder::generate_shape_xml(&shape, index)?);
     }
     out.push_str("</table:shapes>");
     Ok(())

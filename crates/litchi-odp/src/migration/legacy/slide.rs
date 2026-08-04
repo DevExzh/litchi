@@ -4,7 +4,7 @@ use super::{
     AnimationNode, DrawingHyperlink, LegacyAnimationNode, MediaReference, ShapeEventListener,
     SlideTransition,
 };
-use crate::odp::action::validate_event_listeners;
+use crate::model::action::validate_event_listeners;
 use litchi_core::Result;
 
 /// A slide in an ODP presentation.

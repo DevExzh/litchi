@@ -13,7 +13,7 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi_odf::Presentation;
+/// use litchi_odp::Presentation;
 ///
 /// # fn main() -> litchi_core::Result<()> {
 /// let mut presentation = Presentation::open("slides.odp")?;
@@ -67,7 +67,7 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Presentation;
+    /// use litchi_odp::Presentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("slides.odp")?;
@@ -101,7 +101,7 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Presentation;
+    /// use litchi_odp::Presentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let bytes = std::fs::read("slides.odp")?;
@@ -573,25 +573,25 @@ impl Presentation {
     }
 
     /// Inspect inert slide-show settings and ordered custom shows.
-    pub fn settings(&self) -> Result<Option<super::PresentationSettings>> {
-        super::parse_presentation_settings(self.content.xml_content())
+    pub fn settings(&self) -> Result<Option<super::Settings>> {
+        super::parse_settings(self.content.xml_content())
     }
 
     /// Inspect inert header, footer, date-time, and page-binding declarations.
-    pub fn declarations(&self) -> Result<super::PresentationDeclarations> {
-        super::parse_presentation_declarations(self.content.xml_content())
+    pub fn declarations(&self) -> Result<super::Declarations> {
+        super::parse_declarations(self.content.xml_content())
     }
 
     /// Inspect static page names, IDs, and layout/master references.
-    pub fn page_metadata(&self) -> Result<super::PresentationPageMetadataCollection> {
-        super::parse_presentation_page_metadata(self.content.xml_content())
+    pub fn page_metadata(&self) -> Result<super::PageMetadataCollection> {
+        super::parse_page_metadata(self.content.xml_content())
     }
 
     /// Inspect named presentation page layouts and their typed placeholders.
-    pub fn page_layouts(&self) -> Result<super::PresentationPageLayouts> {
+    pub fn page_layouts(&self) -> Result<super::Layouts> {
         match self.styles.as_ref() {
-            Some(styles) => super::parse_presentation_page_layouts(styles.xml_content()),
-            None => Ok(super::PresentationPageLayouts::default()),
+            Some(styles) => super::parse_page_layouts(styles.xml_content()),
+            None => Ok(super::Layouts::default()),
         }
     }
 
@@ -737,7 +737,7 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Presentation;
+    /// use litchi_odp::Presentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("input.odp")?;
@@ -749,7 +749,7 @@ impl Presentation {
     /// # Note
     ///
     /// Full presentation modification support is planned for future releases. For now,
-    /// to modify a presentation, use `PresentationBuilder` to create a new one with
+    /// to modify a presentation, use `Builder` to create a new one with
     /// the desired content.
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
         let bytes = self.to_bytes()?;
@@ -764,7 +764,7 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Presentation;
+    /// use litchi_odp::Presentation;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("slides.odp")?;
