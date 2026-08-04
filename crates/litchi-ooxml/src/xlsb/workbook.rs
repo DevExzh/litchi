@@ -2700,7 +2700,7 @@ mod tests {
     use super::*;
     use crate::xlsb::formula::{FormulaConverter, FormulaParser};
     use litchi_core::sheet::{Cell, WorkbookTrait, Worksheet};
-    use litchi_ooxml_common::embedded::{Kind, Target};
+    use litchi_ooxml_common::embedded::{Kind as EmbeddedKind, Target};
     use litchi_opc::part::Part;
     use litchi_opc::{BlobPart, PackURI};
     use litchi_xlsb::raw::{Kind as RawKind, Writer};
@@ -2929,7 +2929,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].source(), &sheet_uri);
         assert_eq!(entries[0].id(), "rIdObject");
-        assert_eq!(entries[0].kind(), Kind::Object);
+        assert_eq!(entries[0].kind(), EmbeddedKind::Object);
         let Target::Internal(payload) = entries[0].target() else {
             panic!("synthetic XLSB object must be internal")
         };
