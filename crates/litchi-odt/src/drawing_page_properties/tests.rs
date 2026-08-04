@@ -1,6 +1,9 @@
 //! Regression tests for the drawing-page model and codecs.
 
-use super::*;
+use super::{
+    Fill, Repeat, Style, StyleProperties, parse_drawing_page_style_properties,
+    set_drawing_page_style_properties_xml,
+};
 const HEAD: &str = r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:automatic-styles>"#;
 fn doc(body: &str) -> String {
     format!("{HEAD}{body}</office:automatic-styles></office:document>")

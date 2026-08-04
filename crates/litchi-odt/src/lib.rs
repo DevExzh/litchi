@@ -173,13 +173,10 @@ pub use document_scripts::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes drawing style resources")]
 pub use drawing_page_properties::{
-    DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,
-    DrawingPageFillRule, DrawingPageImageRefPoint, DrawingPageLengthOrPercent,
-    DrawingPageNonNegativeInteger, DrawingPagePercent, DrawingPageRepeat, DrawingPageSound,
-    DrawingPageSoundShow, DrawingPageStyle, DrawingPageStyleNameRef, DrawingPageStyleProperties,
-    DrawingPageStyleSet, DrawingPageTileDirection, DrawingPageTileRepeatOffset,
-    DrawingPageTransitionDirection, DrawingPageTransitionSpeed, DrawingPageTransitionStyle,
-    DrawingPageTransitionType, DrawingPageVisibility, parse_drawing_page_style_properties,
+    BackgroundSize, Color, Duration, Fill, FillRule, ImageRefPoint, LengthOrPercent,
+    NonNegativeInteger, Percent, Repeat, Sound, SoundShow, StyleNameRef, StyleProperties, Styles,
+    TileDirection, TileRepeatOffset, TransitionDirection, TransitionSpeed, TransitionStyle,
+    TransitionType, Visibility, parse_drawing_page_style_properties,
     set_drawing_page_style_properties_xml,
 };
 #[allow(
