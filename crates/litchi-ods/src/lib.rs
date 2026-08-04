@@ -11,4 +11,5 @@ pub mod model;
 pub mod package;
 
 pub use facade::{Spreadsheet, SpreadsheetBuilder};
+pub use litchi_odf_common::rdf;
 pub use model::*;

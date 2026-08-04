@@ -255,6 +255,76 @@ impl Presentation {
         }
     }
 
+    /// Read all inert RDF metadata graphs in package order.
+    pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
+        crate::rdf::graphs(&self.package)
+    }
+
+    /// Add a graph and atomically replace this snapshot with the rebuilt package.
+    pub fn add_rdf_graph(
+        &mut self,
+        preferred_path: Option<&str>,
+        triples: &[crate::rdf::Triple],
+    ) -> Result<String> {
+        let (bytes, path) = crate::rdf::add_graph(&self.package, preferred_path, triples)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(path)
+    }
+
+    /// Replace one complete RDF graph and atomically publish the result.
+    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
+        let bytes = crate::rdf::replace_graph(&self.package, path, triples)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Remove one RDF graph after validating that no remaining graph references it.
+    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+        let bytes = crate::rdf::remove_graph(&self.package, path)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Append one triple to an existing graph and return its committed index.
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<usize> {
+        let index = self
+            .rdf_graphs()?
+            .into_iter()
+            .find(|graph| graph.path == path)
+            .ok_or_else(|| Error::InvalidFormat(format!("RDF graph '{path}' was not found")))?
+            .triples
+            .len();
+        let (bytes, _) = crate::rdf::add_triple(&self.package, path, triple)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(index)
+    }
+
+    /// Replace one triple while preserving its description subject.
+    pub fn replace_rdf_triple(
+        &mut self,
+        path: &str,
+        index: usize,
+        triple: &crate::rdf::Triple,
+    ) -> Result<()> {
+        let bytes = crate::rdf::replace_triple(&self.package, path, index, triple)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Remove one triple from a graph.
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+        let bytes = crate::rdf::remove_triple(&self.package, path, index)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Move one triple within its RDF description.
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::rdf::move_triple(&self.package, path, from, to)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
     /// Get the complete format-specific OpenDocument metadata model.
     // Note: For presentation modification operations, see `MutablePresentation` which provides
     // full CRUD operations on slides and shapes including add/remove/update slides, add/remove

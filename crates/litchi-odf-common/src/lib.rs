@@ -13,4 +13,5 @@ pub mod core;
 pub mod datatype;
 pub mod namespace;
 pub mod package;
+pub mod rdf;
 pub mod signature;

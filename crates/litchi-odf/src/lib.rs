@@ -6,7 +6,7 @@
 
 #![forbid(unsafe_code)]
 
-pub use litchi_odf_common::{annotation, constants, coordinates, core, datatype, namespace};
+pub use litchi_odf_common::{annotation, constants, coordinates, core, datatype, namespace, rdf};
 
 /// ODF family detection without constructing a document model.
 pub use litchi_odt::detect;

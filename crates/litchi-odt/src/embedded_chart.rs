@@ -8,6 +8,7 @@ use crate::{
     serialize_chart_content,
 };
 use litchi_core::{Error, Result};
+pub(crate) use litchi_odf_common::package::{Addition, rebuild_package, splice};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -42,12 +43,6 @@ pub(crate) enum EmbeddedChartHost<'a> {
     Text,
     Sheet(&'a str),
     Page(&'a str),
-}
-
-pub(crate) struct Addition {
-    pub(crate) path: String,
-    pub(crate) bytes: Vec<u8>,
-    pub(crate) media_type: String,
 }
 
 #[derive(Clone)]
@@ -465,48 +460,6 @@ fn rename_document_root(
     Ok(out)
 }
 
-pub(crate) fn rebuild_package(
-    source: &OwnedPackage,
-    content: &str,
-    additions: Vec<Addition>,
-    directories: Vec<(String, String)>,
-    excluded_paths: Vec<String>,
-    excluded_prefixes: Vec<String>,
-) -> Result<Vec<u8>> {
-    if content.len() > MAX_CONTENT_BYTES {
-        return invalid("outer content.xml exceeds embedded-chart mutation limit");
-    }
-    let mut writer = PackageWriter::new();
-    writer.set_mimetype(&source.mimetype()?)?;
-    writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
-    if source.has_file(constants::ODF_STYLES)? {
-        writer.add_file(
-            constants::ODF_STYLES,
-            &source.get_file(constants::ODF_STYLES)?,
-        )?;
-    }
-    if source.has_file(constants::ODF_META)? {
-        writer.add_file(constants::ODF_META, &source.get_file(constants::ODF_META)?)?;
-    }
-    for (path, media_type) in directories {
-        writer.add_manifest_directory(&path, &media_type)?;
-    }
-    let mut addition_bytes = 0usize;
-    for addition in additions {
-        addition_bytes = addition_bytes
-            .checked_add(addition.bytes.len())
-            .ok_or_else(|| {
-                Error::InvalidFormat("embedded chart addition size overflow".to_string())
-            })?;
-        if addition_bytes > MAX_EMBEDDED_BYTES {
-            return invalid("embedded chart additions exceed size limit");
-        }
-        writer.add_file_with_media_type(&addition.path, &addition.bytes, &addition.media_type)?;
-    }
-    writer.copy_auxiliary_files_from_except(source, &excluded_paths, &excluded_prefixes)?;
-    writer.finish_to_bytes()
-}
-
 pub(crate) fn unused_object_root(package: &OwnedPackage) -> Result<String> {
     let files = package.files()?;
     let manifest = package.package()?;
@@ -746,17 +699,6 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
         .map_err(|_| Error::InvalidFormat("XML position exceeds platform limits".to_string()))
-}
-pub(crate) fn splice(xml: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
-    if start > end || end > xml.len() || !xml.is_char_boundary(start) || !xml.is_char_boundary(end)
-    {
-        return invalid("invalid embedded chart XML splice range");
-    }
-    let mut out = String::with_capacity(xml.len() - (end - start) + replacement.len());
-    out.push_str(&xml[..start]);
-    out.push_str(replacement);
-    out.push_str(&xml[end..]);
-    Ok(out)
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))

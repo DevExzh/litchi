@@ -17,4 +17,5 @@ pub use facade::*;
 pub use model::*;
 
 pub use litchi_odf_common::core;
+pub use litchi_odf_common::rdf;
 pub use litchi_odf_common::{constants, datatype, namespace};

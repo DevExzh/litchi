@@ -7,14 +7,14 @@ use super::codec::{
 use super::model::{Graph, Object, Subject, Triple};
 use crate::constants;
 use crate::core::OwnedPackage;
-use crate::embedded_chart::{Addition, rebuild_package, splice};
+use crate::package::resolve_package_path;
+use crate::package::{Addition, rebuild_package, splice};
 use litchi_core::{Error, Result};
-use litchi_odf_common::package::resolve_package_path;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
-pub(crate) fn graphs(package: &OwnedPackage) -> Result<Vec<Graph>> {
+pub fn graphs(package: &OwnedPackage) -> Result<Vec<Graph>> {
     let archive = package.package()?;
     let mut paths: Vec<String> = archive
         .manifest()
@@ -39,7 +39,7 @@ pub(crate) fn graphs(package: &OwnedPackage) -> Result<Vec<Graph>> {
     Ok(result)
 }
 
-pub(crate) fn add_graph(
+pub fn add_graph(
     package: &OwnedPackage,
     preferred: Option<&str>,
     triples: &[Triple],
@@ -73,17 +73,13 @@ pub(crate) fn add_graph(
     Ok((bytes, path))
 }
 
-pub(crate) fn replace_graph(
-    package: &OwnedPackage,
-    path: &str,
-    triples: &[Triple],
-) -> Result<Vec<u8>> {
+pub fn replace_graph(package: &OwnedPackage, path: &str, triples: &[Triple]) -> Result<Vec<u8>> {
     let path = existing_graph(package, path)?;
     validate_triples(package, triples, Some(&path))?;
     write_graph(package, &path, serialize_graph(triples)?)
 }
 
-pub(crate) fn remove_graph(package: &OwnedPackage, path: &str) -> Result<Vec<u8>> {
+pub fn remove_graph(package: &OwnedPackage, path: &str) -> Result<Vec<u8>> {
     let path = existing_graph(package, path)?;
     for graph in graphs(package)? {
         if graph.path != path
@@ -110,11 +106,7 @@ pub(crate) fn remove_graph(package: &OwnedPackage, path: &str) -> Result<Vec<u8>
     )
 }
 
-pub(crate) fn add_triple(
-    package: &OwnedPackage,
-    path: &str,
-    triple: &Triple,
-) -> Result<(Vec<u8>, usize)> {
+pub fn add_triple(package: &OwnedPackage, path: &str, triple: &Triple) -> Result<(Vec<u8>, usize)> {
     let path = existing_graph(package, path)?;
     validate_triples(package, std::slice::from_ref(triple), Some(&path))?;
     let xml = graph_xml(package, &path)?;
@@ -127,7 +119,7 @@ pub(crate) fn add_triple(
     write_graph(package, &path, updated).map(|bytes| (bytes, parsed.graph.triples.len()))
 }
 
-pub(crate) fn replace_triple(
+pub fn replace_triple(
     package: &OwnedPackage,
     path: &str,
     index: usize,
@@ -148,7 +140,7 @@ pub(crate) fn replace_triple(
     write_graph(package, &path, updated)
 }
 
-pub(crate) fn remove_triple(package: &OwnedPackage, path: &str, index: usize) -> Result<Vec<u8>> {
+pub fn remove_triple(package: &OwnedPackage, path: &str, index: usize) -> Result<Vec<u8>> {
     let path = existing_graph(package, path)?;
     let xml = graph_xml(package, &path)?;
     let parsed = parse(&path, &xml)?;
@@ -159,12 +151,7 @@ pub(crate) fn remove_triple(package: &OwnedPackage, path: &str, index: usize) ->
     write_graph(package, &path, splice(&xml, span.start, span.end, "")?)
 }
 
-pub(crate) fn move_triple(
-    package: &OwnedPackage,
-    path: &str,
-    from: usize,
-    to: usize,
-) -> Result<Vec<u8>> {
+pub fn move_triple(package: &OwnedPackage, path: &str, from: usize, to: usize) -> Result<Vec<u8>> {
     let path = existing_graph(package, path)?;
     let xml = graph_xml(package, &path)?;
     let parsed = parse(&path, &xml)?;

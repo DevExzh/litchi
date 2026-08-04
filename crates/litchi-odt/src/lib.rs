@@ -68,7 +68,7 @@ pub use litchi_odf_common::{constants, coordinates, datatype, namespace};
 
 pub mod detect;
 pub mod odc;
-pub mod rdf;
+pub use litchi_odf_common::rdf;
 pub mod ods {
     pub mod calculation;
 }
