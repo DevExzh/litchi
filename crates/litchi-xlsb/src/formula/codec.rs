@@ -6,40 +6,10 @@
 /// [MS-XLSB] section 2.2.2 defines formulas as an RPN sequence of Ptg
 /// structures; this module preserves unknown bytes at the containing formula
 /// boundary while validating every modeled token and ancillary payload.
-use thiserror::Error;
-
-mod function_table;
-use function_table::BUILTIN_FUNCTIONS;
-
-/// Maximum size of an XLSB cell formula token stream.
-///
-/// [MS-XLSB] 2.5.98.4 requires cce to be less than 16,385 bytes. Excel also
-/// emits an empty stream for some cells, so zero remains representable.
-pub const MAX_CELL_FORMULA_BYTES: usize = 16_384;
-
-/// Error returned by the standalone formula codec.
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum Error {
-    /// A formula or token violates the BIFF12 formula grammar.
-    #[error("invalid formula: {0}")]
-    InvalidFormula(String),
-    /// A cell or range coordinate is outside the Excel grid.
-    #[error("invalid cell reference: {0}")]
-    InvalidCellReference(String),
-    /// A fixed-width payload is shorter than the required structure.
-    #[error("invalid length: expected {expected}, found {found}")]
-    InvalidLength { expected: usize, found: usize },
-    /// A formula feature is valid but not supported by this codec.
-    #[error("unsupported formula feature: {0}")]
-    UnsupportedFeature(String),
-    /// Text or primitive binary decoding failed.
-    #[error("formula encoding: {0}")]
-    Encoding(String),
-}
-
-/// Result type for standalone formula codecs.
-pub type Result<T> = std::result::Result<T, Error>;
+use super::function_table::BUILTIN_FUNCTIONS;
+use super::model::*;
+use super::model::{column_index_to_name, read_u32_le_at};
+use super::{Error, MAX_CELL_FORMULA_BYTES, Result};
 
 fn read_bytes(data: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
     let end = offset
@@ -56,11 +26,6 @@ fn read_u16_le_at(data: &[u8], offset: usize) -> Result<u16> {
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-fn read_u32_le_at(data: &[u8], offset: usize) -> Result<u32> {
-    let bytes = read_bytes(data, offset, 4)?;
-    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
-}
-
 fn read_f64_le_at(data: &[u8], offset: usize) -> Result<f64> {
     let bytes = read_bytes(data, offset, 8)?;
     Ok(f64::from_le_bytes([
@@ -68,230 +33,7 @@ fn read_f64_le_at(data: &[u8], offset: usize) -> Result<f64> {
     ]))
 }
 
-fn column_index_to_name(mut column: u32) -> String {
-    if column == 0 {
-        return String::new();
-    }
-    let mut name = String::new();
-    while column > 0 {
-        column -= 1;
-        name.insert(0, char::from(b'A' + (column % 26) as u8));
-        column /= 26;
-    }
-    name
-}
-
-fn cell_reference(row: u32, column: u32) -> String {
-    format!("{}{}", column_index_to_name(column + 1), row + 1)
-}
-
-fn parse_cell_reference(value: &str) -> Result<(u32, u32)> {
-    let normalized = value.to_ascii_uppercase();
-    let mut column = String::new();
-    let mut row = String::new();
-    let mut digit_seen = false;
-    for character in normalized.chars() {
-        if character.is_ascii_alphabetic() {
-            if digit_seen {
-                return Err(Error::InvalidCellReference(normalized));
-            }
-            column.push(character);
-        } else if character.is_ascii_digit() {
-            digit_seen = true;
-            row.push(character);
-        } else {
-            return Err(Error::InvalidCellReference(normalized));
-        }
-    }
-    if column.is_empty() || row.is_empty() {
-        return Err(Error::InvalidCellReference(normalized));
-    }
-    let mut column_index = 0_u32;
-    for character in column.bytes() {
-        column_index = column_index
-            .checked_mul(26)
-            .and_then(|value| value.checked_add(u32::from(character - b'A' + 1)))
-            .ok_or_else(|| Error::InvalidCellReference(normalized.clone()))?;
-    }
-    let row_index = row
-        .parse::<u32>()
-        .map_err(|_| Error::InvalidCellReference(normalized.clone()))?;
-    if row_index == 0 || column_index == 0 {
-        return Err(Error::InvalidCellReference(normalized));
-    }
-    Ok((row_index - 1, column_index - 1))
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FormulaRange {
-    pub row_first: u32,
-    pub row_last: u32,
-    pub col_first: u32,
-    pub col_last: u32,
-}
-
-impl FormulaRange {
-    pub fn new(row_first: u32, row_last: u32, col_first: u32, col_last: u32) -> Result<Self> {
-        let range = Self {
-            row_first,
-            row_last,
-            col_first,
-            col_last,
-        };
-        range.validate()?;
-        Ok(range)
-    }
-
-    pub fn parse_a1(value: &str) -> Result<Self> {
-        let (first, last) = value.split_once(':').unwrap_or((value, value));
-        let (row_first, col_first) = parse_cell_reference(first.trim())?;
-        let (row_last, col_last) = parse_cell_reference(last.trim())?;
-        Self::new(row_first, row_last, col_first, col_last)
-    }
-
-    pub fn parse_binary(data: &[u8]) -> Result<Self> {
-        if data.len() < 16 {
-            return Err(Error::InvalidLength {
-                expected: 16,
-                found: data.len(),
-            });
-        }
-        Self::new(
-            read_u32_le_at(data, 0)?,
-            read_u32_le_at(data, 4)?,
-            read_u32_le_at(data, 8)?,
-            read_u32_le_at(data, 12)?,
-        )
-    }
-
-    pub fn to_binary(self) -> [u8; 16] {
-        let mut bytes = [0_u8; 16];
-        bytes[0..4].copy_from_slice(&self.row_first.to_le_bytes());
-        bytes[4..8].copy_from_slice(&self.row_last.to_le_bytes());
-        bytes[8..12].copy_from_slice(&self.col_first.to_le_bytes());
-        bytes[12..16].copy_from_slice(&self.col_last.to_le_bytes());
-        bytes
-    }
-
-    pub fn contains(self, row: u32, col: u32) -> bool {
-        (self.row_first..=self.row_last).contains(&row)
-            && (self.col_first..=self.col_last).contains(&col)
-    }
-
-    pub fn top_left(self) -> (u32, u32) {
-        (self.row_first, self.col_first)
-    }
-
-    pub fn to_a1(self) -> String {
-        format!(
-            "{}:{}",
-            cell_reference(self.row_first, self.col_first),
-            cell_reference(self.row_last, self.col_last)
-        )
-    }
-
-    fn validate(self) -> Result<()> {
-        if self.row_first > self.row_last
-            || self.col_first > self.col_last
-            || self.row_last >= 1_048_576
-            || self.col_last >= 16_384
-        {
-            return Err(Error::InvalidCellReference(self.to_a1()));
-        }
-        Ok(())
-    }
-}
-
-/// The binary representation of a cell formula (`CellParsedFormula`).
-///
-/// `rgce` contains the RPN token stream and `rgcb` contains ancillary data for
-/// tokens such as arrays. Keeping both buffers allows callers to preserve
-/// formulas even when a newer Excel token is not understood by the text
-/// converter.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CellParsedFormula {
-    pub rgce: Vec<u8>,
-    pub rgcb: Vec<u8>,
-}
-
-/// Scalar value stored in an XLSB `PtgExtraArray`.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FormulaArrayValue {
-    Number(f64),
-    String(String),
-    Bool(bool),
-    Error(u8),
-}
-
-/// Kind of non-evaluating memory marker in an XLSB formula token stream.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaMemoryKind {
-    Area,
-    Error(u8),
-    Function,
-    NoMemory,
-}
-
-/// Row subset selected by an XLSB structured table reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaTableRowType {
-    Data,
-    All,
-    Headers,
-    DataAlternate,
-    DataAndHeaders,
-    Totals,
-    DataAndTotals,
-    Current,
-}
-
-/// Column subset selected by a resident structured table reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaTableColumns {
-    All,
-    One(u16),
-    Range { first: u16, last: u16 },
-}
-
-/// Operand class carried by `PtgList`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaTableDataType {
-    Reference,
-    Value,
-    Array,
-}
-
-/// Named column subset stored in a nonresident `PtgExtraList`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FormulaTableNamedColumns {
-    All,
-    One(String),
-    Range { first: String, last: String },
-}
-
-/// Ancillary table/column names for a structured reference in another workbook.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FormulaExternalTableReference {
-    pub table: String,
-    pub row_type: FormulaTableRowType,
-    pub columns: FormulaTableNamedColumns,
-}
-
-/// Typed XLSB `PtgList` structured table reference.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FormulaTableReference {
-    pub sheet_index: u16,
-    pub row_type: Option<FormulaTableRowType>,
-    pub columns: Option<FormulaTableColumns>,
-    pub square_bracket_space: bool,
-    pub comma_space: bool,
-    pub data_type: FormulaTableDataType,
-    pub invalid: bool,
-    pub list_index: Option<u32>,
-    pub external: Option<FormulaExternalTableReference>,
-}
-
-impl CellParsedFormula {
+impl ParsedFormula {
     /// Parse a `CellParsedFormula`, returning the structure and bytes consumed.
     pub fn parse(data: &[u8]) -> Result<(Self, usize)> {
         if data.len() < 4 {
@@ -401,23 +143,7 @@ impl CellParsedFormula {
     }
 }
 
-/// Kind of formula definition following a `PtgExp` cell record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaGroupKind {
-    Array,
-    Shared,
-}
-
-/// Parsed `BrtArrFmla` or `BrtShrFmla` definition.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FormulaGroup {
-    pub kind: FormulaGroupKind,
-    pub range: FormulaRange,
-    pub formula: CellParsedFormula,
-    pub always_calculate: bool,
-}
-
-impl FormulaGroup {
+impl Group {
     pub fn parse_array(data: &[u8]) -> Result<Self> {
         if data.len() < 17 {
             return Err(Error::InvalidLength {
@@ -484,177 +210,7 @@ impl FormulaGroup {
     }
 }
 
-/// Parse Tree Generator (Ptg) token types
-///
-/// These constants define the various formula token types used in XLSB.
-/// Reference: [MS-XLSB] Section 2.5.98.16
-#[allow(dead_code)]
-pub mod ptg_types {
-    // Operands
-    pub const PTG_EXP: u8 = 0x01; // Expression
-    pub const PTG_TBL: u8 = 0x02; // Table
-    pub const PTG_ADD: u8 = 0x03; // Addition
-    pub const PTG_SUB: u8 = 0x04; // Subtraction
-    pub const PTG_MUL: u8 = 0x05; // Multiplication
-    pub const PTG_DIV: u8 = 0x06; // Division
-    pub const PTG_POWER: u8 = 0x07; // Exponentiation
-    pub const PTG_CONCAT: u8 = 0x08; // Concatenation
-    pub const PTG_LT: u8 = 0x09; // Less than
-    pub const PTG_LE: u8 = 0x0A; // Less than or equal
-    pub const PTG_EQ: u8 = 0x0B; // Equal
-    pub const PTG_GE: u8 = 0x0C; // Greater than or equal
-    pub const PTG_GT: u8 = 0x0D; // Greater than
-    pub const PTG_NE: u8 = 0x0E; // Not equal
-    pub const PTG_ISECT: u8 = 0x0F; // Intersection
-    pub const PTG_UNION: u8 = 0x10; // Union
-    pub const PTG_RANGE: u8 = 0x11; // Range
-    pub const PTG_UPLUS: u8 = 0x12; // Unary plus
-    pub const PTG_UMINUS: u8 = 0x13; // Unary minus
-    pub const PTG_PERCENT: u8 = 0x14; // Percent
-    pub const PTG_PAREN: u8 = 0x15; // Parentheses
-    pub const PTG_MISSING_ARG: u8 = 0x16; // Missing argument
-    pub const PTG_STR: u8 = 0x17; // String constant
-    pub const PTG_EXTENDED: u8 = 0x18; // Extended token prefix
-    pub const PTG_ATTR: u8 = 0x19; // Attribute
-    pub const PTG_SHEET: u8 = 0x1A; // Sheet reference
-    pub const PTG_END_SHEET: u8 = 0x1B; // End sheet reference
-    pub const PTG_ERR: u8 = 0x1C; // Error value
-    pub const PTG_BOOL: u8 = 0x1D; // Boolean constant
-    pub const PTG_INT: u8 = 0x1E; // Integer constant
-    pub const PTG_NUM: u8 = 0x1F; // Floating point constant
-
-    // References
-    pub const PTG_REF: u8 = 0x24; // Cell reference
-    pub const PTG_AREA: u8 = 0x25; // Area reference
-    pub const PTG_MEM_AREA: u8 = 0x26; // Memory area
-    pub const PTG_MEM_ERR: u8 = 0x27; // Memory error
-    pub const PTG_MEM_NO_MEM: u8 = 0x28; // Memory no memory
-    pub const PTG_MEM_FUNC: u8 = 0x29; // Memory function
-    pub const PTG_REF_ERR: u8 = 0x2A; // Reference error
-    pub const PTG_AREA_ERR: u8 = 0x2B; // Area error
-    pub const PTG_REF_N: u8 = 0x2C; // Cell reference (relative)
-    pub const PTG_AREA_N: u8 = 0x2D; // Area reference (relative)
-
-    // Functions
-    pub const PTG_NAME_X: u8 = 0x39; // External name
-    pub const PTG_REF_3D: u8 = 0x3A; // 3D cell reference
-    pub const PTG_AREA_3D: u8 = 0x3B; // 3D area reference
-    pub const PTG_REF_ERR_3D: u8 = 0x3C; // 3D reference error
-    pub const PTG_AREA_ERR_3D: u8 = 0x3D; // 3D area error
-
-    // Function calls
-    pub const PTG_FUNC: u8 = 0x21; // Built-in function with fixed args
-    pub const PTG_FUNC_VAR: u8 = 0x22; // Built-in function with variable args
-
-    // Array and name
-    pub const PTG_NAME: u8 = 0x23; // Defined name
-    pub const PTG_ARRAY: u8 = 0x20; // Array constant
-    pub const EPTG_LIST: u8 = 0x19; // Structured table reference
-    pub const EPTG_SX_NAME: u8 = 0x1D; // Pivot calculated name
-}
-
-/// Formula token representation
-///
-/// Represents a single token in a formula's RPN sequence.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FormulaToken {
-    /// Number constant
-    Number(f64),
-    /// String constant
-    String(String),
-    /// Boolean constant
-    Bool(bool),
-    /// Error value
-    Error(u8),
-    /// Integer constant
-    Int(u16),
-    /// Omitted function argument (`PtgMissArg`).
-    MissingArg,
-    /// Display parenthesis around the preceding expression (`PtgParen`).
-    Parenthesis,
-    /// Non-evaluating control/display attribute. The selector is retained for
-    /// diagnostics while its payload is consumed by the parser.
-    Attribute(u8),
-    /// Rectangular constant array stored across `PtgArray` and `RgbExtra`.
-    Array {
-        rows: u32,
-        cols: u32,
-        values: Vec<FormulaArrayValue>,
-    },
-    /// Prefix metadata for a following binary reference expression.
-    Memory {
-        kind: FormulaMemoryKind,
-        expression_bytes: u16,
-        /// Cached `UncheckedRfX` values in field order.
-        cached_ranges: Vec<[u32; 4]>,
-    },
-    /// Cell reference (row, col, relative_row, relative_col)
-    CellRef {
-        row: u32,
-        col: u32,
-        row_relative: bool,
-        col_relative: bool,
-    },
-    /// Area reference (first_row, last_row, first_col, last_col)
-    AreaRef {
-        row_first: u32,
-        row_last: u32,
-        col_first: u32,
-        col_last: u32,
-        row_first_relative: bool,
-        row_last_relative: bool,
-        col_first_relative: bool,
-        col_last_relative: bool,
-    },
-    /// Cell reference qualified by an extern-sheet (`Xti`) index.
-    CellRef3d {
-        sheet_index: u16,
-        row: u32,
-        col: u32,
-        row_relative: bool,
-        col_relative: bool,
-    },
-    /// Area reference qualified by an extern-sheet (`Xti`) index.
-    AreaRef3d {
-        sheet_index: u16,
-        row_first: u32,
-        row_last: u32,
-        col_first: u32,
-        col_last: u32,
-        row_first_relative: bool,
-        row_last_relative: bool,
-        col_first_relative: bool,
-        col_last_relative: bool,
-    },
-    /// Invalid single-cell or area reference. A sheet index is present for
-    /// the 3D token forms and retained even though the text form is `#REF!`.
-    ReferenceError {
-        is_area: bool,
-        sheet_index: Option<u16>,
-    },
-    /// Binary operator
-    BinaryOp(BinaryOperator),
-    /// Unary operator
-    UnaryOp(UnaryOperator),
-    /// Function call (function index, argument count, command-table flag).
-    Function {
-        index: u16,
-        arg_count: u8,
-        is_command: bool,
-    },
-    /// Defined name reference
-    Name(u32),
-    /// Defined name in an external workbook.
-    ExternalName { sheet_index: u16, name_index: u32 },
-    /// Structured table reference (`PtgList`), including nonresident ancillary names.
-    TableReference(FormulaTableReference),
-    /// Zero-based calculated pivot field/item name index (`PtgSxName`).
-    PivotName(u32),
-    /// Unknown/unsupported token
-    Unknown(u8),
-}
-
-impl FormulaToken {
+impl Token {
     /// Encode one of the XLSB extended tokens implemented by this model.
     ///
     /// The first vector is the `Rgce` token and the second is its corresponding
@@ -675,7 +231,7 @@ impl FormulaToken {
     }
 }
 
-impl FormulaTableReference {
+impl TableReference {
     pub fn to_extended_binary(&self) -> Result<(Vec<u8>, Vec<u8>)> {
         let external = self.external.as_ref();
         if self.invalid {
@@ -813,38 +369,10 @@ fn push_formula_utf16(output: &mut Vec<u8>, value: &str) {
     output.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
 }
 
-/// Binary operators
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BinaryOperator {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Power,
-    Concat,
-    LessThan,
-    LessEqual,
-    Equal,
-    GreaterEqual,
-    GreaterThan,
-    NotEqual,
-    Intersection,
-    Union,
-    Range,
-}
-
-/// Unary operators
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnaryOperator {
-    Plus,
-    Minus,
-    Percent,
-}
-
 /// Formula parser
 ///
 /// Parses binary formula bytes into a sequence of tokens.
-pub struct FormulaParser<'a> {
+pub struct Parser<'a> {
     data: &'a [u8],
     offset: usize,
     extra: &'a [u8],
@@ -855,10 +383,10 @@ pub struct FormulaParser<'a> {
     base_cell: Option<(u32, u32)>,
 }
 
-impl<'a> FormulaParser<'a> {
+impl<'a> Parser<'a> {
     /// Create a new formula parser
     pub fn new(data: &'a [u8]) -> Self {
-        FormulaParser {
+        Parser {
             data,
             offset: 0,
             extra: &[],
@@ -872,7 +400,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse a formula together with its corresponding `RgbExtra` stream.
     pub fn with_extra(data: &'a [u8], extra: &'a [u8]) -> Self {
-        FormulaParser {
+        Parser {
             data,
             offset: 0,
             extra,
@@ -886,7 +414,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse a shared-formula definition relative to a concrete target cell.
     pub fn with_base_cell(data: &'a [u8], row: u32, col: u32) -> Self {
-        FormulaParser {
+        Parser {
             data,
             offset: 0,
             extra: &[],
@@ -900,7 +428,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse a shared formula and ancillary stream at a concrete target cell.
     pub fn with_base_cell_and_extra(data: &'a [u8], extra: &'a [u8], row: u32, col: u32) -> Self {
-        FormulaParser {
+        Parser {
             data,
             offset: 0,
             extra,
@@ -1904,7 +1432,7 @@ impl<'a> FormulaParser<'a> {
 ///
 /// The owner codec never discovers package parts or workbook relationships;
 /// it only asks the host for already-resolved formula names and prefixes.
-pub trait FormulaResolution {
+pub trait Resolution {
     fn sheet_prefix(&self, index: u16) -> Result<String>;
     fn defined_name(&self, index: u32) -> Result<String>;
     fn external_name(&self, sheet_index: u16, name_index: u32) -> Result<String>;
@@ -1912,9 +1440,14 @@ pub trait FormulaResolution {
     fn pivot_name(&self, index: u32) -> Result<String>;
 }
 
-pub struct FormulaConverter;
+pub struct Compiler;
 
-impl FormulaConverter {
+// Compatibility names are aliases to the canonical codec types.
+pub use Compiler as FormulaConverter;
+pub use Parser as FormulaParser;
+pub use Resolution as FormulaResolution;
+
+impl Compiler {
     /// Convert formula tokens to string representation
     ///
     /// Uses RPN to infix conversion with proper operator precedence.

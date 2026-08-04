@@ -1,272 +1,19 @@
-//! Typed ISO/IEC 29500 PresentationML legacy comment parts and package graph.
-//!
-//! Comment text and extension payloads are inert data. This module never
-//! resolves identities, follows external targets, or executes embedded data.
+//! Presentation package graph lifecycle and CRUD for legacy comments.
 
+use super::codec::{
+    parse_comment_authors, parse_slide_comments, validate_authors, validate_comment_list,
+    write_comment_authors, write_slide_comments,
+};
+use super::{
+    AUTHORS_CONTENT_TYPE, AUTHORS_REL, Author, COMMENTS_CONTENT_TYPE, COMMENTS_REL, Comment,
+    Comments, Conformance, List, MAX_SLIDES, MAX_TOTAL_COMMENTS, SLIDE_CONTENT_TYPE, SLIDE_REL,
+    STRICT_AUTHORS_REL, STRICT_COMMENTS_REL, STRICT_SLIDE_REL, invalid,
+};
 use crate::{Error, Result};
-use chrono::{DateTime, NaiveDateTime};
-use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
-use quick_xml::encoding::Decoder;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
-const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
-const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
-const COMMENTS_REL: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
-const STRICT_COMMENTS_REL: &str =
-    "http://purl.oclc.org/ooxml/officeDocument/relationships/comments";
-const AUTHORS_REL: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors";
-const STRICT_AUTHORS_REL: &str =
-    "http://purl.oclc.org/ooxml/officeDocument/relationships/commentAuthors";
-const SLIDE_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
-const STRICT_SLIDE_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/slide";
-const AUTHORS_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml";
-const COMMENTS_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.presentationml.comments+xml";
-const SLIDE_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
-const MAX_PART_BYTES: usize = 8 * 1024 * 1024;
-const MAX_DEPTH: usize = 128;
-const MAX_NODES: usize = 262_144;
-const MAX_STRING_BYTES: usize = 1024 * 1024;
-const MAX_AUTHORS: usize = 4096;
-const MAX_SLIDES: usize = 100_000;
-const MAX_COMMENTS_PER_SLIDE: usize = 65_536;
-const MAX_TOTAL_COMMENTS: usize = 1_000_000;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PresentationCommentConformance {
-    Transitional,
-    Strict,
-}
-
-impl PresentationCommentConformance {
-    fn namespace(self) -> &'static str {
-        match self {
-            Self::Transitional => PML,
-            Self::Strict => STRICT_PML,
-        }
-    }
-
-    fn comments_relationship(self) -> &'static str {
-        match self {
-            Self::Transitional => COMMENTS_REL,
-            Self::Strict => STRICT_COMMENTS_REL,
-        }
-    }
-
-    fn authors_relationship(self) -> &'static str {
-        match self {
-            Self::Transitional => AUTHORS_REL,
-            Self::Strict => STRICT_AUTHORS_REL,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationCommentAuthor {
-    pub id: u32,
-    pub name: String,
-    pub initials: String,
-    pub last_index: u32,
-    pub color_index: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationComment {
-    pub author_id: u32,
-    pub date_time: Option<String>,
-    pub index: u32,
-    pub x: i64,
-    pub y: i64,
-    pub text: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideCommentList {
-    pub slide_part_name: String,
-    pub relationship_id: String,
-    pub part_name: String,
-    pub comments: Vec<PresentationComment>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationComments {
-    pub author_relationship_id: String,
-    pub author_part_name: String,
-    pub authors: Vec<PresentationCommentAuthor>,
-    pub slides: Vec<SlideCommentList>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Attribute {
-    name: String,
-    value: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Node {
-    namespace: String,
-    name: String,
-    attributes: Vec<Attribute>,
-    children: Vec<Node>,
-    text: String,
-}
-
-pub fn parse_comment_authors(xml: &[u8]) -> Result<Vec<PresentationCommentAuthor>> {
-    let root = parse_document(xml)?;
-    let namespace = root_namespace(&root, "cmAuthorLst")?;
-    no_attributes(&root, &[])?;
-    whitespace_only(&root)?;
-    if root.children.len() > MAX_AUTHORS {
-        return Err(invalid("comment-author count exceeds limit"));
-    }
-    let mut authors = Vec::with_capacity(root.children.len());
-    let mut ids = HashSet::new();
-    for node in &root.children {
-        require_name(node, namespace, "cmAuthor")?;
-        whitespace_only(node)?;
-        no_attributes(node, &["id", "name", "initials", "lastIdx", "clrIdx"])?;
-        if node.children.len() > 1
-            || node
-                .children
-                .first()
-                .is_some_and(|child| child.namespace != namespace || child.name != "extLst")
-        {
-            return Err(invalid("cmAuthor permits only one trailing extLst"));
-        }
-        let author = PresentationCommentAuthor {
-            id: required_u32(node, "id")?,
-            name: required(node, "name")?.to_owned(),
-            initials: required(node, "initials")?.to_owned(),
-            last_index: required_u32(node, "lastIdx")?,
-            color_index: required_u32(node, "clrIdx")?,
-        };
-        if !ids.insert(author.id) {
-            return Err(invalid(format!(
-                "duplicate comment author ID {}",
-                author.id
-            )));
-        }
-        validate_string("comment author name", &author.name)?;
-        validate_string("comment author initials", &author.initials)?;
-        authors.push(author);
-    }
-    Ok(authors)
-}
-
-pub fn parse_slide_comments(xml: &[u8]) -> Result<Vec<PresentationComment>> {
-    let root = parse_document(xml)?;
-    let namespace = root_namespace(&root, "cmLst")?;
-    no_attributes(&root, &[])?;
-    whitespace_only(&root)?;
-    if root.children.len() > MAX_COMMENTS_PER_SLIDE {
-        return Err(invalid("slide comment count exceeds limit"));
-    }
-    let mut comments = Vec::with_capacity(root.children.len());
-    let mut keys = HashSet::new();
-    for node in &root.children {
-        require_name(node, namespace, "cm")?;
-        whitespace_only(node)?;
-        no_attributes(node, &["authorId", "dt", "idx"])?;
-        if !(node.children.len() == 2 || node.children.len() == 3) {
-            return Err(invalid(
-                "cm requires pos and text, followed optionally by extLst",
-            ));
-        }
-        let position = &node.children[0];
-        require_name(position, namespace, "pos")?;
-        no_attributes(position, &["x", "y"])?;
-        require_empty(position)?;
-        let text = &node.children[1];
-        require_name(text, namespace, "text")?;
-        no_attributes(text, &["xml:space"])?;
-        if !text.children.is_empty() {
-            return Err(invalid("comment text cannot contain elements"));
-        }
-        if let Some(extension_list) = node.children.get(2) {
-            require_name(extension_list, namespace, "extLst")?;
-        }
-        let date_time = optional(node, "dt").map(ToOwned::to_owned);
-        if let Some(value) = &date_time {
-            validate_date_time(value)?;
-        }
-        let comment = PresentationComment {
-            author_id: required_u32(node, "authorId")?,
-            date_time,
-            index: required_u32(node, "idx")?,
-            x: required_i64(position, "x")?,
-            y: required_i64(position, "y")?,
-            text: text.text.clone(),
-        };
-        if comment.index == 0 {
-            return Err(invalid("comment index must be at least 1"));
-        }
-        validate_string("comment text", &comment.text)?;
-        if !keys.insert((comment.author_id, comment.index)) {
-            return Err(invalid("duplicate author/index comment key in slide"));
-        }
-        comments.push(comment);
-    }
-    Ok(comments)
-}
-
-pub fn write_comment_authors(
-    authors: &[PresentationCommentAuthor],
-    conformance: PresentationCommentConformance,
-) -> Result<Vec<u8>> {
-    validate_authors(authors)?;
-    let mut output = declaration();
-    output.extend_from_slice(b"<p:cmAuthorLst xmlns:p=\"");
-    escape(&mut output, conformance.namespace());
-    output.extend_from_slice(b"\">");
-    for author in authors {
-        output.extend_from_slice(b"<p:cmAuthor");
-        attribute(&mut output, "id", &author.id.to_string());
-        attribute(&mut output, "name", &author.name);
-        attribute(&mut output, "initials", &author.initials);
-        attribute(&mut output, "lastIdx", &author.last_index.to_string());
-        attribute(&mut output, "clrIdx", &author.color_index.to_string());
-        output.extend_from_slice(b"/>");
-    }
-    output.extend_from_slice(b"</p:cmAuthorLst>");
-    Ok(output)
-}
-
-pub fn write_slide_comments(
-    comments: &[PresentationComment],
-    conformance: PresentationCommentConformance,
-) -> Result<Vec<u8>> {
-    validate_comment_list(comments)?;
-    let mut output = declaration();
-    output.extend_from_slice(b"<p:cmLst xmlns:p=\"");
-    escape(&mut output, conformance.namespace());
-    output.extend_from_slice(b"\">");
-    for comment in comments {
-        output.extend_from_slice(b"<p:cm");
-        attribute(&mut output, "authorId", &comment.author_id.to_string());
-        if let Some(date_time) = &comment.date_time {
-            attribute(&mut output, "dt", date_time);
-        }
-        attribute(&mut output, "idx", &comment.index.to_string());
-        output.extend_from_slice(b"><p:pos");
-        attribute(&mut output, "x", &comment.x.to_string());
-        attribute(&mut output, "y", &comment.y.to_string());
-        output.extend_from_slice(b"/><p:text>");
-        escape(&mut output, &comment.text);
-        output.extend_from_slice(b"</p:text></p:cm>");
-    }
-    output.extend_from_slice(b"</p:cmLst>");
-    Ok(output)
-}
-
-pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<PresentationComments>> {
+pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Comments>> {
     let presentation = package.main_document_part()?;
     require_presentation_content_type(presentation.content_type())?;
     let presentation_name = presentation.partname().to_string();
@@ -317,7 +64,7 @@ pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Present
         let part = package.get_part(&target)?;
         require_content_type(part, COMMENTS_CONTENT_TYPE)?;
         reject_outbound_relationships(part, "comments")?;
-        slide_lists.push(SlideCommentList {
+        slide_lists.push(List {
             slide_part_name: slide_name.clone(),
             relationship_id: relationship.r_id().to_owned(),
             part_name: target.to_string(),
@@ -342,7 +89,7 @@ pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Present
     require_content_type(author_part, AUTHORS_CONTENT_TYPE)?;
     reject_outbound_relationships(author_part, "comment-author")?;
     reject_orphan_parts(package, Some(author_target.as_str()), &comment_targets)?;
-    let value = PresentationComments {
+    let value = Comments {
         author_relationship_id: author_relationship.r_id().to_owned(),
         author_part_name: author_target.to_string(),
         authors: parse_comment_authors(author_part.blob())?,
@@ -354,8 +101,8 @@ pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Present
 
 pub fn store_presentation_comments(
     package: &mut OpcPackage,
-    value: &PresentationComments,
-    conformance: PresentationCommentConformance,
+    value: &Comments,
+    conformance: Conformance,
 ) -> Result<()> {
     validate_package_value(value)?;
     if load_presentation_comments(package)?.is_some() {
@@ -459,7 +206,7 @@ pub fn store_presentation_comments(
 pub fn find_presentation_comment_author(
     package: &OpcPackage,
     author_id: u32,
-) -> Result<Option<PresentationCommentAuthor>> {
+) -> Result<Option<Author>> {
     Ok(load_presentation_comments(package)?.and_then(|graph| {
         graph
             .authors
@@ -470,8 +217,8 @@ pub fn find_presentation_comment_author(
 
 pub fn add_presentation_comment_author(
     package: &mut OpcPackage,
-    author: PresentationCommentAuthor,
-    conformance: PresentationCommentConformance,
+    author: Author,
+    conformance: Conformance,
 ) -> Result<()> {
     let mut graph = if let Some(graph) = load_presentation_comments(package)? {
         graph
@@ -479,7 +226,7 @@ pub fn add_presentation_comment_author(
         let presentation = package.main_document_part()?;
         let relationship_id = next_relationship_id(presentation, "rIdCommentAuthors")?;
         let part_name = next_legacy_author_part_name(package)?.to_string();
-        let graph = PresentationComments {
+        let graph = Comments {
             author_relationship_id: relationship_id,
             author_part_name: part_name,
             authors: vec![author],
@@ -502,8 +249,8 @@ pub fn add_presentation_comment_author(
 pub fn update_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
-    author: PresentationCommentAuthor,
-    conformance: PresentationCommentConformance,
+    author: Author,
+    conformance: Conformance,
 ) -> Result<()> {
     if author.id != author_id {
         return Err(invalid("replacement author ID must remain stable"));
@@ -522,8 +269,8 @@ pub fn update_presentation_comment_author(
 pub fn replace_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
-    author: PresentationCommentAuthor,
-    conformance: PresentationCommentConformance,
+    author: Author,
+    conformance: Conformance,
 ) -> Result<()> {
     update_presentation_comment_author(package, author_id, author, conformance)
 }
@@ -531,7 +278,7 @@ pub fn replace_presentation_comment_author(
 pub fn remove_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
-    conformance: PresentationCommentConformance,
+    conformance: Conformance,
 ) -> Result<bool> {
     let Some(mut graph) = load_presentation_comments(package)? else {
         return Ok(false);
@@ -559,7 +306,7 @@ pub fn remove_presentation_comment_author(
 pub fn reorder_presentation_comment_authors(
     package: &mut OpcPackage,
     ordered_ids: &[u32],
-    conformance: PresentationCommentConformance,
+    conformance: Conformance,
 ) -> Result<()> {
     let mut graph = load_presentation_comments(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
@@ -595,7 +342,7 @@ pub fn find_presentation_comment(
     slide_part_name: &str,
     author_id: u32,
     index: u32,
-) -> Result<Option<PresentationComment>> {
+) -> Result<Option<Comment>> {
     Ok(load_presentation_comments(package)?.and_then(|graph| {
         graph
             .slides
@@ -613,8 +360,8 @@ pub fn find_presentation_comment(
 pub fn add_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
-    comment: PresentationComment,
-    conformance: PresentationCommentConformance,
+    comment: Comment,
+    conformance: Conformance,
 ) -> Result<()> {
     let mut graph = load_presentation_comments(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
@@ -681,8 +428,8 @@ pub fn update_presentation_comment(
     slide_part_name: &str,
     author_id: u32,
     index: u32,
-    replacement: PresentationComment,
-    conformance: PresentationCommentConformance,
+    replacement: Comment,
+    conformance: Conformance,
 ) -> Result<()> {
     if replacement.author_id != author_id || replacement.index != index {
         return Err(invalid("replacement comment identity must remain stable"));
@@ -708,8 +455,8 @@ pub fn replace_presentation_comment(
     slide_part_name: &str,
     author_id: u32,
     index: u32,
-    replacement: PresentationComment,
-    conformance: PresentationCommentConformance,
+    replacement: Comment,
+    conformance: Conformance,
 ) -> Result<()> {
     update_presentation_comment(
         package,
@@ -726,7 +473,7 @@ pub fn remove_presentation_comment(
     slide_part_name: &str,
     author_id: u32,
     index: u32,
-    conformance: PresentationCommentConformance,
+    conformance: Conformance,
 ) -> Result<bool> {
     let Some(graph) = load_presentation_comments(package)? else {
         return Ok(false);
@@ -767,7 +514,7 @@ pub fn reorder_presentation_comments(
     package: &mut OpcPackage,
     slide_part_name: &str,
     ordered_keys: &[(u32, u32)],
-    conformance: PresentationCommentConformance,
+    conformance: Conformance,
 ) -> Result<()> {
     let graph = load_presentation_comments(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
@@ -806,8 +553,8 @@ pub fn reorder_presentation_comments(
 
 fn commit_legacy_authors(
     package: &mut OpcPackage,
-    graph: &PresentationComments,
-    conformance: PresentationCommentConformance,
+    graph: &Comments,
+    conformance: Conformance,
 ) -> Result<()> {
     validate_package_value(graph)?;
     let xml = write_comment_authors(&graph.authors, conformance)?;
@@ -820,9 +567,9 @@ fn commit_legacy_authors(
 
 fn commit_legacy_slide_comments(
     package: &mut OpcPackage,
-    slide: &SlideCommentList,
-    comments: Vec<PresentationComment>,
-    conformance: PresentationCommentConformance,
+    slide: &List,
+    comments: Vec<Comment>,
+    conformance: Conformance,
 ) -> Result<()> {
     let xml = write_slide_comments(&comments, conformance)?;
     parse_slide_comments(&xml)?;
@@ -883,45 +630,7 @@ fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
     })
 }
 
-fn validate_authors(authors: &[PresentationCommentAuthor]) -> Result<()> {
-    if authors.len() > MAX_AUTHORS {
-        return Err(invalid("comment-author count exceeds limit"));
-    }
-    let mut ids = HashSet::new();
-    for author in authors {
-        validate_string("comment author name", &author.name)?;
-        validate_string("comment author initials", &author.initials)?;
-        if !ids.insert(author.id) {
-            return Err(invalid(format!(
-                "duplicate comment author ID {}",
-                author.id
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_comment_list(comments: &[PresentationComment]) -> Result<()> {
-    if comments.len() > MAX_COMMENTS_PER_SLIDE {
-        return Err(invalid("slide comment count exceeds limit"));
-    }
-    let mut keys = HashSet::new();
-    for comment in comments {
-        if comment.index == 0 {
-            return Err(invalid("comment index must be at least 1"));
-        }
-        validate_string("comment text", &comment.text)?;
-        if let Some(date_time) = &comment.date_time {
-            validate_date_time(date_time)?;
-        }
-        if !keys.insert((comment.author_id, comment.index)) {
-            return Err(invalid("duplicate author/index comment key in slide"));
-        }
-    }
-    Ok(())
-}
-
-fn validate_package_value(value: &PresentationComments) -> Result<()> {
+fn validate_package_value(value: &Comments) -> Result<()> {
     validate_authors(&value.authors)?;
     if value.slides.len() > MAX_SLIDES {
         return Err(invalid("commented-slide count exceeds limit"));
@@ -1065,306 +774,6 @@ fn reject_orphan_parts(
     Ok(())
 }
 
-fn parse_document(xml: &[u8]) -> Result<Node> {
-    if xml.len() > MAX_PART_BYTES {
-        return Err(invalid("presentation comment part is too large"));
-    }
-    let processed = process_ooxml(xml)?;
-    if processed.len() > MAX_PART_BYTES {
-        return Err(invalid(
-            "MCE-expanded presentation comment part is too large",
-        ));
-    }
-    let mut reader = NsReader::from_reader(processed.as_ref());
-    reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
-    let mut stack = Vec::new();
-    let mut root = None;
-    let mut nodes = 0usize;
-    let mut strings = 0usize;
-    loop {
-        let decoder = reader.decoder();
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
-        match event {
-            Event::Start(element) => {
-                if stack.len() >= MAX_DEPTH {
-                    return Err(invalid("presentation comment XML depth exceeds limit"));
-                }
-                let node = make_node(&element, namespace, decoder, &mut strings)?;
-                nodes += 1;
-                if nodes > MAX_NODES {
-                    return Err(invalid("presentation comment XML node count exceeds limit"));
-                }
-                stack.push(node);
-            },
-            Event::Empty(element) => {
-                let node = make_node(&element, namespace, decoder, &mut strings)?;
-                nodes += 1;
-                if nodes > MAX_NODES {
-                    return Err(invalid("presentation comment XML node count exceeds limit"));
-                }
-                attach(node, &mut stack, &mut root)?;
-            },
-            Event::End(element) => {
-                let node = stack
-                    .pop()
-                    .ok_or_else(|| invalid("unexpected XML end element"))?;
-                if node.name.as_bytes() != element.local_name().as_ref() {
-                    return Err(invalid("mismatched XML end element"));
-                }
-                attach(node, &mut stack, &mut root)?;
-            },
-            Event::Text(text) => {
-                let decoded = text.decode().map_err(xml_error)?;
-                let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
-                strings = strings
-                    .checked_add(decoded.len())
-                    .ok_or_else(|| invalid("XML string size overflow"))?;
-                if strings > MAX_STRING_BYTES {
-                    return Err(invalid("presentation comment XML strings exceed limit"));
-                }
-                if let Some(node) = stack.last_mut() {
-                    node.text.push_str(&decoded);
-                } else if !decoded.trim().is_empty() {
-                    return Err(invalid("text outside XML root"));
-                }
-            },
-            Event::CData(_) => {
-                return Err(invalid("CDATA is rejected in presentation comment parts"));
-            },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("DTD and processing instructions are rejected"));
-            },
-            Event::GeneralRef(reference) => {
-                let name = reference.decode().map_err(xml_error)?;
-                let value =
-                    if let Some(character) = reference.resolve_char_ref().map_err(xml_error)? {
-                        character.to_string()
-                    } else {
-                        match name.as_ref() {
-                            "amp" => "&".to_owned(),
-                            "lt" => "<".to_owned(),
-                            "gt" => ">".to_owned(),
-                            "apos" => "'".to_owned(),
-                            "quot" => "\"".to_owned(),
-                            _ => {
-                                return Err(invalid(format!(
-                                    "custom XML entity '&{name};' is rejected"
-                                )));
-                            },
-                        }
-                    };
-                strings = strings
-                    .checked_add(value.len())
-                    .ok_or_else(|| invalid("XML string size overflow"))?;
-                if strings > MAX_STRING_BYTES {
-                    return Err(invalid("presentation comment XML strings exceed limit"));
-                }
-                if let Some(node) = stack.last_mut() {
-                    node.text.push_str(&value);
-                } else {
-                    return Err(invalid("entity reference outside XML root"));
-                }
-            },
-            Event::Decl(_) | Event::Comment(_) => {},
-            Event::Eof => break,
-        }
-        buffer.clear();
-    }
-    if !stack.is_empty() {
-        return Err(invalid("unterminated presentation comment XML"));
-    }
-    root.ok_or_else(|| invalid("missing presentation comment XML root"))
-}
-
-fn make_node(
-    element: &BytesStart<'_>,
-    namespace: ResolveResult<'_>,
-    decoder: Decoder,
-    strings: &mut usize,
-) -> Result<Node> {
-    let namespace = match namespace {
-        ResolveResult::Bound(value) => std::str::from_utf8(value.as_ref())
-            .map_err(xml_error)?
-            .to_owned(),
-        ResolveResult::Unbound => String::new(),
-        ResolveResult::Unknown(prefix) => {
-            return Err(invalid(format!(
-                "unbound XML namespace prefix '{}'",
-                String::from_utf8_lossy(prefix.as_ref())
-            )));
-        },
-    };
-    let name = std::str::from_utf8(element.local_name().as_ref())
-        .map_err(xml_error)?
-        .to_owned();
-    let mut attributes = Vec::new();
-    let mut seen = HashSet::new();
-    for attribute_value in element.attributes().with_checks(true) {
-        let attribute_value = attribute_value.map_err(xml_error)?;
-        let name = std::str::from_utf8(attribute_value.key.as_ref())
-            .map_err(xml_error)?
-            .to_owned();
-        if !seen.insert(name.clone()) {
-            return Err(invalid("duplicate XML attribute"));
-        }
-        let value = attribute_value
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
-            .map_err(xml_error)?
-            .into_owned();
-        *strings = strings
-            .checked_add(name.len() + value.len())
-            .ok_or_else(|| invalid("XML string size overflow"))?;
-        if *strings > MAX_STRING_BYTES {
-            return Err(invalid("presentation comment XML strings exceed limit"));
-        }
-        if name != "xmlns" && !name.starts_with("xmlns:") {
-            attributes.push(Attribute { name, value });
-        }
-    }
-    Ok(Node {
-        namespace,
-        name,
-        attributes,
-        children: Vec::new(),
-        text: String::new(),
-    })
-}
-
-fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
-    if let Some(parent) = stack.last_mut() {
-        parent.children.push(node);
-    } else if root.replace(node).is_some() {
-        return Err(invalid("multiple XML roots"));
-    }
-    Ok(())
-}
-
-fn root_namespace<'a>(root: &'a Node, name: &str) -> Result<&'a str> {
-    if root.name != name || !matches!(root.namespace.as_str(), PML | STRICT_PML) {
-        return Err(invalid(format!("expected PresentationML {name} root")));
-    }
-    Ok(&root.namespace)
-}
-
-fn require_name(node: &Node, namespace: &str, name: &str) -> Result<()> {
-    if node.namespace == namespace && node.name == name {
-        Ok(())
-    } else {
-        Err(invalid(format!(
-            "expected PresentationML {name}, got {}",
-            node.name
-        )))
-    }
-}
-
-fn no_attributes(node: &Node, allowed: &[&str]) -> Result<()> {
-    if let Some(attribute) = node
-        .attributes
-        .iter()
-        .find(|attribute| !allowed.contains(&attribute.name.as_str()))
-    {
-        return Err(invalid(format!(
-            "unexpected attribute '{}' on {}",
-            attribute.name, node.name
-        )));
-    }
-    Ok(())
-}
-
-fn required<'a>(node: &'a Node, name: &str) -> Result<&'a str> {
-    optional(node, name)
-        .ok_or_else(|| invalid(format!("{} requires attribute '{name}'", node.name)))
-}
-
-fn optional<'a>(node: &'a Node, name: &str) -> Option<&'a str> {
-    node.attributes
-        .iter()
-        .find(|attribute| attribute.name == name)
-        .map(|attribute| attribute.value.as_str())
-}
-
-fn required_u32(node: &Node, name: &str) -> Result<u32> {
-    required(node, name)?.parse().map_err(|_| {
-        invalid(format!(
-            "invalid unsigned integer '{name}' on {}",
-            node.name
-        ))
-    })
-}
-
-fn required_i64(node: &Node, name: &str) -> Result<i64> {
-    required(node, name)?
-        .parse()
-        .map_err(|_| invalid(format!("invalid coordinate '{name}' on {}", node.name)))
-}
-
-fn whitespace_only(node: &Node) -> Result<()> {
-    if node.text.trim().is_empty() {
-        Ok(())
-    } else {
-        Err(invalid(format!("unexpected text in {}", node.name)))
-    }
-}
-
-fn require_empty(node: &Node) -> Result<()> {
-    if node.children.is_empty() && node.text.trim().is_empty() {
-        Ok(())
-    } else {
-        Err(invalid(format!("{} must be empty", node.name)))
-    }
-}
-
-fn validate_string(label: &str, value: &str) -> Result<()> {
-    if value.len() <= MAX_STRING_BYTES {
-        Ok(())
-    } else {
-        Err(invalid(format!("{label} exceeds size limit")))
-    }
-}
-
-fn validate_date_time(value: &str) -> Result<()> {
-    if DateTime::parse_from_rfc3339(value).is_ok()
-        || NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
-    {
-        Ok(())
-    } else {
-        Err(invalid(format!("invalid XML dateTime '{value}'")))
-    }
-}
-
-fn declaration() -> Vec<u8> {
-    br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec()
-}
-
-fn attribute(output: &mut Vec<u8>, name: &str, value: &str) {
-    output.push(b' ');
-    output.extend_from_slice(name.as_bytes());
-    output.extend_from_slice(b"=\"");
-    escape(output, value);
-    output.push(b'"');
-}
-
-fn escape(output: &mut Vec<u8>, value: &str) {
-    for character in value.chars() {
-        match character {
-            '&' => output.extend_from_slice(b"&amp;"),
-            '<' => output.extend_from_slice(b"&lt;"),
-            '>' => output.extend_from_slice(b"&gt;"),
-            '"' => output.extend_from_slice(b"&quot;"),
-            '\t' => output.extend_from_slice(b"&#x9;"),
-            '\n' => output.extend_from_slice(b"&#xA;"),
-            '\r' => output.extend_from_slice(b"&#xD;"),
-            _ => {
-                let mut bytes = [0; 4];
-                output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
-            },
-        }
-    }
-}
-
 fn require_presentation_content_type(value: &str) -> Result<()> {
     if matches!(
         value,
@@ -1411,24 +820,19 @@ fn is_comments_relationship(value: &str) -> bool {
 fn is_authors_relationship(value: &str) -> bool {
     matches!(value, AUTHORS_REL | STRICT_AUTHORS_REL)
 }
-fn xml_error(error: impl std::fmt::Display) -> Error {
-    Error::Xml(error.to_string())
-}
-fn invalid(message: impl Into<String>) -> Error {
-    Error::Invalid(message.into())
-}
 
 #[cfg(test)]
 mod tests {
+    use super::super::{MAX_AUTHORS, MAX_DEPTH, MAX_PART_BYTES, PML, STRICT_PML};
     use super::*;
 
     const POI: &[u8] =
-        include_bytes!("../../../test-data/poi/test-data/slideshow/45545_Comment.pptx");
+        include_bytes!("../../../../test-data/poi/test-data/slideshow/45545_Comment.pptx");
     const LIBREOFFICE: &[u8] =
-        include_bytes!("../../../test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx");
+        include_bytes!("../../../../test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx");
 
-    fn author() -> PresentationCommentAuthor {
-        PresentationCommentAuthor {
+    fn author() -> Author {
+        Author {
             id: 7,
             name: "A & B".into(),
             initials: "AB".into(),
@@ -1437,8 +841,8 @@ mod tests {
         }
     }
 
-    fn comment() -> PresentationComment {
-        PresentationComment {
+    fn comment() -> Comment {
+        Comment {
             author_id: 7,
             date_time: Some("2026-07-17T12:34:56.123+08:00".into()),
             index: 1,
@@ -1477,12 +881,12 @@ mod tests {
         package
     }
 
-    fn value() -> PresentationComments {
-        PresentationComments {
+    fn value() -> Comments {
+        Comments {
             author_relationship_id: "rId2".into(),
             author_part_name: "/ppt/commentAuthors.xml".into(),
             authors: vec![author()],
-            slides: vec![SlideCommentList {
+            slides: vec![List {
                 slide_part_name: "/ppt/slides/slide1.xml".into(),
                 relationship_id: "rId2".into(),
                 part_name: "/ppt/comments/comment1.xml".into(),
@@ -1516,17 +920,15 @@ mod tests {
     fn strict_writers_are_deterministic_and_round_trip() {
         let authors = vec![author()];
         let comments = vec![comment()];
-        let author_xml =
-            write_comment_authors(&authors, PresentationCommentConformance::Strict).unwrap();
-        let comment_xml =
-            write_slide_comments(&comments, PresentationCommentConformance::Strict).unwrap();
+        let author_xml = write_comment_authors(&authors, Conformance::Strict).unwrap();
+        let comment_xml = write_slide_comments(&comments, Conformance::Strict).unwrap();
         assert_eq!(
             author_xml,
-            write_comment_authors(&authors, PresentationCommentConformance::Strict).unwrap()
+            write_comment_authors(&authors, Conformance::Strict).unwrap()
         );
         assert_eq!(
             comment_xml,
-            write_slide_comments(&comments, PresentationCommentConformance::Strict).unwrap()
+            write_slide_comments(&comments, Conformance::Strict).unwrap()
         );
         assert!(
             std::str::from_utf8(&comment_xml)
@@ -1552,12 +954,7 @@ mod tests {
     fn package_writer_round_trips_strict_graph() {
         let mut package = package();
         let expected = value();
-        store_presentation_comments(
-            &mut package,
-            &expected,
-            PresentationCommentConformance::Strict,
-        )
-        .unwrap();
+        store_presentation_comments(&mut package, &expected, Conformance::Strict).unwrap();
         assert_eq!(
             load_presentation_comments(&package).unwrap().unwrap(),
             expected
@@ -1606,12 +1003,8 @@ mod tests {
         let mut missing_author = value();
         missing_author.slides[0].comments[0].author_id = 99;
         assert!(
-            store_presentation_comments(
-                &mut package(),
-                &missing_author,
-                PresentationCommentConformance::Transitional
-            )
-            .is_err()
+            store_presentation_comments(&mut package(), &missing_author, Conformance::Transitional)
+                .is_err()
         );
 
         let mut external = package();
@@ -1628,12 +1021,7 @@ mod tests {
         assert!(load_presentation_comments(&external).is_err());
 
         let mut outbound = package();
-        store_presentation_comments(
-            &mut outbound,
-            &value(),
-            PresentationCommentConformance::Transitional,
-        )
-        .unwrap();
+        store_presentation_comments(&mut outbound, &value(), Conformance::Transitional).unwrap();
         outbound
             .get_part_mut(&PackURI::new("/ppt/comments/comment1.xml").unwrap())
             .unwrap()

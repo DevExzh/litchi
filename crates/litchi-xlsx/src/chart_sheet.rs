@@ -5,6 +5,7 @@
 //! chartsheet part grammar described by [MS-XLSX] and [MS-OE376].
 
 use crate::error::{Error, Result};
+use litchi_ooxml_common::custom_xml::valid_guid;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -1659,15 +1660,7 @@ fn parse_state(value: &str) -> Result<ChartSheetState> {
     }
 }
 fn validate_guid(value: &str) -> Result<()> {
-    let bytes = value.as_bytes();
-    if bytes.len() != 38
-        || bytes[0] != b'{'
-        || bytes[37] != b'}'
-        || ![9, 14, 19, 24].iter().all(|index| bytes[*index] == b'-')
-        || bytes[1..37].iter().enumerate().any(|(index, byte)| {
-            !matches!(index + 1, 9 | 14 | 19 | 24) && !byte.is_ascii_hexdigit()
-        })
-    {
+    if !valid_guid(value) {
         return Err(invalid(format!(
             "invalid custom chartsheet view GUID '{value}'"
         )));

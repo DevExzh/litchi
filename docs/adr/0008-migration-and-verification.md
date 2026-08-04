@@ -4151,6 +4151,46 @@ test remains blocked before project compilation because `pkg-config` is not
 available for `yeslogic-fontconfig-sys`/fontconfig. No native Office or
 performance claim is made for this batch.
 
+## PPTX legacy comments, XLSX query tables, and XLSB formula owner layering
+
+This batch applies the same semantic folder rule to three remaining flat
+owners while preserving the existing host adapters and public compatibility
+paths:
+
+- `litchi-pptx::comments` is layered as `model.rs`, `codec.rs`, and
+  `package.rs`. `Conformance`, `Author`, `Comment`, `List`, and `Comments`
+  are the canonical contextual names; historical `PresentationComment*` and
+  `SlideCommentList` names are aliases.
+- `litchi-xlsx::query_table` is layered as `model.rs`, `codec.rs`, and
+  `package.rs`. `Table`, `WorksheetTable`, and the unprefixed value/enums are
+  canonical; historical `QueryTable*` names remain aliases.
+- `litchi-xlsb::formula` is layered as `model.rs`, `codec.rs`, and
+  `function_table.rs`. `Range`, `ParsedFormula`, `Token`, `Parser`,
+  `Compiler`, and the table/reference models are canonical; historical
+  `Formula*` and `CellParsedFormula` names remain aliases.
+
+The shared OOXML `ST_Guid` validator from
+`litchi-ooxml-common::custom_xml` is now reused by XLSX chartsheet, slicer
+cache, and timeline owners in addition to the earlier common-validation
+surfaces. No XML-tree or BIFF12 formula abstraction was promoted across
+formats: the retained query-table extension tree and Ptg grammar have
+format-specific limits and semantics.
+
+Checked-in specification anchors are `[MS-PPTX]` §§2.1.5--2.1.6, 2.2.10,
+and 2.4.3.2--2.4.3.6 for legacy comments; `[MS-XLSX]` §§2.2.4.7, 2.4.41,
+and 2.6.88 for query tables; and `[MS-XLSB]` §§2.2.2, 2.5.98,
+2.5.98.4, and 2.5.98.16 for formulas and Ptgs.
+
+Focused owner all-target tests pass: 196 PPTX, 395 XLSX, and 91 XLSB
+library tests, with integration/doctest targets passing. The no-default-
+features `litchi-ooxml` suite passes 1,499 host library tests and all
+targets; strict owner and host Clippy, formatting, diff, and the crate
+boundary audit pass. The audit remains at 35 workspace packages, 107
+internal dependency declarations, and 13 scheduled debt edges. The full
+workspace test remains blocked before project compilation because `pkg-config`
+is not available for `yeslogic-fontconfig-sys`/fontconfig. No native Office or
+performance claim is made for this batch.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

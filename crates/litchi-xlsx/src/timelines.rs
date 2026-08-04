@@ -4,6 +4,7 @@ use crate::auto_filter::{
     AutoFilterDefinition, parse_auto_filter_fragment, write_auto_filter_fragment,
 };
 use crate::error::{Error, Result};
+use litchi_ooxml_common::custom_xml::valid_guid;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::XmlVersion;
@@ -2008,17 +2009,7 @@ fn looks_like_r1c1(value: &str) -> bool {
         && col.bytes().all(|b| b.is_ascii_digit())
 }
 fn validate_guid(value: &str) -> Result<()> {
-    let inner = value
-        .strip_prefix('{')
-        .and_then(|value| value.strip_suffix('}'))
-        .unwrap_or(value);
-    let groups: Vec<_> = inner.split('-').collect();
-    if groups.len() != 5
-        || groups
-            .iter()
-            .zip([8, 4, 4, 4, 12])
-            .any(|(group, len)| group.len() != len || !group.bytes().all(|b| b.is_ascii_hexdigit()))
-    {
+    if !valid_guid(value) {
         Err(invalid(format!("invalid GUID '{value}'")))
     } else {
         Ok(())

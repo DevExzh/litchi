@@ -152,15 +152,20 @@ pub use phonetic_properties::{
     parse_worksheet_phonetic_properties,
 };
 pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+// Keep the historical root names as aliases; semantic query-table names live
+// under `query_table` and remain available there without the repeated prefix.
 pub use query_table::{
-    QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, QueryTable, QueryTableConformance,
-    QueryTableExtensionAttribute, QueryTableExtensionList, QueryTableField,
-    QueryTableGrowShrinkType, QueryTableIconSet, QueryTableRefresh, QueryTableSortBy,
-    QueryTableSortCondition, QueryTableSortMethod, QueryTableSortState,
-    STRICT_QUERY_TABLE_RELATIONSHIP_TYPE, WorksheetQueryTable, add_worksheet_query_table,
-    find_worksheet_query_table, is_query_table_relationship_type, load_worksheet_query_tables,
-    parse_query_table, remove_worksheet_query_table, reorder_worksheet_query_tables,
-    replace_worksheet_query_table, update_worksheet_query_table, write_query_table,
+    Conformance as QueryTableConformance, ExtensionAttribute as QueryTableExtensionAttribute,
+    ExtensionList as QueryTableExtensionList, Field as QueryTableField,
+    GrowShrinkType as QueryTableGrowShrinkType, IconSet as QueryTableIconSet,
+    QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, Refresh as QueryTableRefresh,
+    STRICT_QUERY_TABLE_RELATIONSHIP_TYPE, SortBy as QueryTableSortBy,
+    SortCondition as QueryTableSortCondition, SortMethod as QueryTableSortMethod,
+    SortState as QueryTableSortState, Table as QueryTable, WorksheetTable as WorksheetQueryTable,
+    add_worksheet_query_table, find_worksheet_query_table, is_query_table_relationship_type,
+    load_worksheet_query_tables, parse_query_table, remove_worksheet_query_table,
+    reorder_worksheet_query_tables, replace_worksheet_query_table, update_worksheet_query_table,
+    write_query_table,
 };
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{

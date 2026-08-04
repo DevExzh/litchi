@@ -10,6 +10,7 @@
 /// bounded sizes. Serialization is deterministic and never interprets
 /// relationship-looking content inside retained subtrees.
 use crate::error::{Error, Result};
+use litchi_ooxml_common::custom_xml::valid_guid;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -708,18 +709,7 @@ fn validate_name(value: &str) -> Result<()> {
 }
 
 fn validate_guid(value: &str) -> Result<()> {
-    let bytes = value.as_bytes();
-    if bytes.len() != 38
-        || bytes[0] != b'{'
-        || bytes[37] != b'}'
-        || ![9, 14, 19, 24]
-            .iter()
-            .all(|position| bytes[*position] == b'-')
-        || bytes[1..37]
-            .iter()
-            .enumerate()
-            .any(|(index, byte)| ![8, 13, 18, 23].contains(&index) && !byte.is_ascii_hexdigit())
-    {
+    if !valid_guid(value) {
         Err(invalid(format!("invalid Slicer Cache uid '{value}'")))
     } else {
         Ok(())
