@@ -9,6 +9,7 @@
 
 pub mod calc;
 pub mod conditional_formatting;
+pub mod data_validation;
 pub mod date_utils;
 pub mod external_link;
 pub mod formula;
@@ -18,6 +19,9 @@ pub mod raw;
 
 pub use raw::Error;
 
+pub use data_validation::{
+    DataValidation, DataValidationRecordKind, DataValidationSettings, FormulaBinary,
+};
 pub use formula::ptg_types;
 pub use formula::{
     BinaryOperator, CellParsedFormula, Error as FormulaError, FormulaArrayValue,
