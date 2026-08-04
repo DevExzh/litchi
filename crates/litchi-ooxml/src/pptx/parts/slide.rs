@@ -1027,7 +1027,9 @@ impl<'a> SlidePart<'a> {
 
     /// Parse the simple shape-animation metadata in this slide's timing tree.
     pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
-        crate::pptx::animations::AnimationSequence::parse_slide_xml(self.xml_bytes())
+        Ok(crate::pptx::animations::AnimationSequence::parse_slide_xml(
+            self.xml_bytes(),
+        )?)
     }
 
     /// Get the background for this slide.
@@ -1109,7 +1111,9 @@ impl<'a> SlideLayoutPart<'a> {
 
     /// Parse the timing metadata declared by this slide layout.
     pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
-        crate::pptx::animations::AnimationSequence::parse_slide_xml(self.xml_bytes())
+        Ok(crate::pptx::animations::AnimationSequence::parse_slide_xml(
+            self.xml_bytes(),
+        )?)
     }
 
     /// Get the transition effect inherited from this slide layout.
@@ -1201,7 +1205,9 @@ impl<'a> SlideMasterPart<'a> {
 
     /// Parse the timing metadata declared by this slide master.
     pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
-        crate::pptx::animations::AnimationSequence::parse_slide_xml(self.xml_bytes())
+        Ok(crate::pptx::animations::AnimationSequence::parse_slide_xml(
+            self.xml_bytes(),
+        )?)
     }
 
     /// Get the transition effect inherited from this slide master.

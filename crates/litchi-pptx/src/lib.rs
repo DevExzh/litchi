@@ -13,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod animations;
 pub mod backgrounds;
 pub mod comments;
 mod error;
@@ -27,6 +28,7 @@ pub mod tag;
 pub mod time;
 pub mod transition;
 
+pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use comments::{
     PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
