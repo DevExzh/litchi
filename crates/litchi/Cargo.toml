@@ -176,18 +176,6 @@ name = "odp_writer_test"
 required-features = ["odf"]
 
 [[example]]
-name = "ods_features_demo"
-required-features = ["odf"]
-
-[[example]]
-name = "ods_reader_test"
-required-features = ["odf"]
-
-[[example]]
-name = "ods_writer_test"
-required-features = ["odf"]
-
-[[example]]
 name = "odt_mutable_page_styles_demo"
 required-features = ["odf"]
 
