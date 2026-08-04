@@ -116,10 +116,13 @@ litchi-iwa          = { version = "0.0.1", path = "crates/litchi-iwa" }
 litchi-iwa-common   = { version = "0.0.1", path = "crates/litchi-iwa-common" }
 litchi-iwa-core     = { version = "0.0.1", path = "crates/litchi-iwa-core" }
 litchi-iwa-graph    = { version = "0.0.1", path = "crates/litchi-iwa-graph" }
+litchi-iwa-text     = { version = "0.0.1", path = "crates/litchi-iwa-text" }
 litchi-iwa-protos   = { version = "0.0.1", path = "crates/litchi-iwa-protos" }
+litchi-keynote      = { version = "0.0.1", path = "crates/litchi-keynote" }
 litchi-markdown     = { version = "0.0.1", path = "crates/litchi-markdown" }
 litchi-odb          = { version = "0.0.1", path = "crates/litchi-odb" }
 litchi-odc          = { version = "0.0.1", path = "crates/litchi-odc" }
+litchi-pages        = { version = "0.0.1", path = "crates/litchi-pages" }
 litchi-odf          = { version = "0.0.1", path = "crates/litchi-odf" }
 litchi-odf-common   = { version = "0.0.1", path = "crates/litchi-odf-common" }
 litchi-odf-formula  = { version = "0.0.1", path = "crates/litchi-odf-formula" }

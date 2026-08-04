@@ -32,7 +32,7 @@
 mod creation;
 pub mod document;
 pub mod editor;
-pub mod section;
+mod section;
 
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
@@ -79,4 +79,4 @@ pub use editor::{
     RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie,
     RemovedPagesTextBox,
 };
-pub use section::{PagesSection, PagesSectionType};
+pub use litchi_pages::{Section, SectionType};

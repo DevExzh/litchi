@@ -68,6 +68,18 @@ wire primitives; `litchi-iwa` and future `litchi-pages`, `litchi-numbers`, and
 an archive, graph, facade, or concrete iWork format crate, and concrete format
 owners retain their own object-model and package-topology semantics.
 
+The first extracted semantic value layer is `litchi-iwa-text`, which owns only
+the allocation-bearing rich-text values shared by the format leaves. It has no
+archive, protobuf, or application dependency. `litchi-pages` owns the concise
+`Section`/`SectionType` vocabulary, and `litchi-keynote` owns `Slide`, `Show`,
+build, and transition values; both depend downward on `litchi-iwa-text` only.
+The existing `litchi-iwa` package reader temporarily consumes these leaf values
+through private migration adapters. The direct edges are present in the
+canonical boundary graph because the adapters are already dependency-safe;
+their removal is a staged ownership exit, not a public compatibility layer.
+Numbers remains the next format-leaf migration, with no peer dependency between
+the three concrete crates.
+
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
 `plot_area`, `reader`, and `writer`; the public codec verbs are the short

@@ -5,14 +5,13 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::show::KeynoteShow;
-use super::slide::KeynoteSlide;
 use crate::bundle::{Bundle, BundleLimits};
 use crate::detect::detect_application_from_document;
 use crate::object_index::ObjectIndex;
 use crate::registry::Application;
 use crate::text::TextExtractor;
 use crate::{Error, Result};
+use litchi_keynote::{Show, Slide};
 
 /// High-level interface for Keynote documents
 #[derive(Debug, Clone)]
@@ -174,7 +173,7 @@ impl KeynoteDocument {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn slides(&self) -> Result<Vec<KeynoteSlide>> {
+    pub fn slides(&self) -> Result<Vec<Slide>> {
         let mut slides = Vec::new();
 
         for (index, slide_id) in self.slide_ids()?.into_iter().enumerate() {
@@ -249,14 +248,10 @@ impl KeynoteDocument {
     }
 
     /// Parse a single slide from an object
-    fn parse_slide(
-        &self,
-        index: usize,
-        object: &crate::archive::ArchiveObject,
-    ) -> Result<KeynoteSlide> {
+    fn parse_slide(&self, index: usize, object: &crate::archive::ArchiveObject) -> Result<Slide> {
         use prost::Message;
 
-        let mut slide = KeynoteSlide::new(index);
+        let mut slide = Slide::new(index);
 
         // Extract text content from the slide object
         let text_parts = crate::archive::extract_text(object);
@@ -361,8 +356,8 @@ impl KeynoteDocument {
     }
 
     /// Extract build animation from a BuildArchive object
-    fn extract_build_animation(&self, build_id: u64) -> Result<super::slide::BuildAnimation> {
-        use super::slide::{BuildAnimation, BuildAnimationType};
+    fn extract_build_animation(&self, build_id: u64) -> Result<litchi_keynote::BuildAnimation> {
+        use litchi_keynote::{BuildAnimation, BuildAnimationType};
         use prost::Message;
 
         if let Some(resolved) = self
@@ -400,8 +395,8 @@ impl KeynoteDocument {
     }
 
     /// Parse build delivery string into animation type
-    fn parse_build_delivery(delivery: &str) -> super::slide::BuildAnimationType {
-        use super::slide::BuildAnimationType;
+    fn parse_build_delivery(delivery: &str) -> litchi_keynote::BuildAnimationType {
+        use litchi_keynote::BuildAnimationType;
 
         match delivery.to_lowercase().as_str() {
             s if s.contains("appear") => BuildAnimationType::Appear,
@@ -417,8 +412,8 @@ impl KeynoteDocument {
     fn parse_transition(
         &self,
         transition: &crate::protobuf::kn::TransitionArchive,
-    ) -> Option<super::slide::SlideTransition> {
-        use super::slide::{SlideTransition, TransitionType};
+    ) -> Option<litchi_keynote::SlideTransition> {
+        use litchi_keynote::{SlideTransition, TransitionType};
 
         // Extract duration from attributes
         // The attributes field is required (not Optional)
@@ -673,8 +668,8 @@ impl KeynoteDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// # }
     /// ```
-    pub fn show(&self) -> Result<KeynoteShow> {
-        let mut show = KeynoteShow::new();
+    pub fn show(&self) -> Result<Show> {
+        let mut show = Show::new();
 
         // Extract show metadata from ShowArchive (message type 2 is KN.ShowArchive)
         let show_objects = self.state.bundle.find_objects_by_type(1101);

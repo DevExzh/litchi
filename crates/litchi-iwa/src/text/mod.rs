@@ -43,7 +43,6 @@ mod paragraph_style_rename;
 mod paragraph_tabs;
 mod position;
 mod smart_field_object;
-pub mod storage;
 mod storage_wire;
 pub mod style;
 pub(crate) mod style_registry;
@@ -134,7 +133,10 @@ pub use text_comment_types::{
 };
 
 pub use extractor::TextExtractor;
-pub use storage::{TextFragment, TextRun, TextStorage};
+pub use litchi_iwa_text::{
+    TextFragment, TextFragmentIter, TextRun, TextStorage, extract_text_from_storages,
+    parse_storage_archive,
+};
 pub use style::{
     ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
     ParagraphBorders, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,

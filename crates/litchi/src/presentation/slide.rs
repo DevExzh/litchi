@@ -12,7 +12,7 @@ pub enum Slide {
     Pptx(SlideData),
     /// Apple Keynote slide
     #[cfg(feature = "iwa")]
-    Keynote(crate::iwa::keynote::KeynoteSlide),
+    Keynote(crate::iwa::keynote::Slide),
     /// OpenDocument Presentation slide
     #[cfg(feature = "odf")]
     Odp(litchi_odp::Slide),

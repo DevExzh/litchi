@@ -5738,6 +5738,18 @@ bounded owner slice.
 
 ## Quality gates
 
+The IWA migration has now established a value-model seam. `litchi-iwa-text`
+owns `TextStorage`, `TextRun`, and borrowed `TextFragment` values; `litchi-pages`
+owns `Section` and `SectionType`; and `litchi-keynote` owns `Slide`, `Show`,
+build-animation, and transition values. The old implementations were removed
+from the monolith; only private, non-public type adapters remain where a
+concurrent reader migration still refers to the legacy local spelling. No
+archive, protobuf, or application decoder was moved into these value crates.
+The adapters and the three corresponding `litchi-iwa` dependency edges are
+staged ownership work, not compatibility API; their exit is to move the owning
+readers before deleting the adapters. The next equivalent slice should extract
+Numbers values and then migrate the Pages/Keynote reader boundaries.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

@@ -2,7 +2,7 @@
 //!
 //! Provides utilities for extracting text from iWork document objects.
 
-use super::storage::{TextStorage, parse_storage_archive};
+use super::{TextStorage, parse_storage_archive};
 use crate::Result;
 use crate::archive::{ArchiveObject, extract_text};
 use crate::bundle::Bundle;
@@ -55,7 +55,7 @@ impl TextExtractor {
             return Ok(TextStorage::new());
         }
 
-        parse_storage_archive(&text_lines)
+        Ok(parse_storage_archive(&text_lines))
     }
 
     /// Get all extracted text as a single string

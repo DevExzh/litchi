@@ -33,8 +33,6 @@
 pub mod creation;
 pub mod document;
 pub mod editor;
-pub mod show;
-pub mod slide;
 
 pub use creation::KeynoteDocumentBuilder;
 pub use document::KeynoteDocument;
@@ -96,5 +94,6 @@ pub use editor::{
     RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape, RemovedKeynoteSlideTable,
     RemovedKeynoteTextBox,
 };
-pub use show::KeynoteShow;
-pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};
+pub use litchi_keynote::{
+    BuildAnimation, BuildAnimationType, Show, Slide, SlideTransition, TransitionType,
+};

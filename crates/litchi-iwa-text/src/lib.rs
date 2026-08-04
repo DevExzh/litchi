@@ -1,24 +1,27 @@
-//! Text Storage Structures
+//! Shared rich-text value models for the iWork format crates.
 //!
-//! iWork documents store text in TSWP (Text Word Processing) storage objects
-//! that contain rich text with styling information.
+//! This crate intentionally has no archive, protobuf, or application-format
+//! dependencies. It owns only the allocation-bearing text values that Pages,
+//! Numbers, and Keynote can exchange without importing one another's package
+//! semantics.
 
-use crate::Result;
+#![forbid(unsafe_code)]
 
-/// Represents a contiguous block of text storage
-#[derive(Debug, Clone)]
+/// A contiguous rich-text storage value.
+#[derive(Debug, Clone, Default)]
 pub struct TextStorage {
-    /// The raw text content
+    /// The UTF-8 text content.
     pub text: String,
-    /// Text runs with styling information
+    /// Runs with styling references relative to [`Self::text`].
     pub runs: Vec<TextRun>,
-    /// Storage identifier
+    /// The source storage identifier, when one exists.
     pub identifier: Option<u64>,
 }
 
 impl TextStorage {
-    /// Create a new empty text storage
-    pub fn new() -> Self {
+    /// Creates an empty text storage.
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             text: String::new(),
             runs: Vec::new(),
@@ -26,7 +29,8 @@ impl TextStorage {
         }
     }
 
-    /// Create text storage from a string
+    /// Creates a storage containing one unstyled run for `text`.
+    #[must_use]
     pub fn from_text(text: String) -> Self {
         let length = text.len();
         Self {
@@ -40,12 +44,14 @@ impl TextStorage {
         }
     }
 
-    /// Get plain text content without styling
+    /// Borrows the plain text content without copying it.
+    #[must_use]
     pub fn plain_text(&self) -> &str {
         &self.text
     }
 
-    /// Iterate over text fragments without copying their text.
+    /// Iterates over non-empty, valid text fragments without copying text.
+    #[must_use]
     pub fn iter_fragments(&self) -> TextFragmentIter<'_> {
         TextFragmentIter {
             text: &self.text,
@@ -53,44 +59,40 @@ impl TextStorage {
         }
     }
 
-    /// Check if storage is empty
-    pub fn is_empty(&self) -> bool {
+    /// Returns whether the storage contains no text.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.text.is_empty()
     }
 
-    /// Get length of stored text
-    pub fn len(&self) -> usize {
+    /// Returns the UTF-8 byte length of the stored text.
+    #[must_use]
+    pub const fn len(&self) -> usize {
         self.text.len()
     }
 }
 
-impl Default for TextStorage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Represents a run of text with consistent styling
+/// A text run with a shared style reference.
 #[derive(Debug, Clone)]
 pub struct TextRun {
-    /// Offset from start of text storage
+    /// UTF-8 byte offset from the start of the storage.
     pub offset: usize,
-    /// Length of this run
+    /// UTF-8 byte length of this run.
     pub length: usize,
-    /// Style identifier (reference to style object)
+    /// Optional style identifier.
     pub style: Option<u64>,
 }
 
-/// A borrowed fragment of text with its associated style.
+/// A borrowed fragment of text and its associated style reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextFragment<'a> {
-    /// The text content borrowed from its [`TextStorage`].
+    /// Text borrowed from the source storage.
     pub text: &'a str,
-    /// Optional style reference
+    /// Optional style identifier.
     pub style: Option<u64>,
 }
 
-/// Lazy iterator over the non-empty, valid runs in a [`TextStorage`].
+/// Lazy iterator over valid, non-empty runs in a [`TextStorage`].
 #[derive(Debug)]
 pub struct TextFragmentIter<'a> {
     text: &'a str,
@@ -112,22 +114,23 @@ impl<'a> Iterator for TextFragmentIter<'a> {
     }
 }
 
-/// Parse text storage from protobuf StorageArchive message
-pub fn parse_storage_archive(text_lines: &[String]) -> Result<TextStorage> {
-    // StorageArchive in iWork protobuf contains text as repeated string field
-    // Join all text lines with newlines to preserve structure
-    let text = text_lines.join("\n");
-
-    Ok(TextStorage::from_text(text))
+/// Converts protobuf-decoded text lines into one storage value.
+///
+/// The line representation has already been decoded by the owning format
+/// crate, so joining it cannot fail. Returning the value directly removes an
+/// unnecessary error wrapper from this allocation-free model layer.
+#[must_use]
+pub fn parse_storage_archive(text_lines: &[String]) -> TextStorage {
+    TextStorage::from_text(text_lines.join("\n"))
 }
 
-/// Extract text from multiple storage archives
+/// Joins owned storages while preserving empty storage positions.
+#[must_use]
 pub fn extract_text_from_storages(storages: Vec<TextStorage>) -> String {
     let capacity = storages
-        .iter()
-        .fold(storages.len().saturating_sub(1), |capacity, storage| {
-            capacity.saturating_add(storage.text.len())
-        });
+        .len()
+        .saturating_sub(1)
+        .saturating_add(storages.iter().map(|storage| storage.text.len()).sum());
     let mut text = String::with_capacity(capacity);
 
     for (index, storage) in storages.into_iter().enumerate() {
@@ -145,16 +148,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_text_storage_creation() {
-        let storage = TextStorage::from_text("Hello, World!".to_string());
+    fn text_storage_creation() {
+        let storage = TextStorage::from_text("Hello, World!".to_owned());
         assert_eq!(storage.plain_text(), "Hello, World!");
         assert_eq!(storage.len(), 13);
         assert!(!storage.is_empty());
     }
 
     #[test]
-    fn test_text_fragments_are_borrowed() {
-        let mut storage = TextStorage::from_text("Hello World".to_string());
+    fn text_fragments_are_borrowed() {
+        let mut storage = TextStorage::from_text("Hello World".to_owned());
         storage.runs = vec![
             TextRun {
                 offset: 0,
@@ -185,9 +188,9 @@ mod tests {
     }
 
     #[test]
-    fn test_text_fragments_skip_malformed_runs() {
+    fn malformed_runs_are_skipped() {
         let storage = TextStorage {
-            text: "éclair".to_string(),
+            text: "éclair".to_owned(),
             runs: vec![
                 TextRun {
                     offset: usize::MAX,
@@ -215,11 +218,11 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_text_uses_one_output_and_preserves_empty_storages() {
+    fn joined_text_uses_one_output_and_preserves_empty_storages() {
         let text = extract_text_from_storages(vec![
-            TextStorage::from_text("First".to_string()),
+            TextStorage::from_text("First".to_owned()),
             TextStorage::new(),
-            TextStorage::from_text("第三".to_string()),
+            TextStorage::from_text("第三".to_owned()),
         ]);
 
         assert_eq!(text, "First\n\n第三");
@@ -227,14 +230,14 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_storage_archive() {
+    fn parse_storage_archive_joins_lines() {
         let lines = vec![
-            "First line".to_string(),
-            "Second line".to_string(),
-            "Third line".to_string(),
+            "First line".to_owned(),
+            "Second line".to_owned(),
+            "Third line".to_owned(),
         ];
 
-        let storage = parse_storage_archive(&lines).unwrap();
+        let storage = parse_storage_archive(&lines);
         assert!(storage.plain_text().contains("First line"));
         assert!(storage.plain_text().contains("Second line"));
         assert!(storage.plain_text().contains("Third line"));

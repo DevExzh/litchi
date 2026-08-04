@@ -14,7 +14,10 @@ litchi-core   = { workspace = true }
 litchi-iwa-common = { workspace = true }
 litchi-iwa-core = { workspace = true }
 litchi-iwa-graph = { workspace = true }
+litchi-iwa-text = { workspace = true }
 litchi-iwa-protos = { workspace = true }
+litchi-keynote = { workspace = true }
+litchi-pages = { workspace = true }
 once_cell     = { workspace = true }
 phf           = { workspace = true }
 plist         = { workspace = true }
