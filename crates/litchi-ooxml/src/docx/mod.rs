@@ -141,10 +141,6 @@ pub use mail_merge::{
     MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
 };
 pub use math::{OfficeMath, OfficeMathParagraph};
-pub use numbering::{
-    AbstractNum, MultiLevelType, Num, NumberFormat, Numbering, ParseMultiLevelTypeError,
-    ParseNumberFormatError, PictureBullet,
-};
 pub use package::Package;
 pub use paragraph::{
     Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,

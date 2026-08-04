@@ -1,7 +1,7 @@
 //! Package-neutral WordprocessingML numbering definitions.
 //!
 //! The owner keeps the compact semantic vocabulary here; the OOXML host
-//! exposes legacy names only as compatibility aliases.
+//! supplies only package and relationship orchestration around it.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};

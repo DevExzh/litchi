@@ -807,20 +807,3 @@ fn word_attribute_value(
     }
     Ok(value)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::numbering::model::Format;
-
-    #[test]
-    fn parses_package_neutral_numbering_xml() {
-        let value = parse_numbering(
-            br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>"#,
-        )
-        .expect("valid numbering XML");
-        assert_eq!(value.abstract_num_count(), 1);
-        assert_eq!(value.num_count(), 1);
-        assert_eq!(value.abstract_nums()[0].levels()[0].format, Format::Decimal);
-    }
-}

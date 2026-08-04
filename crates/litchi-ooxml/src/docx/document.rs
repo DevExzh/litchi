@@ -21,7 +21,7 @@ use crate::docx::footnote::Note;
 use crate::docx::header_footer::HeaderFooter;
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::mail_merge::{MailMergeRecipients, is_settings_relationship};
-use crate::docx::numbering::Numbering;
+use crate::docx::numbering::parse_part;
 use crate::docx::paragraph::Paragraph;
 use crate::docx::parts::DocumentPart;
 use crate::docx::section::{Section, Sections};
@@ -38,6 +38,7 @@ use crate::docx::variables::DocumentVariables;
 use crate::docx::writer::Watermark;
 use crate::error::{OoxmlError, Result};
 use litchi_docx::alt::{Chunk, Part as AltPart, Target, is_relationship};
+use litchi_docx::numbering::{Collection, Suffix};
 use litchi_docx::web;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
@@ -188,7 +189,7 @@ impl<'a> Document<'a> {
                                 if level.paragraph_style.as_deref() == Some(style_id)
                                     && found.is_none()
                                 {
-                                    found = Some(crate::docx::numbering::ParagraphNumbering {
+                                    found = Some(litchi_docx::numbering::Paragraph {
                                         num_id: num.id(),
                                         level: level.level,
                                     });
@@ -275,9 +276,9 @@ impl<'a> Document<'a> {
                 if let crate::docx::list::ListMarker::Text(label) = item.marker {
                     output.push_str(&label);
                     match item.suffix {
-                        crate::docx::numbering::NumberingSuffix::Tab => output.push('\t'),
-                        crate::docx::numbering::NumberingSuffix::Space => output.push(' '),
-                        crate::docx::numbering::NumberingSuffix::Nothing => {},
+                        Suffix::Tab => output.push('\t'),
+                        Suffix::Space => output.push(' '),
+                        Suffix::Nothing => {},
                     }
                 }
             }
@@ -2315,7 +2316,7 @@ impl<'a> Document<'a> {
 
     /// Get the numbering definitions for the document.
     ///
-    /// Returns a `Numbering` object providing access to abstract numbering
+    /// Returns a numbering collection providing access to abstract numbering
     /// definitions and numbering instances used for lists.
     ///
     /// # Examples
@@ -2335,7 +2336,7 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn numbering(&self) -> Result<Option<Numbering>> {
+    pub fn numbering(&self) -> Result<Option<Collection>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
 
@@ -2344,7 +2345,7 @@ impl<'a> Document<'a> {
             Ok(rel) => {
                 let target = rel.target_partname()?;
                 let numbering_part = self.opc.get_part(&target)?;
-                Ok(Some(Numbering::extract_from_part(numbering_part)?))
+                Ok(Some(parse_part(numbering_part)?))
             },
             Err(_) => {
                 // No numbering in document

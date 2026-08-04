@@ -4075,14 +4075,16 @@ or performance claim is made for this batch.
 
 This batch applies the concise-name and layered-module rule across all three
 format crates. Each owner surface is split into `mod.rs`, `model.rs`, and
-`codec.rs`; host files retain only compatibility names, MCE/OPC preprocessing,
-relationship/content-type traversal, and legacy representation conversion:
+`codec.rs` (with `tests.rs` where the owner-level suite is substantial); host
+files retain only MCE/OPC preprocessing, relationship/content-type traversal,
+and legacy representation conversion:
 
 - `litchi-docx::numbering` owns the package-neutral numbering collection,
   definitions, instances, levels, overrides, closed numbering enums, picture
-  bullets, and bounded WordprocessingML state machine. The host preserves the
-  historical `Numbering`, `AbstractNum`, `Num`, and related aliases while
-  retaining MCE/OPC extraction.
+  bullets, and bounded WordprocessingML state machine. The host exposes this
+  owner vocabulary under its contextual `numbering` module and retains only
+  MCE/OPC extraction and error mapping; `Numbering`, `AbstractNum`, `Num`, and
+  the other prefix-expanded compatibility spellings are not retained.
 - `litchi-xlsb::styles` owns neutral alignment, border, font, fill, number
   format, cell-format, styles-table models and the strict Brt* codec. The host
   preserves `StylesTable` and converts owner alignment/border values to the
@@ -4479,12 +4481,12 @@ makes no new external conformance claim beyond the existing parser fixtures.
 ## Owner-only API convergence
 
 The migration now removes compatibility-only aliases and duplicate host model
-wrappers for the touched seams. PPTX and DOCX modern comments, PPTX actions,
-XLSX header/footer, XLSB PivotTable views, ODF font faces, and ODF datatypes
-are consumed through their canonical owner types. OOXML host package methods
-may still map owner errors or resolve OPC relationships, but they no longer
-invent a second semantic type or a prefix-expanded alias. Callers that need a
-format-neutral model use the owning common crate directly.
+wrappers for the touched seams. DOCX numbering, PPTX and DOCX modern comments,
+PPTX actions, XLSX header/footer, XLSB PivotTable views, ODF font faces, and
+ODF datatypes are consumed through their canonical owner types. OOXML host
+package methods may still map owner errors or resolve OPC relationships, but
+they no longer invent a second semantic type or a prefix-expanded alias.
+Callers that need a format-neutral model use the owning common crate directly.
 
 ## ODF namespace vocabulary extraction
 

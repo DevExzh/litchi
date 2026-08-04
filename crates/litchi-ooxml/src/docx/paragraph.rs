@@ -7,7 +7,6 @@ use crate::docx::namespace::{
     direct_word_property_value, is_wordprocessing_namespace, normalize_xml_integer,
     scan_word_element_ranges,
 };
-use crate::docx::numbering::ParagraphNumbering;
 use crate::docx::revision::{Revision, parse_revisions};
 use crate::docx::smart_tag::SmartTag;
 use crate::error::{OoxmlError, Result};
@@ -59,7 +58,7 @@ fn is_fragment_word_name(
 
 impl Paragraph {
     /// Return direct paragraph numbering properties, including `numId=0` cancellation.
-    pub fn numbering(&self) -> Result<Option<ParagraphNumbering>> {
+    pub fn numbering(&self) -> Result<Option<litchi_docx::numbering::Paragraph>> {
         Ok(self.list_properties()?.0)
     }
 
@@ -68,7 +67,9 @@ impl Paragraph {
         Ok(self.list_properties()?.1)
     }
 
-    fn list_properties(&self) -> Result<(Option<ParagraphNumbering>, Option<String>)> {
+    fn list_properties(
+        &self,
+    ) -> Result<(Option<litchi_docx::numbering::Paragraph>, Option<String>)> {
         let mut reader = NsReader::from_reader(self.xml_bytes());
         let mut depth = 0usize;
         let mut word_prefix: Option<Vec<u8>> = None;
@@ -201,7 +202,7 @@ impl Paragraph {
             }
         }
         let numbering = if saw_numpr {
-            Some(ParagraphNumbering {
+            Some(litchi_docx::numbering::Paragraph {
                 num_id: num_id.ok_or_else(|| {
                     OoxmlError::InvalidFormat("paragraph numPr is missing numId".to_owned())
                 })?,

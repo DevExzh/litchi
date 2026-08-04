@@ -1,7 +1,7 @@
 /// Styles - document styles and formatting definitions.
 use crate::docx::enums::WdStyleType;
-use crate::docx::numbering::ParagraphNumbering;
 use crate::error::{OoxmlError, Result};
+use litchi_docx::numbering::Paragraph;
 use litchi_opc::part::Part;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -153,7 +153,7 @@ impl<'a> Styles<'a> {
     }
 
     /// Resolve inherited paragraph numbering with a bounded, cycle-checked `basedOn` walk.
-    pub fn resolved_numbering(&mut self, style_id: &str) -> Result<Option<ParagraphNumbering>> {
+    pub fn resolved_numbering(&mut self, style_id: &str) -> Result<Option<Paragraph>> {
         self.ensure_styles_loaded()?;
         let styles = self.style_list.as_ref().expect("styles loaded");
         let mut current = style_id;
@@ -370,11 +370,10 @@ impl<'a> Styles<'a> {
                     let num_id = pending_num_id.take().ok_or_else(|| {
                         OoxmlError::InvalidFormat("style numPr is missing numId".to_owned())
                     })?;
-                    current_style.as_mut().expect("style checked").numbering =
-                        Some(ParagraphNumbering {
-                            num_id,
-                            level: pending_level.take().unwrap_or(0),
-                        });
+                    current_style.as_mut().expect("style checked").numbering = Some(Paragraph {
+                        num_id,
+                        level: pending_level.take().unwrap_or(0),
+                    });
                     in_num_pr = false;
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"pPr" && in_ppr => {
@@ -426,7 +425,7 @@ struct StyleBuilder {
     is_default: bool,
     is_custom: bool,
     based_on: Option<String>,
-    numbering: Option<ParagraphNumbering>,
+    numbering: Option<Paragraph>,
     outline: Option<Outline>,
     priority: Option<i32>,
     is_quick_style: bool,
@@ -452,7 +451,7 @@ pub struct Style {
     is_custom: bool,
     /// ID of the style this is based on
     based_on: Option<String>,
-    numbering: Option<ParagraphNumbering>,
+    numbering: Option<Paragraph>,
     outline: Option<Outline>,
     /// UI priority for display ordering
     priority: Option<i32>,
@@ -513,7 +512,7 @@ impl Style {
 
     /// Direct paragraph numbering declared by this style.
     #[inline]
-    pub fn numbering(&self) -> Option<ParagraphNumbering> {
+    pub fn numbering(&self) -> Option<Paragraph> {
         self.numbering
     }
 
@@ -597,11 +596,11 @@ mod tests {
         with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Base"><w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="7"/></w:numPr></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Child"><w:basedOn w:val="Base"/></w:style><w:style w:type="paragraph" w:styleId="Cancel"><w:pPr><w:numPr><w:numId w:val="0"/></w:numPr></w:pPr></w:style></w:styles>"#, |value| {
             assert_eq!(
                 value.resolved_numbering("Child").unwrap(),
-                Some(ParagraphNumbering { num_id: 7, level: 2 })
+                Some(Paragraph { num_id: 7, level: 2 })
             );
             assert_eq!(
                 value.resolved_numbering("Cancel").unwrap(),
-                Some(ParagraphNumbering { num_id: 0, level: 0 })
+                Some(Paragraph { num_id: 0, level: 0 })
             );
         });
     }

@@ -241,6 +241,16 @@ operation, so spelling normalization cannot make selectors disagree. The
 package host exposes symmetric `fonts`, `put_fonts`, and `remove_fonts` entry
 points, but never discovers, loads, renders, or executes a font program.
 
+`litchi-docx::numbering` owns the package-neutral numbering collection,
+definitions, instances, levels, overrides, picture bullets, closed numbering
+domains, and bounded WordprocessingML codec. Its contextual facade uses names
+such as `Collection`, `Definition`, `Instance`, `Level`, `Format`, `Restart`,
+and `Suffix`; it does not carry a redundant `Docx` or `Numbering` prefix. The
+OOXML migration host only resolves the numbering relationship, preprocesses
+the part with markup compatibility, maps errors, and returns the owner
+collection. It does not define a second model or retain prefix-expanded
+compatibility aliases.
+
 `litchi-docx::alt` owns WordprocessingML alternative-format anchors and opaque
 payload typing. Its short vocabulary is `Chunk`, `Conformance`, `Data`,
 `Import`, `Kind`, `Part`, and `Target`; cheap low-level identifiers are checked
