@@ -4,9 +4,7 @@
 //! `TextInteractiveInfoAtom`. Offsets are UTF-16 code-unit positions and no
 //! target is resolved or activated here.
 
-use super::hyperlink::{
-    InteractionTrigger, PowerPointInteraction, PowerPointInteractionLimits, encode_record,
-};
+use super::hyperlink::{Interaction, InteractionLimits, InteractionTrigger, encode_record};
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
@@ -15,7 +13,7 @@ use crate::consts::PptRecordType;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PowerPointTextInteractionLimits {
     /// Limits for each paired `InteractiveInfo` record.
-    pub interaction: PowerPointInteractionLimits,
+    pub interaction: InteractionLimits,
     /// Maximum number of action/range pairs in one text body.
     pub max_interactions: usize,
     /// Maximum number of UTF-16 code units in the corresponding text.
@@ -25,7 +23,7 @@ pub struct PowerPointTextInteractionLimits {
 impl Default for PowerPointTextInteractionLimits {
     fn default() -> Self {
         Self {
-            interaction: PowerPointInteractionLimits::default(),
+            interaction: InteractionLimits::default(),
             max_interactions: 4096,
             max_text_units: 16 * 1024 * 1024,
         }
@@ -139,12 +137,12 @@ impl PowerPointTextRange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerPointTextInteraction {
     pub range: PowerPointTextRange,
-    pub interaction: PowerPointInteraction,
+    pub interaction: Interaction,
 }
 
 impl PowerPointTextInteraction {
     /// Construct and validate a range/action pair without a text-length bound.
-    pub fn new(range: PowerPointTextRange, interaction: PowerPointInteraction) -> Result<Self> {
+    pub fn new(range: PowerPointTextRange, interaction: Interaction) -> Result<Self> {
         range.validate_shape()?;
         Ok(Self { range, interaction })
     }
@@ -226,7 +224,7 @@ impl PowerPointTextInteraction {
             if result.len() >= limits.max_interactions {
                 return corrupted("Text body exceeds the configured interaction count");
             }
-            let interaction = PowerPointInteraction::parse_with_limits(record, limits.interaction)?;
+            let interaction = Interaction::parse_with_limits(record, limits.interaction)?;
             let anchor = records.next().ok_or_else(|| {
                 PptError::Corrupted(
                     "Text InteractiveInfo has no following TextInteractiveInfoAtom".to_string(),
@@ -433,7 +431,7 @@ mod tests {
     fn pair(trigger: InteractionTrigger, range: PowerPointTextRange) -> PowerPointTextInteraction {
         PowerPointTextInteraction::new(
             range,
-            PowerPointInteraction::new(
+            Interaction::new(
                 trigger,
                 InteractionAction::Hyperlink,
                 InteractionLinkTarget::Url,

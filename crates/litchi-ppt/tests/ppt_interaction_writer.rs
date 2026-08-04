@@ -1,8 +1,8 @@
 use litchi_ppt::animation::AnimationInfo;
 use litchi_ppt::writer::{Hyperlink, PptWriter};
 use litchi_ppt::{
-    InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger, Package,
-    PowerPointInteraction, PowerPointInteractionLimits,
+    Interaction, InteractionAction, InteractionJump, InteractionLimits, InteractionLinkTarget,
+    InteractionTrigger, Package,
 };
 use std::io::Cursor;
 
@@ -20,7 +20,7 @@ fn typed_click_hover_and_file_link_round_trip() {
     writer
         .add_textbox(slide, 10, 10, 240, 40, "Macro and program actions")
         .unwrap();
-    let mut click = PowerPointInteraction::new(
+    let mut click = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::Macro,
         InteractionLinkTarget::Nil,
@@ -38,7 +38,7 @@ fn typed_click_hover_and_file_link_round_trip() {
         .set_last_shape_interaction(slide, click.clone())
         .unwrap();
 
-    let hover = PowerPointInteraction::new(
+    let hover = Interaction::new(
         InteractionTrigger::MouseOver,
         InteractionAction::RunProgram,
         InteractionLinkTarget::OtherFile,
@@ -61,7 +61,7 @@ fn typed_click_hover_and_file_link_round_trip() {
     writer
         .set_shape_animation(slide, 2, AnimationInfo::new())
         .unwrap();
-    let mut next = PowerPointInteraction::new(
+    let mut next = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::Jump,
         InteractionLinkTarget::NextSlide,
@@ -112,7 +112,7 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
     writer
         .add_textbox(slide, 10, 10, 240, 40, "Atomic interaction")
         .unwrap();
-    let existing = PowerPointInteraction::new(
+    let existing = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::Macro,
         InteractionLinkTarget::Nil,
@@ -123,9 +123,9 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
         .set_last_shape_interaction(slide, existing.clone())
         .unwrap();
 
-    let too_small = PowerPointInteractionLimits {
+    let too_small = InteractionLimits {
         max_record_bytes: 31,
-        ..PowerPointInteractionLimits::default()
+        ..InteractionLimits::default()
     };
     assert!(
         writer
@@ -133,7 +133,7 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
             .is_err()
     );
 
-    let mut dangling = PowerPointInteraction::new(
+    let mut dangling = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::Hyperlink,
         InteractionLinkTarget::Url,
@@ -149,7 +149,7 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
             .is_err()
     );
 
-    let hover = PowerPointInteraction::new(
+    let hover = Interaction::new(
         InteractionTrigger::MouseOver,
         InteractionAction::Ole,
         InteractionLinkTarget::Nil,

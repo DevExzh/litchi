@@ -124,13 +124,13 @@ pub trait ShapeExt {
     fn external_object_id(&self) -> Result<Option<u32>>;
 
     /// Parses click and mouse-over actions with default limits.
-    fn interactions(&self) -> Result<Vec<super::PowerPointInteraction>>;
+    fn interactions(&self) -> Result<Vec<super::Interaction>>;
 
     /// Parses click and mouse-over actions with explicit limits.
     fn interactions_with_limits(
         &self,
-        limits: super::PowerPointInteractionLimits,
-    ) -> Result<Vec<super::PowerPointInteraction>>;
+        limits: super::InteractionLimits,
+    ) -> Result<Vec<super::Interaction>>;
 
     /// Parses range-anchored text actions with default limits.
     fn text_interactions(&self) -> Result<Vec<super::PowerPointTextInteraction>>;
@@ -200,19 +200,19 @@ impl ShapeExt for Shape<'_> {
         Ok(frame(self)?.object_id)
     }
 
-    fn interactions(&self) -> Result<Vec<super::PowerPointInteraction>> {
-        self.interactions_with_limits(super::PowerPointInteractionLimits::default())
+    fn interactions(&self) -> Result<Vec<super::Interaction>> {
+        self.interactions_with_limits(super::InteractionLimits::default())
     }
 
     fn interactions_with_limits(
         &self,
-        limits: super::PowerPointInteractionLimits,
-    ) -> Result<Vec<super::PowerPointInteraction>> {
+        limits: super::InteractionLimits,
+    ) -> Result<Vec<super::Interaction>> {
         let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
             return Ok(Vec::new());
         };
         validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
-        super::PowerPointInteraction::parse_client_data_payload(client_data.data(), limits)
+        super::Interaction::parse_client_data_payload(client_data.data(), limits)
     }
 
     fn text_interactions(&self) -> Result<Vec<super::PowerPointTextInteraction>> {

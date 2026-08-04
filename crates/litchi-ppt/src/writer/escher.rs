@@ -731,7 +731,7 @@ pub struct UserShapeData {
     ///
     /// These take precedence over the legacy single-hyperlink fields for the
     /// corresponding trigger.
-    pub interactions: Vec<crate::PowerPointInteraction>,
+    pub interactions: Vec<crate::Interaction>,
     /// Typed actions attached to UTF-16 ranges in this shape's text.
     pub text_interactions: Vec<crate::PowerPointTextInteraction>,
     /// Picture BLIP index (for picture frames)
@@ -1073,7 +1073,7 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
         });
         if let Some(interaction) = interaction {
             let bytes = interaction
-                .to_bytes_with_limits(crate::PowerPointInteractionLimits::default())
+                .to_bytes_with_limits(crate::InteractionLimits::default())
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             append_client_data_payload(&mut client_data, &bytes)?;
         }
@@ -1129,15 +1129,15 @@ fn legacy_hyperlink_interaction(
     action: u8,
     jump: u8,
     hyperlink_type: u8,
-) -> Result<crate::PowerPointInteraction, PptError> {
+) -> Result<crate::Interaction, PptError> {
     let mut atom_data = [0u8; 16];
     atom_data[4..8].copy_from_slice(&hyperlink_id.to_le_bytes());
     atom_data[8] = action;
     atom_data[10] = jump;
     atom_data[12] = hyperlink_type;
-    let atom = crate::PowerPointInteractiveInfoAtom::parse_payload(&atom_data)
+    let atom = crate::InteractiveInfoAtom::parse_payload(&atom_data)
         .map_err(|error| std::io::Error::other(error.to_string()))?;
-    Ok(crate::PowerPointInteraction {
+    Ok(crate::Interaction {
         trigger: crate::InteractionTrigger::Click,
         sound_id: atom.sound_id,
         hyperlink_id: atom.hyperlink_id,
@@ -2093,14 +2093,14 @@ mod tests {
     fn client_textbox_writes_adjacent_trigger_matched_text_interaction_pairs() {
         use crate::consts::PptRecordType;
         use crate::{
-            InteractionAction, InteractionLinkTarget, InteractionTrigger, PowerPointInteraction,
+            Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger,
             PowerPointTextInteraction, PowerPointTextRange,
         };
 
         let interactions = [
             PowerPointTextInteraction::new(
                 PowerPointTextRange::new(0, 1).unwrap(),
-                PowerPointInteraction::new(
+                Interaction::new(
                     InteractionTrigger::Click,
                     InteractionAction::NoAction,
                     InteractionLinkTarget::Nil,
@@ -2109,7 +2109,7 @@ mod tests {
             .unwrap(),
             PowerPointTextInteraction::new(
                 PowerPointTextRange::new(1, 3).unwrap(),
-                PowerPointInteraction::new(
+                Interaction::new(
                     InteractionTrigger::MouseOver,
                     InteractionAction::NoAction,
                     InteractionLinkTarget::Nil,
@@ -2214,14 +2214,14 @@ mod tests {
 
     #[test]
     fn typed_interactions_coexist_in_client_data_grammar_order() {
-        let click = crate::PowerPointInteraction::new(
+        let click = crate::Interaction::new(
             crate::InteractionTrigger::Click,
             crate::InteractionAction::Macro,
             crate::InteractionLinkTarget::Nil,
         )
         .with_macro_name("Run")
         .unwrap();
-        let hover = crate::PowerPointInteraction::new(
+        let hover = crate::Interaction::new(
             crate::InteractionTrigger::MouseOver,
             crate::InteractionAction::Ole,
             crate::InteractionLinkTarget::Nil,
@@ -2257,7 +2257,7 @@ mod tests {
 
     #[test]
     fn duplicate_typed_interaction_triggers_are_rejected() {
-        let click = crate::PowerPointInteraction::new(
+        let click = crate::Interaction::new(
             crate::InteractionTrigger::Click,
             crate::InteractionAction::NoAction,
             crate::InteractionLinkTarget::Nil,

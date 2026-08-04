@@ -336,7 +336,7 @@ pub struct ShapeProperties {
     /// Hyperlink attached to shape
     pub hyperlink_id: Option<u32>,
     /// Typed click and mouse-over actions attached to the shape.
-    pub interactions: Vec<crate::PowerPointInteraction>,
+    pub interactions: Vec<crate::Interaction>,
     /// Typed actions attached to UTF-16 ranges in the shape text.
     pub text_interactions: Vec<crate::PowerPointTextInteraction>,
 }
@@ -802,11 +802,10 @@ fn get_hyperlink_info(hyperlink_id: Option<u32>, hyperlinks: &HyperlinkCollectio
 fn interaction_for_hyperlink(
     hyperlink_id: u32,
     hyperlinks: &HyperlinkCollection,
-) -> Option<crate::PowerPointInteraction> {
+) -> Option<crate::Interaction> {
     use super::hyperlink::HyperlinkTarget;
     use crate::{
-        InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
-        PowerPointInteraction,
+        Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
     };
 
     let hyperlink = hyperlinks.get(hyperlink_id)?;
@@ -857,7 +856,7 @@ fn interaction_for_hyperlink(
             InteractionLinkTarget::CustomShow,
         ),
     };
-    let mut interaction = PowerPointInteraction::new(InteractionTrigger::Click, action, target);
+    let mut interaction = Interaction::new(InteractionTrigger::Click, action, target);
     interaction.hyperlink_id = hyperlink_id;
     interaction.jump = jump;
     Some(interaction)
@@ -2082,12 +2081,12 @@ impl PptWriter {
     pub fn set_last_shape_interaction(
         &mut self,
         slide: usize,
-        interaction: crate::PowerPointInteraction,
+        interaction: crate::Interaction,
     ) -> Result<(), PptWriteError> {
         self.set_last_shape_interaction_with_limits(
             slide,
             interaction,
-            crate::PowerPointInteractionLimits::default(),
+            crate::InteractionLimits::default(),
         )
     }
 
@@ -2095,8 +2094,8 @@ impl PptWriter {
     pub fn set_last_shape_interaction_with_limits(
         &mut self,
         slide: usize,
-        interaction: crate::PowerPointInteraction,
-        limits: crate::PowerPointInteractionLimits,
+        interaction: crate::Interaction,
+        limits: crate::InteractionLimits,
     ) -> Result<(), PptWriteError> {
         interaction
             .validate_with_limits(limits)
@@ -2462,7 +2461,7 @@ impl PptWriter {
     /// Register an exact embedded WAV or AIFF resource for interactions or animations.
     ///
     /// Validation is atomic. The returned non-zero writer-local ID can be
-    /// passed to [`crate::PowerPointInteraction::with_sound_reference`].
+    /// passed to [`crate::Interaction::with_sound_reference`].
     pub fn add_embedded_sound(
         &mut self,
         name: impl Into<String>,

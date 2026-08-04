@@ -6,7 +6,7 @@ use super::header_footer::{
     PowerPointHeaderFooterDisplayText, PowerPointHeaderFooterParent,
     PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
 };
-use super::hyperlink::PowerPointHyperlinks;
+use super::hyperlink::Hyperlinks;
 use super::main_master::PowerPoint12MainMasterMetadata;
 use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
 use super::ole_object::PowerPointOleObjectCollection;
@@ -439,7 +439,7 @@ impl Presentation {
     /// every non-null reference must resolve in the document SoundCollection.
     pub fn validate_interaction_sound_references(&self) -> Result<()> {
         let sounds = self.embedded_sounds()?;
-        let validate = |interaction: &crate::PowerPointInteraction| -> Result<()> {
+        let validate = |interaction: &crate::Interaction| -> Result<()> {
             if interaction.sound_id == 0 {
                 return Ok(());
             }
@@ -501,8 +501,8 @@ impl Presentation {
     ///
     /// Targets remain inert: this method never opens a URL, path, presentation,
     /// or named show.
-    pub fn hyperlinks(&self) -> Result<PowerPointHyperlinks> {
-        PowerPointHyperlinks::parse(&self.live_document_record()?)
+    pub fn hyperlinks(&self) -> Result<Hyperlinks> {
+        Hyperlinks::parse(&self.live_document_record()?)
     }
 
     /// Return inert embedded and linked OLE metadata without loading object storage.

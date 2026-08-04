@@ -1,9 +1,8 @@
 use litchi_ppt::animation::{AnimationInfo, AnimationSound, BuiltinSound};
 use litchi_ppt::writer::PptWriter;
 use litchi_ppt::{
-    InteractionAction, InteractionLinkTarget, InteractionTrigger, Package,
-    PowerPointBuiltinSoundId, PowerPointInteraction, PowerPointTextInteraction,
-    PowerPointTextRange,
+    Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger, Package,
+    PowerPointBuiltinSoundId, PowerPointTextInteraction, PowerPointTextRange,
 };
 use std::{io::Cursor, num::NonZeroU32};
 
@@ -23,7 +22,7 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     let slide = writer.add_slide().unwrap();
     writer.add_textbox(slide, 10, 10, 240, 40, "A😀BC").unwrap();
 
-    let click = PowerPointInteraction::new(
+    let click = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::NoAction,
         InteractionLinkTarget::Nil,
@@ -32,7 +31,7 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     writer.set_last_shape_interaction(slide, click).unwrap();
     let hover = PowerPointTextInteraction::new(
         PowerPointTextRange::new(1, 3).unwrap(),
-        PowerPointInteraction::new(
+        Interaction::new(
             InteractionTrigger::MouseOver,
             InteractionAction::NoAction,
             InteractionLinkTarget::Nil,
@@ -97,7 +96,7 @@ fn embedded_animation_sound_can_be_shared_by_shape_action() {
     ));
     writer.set_shape_animation(slide, 0, animation).unwrap();
 
-    let interaction = PowerPointInteraction::new(
+    let interaction = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::NoAction,
         InteractionLinkTarget::Nil,
@@ -139,7 +138,7 @@ fn action_only_embedded_sound_uses_the_explicit_registry() {
     writer
         .set_last_shape_interaction(
             slide,
-            PowerPointInteraction::new(
+            Interaction::new(
                 InteractionTrigger::Click,
                 InteractionAction::NoAction,
                 InteractionLinkTarget::Nil,
@@ -179,7 +178,7 @@ fn missing_invalid_and_linked_sound_resources_fail_before_output() {
     writer
         .add_textbox(slide, 10, 10, 240, 40, "Bad sound")
         .unwrap();
-    let interaction = PowerPointInteraction::new(
+    let interaction = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::NoAction,
         InteractionLinkTarget::Nil,
@@ -190,7 +189,7 @@ fn missing_invalid_and_linked_sound_resources_fail_before_output() {
         .unwrap();
     assert!(write(&mut writer).is_err());
 
-    let valid = PowerPointInteraction::new(
+    let valid = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::NoAction,
         InteractionLinkTarget::Nil,

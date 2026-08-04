@@ -56,14 +56,14 @@ pub enum InteractionLinkTarget {
 
 /// Resource limits for an interactive-information container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointInteractionLimits {
+pub struct InteractionLimits {
     /// Maximum complete container size, including its eight-byte header.
     pub max_record_bytes: usize,
     /// Maximum MacroNameAtom UTF-16 payload size.
     pub max_macro_name_bytes: usize,
 }
 
-impl Default for PowerPointInteractionLimits {
+impl Default for InteractionLimits {
     fn default() -> Self {
         Self {
             max_record_bytes: 1024 * 1024,
@@ -74,7 +74,7 @@ impl Default for PowerPointInteractionLimits {
 
 /// Typed payload of an MS-PPT §2.6.10 InteractiveInfoAtom.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointInteractiveInfoAtom {
+pub struct InteractiveInfoAtom {
     pub sound_id: u32,
     pub hyperlink_id: u32,
     pub action: InteractionAction,
@@ -89,7 +89,7 @@ pub struct PowerPointInteractiveInfoAtom {
     pub unused: [u8; 3],
 }
 
-impl PowerPointInteractiveInfoAtom {
+impl InteractiveInfoAtom {
     /// Parse the exact sixteen-byte atom payload.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != 16 {
@@ -134,12 +134,12 @@ impl PowerPointInteractiveInfoAtom {
 
 /// Inert MS-PPT §2.6.11 MacroNameAtom data.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointMacroNameAtom {
+pub struct MacroNameAtom {
     text: String,
     raw_utf16: Vec<u8>,
 }
 
-impl PowerPointMacroNameAtom {
+impl MacroNameAtom {
     /// Construct canonical non-terminated printable UTF-16 data.
     pub fn new(text: impl Into<String>) -> Result<Self> {
         let text = text.into();
@@ -173,7 +173,7 @@ impl PowerPointMacroNameAtom {
 
 /// One click or mouse-over action attached to a shape or text range.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointInteraction {
+pub struct Interaction {
     pub trigger: InteractionTrigger,
     pub sound_id: u32,
     pub hyperlink_id: u32,
@@ -194,14 +194,14 @@ pub struct PowerPointInteraction {
 
 /// Click and mouse-over actions attached to one slide shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointShapeInteractionEntry {
+pub struct ShapeInteractionEntry {
     /// OfficeArt shape identifier.
     pub shape_id: u32,
     /// At most one action for each [`InteractionTrigger`].
-    pub interactions: Vec<PowerPointInteraction>,
+    pub interactions: Vec<Interaction>,
 }
 
-impl PowerPointInteraction {
+impl Interaction {
     /// Construct a canonical interaction with zero references and unused bytes.
     pub fn new(
         trigger: InteractionTrigger,
@@ -228,7 +228,7 @@ impl PowerPointInteraction {
 
     /// Attach inert macro/file/show name data. No macro activation is performed.
     pub fn with_macro_name(mut self, value: impl Into<String>) -> Result<Self> {
-        let atom = PowerPointMacroNameAtom::new(value)?;
+        let atom = MacroNameAtom::new(value)?;
         self.macro_name = Some(atom.text().to_string());
         self.macro_name_data = Some(atom.raw_utf16().to_vec());
         Ok(self)
@@ -253,14 +253,11 @@ impl PowerPointInteraction {
 
     /// Parse an `InteractiveInfo` click or mouse-over container.
     pub fn parse(record: &PptRecord) -> Result<Self> {
-        Self::parse_with_limits(record, PowerPointInteractionLimits::default())
+        Self::parse_with_limits(record, InteractionLimits::default())
     }
 
     /// Parse a container with explicit record and MacroNameAtom bounds.
-    pub fn parse_with_limits(
-        record: &PptRecord,
-        limits: PowerPointInteractionLimits,
-    ) -> Result<Self> {
+    pub fn parse_with_limits(record: &PptRecord, limits: InteractionLimits) -> Result<Self> {
         if record.record_type != PptRecordType::InteractiveInfo
             || record.record_type_raw != PptRecordType::InteractiveInfo.as_u16()
             || record.version != 0x0f
@@ -290,7 +287,7 @@ impl PowerPointInteraction {
         {
             return corrupted("InteractiveInfoAtom has an invalid header or size");
         }
-        let parsed_atom = PowerPointInteractiveInfoAtom::parse_payload(&atom.data)?;
+        let parsed_atom = InteractiveInfoAtom::parse_payload(&atom.data)?;
         let macro_atom = if children.len() == 2 {
             let name = &children[1];
             if name.record_type != PptRecordType::CString
@@ -301,7 +298,7 @@ impl PowerPointInteraction {
             {
                 return corrupted("MacroNameAtom has an invalid record header or length");
             }
-            Some(PowerPointMacroNameAtom::parse_payload(
+            Some(MacroNameAtom::parse_payload(
                 &name.data,
                 limits.max_macro_name_bytes,
             )?)
@@ -328,14 +325,11 @@ impl PowerPointInteraction {
 
     /// Parse one exact complete container from bytes.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::parse_bytes_with_limits(bytes, PowerPointInteractionLimits::default())
+        Self::parse_bytes_with_limits(bytes, InteractionLimits::default())
     }
 
     /// Parse one exact complete container from bounded bytes.
-    pub fn parse_bytes_with_limits(
-        bytes: &[u8],
-        limits: PowerPointInteractionLimits,
-    ) -> Result<Self> {
+    pub fn parse_bytes_with_limits(bytes: &[u8], limits: InteractionLimits) -> Result<Self> {
         if bytes.len() > limits.max_record_bytes {
             return corrupted("InteractiveInfo exceeds the configured record size limit");
         }
@@ -347,8 +341,8 @@ impl PowerPointInteraction {
     }
 
     /// Return the typed required atom.
-    pub fn atom(&self) -> PowerPointInteractiveInfoAtom {
-        PowerPointInteractiveInfoAtom {
+    pub fn atom(&self) -> InteractiveInfoAtom {
+        InteractiveInfoAtom {
             sound_id: self.sound_id,
             hyperlink_id: self.hyperlink_id,
             action: self.action,
@@ -364,23 +358,23 @@ impl PowerPointInteraction {
     }
 
     /// Return the optional inert name atom with its exact bytes.
-    pub fn macro_name_atom(&self) -> Result<Option<PowerPointMacroNameAtom>> {
+    pub fn macro_name_atom(&self) -> Result<Option<MacroNameAtom>> {
         match (&self.macro_name, &self.macro_name_data) {
             (None, None) => Ok(None),
             (Some(text), Some(data)) => {
-                let atom = PowerPointMacroNameAtom::parse_payload(data, usize::MAX)?;
+                let atom = MacroNameAtom::parse_payload(data, usize::MAX)?;
                 if atom.text() != text {
                     return corrupted("MacroNameAtom text and exact data disagree");
                 }
                 Ok(Some(atom))
             },
-            (Some(text), None) => Ok(Some(PowerPointMacroNameAtom::new(text.clone())?)),
+            (Some(text), None) => Ok(Some(MacroNameAtom::new(text.clone())?)),
             (None, Some(_)) => corrupted("MacroNameAtom exact data is present without text"),
         }
     }
 
     /// Validate this interaction against explicit resource limits.
-    pub fn validate_with_limits(&self, limits: PowerPointInteractionLimits) -> Result<()> {
+    pub fn validate_with_limits(&self, limits: InteractionLimits) -> Result<()> {
         let macro_name = self.validated_macro_name_data(limits)?;
         validate_serialized_interaction_size(
             macro_name.as_ref().map(|data| data.len()),
@@ -391,11 +385,11 @@ impl PowerPointInteraction {
 
     /// Serialize canonical headers and exact atom/name payloads with default limits.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.to_bytes_with_limits(PowerPointInteractionLimits::default())
+        self.to_bytes_with_limits(InteractionLimits::default())
     }
 
     /// Serialize canonical headers and exact atom/name payloads with explicit limits.
-    pub fn to_bytes_with_limits(&self, limits: PowerPointInteractionLimits) -> Result<Vec<u8>> {
+    pub fn to_bytes_with_limits(&self, limits: InteractionLimits) -> Result<Vec<u8>> {
         let macro_name = self.validated_macro_name_data(limits)?;
         validate_serialized_interaction_size(
             macro_name.as_ref().map(|data| data.len()),
@@ -430,7 +424,7 @@ impl PowerPointInteraction {
 
     fn validated_macro_name_data(
         &self,
-        limits: PowerPointInteractionLimits,
+        limits: InteractionLimits,
     ) -> Result<Option<Cow<'_, [u8]>>> {
         match (&self.macro_name, &self.macro_name_data) {
             (None, None) => Ok(None),
@@ -442,7 +436,7 @@ impl PowerPointInteraction {
                 Ok(Some(Cow::Borrowed(data)))
             },
             (Some(text), None) => {
-                let atom = PowerPointMacroNameAtom::new(text.clone())?;
+                let atom = MacroNameAtom::new(text.clone())?;
                 if atom.raw_utf16().len() > limits.max_macro_name_bytes {
                     return corrupted("MacroNameAtom exceeds the configured size limit");
                 }
@@ -463,10 +457,7 @@ impl PowerPointInteraction {
     }
 
     /// Resolve this action's hyperlink reference.
-    pub fn hyperlink<'a>(
-        &self,
-        hyperlinks: &'a PowerPointHyperlinks,
-    ) -> Option<&'a PowerPointHyperlink> {
+    pub fn hyperlink<'a>(&self, hyperlinks: &'a Hyperlinks) -> Option<&'a Hyperlink> {
         hyperlinks.get(self.hyperlink_id)
     }
 
@@ -494,7 +485,7 @@ impl PowerPointInteraction {
 
     pub(crate) fn parse_client_data_payload(
         data: &[u8],
-        limits: PowerPointInteractionLimits,
+        limits: InteractionLimits,
     ) -> Result<Vec<Self>> {
         let mut interactions = Vec::new();
         for record in PptRecord::parse_sequence_strict(data, "shape ClientData")? {
@@ -690,7 +681,7 @@ mod interaction_protocol_tests {
     }
 
     fn atom() -> [u8; 16] {
-        PowerPointInteractiveInfoAtom {
+        InteractiveInfoAtom {
             sound_id: 7,
             hyperlink_id: 11,
             action: InteractionAction::Macro,
@@ -710,7 +701,7 @@ mod interaction_protocol_tests {
     fn exact_round_trip_preserves_trigger_macro_bytes_and_undefined_data() {
         let macro_data = [b'R', 0, b'u', 0, b'n', 0, 0, 0, 1, 0];
         let bytes = interaction(1, &atom(), Some(&macro_data));
-        let parsed = PowerPointInteraction::parse_bytes(&bytes).unwrap();
+        let parsed = Interaction::parse_bytes(&bytes).unwrap();
         assert_eq!(parsed.trigger, InteractionTrigger::MouseOver);
         assert_eq!(parsed.macro_name.as_deref(), Some("Run"));
         assert_eq!(
@@ -723,7 +714,7 @@ mod interaction_protocol_tests {
 
     #[test]
     fn canonical_constructor_and_record_accessor_round_trip() {
-        let mut value = PowerPointInteraction::new(
+        let mut value = Interaction::new(
             InteractionTrigger::Click,
             InteractionAction::CustomShow,
             InteractionLinkTarget::CustomShow,
@@ -734,19 +725,19 @@ mod interaction_protocol_tests {
         value.custom_show_return = true;
         let bytes = value.to_bytes().unwrap();
         assert_eq!(
-            PowerPointInteraction::parse(&value.to_record().unwrap()).unwrap(),
+            Interaction::parse(&value.to_record().unwrap()).unwrap(),
             value
         );
-        assert_eq!(PowerPointInteraction::parse_bytes(&bytes).unwrap(), value);
+        assert_eq!(Interaction::parse_bytes(&bytes).unwrap(), value);
     }
 
     #[test]
     fn preserves_ignored_macro_name_without_activating_it() {
         let bytes = interaction(
             0,
-            &PowerPointInteractiveInfoAtom {
+            &InteractiveInfoAtom {
                 action: InteractionAction::Hyperlink,
-                ..PowerPointInteraction::new(
+                ..Interaction::new(
                     InteractionTrigger::Click,
                     InteractionAction::Hyperlink,
                     InteractionLinkTarget::Url,
@@ -756,7 +747,7 @@ mod interaction_protocol_tests {
             .to_payload(),
             Some(&[b'X', 0]),
         );
-        let parsed = PowerPointInteraction::parse_bytes(&bytes).unwrap();
+        let parsed = Interaction::parse_bytes(&bytes).unwrap();
         assert_eq!(parsed.macro_name.as_deref(), Some("X"));
         assert_eq!(parsed.to_bytes().unwrap(), bytes);
     }
@@ -765,23 +756,17 @@ mod interaction_protocol_tests {
     fn rejects_bad_container_atom_and_child_order() {
         let valid_atom = atom();
         for instance in [2u16, 0x0FFF] {
-            assert!(
-                PowerPointInteraction::parse_bytes(&interaction(instance, &valid_atom, None))
-                    .is_err()
-            );
+            assert!(Interaction::parse_bytes(&interaction(instance, &valid_atom, None)).is_err());
         }
         assert!(
-            PowerPointInteraction::parse_bytes(&record(0, 0, PptRecordType::InteractiveInfo, &[]))
-                .is_err()
+            Interaction::parse_bytes(&record(0, 0, PptRecordType::InteractiveInfo, &[])).is_err()
         );
-        assert!(
-            PowerPointInteraction::parse_bytes(&interaction(0, &valid_atom[..15], None)).is_err()
-        );
+        assert!(Interaction::parse_bytes(&interaction(0, &valid_atom[..15], None)).is_err());
 
         let name = record(0, 2, PptRecordType::CString, &[b'A', 0]);
         let atom_record = record(0, 0, PptRecordType::InteractiveInfoAtom, &valid_atom);
         assert!(
-            PowerPointInteraction::parse_bytes(&record(
+            Interaction::parse_bytes(&record(
                 0x0F,
                 0,
                 PptRecordType::InteractiveInfo,
@@ -796,27 +781,23 @@ mod interaction_protocol_tests {
         for (offset, value) in [(8usize, 8u8), (10, 7), (12, 4)] {
             let mut bad = atom();
             bad[offset] = value;
-            assert!(PowerPointInteraction::parse_bytes(&interaction(0, &bad, None)).is_err());
+            assert!(Interaction::parse_bytes(&interaction(0, &bad, None)).is_err());
         }
         let mut reserved = atom();
         reserved[11] |= 0x10;
-        assert!(PowerPointInteraction::parse_bytes(&interaction(0, &reserved, None)).is_err());
-        assert!(PowerPointInteraction::parse_bytes(&interaction(0, &atom(), Some(&[1]))).is_err());
-        assert!(
-            PowerPointInteraction::parse_bytes(&interaction(0, &atom(), Some(&[1, 0]))).is_err()
-        );
-        assert!(
-            PowerPointInteraction::parse_bytes(&interaction(0, &atom(), Some(&[0, 0xD8]))).is_err()
-        );
+        assert!(Interaction::parse_bytes(&interaction(0, &reserved, None)).is_err());
+        assert!(Interaction::parse_bytes(&interaction(0, &atom(), Some(&[1]))).is_err());
+        assert!(Interaction::parse_bytes(&interaction(0, &atom(), Some(&[1, 0]))).is_err());
+        assert!(Interaction::parse_bytes(&interaction(0, &atom(), Some(&[0, 0xD8]))).is_err());
     }
 
     #[test]
     fn enforces_record_and_macro_limits_and_exact_consumption() {
         let bytes = interaction(0, &atom(), Some(&[b'A', 0, b'B', 0]));
         assert!(
-            PowerPointInteraction::parse_bytes_with_limits(
+            Interaction::parse_bytes_with_limits(
                 &bytes,
-                PowerPointInteractionLimits {
+                InteractionLimits {
                     max_record_bytes: bytes.len() - 1,
                     ..Default::default()
                 }
@@ -824,9 +805,9 @@ mod interaction_protocol_tests {
             .is_err()
         );
         assert!(
-            PowerPointInteraction::parse_bytes_with_limits(
+            Interaction::parse_bytes_with_limits(
                 &bytes,
-                PowerPointInteractionLimits {
+                InteractionLimits {
                     max_macro_name_bytes: 2,
                     ..Default::default()
                 }
@@ -835,14 +816,14 @@ mod interaction_protocol_tests {
         );
         let mut trailing = bytes;
         trailing.push(0);
-        assert!(PowerPointInteraction::parse_bytes(&trailing).is_err());
+        assert!(Interaction::parse_bytes(&trailing).is_err());
 
-        let value = PowerPointInteraction::new(
+        let value = Interaction::new(
             InteractionTrigger::Click,
             InteractionAction::NoAction,
             InteractionLinkTarget::Nil,
         );
-        let limits = PowerPointInteractionLimits {
+        let limits = InteractionLimits {
             max_record_bytes: 31,
             ..Default::default()
         };
@@ -853,7 +834,7 @@ mod interaction_protocol_tests {
 
 /// Additional hyperlink data introduced by PowerPoint 9.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointHyperlinkExtension {
+pub struct HyperlinkExtension {
     /// Optional text displayed as a hover screen tip.
     pub screen_tip: Option<String>,
     /// Whether the hyperlink was created in the Insert Hyperlink dialog.
@@ -864,7 +845,7 @@ pub struct PowerPointHyperlinkExtension {
     pub named_show_returns_to_slide: bool,
 }
 
-impl PowerPointHyperlinkExtension {
+impl HyperlinkExtension {
     /// Parse an `ExHyperlink9Container` record and return its referenced ID.
     pub fn parse(record: &PptRecord) -> Result<(u32, Self)> {
         if record.record_type != PptRecordType::ExternalHyperlink9
@@ -929,7 +910,7 @@ impl PowerPointHyperlinkExtension {
 
 /// One base PowerPoint hyperlink definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointHyperlink {
+pub struct Hyperlink {
     /// Positive identifier referenced by interactive information records.
     pub id: u32,
     /// Optional user-readable hyperlink name.
@@ -939,10 +920,10 @@ pub struct PowerPointHyperlink {
     /// Optional location within the destination.
     pub location: Option<String>,
     /// Optional PowerPoint 9 metadata for this hyperlink.
-    pub extension: Option<PowerPointHyperlinkExtension>,
+    pub extension: Option<HyperlinkExtension>,
 }
 
-impl PowerPointHyperlink {
+impl Hyperlink {
     /// Parse an `ExHyperlinkContainer` record.
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.record_type != PptRecordType::ExternalHyperlink
@@ -1006,14 +987,14 @@ impl PowerPointHyperlink {
 
 /// Hyperlink definitions resolved with their PowerPoint 9 extensions.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointHyperlinks {
+pub struct Hyperlinks {
     /// Seed used when allocating new external-object or hyperlink identifiers.
     pub id_seed: Option<i32>,
     /// Hyperlinks in base `ExObjListContainer` order.
-    pub hyperlinks: Vec<PowerPointHyperlink>,
+    pub hyperlinks: Vec<Hyperlink>,
 }
 
-impl PowerPointHyperlinks {
+impl Hyperlinks {
     /// Discover base hyperlinks and merge all `___PPT9` hyperlink extensions.
     pub fn parse(root: &PptRecord) -> Result<Self> {
         let mut lists = Vec::new();
@@ -1034,7 +1015,7 @@ impl PowerPointHyperlinks {
             if record.record_type != PptRecordType::ExternalHyperlink9 {
                 continue;
             }
-            let (id, extension) = PowerPointHyperlinkExtension::parse(&record)?;
+            let (id, extension) = HyperlinkExtension::parse(&record)?;
             if extension_ids.contains(&id) {
                 return Err(PptError::Corrupted(
                     "PowerPoint 9 contains duplicate hyperlink extensions".to_string(),
@@ -1052,11 +1033,11 @@ impl PowerPointHyperlinks {
     }
 
     /// Resolve a hyperlink identifier.
-    pub fn get(&self, id: u32) -> Option<&PowerPointHyperlink> {
+    pub fn get(&self, id: u32) -> Option<&Hyperlink> {
         self.hyperlinks.iter().find(|hyperlink| hyperlink.id == id)
     }
 
-    fn get_mut(&mut self, id: u32) -> Option<&mut PowerPointHyperlink> {
+    fn get_mut(&mut self, id: u32) -> Option<&mut Hyperlink> {
         self.hyperlinks
             .iter_mut()
             .find(|hyperlink| hyperlink.id == id)
@@ -1098,10 +1079,10 @@ impl PowerPointHyperlinks {
             if child.record_type != PptRecordType::ExternalHyperlink {
                 continue;
             }
-            let hyperlink = PowerPointHyperlink::parse(child)?;
+            let hyperlink = Hyperlink::parse(child)?;
             if hyperlinks
                 .iter()
-                .any(|existing: &PowerPointHyperlink| existing.id == hyperlink.id)
+                .any(|existing: &Hyperlink| existing.id == hyperlink.id)
             {
                 return Err(PptError::Corrupted(
                     "External-object list has duplicate hyperlink IDs".to_string(),
@@ -1282,7 +1263,7 @@ mod tests {
             Some(external_object_list(7, &[hyperlink(3)])),
             &[hyperlink9(3, Some("Open example"), 7)],
         );
-        let hyperlinks = PowerPointHyperlinks::parse(&root).unwrap();
+        let hyperlinks = Hyperlinks::parse(&root).unwrap();
         assert_eq!(hyperlinks.id_seed, Some(7));
         let hyperlink = hyperlinks.get(3).unwrap();
         assert_eq!(hyperlink.friendly_name.as_deref(), Some("Example"));
@@ -1297,7 +1278,7 @@ mod tests {
 
     #[test]
     fn parses_and_resolves_interactive_hyperlinks() {
-        let interaction = PowerPointInteraction::parse(&interaction_record(0, 0x09, 8)).unwrap();
+        let interaction = Interaction::parse(&interaction_record(0, 0x09, 8)).unwrap();
         assert_eq!(interaction.trigger, InteractionTrigger::Click);
         assert_eq!(interaction.action, InteractionAction::Hyperlink);
         assert_eq!(interaction.link_target, InteractionLinkTarget::Url);
@@ -1305,8 +1286,7 @@ mod tests {
         assert!(interaction.visited);
 
         let hyperlinks =
-            PowerPointHyperlinks::parse(&root(Some(external_object_list(3, &[hyperlink(3)])), &[]))
-                .unwrap();
+            Hyperlinks::parse(&root(Some(external_object_list(3, &[hyperlink(3)])), &[])).unwrap();
         assert_eq!(
             interaction
                 .hyperlink(&hyperlinks)
@@ -1316,9 +1296,9 @@ mod tests {
             Some("https://example.test")
         );
 
-        assert!(PowerPointInteraction::parse(&interaction_record(2, 0, 8)).is_err());
-        assert!(PowerPointInteraction::parse(&interaction_record(0, 0x10, 8)).is_err());
-        assert!(PowerPointInteraction::parse(&interaction_record(0, 0, 4)).is_err());
+        assert!(Interaction::parse(&interaction_record(2, 0, 8)).is_err());
+        assert!(Interaction::parse(&interaction_record(0, 0x10, 8)).is_err());
+        assert!(Interaction::parse(&interaction_record(0, 0, 4)).is_err());
     }
 
     #[test]
@@ -1330,42 +1310,38 @@ mod tests {
             &record_bytes(0, 0, 4051, &1u32.to_le_bytes()),
         );
         let hyperlinks =
-            PowerPointHyperlinks::parse(&root(Some(external_object_list(1, &[atom_only])), &[]))
-                .unwrap();
+            Hyperlinks::parse(&root(Some(external_object_list(1, &[atom_only])), &[])).unwrap();
         assert_eq!(hyperlinks.get(1).unwrap().target, None);
     }
 
     #[test]
     fn rejects_invalid_hyperlink_ids_and_extensions() {
         assert!(
-            PowerPointHyperlinks::parse(
-                &root(Some(external_object_list(2, &[hyperlink(3)])), &[],)
-            )
-            .is_err()
+            Hyperlinks::parse(&root(Some(external_object_list(2, &[hyperlink(3)])), &[],)).is_err()
         );
         assert!(
-            PowerPointHyperlinks::parse(&root(
+            Hyperlinks::parse(&root(
                 Some(external_object_list(3, &[hyperlink(3), hyperlink(3)])),
                 &[],
             ))
             .is_err()
         );
         assert!(
-            PowerPointHyperlinks::parse(&root(
+            Hyperlinks::parse(&root(
                 Some(external_object_list(3, &[hyperlink(3)])),
                 &[hyperlink9(4, None, 0)],
             ))
             .is_err()
         );
         assert!(
-            PowerPointHyperlinks::parse(&root(
+            Hyperlinks::parse(&root(
                 Some(external_object_list(3, &[hyperlink(3)])),
                 &[hyperlink9(3, None, 8)],
             ))
             .is_err()
         );
         assert!(
-            PowerPointHyperlinks::parse(&root(
+            Hyperlinks::parse(&root(
                 Some(external_object_list(3, &[hyperlink(3)])),
                 &[hyperlink9(3, None, 0), hyperlink9(3, None, 0)],
             ))
@@ -1378,11 +1354,8 @@ mod tests {
         let mut invalid_utf16 = hyperlink(1);
         invalid_utf16[28..30].copy_from_slice(&0xd800u16.to_le_bytes());
         assert!(
-            PowerPointHyperlinks::parse(&root(
-                Some(external_object_list(1, &[invalid_utf16])),
-                &[],
-            ))
-            .is_err()
+            Hyperlinks::parse(&root(Some(external_object_list(1, &[invalid_utf16])), &[],))
+                .is_err()
         );
 
         let mut payload = record_bytes(0, 0, 4051, &1u32.to_le_bytes());
@@ -1390,10 +1363,7 @@ mod tests {
         payload.extend_from_slice(&record_bytes(0, 1, 4026, &unicode("early")));
         let out_of_order = record_bytes(0x0f, 0, 4055, &payload);
         assert!(
-            PowerPointHyperlinks::parse(
-                &root(Some(external_object_list(1, &[out_of_order])), &[],)
-            )
-            .is_err()
+            Hyperlinks::parse(&root(Some(external_object_list(1, &[out_of_order])), &[],)).is_err()
         );
     }
 }

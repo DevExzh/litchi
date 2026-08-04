@@ -590,9 +590,9 @@ impl ShapeHyperlink {
         } else {
             crate::InteractionTrigger::MouseOver
         };
-        let parsed_atom = crate::PowerPointInteractiveInfoAtom::parse_payload(atom.as_bytes())
+        let parsed_atom = crate::InteractiveInfoAtom::parse_payload(atom.as_bytes())
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
-        let interaction = crate::PowerPointInteraction {
+        let interaction = crate::Interaction {
             trigger,
             sound_id: parsed_atom.sound_id,
             hyperlink_id: parsed_atom.hyperlink_id,

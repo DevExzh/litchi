@@ -4,7 +4,7 @@
 //! server, follows a link, or executes object content.
 
 use super::external_media::PowerPointExternalMediaCollection;
-use super::hyperlink::PowerPointHyperlinks;
+use super::hyperlink::Hyperlinks;
 use super::package::{PptError, Result};
 use super::persist::PersistMapping;
 use super::records::PptRecord;
@@ -625,7 +625,7 @@ impl PowerPointOleObjectCollection {
         {
             return corrupted("external-object list reuses an ID for OLE and media objects");
         }
-        let hyperlinks = PowerPointHyperlinks::parse(root)?;
+        let hyperlinks = Hyperlinks::parse(root)?;
         if objects.iter().any(|object| {
             hyperlinks
                 .hyperlinks

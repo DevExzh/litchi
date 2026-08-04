@@ -1,9 +1,8 @@
 use litchi_ppt::writer::text_format::{Paragraph, TextRun};
 use litchi_ppt::writer::{Hyperlink, PptWriter};
 use litchi_ppt::{
-    InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger, Package,
-    PowerPointInteraction, PowerPointTextInteraction, PowerPointTextInteractionLimits,
-    PowerPointTextRange,
+    Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
+    Package, PowerPointTextInteraction, PowerPointTextInteractionLimits, PowerPointTextRange,
 };
 use std::io::Cursor;
 
@@ -25,7 +24,7 @@ fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
         .unwrap();
     let hover = PowerPointTextInteraction::new(
         PowerPointTextRange::new(3, 5).unwrap(),
-        PowerPointInteraction::new(
+        Interaction::new(
             InteractionTrigger::MouseOver,
             InteractionAction::RunProgram,
             InteractionLinkTarget::OtherFile,
@@ -38,7 +37,7 @@ fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
         .set_last_shape_text_interaction(slide, hover.clone())
         .unwrap();
 
-    let mut shape_action = PowerPointInteraction::new(
+    let mut shape_action = Interaction::new(
         InteractionTrigger::Click,
         InteractionAction::Jump,
         InteractionLinkTarget::NextSlide,
@@ -63,7 +62,7 @@ fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
         .unwrap();
     let rich = PowerPointTextInteraction::new(
         PowerPointTextRange::new(5, 10).unwrap(),
-        PowerPointInteraction::new(
+        Interaction::new(
             InteractionTrigger::Click,
             InteractionAction::Macro,
             InteractionLinkTarget::Nil,
@@ -119,7 +118,7 @@ fn invalid_text_ranges_references_and_limits_are_atomic() {
     writer.add_textbox(slide, 10, 10, 240, 40, "ABCDE").unwrap();
     let existing = PowerPointTextInteraction::new(
         PowerPointTextRange::new(1, 3).unwrap(),
-        PowerPointInteraction::new(
+        Interaction::new(
             InteractionTrigger::Click,
             InteractionAction::Macro,
             InteractionLinkTarget::Nil,
@@ -134,7 +133,7 @@ fn invalid_text_ranges_references_and_limits_are_atomic() {
 
     let outside = PowerPointTextInteraction::new(
         PowerPointTextRange::new(0, 7).unwrap(),
-        PowerPointInteraction::new(
+        Interaction::new(
             InteractionTrigger::Click,
             InteractionAction::NoAction,
             InteractionLinkTarget::Nil,
@@ -147,7 +146,7 @@ fn invalid_text_ranges_references_and_limits_are_atomic() {
             .is_err()
     );
 
-    let mut dangling_action = PowerPointInteraction::new(
+    let mut dangling_action = Interaction::new(
         InteractionTrigger::MouseOver,
         InteractionAction::Hyperlink,
         InteractionLinkTarget::Url,
@@ -164,7 +163,7 @@ fn invalid_text_ranges_references_and_limits_are_atomic() {
 
     let second = PowerPointTextInteraction::new(
         PowerPointTextRange::new(3, 5).unwrap(),
-        PowerPointInteraction::new(
+        Interaction::new(
             InteractionTrigger::MouseOver,
             InteractionAction::Ole,
             InteractionLinkTarget::Nil,

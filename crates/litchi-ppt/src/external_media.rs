@@ -1,6 +1,6 @@
 //! Strict, inert legacy PowerPoint external-media metadata.
 
-use super::hyperlink::PowerPointHyperlinks;
+use super::hyperlink::Hyperlinks;
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 use super::sound_collection::PowerPointSoundCollection;
@@ -369,7 +369,7 @@ impl PowerPointExternalMediaCollection {
             return Ok(None);
         };
         let result = Self::parse_list(record)?;
-        let hyperlinks = PowerPointHyperlinks::parse(root)?;
+        let hyperlinks = Hyperlinks::parse(root)?;
         if hyperlinks
             .hyperlinks
             .iter()

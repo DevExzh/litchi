@@ -240,12 +240,11 @@ pub use html_publish::{
     PowerPointCodePage, PowerPointHtmlDocumentSettings, PowerPointHtmlPublishSettings,
     PowerPointWebFrameColors, PowerPointWebOutput, PowerPointWebScreenSize,
 };
+pub use hyperlink::{Hyperlink, HyperlinkExtension, Hyperlinks};
 pub use hyperlink::{
-    InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
-    PowerPointInteraction, PowerPointInteractionLimits, PowerPointInteractiveInfoAtom,
-    PowerPointMacroNameAtom, PowerPointShapeInteractionEntry,
+    Interaction, InteractionAction, InteractionJump, InteractionLimits, InteractionLinkTarget,
+    InteractionTrigger, InteractiveInfoAtom, MacroNameAtom, ShapeInteractionEntry,
 };
-pub use hyperlink::{PowerPointHyperlink, PowerPointHyperlinkExtension, PowerPointHyperlinks};
 pub use kinsoku::{
     BaseKinsokuSettings, KinsokuLanguage, KinsokuLevel, PowerPoint9KinsokuSettings,
     PowerPointKinsoku,

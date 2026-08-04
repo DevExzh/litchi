@@ -115,15 +115,15 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return every shape that has a click or mouse-over interaction.
-    pub fn shape_interactions(&self) -> Result<Vec<crate::PowerPointShapeInteractionEntry>> {
-        self.shape_interactions_with_limits(crate::PowerPointInteractionLimits::default())
+    pub fn shape_interactions(&self) -> Result<Vec<crate::ShapeInteractionEntry>> {
+        self.shape_interactions_with_limits(crate::InteractionLimits::default())
     }
 
     /// Return shape interactions with caller-supplied record and name limits.
     pub fn shape_interactions_with_limits(
         &self,
-        limits: crate::PowerPointInteractionLimits,
-    ) -> Result<Vec<crate::PowerPointShapeInteractionEntry>> {
+        limits: crate::InteractionLimits,
+    ) -> Result<Vec<crate::ShapeInteractionEntry>> {
         let Some(ppdrawing) = self
             .record
             .find_child(crate::consts::PptRecordType::PPDrawing)
@@ -136,7 +136,7 @@ impl<'doc> Slide<'doc> {
         while let Some(shape) = pending.pop() {
             let interactions = shape.interactions_with_limits(limits)?;
             if !interactions.is_empty() {
-                result.push(crate::PowerPointShapeInteractionEntry {
+                result.push(crate::ShapeInteractionEntry {
                     shape_id: shape.id(),
                     interactions,
                 });
