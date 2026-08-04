@@ -986,7 +986,7 @@ impl Package {
     /// alter the application's display state or follow outline-slide targets.
     pub fn view_properties(&self) -> Result<Option<crate::pptx::view_properties::ViewProperties>> {
         crate::pptx::view_properties::load_from_package(&self.opc)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+            .map_err(OoxmlError::from)
     }
 
     /// Load typed presentation settings, if the package contains them.
