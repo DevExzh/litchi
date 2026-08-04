@@ -12,6 +12,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi-odf = { path = ".." }
+litchi-odt = { path = "../../litchi-odt" }
 
 [[bin]]
 name = "detect"
