@@ -1,189 +1,19 @@
-//! Typed PresentationML presentation properties with inert extension payloads.
+//! Bounded PresentationML presentation-properties XML codec.
 
+use super::model::*;
+use super::{
+    A_NS, A_STRICT, BROWSE_MODE_URI, CHART_TRACKING_REF_BASED_URI, DEFAULT_IMAGE_DPI_URI,
+    DISCARD_IMAGE_EDIT_DATA_URI, LASER_COLOR_URI, MAX_BYTES, MAX_DEPTH, MAX_EXTENSIONS, MAX_NODES,
+    MAX_STRING, P_NS, P_STRICT, P14_NS, P15_NS, R_NS, R_STRICT, SHOW_MEDIA_CONTROLS_URI,
+};
 use crate::{Error, Result};
-use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
     events::{BytesStart, Event},
 };
 
-const P_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
-const P_STRICT: &str = "http://purl.oclc.org/ooxml/presentationml/main";
-const A_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
-const A_STRICT: &str = "http://purl.oclc.org/ooxml/drawingml/main";
-const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const R_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const P14_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
-const P15_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
-const DISCARD_IMAGE_EDIT_DATA_URI: &str = "{E76CE94A-603C-4142-B9EB-6D1370010A27}";
-const DEFAULT_IMAGE_DPI_URI: &str = "{D31A062A-798A-4329-ABDD-BBA856620510}";
-const CHART_TRACKING_REF_BASED_URI: &str = "{FD5EFAAD-0ECE-453E-9831-46B23BE46B34}";
-const BROWSE_MODE_URI: &str = "{F99C55AA-B7CB-42B0-86F8-08522FDF87E8}";
-const LASER_COLOR_URI: &str = "{EC167BDD-8182-4AB7-AECC-EB403E3ABB37}";
-const SHOW_MEDIA_CONTROLS_URI: &str = "{2FDB2607-1784-4EEB-B798-7EB5836EED8A}";
-const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps";
-const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/presProps";
-const CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml";
-const MAX_BYTES: usize = 8 * 1024 * 1024;
-const MAX_DEPTH: usize = 128;
-const MAX_NODES: usize = 100_000;
-const MAX_STRING: usize = 1024 * 1024;
-const MAX_EXTENSIONS: usize = 1024;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct InertHtmlTarget {
-    pub relationship_id: String,
-    pub target: Option<String>,
-    pub relationship_type: Option<String>,
-    pub external: Option<bool>,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BrowserSupport {
-    V3,
-    V4,
-    V3V4,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WebScreenSize {
-    S544x376,
-    S640x480,
-    S720x512,
-    S800x600,
-    S1024x768,
-    S1152x882,
-    S1152x900,
-    S1280x1024,
-    S1600x1200,
-    S1800x1400,
-    S1920x1200,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WebColor {
-    None,
-    Browser,
-    PresentationText,
-    PresentationAccent,
-    WhiteTextOnBlack,
-    BlackTextOnWhite,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PrintOutput {
-    Slides,
-    Handouts1,
-    Handouts2,
-    Handouts3,
-    Handouts4,
-    Handouts6,
-    Handouts9,
-    Notes,
-    Outline,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PrintColorMode {
-    BlackWhite,
-    Gray,
-    Color,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SlideSelection {
-    All,
-    Range { start: u32, end: u32 },
-    CustomShow(u32),
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ShowMode {
-    Present,
-    Browse { show_scrollbar: Option<bool> },
-    Kiosk { restart: Option<u32> },
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ColorKind {
-    ScRgb,
-    Srgb,
-    Hsl,
-    System,
-    Scheme,
-    Preset,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PresentationColor {
-    pub kind: ColorKind,
-    pub attributes: Vec<(String, String)>,
-    pub xml: Vec<u8>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OpaquePresentationExtension {
-    pub uri: String,
-    pub xml: Vec<u8>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PresentationPropertyExtension {
-    DiscardImageEditData(bool),
-    DefaultImageDpi(u32),
-    ChartTrackingReferenceBased(bool),
-    Unknown(OpaquePresentationExtension),
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SlideShowExtension {
-    BrowseMode { show_status: Option<bool> },
-    LaserColor(PresentationColor),
-    ShowMediaControls(bool),
-    Unknown(OpaquePresentationExtension),
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HtmlPublishProperties {
-    pub show_speaker_notes: Option<bool>,
-    pub browser: Option<BrowserSupport>,
-    pub target: InertHtmlTarget,
-    pub slides: SlideSelection,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct WebProperties {
-    pub show_animation: Option<bool>,
-    pub resize_graphics: Option<bool>,
-    pub allow_png: Option<bool>,
-    pub rely_on_vml: Option<bool>,
-    pub organize_in_folders: Option<bool>,
-    pub use_long_filenames: Option<bool>,
-    pub image_size: Option<WebScreenSize>,
-    pub encoding: Option<String>,
-    pub color: Option<WebColor>,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct PrintProperties {
-    pub output: Option<PrintOutput>,
-    pub color_mode: Option<PrintColorMode>,
-    pub hidden_slides: Option<bool>,
-    pub scale_to_fit_paper: Option<bool>,
-    pub frame_slides: Option<bool>,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct ShowProperties {
-    pub loop_show: Option<bool>,
-    pub show_narration: Option<bool>,
-    pub show_animation: Option<bool>,
-    pub use_timings: Option<bool>,
-    pub mode: Option<ShowMode>,
-    pub slides: Option<SlideSelection>,
-    pub pen_color: Option<PresentationColor>,
-    pub extensions: Vec<SlideShowExtension>,
-}
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct PresentationProperties {
-    pub html_publish: Option<HtmlPublishProperties>,
-    pub web: Option<WebProperties>,
-    pub print: Option<PrintProperties>,
-    pub show: Option<ShowProperties>,
-    pub recent_colors: Vec<PresentationColor>,
-    pub extensions: Vec<PresentationPropertyExtension>,
-}
-
-impl PresentationProperties {
+impl Properties {
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation properties exceed 8 MiB"));
@@ -229,51 +59,6 @@ impl PresentationProperties {
         }
         Ok(x.into_bytes())
     }
-}
-
-pub fn load_from_package(package: &OpcPackage) -> Result<Option<PresentationProperties>> {
-    let presentation = package.main_document_part()?;
-    let mut found = presentation
-        .rels()
-        .iter()
-        .filter(|r| matches!(r.reltype(), REL | STRICT_REL));
-    let Some(rel) = found.next() else {
-        return Ok(None);
-    };
-    if found.next().is_some() {
-        return Err(invalid(
-            "presentation has multiple presentation-properties relationships",
-        ));
-    }
-    if rel.is_external() {
-        return Err(invalid(
-            "presentation-properties relationship cannot be external",
-        ));
-    }
-    let uri: PackURI = rel.target_partname()?;
-    let part = package.get_part(&uri)?;
-    if part.content_type() != CONTENT_TYPE {
-        return Err(invalid(format!(
-            "presentation-properties part '{uri}' has invalid content type '{}'",
-            part.content_type()
-        )));
-    }
-    let mut value = PresentationProperties::parse(part.blob())?;
-    if let Some(html) = value.html_publish.as_mut() {
-        let target = part
-            .rels()
-            .get(&html.target.relationship_id)
-            .ok_or_else(|| {
-                invalid(format!(
-                    "missing HTML publish relationship '{}'",
-                    html.target.relationship_id
-                ))
-            })?;
-        html.target.target = Some(target.target_ref().to_string());
-        html.target.relationship_type = Some(target.reltype().to_string());
-        html.target.external = Some(target.is_external());
-    }
-    Ok(Some(value))
 }
 
 #[derive(Clone, Debug)]
@@ -450,10 +235,10 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()>
     Ok(())
 }
 
-fn project(root: &Node) -> Result<PresentationProperties> {
+fn project(root: &Node) -> Result<Properties> {
     expect(root, P_NS, P_STRICT, "presentationPr")?;
     no_attrs(root)?;
-    let mut out = PresentationProperties::default();
+    let mut out = Properties::default();
     let mut order = 0;
     let mut has_extensions = false;
     for child in children(root)? {
@@ -521,7 +306,7 @@ fn project(root: &Node) -> Result<PresentationProperties> {
     validate(&out)?;
     Ok(out)
 }
-fn parse_html(n: &Node) -> Result<HtmlPublishProperties> {
+fn parse_html(n: &Node) -> Result<HtmlPublish> {
     let show_speaker_notes = bool_opt(n, "showSpeakerNotes")?;
     let browser = attr_opt(n, "", "pubBrowser")?
         .map(parse_browser)
@@ -555,10 +340,10 @@ fn parse_html(n: &Node) -> Result<HtmlPublishProperties> {
             },
         }
     }
-    Ok(HtmlPublishProperties {
+    Ok(HtmlPublish {
         show_speaker_notes,
         browser,
-        target: InertHtmlTarget {
+        target: HtmlTarget {
             relationship_id: id,
             target: None,
             relationship_type: None,
@@ -568,8 +353,8 @@ fn parse_html(n: &Node) -> Result<HtmlPublishProperties> {
         extension_xml: ext,
     })
 }
-fn parse_web(n: &Node) -> Result<WebProperties> {
-    let mut v = WebProperties {
+fn parse_web(n: &Node) -> Result<Web> {
+    let mut v = Web {
         show_animation: bool_opt(n, "showAnimation")?,
         resize_graphics: bool_opt(n, "resizeGraphics")?,
         allow_png: bool_opt(n, "allowPng")?,
@@ -598,8 +383,8 @@ fn parse_web(n: &Node) -> Result<WebProperties> {
     v.extension_xml = single_ext(n)?;
     Ok(v)
 }
-fn parse_print(n: &Node) -> Result<PrintProperties> {
-    let mut v = PrintProperties {
+fn parse_print(n: &Node) -> Result<Print> {
+    let mut v = Print {
         output: attr_opt(n, "", "prnWhat")?.map(parse_output).transpose()?,
         color_mode: attr_opt(n, "", "clrMode")?
             .map(parse_print_color)
@@ -622,8 +407,8 @@ fn parse_print(n: &Node) -> Result<PrintProperties> {
     v.extension_xml = single_ext(n)?;
     Ok(v)
 }
-fn parse_show(n: &Node) -> Result<ShowProperties> {
-    let mut v = ShowProperties {
+fn parse_show(n: &Node) -> Result<Show> {
+    let mut v = Show {
         loop_show: bool_opt(n, "loop")?,
         show_narration: bool_opt(n, "showNarration")?,
         show_animation: bool_opt(n, "showAnimation")?,
@@ -730,7 +515,7 @@ fn parse_selection(n: &Node) -> Result<SlideSelection> {
         _ => Err(invalid("invalid slide selection")),
     }
 }
-fn parse_color(n: &Node) -> Result<PresentationColor> {
+fn parse_color(n: &Node) -> Result<Color> {
     let kind = match (n.ns.as_str(), n.local.as_str()) {
         (A_NS | A_STRICT, "scrgbClr") => ColorKind::ScRgb,
         (A_NS | A_STRICT, "srgbClr") => ColorKind::Srgb,
@@ -745,14 +530,14 @@ fn parse_color(n: &Node) -> Result<PresentationColor> {
         .iter()
         .map(|a| (a.qname.clone(), a.value.clone()))
         .collect();
-    Ok(PresentationColor {
+    Ok(Color {
         kind,
         attributes,
         xml: node_xml(n, false)?,
     })
 }
 
-fn parse_presentation_extensions(n: &Node) -> Result<Vec<PresentationPropertyExtension>> {
+fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
     no_attrs(n)?;
     let extensions = children(n)?;
     if extensions.len() > MAX_EXTENSIONS {
@@ -764,49 +549,46 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<PresentationPropertyExt
     let mut tracking = false;
     for ext in extensions {
         let uri = extension_uri(ext)?;
-        let value =
-            match uri.as_str() {
-                DISCARD_IMAGE_EDIT_DATA_URI => {
-                    if discard {
-                        return Err(invalid("duplicate discardImageEditData extension"));
-                    }
-                    discard = true;
-                    PresentationPropertyExtension::DiscardImageEditData(parse_extension_bool(
-                        ext,
-                        P14_NS,
-                        "discardImageEditData",
-                    )?)
-                },
-                DEFAULT_IMAGE_DPI_URI => {
-                    if dpi {
-                        return Err(invalid("duplicate defaultImageDpi extension"));
-                    }
-                    dpi = true;
-                    PresentationPropertyExtension::DefaultImageDpi(parse_extension_u32(
-                        ext,
-                        P14_NS,
-                        "defaultImageDpi",
-                    )?)
-                },
-                CHART_TRACKING_REF_BASED_URI => {
-                    if tracking {
-                        return Err(invalid("duplicate chartTrackingRefBased extension"));
-                    }
-                    tracking = true;
-                    PresentationPropertyExtension::ChartTrackingReferenceBased(
-                        parse_extension_bool(ext, P15_NS, "chartTrackingRefBased")?,
-                    )
-                },
-                _ => PresentationPropertyExtension::Unknown(OpaquePresentationExtension {
-                    uri,
-                    xml: node_xml(ext, false)?,
-                }),
-            };
+        let value = match uri.as_str() {
+            DISCARD_IMAGE_EDIT_DATA_URI => {
+                if discard {
+                    return Err(invalid("duplicate discardImageEditData extension"));
+                }
+                discard = true;
+                Extension::DiscardImageEditData(parse_extension_bool(
+                    ext,
+                    P14_NS,
+                    "discardImageEditData",
+                )?)
+            },
+            DEFAULT_IMAGE_DPI_URI => {
+                if dpi {
+                    return Err(invalid("duplicate defaultImageDpi extension"));
+                }
+                dpi = true;
+                Extension::DefaultImageDpi(parse_extension_u32(ext, P14_NS, "defaultImageDpi")?)
+            },
+            CHART_TRACKING_REF_BASED_URI => {
+                if tracking {
+                    return Err(invalid("duplicate chartTrackingRefBased extension"));
+                }
+                tracking = true;
+                Extension::ChartTrackingReferenceBased(parse_extension_bool(
+                    ext,
+                    P15_NS,
+                    "chartTrackingRefBased",
+                )?)
+            },
+            _ => Extension::Unknown(OpaqueExtension {
+                uri,
+                xml: node_xml(ext, false)?,
+            }),
+        };
         out.push(value);
     }
     Ok(out)
 }
-fn parse_show_extensions(n: &Node) -> Result<Vec<SlideShowExtension>> {
+fn parse_show_extensions(n: &Node) -> Result<Vec<ShowExtension>> {
     no_attrs(n)?;
     let extensions = children(n)?;
     if extensions.len() > MAX_EXTENSIONS {
@@ -828,7 +610,7 @@ fn parse_show_extensions(n: &Node) -> Result<Vec<SlideShowExtension>> {
                 let show_status = bool_opt(payload, "showStatus")?;
                 only_attrs(payload, &[("", "showStatus")])?;
                 empty(payload)?;
-                SlideShowExtension::BrowseMode { show_status }
+                ShowExtension::BrowseMode { show_status }
             },
             LASER_COLOR_URI => {
                 if laser {
@@ -841,20 +623,20 @@ fn parse_show_extensions(n: &Node) -> Result<Vec<SlideShowExtension>> {
                 if colors.len() != 1 {
                     return Err(invalid("laserClr requires exactly one DrawingML color"));
                 }
-                SlideShowExtension::LaserColor(parse_color(colors[0])?)
+                ShowExtension::LaserColor(parse_color(colors[0])?)
             },
             SHOW_MEDIA_CONTROLS_URI => {
                 if controls {
                     return Err(invalid("duplicate showMediaCtrls extension"));
                 }
                 controls = true;
-                SlideShowExtension::ShowMediaControls(parse_extension_bool(
+                ShowExtension::ShowMediaControls(parse_extension_bool(
                     ext,
                     P14_NS,
                     "showMediaCtrls",
                 )?)
             },
-            _ => SlideShowExtension::Unknown(OpaquePresentationExtension {
+            _ => ShowExtension::Unknown(OpaqueExtension {
                 uri,
                 xml: node_xml(ext, false)?,
             }),
@@ -904,7 +686,7 @@ fn parse_extension_u32(n: &Node, namespace: &str, local: &str) -> Result<u32> {
     Ok(value)
 }
 
-fn write_html(x: &mut String, v: &HtmlPublishProperties, s: bool) -> Result<()> {
+fn write_html(x: &mut String, v: &HtmlPublish, s: bool) -> Result<()> {
     x.push_str("<p:htmlPubPr");
     bool_opt_write(x, "showSpeakerNotes", v.show_speaker_notes);
     if let Some(b) = v.browser {
@@ -920,7 +702,7 @@ fn write_html(x: &mut String, v: &HtmlPublishProperties, s: bool) -> Result<()> 
     x.push_str("</p:htmlPubPr>");
     Ok(())
 }
-fn write_web(x: &mut String, v: &WebProperties, s: bool) -> Result<()> {
+fn write_web(x: &mut String, v: &Web, s: bool) -> Result<()> {
     x.push_str("<p:webPr");
     for (n, b) in [
         ("showAnimation", v.show_animation),
@@ -950,7 +732,7 @@ fn write_web(x: &mut String, v: &WebProperties, s: bool) -> Result<()> {
     }
     Ok(())
 }
-fn write_print(x: &mut String, v: &PrintProperties, s: bool) -> Result<()> {
+fn write_print(x: &mut String, v: &Print, s: bool) -> Result<()> {
     x.push_str("<p:prnPr");
     if let Some(z) = v.output {
         attr_write(x, "prnWhat", output_str(z));
@@ -974,7 +756,7 @@ fn write_print(x: &mut String, v: &PrintProperties, s: bool) -> Result<()> {
     }
     Ok(())
 }
-fn write_show(x: &mut String, v: &ShowProperties, s: bool) -> Result<()> {
+fn write_show(x: &mut String, v: &Show, s: bool) -> Result<()> {
     x.push_str("<p:showPr");
     for (n, b) in [
         ("loop", v.loop_show),
@@ -1023,25 +805,21 @@ fn write_selection(x: &mut String, v: &SlideSelection) {
         SlideSelection::CustomShow(id) => x.push_str(&format!("<p:custShow id=\"{id}\"/>")),
     }
 }
-fn write_presentation_extensions(
-    x: &mut String,
-    v: &[PresentationPropertyExtension],
-    strict: bool,
-) -> Result<()> {
+fn write_presentation_extensions(x: &mut String, v: &[Extension], strict: bool) -> Result<()> {
     if v.is_empty() {
         return Ok(());
     }
     x.push_str("<p:extLst>");
     for extension in v {
         match extension {
-            PresentationPropertyExtension::DiscardImageEditData(value) => write_bool_extension(
+            Extension::DiscardImageEditData(value) => write_bool_extension(
                 x,
                 DISCARD_IMAGE_EDIT_DATA_URI,
                 "p14",
                 "discardImageEditData",
                 *value,
             ),
-            PresentationPropertyExtension::DefaultImageDpi(value) => {
+            Extension::DefaultImageDpi(value) => {
                 x.push_str("<p:ext uri=\"");
                 x.push_str(DEFAULT_IMAGE_DPI_URI);
                 x.push_str("\"><p14:defaultImageDpi xmlns:p14=\"");
@@ -1050,31 +828,27 @@ fn write_presentation_extensions(
                 x.push_str(&value.to_string());
                 x.push_str("\"/></p:ext>");
             },
-            PresentationPropertyExtension::ChartTrackingReferenceBased(value) => {
-                write_bool_extension(
-                    x,
-                    CHART_TRACKING_REF_BASED_URI,
-                    "p15",
-                    "chartTrackingRefBased",
-                    *value,
-                )
-            },
-            PresentationPropertyExtension::Unknown(value) => {
-                write_unknown_extension(x, value, strict)?
-            },
+            Extension::ChartTrackingReferenceBased(value) => write_bool_extension(
+                x,
+                CHART_TRACKING_REF_BASED_URI,
+                "p15",
+                "chartTrackingRefBased",
+                *value,
+            ),
+            Extension::Unknown(value) => write_unknown_extension(x, value, strict)?,
         }
     }
     x.push_str("</p:extLst>");
     Ok(())
 }
-fn write_show_extensions(x: &mut String, v: &[SlideShowExtension], strict: bool) -> Result<()> {
+fn write_show_extensions(x: &mut String, v: &[ShowExtension], strict: bool) -> Result<()> {
     if v.is_empty() {
         return Ok(());
     }
     x.push_str("<p:extLst>");
     for extension in v {
         match extension {
-            SlideShowExtension::BrowseMode { show_status } => {
+            ShowExtension::BrowseMode { show_status } => {
                 x.push_str("<p:ext uri=\"");
                 x.push_str(BROWSE_MODE_URI);
                 x.push_str("\"><p14:browseMode xmlns:p14=\"");
@@ -1083,7 +857,7 @@ fn write_show_extensions(x: &mut String, v: &[SlideShowExtension], strict: bool)
                 bool_opt_write(x, "showStatus", *show_status);
                 x.push_str("/></p:ext>");
             },
-            SlideShowExtension::LaserColor(color) => {
+            ShowExtension::LaserColor(color) => {
                 x.push_str("<p:ext uri=\"");
                 x.push_str(LASER_COLOR_URI);
                 x.push_str("\"><p14:laserClr xmlns:p14=\"");
@@ -1092,10 +866,10 @@ fn write_show_extensions(x: &mut String, v: &[SlideShowExtension], strict: bool)
                 write_opaque(x, &color.xml, strict)?;
                 x.push_str("</p14:laserClr></p:ext>");
             },
-            SlideShowExtension::ShowMediaControls(value) => {
+            ShowExtension::ShowMediaControls(value) => {
                 write_bool_extension(x, SHOW_MEDIA_CONTROLS_URI, "p14", "showMediaCtrls", *value)
             },
-            SlideShowExtension::Unknown(value) => write_unknown_extension(x, value, strict)?,
+            ShowExtension::Unknown(value) => write_unknown_extension(x, value, strict)?,
         }
     }
     x.push_str("</p:extLst>");
@@ -1116,11 +890,7 @@ fn write_bool_extension(x: &mut String, uri: &str, prefix: &str, local: &str, va
     x.push_str(if value { "1" } else { "0" });
     x.push_str("\"/></p:ext>");
 }
-fn write_unknown_extension(
-    x: &mut String,
-    v: &OpaquePresentationExtension,
-    strict: bool,
-) -> Result<()> {
+fn write_unknown_extension(x: &mut String, v: &OpaqueExtension, strict: bool) -> Result<()> {
     bounded(&v.uri)?;
     let node = parse_dom(&v.xml)?;
     let uri = extension_uri(&node)?;
@@ -1163,7 +933,7 @@ fn write_opaque(x: &mut String, v: &[u8], strict: bool) -> Result<()> {
     Ok(())
 }
 
-fn validate(v: &PresentationProperties) -> Result<()> {
+fn validate(v: &Properties) -> Result<()> {
     if v.recent_colors.len() > 10 {
         return Err(invalid("clrMru permits at most ten colors"));
     }
@@ -1185,7 +955,7 @@ fn validate(v: &PresentationProperties) -> Result<()> {
                 .iter()
                 .flat_map(|s| s.extensions.iter())
                 .filter_map(|e| match e {
-                    SlideShowExtension::LaserColor(c) => Some(c),
+                    ShowExtension::LaserColor(c) => Some(c),
                     _ => None,
                 }),
         )
@@ -1208,7 +978,7 @@ fn validate(v: &PresentationProperties) -> Result<()> {
         .extensions
         .iter()
         .filter_map(|e| match e {
-            PresentationPropertyExtension::Unknown(v) => Some(v),
+            Extension::Unknown(v) => Some(v),
             _ => None,
         })
         .chain(
@@ -1216,7 +986,7 @@ fn validate(v: &PresentationProperties) -> Result<()> {
                 .iter()
                 .flat_map(|s| s.extensions.iter())
                 .filter_map(|e| match e {
-                    SlideShowExtension::Unknown(v) => Some(v),
+                    ShowExtension::Unknown(v) => Some(v),
                     _ => None,
                 }),
         )
@@ -1505,20 +1275,20 @@ mod tests {
 
     #[test]
     fn parses_local_presentation_properties_fixture() {
-        let value = PresentationProperties::parse(include_bytes!(
-            "../../../test-data/ooxml/pptx/presentation-properties/basic_presentation.xml"
+        let value = Properties::parse(include_bytes!(
+            "../../../../test-data/ooxml/pptx/presentation-properties/basic_presentation.xml"
         ))
         .unwrap();
         let show = value.show.as_ref().unwrap();
         assert_eq!(show.mode, Some(ShowMode::Kiosk { restart: Some(5) }));
         assert_eq!(
             show.extensions,
-            vec![SlideShowExtension::BrowseMode {
+            vec![ShowExtension::BrowseMode {
                 show_status: Some(false)
             }]
         );
         let strict = value.to_xml(true).unwrap();
-        let again = PresentationProperties::parse(&strict).unwrap();
+        let again = Properties::parse(&strict).unwrap();
         assert_eq!(again.show, value.show);
     }
     #[test]
@@ -1526,7 +1296,7 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_STRICT}" xmlns:r="{R_STRICT}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:u" mc:Ignorable="u"><mc:AlternateContent><mc:Choice Requires="u"><u:x/></mc:Choice><mc:Fallback><p:webPr showAnimation="1" imgSz="1920x1200" clr="browser"/></mc:Fallback></mc:AlternateContent><p:prnPr prnWhat="handouts6" clrMode="gray"/><p:showPr loop="1"><p:kiosk restart="5"/><p:sldRg st="2" end="4"/></p:showPr></p:presentationPr>"#
         );
-        let v = PresentationProperties::parse(xml.as_bytes()).unwrap();
+        let v = Properties::parse(xml.as_bytes()).unwrap();
         assert_eq!(v.web.unwrap().image_size, Some(WebScreenSize::S1920x1200));
         assert_eq!(v.print.unwrap().output, Some(PrintOutput::Handouts6));
         assert_eq!(
@@ -1539,22 +1309,22 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:r="{R_NS}" xmlns:p14="{P14_NS}" xmlns:p15="{P15_NS}" xmlns:a="{A_NS}" xmlns:v="urn:producer"><p:showPr><p:extLst><p:ext uri="{LASER_COLOR_URI}"><p14:laserClr><a:schemeClr val="accent1"/></p14:laserClr></p:ext><p:ext uri="urn:producer:show"><v:payload r:id="rIdNeverFetched"><v:nested value="opaque"/></v:payload></p:ext><p:ext uri="{SHOW_MEDIA_CONTROLS_URI}"><p14:showMediaCtrls val="0"/></p:ext></p:extLst></p:showPr><p:extLst><p:ext uri="{DISCARD_IMAGE_EDIT_DATA_URI}"><p14:discardImageEditData val="1"/></p:ext><p:ext uri="urn:producer:root"><v:data href="https://example.invalid/not-opened"/></p:ext><p:ext uri="{DEFAULT_IMAGE_DPI_URI}"><p14:defaultImageDpi val="4294967295"/></p:ext><p:ext uri="{CHART_TRACKING_REF_BASED_URI}"><p15:chartTrackingRefBased val="false"/></p:ext></p:extLst></p:presentationPr>"#
         );
-        let value = PresentationProperties::parse(xml.as_bytes()).unwrap();
+        let value = Properties::parse(xml.as_bytes()).unwrap();
         let show = value.show.as_ref().unwrap();
         assert!(
-            matches!(&show.extensions[..],[SlideShowExtension::LaserColor(_),SlideShowExtension::Unknown(OpaquePresentationExtension{uri,..}),SlideShowExtension::ShowMediaControls(false)] if uri=="urn:producer:show")
+            matches!(&show.extensions[..],[ShowExtension::LaserColor(_),ShowExtension::Unknown(OpaqueExtension{uri,..}),ShowExtension::ShowMediaControls(false)] if uri=="urn:producer:show")
         );
         assert!(
-            matches!(&value.extensions[..],[PresentationPropertyExtension::DiscardImageEditData(true),PresentationPropertyExtension::Unknown(OpaquePresentationExtension{uri,..}),PresentationPropertyExtension::DefaultImageDpi(u32::MAX),PresentationPropertyExtension::ChartTrackingReferenceBased(false)] if uri=="urn:producer:root")
+            matches!(&value.extensions[..],[Extension::DiscardImageEditData(true),Extension::Unknown(OpaqueExtension{uri,..}),Extension::DefaultImageDpi(u32::MAX),Extension::ChartTrackingReferenceBased(false)] if uri=="urn:producer:root")
         );
         for strict in [false, true] {
             let written = value.to_xml(strict).unwrap();
-            let again = PresentationProperties::parse(&written).unwrap();
+            let again = Properties::parse(&written).unwrap();
             assert_eq!(
                 again
                     .extensions
                     .iter()
-                    .filter(|e| matches!(e, PresentationPropertyExtension::Unknown(_)))
+                    .filter(|e| matches!(e, Extension::Unknown(_)))
                     .count(),
                 1
             );
@@ -1565,7 +1335,7 @@ mod tests {
                     .unwrap()
                     .extensions
                     .iter()
-                    .filter(|e| matches!(e, SlideShowExtension::Unknown(_)))
+                    .filter(|e| matches!(e, ShowExtension::Unknown(_)))
                     .count(),
                 1
             );
@@ -1579,16 +1349,16 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p14="{P14_NS}"><p:showPr><p:extLst><p:ext uri="{BROWSE_MODE_URI}"><p14:browseMode showStatus="0"/></p:ext></p:extLst></p:showPr></p:presentationPr>"#
         );
-        let value = PresentationProperties::parse(xml.as_bytes()).unwrap();
+        let value = Properties::parse(xml.as_bytes()).unwrap();
         assert_eq!(
             value.show.as_ref().unwrap().extensions,
-            vec![SlideShowExtension::BrowseMode {
+            vec![ShowExtension::BrowseMode {
                 show_status: Some(false)
             }]
         );
         for strict in [false, true] {
             let written = value.to_xml(strict).unwrap();
-            let again = PresentationProperties::parse(&written).unwrap();
+            let again = Properties::parse(&written).unwrap();
             assert_eq!(again.show, value.show);
         }
 
@@ -1596,14 +1366,14 @@ mod tests {
             r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p14="{P14_NS}"><p:showPr><p:extLst><p:ext uri="{BROWSE_MODE_URI}"><p14:browseMode/></p:ext></p:extLst></p:showPr></p:presentationPr>"#
         );
         assert!(matches!(
-            PresentationProperties::parse(no_status.as_bytes()),
-            Ok(PresentationProperties {
-                show: Some(ShowProperties {
+            Properties::parse(no_status.as_bytes()),
+            Ok(Properties {
+                show: Some(Show {
                     extensions,
                     ..
                 }),
                 ..
-            }) if extensions == vec![SlideShowExtension::BrowseMode { show_status: None }]
+            }) if extensions == vec![ShowExtension::BrowseMode { show_status: None }]
         ));
     }
     #[test]
@@ -1643,22 +1413,19 @@ mod tests {
             ),
         ];
         for xml in cases {
-            assert!(
-                PresentationProperties::parse(xml.as_bytes()).is_err(),
-                "accepted {xml}"
-            );
+            assert!(Properties::parse(xml.as_bytes()).is_err(), "accepted {xml}");
         }
-        let value = PresentationProperties {
+        let value = Properties {
             extensions: (0..=MAX_EXTENSIONS)
                 .map(|i| {
-                    PresentationPropertyExtension::Unknown(OpaquePresentationExtension {
+                    Extension::Unknown(OpaqueExtension {
                         uri: format!("urn:vendor:{i}"),
                         xml: format!(r#"<p:ext xmlns:p="{P_NS}" uri="urn:vendor:{i}"/>"#)
                             .into_bytes(),
                     })
                 })
                 .collect(),
-            ..PresentationProperties::default()
+            ..Properties::default()
         };
         assert!(value.to_xml(false).is_err());
     }
@@ -1673,18 +1440,13 @@ mod tests {
             ),
             format!(r#"<!DOCTYPE x><p:presentationPr xmlns:p="{P_NS}"/>"#),
         ] {
-            assert!(
-                PresentationProperties::parse(x.as_bytes()).is_err(),
-                "accepted {x}"
-            );
+            assert!(Properties::parse(x.as_bytes()).is_err(), "accepted {x}");
         }
-        let mut v = PresentationProperties::default();
-        v.extensions.push(PresentationPropertyExtension::Unknown(
-            OpaquePresentationExtension {
-                uri: "urn:bad".into(),
-                xml: b"<?bad?><p:extLst/>".to_vec(),
-            },
-        ));
+        let mut v = Properties::default();
+        v.extensions.push(Extension::Unknown(OpaqueExtension {
+            uri: "urn:bad".into(),
+            xml: b"<?bad?><p:extLst/>".to_vec(),
+        }));
         assert!(v.to_xml(false).is_err());
     }
 
@@ -1693,6 +1455,6 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_NS}"><p:showPr></p:webPr></p:presentationPr>"#
         );
-        assert!(PresentationProperties::parse(xml.as_bytes()).is_err());
+        assert!(Properties::parse(xml.as_bytes()).is_err());
     }
 }

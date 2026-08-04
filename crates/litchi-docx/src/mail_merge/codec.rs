@@ -1,523 +1,29 @@
-//! Canonical, inert WordprocessingML mail-merge metadata and recipient-data codec.
-//!
-//! This module models only stored settings and bounded XML. It never follows,
-//! fetches, opens, or executes a mail-merge source.
+//! Bounded WordprocessingML mail-merge XML codec.
 
+use super::model::{
+    Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,
+    MAX_ATTRIBUTES_PER_NODE, MAX_DEPTH, MAX_FIELD_MAPS, MAX_NODES, MAX_RECIPIENTS,
+    MAX_RELATIONSHIP_ID_BYTES, MAX_STRING_BYTES, MAX_UNIQUE_TAG_BYTES, MainDocumentType, R,
+    Recipient, Recipients, STRICT_R, STRICT_W, Settings, W, invalid,
+};
 use crate::{Error, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use litchi_opc::part::Part;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-const STRICT_W: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
-const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const STRICT_R: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-pub const RECIPIENT_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.mailMergeRecipientData+xml";
-const MAX_DEPTH: usize = 128;
-const MAX_NODES: usize = 1_000_000;
-const MAX_STRING_BYTES: usize = 16 * 1024 * 1024;
-const MAX_RELATIONSHIP_ID_BYTES: usize = 1024;
-const MAX_FIELD_MAPS: usize = 16_384;
-const MAX_RECIPIENTS: usize = 1_000_000;
-const MAX_UNIQUE_TAG_BYTES: usize = 1024 * 1024;
-const MAX_ATTRIBUTES_PER_NODE: usize = 256;
-
-/// Opaque mail-merge source to relate from `settings.xml`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MailMergeSource {
-    /// Bytes are stored as an inert package part and never opened or interpreted.
-    Internal {
-        bytes: Vec<u8>,
-        content_type: String,
-        extension: String,
-    },
-    /// URI is stored as an external relationship and never fetched.
-    External(String),
-}
-
-/// Owned, inert relationship target returned by package lookup.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MailMergeTarget {
-    Internal {
-        part_name: litchi_opc::PackURI,
-        bytes: Vec<u8>,
-        content_type: String,
-    },
-    External(String),
-}
-
-fn invalid(message: impl Into<String>) -> Error {
-    Error::Invalid(message.into())
-}
-
-/// Namespace family used by deterministic mail-merge serializers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MailMergeConformance {
-    Transitional,
-    Strict,
-}
-
-impl MailMergeConformance {
-    fn word(self) -> &'static str {
-        match self {
-            Self::Transitional => W,
-            Self::Strict => STRICT_W,
-        }
-    }
-
-    fn relationships(self) -> &'static str {
-        match self {
-            Self::Transitional => R,
-            Self::Strict => STRICT_R,
-        }
-    }
-}
-
-// The explicit implementations keep rustdoc useful and defaults visible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum MailMergeMainDocumentType {
-    Catalog,
-    Envelopes,
-    MailingLabels,
-    #[default]
-    FormLetters,
-    Email,
-    Fax,
-}
-
-impl MailMergeMainDocumentType {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "catalog" => Ok(Self::Catalog),
-            "envelopes" => Ok(Self::Envelopes),
-            "mailingLabels" => Ok(Self::MailingLabels),
-            "formLetters" => Ok(Self::FormLetters),
-            "email" => Ok(Self::Email),
-            "fax" => Ok(Self::Fax),
-            _ => Err(invalid(format!(
-                "invalid mail-merge document type '{value}'"
-            ))),
-        }
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Catalog => "catalog",
-            Self::Envelopes => "envelopes",
-            Self::MailingLabels => "mailingLabels",
-            Self::FormLetters => "formLetters",
-            Self::Email => "email",
-            Self::Fax => "fax",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MailMergeDataType {
-    TextFile,
-    Database,
-    Spreadsheet,
-    Query,
-    Odbc,
-    Native,
-}
-
-impl MailMergeDataType {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "textFile" => Ok(Self::TextFile),
-            "database" => Ok(Self::Database),
-            "spreadsheet" => Ok(Self::Spreadsheet),
-            "query" => Ok(Self::Query),
-            "odbc" => Ok(Self::Odbc),
-            "native" => Ok(Self::Native),
-            _ => Err(invalid(format!("invalid mail-merge data type '{value}'"))),
-        }
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::TextFile => "textFile",
-            Self::Database => "database",
-            Self::Spreadsheet => "spreadsheet",
-            Self::Query => "query",
-            Self::Odbc => "odbc",
-            Self::Native => "native",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum MailMergeDestination {
-    #[default]
-    NewDocument,
-    Printer,
-    Email,
-    Fax,
-}
-
-impl MailMergeDestination {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "newDocument" => Ok(Self::NewDocument),
-            "printer" => Ok(Self::Printer),
-            "email" => Ok(Self::Email),
-            "fax" => Ok(Self::Fax),
-            _ => Err(invalid(format!("invalid mail-merge destination '{value}'"))),
-        }
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::NewDocument => "newDocument",
-            Self::Printer => "printer",
-            Self::Email => "email",
-            Self::Fax => "fax",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MailMergeFieldMappingType {
-    Null,
-    DatabaseColumn,
-}
-
-impl MailMergeFieldMappingType {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "null" => Ok(Self::Null),
-            "dbColumn" => Ok(Self::DatabaseColumn),
-            _ => Err(invalid(format!(
-                "invalid mail-merge field mapping type '{value}'"
-            ))),
-        }
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Null => "null",
-            Self::DatabaseColumn => "dbColumn",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct MailMergeFieldMap {
-    mapping_type: Option<MailMergeFieldMappingType>,
-    name: Option<String>,
-    mapped_name: Option<String>,
-    column: Option<i32>,
-    language_id: Option<String>,
-    dynamic_address: bool,
-}
-
-impl MailMergeFieldMap {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn set_mapping_type(&mut self, value: Option<MailMergeFieldMappingType>) -> &mut Self {
-        self.mapping_type = value;
-        self
-    }
-    pub fn set_name(&mut self, value: Option<String>) -> &mut Self {
-        self.name = value;
-        self
-    }
-    pub fn set_mapped_name(&mut self, value: Option<String>) -> &mut Self {
-        self.mapped_name = value;
-        self
-    }
-    pub fn set_column(&mut self, value: Option<i32>) -> &mut Self {
-        self.column = value;
-        self
-    }
-    pub fn set_language_id(&mut self, value: Option<String>) -> &mut Self {
-        self.language_id = value;
-        self
-    }
-    pub fn set_dynamic_address(&mut self, value: bool) -> &mut Self {
-        self.dynamic_address = value;
-        self
-    }
-    pub fn mapping_type(&self) -> Option<MailMergeFieldMappingType> {
-        self.mapping_type
-    }
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-    pub fn mapped_name(&self) -> Option<&str> {
-        self.mapped_name.as_deref()
-    }
-    pub fn column(&self) -> Option<i32> {
-        self.column
-    }
-    pub fn language_id(&self) -> Option<&str> {
-        self.language_id.as_deref()
-    }
-    pub fn dynamic_address(&self) -> bool {
-        self.dynamic_address
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct MailMergeDataSourceObject {
-    udl: Option<String>,
-    table: Option<String>,
-    source_relationship_id: Option<String>,
-    column_delimiter: Option<i32>,
-    source_type: Option<String>,
-    first_row_header: bool,
-    field_maps: Vec<MailMergeFieldMap>,
-    recipient_data_relationship_id: Option<String>,
-}
-
-impl MailMergeDataSourceObject {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn set_udl(&mut self, value: Option<String>) -> &mut Self {
-        self.udl = value;
-        self
-    }
-    pub fn set_table(&mut self, value: Option<String>) -> &mut Self {
-        self.table = value;
-        self
-    }
-    pub fn set_column_delimiter(&mut self, value: Option<i32>) -> &mut Self {
-        self.column_delimiter = value;
-        self
-    }
-    pub fn set_source_type(&mut self, value: Option<String>) -> &mut Self {
-        self.source_type = value;
-        self
-    }
-    pub fn set_first_row_header(&mut self, value: bool) -> &mut Self {
-        self.first_row_header = value;
-        self
-    }
-    pub fn field_maps_mut(&mut self) -> &mut Vec<MailMergeFieldMap> {
-        &mut self.field_maps
-    }
-    pub fn add_field_map(&mut self, value: MailMergeFieldMap) -> &mut Self {
-        self.field_maps.push(value);
-        self
-    }
-    pub fn udl(&self) -> Option<&str> {
-        self.udl.as_deref()
-    }
-    pub fn table(&self) -> Option<&str> {
-        self.table.as_deref()
-    }
-    pub fn source_relationship_id(&self) -> Option<&str> {
-        self.source_relationship_id.as_deref()
-    }
-    pub fn column_delimiter(&self) -> Option<i32> {
-        self.column_delimiter
-    }
-    pub fn source_type(&self) -> Option<&str> {
-        self.source_type.as_deref()
-    }
-    pub fn first_row_header(&self) -> bool {
-        self.first_row_header
-    }
-    pub fn field_maps(&self) -> &[MailMergeFieldMap] {
-        &self.field_maps
-    }
-    pub fn recipient_data_relationship_id(&self) -> Option<&str> {
-        self.recipient_data_relationship_id.as_deref()
-    }
-}
-
-/// Complete inert metadata from `w:mailMerge`.
-///
-/// The Word-specific optional `mainDocumentType` and single-`odso` behavior
-/// follows the checked-in `[MS-OE376]` sections 2.1.381 and 2.1.384. The
-/// relationship IDs are retained as inert tokens; this owner never resolves
-/// their targets.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MailMergeSettings {
-    main_document_type: MailMergeMainDocumentType,
-    link_to_query: bool,
-    data_type: Option<MailMergeDataType>,
-    connect_string: Option<String>,
-    query: Option<String>,
-    data_source_relationship_id: Option<String>,
-    header_source_relationship_id: Option<String>,
-    do_not_suppress_blank_lines: bool,
-    destination: MailMergeDestination,
-    address_field_name: Option<String>,
-    mail_subject: Option<String>,
-    mail_as_attachment: bool,
-    view_merged_data: bool,
-    active_record: i32,
-    check_errors: i32,
-    odso: Option<MailMergeDataSourceObject>,
-}
-
-impl Default for MailMergeSettings {
-    fn default() -> Self {
-        Self {
-            main_document_type: MailMergeMainDocumentType::FormLetters,
-            link_to_query: false,
-            data_type: None,
-            connect_string: None,
-            query: None,
-            data_source_relationship_id: None,
-            header_source_relationship_id: None,
-            do_not_suppress_blank_lines: false,
-            destination: MailMergeDestination::NewDocument,
-            address_field_name: None,
-            mail_subject: None,
-            mail_as_attachment: false,
-            view_merged_data: false,
-            active_record: 1,
-            check_errors: 2,
-            odso: None,
-        }
-    }
-}
-
-impl MailMergeSettings {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn set_main_document_type(&mut self, value: MailMergeMainDocumentType) -> &mut Self {
-        self.main_document_type = value;
-        self
-    }
-    pub fn set_link_to_query(&mut self, value: bool) -> &mut Self {
-        self.link_to_query = value;
-        self
-    }
-    pub fn set_data_type(&mut self, value: Option<MailMergeDataType>) -> &mut Self {
-        self.data_type = value;
-        self
-    }
-    pub fn set_connect_string(&mut self, value: Option<String>) -> &mut Self {
-        self.connect_string = value;
-        self
-    }
-    pub fn set_query(&mut self, value: Option<String>) -> &mut Self {
-        self.query = value;
-        self
-    }
-    pub fn set_do_not_suppress_blank_lines(&mut self, value: bool) -> &mut Self {
-        self.do_not_suppress_blank_lines = value;
-        self
-    }
-    pub fn set_destination(&mut self, value: MailMergeDestination) -> &mut Self {
-        self.destination = value;
-        self
-    }
-    pub fn set_address_field_name(&mut self, value: Option<String>) -> &mut Self {
-        self.address_field_name = value;
-        self
-    }
-    pub fn set_mail_subject(&mut self, value: Option<String>) -> &mut Self {
-        self.mail_subject = value;
-        self
-    }
-    pub fn set_mail_as_attachment(&mut self, value: bool) -> &mut Self {
-        self.mail_as_attachment = value;
-        self
-    }
-    pub fn set_view_merged_data(&mut self, value: bool) -> &mut Self {
-        self.view_merged_data = value;
-        self
-    }
-    pub fn set_active_record(&mut self, value: i32) -> &mut Self {
-        self.active_record = value;
-        self
-    }
-    pub fn set_check_errors(&mut self, value: i32) -> &mut Self {
-        self.check_errors = value;
-        self
-    }
-    pub fn set_odso(&mut self, value: Option<MailMergeDataSourceObject>) -> &mut Self {
-        self.odso = value;
-        self
-    }
-
-    pub fn assign_package_relationships(
-        &mut self,
-        data_source: Option<String>,
-        header_source: Option<String>,
-        recipient_data: Option<String>,
-    ) {
-        self.data_source_relationship_id = data_source.clone();
-        self.header_source_relationship_id = header_source;
-        if self.odso.is_none() && (data_source.is_some() || recipient_data.is_some()) {
-            self.odso = Some(MailMergeDataSourceObject::default());
-        }
-        if let Some(odso) = &mut self.odso {
-            odso.source_relationship_id = data_source;
-            odso.recipient_data_relationship_id = recipient_data;
-        }
-    }
-    pub fn main_document_type(&self) -> MailMergeMainDocumentType {
-        self.main_document_type
-    }
-    pub fn link_to_query(&self) -> bool {
-        self.link_to_query
-    }
-    pub fn data_type(&self) -> Option<MailMergeDataType> {
-        self.data_type
-    }
-    pub fn connect_string(&self) -> Option<&str> {
-        self.connect_string.as_deref()
-    }
-    pub fn query(&self) -> Option<&str> {
-        self.query.as_deref()
-    }
-    pub fn data_source_relationship_id(&self) -> Option<&str> {
-        self.data_source_relationship_id.as_deref()
-    }
-    pub fn header_source_relationship_id(&self) -> Option<&str> {
-        self.header_source_relationship_id.as_deref()
-    }
-    pub fn do_not_suppress_blank_lines(&self) -> bool {
-        self.do_not_suppress_blank_lines
-    }
-    pub fn destination(&self) -> MailMergeDestination {
-        self.destination
-    }
-    pub fn address_field_name(&self) -> Option<&str> {
-        self.address_field_name.as_deref()
-    }
-    pub fn mail_subject(&self) -> Option<&str> {
-        self.mail_subject.as_deref()
-    }
-    pub fn mail_as_attachment(&self) -> bool {
-        self.mail_as_attachment
-    }
-    pub fn view_merged_data(&self) -> bool {
-        self.view_merged_data
-    }
-    pub fn active_record(&self) -> i32 {
-        self.active_record
-    }
-    pub fn check_errors(&self) -> i32 {
-        self.check_errors
-    }
-    pub fn odso(&self) -> Option<&MailMergeDataSourceObject> {
-        self.odso.as_ref()
-    }
-
+impl Settings {
     /// Serialize a standalone `w:mailMerge` fragment in schema order.
-    pub fn to_xml(&self, conformance: MailMergeConformance) -> Result<String> {
+    pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
         validate_model(self)?;
         let mut xml = format!(
             r#"<w:mailMerge xmlns:w="{}" xmlns:r="{}">"#,
             conformance.word(),
             conformance.relationships()
         );
-        if self.main_document_type != MailMergeMainDocumentType::FormLetters {
+        if self.main_document_type != MainDocumentType::FormLetters {
             value_leaf(
                 &mut xml,
                 "mainDocumentType",
@@ -545,7 +51,7 @@ impl MailMergeSettings {
             "doNotSuppressBlankLines",
             self.do_not_suppress_blank_lines,
         );
-        if self.destination != MailMergeDestination::NewDocument {
+        if self.destination != Destination::NewDocument {
             value_leaf(&mut xml, "destination", self.destination.as_str());
         }
         optional_string_leaf(
@@ -570,101 +76,7 @@ impl MailMergeSettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MailMergeRecipient {
-    active: bool,
-    column: Option<i32>,
-    unique_tag: Option<Vec<u8>>,
-}
-
-impl MailMergeRecipient {
-    pub fn new(active: bool, column: Option<i32>, unique_tag: Option<Vec<u8>>) -> Self {
-        Self {
-            active,
-            column,
-            unique_tag,
-        }
-    }
-    pub fn set_active(&mut self, value: bool) -> &mut Self {
-        self.active = value;
-        self
-    }
-    pub fn set_column(&mut self, value: Option<i32>) -> &mut Self {
-        self.column = value;
-        self
-    }
-    pub fn set_unique_tag(&mut self, value: Option<Vec<u8>>) -> &mut Self {
-        self.unique_tag = value;
-        self
-    }
-    pub fn active(&self) -> bool {
-        self.active
-    }
-    pub fn column(&self) -> Option<i32> {
-        self.column
-    }
-    pub fn unique_tag(&self) -> Option<&[u8]> {
-        self.unique_tag.as_deref()
-    }
-}
-
-/// Bounded inclusion/exclusion metadata from the inert recipient-data part.
-///
-/// The checked-in `[MS-OE376]` recipient-data part and relationship sections
-/// are treated as package metadata only: no source record is opened, fetched,
-/// hashed, or executed by this codec.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct MailMergeRecipients {
-    recipients: Vec<MailMergeRecipient>,
-}
-
-impl MailMergeRecipients {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn recipients(&self) -> &[MailMergeRecipient] {
-        &self.recipients
-    }
-
-    pub fn recipients_mut(&mut self) -> &mut Vec<MailMergeRecipient> {
-        &mut self.recipients
-    }
-    pub fn add_recipient(&mut self, recipient: MailMergeRecipient) -> Result<&mut Self> {
-        if self.recipients.len() >= MAX_RECIPIENTS {
-            return Err(invalid("too many mail-merge recipients"));
-        }
-        self.recipients.push(recipient);
-        Ok(self)
-    }
-    pub fn set_recipient_active(&mut self, index: usize, active: bool) -> Result<()> {
-        let recipient = self
-            .recipients
-            .get_mut(index)
-            .ok_or_else(|| invalid(format!("recipient index {index} is out of range")))?;
-        recipient.active = active;
-        Ok(())
-    }
-
-    pub fn content_type() -> &'static str {
-        RECIPIENT_CONTENT_TYPE
-    }
-
-    pub fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        if part.content_type() != RECIPIENT_CONTENT_TYPE {
-            return Err(invalid(format!(
-                "invalid mail-merge recipient-data content type '{}'",
-                part.content_type()
-            )));
-        }
-        if part.rels().iter().next().is_some() {
-            return Err(invalid(
-                "mail-merge recipient-data part cannot have relationships",
-            ));
-        }
-        let xml = litchi_ooxml_common::mce::process_part(part)?;
-        Self::parse_xml(xml.as_ref())
-    }
-
+impl Recipients {
     pub fn parse_xml(xml: &[u8]) -> Result<Self> {
         let root = parse_tree(xml)?;
         require_word_element(&root, "recipients")?;
@@ -691,7 +103,7 @@ impl MailMergeRecipients {
         Ok(Self { recipients })
     }
 
-    pub fn to_xml(&self, conformance: MailMergeConformance) -> Result<String> {
+    pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
         if self.recipients.len() > MAX_RECIPIENTS {
             return Err(invalid("too many mail-merge recipients"));
         }
@@ -722,7 +134,7 @@ impl MailMergeRecipients {
     }
 }
 
-pub fn parse_settings_mail_merge(xml: &[u8]) -> Result<Option<MailMergeSettings>> {
+pub fn parse_settings_mail_merge(xml: &[u8]) -> Result<Option<Settings>> {
     let root = parse_tree(xml)?;
     require_word_element(&root, "settings")?;
     let mut found = None;
@@ -812,7 +224,7 @@ fn validate_settings_order(children: &[Node], mail_index: usize) -> Result<()> {
     Ok(())
 }
 
-fn parse_mail_merge(node: &Node) -> Result<MailMergeSettings> {
+fn parse_mail_merge(node: &Node) -> Result<Settings> {
     ensure_no_schema_attrs(node)?;
     let names = [
         "mainDocumentType",
@@ -835,7 +247,7 @@ fn parse_mail_merge(node: &Node) -> Result<MailMergeSettings> {
     let mut seen = [false; 16];
     let mut last = 0usize;
     let mut first = true;
-    let mut value = MailMergeSettings::default();
+    let mut value = Settings::default();
     for child in &node.children {
         if !child.is_word() {
             if names.contains(&child.local.as_str()) {
@@ -868,11 +280,9 @@ fn parse_mail_merge(node: &Node) -> Result<MailMergeSettings> {
         last = index;
         seen[index] = true;
         match index {
-            0 => {
-                value.main_document_type = MailMergeMainDocumentType::parse(&required_val(child)?)?
-            },
+            0 => value.main_document_type = MainDocumentType::parse(&required_val(child)?)?,
             1 => value.link_to_query = on_off(child)?,
-            2 => value.data_type = Some(MailMergeDataType::parse(&required_val(child)?)?),
+            2 => value.data_type = Some(DataType::parse(&required_val(child)?)?),
             3 => {
                 value.connect_string = Some(bounded_string(required_val(child)?, "connectString")?)
             },
@@ -880,7 +290,7 @@ fn parse_mail_merge(node: &Node) -> Result<MailMergeSettings> {
             5 => value.data_source_relationship_id = Some(relationship_id(child)?),
             6 => value.header_source_relationship_id = Some(relationship_id(child)?),
             7 => value.do_not_suppress_blank_lines = on_off(child)?,
-            8 => value.destination = MailMergeDestination::parse(&required_val(child)?)?,
+            8 => value.destination = Destination::parse(&required_val(child)?)?,
             9 => {
                 value.address_field_name =
                     Some(bounded_string(required_val(child)?, "addressFieldName")?)
@@ -903,7 +313,7 @@ fn parse_mail_merge(node: &Node) -> Result<MailMergeSettings> {
     Ok(value)
 }
 
-fn parse_odso(node: &Node) -> Result<MailMergeDataSourceObject> {
+fn parse_odso(node: &Node) -> Result<DataSourceObject> {
     ensure_no_schema_attrs(node)?;
     let names = [
         "udl",
@@ -918,7 +328,7 @@ fn parse_odso(node: &Node) -> Result<MailMergeDataSourceObject> {
     let mut seen = [false; 8];
     let mut last = 0usize;
     let mut first = true;
-    let mut value = MailMergeDataSourceObject::default();
+    let mut value = DataSourceObject::default();
     for child in &node.children {
         if !child.is_word() {
             if names.contains(&child.local.as_str()) {
@@ -972,7 +382,7 @@ fn parse_odso(node: &Node) -> Result<MailMergeDataSourceObject> {
     Ok(value)
 }
 
-fn parse_field_map(node: &Node) -> Result<MailMergeFieldMap> {
+fn parse_field_map(node: &Node) -> Result<FieldMap> {
     ensure_no_schema_attrs(node)?;
     let names = [
         "type",
@@ -985,7 +395,7 @@ fn parse_field_map(node: &Node) -> Result<MailMergeFieldMap> {
     let mut seen = [false; 6];
     let mut last = 0usize;
     let mut first = true;
-    let mut value = MailMergeFieldMap::default();
+    let mut value = FieldMap::default();
     for child in &node.children {
         if !child.is_word() {
             if names.contains(&child.local.as_str()) {
@@ -1018,9 +428,7 @@ fn parse_field_map(node: &Node) -> Result<MailMergeFieldMap> {
         last = index;
         seen[index] = true;
         match index {
-            0 => {
-                value.mapping_type = Some(MailMergeFieldMappingType::parse(&required_val(child)?)?)
-            },
+            0 => value.mapping_type = Some(FieldMappingType::parse(&required_val(child)?)?),
             1 => value.name = Some(bounded_string(required_val(child)?, "field-map name")?),
             2 => {
                 value.mapped_name = Some(bounded_string(required_val(child)?, "mapped field name")?)
@@ -1043,13 +451,13 @@ fn parse_field_map(node: &Node) -> Result<MailMergeFieldMap> {
     Ok(value)
 }
 
-fn parse_recipient(node: &Node) -> Result<MailMergeRecipient> {
+fn parse_recipient(node: &Node) -> Result<Recipient> {
     ensure_no_schema_attrs(node)?;
     let names = ["active", "column", "uniqueTag"];
     let mut seen = [false; 3];
     let mut last = 0usize;
     let mut first = true;
-    let mut recipient = MailMergeRecipient {
+    let mut recipient = Recipient {
         active: true,
         column: None,
         unique_tag: None,
@@ -1101,7 +509,7 @@ fn parse_recipient(node: &Node) -> Result<MailMergeRecipient> {
     Ok(recipient)
 }
 
-fn validate_model(value: &MailMergeSettings) -> Result<()> {
+fn validate_model(value: &Settings) -> Result<()> {
     for (description, string) in [
         ("connectString", value.connect_string.as_deref()),
         ("query", value.query.as_deref()),
@@ -1123,7 +531,7 @@ fn validate_model(value: &MailMergeSettings) -> Result<()> {
     Ok(())
 }
 
-fn write_odso(xml: &mut String, odso: &MailMergeDataSourceObject) {
+fn write_odso(xml: &mut String, odso: &DataSourceObject) {
     xml.push_str("<w:odso>");
     optional_string_leaf(xml, "udl", odso.udl.as_deref());
     optional_string_leaf(xml, "table", odso.table.as_deref());
@@ -1534,24 +942,21 @@ mod tests {
         let value = parse_settings_mail_merge(SETTINGS.as_bytes())
             .unwrap()
             .unwrap();
-        assert_eq!(value.main_document_type(), MailMergeMainDocumentType::Email);
-        assert_eq!(value.data_type(), Some(MailMergeDataType::Native));
-        assert_eq!(value.destination(), MailMergeDestination::Email);
+        assert_eq!(value.main_document_type(), MainDocumentType::Email);
+        assert_eq!(value.data_type(), Some(DataType::Native));
+        assert_eq!(value.destination(), Destination::Email);
         assert_eq!(value.query(), Some("SELECT * FROM inert"));
         assert_eq!(
             value.odso().unwrap().field_maps()[0].mapping_type(),
-            Some(MailMergeFieldMappingType::DatabaseColumn)
+            Some(FieldMappingType::DatabaseColumn)
         );
-        let fragment = value.to_xml(MailMergeConformance::Strict).unwrap();
+        let fragment = value.to_xml(Conformance::Strict).unwrap();
         let wrapped = format!(r#"<s:settings xmlns:s="{STRICT_W}">{fragment}</s:settings>"#);
         let reparsed = parse_settings_mail_merge(wrapped.as_bytes())
             .unwrap()
             .unwrap();
         assert_eq!(reparsed, value);
-        assert_eq!(
-            reparsed.to_xml(MailMergeConformance::Strict).unwrap(),
-            fragment
-        );
+        assert_eq!(reparsed.to_xml(Conformance::Strict).unwrap(), fragment);
     }
 
     #[test]
@@ -1560,11 +965,8 @@ mod tests {
             r#"<w:settings xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><w:mailMerge mc:Ignorable="x" mc:PreserveAttributes="x:*" x:future="kept"><mc:AlternateContent><mc:Choice Requires="x"><x:dataType/></mc:Choice><mc:Fallback><w:viewMergedData/></mc:Fallback></mc:AlternateContent></w:mailMerge></w:settings>"#
         );
         let value = parse_settings_mail_merge(xml.as_bytes()).unwrap().unwrap();
-        assert_eq!(
-            value.main_document_type(),
-            MailMergeMainDocumentType::FormLetters
-        );
-        assert_eq!(value.destination(), MailMergeDestination::NewDocument);
+        assert_eq!(value.main_document_type(), MainDocumentType::FormLetters);
+        assert_eq!(value.destination(), Destination::NewDocument);
         assert_eq!(value.active_record(), 1);
         assert_eq!(value.check_errors(), 2);
         assert!(value.view_merged_data());
@@ -1603,7 +1005,7 @@ mod tests {
         let recipients = format!(
             r#"<w:recipients xmlns:w="{W}"><w:recipientData><w:uniqueTag w:val="AQ="/></w:recipientData></w:recipients>"#
         );
-        assert!(MailMergeRecipients::parse_xml(recipients.as_bytes()).is_err());
+        assert!(Recipients::parse_xml(recipients.as_bytes()).is_err());
     }
 
     #[test]
@@ -1624,17 +1026,14 @@ mod tests {
 
     #[test]
     fn round_trips_strict_recipient_data_with_canonical_base64() {
-        let mut recipients = MailMergeRecipients::new();
+        let mut recipients = Recipients::new();
         recipients
-            .add_recipient(MailMergeRecipient::new(false, Some(7), Some(vec![1, 2, 3])))
+            .add_recipient(Recipient::new(false, Some(7), Some(vec![1, 2, 3])))
             .unwrap();
 
-        let xml = recipients.to_xml(MailMergeConformance::Strict).unwrap();
+        let xml = recipients.to_xml(Conformance::Strict).unwrap();
         assert!(xml.contains(STRICT_W));
         assert!(xml.contains("AQID"));
-        assert_eq!(
-            MailMergeRecipients::parse_xml(xml.as_bytes()).unwrap(),
-            recipients
-        );
+        assert_eq!(Recipients::parse_xml(xml.as_bytes()).unwrap(), recipients);
     }
 }

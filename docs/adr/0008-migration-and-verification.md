@@ -4191,6 +4191,46 @@ workspace test remains blocked before project compilation because `pkg-config`
 is not available for `yeslogic-fontconfig-sys`/fontconfig. No native Office or
 performance claim is made for this batch.
 
+## DOCX mail-merge, PPTX presentation-properties, XLSX ActiveX, and shared web-owner layering
+
+This batch continues the layered-module and concise-name rule across three
+format crates and one genuinely shared OOXML owner:
+
+- `litchi-docx::mail_merge` is layered as `model.rs`, `codec.rs`, and
+  `package.rs`. `Conformance`, `Settings`, `FieldMap`, `Recipient`, and
+  related contextual values are canonical; historical `MailMerge*` names are
+  aliases. Mail-merge sources and recipient parts remain inert.
+- `litchi-pptx::presentation_properties` is layered as `model.rs`, `codec.rs`,
+  and `package.rs`. `Properties`, `HtmlPublish`, `Web`, `Print`, `Show`, and
+  related values are canonical; historical `Presentation*` and `*Properties`
+  names remain aliases.
+- `litchi-xlsx::active_x` is layered as `model.rs`, `codec.rs`, and
+  `package.rs`. `Control`, `Descriptor`, `Binary`, `PreviewImage`, and
+  `ControlSet` use contextual names; historical `ActiveX*` names remain
+  aliases. Control binaries stay opaque and external targets are not followed.
+- `litchi-ooxml-common::web` is layered as `model.rs`, `codec.rs`, and
+  `package.rs` while retaining its `raw` constants and public API. This
+  common owner remains the single implementation used by DOCX, PPTX, XLSX,
+  and XLSB task-pane/web-extension paths; no format-local copies were added.
+
+Checked-in specification anchors are `[MS-OE376]` §§2.1.18, 2.1.32,
+2.1.367, 2.1.381, 2.1.384, 2.1.386, 3.1.1.3, 3.1.2.2.1.2--3.1.2.2.1.3,
+3.4.1.1, and 3.6.1.1--3.6.2.1; `[MS-XLSX]` §§2.1.1, 2.2.4.3, 2.4.25,
+2.4.89, 2.6.46, 2.6.215, and 2.6.227--2.6.228; `[MS-PPTX]` presentation
+properties and web-extension references; `[MS-DOCX]` mail-merge settings
+and `[MS-OWEXML]` §§1.3, 2.1--2.2.10. These anchors cover the bounded
+models, strict/transitional namespaces, relationship validation, and inert
+payload preservation.
+
+Focused owner tests pass: 157 common, 254 DOCX, 196 PPTX, and 395 XLSX
+all-target tests. The no-default-features `litchi-ooxml` suite passes 1,499
+host library tests and all targets. Strict owner and host Clippy, formatting,
+diff, and the crate-boundary audit pass; the audit remains at 35 workspace
+packages, 107 internal dependency declarations, and 13 scheduled debt edges.
+The full workspace test remains blocked before project compilation because
+`pkg-config` is unavailable for `yeslogic-fontconfig-sys`/fontconfig. No
+native Office or performance claim is made for this batch.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
