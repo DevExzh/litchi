@@ -7,7 +7,7 @@ use crate::model::{
     DrawingShapeKind, Effect, EffectDirection, EnhancedGeometry, EnhancedGeometryChild,
     EnhancedGeometryChildKind, EventListener, HyperlinkShow, Kind, LegacyAnimationKind,
     LegacyAnimationNode, Namespace, Node, Parameter, Reference, ScriptEventListener, Shape,
-    ShapeEventListener, Show, Slide, SlideTransition, TransitionDirection, TransitionSound,
+    ShapeEventListener, Show, Slide, Transition, TransitionDirection, TransitionSound,
     TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };
 use litchi_core::{Error, Result, ShapeType};
@@ -34,13 +34,13 @@ const ANIMATION_NAMESPACE_BYTES: &[u8] = ANIMATION_NAMESPACE.as_bytes();
 #[derive(Clone, Default)]
 struct TransitionStyleDefinition {
     parent: Option<String>,
-    transition: SlideTransition,
+    transition: Transition,
 }
 
 #[derive(Default)]
 struct TransitionStyles {
     named: HashMap<String, TransitionStyleDefinition>,
-    default: SlideTransition,
+    default: Transition,
 }
 
 #[derive(Clone, Copy)]
@@ -1518,7 +1518,7 @@ impl Parser {
     fn parse_transition_properties(
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,
-        transition: &mut SlideTransition,
+        transition: &mut Transition,
     ) -> Result<()> {
         transition.transition_type =
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"transition-type")?
@@ -1615,7 +1615,7 @@ impl Parser {
                         is_drawing_page,
                         TransitionStyleDefinition {
                             parent,
-                            transition: SlideTransition::new(),
+                            transition: Transition::new(),
                         },
                     ));
                 },
@@ -1633,7 +1633,7 @@ impl Parser {
                                 STYLE_NAMESPACE,
                                 b"parent-style-name",
                             )?,
-                            transition: SlideTransition::new(),
+                            transition: Transition::new(),
                         };
                         if let Some(name) = name {
                             result.named.insert(name, definition);
@@ -1696,7 +1696,7 @@ impl Parser {
     fn resolved_transition_styles(
         content: &str,
         styles: Option<&str>,
-    ) -> Result<(HashMap<String, SlideTransition>, SlideTransition)> {
+    ) -> Result<(HashMap<String, Transition>, Transition)> {
         let mut definitions = TransitionStyles::default();
         if let Some(styles) = styles {
             definitions = Self::parse_transition_style_definitions(styles)?;
@@ -1710,11 +1710,11 @@ impl Parser {
         fn resolve(
             name: &str,
             definitions: &HashMap<String, TransitionStyleDefinition>,
-            default: &SlideTransition,
-            cache: &mut HashMap<String, SlideTransition>,
+            default: &Transition,
+            cache: &mut HashMap<String, Transition>,
             visiting: &mut HashSet<String>,
             depth: usize,
-        ) -> Result<SlideTransition> {
+        ) -> Result<Transition> {
             if let Some(value) = cache.get(name) {
                 return Ok(value.clone());
             }
@@ -1823,7 +1823,7 @@ impl Parser {
         let mut current_notes_has_paragraph = false;
         let mut in_notes = false;
         let mut current_slide_has_segment = false;
-        let mut current_transition: Option<SlideTransition> = None;
+        let mut current_transition: Option<Transition> = None;
         let mut current_animations = Vec::new();
         let mut animation_node_count = 0;
         let mut current_legacy_animation = None;

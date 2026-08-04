@@ -1,7 +1,7 @@
 //! Slide and shape structures for ODP presentations.
 
 use super::{
-    DrawingHyperlink, LegacyAnimationNode, Node, Reference, ShapeEventListener, SlideTransition,
+    DrawingHyperlink, LegacyAnimationNode, Node, Reference, ShapeEventListener, Transition,
 };
 use crate::action::validate_event_listeners;
 use litchi_core::Result;
@@ -20,7 +20,7 @@ pub struct Slide {
     /// Optional notes for the slide
     pub notes: Option<String>,
     /// Optional slide transition and automatic-advance properties.
-    pub transition: Option<SlideTransition>,
+    pub transition: Option<Transition>,
     /// Inert ODF animation and timing trees attached to the slide.
     pub animations: Vec<Node>,
     /// Optional legacy `presentation:animations` effect tree.
@@ -89,13 +89,13 @@ impl Slide {
     }
 
     /// Get the slide transition configuration.
-    pub fn transition(&self) -> Option<&SlideTransition> {
+    pub fn transition(&self) -> Option<&Transition> {
         self.transition.as_ref()
     }
 
     /// Get or create the slide transition configuration.
-    pub fn transition_mut(&mut self) -> &mut SlideTransition {
-        self.transition.get_or_insert_with(SlideTransition::new)
+    pub fn transition_mut(&mut self) -> &mut Transition {
+        self.transition.get_or_insert_with(Transition::new)
     }
 
     /// Remove the slide transition configuration.

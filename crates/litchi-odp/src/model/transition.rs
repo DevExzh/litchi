@@ -238,7 +238,7 @@ impl TransitionSound {
 
 /// Complete drawing-page transition configuration for a slide.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SlideTransition {
+pub struct Transition {
     pub(crate) transition_type: Option<TransitionType>,
     pub(crate) style: Option<TransitionStyle>,
     pub(crate) speed: Option<TransitionSpeed>,
@@ -250,7 +250,7 @@ pub struct SlideTransition {
     pub(crate) sound: Option<TransitionSound>,
 }
 
-impl SlideTransition {
+impl Transition {
     /// Create an empty transition configuration.
     pub fn new() -> Self {
         Self::default()
@@ -490,7 +490,7 @@ mod tests {
 
     #[test]
     fn validates_color_and_duration_without_partial_parses() {
-        let mut transition = SlideTransition::new();
+        let mut transition = Transition::new();
         transition.set_fade_color(Some("#aB09fF")).unwrap();
         transition.set_duration(Some("P1Y2M3DT4H5M6.25S")).unwrap();
         assert!(transition.set_fade_color(Some("red")).is_err());
@@ -501,13 +501,13 @@ mod tests {
 
     #[test]
     fn child_values_override_inherited_transition_values() {
-        let mut parent = SlideTransition::new();
+        let mut parent = Transition::new();
         parent
             .set_transition_type(Some(TransitionType::Automatic))
             .set_speed(Some(TransitionSpeed::Slow));
         parent.set_duration(Some("PT5S")).unwrap();
 
-        let mut child = SlideTransition::new();
+        let mut child = Transition::new();
         child.set_speed(Some(TransitionSpeed::Fast));
         child.inherit_from(&parent);
         assert_eq!(child.transition_type(), Some(TransitionType::Automatic));

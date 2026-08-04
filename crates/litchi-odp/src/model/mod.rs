@@ -31,6 +31,6 @@ pub use slide::{
     EnhancedGeometryChild, EnhancedGeometryChildKind, Shape, Slide,
 };
 pub use transition::{
-    SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
+    Transition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
     TransitionStyle, TransitionType,
 };
