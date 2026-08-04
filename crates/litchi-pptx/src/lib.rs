@@ -38,8 +38,7 @@ pub use actions::{Jump, Kind, Setting, Target, Trigger};
 pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use comments::{
-    PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
-    PresentationComments, SlideCommentList, add_presentation_comment,
+    Author, Comment, Comments, Conformance, List, add_presentation_comment,
     add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
     load_presentation_comments, parse_comment_authors, parse_slide_comments,
     remove_presentation_comment, remove_presentation_comment_author,

@@ -1,7 +1,4 @@
 //! Semantic values for PresentationML legacy comments.
-//!
-//! These names are scoped by the \`comments\` module; compatibility aliases
-//! retain the historical public vocabulary at the module boundary.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Conformance {

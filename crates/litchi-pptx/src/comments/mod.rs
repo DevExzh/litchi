@@ -20,13 +20,6 @@ pub use package::{
     update_presentation_comment_author,
 };
 
-// Historical type names remain aliases, so there is one canonical declaration per value.
-pub type PresentationCommentConformance = Conformance;
-pub type PresentationCommentAuthor = Author;
-pub type PresentationComment = Comment;
-pub type SlideCommentList = List;
-pub type PresentationComments = Comments;
-
 pub(crate) const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 pub(crate) const COMMENTS_REL: &str =
