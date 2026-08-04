@@ -1,9 +1,9 @@
-//! Compatibility adapter for the canonical XLSX ActiveX persistence codec.
+//! OOXML adapter for the canonical XLSX ActiveX persistence codec.
 //!
 //! SpreadsheetML control metadata, ActiveX descriptor XML, bounded limits, and
 //! the inert OPC graph implementation live in `litchi_xlsx::active_x`.
-//! This module preserves the historical OOXML-facing names and maps owner
-//! failures back to `OoxmlError`. ActiveX payloads remain opaque.
+//! Host-specific descriptor and loaded-control wrappers map owner failures
+//! back to `OoxmlError`; ActiveX payloads remain opaque.
 
 use crate::error::{OoxmlError, Result};
 use litchi_opc::{OpcPackage, PackURI};
@@ -11,8 +11,8 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsx::active_x as owner;
 
 pub use owner::{
-    ActiveXFont, ActiveXPicture, ActiveXProperty, ActiveXPropertyObject, ControlProperties, Marker,
-    ObjectAnchor, OpaqueActiveXBinary, OpaqueActiveXPreviewImage, Persistence, WorksheetControl,
+    Binary, ControlProperties, Font, Marker, ObjectAnchor, Persistence, Picture, PreviewImage,
+    Property, PropertyObject, WorksheetControl,
 };
 
 /// The worksheet `controls` collection.
@@ -47,17 +47,17 @@ impl WorksheetControls {
 
 /// The inert ActiveX descriptor/property XML document.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ActiveXDescriptor {
+pub struct Descriptor {
     pub class_id: String,
     pub license: Option<String>,
     pub persistence: Persistence,
     pub relationship_id: Option<String>,
-    pub properties: Vec<ActiveXProperty>,
+    pub properties: Vec<Property>,
 }
 
-impl ActiveXDescriptor {
+impl Descriptor {
     pub fn parse(xml: &[u8]) -> Result<Self> {
-        owner::ActiveXDescriptor::parse(xml)
+        owner::Descriptor::parse(xml)
             .map(Self::from_owner)
             .map_err(map_owner_error)
     }
@@ -66,8 +66,8 @@ impl ActiveXDescriptor {
         self.to_owner().to_xml().map_err(map_owner_error)
     }
 
-    fn to_owner(&self) -> owner::ActiveXDescriptor {
-        owner::ActiveXDescriptor {
+    fn to_owner(&self) -> owner::Descriptor {
+        owner::Descriptor {
             class_id: self.class_id.clone(),
             license: self.license.clone(),
             persistence: self.persistence,
@@ -76,7 +76,7 @@ impl ActiveXDescriptor {
         }
     }
 
-    fn from_owner(value: owner::ActiveXDescriptor) -> Self {
+    fn from_owner(value: owner::Descriptor) -> Self {
         Self {
             class_id: value.class_id,
             license: value.license,
@@ -89,45 +89,41 @@ impl ActiveXDescriptor {
 
 /// An inert ActiveX control descriptor and its opaque package resources.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LoadedActiveXControl {
+pub struct LoadedControl {
     pub control: WorksheetControl,
     pub descriptor_uri: PackURI,
-    pub descriptor: ActiveXDescriptor,
-    pub binaries: Vec<OpaqueActiveXBinary>,
-    pub preview: Option<OpaqueActiveXPreviewImage>,
+    pub descriptor: Descriptor,
+    pub binaries: Vec<Binary>,
+    pub preview: Option<PreviewImage>,
 }
 
 /// A complete inert ActiveX graph attached to one worksheet.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ActiveXControlSet {
-    pub controls: Vec<LoadedActiveXControl>,
+pub struct ControlSet {
+    pub controls: Vec<LoadedControl>,
 }
 
-impl ActiveXControlSet {
-    fn to_owner(&self) -> owner::ActiveXControlSet {
-        owner::ActiveXControlSet {
-            controls: self
-                .controls
-                .iter()
-                .map(LoadedActiveXControl::to_owner)
-                .collect(),
+impl ControlSet {
+    fn to_owner(&self) -> owner::ControlSet {
+        owner::ControlSet {
+            controls: self.controls.iter().map(LoadedControl::to_owner).collect(),
         }
     }
 
-    fn from_owner(value: owner::ActiveXControlSet) -> Self {
+    fn from_owner(value: owner::ControlSet) -> Self {
         Self {
             controls: value
                 .controls
                 .into_iter()
-                .map(LoadedActiveXControl::from_owner)
+                .map(LoadedControl::from_owner)
                 .collect(),
         }
     }
 }
 
-impl LoadedActiveXControl {
-    fn to_owner(&self) -> owner::LoadedActiveXControl {
-        owner::LoadedActiveXControl {
+impl LoadedControl {
+    fn to_owner(&self) -> owner::LoadedControl {
+        owner::LoadedControl {
             control: self.control.clone(),
             descriptor_uri: self.descriptor_uri.clone(),
             descriptor: self.descriptor.to_owner(),
@@ -136,11 +132,11 @@ impl LoadedActiveXControl {
         }
     }
 
-    fn from_owner(value: owner::LoadedActiveXControl) -> Self {
+    fn from_owner(value: owner::LoadedControl) -> Self {
         Self {
             control: value.control,
             descriptor_uri: value.descriptor_uri,
-            descriptor: ActiveXDescriptor::from_owner(value.descriptor),
+            descriptor: Descriptor::from_owner(value.descriptor),
             binaries: value.binaries,
             preview: value.preview,
         }
@@ -154,12 +150,9 @@ pub fn replace_worksheet_controls_xml(xml: &[u8], controls: &WorksheetControls) 
 }
 
 /// Load one worksheet's complete inert ActiveX graph.
-pub fn load_from_worksheet(
-    package: &OpcPackage,
-    worksheet_uri: &PackURI,
-) -> Result<ActiveXControlSet> {
+pub fn load_from_worksheet(package: &OpcPackage, worksheet_uri: &PackURI) -> Result<ControlSet> {
     owner::load_from_worksheet(package, worksheet_uri)
-        .map(ActiveXControlSet::from_owner)
+        .map(ControlSet::from_owner)
         .map_err(map_owner_error)
 }
 
@@ -167,7 +160,7 @@ pub fn load_from_worksheet(
 pub fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
-    value: &ActiveXControlSet,
+    value: &ControlSet,
 ) -> Result<()> {
     owner::store_on_worksheet(package, worksheet_uri, &value.to_owner()).map_err(map_owner_error)
 }
@@ -176,7 +169,7 @@ pub fn store_on_worksheet(
 pub fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
-    value: &ActiveXControlSet,
+    value: &ControlSet,
 ) -> Result<()> {
     owner::replace_on_worksheet(package, worksheet_uri, &value.to_owner()).map_err(map_owner_error)
 }

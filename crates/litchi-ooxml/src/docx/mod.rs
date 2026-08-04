@@ -118,8 +118,7 @@ pub use field::{
     MergeControlKind, MergeCounter, MergeCounterKind, MergeData, MergeNext, Print, Private, Prompt,
     PromptKind, Property, Quote, RecipientKind, Reference, ReferenceKind, ReferenceOption,
     Sequence, Set, Shape, StyleOption, StyleReference, SubDocument, Switch, Symbol, Toa, ToaEntry,
-    Toc, TocEntry, TocLevelRange, TocSwitch, UserIdentity, UserIdentityFormat, UserIdentityKind,
-    Variable,
+    Toc, TocEntry, TocLevelRange, UserIdentity, UserIdentityFormat, UserIdentityKind, Variable,
 };
 pub use footnote::{Note, NoteType};
 pub use header_footer::HeaderFooter;

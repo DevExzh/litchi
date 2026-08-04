@@ -49,7 +49,7 @@ pub use number_format::NumberFormat;
 use std::collections::HashMap;
 
 use crate::error::Result;
-use crate::xlsx::conditional_formatting::DifferentialFormat;
+use crate::xlsx::conditional_formatting::Differential;
 
 /// Styles collection for an Excel workbook.
 ///
@@ -70,7 +70,7 @@ pub struct Styles {
     /// Cell format records (cellXfs - the actual styles applied to cells)
     pub cell_xfs: Vec<CellStyle>,
     /// Differential formats referenced by conditional-formatting rules.
-    pub differential_formats: Vec<DifferentialFormat>,
+    pub differential_formats: Vec<Differential>,
 }
 
 impl Styles {
@@ -124,7 +124,7 @@ impl Styles {
 
     /// Get a differential format by its zero-based DXF index.
     #[inline]
-    pub fn get_differential_format(&self, id: usize) -> Option<&DifferentialFormat> {
+    pub fn get_differential_format(&self, id: usize) -> Option<&Differential> {
         self.differential_formats.get(id)
     }
 

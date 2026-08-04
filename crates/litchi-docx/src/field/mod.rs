@@ -50,6 +50,6 @@ pub use model::{
     MergeControl, MergeControlKind, MergeCounter, MergeCounterKind, MergeData, MergeNext, Print,
     Private, Prompt, PromptKind, Property, Quote, Recipient, RecipientKind, Reference,
     ReferenceKind, ReferenceOption, Sequence, Set, Shape, StyleOption, StyleReference, SubDocument,
-    Switch, Symbol, Toa, ToaEntry, Toc, TocEntry, TocLevelRange, UserIdentity,
-    UserIdentityFormat, UserIdentityKind, Variable,
+    Switch, Symbol, Toa, ToaEntry, Toc, TocEntry, TocLevelRange, UserIdentity, UserIdentityFormat,
+    UserIdentityKind, Variable,
 };

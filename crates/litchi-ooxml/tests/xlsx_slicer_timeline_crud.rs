@@ -1,12 +1,12 @@
+use litchi_ooxml::xlsx::timelines::{Range, State};
 use litchi_ooxml::xlsx::{
-    PivotFilterType, Slicer, SlicerCacheDefinition, Timeline, TimelineCacheDefinition,
-    TimelineLevel, TimelineRange, TimelineState, add_slicer, add_slicer_cache, add_timeline,
-    add_timeline_cache, find_slicer, find_slicer_cache, find_timeline, find_timeline_cache,
-    parse_slicer_cache_definition, parse_slicers, remove_slicer, remove_slicer_cache,
-    remove_timeline, remove_timeline_cache, reorder_slicer_caches, reorder_slicers,
-    reorder_timeline_caches, reorder_timelines, replace_slicer, replace_slicer_cache,
-    replace_timeline, replace_timeline_cache, update_slicer, update_slicer_cache, update_timeline,
-    update_timeline_cache,
+    CacheDefinition, FilterType, Level, Slicer, SlicerCacheDefinition, View, add_slicer,
+    add_slicer_cache, add_timeline, add_timeline_cache, find_slicer, find_slicer_cache,
+    find_timeline, find_timeline_cache, parse_slicer_cache_definition, parse_slicers,
+    remove_slicer, remove_slicer_cache, remove_timeline, remove_timeline_cache,
+    reorder_slicer_caches, reorder_slicers, reorder_timeline_caches, reorder_timelines,
+    replace_slicer, replace_slicer_cache, replace_timeline, replace_timeline_cache, update_slicer,
+    update_slicer_cache, update_timeline, update_timeline_cache,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -47,31 +47,29 @@ fn slicer_cache(name: &str, source: &str) -> SlicerCacheDefinition {
     .unwrap()
 }
 
-fn timeline_cache(name: &str, source: &str) -> TimelineCacheDefinition {
-    TimelineCacheDefinition {
+fn timeline_cache(name: &str, source: &str) -> CacheDefinition {
+    CacheDefinition {
         name: name.into(),
         uid: None,
         source_name: source.into(),
         pivot_tables: Vec::new(),
-        state: TimelineState {
-            selection: Some(
-                TimelineRange::new("2026-01-01T00:00:00Z", "2026-01-31T23:59:59Z").unwrap(),
-            ),
-            bounds: TimelineRange::new("2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z").unwrap(),
+        state: State {
+            selection: Some(Range::new("2026-01-01T00:00:00Z", "2026-01-31T23:59:59Z").unwrap()),
+            bounds: Range::new("2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z").unwrap(),
             extension_list: None,
             single_range_filter_state: Some(true),
             minimal_refresh_version: 0,
             last_refresh_version: 1,
             pivot_cache_id: 1,
-            filter_type: PivotFilterType::DateBetween,
+            filter_type: FilterType::DateBetween,
         },
         timeline_pivot_filter: None,
         extension_list: None,
     }
 }
 
-fn timeline(name: &str, cache: &str) -> Timeline {
-    Timeline {
+fn timeline(name: &str, cache: &str) -> View {
+    View {
         name: name.into(),
         uid: None,
         cache: cache.into(),
@@ -80,8 +78,8 @@ fn timeline(name: &str, cache: &str) -> Timeline {
         show_selection_label: Some(true),
         show_time_level: Some(true),
         show_horizontal_scrollbar: Some(true),
-        level: TimelineLevel::Month,
-        selection_level: TimelineLevel::Day,
+        level: Level::Month,
+        selection_level: Level::Day,
         scroll_position: Some("2026-01-01T00:00:00Z".into()),
         style: Some("TimelineStyleLight1".into()),
         extension_list: None,
@@ -218,7 +216,7 @@ fn timeline_cache_and_view_crud_preserves_selection_and_reference_integrity() {
     .unwrap();
     update_timeline(&mut package, &worksheet, "Timeline_View_A", |view| {
         view.caption = Some("Updated Date".into());
-        view.selection_level = TimelineLevel::Month;
+        view.selection_level = Level::Month;
     })
     .unwrap();
     replace_timeline(

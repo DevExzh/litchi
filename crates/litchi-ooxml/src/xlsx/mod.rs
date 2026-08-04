@@ -118,11 +118,9 @@ pub use chart::{
     ChartUserShapesRelationshipTarget, WorksheetChart,
 };
 pub use conditional_formatting::{
-    Axis, CellRangeRef, ColorRole, ColorScale, ConditionalFormatPayload, ConditionalFormatValue,
-    ConditionalFormatting, ConditionalFormattingRule, ConditionalFormattingSource, DataBar,
-    DifferentialFormat, DifferentialFormatComponent, DifferentialFormatRef,
-    DifferentialNumberFormat, Direction, ExtensionAssociation, IconSet, IconSet14, Icons, Kind,
-    NamedColor, Operator, Period, SpreadsheetColor, TokenError, ValueKind,
+    Association, Axis, Color, ColorRole, ColorScale, Component, DataBar, Differential,
+    DifferentialRef, Direction, Formatting, IconSet, IconSet14, Icons, Kind, NamedColor, Operator,
+    Payload, Period, Rule, TokenError, Value, ValueKind,
 };
 pub use data_consolidation::{
     WorksheetDataConsolidation, WorksheetDataConsolidationConformance,
@@ -341,13 +339,12 @@ pub use threaded_comments::{
 };
 pub mod timelines;
 pub use timelines::{
-    PivotFilterType, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
-    TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI,
-    TIMELINES_RELATIONSHIP_TYPE, Timeline, TimelineCacheDefinition, TimelineCachePivotTable,
-    TimelineLevel, TimelineOpaqueXml, TimelinePivotFilter, TimelineRange, TimelineState, Timelines,
-    WorkbookTimelineCache, WorksheetTimelines, load_timeline_caches, load_timelines,
-    parse_timeline_cache_definition, parse_timelines, store_timeline_caches,
-    store_worksheet_timelines, write_timeline_cache_definition, write_timelines,
+    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml,
+    TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE,
+    TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI, TIMELINES_RELATIONSHIP_TYPE, View, Views,
+    WorksheetView, load_timeline_caches, load_timelines, parse_timeline_cache_definition,
+    parse_timelines, store_timeline_caches, store_worksheet_timelines,
+    write_timeline_cache_definition, write_timelines,
 };
 pub mod custom_data;
 pub use custom_data::{

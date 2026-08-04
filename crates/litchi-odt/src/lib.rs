@@ -544,11 +544,11 @@ pub use header_footer_content::{
 };
 pub use index::{
     AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,
-    TableOfContentsSource, TextAlphabeticalIndexEntryTemplate,
-    TextAlphabeticalIndexLevel, TextBibliographyEntryTemplate, TextBibliographyEntryToken,
-    TextBibliographyType, TextIndex, TextIndexAttribute, TextIndexBody, TextIndexBodyParagraph,
-    TextIndexBodyTitle, TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexContent,
-    TextIndexElement, TextIndexEntryTemplate, TextIndexEntryToken, TextIndexKind, TextIndexScope,
+    TableOfContentsSource, TextAlphabeticalIndexEntryTemplate, TextAlphabeticalIndexLevel,
+    TextBibliographyEntryTemplate, TextBibliographyEntryToken, TextBibliographyType, TextIndex,
+    TextIndexAttribute, TextIndexBody, TextIndexBodyParagraph, TextIndexBodyTitle,
+    TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexContent, TextIndexElement,
+    TextIndexEntryTemplate, TextIndexEntryToken, TextIndexKind, TextIndexScope,
     TextIndexSimpleEntryTemplate, TextIndexSourceStyles, TextIndexTabStop, TextIndexTitleTemplate,
     UserIndexSource, insert_text_index_xml, remove_text_index_xml, replace_text_index_xml,
 };

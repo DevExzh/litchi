@@ -7,7 +7,7 @@
 use crate::encryption::{Limits, Mode};
 use crate::pivot::PivotTable;
 use crate::xlsx::active_x::{
-    ActiveXControlSet, load_from_worksheet as load_worksheet_active_x,
+    ControlSet, load_from_worksheet as load_worksheet_active_x,
     remove_from_worksheet as remove_worksheet_active_x,
     replace_on_worksheet as replace_worksheet_active_x,
     store_on_worksheet as store_worksheet_active_x,
@@ -988,7 +988,7 @@ impl Workbook {
     /// Load one worksheet's ActiveX descriptors and opaque persistence bytes.
     ///
     /// No control, callback, or embedded binary is instantiated or executed.
-    pub fn worksheet_active_x_controls(&self, index: usize) -> SheetResult<ActiveXControlSet> {
+    pub fn worksheet_active_x_controls(&self, index: usize) -> SheetResult<ControlSet> {
         let info = self
             .worksheets
             .get(index)
@@ -1001,7 +1001,7 @@ impl Workbook {
     pub fn store_worksheet_active_x_controls(
         &mut self,
         index: usize,
-        value: &ActiveXControlSet,
+        value: &ControlSet,
     ) -> SheetResult<()> {
         let info = self
             .worksheets
@@ -1015,7 +1015,7 @@ impl Workbook {
     pub fn replace_worksheet_active_x_controls(
         &mut self,
         index: usize,
-        value: &ActiveXControlSet,
+        value: &ControlSet,
     ) -> SheetResult<()> {
         let info = self
             .worksheets
@@ -4790,8 +4790,7 @@ fn validate_threaded_comment_people<'a>(
 mod tests {
     use super::{Workbook, WorkbookProtectionMetadata, validate_threaded_comment_people};
     use crate::xlsx::active_x::{
-        ActiveXControlSet, ActiveXDescriptor, ActiveXProperty, LoadedActiveXControl, Persistence,
-        WorksheetControl,
+        ControlSet, Descriptor, LoadedControl, Persistence, Property, WorksheetControl,
     };
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
@@ -6305,8 +6304,8 @@ mod tests {
     #[test]
     fn preserves_inert_active_x_graph_during_materialization() {
         let mut workbook = Workbook::create().unwrap();
-        let value = ActiveXControlSet {
-            controls: vec![LoadedActiveXControl {
+        let value = ControlSet {
+            controls: vec![LoadedControl {
                 control: WorksheetControl {
                     shape_id: 17,
                     relationship_id: "rIdGeneratedControl".into(),
@@ -6314,12 +6313,12 @@ mod tests {
                     properties: None,
                 },
                 descriptor_uri: PackURI::new("/xl/activeX/generated.xml").unwrap(),
-                descriptor: ActiveXDescriptor {
+                descriptor: Descriptor {
                     class_id: "{00000000-0000-0000-0000-000000000000}".into(),
                     license: None,
                     persistence: Persistence::PropertyBag,
                     relationship_id: None,
-                    properties: vec![ActiveXProperty {
+                    properties: vec![Property {
                         name: "Caption".into(),
                         value: Some("inert".into()),
                         object: None,

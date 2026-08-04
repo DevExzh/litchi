@@ -13,7 +13,7 @@
 
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
-use crate::xlsx::active_x::ActiveXDescriptor;
+use crate::xlsx::active_x::Descriptor;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::content_type as ct;
@@ -506,7 +506,7 @@ fn resolve_descriptor(
             got: part.content_type().to_string(),
         });
     }
-    let descriptor = ActiveXDescriptor::parse(part.blob())?;
+    let descriptor = Descriptor::parse(part.blob())?;
 
     let binary = match descriptor.relationship_id.as_deref() {
         Some(binary_id) => Some(resolve_binary(

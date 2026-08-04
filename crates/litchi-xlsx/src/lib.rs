@@ -55,9 +55,8 @@ pub mod workbook_metadata;
 pub mod xml_maps;
 
 pub use active_x::{
-    ActiveXControlSet, ActiveXDescriptor, ActiveXFont, ActiveXPicture, ActiveXProperty,
-    ActiveXPropertyObject, ControlProperties, LoadedActiveXControl, Marker, ObjectAnchor,
-    OpaqueActiveXBinary, OpaqueActiveXPreviewImage, Persistence, WorksheetControl,
+    Binary, ControlProperties, ControlSet, Descriptor, Font, LoadedControl, Marker, ObjectAnchor,
+    Persistence, Picture, PreviewImage, Property, PropertyObject, WorksheetControl,
     WorksheetControls, load_from_worksheet, remove_from_worksheet, replace_on_worksheet,
     replace_worksheet_controls_xml, store_on_worksheet,
 };
@@ -87,11 +86,9 @@ pub use chart_sheet::{
 pub use color::{ParseRgbError, Rgb};
 pub use column::{Column, Columns, Width, WidthAt};
 pub use conditional_formatting::{
-    Axis, CellRangeRef, ColorRole, ColorScale, ConditionalFormatPayload, ConditionalFormatValue,
-    ConditionalFormatting, ConditionalFormattingRule, ConditionalFormattingSource, DataBar,
-    DifferentialFormat, DifferentialFormatComponent, DifferentialFormatRef,
-    DifferentialNumberFormat, Direction, ExtensionAssociation, IconSet, IconSet14, Icons, Kind,
-    NamedColor, Operator, Period, SpreadsheetColor, TokenError, ValueKind,
+    Association, Axis, Color, ColorRole, ColorScale, Component, DataBar, Differential,
+    DifferentialRef, Direction, Formatting, IconSet, IconSet14, Icons, Kind, NamedColor,
+    NumberFormat, Operator, Payload, Period, Rule, TokenError, ValueKind,
     parse_conditional_formattings, parse_differential_formats,
 };
 pub use custom_data::{
@@ -200,13 +197,12 @@ pub use threaded_comments::{
     validate_timestamp, write_comments, write_persons,
 };
 pub use timelines::{
-    PivotFilterType, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
-    TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI,
-    TIMELINES_RELATIONSHIP_TYPE, Timeline, TimelineCacheDefinition, TimelineCachePivotTable,
-    TimelineLevel, TimelineOpaqueXml, TimelinePivotFilter, TimelineRange, TimelineState, Timelines,
-    WorkbookTimelineCache, WorksheetTimelines, load_timeline_caches, load_timelines,
-    parse_timeline_cache_definition, parse_timelines, store_timeline_caches,
-    store_worksheet_timelines, write_timeline_cache_definition, write_timelines,
+    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, PivotFilter,
+    TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE,
+    TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI, TIMELINES_RELATIONSHIP_TYPE, View, Views,
+    WorksheetView, load_timeline_caches, load_timelines, parse_timeline_cache_definition,
+    parse_timelines, store_timeline_caches, store_worksheet_timelines,
+    write_timeline_cache_definition, write_timelines,
 };
 pub use views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,

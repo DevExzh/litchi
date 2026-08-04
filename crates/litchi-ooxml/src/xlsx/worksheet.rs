@@ -18,9 +18,7 @@ use super::auto_filter::{AutoFilterDefinition, parse_auto_filter};
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::comments::parse_comments_xml;
 use super::conditional_formatting::{
-    ConditionalFormatting as ParsedConditionalFormatting,
-    ConditionalFormattingRule as ParsedConditionalFormattingRule, DifferentialFormat,
-    DifferentialFormatRef, ExtensionAssociation, parse_conditional_formattings,
+    Association, Differential, DifferentialRef, Formatting, Rule, parse_conditional_formattings,
 };
 use super::data_consolidation::{WorksheetDataConsolidation, parse_worksheet_data_consolidation};
 use super::data_validation::{Collection, Validation, parse_data_validation_collections};
@@ -206,7 +204,7 @@ pub struct Worksheet<'a> {
     rows: HashMap<u32, RowInfo>,
     data_validation_collections: Vec<Collection>,
     /// Complete conditional-formatting containers and rules.
-    conditional_formattings: Vec<ParsedConditionalFormatting>,
+    conditional_formattings: Vec<Formatting>,
     /// Auto-filter
     auto_filter: Option<AutoFilter>,
     auto_filter_definition: Option<AutoFilterDefinition>,
@@ -2095,35 +2093,30 @@ impl<'a> Worksheet<'a> {
     // ===== Conditional Formatting =====
 
     /// Complete conditional-formatting containers in worksheet document order.
-    pub fn conditional_formattings(&self) -> &[ParsedConditionalFormatting] {
+    pub fn conditional_formattings(&self) -> &[Formatting] {
         &self.conditional_formattings
     }
 
     /// Active rules in priority order, retaining document order for equal priorities.
-    pub fn conditional_formatting_rules_by_priority(
-        &self,
-    ) -> Vec<&ParsedConditionalFormattingRule> {
+    pub fn conditional_formatting_rules_by_priority(&self) -> Vec<&Rule> {
         let mut rules: Vec<_> = self
             .conditional_formattings
             .iter()
             .flat_map(|formatting| formatting.rules.iter())
-            .filter(|rule| rule.extension_association != ExtensionAssociation::UnmatchedIgnored)
+            .filter(|rule| rule.extension_association != Association::UnmatchedIgnored)
             .collect();
         rules.sort_by_key(|rule| rule.priority);
         rules
     }
 
     /// Resolve a rule's style-sheet DXF or Office 2010 inline DXF.
-    pub fn differential_format_for_rule<'b>(
-        &'b self,
-        rule: &'b ParsedConditionalFormattingRule,
-    ) -> Option<&'b DifferentialFormat> {
+    pub fn differential_format_for_rule<'b>(&'b self, rule: &'b Rule) -> Option<&'b Differential> {
         match &rule.differential_format {
-            Some(DifferentialFormatRef::StylesIndex(index)) => self
+            Some(DifferentialRef::StylesIndex(index)) => self
                 .workbook
                 .styles()
                 .get_differential_format(*index as usize),
-            Some(DifferentialFormatRef::Inline(format)) => Some(format),
+            Some(DifferentialRef::Inline(format)) => Some(format),
             None => None,
         }
     }

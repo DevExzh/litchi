@@ -1,17 +1,15 @@
-//! Compatibility facade for the canonical XLSX conditional-formatting owner.
+//! OOXML adapter for the canonical XLSX conditional-formatting owner.
 //!
 //! The typed model and bounded XML parser live in
-//! [`litchi_xlsx::conditional_formatting`].  These adapters retain the
-//! historical host error boundary used by worksheet and styles parsing.
+//! [`litchi_xlsx::conditional_formatting`]. These adapters retain the host
+//! error boundary used by worksheet and styles parsing.
 
 use crate::error::{OoxmlError, Result};
 
 pub use litchi_xlsx::conditional_formatting::{
-    Axis, CellRangeRef, ColorRole, ColorScale, ConditionalFormatPayload, ConditionalFormatValue,
-    ConditionalFormatting, ConditionalFormattingRule, ConditionalFormattingSource, DataBar,
-    DifferentialFormat, DifferentialFormatComponent, DifferentialFormatRef,
-    DifferentialNumberFormat, Direction, ExtensionAssociation, IconSet, IconSet14, Icons, Kind,
-    NamedColor, Operator, Period, SpreadsheetColor, TokenError, ValueKind,
+    Association, Axis, Color, ColorRole, ColorScale, Component, DataBar, Differential,
+    DifferentialRef, Direction, Formatting, IconSet, IconSet14, Icons, Kind, NamedColor,
+    NumberFormat, Operator, Payload, Period, Range, Rule, Source, TokenError, Value, ValueKind,
 };
 
 /// Parse worksheet conditional-formatting fragments through the canonical
@@ -19,7 +17,7 @@ pub use litchi_xlsx::conditional_formatting::{
 pub(crate) fn parse_conditional_formattings(
     xml: &[u8],
     differential_format_count: usize,
-) -> Result<Vec<ConditionalFormatting>> {
+) -> Result<Vec<Formatting>> {
     litchi_xlsx::conditional_formatting::parse_conditional_formattings(
         xml,
         differential_format_count,
@@ -29,7 +27,7 @@ pub(crate) fn parse_conditional_formattings(
 
 /// Parse differential styles through the canonical owner while preserving the
 /// host's historical error variants.
-pub(crate) fn parse_differential_formats(xml: &[u8]) -> Result<Vec<DifferentialFormat>> {
+pub(crate) fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
     litchi_xlsx::conditional_formatting::parse_differential_formats(xml).map_err(map_owner_error)
 }
 

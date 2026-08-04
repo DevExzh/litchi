@@ -20,10 +20,10 @@ use crate::xlsx::slicers::{
     store_worksheet_slicers, write_slicers,
 };
 use crate::xlsx::timelines::{
-    TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE,
-    TIMELINES_EXTENSION_URI, Timeline, TimelineCacheDefinition, Timelines, WorkbookTimelineCache,
-    WorksheetTimelines, load_timeline_caches, load_timelines, store_timeline_caches,
-    store_worksheet_timelines, write_timeline_cache_definition, write_timelines,
+    Cache, CacheDefinition, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
+    TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_EXTENSION_URI, View, Views, WorksheetView,
+    load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
+    write_timeline_cache_definition, write_timelines,
 };
 
 const SLICER_CACHE_EXTENSION_URI: &str = "{BBE1A952-AA13-448E-AADC-164F8A28A991}";
@@ -345,23 +345,17 @@ pub fn reorder_slicer_caches(
     Ok(caches)
 }
 
-pub fn find_timeline_cache(
-    package: &OpcPackage,
-    name: &str,
-) -> Result<Option<WorkbookTimelineCache>> {
+pub fn find_timeline_cache(package: &OpcPackage, name: &str) -> Result<Option<Cache>> {
     let workbook = package.main_document_part()?.partname().clone();
     Ok(load_timeline_caches(package, &workbook)?
         .into_iter()
         .find(|cache| cache.definition.name.eq_ignore_ascii_case(name)))
 }
 
-pub fn add_timeline_cache(
-    package: &mut OpcPackage,
-    definition: TimelineCacheDefinition,
-) -> Result<WorkbookTimelineCache> {
+pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition) -> Result<Cache> {
     let workbook = package.main_document_part()?.partname().clone();
     let mut caches = load_timeline_caches(package, &workbook)?;
-    let value = WorkbookTimelineCache {
+    let value = Cache {
         relationship_id: next_relationship_id(package.get_part(&workbook)?, "rIdTimelineCache")?,
         part_name: next_part_name(package, "/xl/timelineCaches/timelineCache%d.xml")?.to_string(),
         definition,
@@ -409,7 +403,7 @@ pub fn add_timeline_cache(
 
 pub fn update_timeline_cache<F>(package: &mut OpcPackage, name: &str, update: F) -> Result<bool>
 where
-    F: FnOnce(&mut TimelineCacheDefinition),
+    F: FnOnce(&mut CacheDefinition),
 {
     let workbook = package.main_document_part()?.partname().clone();
     let mut caches = load_timeline_caches(package, &workbook)?;
@@ -434,7 +428,7 @@ where
 pub fn replace_timeline_cache(
     package: &mut OpcPackage,
     name: &str,
-    replacement: TimelineCacheDefinition,
+    replacement: CacheDefinition,
 ) -> Result<bool> {
     if !replacement.name.eq_ignore_ascii_case(name) {
         return Err(invalid("replacement Timeline Cache name must match"));
@@ -492,7 +486,7 @@ pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<boo
 pub fn reorder_timeline_caches(
     package: &mut OpcPackage,
     ordered_names: &[String],
-) -> Result<Vec<WorkbookTimelineCache>> {
+) -> Result<Vec<Cache>> {
     let workbook = package.main_document_part()?.partname().clone();
     let caches = reorder_by_key(
         load_timeline_caches(package, &workbook)?,
@@ -522,7 +516,7 @@ pub fn find_timeline(
     package: &OpcPackage,
     worksheet: &PackURI,
     name: &str,
-) -> Result<Option<Timeline>> {
+) -> Result<Option<View>> {
     let workbook = package.main_document_part()?.partname().clone();
     Ok(load_timelines(package, &workbook)?
         .into_iter()
@@ -539,8 +533,8 @@ pub fn find_timeline(
 pub fn add_timeline(
     package: &mut OpcPackage,
     worksheet: &PackURI,
-    timeline: Timeline,
-) -> Result<WorksheetTimelines> {
+    timeline: View,
+) -> Result<WorksheetView> {
     let workbook = package.main_document_part()?.partname().clone();
     let caches = load_timeline_caches(package, &workbook)?;
     validate_timeline_cache_reference(&timeline, &caches)?;
@@ -567,11 +561,11 @@ pub fn add_timeline(
         package.unsign();
         return Ok(sheets[index].clone());
     }
-    let value = WorksheetTimelines {
+    let value = WorksheetView {
         worksheet_part_name: worksheet.to_string(),
         relationship_id: next_relationship_id(package.get_part(worksheet)?, "rIdTimeline")?,
         part_name: next_part_name(package, "/xl/timelines/timeline%d.xml")?.to_string(),
-        timelines: Timelines {
+        timelines: Views {
             timelines: vec![timeline],
         },
     };
@@ -587,7 +581,7 @@ pub fn update_timeline<F>(
     update: F,
 ) -> Result<bool>
 where
-    F: FnOnce(&mut Timeline),
+    F: FnOnce(&mut View),
 {
     let workbook = package.main_document_part()?.partname().clone();
     let caches = load_timeline_caches(package, &workbook)?;
@@ -625,7 +619,7 @@ pub fn replace_timeline(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     name: &str,
-    replacement: Timeline,
+    replacement: View,
 ) -> Result<bool> {
     if !replacement.name.eq_ignore_ascii_case(name) {
         return Err(invalid("replacement timeline name must match"));
@@ -688,7 +682,7 @@ pub fn reorder_timelines(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     ordered_names: &[String],
-) -> Result<Vec<Timeline>> {
+) -> Result<Vec<View>> {
     let workbook = package.main_document_part()?.partname().clone();
     let caches = load_timeline_caches(package, &workbook)?;
     let mut sheets = load_timelines(package, &workbook)?;
@@ -780,10 +774,7 @@ fn validate_slicer_cache_pivot_links(
     Ok(())
 }
 
-fn validate_timeline_cache_set(
-    package: &OpcPackage,
-    caches: &[WorkbookTimelineCache],
-) -> Result<()> {
+fn validate_timeline_cache_set(package: &OpcPackage, caches: &[Cache]) -> Result<()> {
     let mut names = HashSet::new();
     let mut uids = HashSet::new();
     let any_uid = caches.iter().any(|cache| cache.definition.uid.is_some());
@@ -870,10 +861,7 @@ fn validate_slicer_views(
     Ok(())
 }
 
-fn validate_timeline_views(
-    sheets: &[WorksheetTimelines],
-    caches: &[WorkbookTimelineCache],
-) -> Result<()> {
+fn validate_timeline_views(sheets: &[WorksheetView], caches: &[Cache]) -> Result<()> {
     let cache_names: HashSet<String> = caches
         .iter()
         .map(|cache| cache.definition.name.to_ascii_lowercase())
@@ -916,10 +904,7 @@ fn validate_slicer_cache_reference(slicer: &Slicer, caches: &[WorkbookSlicerCach
     }
 }
 
-fn validate_timeline_cache_reference(
-    timeline: &Timeline,
-    caches: &[WorkbookTimelineCache],
-) -> Result<()> {
+fn validate_timeline_cache_reference(timeline: &View, caches: &[Cache]) -> Result<()> {
     if caches
         .iter()
         .any(|cache| cache.definition.name.eq_ignore_ascii_case(&timeline.cache))
