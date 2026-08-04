@@ -1,36 +1,31 @@
-//! Bounded BIFF12 writer for typed external-link metadata.
+//! BIFF12 stream authoring for one XLSB external-link part.
 //!
-//! Package parts and OPC relationships remain host concerns. This module only
-//! emits the inert `BrtSupBook` record stream and never follows a target.
+//! OPC relationships and part placement remain host concerns. This owner
+//! emits only the inert `BrtSupBook` stream.
 
-use crate::external_link::{
-    DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
-    DDE_ITEM_SUPPORTS_OLE, EXTERNAL_NAME_BUILT_IN, EXTERNAL_REFERENCE_DDE, EXTERNAL_REFERENCE_OLE,
-    EXTERNAL_REFERENCE_WORKBOOK, Error, OLE_ITEM_DISPLAY_AS_ICON, OLE_ITEM_REQUIRED_CLASS_FLAG,
-    Result, XlsbDdeItem, XlsbExternalCachedValue, XlsbExternalDefinedName, XlsbExternalLink,
-    XlsbExternalLinkKind, XlsbExternalValueMatrix, XlsbOleItem,
+use super::{
+    CachedValue, DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
+    DDE_ITEM_SUPPORTS_OLE, DdeItem, DefinedName, EXTERNAL_NAME_BUILT_IN, EXTERNAL_REFERENCE_DDE,
+    EXTERNAL_REFERENCE_OLE, EXTERNAL_REFERENCE_WORKBOOK, Error, Kind, Link,
+    OLE_ITEM_DISPLAY_AS_ICON, OLE_ITEM_REQUIRED_CLASS_FLAG, OleItem, Result, ValueMatrix,
 };
-use crate::raw::Writer;
-use crate::raw::kind;
+use crate::raw::{Writer, kind};
 
 const NULL_WIDE_STRING_LENGTH: u32 = u32::MAX;
 
-pub fn write_external_link_stream(
-    link: &XlsbExternalLink,
-    relationship_id: Option<&str>,
-) -> Result<Vec<u8>> {
+pub fn write_external_link_stream(link: &Link, relationship_id: Option<&str>) -> Result<Vec<u8>> {
     link.validate()?;
     let mut bytes = Vec::with_capacity(256);
     let mut writer = Writer::new(&mut bytes);
     let mut begin = Vec::with_capacity(64);
     let mut payload = Writer::new(&mut begin);
     match link.kind() {
-        XlsbExternalLinkKind::Workbook => {
+        Kind::Workbook => {
             payload.write_u16(EXTERNAL_REFERENCE_WORKBOOK)?;
             payload.write_wide_string(required_relationship_id(relationship_id, "workbook")?)?;
             payload.write_u32(NULL_WIDE_STRING_LENGTH)?;
         },
-        XlsbExternalLinkKind::Dde => {
+        Kind::Dde => {
             if relationship_id.is_some() {
                 return Err(Error::InvalidFormula(
                     "DDE external link cannot have a relationship".to_string(),
@@ -43,7 +38,7 @@ pub fn write_external_link_stream(
                     .ok_or_else(|| Error::InvalidFormula("DDE link has no topic".to_string()))?,
             )?;
         },
-        XlsbExternalLinkKind::Ole => {
+        Kind::Ole => {
             payload.write_u16(EXTERNAL_REFERENCE_OLE)?;
             payload.write_wide_string(required_relationship_id(relationship_id, "OLE")?)?;
             payload.write_wide_string(link.ole_program_id().ok_or_else(|| {
@@ -87,7 +82,7 @@ fn write_entry_start<W: std::io::Write>(writer: &mut Writer<W>, name: &str) -> R
 
 fn write_defined_name<W: std::io::Write>(
     writer: &mut Writer<W>,
-    entry: &XlsbExternalDefinedName,
+    entry: &DefinedName,
 ) -> Result<()> {
     write_entry_start(writer, entry.name())?;
     let formula = entry.formula().map_or(&[][..], |formula| formula.tokens());
@@ -111,7 +106,7 @@ fn write_defined_name<W: std::io::Write>(
     Ok(())
 }
 
-fn write_dde_item<W: std::io::Write>(writer: &mut Writer<W>, item: &XlsbDdeItem) -> Result<()> {
+fn write_dde_item<W: std::io::Write>(writer: &mut Writer<W>, item: &DdeItem) -> Result<()> {
     write_entry_start(writer, item.name())?;
     let mut bits = [0u8; 7];
     bits[0] = (u8::from(item.wants_advise()) * DATA_ITEM_WANT_ADVISE)
@@ -126,7 +121,7 @@ fn write_dde_item<W: std::io::Write>(writer: &mut Writer<W>, item: &XlsbDdeItem)
     Ok(())
 }
 
-fn write_ole_item<W: std::io::Write>(writer: &mut Writer<W>, item: &XlsbOleItem) -> Result<()> {
+fn write_ole_item<W: std::io::Write>(writer: &mut Writer<W>, item: &OleItem) -> Result<()> {
     write_entry_start(writer, item.name())?;
     let mut bits = [0u8; 7];
     bits[0] = (u8::from(item.wants_advise()) * DATA_ITEM_WANT_ADVISE)
@@ -144,7 +139,7 @@ fn write_ole_item<W: std::io::Write>(writer: &mut Writer<W>, item: &XlsbOleItem)
 
 fn write_cached_values<W: std::io::Write>(
     writer: &mut Writer<W>,
-    values: &XlsbExternalValueMatrix,
+    values: &ValueMatrix,
 ) -> Result<()> {
     let mut dimensions = Vec::with_capacity(8);
     dimensions.extend_from_slice(&values.rows().to_le_bytes());
@@ -152,19 +147,19 @@ fn write_cached_values<W: std::io::Write>(
     writer.write_record(kind::SUP_NAME_VALUE_START, &dimensions)?;
     for value in values.values() {
         match value {
-            XlsbExternalCachedValue::Empty => {
+            CachedValue::Empty => {
                 writer.write_record(kind::SUP_NAME_NIL, &[])?;
             },
-            XlsbExternalCachedValue::Number(number) => {
+            CachedValue::Number(number) => {
                 writer.write_record(kind::SUP_NAME_NUM, &number.to_le_bytes())?;
             },
-            XlsbExternalCachedValue::Boolean(value) => {
+            CachedValue::Boolean(value) => {
                 writer.write_record(kind::SUP_NAME_BOOL, &[u8::from(*value)])?;
             },
-            XlsbExternalCachedValue::Error(error) => {
+            CachedValue::Error(error) => {
                 writer.write_record(kind::SUP_NAME_ERROR, &[error.code()])?;
             },
-            XlsbExternalCachedValue::String(value) => {
+            CachedValue::String(value) => {
                 let mut payload = Vec::with_capacity(4 + value.len() * 2);
                 Writer::new(&mut payload).write_wide_string(value)?;
                 writer.write_record(kind::SUP_NAME_STRING, &payload)?;

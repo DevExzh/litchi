@@ -4248,6 +4248,64 @@ integration/doctest targets; strict all-features Clippy, formatting, diff, and
 crate-boundary checks pass. No native Office or performance claim is made for
 this structural-only migration.
 
+## XLSX named-sheet-view semantic layering
+
+The `litchi-xlsx::named_sheet_view` owner is now layered as `model.rs`,
+`codec.rs`, and `package.rs`. The model exposes contextual names such as
+`Views`, `View`, `Filter`, `ColumnFilter`, `SortRules`, and `Guid`; historical
+`NamedSheetView*` names remain type aliases. The codec owns bounded
+SpreadsheetML/MCE parsing, inert differential-format and extension retention,
+and canonical serialization. The package layer owns worksheet relationships,
+content-type checks, orphan detection, and failure-atomic add/update/remove
+operations.
+
+Checked-in `[MS-XLSX]` §§2.1.19, 2.3.8, 2.4.88, and 2.6.210--2.6.211 govern
+the part, worksheet association, named-sheet-view collection, and filter/sort
+model. The focused all-target XLSX suite passes 395 tests; package Clippy,
+formatting, diff, and crate-boundary checks pass. Full workspace verification
+remains subject to the existing native `pkg-config`/fontconfig environment
+requirement.
+
+## DOCX settings semantic layering
+
+`litchi-docx::settings` is now physically layered by responsibility rather
+than kept in one flat owner: `compatibility.rs`, `notes.rs`, `editing.rs`,
+`colors.rs`, and `smart_tags.rs` hold focused vocabulary models;
+`model.rs` holds the aggregate settings value; `codec.rs` owns bounded
+`settings.xml` parsing and serialization; and `support.rs` contains shared
+local XML/error helpers. The existing `litchi_docx::settings` module path,
+public names, generic note-format mapping, strict/transitional behavior, and
+malformed-input limits are unchanged.
+
+The settings vocabulary is WordprocessingML-specific, so no logic was moved
+to `litchi-ooxml-common` or `litchi-ole-common`; the common-crate boundary
+remains reserved for behavior shared by multiple format owners. The focused
+DOCX all-target suite passes 254 tests plus integration/doctest targets, and
+strict DOCX Clippy and formatting checks pass. No native Office or performance
+claim is made for this structural migration.
+
+## XLSB external-link owner layering
+
+The `litchi-xlsb::external_link` owner is now physically layered under one
+semantic module: `model.rs` contains inert external-link values and invariant
+validation, `codec.rs` contains bounded `BrtSupBook` parsing, and `package.rs`
+contains bounded external-link stream authoring. The canonical owner names are
+contextual (`Link`, `Kind`, `DefinedName`, `DdeItem`, `OleItem`, `ValueMatrix`,
+and `Parsed`); the historical `XlsbExternal*` spellings remain compatibility
+aliases. OPC relationship resolution and part placement remain in
+`litchi-ooxml`, while relationship-type inventories remain shared in
+`litchi-ooxml-common`; no XLSB-specific logic was duplicated into a common
+crate.
+
+The checked-in `[MS-XLSB]` §§2.1.7.25, 2.2.7.4, 2.4.235, 2.4.588,
+2.4.811--2.4.822, 2.5.44, and 2.5.98.2 govern the part boundary, workbook/
+DDE/OLE variants, `BrtSupBook` framing, name/item records, external-reference
+kind, and cached error values. The focused `litchi-xlsb` all-target suite passes
+91 + 8 + 17 tests; the host `litchi-ooxml` no-default all-target suite passes
+1499 tests, strict Clippy and formatting checks pass, and crate-boundary checks
+remain valid. Full all-features host verification remains subject to the
+existing environment's missing `pkg-config`/fontconfig dependency.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

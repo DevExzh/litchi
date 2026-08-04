@@ -1,13 +1,14 @@
-//! Typed, inert reader and package writer for MS-XLSX Named Sheet Views.
+//! Bounded SpreadsheetML named-sheet-view XML codec.
+//!
+//! MCE preprocessing and retained extension fragments stay inert; this layer
+//! owns only XML validation, conversion, and serialization.
 
 use crate::auto_filter::{
     AutoFilterDefinition, FilterColumnDefinition, parse_auto_filter, write_auto_filter_fragment,
 };
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::sort::{SortBy, SortMethod};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
-use litchi_opc::constants::content_type as ct;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships};
 use litchi_sheet::Cell as Address;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
@@ -17,822 +18,14 @@ use quick_xml::{Writer, XmlVersion};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-const NSV: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews";
-const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
-const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
-const RICH: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2";
-const RELATIONSHIP: &str =
-    "http://schemas.microsoft.com/office/2019/04/relationships/namedSheetView";
-const CONTENT_TYPE: &str = "application/vnd.ms-excel.namedsheetviews+xml";
-const MAX_PART_BYTES: usize = 32 * 1024 * 1024;
-const MAX_VIEWS: usize = 1024;
-const MAX_FILTERS: usize = 65_536;
-const MAX_COLUMNS: usize = 16_384;
-const MAX_EXTENSIONS: usize = 65_536;
-const MAX_RETAINED_BYTES: usize = 8 * 1024 * 1024;
-const MAX_MARKUP_BYTES: usize = 1024 * 1024;
-const MAX_NAMESPACE_DECLARATIONS: usize = 256;
-const MAX_FRAGMENT_DEPTH: usize = 256;
-const MAX_FRAGMENT_NODES: usize = 100_000;
-const FRAGMENT_VIEW_ID: &str = "{01234567-89AB-CDEF-0123-456789ABCDEF}";
-const FRAGMENT_FILTER_ID: &str = "{11111111-2222-3333-4444-555555555555}";
+use super::model::*;
+use super::{
+    CORE, FRAGMENT_FILTER_ID, FRAGMENT_VIEW_ID, MAX_COLUMNS, MAX_EXTENSIONS, MAX_FILTERS,
+    MAX_FRAGMENT_DEPTH, MAX_FRAGMENT_NODES, MAX_MARKUP_BYTES, MAX_NAMESPACE_DECLARATIONS,
+    MAX_PART_BYTES, MAX_RETAINED_BYTES, MAX_VIEWS, NSV, RICH, STRICT, X14, invalid, xml_error,
+};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct NamedSheetViewGuid(String);
-impl NamedSheetViewGuid {
-    /// Parse a braced Named Sheet View GUID.
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        parse_guid(&value)
-    }
-
-    /// Generate a fresh RFC 4122 v4 GUID in the braced OOXML representation.
-    pub fn generate() -> Self {
-        Self(litchi_core::id::generate_guid_braced())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedSheetViewRange(String);
-impl NamedSheetViewRange {
-    /// Parse a non-reversed A1 cell or rectangular range.
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        parse_range(&value)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedSheetViewMarkup(Vec<u8>);
-impl NamedSheetViewMarkup {
-    pub fn xml(&self) -> &[u8] {
-        &self.0
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedSheetViewDifferentialFormat {
-    markup: NamedSheetViewMarkup,
-}
-impl NamedSheetViewDifferentialFormat {
-    /// Validate and retain one self-contained Named Sheet Views `dxf` element.
-    ///
-    /// The fragment remains inert: fonts, fills, borders, and extension
-    /// payloads are never interpreted or applied by this API.
-    pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
-        parse_authored_differential_format(xml.as_ref())
-    }
-
-    /// Construct an empty differential-format element.
-    pub fn empty() -> Self {
-        Self {
-            markup: NamedSheetViewMarkup(
-                format!(
-                    r#"<dxf xmlns="{}"/>"#,
-                    std::str::from_utf8(NSV).expect("constant namespace is UTF-8")
-                )
-                .into_bytes(),
-            ),
-        }
-    }
-
-    pub fn xml(&self) -> &[u8] {
-        self.markup.xml()
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedSheetViewExtension {
-    uri: String,
-    markup: NamedSheetViewMarkup,
-}
-impl NamedSheetViewExtension {
-    /// Construct one extension from its URI and bounded XML content.
-    ///
-    /// `content_xml` is inserted below a SpreadsheetML `ext` element and the
-    /// complete result is validated before it can enter the model.
-    pub fn new(uri: impl Into<String>, content_xml: impl AsRef<[u8]>) -> Result<Self> {
-        parse_authored_extension(uri.into(), content_xml.as_ref())
-    }
-
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
-    pub fn markup(&self) -> &NamedSheetViewMarkup {
-        &self.markup
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NamedSheetViewSortConditionKind {
-    Standard,
-    RichValue,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NamedSheetViewIconSet {
-    ThreeArrows,
-    ThreeArrowsGray,
-    ThreeFlags,
-    ThreeTrafficLights1,
-    ThreeTrafficLights2,
-    ThreeSigns,
-    ThreeSymbols,
-    ThreeSymbols2,
-    FourArrows,
-    FourArrowsGray,
-    FourRedToBlack,
-    FourRating,
-    FourTrafficLights,
-    FiveArrows,
-    FiveArrowsGray,
-    FiveRating,
-    FiveQuarters,
-    ThreeStars,
-    ThreeTriangles,
-    FiveBoxes,
-    NoIcons,
-}
-impl NamedSheetViewIconSet {
-    fn parse(v: &str) -> Result<Self> {
-        use NamedSheetViewIconSet::*;
-        match v {
-            "3Arrows" => Ok(ThreeArrows),
-            "3ArrowsGray" => Ok(ThreeArrowsGray),
-            "3Flags" => Ok(ThreeFlags),
-            "3TrafficLights1" => Ok(ThreeTrafficLights1),
-            "3TrafficLights2" => Ok(ThreeTrafficLights2),
-            "3Signs" => Ok(ThreeSigns),
-            "3Symbols" => Ok(ThreeSymbols),
-            "3Symbols2" => Ok(ThreeSymbols2),
-            "4Arrows" => Ok(FourArrows),
-            "4ArrowsGray" => Ok(FourArrowsGray),
-            "4RedToBlack" => Ok(FourRedToBlack),
-            "4Rating" => Ok(FourRating),
-            "4TrafficLights" => Ok(FourTrafficLights),
-            "5Arrows" => Ok(FiveArrows),
-            "5ArrowsGray" => Ok(FiveArrowsGray),
-            "5Rating" => Ok(FiveRating),
-            "5Quarters" => Ok(FiveQuarters),
-            "3Stars" => Ok(ThreeStars),
-            "3Triangles" => Ok(ThreeTriangles),
-            "5Boxes" => Ok(FiveBoxes),
-            "NoIcons" => Ok(NoIcons),
-            _ => Err(invalid(format!("invalid named-sheet-view icon set '{v}'"))),
-        }
-    }
-    fn cardinality(self) -> Option<u32> {
-        use NamedSheetViewIconSet::*;
-        Some(match self {
-            ThreeArrows | ThreeArrowsGray | ThreeFlags | ThreeTrafficLights1
-            | ThreeTrafficLights2 | ThreeSigns | ThreeSymbols | ThreeSymbols2 | ThreeStars
-            | ThreeTriangles => 3,
-            FourArrows | FourArrowsGray | FourRedToBlack | FourRating | FourTrafficLights => 4,
-            FiveArrows | FiveArrowsGray | FiveRating | FiveQuarters | FiveBoxes => 5,
-            NoIcons => return None,
-        })
-    }
-
-    fn as_str(self) -> &'static str {
-        use NamedSheetViewIconSet::*;
-        match self {
-            ThreeArrows => "3Arrows",
-            ThreeArrowsGray => "3ArrowsGray",
-            ThreeFlags => "3Flags",
-            ThreeTrafficLights1 => "3TrafficLights1",
-            ThreeTrafficLights2 => "3TrafficLights2",
-            ThreeSigns => "3Signs",
-            ThreeSymbols => "3Symbols",
-            ThreeSymbols2 => "3Symbols2",
-            FourArrows => "4Arrows",
-            FourArrowsGray => "4ArrowsGray",
-            FourRedToBlack => "4RedToBlack",
-            FourRating => "4Rating",
-            FourTrafficLights => "4TrafficLights",
-            FiveArrows => "5Arrows",
-            FiveArrowsGray => "5ArrowsGray",
-            FiveRating => "5Rating",
-            FiveQuarters => "5Quarters",
-            ThreeStars => "3Stars",
-            ThreeTriangles => "3Triangles",
-            FiveBoxes => "5Boxes",
-            NoIcons => "NoIcons",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedSheetViewSortCondition {
-    kind: NamedSheetViewSortConditionKind,
-    reference: NamedSheetViewRange,
-    descending: bool,
-    sort_by: SortBy,
-    custom_list: Option<String>,
-    differential_format_id: Option<u32>,
-    icon_set: Option<NamedSheetViewIconSet>,
-    icon_id: Option<u32>,
-    rich_sort_key: Option<String>,
-}
-impl NamedSheetViewSortCondition {
-    /// Create a value-based sort condition for a worksheet range.
-    pub fn new(kind: NamedSheetViewSortConditionKind, reference: NamedSheetViewRange) -> Self {
-        Self {
-            kind,
-            reference,
-            descending: false,
-            sort_by: SortBy::Value,
-            custom_list: None,
-            differential_format_id: None,
-            icon_set: None,
-            icon_id: None,
-            rich_sort_key: None,
-        }
-    }
-
-    pub fn set_descending(&mut self, value: bool) -> &mut Self {
-        self.descending = value;
-        self
-    }
-
-    /// Set an optional custom value order.
-    pub fn set_custom_list(&mut self, value: Option<String>) -> Result<&mut Self> {
-        if value
-            .as_ref()
-            .is_some_and(|value| value.chars().count() > 32_767)
-        {
-            return Err(invalid("customList exceeds 32767 characters"));
-        }
-        self.custom_list = value;
-        Ok(self)
-    }
-
-    /// Configure icon sorting, validating the icon index against its set.
-    pub fn set_icon_sort(
-        &mut self,
-        icon_set: NamedSheetViewIconSet,
-        icon_id: Option<u32>,
-    ) -> Result<&mut Self> {
-        if icon_id.is_some_and(|id| icon_set.cardinality().is_some_and(|count| id >= count)) {
-            return Err(invalid("iconId is outside icon set"));
-        }
-        self.sort_by = SortBy::Icon;
-        self.differential_format_id = None;
-        self.icon_set = Some(icon_set);
-        self.icon_id = icon_id;
-        Ok(self)
-    }
-
-    /// Configure sorting by a cell fill or font color.
-    pub fn set_color_sort(
-        &mut self,
-        sort_by: SortBy,
-        differential_format_id: u32,
-    ) -> Result<&mut Self> {
-        if !matches!(sort_by, SortBy::CellColor | SortBy::FontColor) {
-            return Err(invalid(
-                "color sort requires CellColor or FontColor sort kind",
-            ));
-        }
-        self.sort_by = sort_by;
-        self.differential_format_id = Some(differential_format_id);
-        self.icon_set = None;
-        self.icon_id = None;
-        Ok(self)
-    }
-
-    /// Set the rich-value sort key. Standard sort conditions reject this metadata.
-    pub fn set_rich_sort_key(&mut self, value: Option<String>) -> Result<&mut Self> {
-        if self.kind != NamedSheetViewSortConditionKind::RichValue && value.is_some() {
-            return Err(invalid("standard sort condition cannot have richSortKey"));
-        }
-        if value
-            .as_ref()
-            .is_some_and(|value| value.chars().count() > 255)
-        {
-            return Err(invalid("richSortKey exceeds 255 characters"));
-        }
-        self.rich_sort_key = value;
-        Ok(self)
-    }
-
-    pub fn kind(&self) -> NamedSheetViewSortConditionKind {
-        self.kind
-    }
-    pub fn reference(&self) -> &NamedSheetViewRange {
-        &self.reference
-    }
-    pub fn descending(&self) -> bool {
-        self.descending
-    }
-    pub fn sort_by(&self) -> SortBy {
-        self.sort_by
-    }
-    pub fn custom_list(&self) -> Option<&str> {
-        self.custom_list.as_deref()
-    }
-    pub fn differential_format_id(&self) -> Option<u32> {
-        self.differential_format_id
-    }
-    pub fn icon_set(&self) -> Option<NamedSheetViewIconSet> {
-        self.icon_set
-    }
-    pub fn icon_id(&self) -> Option<u32> {
-        self.icon_id
-    }
-    pub fn rich_sort_key(&self) -> Option<&str> {
-        self.rich_sort_key.as_deref()
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedSheetViewSortRule {
-    column_id: u32,
-    id: Option<NamedSheetViewGuid>,
-    differential_format: Option<NamedSheetViewMarkup>,
-    condition: Option<NamedSheetViewSortCondition>,
-}
-impl NamedSheetViewSortRule {
-    pub fn new(column_id: u32) -> Result<Self> {
-        validate_column_id(column_id)?;
-        Ok(Self {
-            column_id,
-            id: None,
-            differential_format: None,
-            condition: None,
-        })
-    }
-
-    pub fn set_id(&mut self, id: Option<NamedSheetViewGuid>) -> &mut Self {
-        self.id = id;
-        self
-    }
-
-    pub fn set_condition(
-        &mut self,
-        condition: Option<NamedSheetViewSortCondition>,
-    ) -> Result<&mut Self> {
-        if condition
-            .as_ref()
-            .is_some_and(|condition| condition.differential_format_id.is_some())
-            != self.differential_format.is_some()
-        {
-            return Err(invalid(
-                "sortRule dxf presence does not match sortCondition dxfId",
-            ));
-        }
-        self.condition = condition;
-        Ok(self)
-    }
-
-    pub fn set_differential_format(
-        &mut self,
-        value: Option<NamedSheetViewDifferentialFormat>,
-    ) -> Result<&mut Self> {
-        if let Some(condition) = self.condition.as_ref()
-            && condition.differential_format_id.is_some() != value.is_some()
-        {
-            return Err(invalid(
-                "sortRule dxf presence does not match sortCondition dxfId",
-            ));
-        }
-        self.differential_format = value.map(|value| value.markup);
-        Ok(self)
-    }
-
-    pub fn column_id(&self) -> u32 {
-        self.column_id
-    }
-    pub fn id(&self) -> Option<&NamedSheetViewGuid> {
-        self.id.as_ref()
-    }
-    pub fn differential_format(&self) -> Option<&NamedSheetViewMarkup> {
-        self.differential_format.as_ref()
-    }
-    pub fn condition(&self) -> Option<&NamedSheetViewSortCondition> {
-        self.condition.as_ref()
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedSheetViewSortRules {
-    sort_method: SortMethod,
-    case_sensitive: bool,
-    rules: Vec<NamedSheetViewSortRule>,
-    extensions: Vec<NamedSheetViewExtension>,
-}
-impl NamedSheetViewSortRules {
-    pub fn new() -> Self {
-        Self {
-            sort_method: SortMethod::None,
-            case_sensitive: false,
-            rules: Vec::new(),
-            extensions: Vec::new(),
-        }
-    }
-
-    pub fn set_sort_method(&mut self, value: SortMethod) -> &mut Self {
-        self.sort_method = value;
-        self
-    }
-
-    pub fn set_case_sensitive(&mut self, value: bool) -> &mut Self {
-        self.case_sensitive = value;
-        self
-    }
-
-    pub fn add_rule(&mut self, rule: NamedSheetViewSortRule) -> Result<&mut Self> {
-        if self.rules.len() >= 64 {
-            return Err(invalid("sortRules exceeds 64 rules"));
-        }
-        self.rules.push(rule);
-        Ok(self)
-    }
-
-    pub fn remove_rule(&mut self, column_id: u32) -> Option<NamedSheetViewSortRule> {
-        self.rules
-            .iter()
-            .position(|rule| rule.column_id == column_id)
-            .map(|index| self.rules.remove(index))
-    }
-
-    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
-        add_extension(&mut self.extensions, value)?;
-        Ok(self)
-    }
-
-    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
-        remove_extension(&mut self.extensions, uri)
-    }
-
-    pub fn sort_method(&self) -> SortMethod {
-        self.sort_method
-    }
-    pub fn case_sensitive(&self) -> bool {
-        self.case_sensitive
-    }
-    pub fn rules(&self) -> &[NamedSheetViewSortRule] {
-        &self.rules
-    }
-    pub fn extensions(&self) -> &[NamedSheetViewExtension] {
-        &self.extensions
-    }
-}
-impl Default for NamedSheetViewSortRules {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-#[derive(Debug, Clone, PartialEq)]
-pub struct NamedSheetViewColumnFilter {
-    column_id: u32,
-    id: Option<NamedSheetViewGuid>,
-    differential_format: Option<NamedSheetViewMarkup>,
-    filters: Vec<FilterColumnDefinition>,
-    extensions: Vec<NamedSheetViewExtension>,
-}
-impl NamedSheetViewColumnFilter {
-    pub fn new(column_id: u32) -> Result<Self> {
-        validate_column_id(column_id)?;
-        Ok(Self {
-            column_id,
-            id: None,
-            differential_format: None,
-            filters: Vec::new(),
-            extensions: Vec::new(),
-        })
-    }
-
-    pub fn set_id(&mut self, id: Option<NamedSheetViewGuid>) -> &mut Self {
-        self.id = id;
-        self
-    }
-
-    /// Add a filter payload for this column.
-    ///
-    /// The shared SpreadsheetML auto-filter serializer validates the payload
-    /// before this model is mutated.
-    pub fn add_filter(&mut self, filter: FilterColumnDefinition) -> Result<&mut Self> {
-        if self.filters.len() >= MAX_FILTERS {
-            return Err(invalid("too many filter payloads"));
-        }
-        if filter.column_id != self.column_id {
-            return Err(invalid(
-                "named-sheet-view filter colId does not match columnFilter colId",
-            ));
-        }
-        filter_payload_markup(&filter)?;
-        self.filters.push(filter);
-        Ok(self)
-    }
-
-    pub fn clear_filters(&mut self) {
-        self.filters.clear();
-    }
-
-    pub fn set_differential_format(
-        &mut self,
-        value: Option<NamedSheetViewDifferentialFormat>,
-    ) -> &mut Self {
-        self.differential_format = value.map(|value| value.markup);
-        self
-    }
-
-    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
-        add_extension(&mut self.extensions, value)?;
-        Ok(self)
-    }
-
-    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
-        remove_extension(&mut self.extensions, uri)
-    }
-
-    pub fn column_id(&self) -> u32 {
-        self.column_id
-    }
-    pub fn id(&self) -> Option<&NamedSheetViewGuid> {
-        self.id.as_ref()
-    }
-    pub fn differential_format(&self) -> Option<&NamedSheetViewMarkup> {
-        self.differential_format.as_ref()
-    }
-    pub fn filters(&self) -> &[FilterColumnDefinition] {
-        &self.filters
-    }
-    pub fn extensions(&self) -> &[NamedSheetViewExtension] {
-        &self.extensions
-    }
-}
-#[derive(Debug, Clone, PartialEq)]
-pub struct NamedSheetViewFilter {
-    filter_id: NamedSheetViewGuid,
-    reference: Option<NamedSheetViewRange>,
-    table_id: Option<u32>,
-    column_filters: Vec<NamedSheetViewColumnFilter>,
-    sort_rules: Option<NamedSheetViewSortRules>,
-    extensions: Vec<NamedSheetViewExtension>,
-}
-impl NamedSheetViewFilter {
-    pub fn new(filter_id: NamedSheetViewGuid) -> Self {
-        Self {
-            filter_id,
-            reference: None,
-            table_id: None,
-            column_filters: Vec::new(),
-            sort_rules: None,
-            extensions: Vec::new(),
-        }
-    }
-
-    pub fn set_reference(&mut self, value: Option<NamedSheetViewRange>) -> &mut Self {
-        self.reference = value;
-        self
-    }
-
-    pub fn set_table_id(&mut self, value: Option<u32>) -> &mut Self {
-        self.table_id = value;
-        self
-    }
-
-    pub fn add_column_filter(&mut self, filter: NamedSheetViewColumnFilter) -> Result<&mut Self> {
-        if self.column_filters.len() >= MAX_COLUMNS {
-            return Err(invalid("too many named-sheet-view column filters"));
-        }
-        self.column_filters.push(filter);
-        Ok(self)
-    }
-
-    pub fn remove_column_filter(&mut self, column_id: u32) -> Option<NamedSheetViewColumnFilter> {
-        self.column_filters
-            .iter()
-            .position(|filter| filter.column_id == column_id)
-            .map(|index| self.column_filters.remove(index))
-    }
-
-    pub fn set_sort_rules(&mut self, value: Option<NamedSheetViewSortRules>) -> &mut Self {
-        self.sort_rules = value;
-        self
-    }
-
-    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
-        add_extension(&mut self.extensions, value)?;
-        Ok(self)
-    }
-
-    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
-        remove_extension(&mut self.extensions, uri)
-    }
-
-    pub fn filter_id(&self) -> &NamedSheetViewGuid {
-        &self.filter_id
-    }
-    pub fn reference(&self) -> Option<&NamedSheetViewRange> {
-        self.reference.as_ref()
-    }
-    pub fn table_id(&self) -> Option<u32> {
-        self.table_id
-    }
-    pub fn column_filters(&self) -> &[NamedSheetViewColumnFilter] {
-        &self.column_filters
-    }
-    pub fn sort_rules(&self) -> Option<&NamedSheetViewSortRules> {
-        self.sort_rules.as_ref()
-    }
-    pub fn extensions(&self) -> &[NamedSheetViewExtension] {
-        &self.extensions
-    }
-}
-#[derive(Debug, Clone, PartialEq)]
-pub struct NamedSheetView {
-    name: String,
-    id: NamedSheetViewGuid,
-    filters: Vec<NamedSheetViewFilter>,
-    extensions: Vec<NamedSheetViewExtension>,
-}
-impl NamedSheetView {
-    /// Create an empty Named Sheet View with a fresh identifier.
-    ///
-    /// The resulting view is metadata only: it does not apply filters or sort
-    /// worksheet data. Use [`NamedSheetViews::add_view`] to add it to the
-    /// worksheet-scoped collection before storing that collection.
-    pub fn new(name: impl Into<String>) -> Result<Self> {
-        Self::with_id(name, NamedSheetViewGuid::generate())
-    }
-
-    /// Create an empty Named Sheet View with a caller-supplied identifier.
-    pub fn with_id(name: impl Into<String>, id: NamedSheetViewGuid) -> Result<Self> {
-        let name = name.into();
-        validate_name(&name)?;
-        Ok(Self {
-            name,
-            id,
-            filters: Vec::new(),
-            extensions: Vec::new(),
-        })
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-    pub fn id(&self) -> &NamedSheetViewGuid {
-        &self.id
-    }
-    pub fn filters(&self) -> &[NamedSheetViewFilter] {
-        &self.filters
-    }
-    pub fn extensions(&self) -> &[NamedSheetViewExtension] {
-        &self.extensions
-    }
-
-    pub fn add_filter(&mut self, filter: NamedSheetViewFilter) -> Result<&mut Self> {
-        if self.filters.len() >= MAX_FILTERS {
-            return Err(invalid("too many named-sheet-view filters"));
-        }
-        self.filters.push(filter);
-        Ok(self)
-    }
-
-    pub fn remove_filter(
-        &mut self,
-        filter_id: &NamedSheetViewGuid,
-    ) -> Option<NamedSheetViewFilter> {
-        self.filters
-            .iter()
-            .position(|filter| &filter.filter_id == filter_id)
-            .map(|index| self.filters.remove(index))
-    }
-
-    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
-        add_extension(&mut self.extensions, value)?;
-        Ok(self)
-    }
-
-    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
-        remove_extension(&mut self.extensions, uri)
-    }
-}
-#[derive(Debug, Clone, PartialEq)]
-pub struct NamedSheetViews {
-    views: Vec<NamedSheetView>,
-    extensions: Vec<NamedSheetViewExtension>,
-    namespace_declarations: Vec<(String, String)>,
-}
-impl NamedSheetViews {
-    /// Start a valid Named Sheet Views collection with one view.
-    ///
-    /// A Named Sheet Views part requires at least one `namedSheetView`, so an
-    /// empty collection is deliberately not constructible through this API.
-    pub fn new(view: NamedSheetView) -> Self {
-        let mut namespace_declarations =
-            vec![("xmlns".into(), std::str::from_utf8(NSV).unwrap().into())];
-        if view_has_filter_payload(&view) {
-            namespace_declarations
-                .push(("xmlns:x".into(), std::str::from_utf8(CORE).unwrap().into()));
-        }
-        Self {
-            views: vec![view],
-            extensions: Vec::new(),
-            // Match the parser's retained root declarations so a freshly
-            // constructed value has parse/write round-trip equality too.
-            namespace_declarations,
-        }
-    }
-
-    /// Add a uniquely named and identified view to this worksheet collection.
-    pub fn add_view(&mut self, view: NamedSheetView) -> Result<&mut Self> {
-        if self.views.len() >= MAX_VIEWS {
-            return Err(invalid("too many named sheet views"));
-        }
-        if self.views.iter().any(|existing| existing.name == view.name) {
-            return Err(invalid("duplicate named sheet view name"));
-        }
-        if self.views.iter().any(|existing| existing.id == view.id) {
-            return Err(invalid("duplicate named sheet view GUID"));
-        }
-        if view_has_filter_payload(&view)
-            && !self
-                .namespace_declarations
-                .iter()
-                .any(|(name, _)| name == "xmlns:x")
-        {
-            self.namespace_declarations
-                .push(("xmlns:x".into(), std::str::from_utf8(CORE).unwrap().into()));
-        }
-        self.views.push(view);
-        Ok(self)
-    }
-
-    /// Remove a view by its worksheet-scoped name.
-    ///
-    /// Removing the final view is rejected because an empty Named Sheet Views
-    /// part is not valid OOXML. Remove the worksheet part instead with
-    /// [`remove_worksheet_named_sheet_views`] or
-    /// [`crate::Workbook::remove_named_sheet_views`].
-    pub fn remove_view(&mut self, name: &str) -> Result<Option<NamedSheetView>> {
-        let Some(index) = self.views.iter().position(|view| view.name == name) else {
-            return Ok(None);
-        };
-        if self.views.len() == 1 {
-            return Err(invalid(
-                "Named Sheet Views part must contain a namedSheetView",
-            ));
-        }
-        Ok(Some(self.views.remove(index)))
-    }
-
-    pub fn views(&self) -> &[NamedSheetView] {
-        &self.views
-    }
-    pub fn extensions(&self) -> &[NamedSheetViewExtension] {
-        &self.extensions
-    }
-
-    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
-        add_extension(&mut self.extensions, value)?;
-        Ok(self)
-    }
-
-    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
-        remove_extension(&mut self.extensions, uri)
-    }
-
-    /// Serialize this parsed Named Sheet Views value without evaluating filters
-    /// or changing sort semantics.
-    pub fn to_xml(&self) -> Result<Vec<u8>> {
-        write_named_sheet_views(self)
-    }
-}
-
-pub fn discover_named_sheet_views(
-    package: &OpcPackage,
-    relationships: &Relationships,
-) -> Result<Option<NamedSheetViews>> {
-    let mut found = relationships.iter().filter(|r| r.reltype() == RELATIONSHIP);
-    let Some(relationship) = found.next() else {
-        return Ok(None);
-    };
-    if found.next().is_some() {
-        return Err(invalid(
-            "worksheet has multiple Named Sheet Views relationships",
-        ));
-    }
-    if relationship.is_external() {
-        return Err(invalid("Named Sheet Views relationship cannot be external"));
-    }
-    let part = package.get_part(&relationship.target_partname()?)?;
-    if part.content_type() != CONTENT_TYPE {
-        return Err(content_type_mismatch(CONTENT_TYPE, part.content_type()));
-    }
-    if !part.rels().is_empty() {
-        return Err(invalid(
-            "Named Sheet Views part must not have relationships",
-        ));
-    }
-    parse_named_sheet_views(part.blob()).map(Some)
-}
-
-pub fn parse_named_sheet_views(xml: &[u8]) -> Result<NamedSheetViews> {
+pub fn parse_named_sheet_views(xml: &[u8]) -> Result<Views> {
     if xml.len() > MAX_PART_BYTES {
         return Err(invalid("Named Sheet Views part exceeds size limit"));
     }
@@ -894,84 +87,7 @@ pub fn parse_named_sheet_views(xml: &[u8]) -> Result<NamedSheetViews> {
     parser.finish()
 }
 
-/// Load the optional Named Sheet Views part owned by one worksheet.
-///
-/// Filters, sort metadata, and retained extensions are parsed only. This does
-/// not apply a view, evaluate formulas, or fetch any external resource.
-pub fn load_worksheet_named_sheet_views(
-    package: &OpcPackage,
-    worksheet_part: &PackURI,
-) -> Result<Option<NamedSheetViews>> {
-    require_worksheet(package.get_part(worksheet_part)?)?;
-    validate_named_sheet_views_graph(package)?;
-    let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? else {
-        return Ok(None);
-    };
-    let part = package.get_part(&relationship.part_name)?;
-    parse_named_sheet_views(part.blob()).map(Some)
-}
-
-/// Store a parsed Named Sheet Views value as the worksheet's sole modern view
-/// part.
-///
-/// The value is serialized as inert filter and sort metadata. Existing package
-/// graph violations are rejected before any part is changed.
-pub fn store_worksheet_named_sheet_views(
-    package: &mut OpcPackage,
-    worksheet_part: &PackURI,
-    value: &NamedSheetViews,
-) -> Result<()> {
-    let xml = write_named_sheet_views(value)?;
-    require_worksheet(package.get_part(worksheet_part)?)?;
-    validate_named_sheet_views_graph(package)?;
-
-    if let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? {
-        package.get_part_mut(&relationship.part_name)?.set_blob(xml);
-    } else {
-        let part_name = next_named_sheet_views_part_name(package)?;
-        let relationship_id = next_named_sheet_views_relationship_id(package, worksheet_part)?;
-        let target = part_name.relative_ref(worksheet_part.base_uri());
-        package.try_add_part(Box::new(BlobPart::new(part_name, CONTENT_TYPE.into(), xml)))?;
-        package
-            .get_part_mut(worksheet_part)?
-            .rels_mut()
-            .add_relationship(RELATIONSHIP.into(), target, relationship_id, false);
-    }
-
-    package.unsign();
-    Ok(())
-}
-
-/// Remove a worksheet's Named Sheet Views relationship and unreferenced part.
-///
-/// The worksheet data and its ordinary active view are left unchanged.
-pub fn remove_worksheet_named_sheet_views(
-    package: &mut OpcPackage,
-    worksheet_part: &PackURI,
-) -> Result<bool> {
-    require_worksheet(package.get_part(worksheet_part)?)?;
-    validate_named_sheet_views_graph(package)?;
-    let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? else {
-        return Ok(false);
-    };
-
-    package
-        .get_part_mut(worksheet_part)?
-        .rels_mut()
-        .remove(&relationship.relationship_id);
-    if !package_part_is_referenced(package, &relationship.part_name) {
-        package.remove_part(&relationship.part_name);
-    }
-    package.unsign();
-    Ok(true)
-}
-
-/// Serialize one modern Named Sheet Views part.
-///
-/// The caller supplies a value obtained from [`parse_named_sheet_views`] or
-/// [`load_worksheet_named_sheet_views`]. The writer preserves retained markup
-/// inertly and validates its own output by parsing it again.
-pub fn write_named_sheet_views(value: &NamedSheetViews) -> Result<Vec<u8>> {
+pub fn write_named_sheet_views(value: &Views) -> Result<Vec<u8>> {
     validate_view_collection(&value.views)?;
 
     let mut output = Vec::new();
@@ -1010,167 +126,11 @@ pub fn write_named_sheet_views(value: &NamedSheetViews) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-#[derive(Debug, Clone)]
-struct NamedSheetViewsRelationship {
-    relationship_id: String,
-    part_name: PackURI,
-}
-
-fn named_sheet_views_relationship(
-    package: &OpcPackage,
-    worksheet_part: &PackURI,
-) -> Result<Option<NamedSheetViewsRelationship>> {
-    let worksheet = package.get_part(worksheet_part)?;
-    require_worksheet(worksheet)?;
-    let mut matches = worksheet
-        .rels()
-        .iter()
-        .filter(|relationship| relationship.reltype() == RELATIONSHIP);
-    let Some(relationship) = matches.next() else {
-        return Ok(None);
-    };
-    if matches.next().is_some() {
-        return Err(invalid(
-            "worksheet has multiple Named Sheet Views relationships",
-        ));
-    }
-    if relationship.is_external() {
-        return Err(invalid("Named Sheet Views relationship cannot be external"));
-    }
-    let part_name = relationship.target_partname()?;
-    validate_named_sheet_views_part(package, &part_name)?;
-    Ok(Some(NamedSheetViewsRelationship {
-        relationship_id: relationship.r_id().to_owned(),
-        part_name,
-    }))
-}
-
-fn validate_named_sheet_views_graph(package: &OpcPackage) -> Result<()> {
-    if package
-        .rels()
-        .iter()
-        .any(|relationship| relationship.reltype() == RELATIONSHIP)
-    {
-        return Err(invalid(
-            "package root cannot source a Named Sheet Views relationship",
-        ));
-    }
-
-    let mut targets = HashSet::new();
-    for source in package.iter_parts() {
-        let mut relationships = source
-            .rels()
-            .iter()
-            .filter(|relationship| relationship.reltype() == RELATIONSHIP);
-        let Some(relationship) = relationships.next() else {
-            continue;
-        };
-        require_worksheet(source)?;
-        if relationships.next().is_some() {
-            return Err(invalid(format!(
-                "worksheet '{}' has multiple Named Sheet Views relationships",
-                source.partname()
-            )));
-        }
-        if relationship.is_external() {
-            return Err(invalid("Named Sheet Views relationship cannot be external"));
-        }
-        let target = relationship.target_partname()?;
-        if !targets.insert(target.clone()) {
-            return Err(invalid(format!(
-                "Named Sheet Views part '{target}' is targeted more than once"
-            )));
-        }
-        validate_named_sheet_views_part(package, &target)?;
-    }
-
-    for part in package
-        .iter_parts()
-        .filter(|part| part.content_type() == CONTENT_TYPE)
-    {
-        if !targets.contains(part.partname()) {
-            return Err(invalid(format!(
-                "Named Sheet Views part '{}' has no worksheet relationship",
-                part.partname()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_named_sheet_views_part(package: &OpcPackage, part_name: &PackURI) -> Result<()> {
-    let part = package.get_part(part_name)?;
-    if part.content_type() != CONTENT_TYPE {
-        return Err(content_type_mismatch(CONTENT_TYPE, part.content_type()));
-    }
-    if !part.rels().is_empty() {
-        return Err(invalid(format!(
-            "Named Sheet Views part '{part_name}' must not have relationships"
-        )));
-    }
-    Ok(())
-}
-
-fn next_named_sheet_views_part_name(package: &OpcPackage) -> Result<PackURI> {
-    for suffix in 1..=65_536u32 {
-        let candidate = PackURI::new(format!("/xl/namedSheetViews/namedSheetView{suffix}.xml"))
-            .map_err(uri_error)?;
-        if package
-            .iter_parts()
-            .all(|part| part.partname() != &candidate)
-        {
-            return Ok(candidate);
-        }
-    }
-    Err(invalid("no free Named Sheet Views part name"))
-}
-
-fn next_named_sheet_views_relationship_id(
-    package: &OpcPackage,
-    worksheet_part: &PackURI,
-) -> Result<String> {
-    let relationships = package.get_part(worksheet_part)?.rels();
-    for suffix in 1..=65_537u32 {
-        let candidate = format!("rIdNamedSheetView{suffix}");
-        if relationships.get(&candidate).is_none() {
-            return Ok(candidate);
-        }
-    }
-    Err(invalid("no free Named Sheet Views relationship ID"))
-}
-
-fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.iter_parts().any(|part| {
-        part.rels().iter().any(|relationship| {
-            !relationship.is_external()
-                && relationship
-                    .target_partname()
-                    .is_ok_and(|part_name| part_name == *target)
-        })
-    }) || package.rels().iter().any(|relationship| {
-        !relationship.is_external()
-            && relationship
-                .target_partname()
-                .is_ok_and(|part_name| part_name == *target)
-    })
-}
-
-fn require_worksheet(part: &dyn Part) -> Result<()> {
-    if part.content_type() == ct::SML_WORKSHEET {
-        Ok(())
-    } else {
-        Err(invalid(format!(
-            "part '{}' is not a worksheet",
-            part.partname()
-        )))
-    }
-}
-
-fn has_filter_payload(value: &NamedSheetViews) -> bool {
+fn has_filter_payload(value: &Views) -> bool {
     value.views.iter().any(view_has_filter_payload)
 }
 
-fn view_has_filter_payload(view: &NamedSheetView) -> bool {
+pub(crate) fn view_has_filter_payload(view: &View) -> bool {
     view.filters.iter().any(|filter| {
         filter
             .column_filters
@@ -1179,7 +139,7 @@ fn view_has_filter_payload(view: &NamedSheetView) -> bool {
     })
 }
 
-fn needs_local_spreadsheet_prefix_binding(value: &NamedSheetViews) -> bool {
+fn needs_local_spreadsheet_prefix_binding(value: &Views) -> bool {
     value
         .namespace_declarations
         .iter()
@@ -1191,7 +151,7 @@ fn needs_local_spreadsheet_prefix_binding(value: &NamedSheetViews) -> bool {
 
 fn write_named_sheet_view(
     output: &mut Vec<u8>,
-    view: &NamedSheetView,
+    view: &View,
     spreadsheet_prefix_needs_local_binding: bool,
 ) -> Result<()> {
     validate_name(&view.name)?;
@@ -1213,7 +173,7 @@ fn write_named_sheet_view(
 
 fn write_named_sheet_view_filter(
     output: &mut Vec<u8>,
-    filter: &NamedSheetViewFilter,
+    filter: &Filter,
     spreadsheet_prefix_needs_local_binding: bool,
 ) -> Result<()> {
     output.extend_from_slice(b"<nsvFilter");
@@ -1245,7 +205,7 @@ fn write_named_sheet_view_filter(
 
 fn write_column_filter(
     output: &mut Vec<u8>,
-    column: &NamedSheetViewColumnFilter,
+    column: &ColumnFilter,
     spreadsheet_prefix_needs_local_binding: bool,
 ) -> Result<()> {
     if column.column_id >= MAX_COLUMNS as u32 {
@@ -1303,7 +263,7 @@ fn write_filter_payload(
     Ok(())
 }
 
-fn filter_payload_markup(filter: &FilterColumnDefinition) -> Result<Vec<u8>> {
+pub(crate) fn filter_payload_markup(filter: &FilterColumnDefinition) -> Result<Vec<u8>> {
     let fragment = write_auto_filter_fragment(&AutoFilterDefinition {
         reference: None,
         columns: vec![filter.clone()],
@@ -1359,7 +319,7 @@ fn filter_payload_markup(filter: &FilterColumnDefinition) -> Result<Vec<u8>> {
     Ok(markup)
 }
 
-fn write_sort_rules(output: &mut Vec<u8>, rules: &NamedSheetViewSortRules) -> Result<()> {
+fn write_sort_rules(output: &mut Vec<u8>, rules: &SortRules) -> Result<()> {
     output.extend_from_slice(b"<sortRules");
     if rules.sort_method != SortMethod::None {
         write_xml_attribute(output, "sortMethod", rules.sort_method.as_str());
@@ -1380,7 +340,7 @@ fn write_sort_rules(output: &mut Vec<u8>, rules: &NamedSheetViewSortRules) -> Re
     Ok(())
 }
 
-fn write_sort_rule(output: &mut Vec<u8>, rule: &NamedSheetViewSortRule) -> Result<()> {
+fn write_sort_rule(output: &mut Vec<u8>, rule: &SortRule) -> Result<()> {
     if rule.column_id >= MAX_COLUMNS as u32 {
         return Err(invalid(
             "named-sheet-view colId exceeds worksheet column limit",
@@ -1406,13 +366,10 @@ fn write_sort_rule(output: &mut Vec<u8>, rule: &NamedSheetViewSortRule) -> Resul
     Ok(())
 }
 
-fn write_sort_condition(
-    output: &mut Vec<u8>,
-    condition: &NamedSheetViewSortCondition,
-) -> Result<()> {
+fn write_sort_condition(output: &mut Vec<u8>, condition: &SortCondition) -> Result<()> {
     let name = match condition.kind {
-        NamedSheetViewSortConditionKind::Standard => "sortCondition",
-        NamedSheetViewSortConditionKind::RichValue => "richSortCondition",
+        SortConditionKind::Standard => "sortCondition",
+        SortConditionKind::RichValue => "richSortCondition",
     };
     output.push(b'<');
     output.extend_from_slice(name.as_bytes());
@@ -1442,7 +399,7 @@ fn write_sort_condition(
     Ok(())
 }
 
-fn write_extensions(output: &mut Vec<u8>, extensions: &[NamedSheetViewExtension]) {
+fn write_extensions(output: &mut Vec<u8>, extensions: &[Extension]) {
     if extensions.is_empty() {
         return;
     }
@@ -1502,7 +459,7 @@ enum DxfOwner {
 }
 enum Payload {
     Filter,
-    Extension(ExtOwner, NamedSheetViewExtension),
+    Extension(ExtOwner, Extension),
     Dxf(DxfOwner),
 }
 struct Capture {
@@ -1513,7 +470,7 @@ struct Capture {
 #[derive(Default)]
 struct Parser {
     stack: Vec<Ctx>,
-    root: Option<NamedSheetViews>,
+    root: Option<Views>,
     view: Option<ViewBuilder>,
     filter: Option<FilterBuilder>,
     column: Option<ColumnBuilder>,
@@ -1525,23 +482,23 @@ struct Parser {
     seen_root: bool,
 }
 struct ViewBuilder {
-    value: NamedSheetView,
+    value: View,
     phase: u8,
 }
 struct FilterBuilder {
-    value: NamedSheetViewFilter,
+    value: Filter,
     phase: u8,
 }
 struct ColumnBuilder {
-    value: NamedSheetViewColumnFilter,
+    value: ColumnFilter,
     phase: u8,
 }
 struct SortRulesBuilder {
-    value: NamedSheetViewSortRules,
+    value: SortRules,
     phase: u8,
 }
 struct SortRuleBuilder {
-    value: NamedSheetViewSortRule,
+    value: SortRule,
     phase: u8,
 }
 
@@ -1578,11 +535,11 @@ impl Parser {
                 self.stack.push(Ctx::SortRule)
             },
             (Ctx::SortRule, true, b"sortCondition") => {
-                self.add_condition(e, d, NamedSheetViewSortConditionKind::Standard)?;
+                self.add_condition(e, d, SortConditionKind::Standard)?;
                 self.stack.push(Ctx::Leaf)
             },
             (Ctx::SortRule, true, b"richSortCondition") => {
-                self.add_condition(e, d, NamedSheetViewSortConditionKind::RichValue)?;
+                self.add_condition(e, d, SortConditionKind::RichValue)?;
                 self.stack.push(Ctx::Leaf)
             },
             (parent, true, b"extLst") => {
@@ -1660,10 +617,10 @@ impl Parser {
                 self.finish_sort_rule()?
             },
             (Ctx::SortRule, true, b"sortCondition") => {
-                self.add_condition(e, d, NamedSheetViewSortConditionKind::Standard)?
+                self.add_condition(e, d, SortConditionKind::Standard)?
             },
             (Ctx::SortRule, true, b"richSortCondition") => {
-                self.add_condition(e, d, NamedSheetViewSortConditionKind::RichValue)?
+                self.add_condition(e, d, SortConditionKind::RichValue)?
             },
             (parent, true, b"extLst") => {
                 let owner = self.ext_owner(parent)?;
@@ -1726,7 +683,7 @@ impl Parser {
         }
         self.seen_root = true;
         self.root_phase = 0;
-        self.root = Some(NamedSheetViews {
+        self.root = Some(Views {
             views: Vec::new(),
             extensions: Vec::new(),
             namespace_declarations: parse_namespace_declarations(e, d)?,
@@ -1751,7 +708,7 @@ impl Parser {
         validate_name(&name)?;
         let id = parse_guid(&required_attr(e, b"id", d)?)?;
         self.view = Some(ViewBuilder {
-            value: NamedSheetView {
+            value: View {
                 name,
                 id,
                 filters: Vec::new(),
@@ -1786,7 +743,7 @@ impl Parser {
             return Err(invalid("too many named-sheet-view filters"));
         }
         self.filter = Some(FilterBuilder {
-            value: NamedSheetViewFilter {
+            value: Filter {
                 filter_id: parse_guid(&required_attr(e, b"filterId", d)?)?,
                 reference: attr(e, b"ref", d)?.map(|v| parse_range(&v)).transpose()?,
                 table_id: optional_u32(e, b"tableId", d)?,
@@ -1824,7 +781,7 @@ impl Parser {
             return Err(invalid("too many named-sheet-view column filters"));
         }
         self.column = Some(ColumnBuilder {
-            value: NamedSheetViewColumnFilter {
+            value: ColumnFilter {
                 column_id: column_id(e, d)?,
                 id: optional_guid(e, b"id", d)?,
                 differential_format: None,
@@ -1864,7 +821,7 @@ impl Parser {
             .parse::<SortMethod>()
             .map_err(|error| invalid(error.to_string()))?;
         self.sort_rules = Some(SortRulesBuilder {
-            value: NamedSheetViewSortRules {
+            value: SortRules {
                 sort_method: method,
                 case_sensitive: bool_attr(e, b"caseSensitive", d)?.unwrap_or(false),
                 rules: Vec::new(),
@@ -1899,7 +856,7 @@ impl Parser {
             return Err(invalid("sortRules exceeds 64 rules"));
         }
         self.sort_rule = Some(SortRuleBuilder {
-            value: NamedSheetViewSortRule {
+            value: SortRule {
                 column_id: column_id(e, d)?,
                 id: optional_guid(e, b"id", d)?,
                 differential_format: None,
@@ -1937,7 +894,7 @@ impl Parser {
         &mut self,
         e: &BytesStart<'_>,
         d: Decoder,
-        kind: NamedSheetViewSortConditionKind,
+        kind: SortConditionKind,
     ) -> Result<()> {
         let rule = self
             .sort_rule
@@ -2006,14 +963,14 @@ impl Parser {
                 if v.phase > 0 || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced columnFilter dxf"));
                 }
-                v.value.differential_format = Some(NamedSheetViewMarkup(Vec::new()))
+                v.value.differential_format = Some(Markup(Vec::new()))
             },
             DxfOwner::SortRule => {
                 let v = self.sort_rule.as_mut().unwrap();
                 if v.phase > 0 || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced sortRule dxf"));
                 }
-                v.value.differential_format = Some(NamedSheetViewMarkup(Vec::new()))
+                v.value.differential_format = Some(Markup(Vec::new()))
             },
         }
         Ok(())
@@ -2088,15 +1045,13 @@ impl Parser {
                 column.value.filters.push(parsed)
             },
             Payload::Dxf(DxfOwner::Column) => {
-                self.column.as_mut().unwrap().value.differential_format =
-                    Some(NamedSheetViewMarkup(markup))
+                self.column.as_mut().unwrap().value.differential_format = Some(Markup(markup))
             },
             Payload::Dxf(DxfOwner::SortRule) => {
-                self.sort_rule.as_mut().unwrap().value.differential_format =
-                    Some(NamedSheetViewMarkup(markup))
+                self.sort_rule.as_mut().unwrap().value.differential_format = Some(Markup(markup))
             },
             Payload::Extension(owner, mut x) => {
-                x.markup = NamedSheetViewMarkup(markup);
+                x.markup = Markup(markup);
                 match owner {
                     ExtOwner::Root => self.root.as_mut().unwrap().extensions.push(x),
                     ExtOwner::View => self.view.as_mut().unwrap().value.extensions.push(x),
@@ -2110,7 +1065,7 @@ impl Parser {
         }
         Ok(())
     }
-    fn finish(self) -> Result<NamedSheetViews> {
+    fn finish(self) -> Result<Views> {
         let root = self
             .root
             .ok_or_else(|| invalid("missing namedSheetViews root"))?;
@@ -2206,8 +1161,8 @@ fn adapt_filter_root(e: &BytesStart<'_>, d: Decoder) -> Result<BytesStart<'stati
 fn parse_condition(
     e: &BytesStart<'_>,
     d: Decoder,
-    kind: NamedSheetViewSortConditionKind,
-) -> Result<NamedSheetViewSortCondition> {
+    kind: SortConditionKind,
+) -> Result<SortCondition> {
     let reference = parse_range(&required_attr(e, b"ref", d)?)?;
     let sort_by = attr(e, b"sortBy", d)?
         .as_deref()
@@ -2216,7 +1171,7 @@ fn parse_condition(
         .map_err(|error| invalid(error.to_string()))?;
     let dxf = optional_u32(e, b"dxfId", d)?;
     let icon_set = attr(e, b"iconSet", d)?
-        .map(|v| NamedSheetViewIconSet::parse(&v))
+        .map(|v| IconSet::parse(&v))
         .transpose()?;
     let icon_id = optional_u32(e, b"iconId", d)?;
     if sort_by == SortBy::Icon {
@@ -2236,7 +1191,7 @@ fn parse_condition(
     if !matches!(sort_by, SortBy::CellColor | SortBy::FontColor) && dxf.is_some() {
         return Err(invalid("dxfId is only valid for color sorting"));
     }
-    let rich_sort_key = if kind == NamedSheetViewSortConditionKind::RichValue {
+    let rich_sort_key = if kind == SortConditionKind::RichValue {
         attr(e, b"richSortKey", d)?
     } else {
         if attr(e, b"richSortKey", d)?.is_some() {
@@ -2250,7 +1205,7 @@ fn parse_condition(
     {
         return Err(invalid("richSortKey exceeds 255 characters"));
     }
-    Ok(NamedSheetViewSortCondition {
+    Ok(SortCondition {
         kind,
         reference,
         descending: bool_attr(e, b"descending", d)?.unwrap_or(false),
@@ -2262,17 +1217,17 @@ fn parse_condition(
         rich_sort_key,
     })
 }
-fn parse_extension(e: &BytesStart<'_>, d: Decoder) -> Result<NamedSheetViewExtension> {
+fn parse_extension(e: &BytesStart<'_>, d: Decoder) -> Result<Extension> {
     let uri = required_attr(e, b"uri", d)?;
     if uri.is_empty() || uri.len() > 1024 {
         return Err(invalid("invalid Named Sheet Views extension URI"));
     }
-    Ok(NamedSheetViewExtension {
+    Ok(Extension {
         uri,
-        markup: NamedSheetViewMarkup(Vec::new()),
+        markup: Markup(Vec::new()),
     })
 }
-fn parse_authored_differential_format(xml: &[u8]) -> Result<NamedSheetViewDifferentialFormat> {
+pub(crate) fn parse_authored_differential_format(xml: &[u8]) -> Result<DifferentialFormat> {
     if xml.is_empty() || xml.len() > MAX_MARKUP_BYTES {
         return Err(invalid("invalid authored Named Sheet Views dxf size"));
     }
@@ -2296,9 +1251,9 @@ fn parse_authored_differential_format(xml: &[u8]) -> Result<NamedSheetViewDiffer
         .and_then(|mut filter| filter.column_filters.pop())
         .and_then(|column| column.differential_format)
         .ok_or_else(|| invalid("authored fragment must contain exactly one dxf element"))?;
-    Ok(NamedSheetViewDifferentialFormat { markup })
+    Ok(DifferentialFormat { markup })
 }
-fn parse_authored_extension(uri: String, content_xml: &[u8]) -> Result<NamedSheetViewExtension> {
+pub(crate) fn parse_authored_extension(uri: String, content_xml: &[u8]) -> Result<Extension> {
     if uri.is_empty() || uri.len() > 1024 {
         return Err(invalid("invalid Named Sheet Views extension URI"));
     }
@@ -2414,26 +1369,20 @@ fn fragment_document_prefix() -> Vec<u8> {
     )
     .into_bytes()
 }
-fn add_extension(
-    extensions: &mut Vec<NamedSheetViewExtension>,
-    value: NamedSheetViewExtension,
-) -> Result<()> {
+pub(crate) fn add_extension(extensions: &mut Vec<Extension>, value: Extension) -> Result<()> {
     if extensions.len() >= MAX_EXTENSIONS {
         return Err(invalid("too many Named Sheet Views extensions"));
     }
     extensions.push(value);
     Ok(())
 }
-fn remove_extension(
-    extensions: &mut Vec<NamedSheetViewExtension>,
-    uri: &str,
-) -> Option<NamedSheetViewExtension> {
+pub(crate) fn remove_extension(extensions: &mut Vec<Extension>, uri: &str) -> Option<Extension> {
     extensions
         .iter()
         .position(|extension| extension.uri == uri)
         .map(|index| extensions.remove(index))
 }
-fn validate_name(v: &str) -> Result<()> {
+pub(crate) fn validate_name(v: &str) -> Result<()> {
     let n = v.chars().count();
     if n == 0
         || n > 127
@@ -2447,7 +1396,7 @@ fn validate_name(v: &str) -> Result<()> {
     }
     Ok(())
 }
-fn validate_column_id(value: u32) -> Result<()> {
+pub(crate) fn validate_column_id(value: u32) -> Result<()> {
     if value >= MAX_COLUMNS as u32 {
         Err(invalid(
             "named-sheet-view colId exceeds worksheet column limit",
@@ -2456,7 +1405,7 @@ fn validate_column_id(value: u32) -> Result<()> {
         Ok(())
     }
 }
-fn validate_view_collection(views: &[NamedSheetView]) -> Result<()> {
+fn validate_view_collection(views: &[View]) -> Result<()> {
     if views.is_empty() {
         return Err(invalid(
             "Named Sheet Views part must contain a namedSheetView",
@@ -2477,7 +1426,7 @@ fn validate_view_collection(views: &[NamedSheetView]) -> Result<()> {
     }
     Ok(())
 }
-fn parse_guid(v: &str) -> Result<NamedSheetViewGuid> {
+pub(crate) fn parse_guid(v: &str) -> Result<Guid> {
     let b = v.as_bytes();
     let hyphens = [9usize, 14, 19, 24];
     if b.len() != 38
@@ -2491,13 +1440,9 @@ fn parse_guid(v: &str) -> Result<NamedSheetViewGuid> {
     {
         return Err(invalid(format!("invalid GUID '{v}'")));
     }
-    Ok(NamedSheetViewGuid(v.into()))
+    Ok(Guid(v.into()))
 }
-fn optional_guid(
-    e: &BytesStart<'_>,
-    name: &[u8],
-    d: Decoder,
-) -> Result<Option<NamedSheetViewGuid>> {
+fn optional_guid(e: &BytesStart<'_>, name: &[u8], d: Decoder) -> Result<Option<Guid>> {
     attr(e, name, d)?.map(|v| parse_guid(&v)).transpose()
 }
 fn column_id(e: &BytesStart<'_>, d: Decoder) -> Result<u32> {
@@ -2509,7 +1454,7 @@ fn column_id(e: &BytesStart<'_>, d: Decoder) -> Result<u32> {
     }
     Ok(v)
 }
-fn parse_range(v: &str) -> Result<NamedSheetViewRange> {
+pub(crate) fn parse_range(v: &str) -> Result<Range> {
     let mut parts = v.split(':');
     let a = parts.next().unwrap_or("");
     let b = parts.next();
@@ -2525,7 +1470,7 @@ fn parse_range(v: &str) -> Result<NamedSheetViewRange> {
     if start.row() > end.row() || start.column() > end.column() {
         return Err(invalid(format!("reversed named-sheet-view range '{v}'")));
     }
-    Ok(NamedSheetViewRange(v.into()))
+    Ok(Range(v.into()))
 }
 fn parse_namespace_declarations(e: &BytesStart<'_>, d: Decoder) -> Result<Vec<(String, String)>> {
     let mut declarations = Vec::new();
@@ -2611,24 +1556,13 @@ fn core(ns: &ResolveResult<'_>) -> bool {
 fn inside(ctx: Ctx) -> bool {
     !matches!(ctx, Ctx::Outside)
 }
-fn invalid(v: impl Into<String>) -> Error {
-    Error::Invalid(v.into())
-}
-fn uri_error(v: impl std::fmt::Display) -> Error {
-    Error::Common(litchi_ooxml_common::Error::Uri(v.to_string()))
-}
-fn content_type_mismatch(expected: &str, actual: &str) -> Error {
-    Error::Common(litchi_ooxml_common::Error::ContentType {
-        expected: expected.into(),
-        actual: actual.into(),
-    })
-}
-fn xml_error(v: impl std::fmt::Display) -> Error {
-    Error::Xml(litchi_ooxml_common::XmlError::Malformed(v.to_string()))
-}
-
 #[cfg(test)]
 mod tests {
+    use super::super::RELATIONSHIP;
+    use super::super::package::{
+        discover_named_sheet_views, load_worksheet_named_sheet_views,
+        remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views,
+    };
     use super::*;
     use crate::auto_filter::{
         CalendarType, DateGroupItem, DateTimeGrouping, FilterColumnPayload, FilterItem,
@@ -2638,7 +1572,7 @@ mod tests {
 
     fn libreoffice_fixture() -> OpcPackage {
         OpcPackage::from_bytes(include_bytes!(
-            "../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx"
         ))
         .unwrap()
     }
@@ -2698,36 +1632,29 @@ mod tests {
 
     #[test]
     fn constructs_core_views_and_extends_libreoffice_metadata() {
-        let explicit_id =
-            NamedSheetViewGuid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap();
-        let primary = NamedSheetView::with_id("Personal", explicit_id.clone()).unwrap();
-        let mut authored = NamedSheetViews::new(primary);
-        let shared = NamedSheetView::new("Shared").unwrap();
-        assert!(NamedSheetViewGuid::new(shared.id().as_str()).is_ok());
+        let explicit_id = Guid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap();
+        let primary = View::with_id("Personal", explicit_id.clone()).unwrap();
+        let mut authored = Views::new(primary);
+        let shared = View::new("Shared").unwrap();
+        assert!(Guid::new(shared.id().as_str()).is_ok());
         authored.add_view(shared).unwrap();
 
+        assert!(authored.add_view(View::new("Personal").unwrap()).is_err());
         assert!(
             authored
-                .add_view(NamedSheetView::new("Personal").unwrap())
+                .add_view(View::with_id("Duplicate GUID", explicit_id).unwrap())
                 .is_err()
         );
-        assert!(
-            authored
-                .add_view(NamedSheetView::with_id("Duplicate GUID", explicit_id).unwrap())
-                .is_err()
-        );
-        assert!(NamedSheetView::new(" _xlnsv.reserved").is_err());
-        assert!(NamedSheetViewGuid::new("not-a-guid").is_err());
-        assert!(NamedSheetViewRange::new("B2:A1").is_err());
+        assert!(View::new(" _xlnsv.reserved").is_err());
+        assert!(Guid::new("not-a-guid").is_err());
+        assert!(Range::new("B2:A1").is_err());
 
         let package = libreoffice_fixture();
         let worksheet = fixture_worksheet();
         let mut preserved = load_worksheet_named_sheet_views(&package, &worksheet)
             .unwrap()
             .unwrap();
-        preserved
-            .add_view(NamedSheetView::new("Authored").unwrap())
-            .unwrap();
+        preserved.add_view(View::new("Authored").unwrap()).unwrap();
         assert_eq!(
             parse_named_sheet_views(&write_named_sheet_views(&preserved).unwrap()).unwrap(),
             preserved
@@ -2741,8 +1668,8 @@ mod tests {
 
     #[test]
     fn authors_detailed_value_date_and_sort_metadata() {
-        let filter_id = NamedSheetViewGuid::new("{11111111-2222-3333-4444-555555555555}").unwrap();
-        let mut column = NamedSheetViewColumnFilter::new(1).unwrap();
+        let filter_id = Guid::new("{11111111-2222-3333-4444-555555555555}").unwrap();
+        let mut column = ColumnFilter::new(1).unwrap();
         let mut payload = FilterColumnDefinition::new(1).unwrap();
         payload.set_payload(Some(FilterColumnPayload::Values(
             FilterValues::new(
@@ -2768,39 +1695,37 @@ mod tests {
         )));
         column.add_filter(payload).unwrap();
 
-        let mut condition = NamedSheetViewSortCondition::new(
-            NamedSheetViewSortConditionKind::RichValue,
-            NamedSheetViewRange::new("B2:B20").unwrap(),
-        );
+        let mut condition =
+            SortCondition::new(SortConditionKind::RichValue, Range::new("B2:B20").unwrap());
         condition
             .set_descending(true)
             .set_custom_list(Some("North,South".into()))
             .unwrap()
             .set_rich_sort_key(Some("Region".into()))
             .unwrap();
-        let mut rule = NamedSheetViewSortRule::new(1).unwrap();
+        let mut rule = SortRule::new(1).unwrap();
         rule.set_condition(Some(condition)).unwrap();
-        let mut rules = NamedSheetViewSortRules::new();
+        let mut rules = SortRules::new();
         rules
             .set_sort_method(SortMethod::PinYin)
             .set_case_sensitive(true)
             .add_rule(rule)
             .unwrap();
 
-        let mut filter = NamedSheetViewFilter::new(filter_id);
+        let mut filter = Filter::new(filter_id);
         filter
-            .set_reference(Some(NamedSheetViewRange::new("A1:C20").unwrap()))
+            .set_reference(Some(Range::new("A1:C20").unwrap()))
             .set_table_id(Some(7))
             .add_column_filter(column)
             .unwrap()
             .set_sort_rules(Some(rules));
-        let mut view = NamedSheetView::with_id(
+        let mut view = View::with_id(
             "Regional",
-            NamedSheetViewGuid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap(),
+            Guid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap(),
         )
         .unwrap();
         view.add_filter(filter).unwrap();
-        let authored = NamedSheetViews::new(view);
+        let authored = Views::new(view);
 
         let xml = authored.to_xml().unwrap();
         let text = std::str::from_utf8(&xml).unwrap();
@@ -2817,7 +1742,7 @@ mod tests {
 
     #[test]
     fn detailed_authoring_rejects_invalid_relationships_and_filter_values() {
-        let mut column = NamedSheetViewColumnFilter::new(3).unwrap();
+        let mut column = ColumnFilter::new(3).unwrap();
         assert!(
             column
                 .add_filter(FilterColumnDefinition::new(2).unwrap())
@@ -2838,7 +1763,7 @@ mod tests {
         assert!(Top10Filter::new(true, true, 101.0, None).is_err());
         assert!(IconFilter::new(crate::auto_filter::FilterIconSet::ThreeArrows, Some(3)).is_err());
 
-        assert!(NamedSheetViewColumnFilter::new(MAX_COLUMNS as u32).is_err());
+        assert!(ColumnFilter::new(MAX_COLUMNS as u32).is_err());
     }
 
     #[test]
@@ -2848,38 +1773,33 @@ mod tests {
             br#"<dxf xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews"/><dxf xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews"/>"#,
             br#"<!DOCTYPE x><dxf xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews"/>"#,
         ] {
-            assert!(NamedSheetViewDifferentialFormat::from_xml(xml).is_err());
+            assert!(DifferentialFormat::from_xml(xml).is_err());
         }
-        assert!(NamedSheetViewExtension::new("", b"").is_err());
+        assert!(Extension::new("", b"").is_err());
+        assert!(Extension::new("urn:test", br#"<x:payload xmlns:x="urn:test">"#,).is_err());
         assert!(
-            NamedSheetViewExtension::new("urn:test", br#"<x:payload xmlns:x="urn:test">"#,)
-                .is_err()
-        );
-        assert!(
-            NamedSheetViewExtension::new(
+            Extension::new(
                 "urn:test",
                 br#"<x:one xmlns:x="urn:test"/><x:two xmlns:x="urn:test"/>"#,
             )
             .is_err()
         );
-        assert!(NamedSheetViewExtension::new("urn:test", b"not markup").is_err());
+        assert!(Extension::new("urn:test", b"not markup").is_err());
         assert!(
-            NamedSheetViewExtension::new(
+            Extension::new(
                 "urn:test",
                 br#"<?unsafe value?><x:payload xmlns:x="urn:test"/>"#,
             )
             .is_err()
         );
 
-        let mut condition = NamedSheetViewSortCondition::new(
-            NamedSheetViewSortConditionKind::Standard,
-            NamedSheetViewRange::new("A1:A2").unwrap(),
-        );
+        let mut condition =
+            SortCondition::new(SortConditionKind::Standard, Range::new("A1:A2").unwrap());
         assert!(condition.set_color_sort(SortBy::Value, 0).is_err());
         condition.set_color_sort(SortBy::FontColor, 0).unwrap();
-        let mut rule = NamedSheetViewSortRule::new(0).unwrap();
+        let mut rule = SortRule::new(0).unwrap();
         assert!(rule.set_condition(Some(condition.clone())).is_err());
-        rule.set_differential_format(Some(NamedSheetViewDifferentialFormat::empty()))
+        rule.set_differential_format(Some(DifferentialFormat::empty()))
             .unwrap()
             .set_condition(Some(condition))
             .unwrap();
@@ -2957,7 +1877,7 @@ mod tests {
     #[test]
     fn poi_fixture_has_no_named_sheet_views_relationship() {
         let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx"
         ))
         .unwrap();
         let sheet = package
@@ -2976,7 +1896,7 @@ mod tests {
         let rules = v.views()[0].filters()[0].sort_rules().unwrap();
         assert_eq!(rules.sort_method(), SortMethod::PinYin);
         let c = rules.rules()[0].condition().unwrap();
-        assert_eq!(c.kind(), NamedSheetViewSortConditionKind::RichValue);
+        assert_eq!(c.kind(), SortConditionKind::RichValue);
         assert_eq!(c.rich_sort_key(), Some("City"));
         assert_eq!(v.views()[0].extensions()[0].uri(), "urn:test");
         assert_eq!(
