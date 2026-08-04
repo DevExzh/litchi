@@ -316,7 +316,7 @@ impl<'a> Slide<'a> {
     ///
     /// Media payloads remain stored bytes. They are never decoded, rendered,
     /// played, fetched, or executed.
-    pub fn media(&self) -> Result<crate::pptx::media_parts::SlideMediaList> {
+    pub fn media(&self) -> Result<crate::pptx::media_parts::List> {
         let package = self.package.ok_or_else(|| {
             OoxmlError::InvalidFormat("slide media requires package-backed slide access".into())
         })?;

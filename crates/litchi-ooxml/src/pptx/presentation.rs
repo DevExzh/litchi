@@ -766,7 +766,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns None when the presentation does not contain legacy comments.
     /// Comment text and extension payloads remain inert document data.
-    pub fn comments(&self) -> Result<Option<crate::pptx::PresentationComments>> {
+    pub fn comments(&self) -> Result<Option<crate::pptx::comments::Comments>> {
         Ok(crate::pptx::load_presentation_comments(self.package)?)
     }
 

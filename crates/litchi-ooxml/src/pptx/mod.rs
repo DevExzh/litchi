@@ -110,8 +110,7 @@ pub use changes_information::{
 };
 pub use color_map::{ColorMap, ColorMapOverride, ColorMapSlot, ThemeColorRole};
 pub use comments::{
-    PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
-    PresentationComments, SlideCommentList, add_presentation_comment,
+    Author, Comment, Comments, Conformance, List, add_presentation_comment,
     add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
     load_presentation_comments, parse_comment_authors, parse_slide_comments,
     remove_presentation_comment, remove_presentation_comment_author,
@@ -150,10 +149,8 @@ pub use master_layout::{
 };
 pub use media::{Media, MediaFormat, MediaType};
 pub use media_parts::{
-    MediaBookmark, MediaData, MediaExtensionList, MediaFade, MediaResource, MediaTrim,
-    OfficeMediaExtension, SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
-    SlideMediaPoster, SlideMediaTransform, load_slide_media, parse_slide_media, store_slide_media,
-    write_slide_media_pictures,
+    Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
+    load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
 pub use ole::{PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind};
 pub use ole_object::{AuthoredOleObject, OleObjectFrame, add_ole_object};

@@ -8,9 +8,8 @@ use crate::error::{OoxmlError, Result};
 use litchi_opc::{OpcPackage, PackURI};
 
 pub use litchi_pptx::media_parts::{
-    MediaBookmark, MediaData, MediaExtensionList, MediaFade, MediaResource, MediaTrim,
-    OfficeMediaExtension, SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
-    SlideMediaPoster, SlideMediaTransform,
+    Bookmark, Conformance, Data, Extension, ExtensionList, Fade, Kind, List, Picture, Poster,
+    Resource, Transform, Trim,
 };
 
 fn map_media_error(error: litchi_pptx::Error) -> OoxmlError {
@@ -40,20 +39,17 @@ fn map_media_error(error: litchi_pptx::Error) -> OoxmlError {
 }
 
 /// Parse all audio/video pictures from a complete Slide part.
-pub fn parse_slide_media(xml: &[u8]) -> Result<SlideMediaList> {
+pub fn parse_slide_media(xml: &[u8]) -> Result<List> {
     litchi_pptx::media_parts::parse_slide_media(xml).map_err(map_media_error)
 }
 /// Serialize audio/video pictures for insertion into a Slide part.
-pub fn write_slide_media_pictures(
-    value: &SlideMediaList,
-    conformance: SlideMediaConformance,
-) -> Result<Vec<u8>> {
+pub fn write_slide_media_pictures(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
     litchi_pptx::media_parts::write_slide_media_pictures(value, conformance)
         .map_err(map_media_error)
 }
 
 /// Load media pictures and validate their complete internal OPC resource graph.
-pub fn load_slide_media(package: &OpcPackage, slide_name: &PackURI) -> Result<SlideMediaList> {
+pub fn load_slide_media(package: &OpcPackage, slide_name: &PackURI) -> Result<List> {
     litchi_pptx::media_parts::load_slide_media(package, slide_name).map_err(map_media_error)
 }
 
@@ -61,8 +57,8 @@ pub fn load_slide_media(package: &OpcPackage, slide_name: &PackURI) -> Result<Sl
 pub fn store_slide_media(
     package: &mut OpcPackage,
     slide_name: &PackURI,
-    value: &SlideMediaList,
-    conformance: SlideMediaConformance,
+    value: &List,
+    conformance: Conformance,
 ) -> Result<()> {
     litchi_pptx::media_parts::store_slide_media(package, slide_name, value, conformance)
         .map_err(map_media_error)
@@ -82,7 +78,7 @@ mod tests {
         let media = load_slide_media(&package, &slide).expect("media graph");
 
         assert_eq!(media.pictures.len(), 1);
-        assert_eq!(media.pictures[0].kind, SlideMediaKind::Video);
+        assert_eq!(media.pictures[0].kind, Kind::Video);
         assert_eq!(
             media.pictures[0].resource.as_ref().unwrap().data.len(),
             101_799

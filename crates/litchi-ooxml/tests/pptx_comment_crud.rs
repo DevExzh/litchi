@@ -1,7 +1,4 @@
-use litchi_ooxml::pptx::comments::{
-    PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
-    PresentationComments, SlideCommentList,
-};
+use litchi_ooxml::pptx::comments::{Author, Comment, Comments, Conformance, List};
 use litchi_ooxml::pptx::{
     add_presentation_comment, add_presentation_comment_author, find_presentation_comment,
     find_presentation_comment_author, remove_presentation_comment,
@@ -14,12 +11,12 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 use litchi_pptx::modern_comments::{
-    Author, Comment, Progress, Reply, add_modern_comment, add_modern_comment_author,
-    add_modern_comment_reply, find_modern_comment, find_modern_comment_reply,
-    remove_modern_comment, remove_modern_comment_author, remove_modern_comment_reply,
-    reorder_modern_comment_authors, reorder_modern_comments, replace_modern_comment,
-    replace_modern_comment_author, replace_modern_comment_reply, update_modern_comment,
-    update_modern_comment_author, update_modern_comment_reply,
+    self, Progress, Reply, add_modern_comment, add_modern_comment_author, add_modern_comment_reply,
+    find_modern_comment, find_modern_comment_reply, remove_modern_comment,
+    remove_modern_comment_author, remove_modern_comment_reply, reorder_modern_comment_authors,
+    reorder_modern_comments, replace_modern_comment, replace_modern_comment_author,
+    replace_modern_comment_reply, update_modern_comment, update_modern_comment_author,
+    update_modern_comment_reply,
 };
 
 const SLIDE: &str = "/ppt/slides/slide1.xml";
@@ -50,8 +47,8 @@ fn package() -> (OpcPackage, PackURI) {
     (package, slide_name)
 }
 
-fn legacy_author(id: u32, name: &str) -> PresentationCommentAuthor {
-    PresentationCommentAuthor {
+fn legacy_author(id: u32, name: &str) -> Author {
+    Author {
         id,
         name: name.into(),
         initials: name.chars().next().unwrap().to_string(),
@@ -60,8 +57,8 @@ fn legacy_author(id: u32, name: &str) -> PresentationCommentAuthor {
     }
 }
 
-fn legacy_comment(author_id: u32, index: u32, text: &str) -> PresentationComment {
-    PresentationComment {
+fn legacy_comment(author_id: u32, index: u32, text: &str) -> Comment {
+    Comment {
         author_id,
         date_time: Some("2026-07-19T12:00:00Z".into()),
         index,
@@ -71,8 +68,8 @@ fn legacy_comment(author_id: u32, index: u32, text: &str) -> PresentationComment
     }
 }
 
-fn modern_author(id: &str, name: &str) -> Author {
-    Author {
+fn modern_author(id: &str, name: &str) -> modern_comments::Author {
+    modern_comments::Author {
         id: id.into(),
         name: name.into(),
         initials: Some(name.chars().next().unwrap().to_string()),
@@ -83,8 +80,8 @@ fn modern_author(id: &str, name: &str) -> Author {
     }
 }
 
-fn modern_comment(id: &str, author_id: &str, title: &str) -> Comment {
-    Comment {
+fn modern_comment(id: &str, author_id: &str, title: &str) -> modern_comments::Comment {
+    modern_comments::Comment {
         id: id.into(),
         author_id: author_id.into(),
         status: None,
@@ -120,35 +117,30 @@ fn modern_reply(id: &str, author_id: &str) -> Reply {
 #[test]
 fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
     let (mut package, _) = package();
-    let graph = PresentationComments {
+    let graph = Comments {
         author_relationship_id: "rIdLegacyAuthors".into(),
         author_part_name: "/ppt/commentAuthors.xml".into(),
         authors: vec![legacy_author(1, "Ada")],
-        slides: vec![SlideCommentList {
+        slides: vec![List {
             slide_part_name: SLIDE.into(),
             relationship_id: "rIdLegacyComments".into(),
             part_name: "/ppt/comments/comment1.xml".into(),
             comments: vec![legacy_comment(1, 1, "first")],
         }],
     };
-    store_presentation_comments(
-        &mut package,
-        &graph,
-        PresentationCommentConformance::Transitional,
-    )
-    .unwrap();
+    store_presentation_comments(&mut package, &graph, Conformance::Transitional).unwrap();
 
     add_presentation_comment_author(
         &mut package,
         legacy_author(2, "Grace"),
-        PresentationCommentConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
     add_presentation_comment(
         &mut package,
         SLIDE,
         legacy_comment(2, 1, "second"),
-        PresentationCommentConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
     let mut changed = legacy_comment(2, 1, "updated");
@@ -159,7 +151,7 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
         2,
         1,
         changed.clone(),
-        PresentationCommentConformance::Strict,
+        Conformance::Strict,
     )
     .unwrap();
     replace_presentation_comment(
@@ -168,40 +160,24 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
         2,
         1,
         changed,
-        PresentationCommentConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
     reorder_presentation_comments(
         &mut package,
         SLIDE,
         &[(2, 1), (1, 1)],
-        PresentationCommentConformance::Transitional,
+        Conformance::Transitional,
     )
     .unwrap();
-    reorder_presentation_comment_authors(
-        &mut package,
-        &[2, 1],
-        PresentationCommentConformance::Transitional,
-    )
-    .unwrap();
+    reorder_presentation_comment_authors(&mut package, &[2, 1], Conformance::Transitional).unwrap();
     let mut grace = find_presentation_comment_author(&package, 2)
         .unwrap()
         .unwrap();
     grace.name = "Grace Hopper".into();
-    update_presentation_comment_author(
-        &mut package,
-        2,
-        grace.clone(),
-        PresentationCommentConformance::Transitional,
-    )
-    .unwrap();
-    replace_presentation_comment_author(
-        &mut package,
-        2,
-        grace,
-        PresentationCommentConformance::Transitional,
-    )
-    .unwrap();
+    update_presentation_comment_author(&mut package, 2, grace.clone(), Conformance::Transitional)
+        .unwrap();
+    replace_presentation_comment_author(&mut package, 2, grace, Conformance::Transitional).unwrap();
     assert_eq!(
         find_presentation_comment(&package, SLIDE, 2, 1)
             .unwrap()
@@ -210,12 +186,7 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
         "updated"
     );
     assert!(
-        remove_presentation_comment_author(
-            &mut package,
-            2,
-            PresentationCommentConformance::Transitional
-        )
-        .is_err()
+        remove_presentation_comment_author(&mut package, 2, Conformance::Transitional).is_err()
     );
 
     let comment_part = PackURI::new("/ppt/comments/comment1.xml").unwrap();
@@ -227,32 +198,13 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
     shared_owner.relate_to("comments/comment1.xml", "urn:test:shared");
     package.add_part(Box::new(shared_owner));
     assert!(
-        remove_presentation_comment(
-            &mut package,
-            SLIDE,
-            2,
-            1,
-            PresentationCommentConformance::Transitional
-        )
-        .unwrap()
+        remove_presentation_comment(&mut package, SLIDE, 2, 1, Conformance::Transitional).unwrap()
     );
     assert!(
-        remove_presentation_comment_author(
-            &mut package,
-            2,
-            PresentationCommentConformance::Transitional
-        )
-        .unwrap()
+        remove_presentation_comment_author(&mut package, 2, Conformance::Transitional).unwrap()
     );
     assert!(
-        remove_presentation_comment(
-            &mut package,
-            SLIDE,
-            1,
-            1,
-            PresentationCommentConformance::Transitional
-        )
-        .unwrap()
+        remove_presentation_comment(&mut package, SLIDE, 1, 1, Conformance::Transitional).unwrap()
     );
     assert!(package.get_part(&comment_part).is_ok());
 }
