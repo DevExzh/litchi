@@ -113,8 +113,13 @@ litchi-formula      = { version = "0.0.1", path = "crates/litchi-formula" }
 litchi-imgconv      = { version = "0.0.1", path = "crates/litchi-imgconv" }
 litchi-iwa          = { version = "0.0.1", path = "crates/litchi-iwa" }
 litchi-markdown     = { version = "0.0.1", path = "crates/litchi-markdown" }
+litchi-odb          = { version = "0.0.1", path = "crates/litchi-odb" }
+litchi-odc          = { version = "0.0.1", path = "crates/litchi-odc" }
 litchi-odf          = { version = "0.0.1", path = "crates/litchi-odf" }
 litchi-odf-common   = { version = "0.0.1", path = "crates/litchi-odf-common" }
+litchi-odg          = { version = "0.0.1", path = "crates/litchi-odg" }
+litchi-odi          = { version = "0.0.1", path = "crates/litchi-odi" }
+litchi-odm          = { version = "0.0.1", path = "crates/litchi-odm" }
 litchi-odp          = { version = "0.0.1", path = "crates/litchi-odp" }
 litchi-ods          = { version = "0.0.1", path = "crates/litchi-ods" }
 litchi-odt          = { version = "0.0.1", path = "crates/litchi-odt" }
@@ -124,6 +129,7 @@ litchi-ole-common   = { version = "0.0.1", path = "crates/litchi-ole-common" }
 litchi-ooxml        = { version = "0.0.1", path = "crates/litchi-ooxml" }
 litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
 litchi-opc          = { version = "0.0.1", path = "crates/litchi-opc" }
+litchi-oth          = { version = "0.0.1", path = "crates/litchi-oth" }
 litchi-ppt          = { version = "0.0.1", path = "crates/litchi-ppt" }
 litchi-pptx         = { version = "0.0.1", path = "crates/litchi-pptx" }
 litchi-rtf          = { version = "0.0.1", path = "crates/litchi-rtf" }

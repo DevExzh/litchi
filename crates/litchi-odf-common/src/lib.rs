@@ -11,6 +11,7 @@ pub mod constants;
 pub mod coordinates;
 pub mod core;
 pub mod datatype;
+pub mod detect;
 pub mod namespace;
 pub mod package;
 pub mod rdf;

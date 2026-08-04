@@ -13,7 +13,12 @@
       "litchi-imgconv",
       "litchi-iwa",
       "litchi-markdown",
+      "litchi-odb",
+      "litchi-odc",
       "litchi-odf",
+      "litchi-odg",
+      "litchi-odi",
+      "litchi-odm",
       "litchi-odp",
       "litchi-odraw",
       "litchi-ods",
@@ -76,16 +81,42 @@
     "litchi-markdown": [
       "litchi-core"
     ],
+    "litchi-odb": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odc": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
     "litchi-odf": [
       "litchi-eval",
+      "litchi-odb",
+      "litchi-odc",
       "litchi-odf-common",
+      "litchi-odg",
+      "litchi-odi",
+      "litchi-odm",
       "litchi-odp",
       "litchi-ods",
-      "litchi-odt"
+      "litchi-odt",
+      "litchi-oth"
     ],
     "litchi-odf-common": [
       "litchi-core",
       "soapberry-zip"
+    ],
+    "litchi-odg": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odi": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odm": [
+      "litchi-core",
+      "litchi-odf-common"
     ],
     "litchi-odp": [
       "litchi-core",
@@ -121,6 +152,10 @@
       "litchi-core",
       "litchi-sign",
       "soapberry-zip"
+    ],
+    "litchi-oth": [
+      "litchi-core",
+      "litchi-odf-common"
     ],
     "litchi-ppt": [
       "litchi-cfb",
@@ -288,7 +323,12 @@
     "litchi-docx",
     "litchi-drawingml",
     "litchi-eval",
+    "litchi-odb",
+    "litchi-odc",
     "litchi-odf-common",
+    "litchi-odg",
+    "litchi-odi",
+    "litchi-odm",
     "litchi-odp",
     "litchi-odraw",
     "litchi-ods",

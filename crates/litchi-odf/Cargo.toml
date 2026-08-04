@@ -9,10 +9,16 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+litchi-odb = { workspace = true }
+litchi-odc = { workspace = true }
 litchi-odf-common = { workspace = true }
+litchi-odg = { workspace = true }
+litchi-odi = { workspace = true }
+litchi-odm = { workspace = true }
 litchi-odp = { workspace = true }
 litchi-ods = { workspace = true }
 litchi-odt = { workspace = true }
+litchi-oth = { workspace = true }
 
 [dev-dependencies]
 litchi-eval = { workspace = true }
