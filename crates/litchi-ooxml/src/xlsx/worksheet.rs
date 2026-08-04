@@ -56,9 +56,9 @@ use super::{
         is_chart_user_shapes_relationship_type, parse_chart_from_xml,
     },
 };
-use litchi_xlsx::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
+use litchi_xlsx::cell_watches::{CellWatches, parse_cell_watches};
 use litchi_xlsx::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
-use litchi_xlsx::outline_properties::WorksheetOutlineProperties;
+use litchi_xlsx::outline_properties::OutlineProperties;
 use litchi_xlsx::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
 use litchi_xlsx::phonetic_properties::{
     WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
@@ -228,13 +228,13 @@ pub struct Worksheet<'a> {
     /// User-reviewed worksheet error-checking exceptions.
     ignored_errors: Option<WorksheetIgnoredErrors>,
     /// Watch-window cell references tracked by the worksheet.
-    cell_watches: Option<WorksheetCellWatches>,
+    cell_watches: Option<CellWatches>,
     /// Worksheet-level calculation properties from `sheetCalcPr`.
     sheet_calculation_properties: Option<WorksheetSheetCalculationProperties>,
     /// Worksheet what-if scenario collection.
     scenarios: Option<WorksheetScenarios>,
     /// Effective worksheet outline and summary-placement policy.
-    outline_properties: Option<WorksheetOutlineProperties>,
+    outline_properties: Option<OutlineProperties>,
     /// Complete worksheet-level properties from `sheetPr`.
     sheet_properties: Option<WorksheetSheetProperties>,
     /// Default East Asian phonetic text formatting.
@@ -415,7 +415,7 @@ impl<'a> Worksheet<'a> {
         let sheet_format_properties =
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
-        let cell_watches = parse_worksheet_cell_watches(sheet_data.as_bytes())?;
+        let cell_watches = parse_cell_watches(sheet_data.as_bytes())?;
         let sheet_calculation_properties =
             parse_worksheet_sheet_calculation_properties(sheet_data.as_bytes())?;
         let scenarios = parse_worksheet_scenarios(sheet_data.as_bytes())?;
@@ -1992,7 +1992,7 @@ impl<'a> Worksheet<'a> {
     // ===== Cell Watches =====
 
     /// Watch-window cell references tracked by the worksheet, when present.
-    pub fn cell_watches(&self) -> Option<&WorksheetCellWatches> {
+    pub fn cell_watches(&self) -> Option<&CellWatches> {
         self.cell_watches.as_ref()
     }
 
@@ -2013,7 +2013,7 @@ impl<'a> Worksheet<'a> {
     // ===== Outline Properties =====
 
     /// Worksheet outline and summary-placement policy, when explicitly present.
-    pub fn outline_properties(&self) -> Option<&WorksheetOutlineProperties> {
+    pub fn outline_properties(&self) -> Option<&OutlineProperties> {
         self.outline_properties.as_ref()
     }
 

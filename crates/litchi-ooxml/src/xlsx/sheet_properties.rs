@@ -3,9 +3,7 @@
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
-use litchi_xlsx::outline_properties::{
-    WorksheetOutlineProperties, parse_worksheet_outline_properties,
-};
+use litchi_xlsx::outline_properties::{OutlineProperties, parse_outline_properties};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -95,7 +93,7 @@ pub struct WorksheetSheetProperties {
     filter_mode: bool,
     format_condition_calculation_enabled: bool,
     tab_color: Option<WorksheetTabColor>,
-    outline_properties: Option<WorksheetOutlineProperties>,
+    outline_properties: Option<OutlineProperties>,
     page_setup_properties: Option<WorksheetPageSetupProperties>,
 }
 
@@ -131,7 +129,7 @@ impl WorksheetSheetProperties {
     pub fn tab_color(&self) -> Option<&WorksheetTabColor> {
         self.tab_color.as_ref()
     }
-    pub fn outline_properties(&self) -> Option<&WorksheetOutlineProperties> {
+    pub fn outline_properties(&self) -> Option<&OutlineProperties> {
         self.outline_properties.as_ref()
     }
     pub fn page_setup_properties(&self) -> Option<&WorksheetPageSetupProperties> {
@@ -155,10 +153,7 @@ struct Builder {
 }
 
 impl Builder {
-    fn finish(
-        self,
-        outline_properties: Option<WorksheetOutlineProperties>,
-    ) -> WorksheetSheetProperties {
+    fn finish(self, outline_properties: Option<OutlineProperties>) -> WorksheetSheetProperties {
         WorksheetSheetProperties {
             code_name: self.code_name,
             synchronization_reference: self.synchronization_reference,
@@ -204,7 +199,7 @@ pub fn parse_worksheet_sheet_properties(xml: &[u8]) -> Result<Option<WorksheetSh
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
-    let outline_properties = parse_worksheet_outline_properties(xml)?;
+    let outline_properties = parse_outline_properties(xml)?;
     let limits = MceLimits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,

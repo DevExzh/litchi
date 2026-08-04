@@ -130,8 +130,7 @@ pub use litchi_xlsx::calculation_properties::{
     parse_workbook_calculation_properties,
 };
 pub use litchi_xlsx::cell_watches::{
-    CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
-    parse_worksheet_cell_watches, write_worksheet_cell_watches,
+    CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };
 pub use litchi_xlsx::scenarios::{
     ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,
@@ -162,9 +161,7 @@ pub use litchi_xlsx::ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
-pub use litchi_xlsx::outline_properties::{
-    WorksheetOutlineProperties, parse_worksheet_outline_properties,
-};
+pub use litchi_xlsx::outline_properties::{OutlineProperties, parse_outline_properties};
 pub use litchi_xlsx::page_margins::{
     PageMargin, WorksheetPageMargins, parse_worksheet_page_margins,
 };

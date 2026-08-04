@@ -15,14 +15,14 @@ const MAX_EVENTS: usize = 1_000_000;
 
 /// Effective grouping and outline-display policy from `sheetPr/outlinePr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WorksheetOutlineProperties {
+pub struct OutlineProperties {
     apply_styles: bool,
     summary_below: bool,
     summary_right: bool,
     show_outline_symbols: bool,
 }
 
-impl WorksheetOutlineProperties {
+impl OutlineProperties {
     pub fn apply_styles(&self) -> bool {
         self.apply_styles
     }
@@ -47,8 +47,8 @@ struct Builder {
 }
 
 impl Builder {
-    fn finish(self) -> WorksheetOutlineProperties {
-        WorksheetOutlineProperties {
+    fn finish(self) -> OutlineProperties {
+        OutlineProperties {
             apply_styles: self.apply_styles.unwrap_or(false),
             summary_below: self.summary_below.unwrap_or(true),
             summary_right: self.summary_right.unwrap_or(true),
@@ -67,7 +67,7 @@ enum Context {
 
 struct Parser {
     stack: Vec<Context>,
-    properties: Option<WorksheetOutlineProperties>,
+    properties: Option<OutlineProperties>,
     seen_sheet_properties: bool,
     seen_outline_properties: bool,
 }
@@ -75,9 +75,7 @@ struct Parser {
 /// Parse the worksheet's exact `worksheet/sheetPr/outlinePr` child path.
 // Text/CData arms keep `?`-bearing whitespace checks out of guards; guards cannot use `?`.
 #[allow(clippy::collapsible_match)]
-pub fn parse_worksheet_outline_properties(
-    xml: &[u8],
-) -> Result<Option<WorksheetOutlineProperties>> {
+pub fn parse_outline_properties(xml: &[u8]) -> Result<Option<OutlineProperties>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
@@ -415,8 +413,8 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetOutlineProperties>> {
-        parse_worksheet_outline_properties(
+    fn parse(child: &str) -> Result<Option<OutlineProperties>> {
+        parse_outline_properties(
             format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
         )
     }
@@ -446,7 +444,7 @@ mod tests {
     fn supports_strict_mce_and_exact_scoping() {
         let strict = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><sheetPr><outlinePr summaryRight="0"/></sheetPr></worksheet>"#;
         assert!(
-            !parse_worksheet_outline_properties(strict)
+            !parse_outline_properties(strict)
                 .unwrap()
                 .unwrap()
                 .summary_right()
@@ -461,7 +459,7 @@ mod tests {
             NS
         );
         assert!(
-            !parse_worksheet_outline_properties(mce.as_bytes())
+            !parse_outline_properties(mce.as_bytes())
                 .unwrap()
                 .unwrap()
                 .summary_below()
@@ -503,7 +501,7 @@ mod tests {
             format!(r#"<worksheet xmlns="{NS}"><sheetPr></worksheet>"#),
         ] {
             assert!(
-                parse_worksheet_outline_properties(xml.as_bytes()).is_err(),
+                parse_outline_properties(xml.as_bytes()).is_err(),
                 "expected rejection for {xml}"
             );
         }
@@ -516,17 +514,15 @@ mod tests {
             xml.push_str("</extension>");
         }
         xml.push_str("</worksheet>");
-        assert!(parse_worksheet_outline_properties(xml.as_bytes()).is_err());
+        assert!(parse_outline_properties(xml.as_bytes()).is_err());
     }
 
-    fn fixture(bytes: &[u8]) -> WorksheetOutlineProperties {
+    fn fixture(bytes: &[u8]) -> OutlineProperties {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .unwrap();
-        parse_worksheet_outline_properties(part.blob())
-            .unwrap()
-            .unwrap()
+        parse_outline_properties(part.blob()).unwrap().unwrap()
     }
 
     #[test]

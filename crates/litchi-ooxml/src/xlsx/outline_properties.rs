@@ -1,5 +1,3 @@
-//! Compatibility re-exports for the canonical XLSX outline-properties owner.
+//! Canonical re-exports for the XLSX outline-properties owner.
 
-pub use litchi_xlsx::outline_properties::{
-    WorksheetOutlineProperties, parse_worksheet_outline_properties,
-};
+pub use litchi_xlsx::outline_properties::{OutlineProperties, parse_outline_properties};

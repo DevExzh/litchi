@@ -73,8 +73,7 @@ pub use calculation_properties::{
 };
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
 pub use cell_watches::{
-    CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
-    parse_worksheet_cell_watches, write_worksheet_cell_watches,
+    CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };
 pub use chart_sheet::{parse_chartsheet, validate_chartsheet, write_chartsheet};
 pub use color::{ParseRgbError, Rgb};
@@ -127,7 +126,7 @@ pub use named_sheet_view::{
     store_worksheet_named_sheet_views, write_named_sheet_views,
 };
 pub use outline::{Outline, OutlineAt};
-pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
+pub use outline_properties::{OutlineProperties, parse_outline_properties};
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
 pub use page_setup::{
     Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, LexicalError, Measure, Order, Orientation,

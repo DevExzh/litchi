@@ -22,12 +22,12 @@ const MAX_COLUMN: u32 = 16_384;
 
 /// Namespace form used when serializing a cell-watches fragment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetCellWatchConformance {
+pub enum CellWatchConformance {
     Transitional,
     Strict,
 }
 
-impl WorksheetCellWatchConformance {
+impl CellWatchConformance {
     fn main_namespace(self) -> &'static str {
         match self {
             Self::Transitional => TRANSITIONAL_MAIN,
@@ -54,11 +54,11 @@ impl CellWatchReference {
 
 /// The worksheet `cellWatches` collection in document order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetCellWatches {
+pub struct CellWatches {
     references: Vec<CellWatchReference>,
 }
 
-impl WorksheetCellWatches {
+impl CellWatches {
     pub fn new(references: Vec<CellWatchReference>) -> Result<Self> {
         if references.is_empty() {
             return Err(invalid("cellWatches requires at least one cellWatch"));
@@ -92,7 +92,7 @@ enum NamespaceKind {
 }
 
 /// Parses the direct worksheet `cellWatches` child after applying shared MCE processing.
-pub fn parse_worksheet_cell_watches(xml: &[u8]) -> Result<Option<WorksheetCellWatches>> {
+pub fn parse_cell_watches(xml: &[u8]) -> Result<Option<CellWatches>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML exceeds safety limit"));
     }
@@ -247,7 +247,7 @@ pub fn parse_worksheet_cell_watches(xml: &[u8]) -> Result<Option<WorksheetCellWa
     }
     match references {
         None => Ok(None),
-        Some(references) => Ok(Some(WorksheetCellWatches::new(references)?)),
+        Some(references) => Ok(Some(CellWatches::new(references)?)),
     }
 }
 
@@ -334,9 +334,9 @@ fn parse_cell_watch_attributes(
 }
 
 /// Serializes one canonical, namespace-complete `cellWatches` fragment.
-pub fn write_worksheet_cell_watches(
-    value: &WorksheetCellWatches,
-    conformance: WorksheetCellWatchConformance,
+pub fn write_cell_watches(
+    value: &CellWatches,
+    conformance: CellWatchConformance,
 ) -> Result<String> {
     if value.references.is_empty() {
         return Err(invalid("cellWatches requires at least one cellWatch"));
@@ -441,10 +441,8 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetCellWatches>> {
-        parse_worksheet_cell_watches(
-            format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
-        )
+    fn parse(child: &str) -> Result<Option<CellWatches>> {
+        parse_cell_watches(format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes())
     }
 
     #[test]
@@ -469,9 +467,7 @@ mod tests {
             r#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main">"#,
             r#"<cellWatches><cellWatch r="B2"/></cellWatches></worksheet>"#,
         );
-        let value = parse_worksheet_cell_watches(xml.as_bytes())
-            .unwrap()
-            .unwrap();
+        let value = parse_cell_watches(xml.as_bytes()).unwrap().unwrap();
         assert_eq!(value.references()[0].as_str(), "B2");
     }
 
@@ -510,7 +506,7 @@ mod tests {
             format!(r#"<!DOCTYPE worksheet><worksheet xmlns="{NS}"/>"#),
         ] {
             assert!(
-                parse_worksheet_cell_watches(xml.as_bytes()).is_err(),
+                parse_cell_watches(xml.as_bytes()).is_err(),
                 "expected rejection for {xml}"
             );
         }
@@ -523,27 +519,25 @@ mod tests {
             xml.push_str("</extension>");
         }
         xml.push_str("</worksheet>");
-        assert!(parse_worksheet_cell_watches(xml.as_bytes()).is_err());
+        assert!(parse_cell_watches(xml.as_bytes()).is_err());
     }
 
     #[test]
     fn write_round_trips_through_the_reader() {
-        let expected = WorksheetCellWatches::new(vec![
+        let expected = CellWatches::new(vec![
             CellWatchReference::new("A1").unwrap(),
             CellWatchReference::new("$D$7").unwrap(),
         ])
         .unwrap();
         for conformance in [
-            WorksheetCellWatchConformance::Transitional,
-            WorksheetCellWatchConformance::Strict,
+            CellWatchConformance::Transitional,
+            CellWatchConformance::Strict,
         ] {
-            let fragment = write_worksheet_cell_watches(&expected, conformance).unwrap();
+            let fragment = write_cell_watches(&expected, conformance).unwrap();
             let document = format!(r#"<worksheet xmlns="{NS}">{fragment}</worksheet>"#);
-            let parsed = parse_worksheet_cell_watches(document.as_bytes())
-                .unwrap()
-                .unwrap();
+            let parsed = parse_cell_watches(document.as_bytes()).unwrap().unwrap();
             assert_eq!(parsed, expected);
         }
-        assert!(WorksheetCellWatches::new(Vec::new()).is_err());
+        assert!(CellWatches::new(Vec::new()).is_err());
     }
 }
