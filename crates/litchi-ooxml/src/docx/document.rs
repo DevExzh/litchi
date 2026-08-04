@@ -131,23 +131,23 @@ impl<'a> Document<'a> {
     /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored
     /// in this document.
     ///
-    /// Each returned [`crate::docx::smartart::DocxSmartArt`] carries the
+    /// Each returned [`crate::docx::smartart::Diagram`] carries the
     /// parsed data-model node tree, the layout/quick-style/colors part
     /// metadata, and the diagram part names. Both transitional and Strict
     /// namespace dialects are supported.
-    pub fn smart_arts(&self) -> Result<Vec<crate::docx::smartart::DocxSmartArt>> {
+    pub fn smart_arts(&self) -> Result<Vec<crate::docx::smartart::Diagram>> {
         crate::docx::smartart::load_smart_arts(self.opc, self.part.part().partname())
     }
 
     /// Load the typed, inert text-box and WordArt inventory anchored in this
     /// document.
     ///
-    /// Each returned [`crate::docx::textbox::DocxTextBox`] carries the shape
+    /// Each returned [`crate::docx::textbox::TextBox`] carries the shape
     /// identity, the `wps:bodyPr` text-body properties, the story as
     /// paragraphs with runs, and WordArt warp/styling presence flags. Both
     /// DrawingML shapes and legacy VML `w:pict` fallbacks are recognized, in
     /// both the transitional and Strict namespace dialects.
-    pub fn text_boxes(&self) -> Result<Vec<crate::docx::textbox::DocxTextBox>> {
+    pub fn text_boxes(&self) -> Result<Vec<crate::docx::textbox::TextBox>> {
         crate::docx::textbox::load_text_boxes(self.part.xml_bytes())
     }
 
@@ -429,12 +429,12 @@ impl<'a> Document<'a> {
     ///
     /// Uses a single-pass XML parser that is significantly faster than
     /// calling `paragraphs()` and `tables()` separately.
-    pub fn elements(&self) -> Result<Vec<crate::docx::DocxElement>> {
+    pub fn elements(&self) -> Result<Vec<crate::docx::Element>> {
         self.part.elements()
     }
 
     /// Return paragraphs, tables, and alternative-format anchors in document order.
-    pub fn blocks(&self) -> Result<Vec<crate::docx::DocumentBlock>> {
+    pub fn blocks(&self) -> Result<Vec<crate::docx::Block>> {
         self.part.blocks()
     }
 
@@ -2461,7 +2461,7 @@ impl<'a> Document<'a> {
     /// Returns every classic DrawingML chart anchored in the main document
     /// body together with its style, color-style, and embedded-workbook
     /// companion parts. See [`crate::docx::chart::load_chart_graph`].
-    pub fn chart_graph(&self) -> Result<crate::docx::chart::DocxChartGraph> {
+    pub fn chart_graph(&self) -> Result<crate::docx::chart::ChartGraph> {
         let main = self.opc.main_document_part()?.partname().clone();
         crate::docx::chart::load_chart_graph(self.opc, &main)
     }

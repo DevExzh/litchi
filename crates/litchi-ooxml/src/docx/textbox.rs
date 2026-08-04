@@ -175,7 +175,7 @@ impl TextBoxParagraph {
 
 /// A typed, inert text box or WordArt shape anchored in a Word document.
 #[derive(Clone, Debug)]
-pub struct DocxTextBox {
+pub struct TextBox {
     /// Drawing element ID (`wp:docPr@id` / `wps:cNvSpPr@id`), when declared.
     pub id: Option<u32>,
     /// Shape name, when declared (`wp:docPr@name`, or the VML shape `id`).
@@ -193,7 +193,7 @@ pub struct DocxTextBox {
     pub paragraphs: Vec<TextBoxParagraph>,
 }
 
-impl DocxTextBox {
+impl TextBox {
     /// Whether this shape carries WordArt styling.
     pub fn is_word_art(&self) -> bool {
         self.word_art.is_some()
@@ -248,7 +248,7 @@ impl ShapeBuilder {
         Ok(())
     }
 
-    fn finish(self) -> Option<DocxTextBox> {
+    fn finish(self) -> Option<TextBox> {
         if !self.saw_content && !self.saw_body_pr && !self.legacy_word_art {
             return None;
         }
@@ -264,7 +264,7 @@ impl ShapeBuilder {
         } else {
             None
         };
-        Some(DocxTextBox {
+        Some(TextBox {
             id: self.id,
             name: self.name,
             anchor: self.anchor,
@@ -283,7 +283,7 @@ impl ShapeBuilder {
 /// processing is applied so `mc:AlternateContent` fallbacks resolve to the
 /// representation this inventory reads. Shapes are returned in document
 /// order, with shapes nested inside another shape's story finishing first.
-pub fn load_text_boxes(xml_bytes: &[u8]) -> Result<Vec<DocxTextBox>> {
+pub fn load_text_boxes(xml_bytes: &[u8]) -> Result<Vec<TextBox>> {
     if xml_bytes.len() > MAX_DOCUMENT_XML {
         return Err(limit("document XML bytes"));
     }
@@ -294,7 +294,7 @@ pub fn load_text_boxes(xml_bytes: &[u8]) -> Result<Vec<DocxTextBox>> {
     parse_text_boxes(processed.as_ref())
 }
 
-fn parse_text_boxes(xml: &[u8]) -> Result<Vec<DocxTextBox>> {
+fn parse_text_boxes(xml: &[u8]) -> Result<Vec<TextBox>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut stack: Vec<ShapeBuilder> = Vec::new();

@@ -1,5 +1,5 @@
 use litchi_docx::alt::{Data, Import, Kind, MAX_CHUNKS, Target};
-use litchi_ooxml::docx::{DocumentBlock, Package};
+use litchi_ooxml::docx::{Block, Package};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
@@ -60,11 +60,11 @@ fn libreoffice_payloads_are_ordered_borrowed_and_opaque() {
     let document = html.document().unwrap();
     let blocks = document.blocks().unwrap();
     assert_eq!(blocks.len(), 3);
-    assert!(matches!(blocks[0], DocumentBlock::Paragraph(_)));
-    let DocumentBlock::Alt(chunk) = &blocks[1] else {
+    assert!(matches!(blocks[0], Block::Paragraph(_)));
+    let Block::Alt(chunk) = &blocks[1] else {
         panic!("missing ordered alternative-format anchor")
     };
-    assert!(matches!(blocks[2], DocumentBlock::Paragraph(_)));
+    assert!(matches!(blocks[2], Block::Paragraph(_)));
     let payload = document.resolve_alt(chunk).unwrap();
     assert_eq!(payload.kind(), Kind::Html);
     assert_eq!(payload.media_type(), "text/html");
@@ -121,11 +121,11 @@ fn markup_compatibility_selectors_and_package_indexes_share_the_active_branch() 
         assert_eq!(chunks[0].relationship().as_str(), "fallback");
         let blocks = document.blocks().unwrap();
         assert_eq!(blocks.len(), 2);
-        let DocumentBlock::Paragraph(paragraph) = &blocks[0] else {
+        let Block::Paragraph(paragraph) = &blocks[0] else {
             panic!("missing active fallback paragraph")
         };
         assert_eq!(paragraph.text().unwrap(), "active");
-        assert!(matches!(blocks[1], DocumentBlock::Alt(_)));
+        assert!(matches!(blocks[1], Block::Alt(_)));
     }
     assert_eq!(package.document_mut().unwrap().alts().len(), 1);
     assert!(package.remove_alt(1).is_err());

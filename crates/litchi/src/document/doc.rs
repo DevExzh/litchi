@@ -547,7 +547,7 @@ impl Document {
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(package, _) => {
                 use super::DocumentElement;
-                use litchi_ooxml::docx::DocxElement;
+                use litchi_ooxml::docx::Element;
                 let raw = package
                     .document()
                     .and_then(|document| document.elements())
@@ -555,10 +555,10 @@ impl Document {
                 Ok(raw
                     .into_iter()
                     .map(|el| match el {
-                        DocxElement::Paragraph(p) => {
+                        Element::Paragraph(p) => {
                             DocumentElement::Paragraph(Box::new(super::Paragraph::Docx(*p)))
                         },
-                        DocxElement::Table(t) => {
+                        Element::Table(t) => {
                             DocumentElement::Table(Box::new(super::Table::Docx(t)))
                         },
                     })

@@ -1136,7 +1136,7 @@ impl Package {
     }
 
     /// Load the bounded, inert classic-chart graph owned by the main document.
-    pub fn chart_graph(&self) -> Result<crate::docx::chart::DocxChartGraph> {
+    pub fn chart_graph(&self) -> Result<crate::docx::chart::ChartGraph> {
         let document = self.opc.main_document_part()?.partname().clone();
         crate::docx::chart::load_chart_graph(&self.opc, &document)
     }
@@ -1144,11 +1144,11 @@ impl Package {
     /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored
     /// in the main document.
     ///
-    /// Each returned [`crate::docx::smartart::DocxSmartArt`] carries the
+    /// Each returned [`crate::docx::smartart::Diagram`] carries the
     /// parsed data-model node tree, the layout/quick-style/colors part
     /// metadata, and the diagram part names. Both transitional and Strict
     /// namespace dialects are supported.
-    pub fn smart_arts(&self) -> Result<Vec<crate::docx::smartart::DocxSmartArt>> {
+    pub fn smart_arts(&self) -> Result<Vec<crate::docx::smartart::Diagram>> {
         let document = self.opc.main_document_part()?.partname().clone();
         crate::docx::smartart::load_smart_arts(&self.opc, &document)
     }
@@ -1156,17 +1156,17 @@ impl Package {
     /// Load the typed, inert text-box and WordArt inventory anchored in the
     /// main document.
     ///
-    /// Each returned [`crate::docx::textbox::DocxTextBox`] carries the shape
+    /// Each returned [`crate::docx::textbox::TextBox`] carries the shape
     /// identity, the `wps:bodyPr` text-body properties, the story as
     /// paragraphs with runs, and WordArt warp/styling presence flags. Both
     /// DrawingML shapes and legacy VML `w:pict` fallbacks are recognized, in
     /// both the transitional and Strict namespace dialects.
-    pub fn text_boxes(&self) -> Result<Vec<crate::docx::textbox::DocxTextBox>> {
+    pub fn text_boxes(&self) -> Result<Vec<crate::docx::textbox::TextBox>> {
         crate::docx::textbox::load_text_boxes(self.opc.main_document_part()?.blob())
     }
 
     /// Deterministically store an already coherent classic-chart graph.
-    pub fn store_chart_graph(&mut self, graph: &crate::docx::chart::DocxChartGraph) -> Result<()> {
+    pub fn store_chart_graph(&mut self, graph: &crate::docx::chart::ChartGraph) -> Result<()> {
         let document = self.opc.main_document_part()?.partname().clone();
         crate::docx::chart::store_chart_graph(&mut self.opc, &document, graph)
     }

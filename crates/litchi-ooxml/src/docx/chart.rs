@@ -42,12 +42,12 @@ const MAX_ATTRIBUTES: usize = 750_000;
 const MAX_ATTRIBUTE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DocxChartConformance {
+pub enum ChartConformance {
     Transitional,
     Strict,
 }
 
-impl DocxChartConformance {
+impl ChartConformance {
     fn w(self) -> &'static str {
         if self == Self::Strict { WS } else { W }
     }
@@ -77,11 +77,11 @@ impl DocxChartConformance {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DocxChartEmbeddedWorkbookContentType {
+pub enum ChartEmbeddedWorkbookContentType {
     Xlsx,
 }
 
-impl DocxChartEmbeddedWorkbookContentType {
+impl ChartEmbeddedWorkbookContentType {
     pub fn as_str(self) -> &'static str {
         WORKBOOK_CT
     }
@@ -94,7 +94,7 @@ impl DocxChartEmbeddedWorkbookContentType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocxChartCompanionResource {
+pub struct ChartCompanionResource {
     pub relationship_id: String,
     pub part_name: String,
     pub content_type: String,
@@ -102,28 +102,28 @@ pub struct DocxChartCompanionResource {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocxChartEmbeddedWorkbookResource {
+pub struct ChartEmbeddedWorkbookResource {
     pub relationship_id: String,
     pub part_name: String,
-    pub content_type: DocxChartEmbeddedWorkbookContentType,
+    pub content_type: ChartEmbeddedWorkbookContentType,
     pub data: Vec<u8>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocxChartResource {
+pub struct ChartResource {
     pub document_relationship_id: String,
     pub part_name: String,
     pub content_type: String,
     pub data: Vec<u8>,
-    pub styles: Vec<DocxChartCompanionResource>,
-    pub color_styles: Vec<DocxChartCompanionResource>,
-    pub workbook: Option<DocxChartEmbeddedWorkbookResource>,
+    pub styles: Vec<ChartCompanionResource>,
+    pub color_styles: Vec<ChartCompanionResource>,
+    pub workbook: Option<ChartEmbeddedWorkbookResource>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocxChartGraph {
-    pub conformance: DocxChartConformance,
-    pub charts: Vec<DocxChartResource>,
+pub struct ChartGraph {
+    pub conformance: ChartConformance,
+    pub charts: Vec<ChartResource>,
 }
 
 /// Fully resolved attribute triple: `(namespace, local name, unescaped value)`.
@@ -146,7 +146,7 @@ struct Limits {
 }
 
 /// Load the complete bounded classic-chart graph owned by a DOCX main document.
-pub fn load_chart_graph(package: &OpcPackage, document_name: &PackURI) -> Result<DocxChartGraph> {
+pub fn load_chart_graph(package: &OpcPackage, document_name: &PackURI) -> Result<ChartGraph> {
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
         return Err(invalid(
@@ -266,12 +266,12 @@ pub fn load_chart_graph(package: &OpcPackage, document_name: &PackURI) -> Result
                     let target = relationship_target(chart_part, child)?;
                     validate_leaf_path(&target, "/word/embeddings/", "embedded workbook")?;
                     let part = package.get_part(&target)?;
-                    let content_type = DocxChartEmbeddedWorkbookContentType::parse(
-                        part.content_type(),
-                    )
-                    .ok_or_else(|| {
-                        invalid("embedded chart workbook has invalid or macro-enabled content type")
-                    })?;
+                    let content_type = ChartEmbeddedWorkbookContentType::parse(part.content_type())
+                        .ok_or_else(|| {
+                            invalid(
+                                "embedded chart workbook has invalid or macro-enabled content type",
+                            )
+                        })?;
                     if !content_type.validates_path(target.as_str()) {
                         return Err(invalid(
                             "embedded chart workbook content type and suffix differ",
@@ -286,7 +286,7 @@ pub fn load_chart_graph(package: &OpcPackage, document_name: &PackURI) -> Result
                         MAX_WORKBOOK_BYTES,
                         "embedded workbook bytes",
                     )?;
-                    workbook = Some(DocxChartEmbeddedWorkbookResource {
+                    workbook = Some(ChartEmbeddedWorkbookResource {
                         relationship_id: child.r_id().to_owned(),
                         part_name: target.as_str().to_owned(),
                         content_type,
@@ -306,7 +306,7 @@ pub fn load_chart_graph(package: &OpcPackage, document_name: &PackURI) -> Result
         }
         styles.sort_by(|left, right| left.relationship_id.cmp(&right.relationship_id));
         color_styles.sort_by(|left, right| left.relationship_id.cmp(&right.relationship_id));
-        charts.push(DocxChartResource {
+        charts.push(ChartResource {
             document_relationship_id: reference,
             part_name: chart_name.as_str().to_owned(),
             content_type: chart_part.content_type().to_owned(),
@@ -333,7 +333,7 @@ pub fn load_chart_graph(package: &OpcPackage, document_name: &PackURI) -> Result
             "package contains orphan or unsupported-source classic chart parts",
         ));
     }
-    Ok(DocxChartGraph {
+    Ok(ChartGraph {
         conformance,
         charts,
     })
@@ -344,7 +344,7 @@ pub fn load_chart_graph(package: &OpcPackage, document_name: &PackURI) -> Result
 pub fn store_chart_graph(
     package: &mut OpcPackage,
     document_name: &PackURI,
-    graph: &DocxChartGraph,
+    graph: &ChartGraph,
 ) -> Result<()> {
     let current = load_chart_graph(package, document_name)?;
     validate_graph_value(graph)?;
@@ -458,7 +458,7 @@ fn load_companion(
     root: &str,
     label: &str,
     total: &mut usize,
-) -> Result<DocxChartCompanionResource> {
+) -> Result<ChartCompanionResource> {
     let target = relationship_target(source, relationship)?;
     validate_leaf_path(&target, "/word/charts/", label)?;
     let part = package.get_part(&target)?;
@@ -475,7 +475,7 @@ fn load_companion(
         MAX_COMPANION_XML,
         "chart companion bytes",
     )?;
-    Ok(DocxChartCompanionResource {
+    Ok(ChartCompanionResource {
         relationship_id: relationship.r_id().to_owned(),
         part_name: target.as_str().to_owned(),
         content_type: part.content_type().to_owned(),
@@ -483,7 +483,7 @@ fn load_companion(
     })
 }
 
-fn validate_graph_value(graph: &DocxChartGraph) -> Result<()> {
+fn validate_graph_value(graph: &ChartGraph) -> Result<()> {
     if graph.charts.len() > MAX_CHARTS {
         return Err(limit("chart count"));
     }
@@ -573,11 +573,8 @@ fn validate_graph_value(graph: &DocxChartGraph) -> Result<()> {
     Ok(())
 }
 
-fn document_references(xml: &[u8]) -> Result<(DocxChartConformance, Vec<String>)> {
-    for conformance in [
-        DocxChartConformance::Transitional,
-        DocxChartConformance::Strict,
-    ] {
+fn document_references(xml: &[u8]) -> Result<(ChartConformance, Vec<String>)> {
+    for conformance in [ChartConformance::Transitional, ChartConformance::Strict] {
         if let Ok(value) = scan_document_xml(xml, conformance) {
             return Ok((conformance, value));
         }
@@ -585,7 +582,7 @@ fn document_references(xml: &[u8]) -> Result<(DocxChartConformance, Vec<String>)
     Err(invalid("invalid DOCX document root or chart anchors"))
 }
 
-fn scan_document_xml(xml: &[u8], conformance: DocxChartConformance) -> Result<Vec<String>> {
+fn scan_document_xml(xml: &[u8], conformance: ChartConformance) -> Result<Vec<String>> {
     if xml.len() > MAX_DOCUMENT_XML {
         return Err(limit("document XML bytes"));
     }
@@ -677,7 +674,7 @@ fn scan_document_xml(xml: &[u8], conformance: DocxChartConformance) -> Result<Ve
     Ok(references)
 }
 
-fn scan_chart_xml(xml: &[u8], conformance: DocxChartConformance) -> Result<ChartScan> {
+fn scan_chart_xml(xml: &[u8], conformance: ChartConformance) -> Result<ChartScan> {
     if xml.len() > MAX_CHART_XML {
         return Err(limit("chart XML bytes"));
     }
@@ -754,7 +751,7 @@ fn inspect_chart_element(
     ns: &str,
     local: &str,
     attrs: &[ResolvedAttribute],
-    conformance: DocxChartConformance,
+    conformance: ChartConformance,
     depth: usize,
     scan: &mut ChartScan,
 ) -> Result<()> {
@@ -909,7 +906,7 @@ fn element_info(
     Ok((namespace, local, values))
 }
 
-fn required_rel_id(attrs: &[ResolvedAttribute], conformance: DocxChartConformance) -> Result<&str> {
+fn required_rel_id(attrs: &[ResolvedAttribute], conformance: ChartConformance) -> Result<&str> {
     let value = attr(attrs, conformance.r(), "id")
         .ok_or_else(|| invalid("chart reference lacks relationship ID"))?;
     if attrs
@@ -934,7 +931,7 @@ fn structure(limits: &mut Limits, depth: usize) -> Result<()> {
     }
     Ok(())
 }
-fn ownership(graph: &DocxChartGraph) -> BTreeSet<String> {
+fn ownership(graph: &ChartGraph) -> BTreeSet<String> {
     graph
         .charts
         .iter()
@@ -1073,7 +1070,7 @@ mod tests {
             assert_eq!(load_chart_graph(&package, &name).unwrap(), graph);
         }
     }
-    fn synthetic(conformance: DocxChartConformance) -> (OpcPackage, PackURI) {
+    fn synthetic(conformance: ChartConformance) -> (OpcPackage, PackURI) {
         let mut package = OpcPackage::new();
         let name = document();
         let mut document_part=BlobPart::new(name.clone(),DOCUMENT_CT.into(),format!("<w:document xmlns:w=\"{}\" xmlns:a=\"{}\" xmlns:c=\"{}\" xmlns:r=\"{}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><w:body><mc:AlternateContent><mc:Choice Requires=\"u\"><u:active/></mc:Choice><mc:Fallback><w:p><w:r><w:drawing><a:graphic><a:graphicData uri=\"{}\"><c:chart r:id=\"rIdChart\"/></a:graphicData></a:graphic></w:drawing></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>",conformance.w(),conformance.a(),conformance.c(),conformance.r(),conformance.c()).into_bytes());
@@ -1124,7 +1121,7 @@ mod tests {
     }
     #[test]
     fn strict_mce_graph_round_trips_without_opening_workbook() {
-        let (mut package, name) = synthetic(DocxChartConformance::Strict);
+        let (mut package, name) = synthetic(ChartConformance::Strict);
         let graph = load_chart_graph(&package, &name).unwrap();
         assert_eq!(
             graph.charts[0].workbook.as_ref().unwrap().data,
@@ -1137,20 +1134,20 @@ mod tests {
     fn rejects_external_ole_malformed_orphan_unsupported_and_caps_before_mutation() {
         let package = OpcPackage::from_bytes(LO_EXTERNAL).unwrap();
         assert!(load_chart_graph(&package, &document()).is_err());
-        let (mut package, name) = synthetic(DocxChartConformance::Transitional);
+        let (mut package, name) = synthetic(ChartConformance::Transitional);
         package
             .get_part_mut(&PackURI::new("/word/charts/chart1.xml").unwrap())
             .unwrap()
             .set_blob(format!("<c:wrong xmlns:c=\"{C}\"/>").into_bytes());
         assert!(load_chart_graph(&package, &name).is_err());
-        let (mut package, name) = synthetic(DocxChartConformance::Transitional);
+        let (mut package, name) = synthetic(ChartConformance::Transitional);
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/word/charts/orphan.xml").unwrap(),
             CHART_CT.into(),
             format!("<c:chartSpace xmlns:c=\"{C}\"><c:chart/></c:chartSpace>").into_bytes(),
         )));
         assert!(load_chart_graph(&package, &name).is_err());
-        let (mut package, name) = synthetic(DocxChartConformance::Transitional);
+        let (mut package, name) = synthetic(ChartConformance::Transitional);
         package
             .get_part_mut(&PackURI::new("/word/charts/chart1.xml").unwrap())
             .unwrap()
@@ -1162,7 +1159,7 @@ mod tests {
                 false,
             );
         assert!(load_chart_graph(&package, &name).is_err());
-        let (mut package, name) = synthetic(DocxChartConformance::Transitional);
+        let (mut package, name) = synthetic(ChartConformance::Transitional);
         let mut graph = load_chart_graph(&package, &name).unwrap();
         graph.charts[0].workbook.as_mut().unwrap().data = vec![0; MAX_WORKBOOK_BYTES + 1];
         let before = package.get_part(&name).unwrap().blob().to_vec();

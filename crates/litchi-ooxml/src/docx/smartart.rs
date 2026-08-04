@@ -46,14 +46,14 @@ const MAX_DEPTH: usize = 128;
 
 /// Namespace dialect of a DOCX SmartArt graph.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DocxDiagramConformance {
+pub enum DiagramConformance {
     /// Transitional (`schemas.openxmlformats.org`) namespaces.
     Transitional,
     /// ISO/IEC 29500 Strict (`purl.oclc.org`) namespaces.
     Strict,
 }
 
-impl DocxDiagramConformance {
+impl DiagramConformance {
     fn w(self) -> &'static str {
         if self == Self::Strict { WS } else { W }
     }
@@ -102,9 +102,9 @@ impl DocxDiagramConformance {
 
 /// A typed, inert SmartArt diagram anchored in a Word document.
 #[derive(Clone, Debug)]
-pub struct DocxSmartArt {
+pub struct Diagram {
     /// Namespace dialect of the owning document.
-    pub conformance: DocxDiagramConformance,
+    pub conformance: DiagramConformance,
     /// Relationship ID of the data-model part (`r:dm`).
     pub data_relationship_id: String,
     /// Relationship ID of the layout part (`r:lo`).
@@ -133,7 +133,7 @@ pub struct DocxSmartArt {
     pub colors: Option<DiagramDefinition>,
 }
 
-impl DocxSmartArt {
+impl Diagram {
     /// Best-effort diagram type, inferred from the data model's layout type
     /// identifier, falling back to the layout part's `uniqueId`.
     pub fn diagram_type(&self) -> DiagramType {
@@ -179,7 +179,7 @@ struct DiagramAnchor {
 /// Diagrams are returned in document order. The diagram parts are validated
 /// (relationship types, `word/diagrams/` containment, content types, size
 /// caps) and parsed as inert metadata.
-pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<Vec<DocxSmartArt>> {
+pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<Vec<Diagram>> {
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
         return Err(invalid(
@@ -291,7 +291,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             }
         }
 
-        smart_arts.push(DocxSmartArt {
+        smart_arts.push(Diagram {
             conformance,
             data_relationship_id: data_id.to_owned(),
             layout_relationship_id,
@@ -379,11 +379,8 @@ fn resolve_part(
 
 /// Scan the document body for `dgm:relIds` SmartArt anchors, detecting the
 /// namespace dialect from the document root.
-fn document_anchors(xml: &[u8]) -> Result<(DocxDiagramConformance, Vec<DiagramAnchor>)> {
-    for conformance in [
-        DocxDiagramConformance::Transitional,
-        DocxDiagramConformance::Strict,
-    ] {
+fn document_anchors(xml: &[u8]) -> Result<(DiagramConformance, Vec<DiagramAnchor>)> {
+    for conformance in [DiagramConformance::Transitional, DiagramConformance::Strict] {
         if let Ok(anchors) = scan_document_xml(xml, conformance) {
             return Ok((conformance, anchors));
         }
@@ -391,10 +388,7 @@ fn document_anchors(xml: &[u8]) -> Result<(DocxDiagramConformance, Vec<DiagramAn
     Err(invalid("invalid DOCX document root or SmartArt anchors"))
 }
 
-fn scan_document_xml(
-    xml: &[u8],
-    conformance: DocxDiagramConformance,
-) -> Result<Vec<DiagramAnchor>> {
+fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<DiagramAnchor>> {
     if xml.len() > MAX_DOCUMENT_XML {
         return Err(limit("document XML bytes"));
     }
@@ -502,7 +496,7 @@ fn scan_document_xml(
 fn rel_ids(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    conformance: DocxDiagramConformance,
+    conformance: DiagramConformance,
 ) -> Result<DiagramAnchor> {
     let mut anchor = DiagramAnchor::default();
     for item in element.attributes().with_checks(true) {
@@ -639,7 +633,7 @@ mod tests {
         PackURI::new("/word/document.xml").unwrap()
     }
 
-    fn data_xml(conformance: DocxDiagramConformance) -> String {
+    fn data_xml(conformance: DiagramConformance) -> String {
         format!(
             "<dgm:dataModel xmlns:dgm=\"{}\" xmlns:a=\"{}\">\
              <dgm:ptLst>\
@@ -657,7 +651,7 @@ mod tests {
     }
 
     /// Build a synthetic single-diagram package in the given dialect.
-    fn synthetic(conformance: DocxDiagramConformance) -> (OpcPackage, PackURI) {
+    fn synthetic(conformance: DiagramConformance) -> (OpcPackage, PackURI) {
         let mut package = OpcPackage::new();
         let name = document_name();
         let document_xml = format!(
@@ -737,10 +731,7 @@ mod tests {
 
     #[test]
     fn loads_synthetic_inventory_in_both_dialects() {
-        for conformance in [
-            DocxDiagramConformance::Transitional,
-            DocxDiagramConformance::Strict,
-        ] {
+        for conformance in [DiagramConformance::Transitional, DiagramConformance::Strict] {
             let (package, name) = synthetic(conformance);
             let smart_arts = load_smart_arts(&package, &name).unwrap();
             assert_eq!(smart_arts.len(), 1);
@@ -775,7 +766,7 @@ mod tests {
         let smart_arts = load_smart_arts(&package, &name).unwrap();
         assert_eq!(smart_arts.len(), 1);
         let smart_art = &smart_arts[0];
-        assert_eq!(smart_art.conformance, DocxDiagramConformance::Strict);
+        assert_eq!(smart_art.conformance, DiagramConformance::Strict);
         assert_eq!(smart_art.diagram_type(), DiagramType::Cycle);
         assert_eq!(smart_art.text(), "a\nb\nc");
         assert_eq!(smart_art.data.points.len(), 20);
@@ -792,18 +783,18 @@ mod tests {
 
     #[test]
     fn rejects_missing_or_mistyped_relationships() {
-        let (package, name) = synthetic(DocxDiagramConformance::Transitional);
+        let (package, name) = synthetic(DiagramConformance::Transitional);
         // Wrong content type on the data part.
         let mut package = package;
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/word/diagrams/data1.xml").unwrap(),
             ct::DML_DIAGRAM_LAYOUT.into(),
-            data_xml(DocxDiagramConformance::Transitional).into_bytes(),
+            data_xml(DiagramConformance::Transitional).into_bytes(),
         )));
         assert!(load_smart_arts(&package, &name).is_err());
 
         // Anchor references a missing relationship.
-        let (package, name) = synthetic(DocxDiagramConformance::Transitional);
+        let (package, name) = synthetic(DiagramConformance::Transitional);
         let mut package = package;
         let document = package.get_part_mut(&name).unwrap();
         document.rels_mut().remove("rIdDm");

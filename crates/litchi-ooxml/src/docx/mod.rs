@@ -97,9 +97,8 @@ pub use bibliography_writer::{
 };
 pub use bookmark::Bookmark;
 pub use chart::{
-    DocxChartCompanionResource, DocxChartConformance, DocxChartEmbeddedWorkbookContentType,
-    DocxChartEmbeddedWorkbookResource, DocxChartGraph, DocxChartResource, load_chart_graph,
-    store_chart_graph,
+    ChartCompanionResource, ChartConformance, ChartEmbeddedWorkbookContentType,
+    ChartEmbeddedWorkbookResource, ChartGraph, ChartResource, load_chart_graph, store_chart_graph,
 };
 pub use comment::Comment;
 pub use content_control::{ContentControl, Kind as ContentControlKind};
@@ -146,7 +145,7 @@ pub use settings::{
     ThemeFontLanguages, View,
 };
 pub use smart_tag::{SmartTag, SmartTagAttribute};
-pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
+pub use smartart::{Diagram, DiagramConformance, load_smart_arts};
 // Re-export the shared semantic SmartArt model for authoring.
 use litchi_docx::alt::Chunk;
 pub use litchi_drawingml::diagram::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
@@ -155,7 +154,7 @@ pub use statistics::Statistics;
 pub use styles::{Outline, Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use textbox::{
-    Columns, Coordinate32, DocxTextBox, TextBoxAnchor, TextBoxAutofit, TextBoxBodyProperties,
+    Columns, Coordinate32, TextBox, TextBoxAnchor, TextBoxAutofit, TextBoxBodyProperties,
     TextBoxInsets, TextBoxParagraph, TextBoxRun, TextDirection, TextUnderline, TextVerticalAnchor,
     TextWrap, WordArt, load_text_boxes,
 };
@@ -192,7 +191,7 @@ pub use writer::{
 /// variants. Keeping it crate-local avoids a reverse dependency from
 /// `litchi-ooxml` back to the umbrella's `document` types.
 #[derive(Debug, Clone)]
-pub enum DocxElement {
+pub enum Element {
     /// A paragraph element.
     Paragraph(Box<Paragraph>),
     /// A table element.
@@ -201,10 +200,10 @@ pub enum DocxElement {
 
 /// Ordered main-document block, including opaque alternative-format anchors.
 ///
-/// This is separate from [`DocxElement`] so existing format-agnostic callers
-/// that exhaustively match paragraphs and tables remain source-compatible.
+/// This is separate from [`Element`] because it also carries opaque
+/// alternative-format anchors.
 #[derive(Debug, Clone)]
-pub enum DocumentBlock {
+pub enum Block {
     Paragraph(Box<Paragraph>),
     Table(Box<Table>),
     Alt(Box<Chunk>),
