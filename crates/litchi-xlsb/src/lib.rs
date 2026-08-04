@@ -9,6 +9,7 @@
 
 pub mod calc;
 pub mod date_utils;
+pub mod hyperlinks;
 pub mod merged_cells;
 pub mod raw;
 

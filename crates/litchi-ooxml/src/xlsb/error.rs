@@ -19,6 +19,8 @@ pub enum XlsbError {
     Calc(litchi_xlsb::calc::Error),
     /// Typed merged-cell record error.
     MergedCell(litchi_xlsb::merged_cells::Error),
+    /// Typed hyperlink record error.
+    Hyperlink(litchi_xlsb::hyperlinks::Error),
     /// Invalid record type
     InvalidRecordType(u16),
     /// Unexpected record
@@ -91,6 +93,7 @@ impl fmt::Display for XlsbError {
             XlsbError::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
             XlsbError::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
             XlsbError::MergedCell(e) => write!(f, "XLSB merged-cell error: {e}"),
+            XlsbError::Hyperlink(e) => write!(f, "XLSB hyperlink error: {e}"),
             XlsbError::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
             XlsbError::UnexpectedRecord { expected, found } => {
                 write!(
@@ -156,6 +159,7 @@ impl std::error::Error for XlsbError {
             XlsbError::Wire(e) => Some(e),
             XlsbError::Calc(e) => Some(e),
             XlsbError::MergedCell(e) => Some(e),
+            XlsbError::Hyperlink(e) => Some(e),
             XlsbError::Allocation { source, .. } => Some(source),
             XlsbError::Drawing(e) => Some(e),
             XlsbError::Common(e) => Some(e),
@@ -194,6 +198,12 @@ impl From<litchi_xlsb::calc::Error> for XlsbError {
 impl From<litchi_xlsb::merged_cells::Error> for XlsbError {
     fn from(error: litchi_xlsb::merged_cells::Error) -> Self {
         Self::MergedCell(error)
+    }
+}
+
+impl From<litchi_xlsb::hyperlinks::Error> for XlsbError {
+    fn from(error: litchi_xlsb::hyperlinks::Error) -> Self {
+        Self::Hyperlink(error)
     }
 }
 

@@ -2425,7 +2425,7 @@ impl MutableXlsbWorksheet {
     /// Write hyperlinks
     fn write_hyperlinks<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
         for hyperlink in &self.hyperlinks {
-            let data = hyperlink.serialize();
+            let data = hyperlink.try_serialize()?;
             writer.write_record(kind::H_LINK, &data)?;
         }
         Ok(())
