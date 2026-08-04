@@ -5796,6 +5796,16 @@ error boundary remains before `wire.rs` itself can be deleted. Next, finish
 that callback extraction, then harden and extract Numbers table/sheet/formula
 values and the Pages/Keynote reader boundaries.
 
+The Numbers ingress hardening now precedes that ownership move. The table
+adapter validates bounded dimensions before loading referenced data, rejects
+duplicate or out-of-range tile keys and coordinates, requires one typed tile
+payload, and maps allocation failures and finite table/cell budgets through
+the shared structured error type. Offset decoding is sparse and single-pass
+after a no-allocation shape/count scan; it never reserves from the archive's
+untrusted `cell_count` alone. Focused malformed-input tests cover dimension,
+coordinate, duplicate, odd-buffer, sparse-sentinel, descending-offset, and
+allocation-amplification cases.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

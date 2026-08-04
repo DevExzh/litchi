@@ -29,6 +29,14 @@ pub enum LimitKind {
     Nesting,
     /// Aggregate rewrite visits or replacement work.
     RewriteWork,
+    /// Addressable table rows.
+    TableRows,
+    /// Addressable table columns.
+    TableColumns,
+    /// Addressable table cells.
+    TableCells,
+    /// Materialized sparse table cells.
+    MaterializedCells,
 }
 
 impl std::fmt::Display for LimitKind {
@@ -39,6 +47,10 @@ impl std::fmt::Display for LimitKind {
             Self::OutputBytes => "output bytes",
             Self::Nesting => "nesting depth",
             Self::RewriteWork => "rewrite work",
+            Self::TableRows => "table rows",
+            Self::TableColumns => "table columns",
+            Self::TableCells => "table cells",
+            Self::MaterializedCells => "materialized cells",
         };
         formatter.write_str(name)
     }

@@ -45,6 +45,12 @@ type CommentTable = HashMap<u32, NumbersCellComment>;
 type FormulaOwnerKey = [u32; 4];
 type FormulaCategoryKey = [u64; 2];
 
+const TILE_MESSAGE_TYPE: u32 = 6_002;
+const MAX_TABLE_ROWS: usize = 1 << 20;
+const MAX_TABLE_COLUMNS: usize = 1 << 14;
+const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
+const MAX_MATERIALIZED_CELLS: usize = 1 << 20;
+
 struct CellTables<'a> {
     strings: &'a HashMap<u32, String>,
     formulas: &'a FormulaTable,
@@ -57,6 +63,99 @@ struct CellTables<'a> {
 struct ParsedCell {
     value: CellValue,
     comment_identifier: Option<u32>,
+}
+
+#[derive(Debug)]
+struct CellBudget {
+    remaining: usize,
+}
+
+impl CellBudget {
+    fn new() -> Self {
+        Self {
+            remaining: MAX_MATERIALIZED_CELLS,
+        }
+    }
+
+    fn check(&self, requested: usize) -> Result<()> {
+        if requested > self.remaining {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::MaterializedCells,
+                observed: MAX_MATERIALIZED_CELLS
+                    .saturating_sub(self.remaining)
+                    .saturating_add(requested),
+                limit: MAX_MATERIALIZED_CELLS,
+            }));
+        }
+        Ok(())
+    }
+
+    fn consume(&mut self, materialized: usize) -> Result<()> {
+        self.check(materialized)?;
+        self.remaining -= materialized;
+        Ok(())
+    }
+}
+
+fn allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+fn checked_table_dimensions(row_count: u32, column_count: u32) -> Result<(usize, usize)> {
+    let row_count = usize::try_from(row_count).map_err(|_| {
+        Error::InvalidFormat("Numbers table row count does not fit the host usize".to_owned())
+    })?;
+    let column_count = usize::try_from(column_count).map_err(|_| {
+        Error::InvalidFormat("Numbers table column count does not fit the host usize".to_owned())
+    })?;
+
+    if row_count > MAX_TABLE_ROWS {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableRows,
+            observed: row_count,
+            limit: MAX_TABLE_ROWS,
+        }));
+    }
+    if column_count > MAX_TABLE_COLUMNS {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableColumns,
+            observed: column_count,
+            limit: MAX_TABLE_COLUMNS,
+        }));
+    }
+
+    let addressable_cells = row_count.checked_mul(column_count).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table dimensions overflow host address space: {row_count}x{column_count}"
+        ))
+    })?;
+    if addressable_cells > MAX_ADDRESSABLE_CELLS {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableCells,
+            observed: addressable_cells,
+            limit: MAX_ADDRESSABLE_CELLS,
+        }));
+    }
+
+    Ok((row_count, column_count))
+}
+
+fn validate_table_row(row: usize, row_count: usize) -> Result<()> {
+    if row >= row_count {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers tile row {row} is outside the declared table height {row_count}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_table_column(column: usize, column_count: usize) -> Result<()> {
+    if column >= column_count {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers cell column {column} is outside the declared table width {column_count}"
+        )));
+    }
+    Ok(())
 }
 
 fn validate_table_data_list_segment(
@@ -159,9 +258,13 @@ impl<'a> TableDataExtractor<'a> {
     ) -> Result<Option<NumbersTable>> {
         // Find the TableModelArchive message
         for msg in object.messages {
-            if (msg.type_ == 6000 || msg.type_ == 6001)
-                && let Ok(table_model) = tst::TableModelArchive::decode(&*msg.data)
-            {
+            if msg.type_ == 6000 || msg.type_ == 6001 {
+                let table_model = tst::TableModelArchive::decode(&*msg.data).map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "Numbers table-model message {} is malformed: {error}",
+                        msg.type_
+                    ))
+                })?;
                 return self.parse_table_model(table_model).map(Some);
             }
         }
@@ -171,11 +274,10 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Parse a TableModelArchive protobuf message
     fn parse_table_model(&self, table_model: tst::TableModelArchive) -> Result<NumbersTable> {
-        let mut table = NumbersTable::with_dimensions(
-            table_model.table_name.clone(),
-            table_model.number_of_rows as usize,
-            table_model.number_of_columns as usize,
-        );
+        let (row_count, column_count) =
+            checked_table_dimensions(table_model.number_of_rows, table_model.number_of_columns)?;
+        let mut table =
+            NumbersTable::with_dimensions(table_model.table_name.clone(), row_count, column_count);
 
         // Extract string table for cell text values
         // string_table is a required field, not Optional
@@ -440,21 +542,55 @@ impl<'a> TableDataExtractor<'a> {
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
-        let tile_size = tile_storage.tile_size.unwrap_or(256);
+        let tile_size = usize::try_from(tile_storage.tile_size.unwrap_or(256)).map_err(|_| {
+            Error::InvalidFormat("Numbers tile size does not fit the host usize".to_owned())
+        })?;
         if tile_size == 0 {
             return Err(Error::InvalidFormat(
                 "Numbers table declares a zero tile size".to_owned(),
             ));
         }
+        let tile_count = if table.row_count() == 0 {
+            0
+        } else {
+            (table.row_count() - 1) / tile_size + 1
+        };
+        let mut seen_tile_ids = HashSet::new();
+        seen_tile_ids
+            .try_reserve(tile_storage.tiles.len())
+            .map_err(|_| allocation_error("Numbers tile keys", tile_storage.tiles.len()))?;
+        let mut budget = CellBudget::new();
         // Resolve each tile reference and parse its contents
         for tile_ref in &tile_storage.tiles {
-            let row_origin = tile_ref
-                .tileid
+            let tile_key = usize::try_from(tile_ref.tileid).map_err(|_| {
+                Error::InvalidFormat("Numbers tile key does not fit the host usize".to_owned())
+            })?;
+            if tile_key >= tile_count {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers tile key {tile_key} is outside the declared table height {}",
+                    table.row_count()
+                )));
+            }
+            if !seen_tile_ids.insert(tile_ref.tileid) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers table repeats tile key {tile_key}"
+                )));
+            }
+            let row_origin = tile_key
                 .checked_mul(tile_size)
                 .ok_or_else(|| Error::ParseError("Numbers tile row origin overflow".to_owned()))?;
             // tile is a required field, not Optional
             let tile_reference = &tile_ref.tile;
-            self.parse_tile(tile_reference.identifier, row_origin, cell_tables, table)?;
+            self.parse_tile(
+                tile_reference.identifier,
+                row_origin,
+                tile_size,
+                table.row_count(),
+                table.column_count(),
+                &mut budget,
+                cell_tables,
+                table,
+            )?;
         }
 
         Ok(())
@@ -464,17 +600,54 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_tile(
         &self,
         tile_id: u64,
-        row_origin: u32,
+        row_origin: usize,
+        tile_size: usize,
+        row_count: usize,
+        column_count: usize,
+        budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
-        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, tile_id)? {
-            for msg in resolved.messages {
-                // Tile messages are typically in the TST namespace
-                if let Ok(tile) = tst::Tile::decode(&*msg.data) {
-                    self.parse_tile_rows(&tile, row_origin, cell_tables, table)?;
-                }
+        let resolved = self
+            .object_index
+            .resolve_ref_id(self.bundle, tile_id)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers tile object {tile_id} referenced by table is missing"
+                ))
+            })?;
+        let mut decoded = false;
+        for msg in resolved.messages {
+            if msg.type_ != TILE_MESSAGE_TYPE {
+                continue;
             }
+            if decoded {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers tile object {tile_id} contains multiple tile payloads"
+                )));
+            }
+            let tile = tst::Tile::decode(&*msg.data).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers tile object {tile_id} has a malformed tile payload: {error}"
+                ))
+            })?;
+            self.parse_tile_rows(
+                &tile,
+                row_origin,
+                tile_size,
+                row_count,
+                column_count,
+                budget,
+                cell_tables,
+                table,
+            )?;
+            decoded = true;
+        }
+
+        if !decoded {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers tile object {tile_id} has no tile payload"
+            )));
         }
 
         Ok(())
@@ -484,12 +657,25 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_tile_rows(
         &self,
         tile: &tst::Tile,
-        row_origin: u32,
+        row_origin: usize,
+        tile_size: usize,
+        row_count: usize,
+        column_count: usize,
+        budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
         for row_info in &tile.row_infos {
-            self.parse_tile_row(row_info, row_origin, cell_tables, table)?;
+            self.parse_tile_row(
+                row_info,
+                row_origin,
+                tile_size,
+                row_count,
+                column_count,
+                budget,
+                cell_tables,
+                table,
+            )?;
         }
 
         Ok(())
@@ -499,14 +685,27 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_tile_row(
         &self,
         row_info: &tst::TileRowInfo,
-        row_origin: u32,
+        row_origin: usize,
+        tile_size: usize,
+        row_count: usize,
+        column_count: usize,
+        budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
+        let tile_row_index = usize::try_from(row_info.tile_row_index).map_err(|_| {
+            Error::InvalidFormat("Numbers tile row index does not fit the host usize".to_owned())
+        })?;
+        if tile_row_index >= tile_size {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers tile row {} is outside tile size {tile_size}",
+                row_info.tile_row_index
+            )));
+        }
         let row_index = row_origin
-            .checked_add(row_info.tile_row_index)
-            .map(|row| row as usize)
+            .checked_add(tile_row_index)
             .ok_or_else(|| Error::ParseError("Numbers tile row index overflow".to_owned()))?;
+        validate_table_row(row_index, row_count)?;
 
         // The cell_storage_buffer contains serialized Cell messages
         // The cell_offsets buffer contains the byte offsets for each cell
@@ -522,14 +721,21 @@ impl<'a> TableDataExtractor<'a> {
             ),
         };
 
+        let expected_cells = usize::try_from(row_info.cell_count).map_err(|_| {
+            Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
+        })?;
+        budget.check(expected_cells)?;
         let cells = Self::parse_cell_offsets(
             cell_offsets,
             cell_storage.len(),
             row_info.has_wide_offsets.unwrap_or(false),
-            row_info.cell_count as usize,
+            expected_cells,
+            column_count,
         )?;
+        budget.consume(cells.len())?;
 
         for (column_index, range) in cells {
+            validate_table_column(column_index, column_count)?;
             let parsed = Self::parse_cell_storage(
                 &cell_storage[range],
                 cell_tables,
@@ -559,6 +765,7 @@ impl<'a> TableDataExtractor<'a> {
         storage_length: usize,
         wide_offsets: bool,
         expected_cells: usize,
+        column_count: usize,
     ) -> Result<Vec<(usize, std::ops::Range<usize>)>> {
         if !offsets_buffer.len().is_multiple_of(2) {
             return Err(Error::ParseError(
@@ -566,8 +773,34 @@ impl<'a> TableDataExtractor<'a> {
             ));
         }
 
+        let slot_count = offsets_buffer.len() / 2;
+        if slot_count > column_count {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers row has {slot_count} offset slots but table width is {column_count}"
+            )));
+        }
+        if expected_cells > slot_count {
+            return Err(Error::ParseError(format!(
+                "Numbers row declares {expected_cells} cells but has only {slot_count} offset slots"
+            )));
+        }
+
+        let present_cells = offsets_buffer
+            .chunks_exact(2)
+            .filter(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX)
+            .count();
+        if present_cells != expected_cells {
+            return Err(Error::ParseError(format!(
+                "Numbers row declares {expected_cells} cells but has {present_cells} offsets"
+            )));
+        }
+
         let width = if wide_offsets { 4usize } else { 1usize };
-        let mut offsets = Vec::with_capacity(expected_cells);
+        let mut cells = Vec::new();
+        cells
+            .try_reserve_exact(expected_cells)
+            .map_err(|_| allocation_error("Numbers cell ranges", expected_cells))?;
+        let mut previous = None;
         for (column, bytes) in offsets_buffer.chunks_exact(2).enumerate() {
             let raw_offset = u16::from_le_bytes([bytes[0], bytes[1]]);
             if raw_offset == u16::MAX {
@@ -581,27 +814,23 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers cell offset {offset} exceeds storage length {storage_length}"
                 )));
             }
-            offsets.push((column, offset));
+            if let Some((previous_column, previous_offset)) = previous {
+                if offset <= previous_offset {
+                    return Err(Error::ParseError(format!(
+                        "Numbers cell offsets are not strictly increasing: {previous_offset} then {offset}"
+                    )));
+                }
+                cells.push((previous_column, previous_offset..offset));
+            }
+            previous = Some((column, offset));
         }
-
-        if offsets.len() != expected_cells {
-            return Err(Error::ParseError(format!(
-                "Numbers row declares {expected_cells} cells but has {} offsets",
-                offsets.len()
-            )));
-        }
-
-        let mut cells = Vec::with_capacity(offsets.len());
-        for (index, &(column, start)) in offsets.iter().enumerate() {
-            let end = offsets
-                .get(index + 1)
-                .map_or(storage_length, |(_, offset)| *offset);
-            if end <= start {
+        if let Some((column, start)) = previous {
+            if storage_length <= start {
                 return Err(Error::ParseError(format!(
-                    "Numbers cell offsets are not strictly increasing: {start} then {end}"
+                    "Numbers cell offset range ends at {storage_length} after {start}"
                 )));
             }
-            cells.push((column, start..end));
+            cells.push((column, start..storage_length));
         }
         Ok(cells)
     }
@@ -1912,8 +2141,77 @@ mod tests {
             0x30, 0x00, // column 3 starts at 48
             0xff, 0xff,
         ];
-        let cells = TableDataExtractor::parse_cell_offsets(&offsets, 72, false, 3).unwrap();
+        let cells = TableDataExtractor::parse_cell_offsets(&offsets, 72, false, 3, 5).unwrap();
         assert_eq!(cells, vec![(1, 0..24), (2, 24..48), (3, 48..72)]);
+    }
+
+    #[test]
+    fn table_dimensions_are_bounded_before_archive_references_are_loaded() {
+        assert_eq!(checked_table_dimensions(0, 0).unwrap(), (0, 0));
+        assert_eq!(checked_table_dimensions(3, 5).unwrap(), (3, 5));
+
+        let error = checked_table_dimensions((MAX_TABLE_ROWS + 1) as u32, 1).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::TableRows,
+                ..
+            })
+        ));
+
+        let error = checked_table_dimensions(1, (MAX_TABLE_COLUMNS + 1) as u32).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::TableColumns,
+                ..
+            })
+        ));
+
+        let error = checked_table_dimensions(1_025, MAX_TABLE_COLUMNS as u32).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::TableCells,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn table_coordinates_are_checked_against_declared_dimensions() {
+        validate_table_row(2, 3).unwrap();
+        validate_table_column(4, 5).unwrap();
+        assert!(validate_table_row(3, 3).is_err());
+        assert!(validate_table_column(5, 5).is_err());
+    }
+
+    #[test]
+    fn cell_count_is_validated_before_offset_reservation() {
+        let error =
+            TableDataExtractor::parse_cell_offsets(&[], 0, false, usize::MAX, 0).unwrap_err();
+        assert!(matches!(error, Error::ParseError(message) if message.contains("offset slots")));
+
+        let offsets = [0, 0, 0xff, 0xff];
+        let error = TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1).unwrap_err();
+        assert!(matches!(error, Error::InvalidFormat(message) if message.contains("offset slots")));
+    }
+
+    #[test]
+    fn malformed_and_sparse_cell_offsets_are_handled_strictly() {
+        let error = TableDataExtractor::parse_cell_offsets(&[0, 0, 1], 2, false, 1, 2).unwrap_err();
+        assert!(matches!(error, Error::ParseError(message) if message.contains("odd")));
+
+        let descending = [0, 0, 2, 0, 1, 0];
+        let error =
+            TableDataExtractor::parse_cell_offsets(&descending, 3, false, 3, 3).unwrap_err();
+        assert!(
+            matches!(error, Error::ParseError(message) if message.contains("strictly increasing"))
+        );
+
+        let sparse = [0xff, 0xff, 0, 0, 2, 0, 0xff, 0xff];
+        let cells = TableDataExtractor::parse_cell_offsets(&sparse, 3, false, 2, 4).unwrap();
+        assert_eq!(cells, vec![(1, 0..2), (2, 2..3)]);
     }
 
     #[test]

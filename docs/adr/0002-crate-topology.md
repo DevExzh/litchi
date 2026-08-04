@@ -120,6 +120,14 @@ boundary. This is an ownership move, not a compatibility surface. The next
 Numbers slice remains the table/sheet/formula model, while the wire owner can
 later add borrowed decoding and compact field storage without reopening the
 archive boundary.
+Before that semantic move, the IWA adapter enforces a finite Numbers ingress
+profile: table rows, columns, addressable cells, and materialized sparse cells
+are bounded; tile keys and local/global coordinates are checked against those
+dimensions; and a tile reference must resolve to exactly one typed `6002`
+payload. Sparse offset ranges are decoded into one fallibly reserved vector,
+with count, slot, storage, and monotonicity checks performed before allocation.
+These limits belong temporarily to the adapter and will move with the table
+owner; they are not a dense-grid compatibility promise.
 
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
