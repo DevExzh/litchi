@@ -2,7 +2,7 @@
 use crate::docx::bookmark::Bookmark;
 use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
-use crate::docx::custom_xml::Part;
+use crate::docx::custom_xml::Part as CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
@@ -37,7 +37,7 @@ use crate::docx::theme::Theme;
 use crate::docx::variables::DocumentVariables;
 use crate::docx::writer::Watermark;
 use crate::error::{OoxmlError, Result};
-use litchi_docx::alt::{Chunk, Part as AltPart, Target, is_relationship};
+use litchi_docx::alt::{Chunk, Part, Target, is_relationship};
 use litchi_docx::numbering::{Collection, Suffix};
 use litchi_docx::web;
 use litchi_opc::OpcPackage;
@@ -451,7 +451,7 @@ impl<'a> Document<'a> {
     ///
     /// This validates the relationship type and internal target but never parses,
     /// imports, executes, or fetches the foreign content.
-    pub fn resolve_alt<'b>(&'b self, chunk: &Chunk) -> Result<AltPart<'b>> {
+    pub fn resolve_alt<'b>(&'b self, chunk: &Chunk) -> Result<Part<'b>> {
         let relationship = self
             .part
             .part()
@@ -481,7 +481,7 @@ impl<'a> Document<'a> {
         let part = self.opc.get_part(&target).map_err(|error| {
             OoxmlError::PartNotFound(format!("altChunk target '{}': {error}", target.as_str()))
         })?;
-        Ok(AltPart::new(part))
+        Ok(Part::new(part))
     }
 
     /// Resolve an alternative-format target without fetching or interpreting it.
@@ -2598,7 +2598,7 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn custom_xml(&self) -> Result<Vec<Part>> {
+    pub fn custom_xml(&self) -> Result<Vec<CustomXmlPart>> {
         let mut custom_parts = Vec::new();
 
         // Custom XML parts are stored as relationships from the main document part
@@ -2611,7 +2611,7 @@ impl<'a> Document<'a> {
                 let target = rel.target_partname()?;
                 let part = self.opc.get_part(&target)?;
                 let id = rel.r_id().to_string();
-                let custom_xml = Part::from_part(part, id)?;
+                let custom_xml = CustomXmlPart::from_part(part, id)?;
                 custom_parts.push(custom_xml);
             }
         }
