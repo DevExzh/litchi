@@ -1045,7 +1045,7 @@ mod tests {
                 let id = entry.id().get();
                 assert!(id > previous_id);
                 assert_eq!(object.archive_info.identifier, Some(id));
-                Ok((count + 1, id))
+                Ok::<(usize, u64), Error>((count + 1, id))
             })
             .unwrap();
 
