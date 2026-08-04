@@ -80,7 +80,7 @@ enum ShapeContainerScope {
 }
 
 #[derive(Clone, Copy)]
-enum OdpElement {
+enum Element {
     Page,
     Notes,
     SheetShapes,
@@ -271,87 +271,87 @@ impl Parser {
         element_depth.saturating_sub(1)
     }
 
-    fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> OdpElement {
+    fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Element {
         if Self::is_namespace(namespace, ANIMATION_NAMESPACE_BYTES) {
             AnimationKind::from_local_name(local_name)
-                .map(OdpElement::Animation)
-                .unwrap_or(OdpElement::UnknownAnimation)
+                .map(Element::Animation)
+                .unwrap_or(Element::UnknownAnimation)
         } else if Self::is_namespace(namespace, DRAW_NAMESPACE) {
             match local_name {
-                b"page" => OdpElement::Page,
-                b"frame" => OdpElement::Shape(ShapeElement::Frame),
-                b"rect" => OdpElement::Shape(ShapeElement::Rect),
-                b"ellipse" => OdpElement::Shape(ShapeElement::Ellipse),
-                b"line" => OdpElement::Shape(ShapeElement::Line),
-                b"custom-shape" => OdpElement::Shape(ShapeElement::CustomShape),
-                b"circle" => OdpElement::Shape(ShapeElement::Circle),
-                b"path" => OdpElement::Shape(ShapeElement::Path),
-                b"polygon" => OdpElement::Shape(ShapeElement::Polygon),
-                b"polyline" => OdpElement::Shape(ShapeElement::Polyline),
-                b"regular-polygon" => OdpElement::Shape(ShapeElement::RegularPolygon),
-                b"page-thumbnail" => OdpElement::Shape(ShapeElement::PageThumbnail),
-                b"measure" => OdpElement::Shape(ShapeElement::Measure),
-                b"caption" => OdpElement::Shape(ShapeElement::Caption),
-                b"connector" => OdpElement::Shape(ShapeElement::Connector),
-                b"control" => OdpElement::Shape(ShapeElement::Control),
-                b"g" => OdpElement::Shape(ShapeElement::Group),
-                b"image" => OdpElement::Image,
-                b"object" | b"object-ole" => OdpElement::Object,
-                b"plugin" => OdpElement::Plugin,
-                b"param" => OdpElement::PluginParameter,
-                b"a" => OdpElement::DrawingHyperlink,
-                b"enhanced-geometry" => OdpElement::EnhancedGeometry,
-                b"equation" => OdpElement::EnhancedEquation,
-                b"handle" => OdpElement::EnhancedHandle,
-                _ => OdpElement::Other,
+                b"page" => Element::Page,
+                b"frame" => Element::Shape(ShapeElement::Frame),
+                b"rect" => Element::Shape(ShapeElement::Rect),
+                b"ellipse" => Element::Shape(ShapeElement::Ellipse),
+                b"line" => Element::Shape(ShapeElement::Line),
+                b"custom-shape" => Element::Shape(ShapeElement::CustomShape),
+                b"circle" => Element::Shape(ShapeElement::Circle),
+                b"path" => Element::Shape(ShapeElement::Path),
+                b"polygon" => Element::Shape(ShapeElement::Polygon),
+                b"polyline" => Element::Shape(ShapeElement::Polyline),
+                b"regular-polygon" => Element::Shape(ShapeElement::RegularPolygon),
+                b"page-thumbnail" => Element::Shape(ShapeElement::PageThumbnail),
+                b"measure" => Element::Shape(ShapeElement::Measure),
+                b"caption" => Element::Shape(ShapeElement::Caption),
+                b"connector" => Element::Shape(ShapeElement::Connector),
+                b"control" => Element::Shape(ShapeElement::Control),
+                b"g" => Element::Shape(ShapeElement::Group),
+                b"image" => Element::Image,
+                b"object" | b"object-ole" => Element::Object,
+                b"plugin" => Element::Plugin,
+                b"param" => Element::PluginParameter,
+                b"a" => Element::DrawingHyperlink,
+                b"enhanced-geometry" => Element::EnhancedGeometry,
+                b"equation" => Element::EnhancedEquation,
+                b"handle" => Element::EnhancedHandle,
+                _ => Element::Other,
             }
         } else if Self::is_namespace(namespace, DR3D_NAMESPACE) {
             match local_name {
-                b"scene" => OdpElement::Shape(ShapeElement::ThreeDimensionalScene),
-                b"light" => OdpElement::Shape(ShapeElement::ThreeDimensionalLight),
-                b"cube" => OdpElement::Shape(ShapeElement::ThreeDimensionalCube),
-                b"sphere" => OdpElement::Shape(ShapeElement::ThreeDimensionalSphere),
-                b"extrude" => OdpElement::Shape(ShapeElement::ThreeDimensionalExtrude),
-                b"rotate" => OdpElement::Shape(ShapeElement::ThreeDimensionalRotate),
-                _ => OdpElement::Other,
+                b"scene" => Element::Shape(ShapeElement::ThreeDimensionalScene),
+                b"light" => Element::Shape(ShapeElement::ThreeDimensionalLight),
+                b"cube" => Element::Shape(ShapeElement::ThreeDimensionalCube),
+                b"sphere" => Element::Shape(ShapeElement::ThreeDimensionalSphere),
+                b"extrude" => Element::Shape(ShapeElement::ThreeDimensionalExtrude),
+                b"rotate" => Element::Shape(ShapeElement::ThreeDimensionalRotate),
+                _ => Element::Other,
             }
         } else if Self::is_namespace(namespace, OFFICE_NAMESPACE) {
             match local_name {
-                b"event-listeners" => OdpElement::EventListeners,
-                b"spreadsheet" => OdpElement::SpreadsheetRoot,
-                _ => OdpElement::Other,
+                b"event-listeners" => Element::EventListeners,
+                b"spreadsheet" => Element::SpreadsheetRoot,
+                _ => Element::Other,
             }
         } else if Self::is_namespace(namespace, PRESENTATION_NAMESPACE) {
             if local_name == b"notes" {
-                OdpElement::Notes
+                Element::Notes
             } else if local_name == b"event-listener" {
-                OdpElement::EventListener
+                Element::EventListener
             } else if local_name == b"sound" {
-                OdpElement::Sound
+                Element::Sound
             } else {
                 LegacyAnimationKind::from_local_name(local_name)
-                    .map(OdpElement::LegacyAnimation)
-                    .unwrap_or(OdpElement::Other)
+                    .map(Element::LegacyAnimation)
+                    .unwrap_or(Element::Other)
             }
         } else if Self::is_namespace(namespace, SCRIPT_NAMESPACE) && local_name == b"event-listener"
         {
-            OdpElement::ScriptEventListener
+            Element::ScriptEventListener
         } else if Self::is_namespace(namespace, TABLE_NAMESPACE) {
             match local_name {
-                b"table" => OdpElement::Table,
-                b"shapes" => OdpElement::SheetShapes,
-                _ => OdpElement::Other,
+                b"table" => Element::Table,
+                b"shapes" => Element::SheetShapes,
+                _ => Element::Other,
             }
         } else if Self::is_namespace(namespace, TEXT_NAMESPACE) {
             match local_name {
-                b"p" | b"h" => OdpElement::TextParagraph,
-                b"s" => OdpElement::TextSpace,
-                b"tab" => OdpElement::TextTab,
-                b"line-break" => OdpElement::TextLineBreak,
-                _ => OdpElement::Other,
+                b"p" | b"h" => Element::TextParagraph,
+                b"s" => Element::TextSpace,
+                b"tab" => Element::TextTab,
+                b"line-break" => Element::TextLineBreak,
+                _ => Element::Other,
             }
         } else {
-            OdpElement::Other
+            Element::Other
         }
     }
 
@@ -419,7 +419,7 @@ impl Parser {
 
     fn validate_three_dimensional_child_element(
         parent: Option<&ShapeBuilder>,
-        child: OdpElement,
+        child: Element,
     ) -> Result<()> {
         let Some(parent_kind) = parent.and_then(|builder| builder.drawing_kind) else {
             return Ok(());
@@ -433,10 +433,10 @@ impl Parser {
             ));
         }
         match child {
-            OdpElement::Shape(shape) if Self::drawing_kind(shape).is_three_dimensional() => Ok(()),
+            Element::Shape(shape) if Self::drawing_kind(shape).is_three_dimensional() => Ok(()),
             // `svg:title`, `svg:desc`, `draw:glue-point`, and foreign
             // extension elements are intentionally handled as opaque content.
-            OdpElement::Other => Ok(()),
+            Element::Other => Ok(()),
             _ => Err(Error::InvalidFormat(
                 "dr3d:scene can only contain 3D content".to_string(),
             )),
@@ -1486,13 +1486,13 @@ impl Parser {
     fn push_text_control(
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,
-        element_type: OdpElement,
+        element_type: Element,
         paragraph: &mut ParagraphText,
     ) -> Result<()> {
         match element_type {
-            OdpElement::TextLineBreak => paragraph.push_explicit('\n', 1),
-            OdpElement::TextTab => paragraph.push_explicit('\t', 1),
-            OdpElement::TextSpace => {
+            Element::TextLineBreak => paragraph.push_explicit('\n', 1),
+            Element::TextTab => paragraph.push_explicit('\t', 1),
+            Element::TextSpace => {
                 let count = Self::get_attr(reader, element, TEXT_NAMESPACE, b"c")?
                     .map(|value| {
                         value.parse::<usize>().map_err(|_| {
@@ -1875,13 +1875,13 @@ impl Parser {
                             "draw:param cannot contain child elements".to_string(),
                         ));
                     }
-                    if in_media_plugin && !matches!(element_type, OdpElement::PluginParameter) {
+                    if in_media_plugin && !matches!(element_type, Element::PluginParameter) {
                         return Err(Error::InvalidFormat(
                             "draw:plugin can only contain draw:param elements".to_string(),
                         ));
                     }
                     match element_type {
-                        OdpElement::Page if !sheet_scope => {
+                        Element::Page if !sheet_scope => {
                             if in_slide {
                                 slides.push(Slide {
                                     title: current_slide_title.take(),
@@ -1909,8 +1909,8 @@ impl Parser {
                             current_transition = (!transition.is_empty()).then_some(transition);
                             in_slide = true;
                         },
-                        OdpElement::Notes if in_slide => in_notes = true,
-                        OdpElement::EnhancedGeometry if !shape_stack.is_empty() => {
+                        Element::Notes if in_slide => in_notes = true,
+                        Element::EnhancedGeometry if !shape_stack.is_empty() => {
                             let builder = shape_stack.last().expect("shape checked above");
                             if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
                                 return Err(Error::InvalidFormat(
@@ -1930,16 +1930,16 @@ impl Parser {
                                 .expect("shape checked above")
                                 .enhanced_geometry = Some(geometry);
                         },
-                        OdpElement::EnhancedGeometry
-                        | OdpElement::EnhancedEquation
-                        | OdpElement::EnhancedHandle
+                        Element::EnhancedGeometry
+                        | Element::EnhancedEquation
+                        | Element::EnhancedHandle
                             if in_slide =>
                         {
                             return Err(Error::InvalidFormat(
                                 "misplaced custom-shape enhanced geometry".to_string(),
                             ));
                         },
-                        OdpElement::LegacyAnimation(kind)
+                        Element::LegacyAnimation(kind)
                             if in_slide
                                 && !in_notes
                                 && shape_stack.is_empty()
@@ -1968,7 +1968,7 @@ impl Parser {
                             validate_legacy_animation_root(&root)?;
                             current_legacy_animation = Some(root);
                         },
-                        OdpElement::Plugin if !shape_stack.is_empty() => {
+                        Element::Plugin if !shape_stack.is_empty() => {
                             let builder = shape_stack.last_mut().expect("shape checked above");
                             if !builder.is_frame {
                                 return Err(Error::InvalidFormat(
@@ -1985,12 +1985,12 @@ impl Parser {
                             builder.media = Some(Self::media_reference(&reader, element)?);
                             in_media_plugin = true;
                         },
-                        OdpElement::Plugin if in_slide => {
+                        Element::Plugin if in_slide => {
                             return Err(Error::InvalidFormat(
                                 "draw:plugin must be contained by a drawing shape".to_string(),
                             ));
                         },
-                        OdpElement::PluginParameter
+                        Element::PluginParameter
                             if in_media_plugin
                                 && !in_media_parameter
                                 && !shape_stack.is_empty() =>
@@ -2002,19 +2002,19 @@ impl Parser {
                                 .add_parameter(Self::media_parameter(&reader, element)?)?;
                             in_media_parameter = true;
                         },
-                        OdpElement::DrawingHyperlink
+                        Element::DrawingHyperlink
                             if in_slide && !in_notes && current_hyperlink.is_none() =>
                         {
                             current_hyperlink = Some(Self::drawing_hyperlink(&reader, element)?);
                             hyperlink_parent_depth = Some(shape_stack.len());
                             hyperlink_shape_seen = false;
                         },
-                        OdpElement::DrawingHyperlink if in_slide => {
+                        Element::DrawingHyperlink if in_slide => {
                             return Err(Error::InvalidFormat(
                                 "nested or misplaced draw:a presentation hyperlink".to_string(),
                             ));
                         },
-                        OdpElement::EventListeners if !shape_stack.is_empty() => {
+                        Element::EventListeners if !shape_stack.is_empty() => {
                             let builder = shape_stack.last_mut().expect("shape checked above");
                             if builder
                                 .drawing_kind
@@ -2035,10 +2035,10 @@ impl Parser {
                             element_depth = Self::rewind_consumed_subtree(element_depth);
                             builder.event_listeners_seen = true;
                         },
-                        OdpElement::EventListeners
-                        | OdpElement::EventListener
-                        | OdpElement::ScriptEventListener
-                        | OdpElement::Sound
+                        Element::EventListeners
+                        | Element::EventListener
+                        | Element::ScriptEventListener
+                        | Element::Sound
                             if in_slide =>
                         {
                             return Err(Error::InvalidFormat(
@@ -2056,7 +2056,7 @@ impl Parser {
                                 "draw:plugin can only contain draw:param elements".to_string(),
                             ));
                         },
-                        OdpElement::TextParagraph if in_slide => {
+                        Element::TextParagraph if in_slide => {
                             if current_paragraph.is_some() {
                                 return Err(Error::InvalidFormat(
                                     "nested ODP text paragraphs are not supported".to_string(),
@@ -2064,7 +2064,7 @@ impl Parser {
                             }
                             current_paragraph = Some(ParagraphText::default());
                         },
-                        OdpElement::TextSpace | OdpElement::TextTab | OdpElement::TextLineBreak
+                        Element::TextSpace | Element::TextTab | Element::TextLineBreak
                             if current_paragraph.is_some() =>
                         {
                             Self::push_text_control(
@@ -2075,13 +2075,13 @@ impl Parser {
                             )?;
                         },
                         _ if in_notes => {},
-                        OdpElement::UnknownAnimation if in_slide => {
+                        Element::UnknownAnimation if in_slide => {
                             return Err(Error::InvalidFormat(format!(
                                 "unknown ODF animation element '{}'",
                                 String::from_utf8_lossy(element.local_name().as_ref()),
                             )));
                         },
-                        OdpElement::Animation(kind)
+                        Element::Animation(kind)
                             if in_slide
                                 && shape_stack.is_empty()
                                 && current_paragraph.is_none() =>
@@ -2100,10 +2100,10 @@ impl Parser {
                             )?);
                             element_depth = Self::rewind_consumed_subtree(element_depth);
                         },
-                        OdpElement::SpreadsheetRoot if sheet_scope => {
+                        Element::SpreadsheetRoot if sheet_scope => {
                             spreadsheet_depth = Some(element_depth);
                         },
-                        OdpElement::Table
+                        Element::Table
                             if sheet_scope
                                 && shape_stack.is_empty()
                                 && spreadsheet_depth
@@ -2112,7 +2112,7 @@ impl Parser {
                             sheet_table_depth = Some(element_depth);
                             sheet_table_has_shapes = false;
                         },
-                        OdpElement::SheetShapes
+                        Element::SheetShapes
                             if sheet_scope
                                 && sheet_table_depth
                                     .is_some_and(|depth| element_depth == depth + 1) =>
@@ -2127,7 +2127,7 @@ impl Parser {
                             sheet_shapes_depth = Some(element_depth);
                             in_slide = true;
                         },
-                        OdpElement::Shape(shape_element) => {
+                        Element::Shape(shape_element) => {
                             let drawing_kind = Self::drawing_kind(shape_element);
                             shape_node_count =
                                 shape_node_count.checked_add(1).ok_or_else(|| {
@@ -2190,19 +2190,19 @@ impl Parser {
                                 shape_stack.push(builder);
                             }
                         },
-                        OdpElement::Image if !shape_stack.is_empty() => {
+                        Element::Image if !shape_stack.is_empty() => {
                             let builder = shape_stack.last_mut().expect("shape checked above");
                             builder.shape_type = ShapeType::Picture;
                             builder.image_href =
                                 Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
                         },
-                        OdpElement::Table if !shape_stack.is_empty() => {
+                        Element::Table if !shape_stack.is_empty() => {
                             shape_stack
                                 .last_mut()
                                 .expect("shape checked above")
                                 .shape_type = ShapeType::Table;
                         },
-                        OdpElement::Object if !shape_stack.is_empty() => {
+                        Element::Object if !shape_stack.is_empty() => {
                             shape_stack
                                 .last_mut()
                                 .expect("shape checked above")
@@ -2307,13 +2307,13 @@ impl Parser {
                             "draw:param cannot contain child elements".to_string(),
                         ));
                     }
-                    if in_media_plugin && !matches!(element_type, OdpElement::PluginParameter) {
+                    if in_media_plugin && !matches!(element_type, Element::PluginParameter) {
                         return Err(Error::InvalidFormat(
                             "draw:plugin can only contain draw:param elements".to_string(),
                         ));
                     }
                     match element_type {
-                        OdpElement::Page if !sheet_scope && !in_slide => {
+                        Element::Page if !sheet_scope && !in_slide => {
                             let style_name =
                                 Self::get_attr(&reader, element, DRAW_NAMESPACE, b"style-name")?;
                             let transition = style_name
@@ -2333,7 +2333,7 @@ impl Parser {
                             });
                             slide_index += 1;
                         },
-                        OdpElement::EnhancedGeometry if !shape_stack.is_empty() => {
+                        Element::EnhancedGeometry if !shape_stack.is_empty() => {
                             let builder = shape_stack.last_mut().expect("shape checked above");
                             if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
                                 return Err(Error::InvalidFormat(
@@ -2351,16 +2351,16 @@ impl Parser {
                                 children: Vec::new(),
                             });
                         },
-                        OdpElement::EnhancedGeometry
-                        | OdpElement::EnhancedEquation
-                        | OdpElement::EnhancedHandle
+                        Element::EnhancedGeometry
+                        | Element::EnhancedEquation
+                        | Element::EnhancedHandle
                             if in_slide =>
                         {
                             return Err(Error::InvalidFormat(
                                 "misplaced custom-shape enhanced geometry".to_string(),
                             ));
                         },
-                        OdpElement::Plugin => {
+                        Element::Plugin => {
                             if let Some(builder) = shape_stack.last_mut() {
                                 if !builder.is_frame {
                                     return Err(Error::InvalidFormat(
@@ -2382,12 +2382,12 @@ impl Parser {
                                 ));
                             }
                         },
-                        OdpElement::DrawingHyperlink if in_slide => {
+                        Element::DrawingHyperlink if in_slide => {
                             return Err(Error::InvalidFormat(
                                 "draw:a must wrap exactly one non-empty drawing shape".to_string(),
                             ));
                         },
-                        OdpElement::EventListeners if !shape_stack.is_empty() => {
+                        Element::EventListeners if !shape_stack.is_empty() => {
                             let builder = shape_stack.last_mut().expect("shape checked above");
                             if builder
                                 .drawing_kind
@@ -2406,10 +2406,10 @@ impl Parser {
                             }
                             builder.event_listeners_seen = true;
                         },
-                        OdpElement::EventListeners
-                        | OdpElement::EventListener
-                        | OdpElement::ScriptEventListener
-                        | OdpElement::Sound
+                        Element::EventListeners
+                        | Element::EventListener
+                        | Element::ScriptEventListener
+                        | Element::Sound
                             if in_slide =>
                         {
                             return Err(Error::InvalidFormat(
@@ -2417,7 +2417,7 @@ impl Parser {
                                     .to_string(),
                             ));
                         },
-                        OdpElement::PluginParameter
+                        Element::PluginParameter
                             if in_media_plugin
                                 && !in_media_parameter
                                 && !shape_stack.is_empty() =>
@@ -2438,7 +2438,7 @@ impl Parser {
                                 "draw:plugin can only contain draw:param elements".to_string(),
                             ));
                         },
-                        OdpElement::TextParagraph if in_slide => {
+                        Element::TextParagraph if in_slide => {
                             Self::push_parsed_paragraph(
                                 "",
                                 in_notes,
@@ -2449,7 +2449,7 @@ impl Parser {
                                 &mut current_slide_has_segment,
                             );
                         },
-                        OdpElement::TextSpace | OdpElement::TextTab | OdpElement::TextLineBreak
+                        Element::TextSpace | Element::TextTab | Element::TextLineBreak
                             if current_paragraph.is_some() =>
                         {
                             Self::push_text_control(
@@ -2460,7 +2460,7 @@ impl Parser {
                             )?;
                         },
                         _ if in_notes => {},
-                        OdpElement::LegacyAnimation(kind) if in_slide => {
+                        Element::LegacyAnimation(kind) if in_slide => {
                             if kind != LegacyAnimationKind::Animations {
                                 return Err(Error::InvalidFormat(
                                     "legacy presentation effects require a presentation:animations root"
@@ -2487,13 +2487,13 @@ impl Parser {
                             validate_legacy_animation_root(&root)?;
                             current_legacy_animation = Some(root);
                         },
-                        OdpElement::UnknownAnimation if in_slide => {
+                        Element::UnknownAnimation if in_slide => {
                             return Err(Error::InvalidFormat(format!(
                                 "unknown ODF animation element '{}'",
                                 String::from_utf8_lossy(element.local_name().as_ref()),
                             )));
                         },
-                        OdpElement::Animation(kind)
+                        Element::Animation(kind)
                             if in_slide
                                 && shape_stack.is_empty()
                                 && current_paragraph.is_none() =>
@@ -2520,7 +2520,7 @@ impl Parser {
                                 Vec::new(),
                             ));
                         },
-                        OdpElement::Table
+                        Element::Table
                             if sheet_scope
                                 && shape_stack.is_empty()
                                 && spreadsheet_depth
@@ -2538,7 +2538,7 @@ impl Parser {
                             });
                             slide_index += 1;
                         },
-                        OdpElement::SheetShapes
+                        Element::SheetShapes
                             if sheet_scope
                                 && sheet_table_depth
                                     .is_some_and(|depth| element_depth == depth) =>
@@ -2551,24 +2551,24 @@ impl Parser {
                             }
                             sheet_table_has_shapes = true;
                         },
-                        OdpElement::Image => {
+                        Element::Image => {
                             if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::Picture;
                                 builder.image_href =
                                     Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
                             }
                         },
-                        OdpElement::Table => {
+                        Element::Table => {
                             if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::Table;
                             }
                         },
-                        OdpElement::Object => {
+                        Element::Object => {
                             if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::GraphicFrame;
                             }
                         },
-                        OdpElement::Shape(shape_element) if in_slide => {
+                        Element::Shape(shape_element) if in_slide => {
                             let drawing_kind = Self::drawing_kind(shape_element);
                             shape_node_count =
                                 shape_node_count.checked_add(1).ok_or_else(|| {
@@ -2627,8 +2627,7 @@ impl Parser {
                 Event::End(ref element) => {
                     element_depth = element_depth.saturating_sub(1);
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
-                    if matches!(element_type, OdpElement::TextParagraph)
-                        && current_paragraph.is_some()
+                    if matches!(element_type, Element::TextParagraph) && current_paragraph.is_some()
                     {
                         let paragraph = current_paragraph
                             .take()
@@ -2646,17 +2645,17 @@ impl Parser {
                         buf.clear();
                         continue;
                     }
-                    if matches!(element_type, OdpElement::Notes) {
+                    if matches!(element_type, Element::Notes) {
                         in_notes = false;
                         buf.clear();
                         continue;
                     }
-                    if matches!(element_type, OdpElement::Plugin) {
+                    if matches!(element_type, Element::Plugin) {
                         in_media_plugin = false;
                         buf.clear();
                         continue;
                     }
-                    if matches!(element_type, OdpElement::PluginParameter) && in_media_parameter {
+                    if matches!(element_type, Element::PluginParameter) && in_media_parameter {
                         in_media_parameter = false;
                         buf.clear();
                         continue;
@@ -2666,7 +2665,7 @@ impl Parser {
                         continue;
                     }
                     match element_type {
-                        OdpElement::DrawingHyperlink if current_hyperlink.is_some() => {
+                        Element::DrawingHyperlink if current_hyperlink.is_some() => {
                             if hyperlink_parent_depth != Some(shape_stack.len())
                                 || !hyperlink_shape_seen
                             {
@@ -2679,7 +2678,7 @@ impl Parser {
                             hyperlink_parent_depth = None;
                             hyperlink_shape_seen = false;
                         },
-                        OdpElement::Page if !sheet_scope => {
+                        Element::Page if !sheet_scope => {
                             if in_slide {
                                 if current_hyperlink.is_some() {
                                     return Err(Error::InvalidFormat(
@@ -2703,14 +2702,14 @@ impl Parser {
                             current_notes_has_paragraph = false;
                             in_slide = false;
                         },
-                        OdpElement::SpreadsheetRoot
+                        Element::SpreadsheetRoot
                             if sheet_scope
                                 && spreadsheet_depth
                                     .is_some_and(|depth| element_depth + 1 == depth) =>
                         {
                             spreadsheet_depth = None;
                         },
-                        OdpElement::SheetShapes
+                        Element::SheetShapes
                             if sheet_scope
                                 && sheet_shapes_depth
                                     .is_some_and(|depth| element_depth + 1 == depth) =>
@@ -2723,7 +2722,7 @@ impl Parser {
                             sheet_shapes_depth = None;
                             in_slide = false;
                         },
-                        OdpElement::Table
+                        Element::Table
                             if sheet_scope
                                 && sheet_table_depth
                                     .is_some_and(|depth| element_depth + 1 == depth) =>
@@ -2742,7 +2741,7 @@ impl Parser {
                             sheet_table_depth = None;
                             current_slide_has_segment = false;
                         },
-                        OdpElement::Shape(_) => {
+                        Element::Shape(_) => {
                             if let Some(builder) = shape_stack.pop() {
                                 if let Some(parent) = shape_stack.last_mut() {
                                     parent.children.push(builder.build());
