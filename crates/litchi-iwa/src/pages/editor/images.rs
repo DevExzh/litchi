@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use super::*;
 use crate::ImageAdjustments;
+use crate::comments::DrawableObjectId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -196,8 +197,13 @@ impl PagesEditor {
     }
 
     /// Read geometry for one body-anchored image.
-    pub fn body_image_geometry(&self, drawable_object_id: u64) -> Result<DrawableGeometry> {
-        Ok(body_image_graph(self, drawable_object_id)?.info.geometry)
+    pub fn body_image_geometry(
+        &self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<DrawableGeometry> {
+        Ok(body_image_graph(self, drawable_object_id.object_id())?
+            .info
+            .geometry)
     }
 
     /// Restore a body image's displayed dimensions from its stored original size.
@@ -207,9 +213,10 @@ impl PagesEditor {
     /// original-size metadata.
     pub fn restore_body_image_original_size(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
     ) -> Result<DrawableGeometry> {
-        let source = body_image_graph(self, drawable_object_id)?;
+        let raw_drawable_object_id = drawable_object_id.object_id();
+        let source = body_image_graph(self, raw_drawable_object_id)?;
         let original_size = source.info.original_size.ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "Pages image {drawable_object_id} has no original-size metadata"
@@ -220,7 +227,7 @@ impl PagesEditor {
         set_image_geometry(
             &mut staged,
             &source.archive_name,
-            drawable_object_id,
+            raw_drawable_object_id,
             geometry,
         )?;
         let verified = Self::from_package(staged)?;
@@ -239,16 +246,17 @@ impl PagesEditor {
     /// Pages Flip Horizontally or Flip Vertically command.
     pub fn flip_body_image(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
         axis: DrawableFlipAxis,
     ) -> Result<DrawableGeometry> {
-        let source = body_image_graph(self, drawable_object_id)?;
+        let raw_drawable_object_id = drawable_object_id.object_id();
+        let source = body_image_graph(self, raw_drawable_object_id)?;
         let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
         let mut staged = self.package().clone();
         set_image_geometry(
             &mut staged,
             &source.archive_name,
-            drawable_object_id,
+            raw_drawable_object_id,
             geometry,
         )?;
         let verified = Self::from_package(staged)?;
@@ -264,15 +272,16 @@ impl PagesEditor {
     /// Update body-image geometry while preserving unknown image fields.
     pub fn set_body_image_geometry(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
         geometry: DrawableGeometry,
     ) -> Result<()> {
-        let source = body_image_graph(self, drawable_object_id)?;
+        let raw_drawable_object_id = drawable_object_id.object_id();
+        let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut staged = self.package().clone();
         set_image_geometry(
             &mut staged,
             &source.archive_name,
-            drawable_object_id,
+            raw_drawable_object_id,
             geometry,
         )?;
         let verified = Self::from_package(staged)?;
@@ -286,8 +295,13 @@ impl PagesEditor {
     }
 
     /// Read shared drawable properties for one body-anchored image.
-    pub fn body_image_properties(&self, drawable_object_id: u64) -> Result<DrawableProperties> {
-        Ok(body_image_graph(self, drawable_object_id)?.info.properties)
+    pub fn body_image_properties(
+        &self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<DrawableProperties> {
+        Ok(body_image_graph(self, drawable_object_id.object_id())?
+            .info
+            .properties)
     }
 
     /// Update image accessibility, hyperlink, and lock properties.
@@ -296,15 +310,16 @@ impl PagesEditor {
     /// clearing a property with `None` and encoding explicit boolean defaults.
     pub fn set_body_image_properties(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
         properties: DrawableProperties,
     ) -> Result<()> {
-        let source = body_image_graph(self, drawable_object_id)?;
+        let raw_drawable_object_id = drawable_object_id.object_id();
+        let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut staged = self.package().clone();
         set_image_properties(
             &mut staged,
             &source.archive_name,
-            drawable_object_id,
+            raw_drawable_object_id,
             &properties,
         )?;
         let verified = Self::from_package(staged)?;
@@ -320,13 +335,17 @@ impl PagesEditor {
     /// Read the native title and caption attached to one body image.
     pub fn body_image_title_caption(
         &self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
     ) -> Result<crate::DrawableTitleCaption> {
-        image_title_caption(self, drawable_object_id)
+        image_title_caption(self, drawable_object_id.object_id())
     }
 
     /// Create or replace one body image's native title.
-    pub fn set_body_image_title(&mut self, drawable_object_id: u64, title: &str) -> Result<()> {
+    pub fn set_body_image_title(
+        &mut self,
+        drawable_object_id: DrawableObjectId,
+        title: &str,
+    ) -> Result<()> {
         set_body_image_caption(self, drawable_object_id, title, DrawableCaptionKind::Title)
     }
 
@@ -334,12 +353,19 @@ impl PagesEditor {
     ///
     /// Returns whether a title was present. Native iWork removal preserves the
     /// prior title graph for undo history and attaches a fresh empty stand-in.
-    pub fn remove_body_image_title(&mut self, drawable_object_id: u64) -> Result<bool> {
+    pub fn remove_body_image_title(
+        &mut self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<bool> {
         remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Title)
     }
 
     /// Create or replace one body image's native caption.
-    pub fn set_body_image_caption(&mut self, drawable_object_id: u64, caption: &str) -> Result<()> {
+    pub fn set_body_image_caption(
+        &mut self,
+        drawable_object_id: DrawableObjectId,
+        caption: &str,
+    ) -> Result<()> {
         set_body_image_caption(
             self,
             drawable_object_id,
@@ -353,13 +379,19 @@ impl PagesEditor {
     /// Returns whether a caption was present. Native iWork removal preserves
     /// the prior caption graph for undo history and attaches a fresh empty
     /// stand-in.
-    pub fn remove_body_image_caption(&mut self, drawable_object_id: u64) -> Result<bool> {
+    pub fn remove_body_image_caption(
+        &mut self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<bool> {
         remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Caption)
     }
 
     /// Read the basic controls in iWork's Image inspector for one body image.
-    pub fn body_image_adjustments(&self, drawable_object_id: u64) -> Result<ImageAdjustments> {
-        Ok(body_image_graph(self, drawable_object_id)?
+    pub fn body_image_adjustments(
+        &self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<ImageAdjustments> {
+        Ok(body_image_graph(self, drawable_object_id.object_id())?
             .info
             .image_adjustments)
     }
@@ -368,15 +400,16 @@ impl PagesEditor {
     /// and unknown native adjustment fields.
     pub fn set_body_image_adjustments(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
         adjustments: ImageAdjustments,
     ) -> Result<()> {
-        let source = body_image_graph(self, drawable_object_id)?;
+        let raw_drawable_object_id = drawable_object_id.object_id();
+        let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut staged = self.package().clone();
         let expected = replace_image_adjustments(
             &mut staged,
             &source.archive_name,
-            drawable_object_id,
+            raw_drawable_object_id,
             "Pages image",
             adjustments,
         )?;
@@ -399,10 +432,11 @@ impl PagesEditor {
     /// replacing either image's data updates both images.
     pub fn duplicate_body_image(
         &mut self,
-        source_drawable_object_id: u64,
+        source_drawable_object_id: DrawableObjectId,
         anchor_character_index: usize,
     ) -> Result<PagesImageInfo> {
-        let source = body_image_graph(self, source_drawable_object_id)?;
+        let raw_source_drawable_object_id = source_drawable_object_id.object_id();
+        let source = body_image_graph(self, raw_source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
         let mut remap = HashMap::with_capacity(source.object_ids.len());
@@ -428,7 +462,7 @@ impl PagesEditor {
             })?;
         }
 
-        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+        let new_drawable_id = *remap.get(&raw_source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Pages image clone has no drawable identifier".to_owned())
         })?;
         let new_attachment_id = *remap.get(&source.attachment_id).ok_or_else(|| {
@@ -533,23 +567,27 @@ impl PagesEditor {
     /// observe this replacement together, matching Pages' native behavior.
     pub fn replace_body_image_data(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
-        let source = body_image_graph(self, drawable_object_id)?;
+        let source = body_image_graph(self, drawable_object_id.object_id())?;
         self.replace_media(source.info.image_data_identifier, replacement)
     }
 
     /// Remove a body-anchored image, its private graph, and unshared assets.
-    pub fn remove_body_image(&mut self, drawable_object_id: u64) -> Result<RemovedPagesImage> {
-        let source = body_image_graph(self, drawable_object_id)?;
+    pub fn remove_body_image(
+        &mut self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<RemovedPagesImage> {
+        let raw_drawable_object_id = drawable_object_id.object_id();
+        let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(raw_drawable_object_id)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
-        patch_pages_zorder(&mut staged, Some(drawable_object_id), None)?;
+        patch_pages_zorder(&mut staged, Some(raw_drawable_object_id), None)?;
         for &(data_identifier, object_identifier) in &source.data_references {
             remove_component_data_reference(
                 &mut staged,
@@ -602,7 +640,7 @@ impl PagesEditor {
         if verified
             .body_images()?
             .iter()
-            .any(|image| image.drawable_object_id == drawable_object_id)
+            .any(|image| image.drawable_object_id == raw_drawable_object_id)
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
@@ -623,13 +661,14 @@ impl PagesEditor {
 
 fn set_body_image_caption(
     editor: &mut PagesEditor,
-    drawable_object_id: u64,
+    drawable_object_id: DrawableObjectId,
     text: &str,
     kind: DrawableCaptionKind,
 ) -> Result<()> {
-    let source = body_image_graph(editor, drawable_object_id)?;
-    let slot = image_caption_slot(editor, drawable_object_id, kind)?;
-    let before = image_title_caption(editor, drawable_object_id)?;
+    let raw_drawable_object_id = drawable_object_id.object_id();
+    let source = body_image_graph(editor, raw_drawable_object_id)?;
+    let slot = image_caption_slot(editor, raw_drawable_object_id, kind)?;
+    let before = image_title_caption(editor, raw_drawable_object_id)?;
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
         text_editor.set_text(storage_id, text)?;
@@ -648,7 +687,7 @@ fn set_body_image_caption(
         insert_image_caption(
             &mut staged,
             &source.archive_name,
-            drawable_object_id,
+            raw_drawable_object_id,
             slot.reference_id,
             image_width,
             text,
@@ -684,21 +723,22 @@ fn set_body_image_caption(
 
 fn remove_body_image_caption(
     editor: &mut PagesEditor,
-    drawable_object_id: u64,
+    drawable_object_id: DrawableObjectId,
     kind: DrawableCaptionKind,
 ) -> Result<bool> {
-    let source = body_image_graph(editor, drawable_object_id)?;
-    let slot = image_caption_slot(editor, drawable_object_id, kind)?;
+    let raw_drawable_object_id = drawable_object_id.object_id();
+    let source = body_image_graph(editor, raw_drawable_object_id)?;
+    let slot = image_caption_slot(editor, raw_drawable_object_id, kind)?;
     if slot.storage_id.is_none() {
         return Ok(false);
     }
-    let before = image_title_caption(editor, drawable_object_id)?;
+    let before = image_title_caption(editor, raw_drawable_object_id)?;
     let standin_id = next_object_identifier(editor.package())?;
     let mut staged = editor.package().clone();
     insert_image_caption_standin(
         &mut staged,
         &source.archive_name,
-        drawable_object_id,
+        raw_drawable_object_id,
         slot.reference_id,
         kind,
         standin_id,
@@ -749,6 +789,53 @@ mod tests {
         PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).with_natural_size(NATURAL_IMAGE_SIZE)
     }
 
+    fn selector(image: &PagesImageInfo) -> DrawableObjectId {
+        DrawableObjectId::from_object_id(image.drawable_object_id).unwrap()
+    }
+
+    fn missing_selector() -> DrawableObjectId {
+        DrawableObjectId::from_object_id(999).unwrap()
+    }
+
+    #[test]
+    fn image_selectors_use_drawable_object_id() {
+        let _: fn(&PagesEditor, DrawableObjectId) -> Result<DrawableGeometry> =
+            PagesEditor::body_image_geometry;
+        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<DrawableGeometry> =
+            PagesEditor::restore_body_image_original_size;
+        let _: fn(
+            &mut PagesEditor,
+            DrawableObjectId,
+            DrawableFlipAxis,
+        ) -> Result<DrawableGeometry> = PagesEditor::flip_body_image;
+        let _: fn(&mut PagesEditor, DrawableObjectId, DrawableGeometry) -> Result<()> =
+            PagesEditor::set_body_image_geometry;
+        let _: fn(&PagesEditor, DrawableObjectId) -> Result<DrawableProperties> =
+            PagesEditor::body_image_properties;
+        let _: fn(&mut PagesEditor, DrawableObjectId, DrawableProperties) -> Result<()> =
+            PagesEditor::set_body_image_properties;
+        let _: fn(&PagesEditor, DrawableObjectId) -> Result<crate::DrawableTitleCaption> =
+            PagesEditor::body_image_title_caption;
+        let _: fn(&mut PagesEditor, DrawableObjectId, &str) -> Result<()> =
+            PagesEditor::set_body_image_title;
+        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<bool> =
+            PagesEditor::remove_body_image_title;
+        let _: fn(&mut PagesEditor, DrawableObjectId, &str) -> Result<()> =
+            PagesEditor::set_body_image_caption;
+        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<bool> =
+            PagesEditor::remove_body_image_caption;
+        let _: fn(&PagesEditor, DrawableObjectId) -> Result<ImageAdjustments> =
+            PagesEditor::body_image_adjustments;
+        let _: fn(&mut PagesEditor, DrawableObjectId, ImageAdjustments) -> Result<()> =
+            PagesEditor::set_body_image_adjustments;
+        let _: fn(&mut PagesEditor, DrawableObjectId, usize) -> Result<PagesImageInfo> =
+            PagesEditor::duplicate_body_image;
+        let _: fn(&mut PagesEditor, DrawableObjectId, &[u8]) -> Result<Vec<u8>> =
+            PagesEditor::replace_body_image_data;
+        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<RemovedPagesImage> =
+            PagesEditor::remove_body_image;
+    }
+
     #[test]
     fn scratch_document_supports_image_crud_without_a_source_package() {
         let original = fixture("test-data/images/png/lena.png");
@@ -765,6 +852,7 @@ mod tests {
                 options(),
             )
             .unwrap();
+        let created_id = selector(&created);
         assert_eq!(created.thumbnail_data_identifier, None);
         assert_eq!(created.original_size, Some(NATURAL_IMAGE_SIZE));
         assert_eq!(created.natural_size, Some(NATURAL_IMAGE_SIZE));
@@ -790,35 +878,27 @@ mod tests {
             angle: Some(UPDATED_ANGLE_DEGREES),
         };
         editor
-            .set_body_image_geometry(created.drawable_object_id, changed_geometry)
+            .set_body_image_geometry(created_id, changed_geometry)
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_geometry(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_geometry(created_id).unwrap(),
             changed_geometry
         );
-        let restored_original_size = editor
-            .restore_body_image_original_size(created.drawable_object_id)
-            .unwrap();
+        let restored_original_size = editor.restore_body_image_original_size(created_id).unwrap();
         let expected_original_size_geometry = DrawableGeometry {
             size: Some(NATURAL_IMAGE_SIZE),
             ..changed_geometry
         };
         assert_eq!(restored_original_size, expected_original_size_geometry);
         assert_eq!(
-            editor
-                .body_image_geometry(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_geometry(created_id).unwrap(),
             expected_original_size_geometry
         );
         let horizontally_flipped = editor
-            .flip_body_image(created.drawable_object_id, DrawableFlipAxis::Horizontal)
+            .flip_body_image(created_id, DrawableFlipAxis::Horizontal)
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_geometry(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_geometry(created_id).unwrap(),
             horizontally_flipped
         );
         assert_ne!(
@@ -826,12 +906,10 @@ mod tests {
             expected_original_size_geometry.flags
         );
         let vertically_flipped = editor
-            .flip_body_image(created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .flip_body_image(created_id, DrawableFlipAxis::Vertical)
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_geometry(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_geometry(created_id).unwrap(),
             vertically_flipped
         );
         assert_ne!(
@@ -846,21 +924,17 @@ mod tests {
             accessibility_description: Some("Quarterly-results portrait".to_owned()),
         };
         editor
-            .set_body_image_properties(created.drawable_object_id, changed_properties.clone())
+            .set_body_image_properties(created_id, changed_properties.clone())
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_properties(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_properties(created_id).unwrap(),
             changed_properties
         );
         editor
-            .set_body_image_properties(created.drawable_object_id, DrawableProperties::default())
+            .set_body_image_properties(created_id, DrawableProperties::default())
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_properties(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_properties(created_id).unwrap(),
             DrawableProperties::default()
         );
 
@@ -869,26 +943,22 @@ mod tests {
             .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
             .with_enhancement(Some(ImageEnhancement::Enabled));
         editor
-            .set_body_image_adjustments(created.drawable_object_id, changed_adjustments)
+            .set_body_image_adjustments(created_id, changed_adjustments)
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_adjustments(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_adjustments(created_id).unwrap(),
             changed_adjustments
         );
         editor
-            .set_body_image_adjustments(created.drawable_object_id, created.image_adjustments)
+            .set_body_image_adjustments(created_id, created.image_adjustments)
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_adjustments(created.drawable_object_id)
-                .unwrap(),
+            editor.body_image_adjustments(created_id).unwrap(),
             created.image_adjustments
         );
 
         let previous = editor
-            .replace_body_image_data(created.drawable_object_id, &replacement)
+            .replace_body_image_data(created_id, &replacement)
             .unwrap();
         assert_eq!(previous, original);
         assert_eq!(
@@ -900,9 +970,7 @@ mod tests {
             created.image_data_identifier
         );
 
-        let removed = editor
-            .remove_body_image(created.drawable_object_id)
-            .unwrap();
+        let removed = editor.remove_body_image(created_id).unwrap();
         assert_eq!(removed.image.drawable_object_id, created.drawable_object_id);
         assert_eq!(
             removed.removed_data_identifiers,
@@ -926,23 +994,20 @@ mod tests {
                 options(),
             )
             .unwrap();
+        let image_id = selector(&image);
 
         assert_eq!(
-            editor
-                .body_image_title_caption(image.drawable_object_id)
-                .unwrap(),
+            editor.body_image_title_caption(image_id).unwrap(),
             crate::DrawableTitleCaption::default()
         );
         editor
-            .set_body_image_title(image.drawable_object_id, "Quarterly portrait")
+            .set_body_image_title(image_id, "Quarterly portrait")
             .unwrap();
         editor
-            .set_body_image_caption(image.drawable_object_id, "Revenue report")
+            .set_body_image_caption(image_id, "Revenue report")
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_title_caption(image.drawable_object_id)
-                .unwrap(),
+            editor.body_image_title_caption(image_id).unwrap(),
             crate::DrawableTitleCaption {
                 title: Some("Quarterly portrait".to_owned()),
                 caption: Some("Revenue report".to_owned()),
@@ -950,38 +1015,22 @@ mod tests {
         );
 
         editor
-            .set_body_image_title(image.drawable_object_id, "Updated portrait")
+            .set_body_image_title(image_id, "Updated portrait")
             .unwrap();
-        assert!(
-            editor
-                .remove_body_image_caption(image.drawable_object_id)
-                .unwrap()
-        );
-        assert!(
-            !editor
-                .remove_body_image_caption(image.drawable_object_id)
-                .unwrap()
-        );
-        assert!(
-            editor
-                .remove_body_image_title(image.drawable_object_id)
-                .unwrap()
-        );
+        assert!(editor.remove_body_image_caption(image_id).unwrap());
+        assert!(!editor.remove_body_image_caption(image_id).unwrap());
+        assert!(editor.remove_body_image_title(image_id).unwrap());
         assert_eq!(
-            editor
-                .body_image_title_caption(image.drawable_object_id)
-                .unwrap(),
+            editor.body_image_title_caption(image_id).unwrap(),
             crate::DrawableTitleCaption::default()
         );
 
         editor
-            .set_body_image_caption(image.drawable_object_id, "Recreated caption")
+            .set_body_image_caption(image_id, "Recreated caption")
             .unwrap();
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened
-                .body_image_title_caption(image.drawable_object_id)
-                .unwrap(),
+            reopened.body_image_title_caption(image_id).unwrap(),
             crate::DrawableTitleCaption {
                 title: None,
                 caption: Some("Recreated caption".to_owned()),
@@ -1002,6 +1051,7 @@ mod tests {
                 options(),
             )
             .unwrap();
+        let source_id = selector(&source);
         let source_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/pages-source".to_owned()),
             locked: Some(true),
@@ -1009,22 +1059,23 @@ mod tests {
             accessibility_description: Some("Source portrait".to_owned()),
         };
         editor
-            .set_body_image_properties(source.drawable_object_id, source_properties.clone())
+            .set_body_image_properties(source_id, source_properties.clone())
             .unwrap();
         editor
-            .set_body_image_title(source.drawable_object_id, "Source title")
+            .set_body_image_title(source_id, "Source title")
             .unwrap();
         editor
-            .set_body_image_caption(source.drawable_object_id, "Source caption")
+            .set_body_image_caption(source_id, "Source caption")
             .unwrap();
         let source_geometry = editor
-            .flip_body_image(source.drawable_object_id, DrawableFlipAxis::Vertical)
+            .flip_body_image(source_id, DrawableFlipAxis::Vertical)
             .unwrap();
         let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
 
         let duplicate = editor
-            .duplicate_body_image(source.drawable_object_id, duplicate_anchor)
+            .duplicate_body_image(source_id, duplicate_anchor)
             .unwrap();
+        let duplicate_id = selector(&duplicate);
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
         let source_graph = body_image_graph(&editor, source.drawable_object_id).unwrap();
         let duplicate_graph = body_image_graph(&editor, duplicate.drawable_object_id).unwrap();
@@ -1053,9 +1104,7 @@ mod tests {
         assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.properties, source_properties);
         assert_eq!(
-            editor
-                .body_image_title_caption(duplicate.drawable_object_id)
-                .unwrap(),
+            editor.body_image_title_caption(duplicate_id).unwrap(),
             crate::DrawableTitleCaption {
                 title: Some("Source title".to_owned()),
                 caption: Some("Source caption".to_owned()),
@@ -1077,18 +1126,14 @@ mod tests {
             ..duplicate.geometry
         };
         editor
-            .set_body_image_geometry(duplicate.drawable_object_id, moved_duplicate)
+            .set_body_image_geometry(duplicate_id, moved_duplicate)
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_geometry(source.drawable_object_id)
-                .unwrap(),
+            editor.body_image_geometry(source_id).unwrap(),
             source_geometry
         );
         assert_eq!(
-            editor
-                .body_image_geometry(duplicate.drawable_object_id)
-                .unwrap(),
+            editor.body_image_geometry(duplicate_id).unwrap(),
             moved_duplicate
         );
 
@@ -1097,24 +1142,20 @@ mod tests {
             ..source_properties.clone()
         };
         editor
-            .set_body_image_properties(duplicate.drawable_object_id, duplicate_properties.clone())
+            .set_body_image_properties(duplicate_id, duplicate_properties.clone())
             .unwrap();
         assert_eq!(
-            editor
-                .body_image_properties(source.drawable_object_id)
-                .unwrap(),
+            editor.body_image_properties(source_id).unwrap(),
             source_properties
         );
         assert_eq!(
-            editor
-                .body_image_properties(duplicate.drawable_object_id)
-                .unwrap(),
+            editor.body_image_properties(duplicate_id).unwrap(),
             duplicate_properties
         );
 
         assert_eq!(
             editor
-                .replace_body_image_data(duplicate.drawable_object_id, &replacement)
+                .replace_body_image_data(duplicate_id, &replacement)
                 .unwrap(),
             original
         );
@@ -1135,12 +1176,10 @@ mod tests {
             moved_duplicate
         );
 
-        let removed_source = editor.remove_body_image(source.drawable_object_id).unwrap();
+        let removed_source = editor.remove_body_image(source_id).unwrap();
         assert!(removed_source.removed_data_identifiers.is_empty());
         assert_eq!(editor.body_images().unwrap().len(), 1);
-        let removed_duplicate = editor
-            .remove_body_image(duplicate.drawable_object_id)
-            .unwrap();
+        let removed_duplicate = editor.remove_body_image(duplicate_id).unwrap();
         assert_eq!(
             removed_duplicate.removed_data_identifiers,
             [source.image_data_identifier]
@@ -1156,7 +1195,8 @@ mod tests {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
 
-        assert!(editor.duplicate_body_image(999, 0).is_err());
+        let missing_id = missing_selector();
+        assert!(editor.duplicate_body_image(missing_id, 0).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
@@ -1189,19 +1229,19 @@ mod tests {
             .add_body_image(4, "lena.png", &original, options())
             .unwrap();
         let before_restore = editor.to_bytes().unwrap();
-        assert!(editor.restore_body_image_original_size(999).is_err());
+        assert!(editor.restore_body_image_original_size(missing_id).is_err());
         assert_eq!(editor.to_bytes().unwrap(), before_restore);
         let before_flip = editor.to_bytes().unwrap();
         assert!(
             editor
-                .flip_body_image(999, DrawableFlipAxis::Horizontal)
+                .flip_body_image(missing_id, DrawableFlipAxis::Horizontal)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_flip);
         let before_properties = editor.to_bytes().unwrap();
         assert!(
             editor
-                .set_body_image_properties(999, DrawableProperties::default())
+                .set_body_image_properties(missing_id, DrawableProperties::default())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_properties);
@@ -1209,7 +1249,7 @@ mod tests {
         assert!(
             editor
                 .set_body_image_geometry(
-                    created.drawable_object_id,
+                    selector(&created),
                     DrawableGeometry {
                         size: Some(DrawableSize {
                             width: -1.0,
