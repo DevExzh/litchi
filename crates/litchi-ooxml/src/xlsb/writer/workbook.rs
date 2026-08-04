@@ -2059,48 +2059,47 @@ mod tests {
     #[test]
     fn structured_tables_round_trip_through_save_and_read() {
         use crate::xlsb::table::{
-            XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableRange, XlsbTableStyleInfo,
-            XlsbTableTotalsRowFunction, XlsbTableType,
+            Column, Formula, Range, StyleInfo, Table, TotalsRowFunction, Type,
         };
 
-        let table = XlsbTable {
+        let table = Table {
             id: 3,
             name: Some("SalesTable".to_string()),
             display_name: Some("SalesTable".to_string()),
-            range: XlsbTableRange {
+            range: Range {
                 first_row: 0,
                 last_row: 2,
                 first_column: 0,
                 last_column: 1,
             },
-            table_type: XlsbTableType::Range,
+            table_type: Type::Range,
             header_row_count: 1,
             columns: vec![
-                XlsbTableColumn {
+                Column {
                     id: 1,
                     name: Some("Region".to_string()),
-                    ..XlsbTableColumn::default()
+                    ..Column::default()
                 },
-                XlsbTableColumn {
+                Column {
                     id: 2,
                     name: Some("Amount".to_string()),
-                    totals_row_function: XlsbTableTotalsRowFunction::Sum,
-                    calculated_column_formula: Some(XlsbTableFormula {
+                    totals_row_function: TotalsRowFunction::Sum,
+                    calculated_column_formula: Some(Formula {
                         array: false,
                         tokens: vec![0x1E, 0x02],
                         extra: Vec::new(),
                     }),
-                    ..XlsbTableColumn::default()
+                    ..Column::default()
                 },
             ],
-            style_info: Some(XlsbTableStyleInfo {
+            style_info: Some(StyleInfo {
                 name: Some("TableStyleMedium2".to_string()),
                 show_first_column: false,
                 show_last_column: false,
                 show_row_stripes: true,
                 show_column_stripes: false,
             }),
-            ..XlsbTable::default()
+            ..Table::default()
         };
 
         let mut workbook = XlsbWorkbookWriter::new();
@@ -2114,36 +2113,36 @@ mod tests {
         // duplicate id.
         assert!(
             sheet
-                .add_table(XlsbTable {
+                .add_table(Table {
                     id: 9,
                     range: table.range,
-                    ..XlsbTable::default()
+                    ..Table::default()
                 })
                 .is_err()
         );
         assert!(
             sheet
-                .add_table(XlsbTable {
+                .add_table(Table {
                     id: 9,
                     display_name: Some("Bad".to_string()),
-                    range: XlsbTableRange {
+                    range: Range {
                         first_row: 5,
                         last_row: 2,
                         first_column: 0,
                         last_column: 0,
                     },
-                    ..XlsbTable::default()
+                    ..Table::default()
                 })
                 .is_err()
         );
         assert!(
             sheet
-                .add_table(XlsbTable {
+                .add_table(Table {
                     id: 9,
                     display_name: Some("Bad".to_string()),
                     range: table.range,
-                    columns: vec![XlsbTableColumn::default()],
-                    ..XlsbTable::default()
+                    columns: vec![Column::default()],
+                    ..Table::default()
                 })
                 .is_err()
         );

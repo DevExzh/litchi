@@ -226,8 +226,7 @@ pub use styles::{
 };
 pub use styles_table::{CellFormat, Fill, Font, NumberFormat, StylesTable};
 pub use table::{
-    XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableRange, XlsbTableStyleInfo,
-    XlsbTableTotalsRowFunction, XlsbTableType, parse_table_part,
+    Column, Formula, Range, StyleInfo, Table, TotalsRowFunction, Type, parse_table_part,
 };
 pub use vba_project::{VbaProject, VbaProjectSignature, VbaProjectSignatureKind};
 pub use web_extension_bindings::{

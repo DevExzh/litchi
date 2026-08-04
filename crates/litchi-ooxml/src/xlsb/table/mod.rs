@@ -1,6 +1,6 @@
 //! Table (ListObject) stream parsing (MS-XLSB 2.1.7.51).
 //!
-//! Parses a `tables/table*.bin` part into a typed [`XlsbTable`] model
+//! Parses a `tables/table*.bin` part into a typed [`Table`] model
 //! covering the table identity and range, header/total row and insert-row
 //! metadata, differential-formatting references, table columns with their
 //! total-row functions and formulas, the applied table style, and alternate

@@ -6,7 +6,7 @@
 //! through `XlsbWorkbook::structured_tables`.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::table::model::{XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableStyleInfo};
+use crate::xlsb::table::model::{Column, Formula, StyleInfo, Table};
 use litchi_xlsb::raw::Writer;
 use litchi_xlsb::raw::kind as rt;
 
@@ -65,7 +65,7 @@ fn write_blob(data: &mut Vec<u8>, blob: &[u8]) {
 }
 
 /// `BrtBeginList` payload (MS-XLSB 2.4.100).
-fn list_payload(table: &XlsbTable) -> Vec<u8> {
+fn list_payload(table: &Table) -> Vec<u8> {
     let mut data = Vec::with_capacity(64);
     data.extend_from_slice(&table.range.first_row.to_le_bytes());
     data.extend_from_slice(&table.range.last_row.to_le_bytes());
@@ -109,7 +109,7 @@ fn list_payload(table: &XlsbTable) -> Vec<u8> {
 }
 
 /// `BrtBeginListCol` payload (MS-XLSB 2.4.101).
-fn column_payload(column: &XlsbTableColumn) -> Vec<u8> {
+fn column_payload(column: &Column) -> Vec<u8> {
     let mut data = Vec::with_capacity(48);
     data.extend_from_slice(&column.id.to_le_bytes());
     data.extend_from_slice(&(column.totals_row_function as u32).to_le_bytes());
@@ -127,7 +127,7 @@ fn column_payload(column: &XlsbTableColumn) -> Vec<u8> {
 }
 
 /// `BrtListCCFmla`/`BrtListTrFmla` payload (MS-XLSB 2.4.706, 2.4.708).
-fn formula_payload(formula: &XlsbTableFormula) -> Vec<u8> {
+fn formula_payload(formula: &Formula) -> Vec<u8> {
     let mut data = Vec::with_capacity(formula.tokens.len() + formula.extra.len() + 9);
     data.push(if formula.array { FORMULA_ARRAY } else { 0 });
     write_blob(&mut data, &formula.tokens);
@@ -136,7 +136,7 @@ fn formula_payload(formula: &XlsbTableFormula) -> Vec<u8> {
 }
 
 /// `BrtTableStyleClient` payload (MS-XLSB 2.4.847).
-fn style_client_payload(style: &XlsbTableStyleInfo) -> Vec<u8> {
+fn style_client_payload(style: &StyleInfo) -> Vec<u8> {
     let mut flags = 0u16;
     if style.show_first_column {
         flags |= STYLE_FIRST_COLUMN;
@@ -157,7 +157,7 @@ fn style_client_payload(style: &XlsbTableStyleInfo) -> Vec<u8> {
 }
 
 /// Serialize one table into its complete table-part stream.
-pub(crate) fn write_table_part(table: &XlsbTable) -> XlsbResult<Vec<u8>> {
+pub(crate) fn write_table_part(table: &Table) -> XlsbResult<Vec<u8>> {
     let mut data = Vec::with_capacity(256);
     let mut writer = Writer::new(&mut data);
     writer.write_record(rt::BEGIN_LIST, &list_payload(table))?;
@@ -214,53 +214,53 @@ pub(crate) fn write_list_parts<W: std::io::Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::table::model::{XlsbTableRange, XlsbTableTotalsRowFunction, XlsbTableType};
+    use crate::xlsb::table::model::{Range, TotalsRowFunction, Type};
     use crate::xlsb::table::parse_table_part;
 
-    fn sample_table() -> XlsbTable {
-        XlsbTable {
+    fn sample_table() -> Table {
+        Table {
             id: 7,
             name: Some("SalesTable".to_string()),
             display_name: Some("SalesTable".to_string()),
             comment: Some("Quarterly sales".to_string()),
-            range: XlsbTableRange {
+            range: Range {
                 first_row: 0,
                 last_row: 9,
                 first_column: 1,
                 last_column: 3,
             },
-            table_type: XlsbTableType::Range,
+            table_type: Type::Range,
             header_row_count: 1,
             totals_row_count: 1,
             totals_row_shown: true,
             published: true,
             columns: vec![
-                XlsbTableColumn {
+                Column {
                     id: 1,
                     name: Some("Region".to_string()),
-                    totals_row_function: XlsbTableTotalsRowFunction::None,
-                    ..XlsbTableColumn::default()
+                    totals_row_function: TotalsRowFunction::None,
+                    ..Column::default()
                 },
-                XlsbTableColumn {
+                Column {
                     id: 2,
                     name: Some("Amount".to_string()),
                     caption: Some("Total".to_string()),
-                    totals_row_function: XlsbTableTotalsRowFunction::Sum,
+                    totals_row_function: TotalsRowFunction::Sum,
                     totals_row_label: Some("Grand Total".to_string()),
-                    ..XlsbTableColumn::default()
+                    ..Column::default()
                 },
-                XlsbTableColumn {
+                Column {
                     id: 3,
                     name: Some("Ratio".to_string()),
-                    calculated_column_formula: Some(XlsbTableFormula {
+                    calculated_column_formula: Some(Formula {
                         array: true,
                         tokens: vec![0x1E, 0x02],
                         extra: Vec::new(),
                     }),
-                    ..XlsbTableColumn::default()
+                    ..Column::default()
                 },
             ],
-            style_info: Some(XlsbTableStyleInfo {
+            style_info: Some(StyleInfo {
                 name: Some("TableStyleMedium2".to_string()),
                 show_first_column: false,
                 show_last_column: false,
@@ -269,7 +269,7 @@ mod tests {
             }),
             alternate_text: Some("Sales by region".to_string()),
             alternate_text_summary: Some("Summary".to_string()),
-            ..XlsbTable::default()
+            ..Table::default()
         }
     }
 
@@ -283,17 +283,17 @@ mod tests {
 
     #[test]
     fn serialized_minimal_table_round_trips() {
-        let table = XlsbTable {
+        let table = Table {
             id: 1,
             display_name: Some("T".to_string()),
-            range: XlsbTableRange {
+            range: Range {
                 first_row: 0,
                 last_row: 0,
                 first_column: 0,
                 last_column: 0,
             },
             single_cell: true,
-            ..XlsbTable::default()
+            ..Table::default()
         };
         let bytes = write_table_part(&table).unwrap();
         let parsed = parse_table_part(&bytes).unwrap();

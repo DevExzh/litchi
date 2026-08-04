@@ -58,7 +58,7 @@ pub struct XlsbWorkbook {
     calc: Props,
     is_1904: bool,
     pivot_cache_definitions: Vec<(u32, crate::xlsb::pivot::PivotCacheDefinition)>,
-    structured_tables: Vec<(usize, crate::xlsb::table::XlsbTable)>,
+    structured_tables: Vec<(usize, crate::xlsb::table::Table)>,
     chart_sheets: Vec<(usize, crate::xlsb::chartsheet::XlsbChartSheet)>,
     sheet_drawings: Vec<crate::xlsb::drawing::SheetDrawing>,
     connections: Option<crate::xlsb::connections::Connections>,
@@ -466,13 +466,13 @@ impl XlsbWorkbook {
     /// contacted, or evaluated. Named `structured_tables` because
     /// [`XlsbWorkbook::tables`] already exposes the formula-context table
     /// definitions.
-    pub fn structured_tables(&self) -> &[(usize, crate::xlsb::table::XlsbTable)] {
+    pub fn structured_tables(&self) -> &[(usize, crate::xlsb::table::Table)] {
         &self.structured_tables
     }
 
     /// Typed structured-table (ListObject) definitions anchored to one
     /// worksheet, selected by zero-based worksheet index.
-    pub fn tables_on_sheet(&self, sheet_index: usize) -> Vec<&crate::xlsb::table::XlsbTable> {
+    pub fn tables_on_sheet(&self, sheet_index: usize) -> Vec<&crate::xlsb::table::Table> {
         self.structured_tables
             .iter()
             .filter(|(index, _)| *index == sheet_index)

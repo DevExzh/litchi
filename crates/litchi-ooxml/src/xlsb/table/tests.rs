@@ -30,7 +30,7 @@ fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     data
 }
 
-fn parse(records: &[(Kind, Vec<u8>)]) -> XlsbResult<XlsbTable> {
+fn parse(records: &[(Kind, Vec<u8>)]) -> XlsbResult<Table> {
     parse_table_part(&stream(records))
 }
 
@@ -106,14 +106,14 @@ fn parses_minimal_table_with_columns() {
     assert_eq!(table.comment.as_deref(), Some(" quarterly numbers "));
     assert_eq!(
         table.range,
-        XlsbTableRange {
+        Range {
             first_row: 0,
             last_row: 9,
             first_column: 0,
             last_column: 1,
         }
     );
-    assert_eq!(table.table_type, XlsbTableType::Range);
+    assert_eq!(table.table_type, Type::Range);
     assert_eq!(table.header_row_count, 1);
     assert_eq!(table.totals_row_count, 0);
     assert!(table.totals_row_shown);
@@ -130,12 +130,12 @@ fn parses_minimal_table_with_columns() {
     assert_eq!(table.columns.len(), 2);
     let item = &table.columns[0];
     assert_eq!(item.id, 1);
-    assert_eq!(item.totals_row_function, XlsbTableTotalsRowFunction::None);
+    assert_eq!(item.totals_row_function, TotalsRowFunction::None);
     assert_eq!(item.caption.as_deref(), Some("Item"));
     assert_eq!(item.totals_dxf_id, Some(5));
     assert_eq!(item.query_table_field_id, 0);
     let price = &table.columns[1];
-    assert_eq!(price.totals_row_function, XlsbTableTotalsRowFunction::Sum);
+    assert_eq!(price.totals_row_function, TotalsRowFunction::Sum);
 }
 
 #[test]
@@ -169,7 +169,7 @@ fn parses_totals_row_functions_labels_and_formulas() {
     .unwrap();
 
     let item = &table.columns[0];
-    assert_eq!(item.totals_row_function, XlsbTableTotalsRowFunction::Count);
+    assert_eq!(item.totals_row_function, TotalsRowFunction::Count);
     assert_eq!(item.totals_row_label.as_deref(), Some("3 items"));
     let calculated = item.calculated_column_formula.as_ref().unwrap();
     assert!(!calculated.array);
@@ -177,10 +177,7 @@ fn parses_totals_row_functions_labels_and_formulas() {
     assert!(calculated.extra.is_empty());
 
     let price = &table.columns[1];
-    assert_eq!(
-        price.totals_row_function,
-        XlsbTableTotalsRowFunction::Custom
-    );
+    assert_eq!(price.totals_row_function, TotalsRowFunction::Custom);
     assert_eq!(price.totals_row_label, None);
     let totals = price.totals_row_formula.as_ref().unwrap();
     assert!(totals.array);

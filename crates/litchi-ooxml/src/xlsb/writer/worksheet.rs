@@ -144,7 +144,7 @@ pub struct MutableXlsbWorksheet {
     /// groups intentionally have no entry and are never recompiled.
     formula_group_sources: BTreeMap<(u32, u32), String>,
     /// Structured tables (ListObjects) hosted on this sheet.
-    tables: Vec<crate::xlsb::table::XlsbTable>,
+    tables: Vec<crate::xlsb::table::Table>,
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
     pivot_table_views: Vec<litchi_xlsb::pivot_view::Part>,
     /// Typed DrawingML charts anchored on this sheet.
@@ -1054,7 +1054,7 @@ impl MutableXlsbWorksheet {
     /// The table part is serialized and related from this worksheet when the
     /// workbook is saved. The display name is required by Excel; the column
     /// list, when present, must match the range width.
-    pub fn add_table(&mut self, table: crate::xlsb::table::XlsbTable) -> XlsbResult<()> {
+    pub fn add_table(&mut self, table: crate::xlsb::table::Table) -> XlsbResult<()> {
         const MAX_TABLES_PER_SHEET: usize = 4_096;
         if self.tables.len() >= MAX_TABLES_PER_SHEET {
             return Err(crate::xlsb::error::XlsbError::InvalidFormula(
@@ -1090,7 +1090,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// The structured tables hosted on this sheet.
-    pub fn tables(&self) -> &[crate::xlsb::table::XlsbTable] {
+    pub fn tables(&self) -> &[crate::xlsb::table::Table] {
         &self.tables
     }
 

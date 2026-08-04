@@ -50,12 +50,12 @@ const STYLE_COLUMN_STRIPES: u16 = 1 << 3;
 /// Byte length of an `FRTBlank` header (MS-XLSB 2.5.55).
 const FRT_BLANK_LEN: usize = 4;
 
-/// Parse a Table part (`tables/table*.bin`) into a typed [`XlsbTable`].
+/// Parse a Table part (`tables/table*.bin`) into a typed [`Table`].
 ///
 /// The stream must start with `BrtBeginList`. Records after `BrtEndList` are
 /// ignored. Unknown record types anywhere in the stream are skipped without
 /// failing.
-pub fn parse_table_part(data: &[u8]) -> XlsbResult<XlsbTable> {
+pub fn parse_table_part(data: &[u8]) -> XlsbResult<Table> {
     let mut walker = RecordWalker::new(data);
     let first = walker.required_begin(rt::BEGIN_LIST, "BrtBeginList")?;
     let mut table = parse_list_payload(first.payload())?;
@@ -129,15 +129,15 @@ fn parse_list_parts(
 }
 
 /// `BrtBeginList` payload (MS-XLSB 2.4.100).
-fn parse_list_payload(data: &[u8]) -> XlsbResult<XlsbTable> {
+fn parse_list_payload(data: &[u8]) -> XlsbResult<Table> {
     let mut cursor = Cursor::new(data, "BrtBeginList");
-    let range = XlsbTableRange {
+    let range = Range {
         first_row: cursor.read_u32()?,
         last_row: cursor.read_u32()?,
         first_column: cursor.read_u32()?,
         last_column: cursor.read_u32()?,
     };
-    let table_type = XlsbTableType::try_from(cursor.read_u32()?)?;
+    let table_type = Type::try_from(cursor.read_u32()?)?;
     let id = cursor.read_u32()?;
     let header_row_count = u32::from(cursor.read_bool32()?);
     let totals_row_count = u32::from(cursor.read_bool32()?);
@@ -159,7 +159,7 @@ fn parse_list_payload(data: &[u8]) -> XlsbResult<XlsbTable> {
     let data_style = cursor.read_nullable_wide_string()?;
     let totals_style = cursor.read_nullable_wide_string()?;
     cursor.finish()?;
-    Ok(XlsbTable {
+    Ok(Table {
         id,
         name,
         display_name,
@@ -183,16 +183,12 @@ fn parse_list_payload(data: &[u8]) -> XlsbResult<XlsbTable> {
         header_style,
         data_style,
         totals_style,
-        ..XlsbTable::default()
+        ..Table::default()
     })
 }
 
 /// `BrtBeginListCols` collection (MS-XLSB 2.4.102).
-fn parse_columns(
-    walker: &mut RecordWalker<'_>,
-    data: &[u8],
-    table: &mut XlsbTable,
-) -> XlsbResult<()> {
+fn parse_columns(walker: &mut RecordWalker<'_>, data: &[u8], table: &mut Table) -> XlsbResult<()> {
     let mut cursor = Cursor::new(data, "BrtBeginListCols");
     let declared = cursor.read_u32()?;
     cursor.finish()?;
@@ -221,7 +217,7 @@ fn parse_columns(
 }
 
 /// `BrtBeginListCol` collection (MS-XLSB 2.4.101).
-fn parse_column(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<XlsbTableColumn> {
+fn parse_column(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<Column> {
     let mut column = parse_column_payload(data)?;
     while let Some(record) = walker.next()? {
         match record.kind() {
@@ -241,10 +237,10 @@ fn parse_column(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<XlsbTa
 }
 
 /// `BrtBeginListCol` payload (MS-XLSB 2.4.101).
-fn parse_column_payload(data: &[u8]) -> XlsbResult<XlsbTableColumn> {
+fn parse_column_payload(data: &[u8]) -> XlsbResult<Column> {
     let mut cursor = Cursor::new(data, "BrtBeginListCol");
     let id = cursor.read_u32()?;
-    let totals_row_function = XlsbTableTotalsRowFunction::try_from(cursor.read_u32()?)?;
+    let totals_row_function = TotalsRowFunction::try_from(cursor.read_u32()?)?;
     let header_dxf_id = cursor.read_dxf_id()?;
     let insert_row_dxf_id = cursor.read_dxf_id()?;
     let totals_dxf_id = cursor.read_dxf_id()?;
@@ -256,7 +252,7 @@ fn parse_column_payload(data: &[u8]) -> XlsbResult<XlsbTableColumn> {
     let insert_row_style = cursor.read_nullable_wide_string()?;
     let totals_style = cursor.read_nullable_wide_string()?;
     cursor.finish()?;
-    Ok(XlsbTableColumn {
+    Ok(Column {
         id,
         totals_row_function,
         header_dxf_id,
@@ -269,19 +265,19 @@ fn parse_column_payload(data: &[u8]) -> XlsbResult<XlsbTableColumn> {
         header_style,
         insert_row_style,
         totals_style,
-        ..XlsbTableColumn::default()
+        ..Column::default()
     })
 }
 
 /// `BrtListCCFmla`/`BrtListTrFmla` payload: a flag byte followed by a
 /// `ListParsedFormula` (MS-XLSB 2.4.706, 2.4.708, 2.5.98.11), stored verbatim.
-fn parse_formula(data: &[u8]) -> XlsbResult<XlsbTableFormula> {
+fn parse_formula(data: &[u8]) -> XlsbResult<Formula> {
     let mut cursor = Cursor::new(data, "BrtList formula");
     let flags = cursor.read_u8()?;
     let tokens = cursor.read_blob()?;
     let extra = cursor.read_blob()?;
     cursor.finish()?;
-    Ok(XlsbTableFormula {
+    Ok(Formula {
         array: flags & FORMULA_ARRAY != 0,
         tokens: tokens.to_vec(),
         extra: extra.to_vec(),
@@ -289,12 +285,12 @@ fn parse_formula(data: &[u8]) -> XlsbResult<XlsbTableFormula> {
 }
 
 /// `BrtTableStyleClient` payload (MS-XLSB 2.4.847).
-fn parse_style_client(data: &[u8]) -> XlsbResult<XlsbTableStyleInfo> {
+fn parse_style_client(data: &[u8]) -> XlsbResult<StyleInfo> {
     let mut cursor = Cursor::new(data, "BrtTableStyleClient");
     let flags = cursor.read_u16()?;
     let name = cursor.read_nullable_wide_string()?;
     cursor.finish()?;
-    Ok(XlsbTableStyleInfo {
+    Ok(StyleInfo {
         name,
         show_first_column: flags & STYLE_FIRST_COLUMN != 0,
         show_last_column: flags & STYLE_LAST_COLUMN != 0,
@@ -304,7 +300,7 @@ fn parse_style_client(data: &[u8]) -> XlsbResult<XlsbTableStyleInfo> {
 }
 
 /// `BrtList14` payload (MS-XLSB 2.4.705): table alternate text.
-fn parse_list14(data: &[u8], table: &mut XlsbTable) -> XlsbResult<()> {
+fn parse_list14(data: &[u8], table: &mut Table) -> XlsbResult<()> {
     let mut cursor = Cursor::new(data, "BrtList14");
     cursor.guard(FRT_BLANK_LEN)?;
     cursor.skip(FRT_BLANK_LEN)?;

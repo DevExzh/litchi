@@ -12,7 +12,7 @@ use crate::xlsb::error::XlsbError;
 /// A structured table parsed from one `tables/table*.bin` part
 /// (`BrtBeginList` and its record collection, MS-XLSB 2.4.100).
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct XlsbTable {
+pub struct Table {
     /// Numeric identifier of the table (`idList`); unique within the workbook.
     pub id: u32,
     /// String identifier used for programmatic purposes (`stName`); when
@@ -24,9 +24,9 @@ pub struct XlsbTable {
     /// Comment about the table (`stComment`).
     pub comment: Option<String>,
     /// Cell range the table occupies (`rfxList`).
-    pub range: XlsbTableRange,
+    pub range: Range,
     /// Table type (`lt`, a `ListType` value, MS-XLSB 2.5.89).
-    pub table_type: XlsbTableType,
+    pub table_type: Type,
     /// Header row count (`crwHeader`; `0` or `1` per the Boolean encoding).
     pub header_row_count: u32,
     /// Total row count (`crwTotals`; `0` or `1` per the Boolean encoding).
@@ -67,9 +67,9 @@ pub struct XlsbTable {
     /// Cell style applied to the total row (`stStyleAgg`).
     pub totals_style: Option<String>,
     /// Table columns in column index order (`BrtBeginListCols` collection).
-    pub columns: Vec<XlsbTableColumn>,
+    pub columns: Vec<Column>,
     /// Table style information (`BrtTableStyleClient`, MS-XLSB 2.4.847).
-    pub style_info: Option<XlsbTableStyleInfo>,
+    pub style_info: Option<StyleInfo>,
     /// Alternate text of the table (`stAltText` of `BrtList14`,
     /// MS-XLSB 2.4.705).
     pub alternate_text: Option<String>,
@@ -80,7 +80,7 @@ pub struct XlsbTable {
 
 /// A cell range (`RfX`, MS-XLSB 2.5.118).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsbTableRange {
+pub struct Range {
     /// First row (`rwFirst`).
     pub first_row: u32,
     /// Last row (`rwLast`).
@@ -94,7 +94,7 @@ pub struct XlsbTableRange {
 /// Table type (`ListType`, MS-XLSB 2.5.89).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
-pub enum XlsbTableType {
+pub enum Type {
     /// Standard table (`LTRANGE`).
     #[default]
     Range = 0,
@@ -104,7 +104,7 @@ pub enum XlsbTableType {
     QueryTable = 3,
 }
 
-impl TryFrom<u32> for XlsbTableType {
+impl TryFrom<u32> for Type {
     type Error = XlsbError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
@@ -124,7 +124,7 @@ impl TryFrom<u32> for XlsbTableType {
 /// MS-XLSB 2.5.88).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
-pub enum XlsbTableTotalsRowFunction {
+pub enum TotalsRowFunction {
     /// No operation (`ILTA_NONE`).
     #[default]
     None = 0,
@@ -149,7 +149,7 @@ pub enum XlsbTableTotalsRowFunction {
     Custom = 9,
 }
 
-impl TryFrom<u32> for XlsbTableTotalsRowFunction {
+impl TryFrom<u32> for TotalsRowFunction {
     type Error = XlsbError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
@@ -174,11 +174,11 @@ impl TryFrom<u32> for XlsbTableTotalsRowFunction {
 
 /// A column of a table (`BrtBeginListCol` collection, MS-XLSB 2.4.101).
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct XlsbTableColumn {
+pub struct Column {
     /// Numeric identifier of the column (`idField`); unique within the table.
     pub id: u32,
     /// Total row aggregation function (`ilta`).
-    pub totals_row_function: XlsbTableTotalsRowFunction,
+    pub totals_row_function: TotalsRowFunction,
     /// Differential formatting of the column header (`nDxfHdr`); `None` = none.
     pub header_dxf_id: Option<u32>,
     /// Differential formatting of the column insert row (`nDxfInsertRow`);
@@ -204,15 +204,15 @@ pub struct XlsbTableColumn {
     pub totals_style: Option<String>,
     /// Calculated column formula (`BrtListCCFmla`, MS-XLSB 2.4.706), stored
     /// as raw tokens; never evaluated.
-    pub calculated_column_formula: Option<XlsbTableFormula>,
+    pub calculated_column_formula: Option<Formula>,
     /// Total row formula (`BrtListTrFmla`, MS-XLSB 2.4.708), stored as raw
     /// tokens; never evaluated.
-    pub totals_row_formula: Option<XlsbTableFormula>,
+    pub totals_row_formula: Option<Formula>,
 }
 
 /// A `ListParsedFormula` (MS-XLSB 2.5.98.11) stored verbatim; never evaluated.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsbTableFormula {
+pub struct Formula {
     /// The formula is an array formula (`fArray`).
     pub array: bool,
     /// Ptg token bytes (`rgce`).
@@ -223,7 +223,7 @@ pub struct XlsbTableFormula {
 
 /// Table style applied to the table (`BrtTableStyleClient`, MS-XLSB 2.4.847).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsbTableStyleInfo {
+pub struct StyleInfo {
     /// Name of the table style (`stStyleName`); a built-in style name or the
     /// `strName` of a `BrtBeginTableStyle` record in the Styles part.
     pub name: Option<String>,
