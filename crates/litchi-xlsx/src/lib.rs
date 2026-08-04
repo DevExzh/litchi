@@ -48,7 +48,7 @@ pub use cell_watches::{
 pub use column::{Column, Columns, Width, WidthAt};
 pub use data_validation::{
     DataValidationCollection, DataValidationConformance, DataValidationFormula,
-    DataValidationRange, DataValidationSqref, DataValidationSource, ParsedDataValidation,
+    DataValidationRange, DataValidationSource, DataValidationSqref, ParsedDataValidation,
     ParsedDataValidationErrorStyle, ParsedDataValidationImeMode, ParsedDataValidationOperator,
     ParsedDataValidationType, ValidationListSource, parse_data_validation_collections,
     replace_data_validation_collections, validate_data_validation_collections,

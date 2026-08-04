@@ -3679,6 +3679,39 @@ integration and doctest surfaces. This is functional and boundary evidence;
 native Office and performance evidence remain governed by the evidence levels
 below.
 
+## DOCX fields, PPTX timing, and XLSX validation/protection owner follow-up
+
+The next concrete-crate migration batch closes four format-owned semantic and
+codec seams while retaining the historical host paths as compatibility
+adapters:
+
+- WordprocessingML field instruction/result semantics and bounded field XML
+  extraction now live in `litchi-docx::field`. Document traversal remains in
+  `litchi-ooxml`, with the host's legacy error type bridged to the owner error.
+- PresentationML timing trees, animation behavior values, bounded timing XML,
+  and animation relationship validation now live in `litchi-pptx::animations`.
+  Slide/package traversal and writer ordering remain host adapters.
+- SpreadsheetML data-validation collections, formula values, core/x14
+  extension handling, and atomic worksheet replacement now live in
+  `litchi-xlsx::data_validation`.
+- SpreadsheetML sheet-protection metadata, protected-range references,
+  legacy/strong verifier metadata, core/x14 extension handling, and ordered
+  worksheet replacement now live in `litchi-xlsx::sheet_protection`.
+  Workbook and worksheet transaction orchestration remains in `litchi-ooxml`.
+
+The codecs were checked against the corresponding checked-in `[MS-DOCX]` and
+`[MS-OE376]` field sections, `[MS-PPTX]` timing/animation sections, and
+`[MS-XLSX]` data-validations sections 2.4.7 and 2.6.3--2.6.5 plus protected
+ranges sections 2.4.10 and 2.6.55--2.6.56. The owner crates pass 227 DOCX,
+160 PPTX, and 294 XLSX unit tests; DOCX also passes its nine doctests. Strict
+all-features Clippy passes for all three owner crates, default all-target
+Clippy passes for `litchi-ooxml`, formatting and boundary checks pass, and the
+full host package surface passes 1,699 unit tests plus its integration and
+doctest targets. Host all-features Clippy remains environment-blocked before
+compilation because `pkg-config`/fontconfig is unavailable. This is functional
+and boundary evidence; native Office and performance evidence remain governed
+by the evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
