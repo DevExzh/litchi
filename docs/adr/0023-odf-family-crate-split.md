@@ -23,6 +23,7 @@ litchi-odf-common
 ├── litchi-odt
 ├── litchi-ods
 ├── litchi-odp
+├── litchi-odf-formula
 ├── litchi-odg
 ├── litchi-odc
 ├── litchi-odi
@@ -52,6 +53,13 @@ re-export canonical family modules, but it does not define aliases, duplicate
 models, or compatibility forwarding layers. Users who need minimal compile
 and memory footprints can depend directly on a family crate.
 
+The umbrella's family features are independent. Its default feature set covers
+the three primary document families (`odt`, `ods`, and `odp`); `--no-default-
+features` leaves only detection and common vocabulary, and `all` opts into the
+remaining family crates including `formula`. The top-level `litchi` facade
+depends directly on the concrete families it exposes so enabling one unified
+format does not pull the umbrella's unrelated family closure.
+
 Flat formats remain in their owning family crate (`.fodt`/`.oth` with text,
 `.fods` with spreadsheets, and so on). Formula documents and database
 front-ends are independent owners even when they reuse common XML primitives.
@@ -64,7 +72,8 @@ Migration is structural and behavior-preserving in stages:
 1. move common substrate ownership downward and make its public vocabulary
    contextual;
 2. migrate ODT, ODS, and ODP as complete family slices;
-3. migrate ODG, ODC, ODI, ODM, OTH, ODB, and formula/flat paths;
+3. migrate ODG, ODC, ODI, ODM, OTH, ODB, and formula/flat paths into their
+   dedicated owners;
 4. reduce `litchi-odf` to detection and optional facade wiring;
 5. add ADR 0003 `Snapshot`/`Edit`/`Commit` and reversible patch surfaces at
    each family owner, deleting the old attached mutable root paths as each
