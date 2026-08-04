@@ -50,7 +50,7 @@ pub struct ScriptEventListener {
 
 /// One child of the document-level `office:event-listeners` element.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DocumentEventListener {
+pub enum EventListener {
     Script(ScriptEventListener),
     /// A presentation listener preserved as inert XML for lossless round trips.
     PresentationXml(String),
@@ -73,21 +73,21 @@ enum NamespaceKind {
 
 /// Semantic contents of an ODF `office:scripts` element.
 #[derive(Debug, Clone, Default)]
-pub struct DocumentScripts {
+pub struct Scripts {
     pub scripts: Vec<EmbeddedScript>,
-    pub event_listeners: Vec<DocumentEventListener>,
+    pub event_listeners: Vec<EventListener>,
     namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl PartialEq for DocumentScripts {
+impl PartialEq for Scripts {
     fn eq(&self, other: &Self) -> bool {
         self.scripts == other.scripts && self.event_listeners == other.event_listeners
     }
 }
 
-impl Eq for DocumentScripts {}
+impl Eq for Scripts {}
 
-impl DocumentScripts {
+impl Scripts {
     /// Validate resource limits, required values, and preserved XML fragments.
     pub fn validate(&self) -> Result<()> {
         if self.scripts.len() > MAX_SCRIPT_COUNT {
@@ -111,7 +111,7 @@ impl DocumentScripts {
 
         for listener in &self.event_listeners {
             match listener {
-                DocumentEventListener::Script(listener) => {
+                EventListener::Script(listener) => {
                     validate_required_value(&listener.event_name, "script:event-name")?;
                     validate_required_value(&listener.language, "script:language")?;
                     text_bytes = checked_text_bytes(text_bytes, listener.event_name.len())?;
@@ -123,7 +123,7 @@ impl DocumentScripts {
                     validate_required_value(value, "script event target")?;
                     text_bytes = checked_text_bytes(text_bytes, value.len())?;
                 },
-                DocumentEventListener::PresentationXml(xml) => {
+                EventListener::PresentationXml(xml) => {
                     text_bytes = checked_text_bytes(text_bytes, xml.len())?;
                     validate_fragment(xml, &self.namespace_declarations)?;
                 },
@@ -184,7 +184,7 @@ impl DocumentScripts {
             output.push_str("<office:event-listeners>");
             for listener in &self.event_listeners {
                 match listener {
-                    DocumentEventListener::Script(listener) => {
+                    EventListener::Script(listener) => {
                         output.push_str("<script:event-listener script:event-name=\"");
                         escape_attribute(&mut output, &listener.event_name);
                         output.push_str("\" script:language=\"");
@@ -202,7 +202,7 @@ impl DocumentScripts {
                             },
                         }
                     },
-                    DocumentEventListener::PresentationXml(xml) => output.push_str(xml),
+                    EventListener::PresentationXml(xml) => output.push_str(xml),
                 }
             }
             output.push_str("</office:event-listeners>");
@@ -216,7 +216,7 @@ impl DocumentScripts {
             .iter()
             .map(|script| script.language.len() + script.content_xml.len())
             .chain(self.event_listeners.iter().map(|listener| match listener {
-                DocumentEventListener::Script(listener) => {
+                EventListener::Script(listener) => {
                     listener.event_name.len()
                         + listener.language.len()
                         + match &listener.binding {
@@ -224,14 +224,14 @@ impl DocumentScripts {
                             ScriptBinding::Linked { href } => href.len(),
                         }
                 },
-                DocumentEventListener::PresentationXml(xml) => xml.len(),
+                EventListener::PresentationXml(xml) => xml.len(),
             }))
             .sum()
     }
 }
 
 /// Parse the optional direct `office:scripts` child from an ODF XML document.
-pub fn parse_document_scripts(xml: &str) -> Result<Option<DocumentScripts>> {
+pub fn parse_scripts(xml: &str) -> Result<Option<Scripts>> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte script-inventory limit"
@@ -307,9 +307,9 @@ pub fn parse_document_scripts(xml: &str) -> Result<Option<DocumentScripts>> {
                         &mut in_scope_namespaces,
                         namespace_declarations(&reader, &element)?,
                     );
-                    result = Some(DocumentScripts {
+                    result = Some(Scripts {
                         namespace_declarations: in_scope_namespaces,
-                        ..DocumentScripts::default()
+                        ..Scripts::default()
                     });
                 }
             },
@@ -335,7 +335,7 @@ fn parse_scripts_element(
     xml: &str,
     root_namespaces: &[NamespaceDeclaration],
     _content_start: usize,
-) -> Result<DocumentScripts> {
+) -> Result<Scripts> {
     let mut scripts = Vec::new();
     let mut event_listeners = Vec::new();
     let mut listener_container_seen = false;
@@ -436,7 +436,7 @@ fn parse_scripts_element(
         buffer.clear();
     }
 
-    Ok(DocumentScripts {
+    Ok(Scripts {
         scripts,
         event_listeners,
         namespace_declarations: root_namespaces.to_vec(),
@@ -447,7 +447,7 @@ fn parse_event_listeners(
     reader: &mut NsReader<&[u8]>,
     xml: &str,
     text_bytes: &mut usize,
-) -> Result<Vec<DocumentEventListener>> {
+) -> Result<Vec<EventListener>> {
     let mut listeners = Vec::new();
     let mut buffer = Vec::new();
     loop {
@@ -467,7 +467,7 @@ fn parse_event_listeners(
                 ensure_listener_capacity(listeners.len())?;
                 let listener = parse_script_listener(reader, &element)?;
                 *text_bytes = checked_text_bytes(*text_bytes, script_listener_bytes(&listener))?;
-                listeners.push(DocumentEventListener::Script(listener));
+                listeners.push(EventListener::Script(listener));
             },
             Event::Start(element)
                 if bound_to(&namespace, SCRIPT_NAMESPACE)
@@ -477,7 +477,7 @@ fn parse_event_listeners(
                 let listener = parse_script_listener(reader, &element)?;
                 require_empty_element(reader, b"event-listener", SCRIPT_NAMESPACE)?;
                 *text_bytes = checked_text_bytes(*text_bytes, script_listener_bytes(&listener))?;
-                listeners.push(DocumentEventListener::Script(listener));
+                listeners.push(EventListener::Script(listener));
             },
             Event::Empty(element)
                 if bound_to(&namespace, PRESENTATION_NAMESPACE)
@@ -491,7 +491,7 @@ fn parse_event_listeners(
                     })?
                     .to_string();
                 *text_bytes = checked_text_bytes(*text_bytes, raw.len())?;
-                listeners.push(DocumentEventListener::PresentationXml(raw));
+                listeners.push(EventListener::PresentationXml(raw));
             },
             Event::Start(element)
                 if bound_to(&namespace, PRESENTATION_NAMESPACE)
@@ -500,7 +500,7 @@ fn parse_event_listeners(
                 ensure_listener_capacity(listeners.len())?;
                 let raw = capture_full_xml(reader, xml, event_start, b"event-listener")?;
                 *text_bytes = checked_text_bytes(*text_bytes, raw.len())?;
-                listeners.push(DocumentEventListener::PresentationXml(raw));
+                listeners.push(EventListener::PresentationXml(raw));
             },
             Event::End(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
@@ -968,21 +968,21 @@ mod tests {
         let xml = format!(
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:s="{SCRIPT}" xmlns:p="{PRESENTATION}" xmlns:x="http://www.w3.org/1999/xlink" xmlns:ooo="http://openoffice.org/2004/office"><o:scripts><o:script s:language="ooo:Basic"><ooo:libraries><ooo:library name="A&amp;B"/></ooo:libraries></o:script><o:script s:language="Python"/><o:event-listeners><s:event-listener s:event-name="dom:load" s:language="ooo:script" s:macro-name="Standard.Module.Main"/><s:event-listener s:event-name="dom:unload" s:language="javascript" x:type="simple" x:href="Scripts/close.js" x:actuate="onRequest"/><p:event-listener s:event-name="dom:click" p:action="next-page"/></o:event-listeners></o:scripts><o:body/></o:document-content>"#
         );
-        let scripts = parse_document_scripts(&xml).unwrap().unwrap();
+        let scripts = parse_scripts(&xml).unwrap().unwrap();
         assert_eq!(scripts.scripts.len(), 2);
         assert_eq!(scripts.scripts[0].language, "ooo:Basic");
         assert!(scripts.scripts[0].content_xml.contains("ooo:library"));
         assert_eq!(scripts.event_listeners.len(), 3);
         assert!(matches!(
             &scripts.event_listeners[1],
-            DocumentEventListener::Script(ScriptEventListener {
+            EventListener::Script(ScriptEventListener {
                 binding: ScriptBinding::Linked { href },
                 ..
             }) if href == "Scripts/close.js"
         ));
 
         let serialized = scripts.to_xml().unwrap();
-        let reparsed = parse_document_scripts(&format!(
+        let reparsed = parse_scripts(&format!(
             r#"<office:document-content xmlns:office="{OFFICE}">{serialized}<office:body/></office:document-content>"#
         ))
         .unwrap()
@@ -1005,7 +1005,7 @@ mod tests {
             r#"<o:event-listeners><s:event-listener s:event-name="load" s:language="x" x:type="extended" x:href="S"/></o:event-listeners>"#,
             r#"<o:script s:language="Python"><!DOCTYPE x></o:script>"#,
         ] {
-            assert!(parse_document_scripts(&wrap(body)).is_err(), "{body}");
+            assert!(parse_scripts(&wrap(body)).is_err(), "{body}");
         }
     }
 
@@ -1014,10 +1014,10 @@ mod tests {
         let nested = format!(
             r#"<o:document-content xmlns:o="{OFFICE}"><o:body><o:scripts/></o:body></o:document-content>"#
         );
-        assert!(parse_document_scripts(&nested).is_err());
+        assert!(parse_scripts(&nested).is_err());
         let duplicate = format!(
             r#"<o:document-content xmlns:o="{OFFICE}"><o:scripts/><o:scripts/><o:body/></o:document-content>"#
         );
-        assert!(parse_document_scripts(&duplicate).is_err());
+        assert!(parse_scripts(&duplicate).is_err());
     }
 }

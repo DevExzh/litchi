@@ -4,7 +4,7 @@
 
 use crate::core::OwnedPackage;
 use crate::document_scripts::{
-    DocumentEventListener, DocumentScripts, EmbeddedScript, ScriptBinding, parse_document_scripts,
+    EmbeddedScript, EventListener, ScriptBinding, Scripts, parse_scripts,
 };
 use crate::package::charts::{Addition, rebuild_package};
 use litchi_core::{Error, Result};
@@ -53,8 +53,8 @@ pub struct ScriptResourceSpec {
     pub bytes: Vec<u8>,
 }
 
-pub(crate) fn document_scripts(content: &str) -> Result<Option<DocumentScripts>> {
-    parse_document_scripts(content)
+pub(crate) fn document_scripts(content: &str) -> Result<Option<Scripts>> {
+    parse_scripts(content)
 }
 
 pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<ScriptResource>> {
@@ -103,13 +103,13 @@ pub(crate) fn find_resource(package: &OwnedPackage, path: &str) -> Result<Option
 pub(crate) fn set_document_scripts(
     package: &OwnedPackage,
     content: &str,
-    scripts: Option<&DocumentScripts>,
+    scripts: Option<&Scripts>,
 ) -> Result<Vec<u8>> {
     if let Some(scripts) = scripts {
         validate_script_links(scripts)?;
     }
     let updated = replace_scripts_element(content, scripts)?;
-    let staged = parse_document_scripts(&updated)?;
+    let staged = parse_scripts(&updated)?;
     if staged.as_ref().map(|value| value.scripts.len()) != scripts.map(|value| value.scripts.len())
     {
         return invalid("staged office:scripts mutation did not round-trip");
@@ -129,7 +129,7 @@ pub(crate) fn add_embedded_script(
     content: &str,
     script: &EmbeddedScript,
 ) -> Result<(Vec<u8>, usize)> {
-    let mut scripts = parse_document_scripts(content)?.unwrap_or_default();
+    let mut scripts = parse_scripts(content)?.unwrap_or_default();
     let index = scripts.scripts.len();
     scripts.scripts.push(script.clone());
     Ok((
@@ -179,9 +179,9 @@ pub(crate) fn move_embedded_script(
 pub(crate) fn add_event_listener(
     package: &OwnedPackage,
     content: &str,
-    listener: &DocumentEventListener,
+    listener: &EventListener,
 ) -> Result<(Vec<u8>, usize)> {
-    let mut scripts = parse_document_scripts(content)?.unwrap_or_default();
+    let mut scripts = parse_scripts(content)?.unwrap_or_default();
     let index = scripts.event_listeners.len();
     scripts.event_listeners.push(listener.clone());
     Ok((
@@ -194,7 +194,7 @@ pub(crate) fn replace_event_listener(
     package: &OwnedPackage,
     content: &str,
     index: usize,
-    listener: &DocumentEventListener,
+    listener: &EventListener,
 ) -> Result<Vec<u8>> {
     let mut scripts = require_scripts(content)?;
     *scripts
@@ -312,8 +312,8 @@ pub(crate) fn remove_resource(
     )
 }
 
-fn require_scripts(content: &str) -> Result<DocumentScripts> {
-    parse_document_scripts(content)?
+fn require_scripts(content: &str) -> Result<Scripts> {
+    parse_scripts(content)?
         .ok_or_else(|| Error::InvalidFormat("document has no office:scripts element".to_string()))
 }
 
@@ -331,10 +331,10 @@ fn move_item<T>(items: &mut Vec<T>, from: usize, to: usize, what: &str) -> Resul
     Ok(())
 }
 
-fn replace_scripts_element(content: &str, scripts: Option<&DocumentScripts>) -> Result<String> {
+fn replace_scripts_element(content: &str, scripts: Option<&Scripts>) -> Result<String> {
     let (span, root_open_end) = locate_scripts_element(content)?;
     let replacement = scripts
-        .map(DocumentScripts::to_xml)
+        .map(Scripts::to_xml)
         .transpose()?
         .unwrap_or_default();
     let (start, end) = span.unwrap_or((root_open_end, root_open_end));
@@ -420,10 +420,10 @@ fn is_office_scripts(office_namespace: bool, local: &[u8]) -> bool {
     local == b"scripts" && office_namespace
 }
 
-fn validate_script_links(scripts: &DocumentScripts) -> Result<()> {
+fn validate_script_links(scripts: &Scripts) -> Result<()> {
     scripts.validate()?;
     for listener in &scripts.event_listeners {
-        if let DocumentEventListener::Script(listener) = listener
+        if let EventListener::Script(listener) = listener
             && let ScriptBinding::Linked { href } = &listener.binding
         {
             validate_inert_href(href)?;
@@ -466,11 +466,11 @@ fn uri_scheme(value: &str) -> Option<&str> {
 }
 
 fn resource_is_referenced(content: &str, path: &str) -> Result<bool> {
-    let Some(scripts) = parse_document_scripts(content)? else {
+    let Some(scripts) = parse_scripts(content)? else {
         return Ok(false);
     };
     for listener in scripts.event_listeners {
-        if let DocumentEventListener::Script(listener) = listener
+        if let EventListener::Script(listener) = listener
             && let ScriptBinding::Linked { href } = listener.binding
         {
             validate_inert_href(&href)?;
@@ -689,12 +689,12 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 macro_rules! script_facade_methods {
     () => {
-        pub fn document_scripts(&self) -> litchi_core::Result<Option<crate::DocumentScripts>> {
+        pub fn document_scripts(&self) -> litchi_core::Result<Option<crate::Scripts>> {
             crate::package::scripts::document_scripts(self.content.xml_content())
         }
         pub fn set_document_scripts(
             &mut self,
-            scripts: Option<&crate::DocumentScripts>,
+            scripts: Option<&crate::Scripts>,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::set_document_scripts(
                 &self.package,
@@ -751,7 +751,7 @@ macro_rules! script_facade_methods {
         }
         pub fn add_document_event_listener(
             &mut self,
-            listener: &crate::DocumentEventListener,
+            listener: &crate::EventListener,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::package::scripts::add_event_listener(
                 &self.package,
@@ -764,7 +764,7 @@ macro_rules! script_facade_methods {
         pub fn replace_document_event_listener(
             &mut self,
             index: usize,
-            listener: &crate::DocumentEventListener,
+            listener: &crate::EventListener,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::replace_event_listener(
                 &self.package,

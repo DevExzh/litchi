@@ -157,8 +157,7 @@ pub use core::{
 pub use dde_connection::{DdeConnectionDeclaration, DdeConnectionUse};
 #[allow(unused_imports, reason = "ODT facade exposes document script metadata")]
 pub use document_scripts::{
-    DocumentEventListener, DocumentScripts, EmbeddedScript, ScriptBinding, ScriptEventListener,
-    parse_document_scripts,
+    EmbeddedScript, EventListener, ScriptBinding, ScriptEventListener, Scripts, parse_scripts,
 };
 #[allow(
     unused_imports,
