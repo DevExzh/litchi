@@ -25,7 +25,7 @@ use crate::xlsx::external_links::{
     build_external_link_part_with_conformance, load_external_link,
 };
 use crate::xlsx::named_sheet_view::{
-    NamedSheetViews, load_worksheet_named_sheet_views, remove_worksheet_named_sheet_views,
+    Views, load_worksheet_named_sheet_views, remove_worksheet_named_sheet_views,
     store_worksheet_named_sheet_views,
 };
 use crate::xlsx::sheet_protection::{
@@ -952,7 +952,7 @@ impl Workbook {
     ///
     /// These are stored sort/filter settings only. Reading them does not apply
     /// filters, reorder cells, evaluate formulas, or fetch external data.
-    pub fn named_sheet_views(&self, index: usize) -> SheetResult<Option<NamedSheetViews>> {
+    pub fn named_sheet_views(&self, index: usize) -> SheetResult<Option<Views>> {
         let info = self
             .worksheets
             .get(index)
@@ -965,11 +965,7 @@ impl Workbook {
     ///
     /// The supplied metadata is serialized without applying its sort or filter
     /// settings to worksheet cells.
-    pub fn set_named_sheet_views(
-        &mut self,
-        index: usize,
-        value: &NamedSheetViews,
-    ) -> SheetResult<()> {
+    pub fn set_named_sheet_views(&mut self, index: usize, value: &Views) -> SheetResult<()> {
         let info = self
             .worksheets
             .get(index)
@@ -3036,7 +3032,7 @@ impl Workbook {
     /// parts attached would create orphaned package data.
     fn detach_named_sheet_views_before_materialization(
         &mut self,
-    ) -> SheetResult<Vec<(u32, NamedSheetViews)>> {
+    ) -> SheetResult<Vec<(u32, Views)>> {
         // Named sheet views only exist on worksheets; chartsheets share the
         // sheets sequence but have no worksheet part to detach from.
         let mut worksheets = Vec::new();
@@ -3059,7 +3055,7 @@ impl Workbook {
     /// worksheet parts and their relationship collections.
     fn restore_named_sheet_views_after_materialization(
         &mut self,
-        retained: &[(u32, NamedSheetViews)],
+        retained: &[(u32, Views)],
     ) -> SheetResult<()> {
         for (sheet_id, value) in retained {
             let worksheet_part = PackURI::new(format!("/xl/worksheets/sheet{sheet_id}.xml"))?;

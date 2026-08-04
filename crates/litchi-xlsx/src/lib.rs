@@ -132,12 +132,8 @@ pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 pub use named_sheet_view::{
-    NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewDifferentialFormat,
-    NamedSheetViewExtension, NamedSheetViewFilter, NamedSheetViewGuid, NamedSheetViewIconSet,
-    NamedSheetViewMarkup, NamedSheetViewRange, NamedSheetViewSortCondition,
-    NamedSheetViewSortConditionKind, NamedSheetViewSortRule, NamedSheetViewSortRules,
-    NamedSheetViews, load_worksheet_named_sheet_views, parse_named_sheet_views,
-    remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views, write_named_sheet_views,
+    load_worksheet_named_sheet_views, parse_named_sheet_views, remove_worksheet_named_sheet_views,
+    store_worksheet_named_sheet_views, write_named_sheet_views,
 };
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};

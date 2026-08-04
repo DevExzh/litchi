@@ -27,7 +27,7 @@ use super::data_validation::{Collection, Validation, parse_data_validation_colle
 use super::drawing::parse_drawing_xml;
 use super::format::{CellFill, CellFont, CellFormat};
 use super::header_footer::{Settings, parse_worksheet_header_footer};
-use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
+use super::named_sheet_view::{Views, discover_named_sheet_views};
 use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
 use super::query_table::{
@@ -216,7 +216,7 @@ pub struct Worksheet<'a> {
     /// Complete immutable worksheet-view collection.
     sheet_view_collection: Option<WorksheetViewCollection>,
     /// Static Named Sheet Views part associated with this worksheet.
-    named_sheet_views: Option<NamedSheetViews>,
+    named_sheet_views: Option<Views>,
     /// Static worksheet protection and editable-range metadata.
     protection_metadata: WorksheetProtectionMetadata,
     /// Static worksheet header/footer settings.
@@ -1565,7 +1565,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Static Named Sheet Views associated with this worksheet.
-    pub fn named_sheet_views(&self) -> Option<&NamedSheetViews> {
+    pub fn named_sheet_views(&self) -> Option<&Views> {
         self.named_sheet_views.as_ref()
     }
 

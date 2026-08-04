@@ -200,12 +200,8 @@ pub use litchi_xlsx::sheet_calculation_properties::{
 };
 pub use litchi_xlsx::web;
 pub use named_sheet_view::{
-    NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewDifferentialFormat,
-    NamedSheetViewExtension, NamedSheetViewFilter, NamedSheetViewGuid, NamedSheetViewIconSet,
-    NamedSheetViewMarkup, NamedSheetViewRange, NamedSheetViewSortCondition,
-    NamedSheetViewSortConditionKind, NamedSheetViewSortRule, NamedSheetViewSortRules,
-    NamedSheetViews, load_worksheet_named_sheet_views, parse_named_sheet_views,
-    remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views, write_named_sheet_views,
+    load_worksheet_named_sheet_views, parse_named_sheet_views, remove_worksheet_named_sheet_views,
+    store_worksheet_named_sheet_views, write_named_sheet_views,
 };
 pub use ole_objects::{
     OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker, OleObjectProperties,
