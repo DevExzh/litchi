@@ -16,6 +16,7 @@ pub mod external_link;
 pub mod formula;
 pub mod hyperlinks;
 pub mod merged_cells;
+pub mod named_ranges;
 pub mod pivot_view;
 pub mod raw;
 pub mod styles;
