@@ -1,7 +1,7 @@
 //! ODF data-pilot (pivot-table) declarations.
 
 use super::{
-    DatabaseFilter, DatabaseSource,
+    Filter, Source,
     database_range::{
         parse_filter, parse_source_query, parse_source_sql, parse_source_table, validate_filter,
         write_database_source, write_filter,
@@ -169,7 +169,7 @@ pub enum DataPilotGroupBoundary {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DataPilotSource {
     /// SQL, database table, or database query metadata. Litchi never executes it.
-    Database(DatabaseSource),
+    Database(Source),
     /// Application service metadata. Litchi never invokes the service.
     Service {
         name: String,
@@ -183,7 +183,7 @@ pub enum DataPilotSource {
         /// Optional ODF 1.3 named-range source identifier.
         name: Option<String>,
         cell_range_address: String,
-        filter: Option<DatabaseFilter>,
+        filter: Option<Filter>,
     },
 }
 
@@ -455,7 +455,7 @@ impl DataPilotTable {
         }
         if let Some(DataPilotSource::Database(source)) = &self.source {
             match source {
-                DatabaseSource::Sql {
+                Source::Sql {
                     database_name,
                     statement,
                     ..
@@ -463,14 +463,14 @@ impl DataPilotTable {
                     validate_string("data-pilot database name", database_name, false)?;
                     validate_string("data-pilot SQL statement", statement, false)?;
                 },
-                DatabaseSource::Table {
+                Source::Table {
                     database_name,
                     table_name,
                 } => {
                     validate_string("data-pilot database name", database_name, false)?;
                     validate_string("data-pilot database table", table_name, false)?;
                 },
-                DatabaseSource::Query {
+                Source::Query {
                     database_name,
                     query_name,
                 } => {

@@ -30,14 +30,14 @@ impl HasLocalName for BytesEnd<'_> {
 
 /// Whether database fields are arranged in columns or rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DatabaseOrientation {
+pub enum Orientation {
     /// Each field occupies a column.
     Column,
     /// Each field occupies a row.
     Row,
 }
 
-impl DatabaseOrientation {
+impl Orientation {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "column" => Ok(Self::Column),
@@ -56,7 +56,7 @@ impl DatabaseOrientation {
 
 /// An inert external database source declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DatabaseSource {
+pub enum Source {
     /// A SQL statement stored in the document. It is never executed by this crate.
     Sql {
         /// Database identifier or URI.
@@ -140,7 +140,7 @@ impl EmbeddedNumberBehavior {
 
 /// One field in a database-range sort specification.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatabaseSortKey {
+pub struct SortKey {
     /// Zero-based field number.
     pub field_number: u64,
     /// Standard or application-defined sort data type.
@@ -149,7 +149,7 @@ pub struct DatabaseSortKey {
     pub order: Option<SortOrder>,
 }
 
-impl DatabaseSortKey {
+impl SortKey {
     /// Create a sort key for a zero-based field number.
     pub fn new(field_number: u64) -> Self {
         Self {
@@ -162,7 +162,7 @@ impl DatabaseSortKey {
 
 /// Sort configuration attached to a database range.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DatabaseSort {
+pub struct Sort {
     /// Whether styles remain bound to sorted content.
     pub bind_styles_to_content: Option<bool>,
     /// Optional destination range.
@@ -182,7 +182,7 @@ pub struct DatabaseSort {
     /// Embedded-number comparison behavior.
     pub embedded_number_behavior: Option<EmbeddedNumberBehavior>,
     /// Ordered sort keys. ODF requires at least one.
-    pub keys: Vec<DatabaseSortKey>,
+    pub keys: Vec<SortKey>,
 }
 
 /// Source used to obtain filter conditions.
@@ -281,7 +281,7 @@ pub enum FilterExpression {
 
 /// Filter configuration attached to a database range.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatabaseFilter {
+pub struct Filter {
     /// Optional destination range.
     pub target_range_address: Option<String>,
     /// Optional condition source.
@@ -338,7 +338,7 @@ pub struct SubtotalRules {
 
 /// A spreadsheet database range and its non-executing query/filter metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatabaseRange {
+pub struct Range {
     /// Optional range name.
     pub name: Option<String>,
     /// Whether this range represents the current selection.
@@ -350,7 +350,7 @@ pub struct DatabaseRange {
     /// Whether imported data is persisted in the document.
     pub has_persistent_data: Option<bool>,
     /// Field orientation.
-    pub orientation: Option<DatabaseOrientation>,
+    pub orientation: Option<Orientation>,
     /// Whether the first field is a header.
     pub contains_header: Option<bool>,
     /// Whether filter buttons are displayed.
@@ -360,16 +360,16 @@ pub struct DatabaseRange {
     /// Optional XML Schema refresh duration.
     pub refresh_delay: Option<String>,
     /// Optional inert external source.
-    pub source: Option<DatabaseSource>,
+    pub source: Option<Source>,
     /// Optional filter.
-    pub filter: Option<DatabaseFilter>,
+    pub filter: Option<Filter>,
     /// Optional sorting.
-    pub sort: Option<DatabaseSort>,
+    pub sort: Option<Sort>,
     /// Optional subtotal rules.
     pub subtotals: Option<SubtotalRules>,
 }
 
-impl DatabaseRange {
+impl Range {
     /// Create a database range for an ODF cell range address.
     pub fn new(target_range_address: impl Into<String>) -> Self {
         Self {
@@ -446,7 +446,7 @@ impl DatabaseRange {
         }
         if let Some(source) = &self.source {
             match source {
-                DatabaseSource::Sql {
+                Source::Sql {
                     database_name,
                     statement,
                     ..
@@ -454,14 +454,14 @@ impl DatabaseRange {
                     validate_text("database source name", Some(database_name), true)?;
                     validate_text("database SQL statement", Some(statement), true)?;
                 },
-                DatabaseSource::Table {
+                Source::Table {
                     database_name,
                     table_name,
                 } => {
                     validate_text("database source name", Some(database_name), true)?;
                     validate_text("database table name", Some(table_name), true)?;
                 },
-                DatabaseSource::Query {
+                Source::Query {
                     database_name,
                     query_name,
                 } => {
@@ -494,7 +494,7 @@ impl DatabaseRange {
     }
 }
 
-pub(crate) fn validate_database_range_collection(ranges: &[DatabaseRange]) -> Result<()> {
+pub(crate) fn validate_database_range_collection(ranges: &[Range]) -> Result<()> {
     use std::collections::HashSet;
     if ranges.len() > MAX_DATABASE_RANGES {
         return too_many("database ranges");
@@ -534,7 +534,7 @@ fn too_many(label: &str) -> Result<()> {
     )))
 }
 
-pub(crate) fn validate_filter(filter: &DatabaseFilter) -> Result<()> {
+pub(crate) fn validate_filter(filter: &Filter) -> Result<()> {
     validate_filter_expression(&filter.expression, 0, None)?;
     if filter.condition_source == Some(FilterConditionSource::CellRange)
         && filter.condition_source_range_address.is_none()
@@ -596,7 +596,7 @@ fn validate_filter_expression(
     Ok(())
 }
 
-pub(crate) fn parse_database_ranges(xml: &str) -> Result<Vec<DatabaseRange>> {
+pub(crate) fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
     if xml.len() > 64 * 1_048_576 {
         return Err(Error::InvalidFormat(
             "database-range XML exceeds 64 MiB".to_string(),
@@ -640,10 +640,7 @@ pub(crate) fn parse_database_ranges(xml: &str) -> Result<Vec<DatabaseRange>> {
     Ok(ranges)
 }
 
-fn parse_database_range(
-    reader: &mut NsReader<&[u8]>,
-    start: &BytesStart<'_>,
-) -> Result<DatabaseRange> {
+fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Range> {
     let mut range = database_range_from_start(reader, start)?;
     let mut buf = Vec::new();
     loop {
@@ -704,19 +701,16 @@ fn parse_database_range(
     Ok(range)
 }
 
-fn database_range_from_start(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<DatabaseRange> {
+fn database_range_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Range> {
     let target = required_attr(reader, element, b"target-range-address")?;
-    Ok(DatabaseRange {
+    Ok(Range {
         name: optional_attr(reader, element, b"name")?,
         is_selection: optional_bool(reader, element, b"is-selection")?,
         on_update_keep_styles: optional_bool(reader, element, b"on-update-keep-styles")?,
         on_update_keep_size: optional_bool(reader, element, b"on-update-keep-size")?,
         has_persistent_data: optional_bool(reader, element, b"has-persistent-data")?,
         orientation: optional_attr(reader, element, b"orientation")?
-            .map(|value| DatabaseOrientation::parse(&value))
+            .map(|value| Orientation::parse(&value))
             .transpose()?,
         contains_header: optional_bool(reader, element, b"contains-header")?,
         display_filter_buttons: optional_bool(reader, element, b"display-filter-buttons")?,
@@ -732,10 +726,10 @@ fn database_range_from_start(
 pub(crate) fn parse_source_sql(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<DatabaseSource> {
+) -> Result<Source> {
     let parse_statement = optional_bool(reader, element, b"parse-sql-statement")?
         .or(optional_bool(reader, element, b"parse-sql-statements")?);
-    Ok(DatabaseSource::Sql {
+    Ok(Source::Sql {
         database_name: required_attr(reader, element, b"database-name")?,
         statement: required_attr(reader, element, b"sql-statement")?,
         parse_statement,
@@ -745,8 +739,8 @@ pub(crate) fn parse_source_sql(
 pub(crate) fn parse_source_table(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<DatabaseSource> {
-    Ok(DatabaseSource::Table {
+) -> Result<Source> {
+    Ok(Source::Table {
         database_name: required_attr(reader, element, b"database-name")?,
         table_name: optional_attr(reader, element, b"database-table-name")?
             .or(optional_attr(reader, element, b"table-name")?)
@@ -757,17 +751,14 @@ pub(crate) fn parse_source_table(
 pub(crate) fn parse_source_query(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<DatabaseSource> {
-    Ok(DatabaseSource::Query {
+) -> Result<Source> {
+    Ok(Source::Query {
         database_name: required_attr(reader, element, b"database-name")?,
         query_name: required_attr(reader, element, b"query-name")?,
     })
 }
 
-pub(crate) fn parse_filter(
-    reader: &mut NsReader<&[u8]>,
-    start: &BytesStart<'_>,
-) -> Result<DatabaseFilter> {
+pub(crate) fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Filter> {
     let target_range_address = optional_attr(reader, start, b"target-range-address")?;
     let condition_source = optional_attr(reader, start, b"condition-source")?
         .map(|value| FilterConditionSource::parse(&value))
@@ -808,7 +799,7 @@ pub(crate) fn parse_filter(
         }
         buf.clear();
     }
-    Ok(DatabaseFilter {
+    Ok(Filter {
         target_range_address,
         condition_source,
         condition_source_range_address,
@@ -929,8 +920,8 @@ fn condition_from_start(
     })
 }
 
-fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DatabaseSort> {
-    let mut sort = DatabaseSort {
+fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Sort> {
+    let mut sort = Sort {
         bind_styles_to_content: optional_bool(reader, start, b"bind-styles-to-content")?,
         target_range_address: optional_attr(reader, start, b"target-range-address")?,
         case_sensitive: optional_bool(reader, start, b"case-sensitive")?,
@@ -953,7 +944,7 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Da
             Event::Empty(ref element) | Event::Start(ref element)
                 if is_table(&namespace, element, b"sort-by") =>
             {
-                sort.keys.push(DatabaseSortKey {
+                sort.keys.push(SortKey {
                     field_number: required_u64(reader, element, b"field-number")?,
                     data_type: optional_attr(reader, element, b"data-type")?,
                     order: optional_attr(reader, element, b"order")?
@@ -1049,7 +1040,7 @@ fn parse_subtotal_rule(
     Ok(rule)
 }
 
-pub(crate) fn write_database_ranges(output: &mut String, ranges: &[DatabaseRange]) -> Result<()> {
+pub(crate) fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()> {
     validate_database_range_collection(ranges)?;
     if ranges.is_empty() {
         return Ok(());
@@ -1063,7 +1054,7 @@ pub(crate) fn write_database_ranges(output: &mut String, ranges: &[DatabaseRange
     Ok(())
 }
 
-pub(crate) fn write_database_range_fragment(range: &DatabaseRange) -> Result<String> {
+pub(crate) fn write_database_range_fragment(range: &Range) -> Result<String> {
     range.validate()?;
     let mut output = String::with_capacity(512);
     output.push_str(
@@ -1078,7 +1069,7 @@ pub(crate) fn write_database_range_fragment(range: &DatabaseRange) -> Result<Str
     Ok(output[start..end].to_string())
 }
 
-fn write_database_range(output: &mut String, range: &DatabaseRange) {
+fn write_database_range(output: &mut String, range: &Range) {
     output.push_str("<table:database-range");
     attr(output, "table:name", range.name.as_deref());
     bool_attr(output, "table:is-selection", range.is_selection);
@@ -1100,7 +1091,7 @@ fn write_database_range(output: &mut String, range: &DatabaseRange) {
     attr(
         output,
         "table:orientation",
-        range.orientation.map(DatabaseOrientation::as_str),
+        range.orientation.map(Orientation::as_str),
     );
     bool_attr(output, "table:contains-header", range.contains_header);
     bool_attr(
@@ -1142,9 +1133,9 @@ fn write_database_range(output: &mut String, range: &DatabaseRange) {
     output.push_str("</table:database-range>");
 }
 
-pub(crate) fn write_database_source(output: &mut String, source: &DatabaseSource) {
+pub(crate) fn write_database_source(output: &mut String, source: &Source) {
     match source {
-        DatabaseSource::Sql {
+        Source::Sql {
             database_name,
             statement,
             parse_statement,
@@ -1154,7 +1145,7 @@ pub(crate) fn write_database_source(output: &mut String, source: &DatabaseSource
             attr(output, "table:sql-statement", Some(statement));
             bool_attr(output, "table:parse-sql-statement", *parse_statement);
         },
-        DatabaseSource::Table {
+        Source::Table {
             database_name,
             table_name,
         } => {
@@ -1162,7 +1153,7 @@ pub(crate) fn write_database_source(output: &mut String, source: &DatabaseSource
             attr(output, "table:database-name", Some(database_name));
             attr(output, "table:database-table-name", Some(table_name));
         },
-        DatabaseSource::Query {
+        Source::Query {
             database_name,
             query_name,
         } => {
@@ -1174,7 +1165,7 @@ pub(crate) fn write_database_source(output: &mut String, source: &DatabaseSource
     output.push_str("/>");
 }
 
-pub(crate) fn write_filter(output: &mut String, filter: &DatabaseFilter) {
+pub(crate) fn write_filter(output: &mut String, filter: &Filter) {
     output.push_str("<table:filter");
     attr(
         output,
@@ -1243,7 +1234,7 @@ fn write_filter_expression(output: &mut String, expression: &FilterExpression) {
     }
 }
 
-fn write_sort(output: &mut String, sort: &DatabaseSort) {
+fn write_sort(output: &mut String, sort: &Sort) {
     output.push_str("<table:sort");
     bool_attr(
         output,
@@ -1526,9 +1517,9 @@ mod tests {
         assert_eq!(parsed.len(), 1);
         let range = &parsed[0];
         assert_eq!(range.name.as_deref(), Some("Data & More"));
-        assert_eq!(range.orientation, Some(DatabaseOrientation::Column));
+        assert_eq!(range.orientation, Some(Orientation::Column));
         assert_eq!(range.refresh_delay.as_deref(), Some("PT5M"));
-        assert!(matches!(range.source, Some(DatabaseSource::Sql { .. })));
+        assert!(matches!(range.source, Some(Source::Sql { .. })));
         assert_eq!(range.sort.as_ref().unwrap().keys[0].field_number, 1);
         assert_eq!(
             range.subtotals.as_ref().unwrap().rules[0].fields[0].function,
@@ -1563,7 +1554,7 @@ mod tests {
         let ranges = parse_database_ranges(xml).unwrap();
         assert_eq!(
             ranges[0].source,
-            Some(DatabaseSource::Query {
+            Some(Source::Query {
                 database_name: "file:///database.odb".to_string(),
                 query_name: "DangerousQuery".to_string(),
             })
@@ -1572,15 +1563,15 @@ mod tests {
 
     #[test]
     fn database_ranges_round_trip_through_builder_and_mutable_packages() {
-        let mut range = DatabaseRange::new("Sheet1.A1:Sheet1.C20");
+        let mut range = Range::new("Sheet1.A1:Sheet1.C20");
         range.name = Some("Sales".to_string());
-        range.orientation = Some(DatabaseOrientation::Column);
+        range.orientation = Some(Orientation::Column);
         range.display_filter_buttons = Some(true);
-        range.source = Some(DatabaseSource::Query {
+        range.source = Some(Source::Query {
             database_name: "file:///sales&forecast.odb".to_string(),
             query_name: "Quarter <One>".to_string(),
         });
-        range.filter = Some(DatabaseFilter {
+        range.filter = Some(Filter {
             target_range_address: None,
             condition_source: Some(FilterConditionSource::SelfContained),
             condition_source_range_address: None,
@@ -1593,14 +1584,14 @@ mod tests {
                 ]),
             ]),
         });
-        range.sort = Some(DatabaseSort {
+        range.sort = Some(Sort {
             embedded_number_behavior: Some(EmbeddedNumberBehavior::Integer),
-            keys: vec![DatabaseSortKey {
+            keys: vec![SortKey {
                 field_number: 1,
                 data_type: Some("number".to_string()),
                 order: Some(SortOrder::Descending),
             }],
-            ..DatabaseSort::default()
+            ..Sort::default()
         });
         range.subtotals = Some(SubtotalRules {
             rules: vec![SubtotalRule {
