@@ -1302,7 +1302,7 @@ impl<'a> Document<'a> {
     /// ```
     pub fn fields(&self) -> Result<Vec<Field>> {
         let xml_bytes = self.part.xml_bytes();
-        Field::extract_from_document(xml_bytes)
+        Ok(Field::extract_from_document(xml_bytes)?)
     }
 
     /// Get the number of fields in the document.
@@ -1330,7 +1330,7 @@ impl<'a> Document<'a> {
     pub fn hyperlink_fields(&self) -> Result<Vec<HyperlinkField>> {
         self.fields()?
             .iter()
-            .map(Field::hyperlink_field)
+            .map(|field| Field::hyperlink_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1348,7 +1348,7 @@ impl<'a> Document<'a> {
     pub fn citations(&self) -> Result<Vec<CitationField>> {
         self.fields()?
             .iter()
-            .map(Field::citation)
+            .map(|field| Field::citation(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1366,7 +1366,7 @@ impl<'a> Document<'a> {
     pub fn bibliographies(&self) -> Result<Vec<BibliographyField>> {
         self.fields()?
             .iter()
-            .map(Field::bibliography)
+            .map(|field| Field::bibliography(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1384,7 +1384,7 @@ impl<'a> Document<'a> {
     pub fn document_variable_fields(&self) -> Result<Vec<DocumentVariableField>> {
         self.fields()?
             .iter()
-            .map(Field::document_variable)
+            .map(|field| Field::document_variable(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1402,7 +1402,7 @@ impl<'a> Document<'a> {
     pub fn document_property_fields(&self) -> Result<Vec<DocumentPropertyField>> {
         self.fields()?
             .iter()
-            .map(Field::document_property)
+            .map(|field| Field::document_property(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1421,7 +1421,7 @@ impl<'a> Document<'a> {
     pub fn info_fields(&self) -> Result<Vec<InfoField>> {
         self.fields()?
             .iter()
-            .map(Field::info_field)
+            .map(|field| Field::info_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1440,7 +1440,7 @@ impl<'a> Document<'a> {
     pub fn document_information_fields(&self) -> Result<Vec<DocumentInformationField>> {
         self.fields()?
             .iter()
-            .map(Field::document_information)
+            .map(|field| Field::document_information(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1459,7 +1459,7 @@ impl<'a> Document<'a> {
     pub fn document_context_fields(&self) -> Result<Vec<DocumentContextField>> {
         self.fields()?
             .iter()
-            .map(Field::document_context)
+            .map(|field| Field::document_context(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1477,7 +1477,7 @@ impl<'a> Document<'a> {
     pub fn macro_button_fields(&self) -> Result<Vec<MacroButtonField>> {
         self.fields()?
             .iter()
-            .map(Field::macro_button)
+            .map(|field| Field::macro_button(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1497,7 +1497,7 @@ impl<'a> Document<'a> {
     pub fn active_content_fields(&self) -> Result<Vec<ActiveContentField>> {
         self.fields()?
             .iter()
-            .map(Field::active_content_field)
+            .map(|field| Field::active_content_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1516,7 +1516,7 @@ impl<'a> Document<'a> {
     pub fn auto_text_fields(&self) -> Result<Vec<AutoTextField>> {
         self.fields()?
             .iter()
-            .map(Field::auto_text_field)
+            .map(|field| Field::auto_text_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1535,7 +1535,7 @@ impl<'a> Document<'a> {
     pub fn auto_text_list_fields(&self) -> Result<Vec<AutoTextListField>> {
         self.fields()?
             .iter()
-            .map(Field::auto_text_list_field)
+            .map(|field| Field::auto_text_list_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1553,7 +1553,7 @@ impl<'a> Document<'a> {
     pub fn go_to_button_fields(&self) -> Result<Vec<GoToButtonField>> {
         self.fields()?
             .iter()
-            .map(Field::go_to_button)
+            .map(|field| Field::go_to_button(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1572,7 +1572,7 @@ impl<'a> Document<'a> {
     pub fn print_fields(&self) -> Result<Vec<PrintField>> {
         self.fields()?
             .iter()
-            .map(Field::print_field)
+            .map(|field| Field::print_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1591,7 +1591,7 @@ impl<'a> Document<'a> {
     pub fn embed_fields(&self) -> Result<Vec<EmbedField>> {
         self.fields()?
             .iter()
-            .map(Field::embed_field)
+            .map(|field| Field::embed_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1610,7 +1610,7 @@ impl<'a> Document<'a> {
     pub fn barcode_fields(&self) -> Result<Vec<BarcodeField>> {
         self.fields()?
             .iter()
-            .map(Field::barcode_field)
+            .map(|field| Field::barcode_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1629,7 +1629,7 @@ impl<'a> Document<'a> {
     pub fn bidi_outline_fields(&self) -> Result<Vec<BidiOutlineField>> {
         self.fields()?
             .iter()
-            .map(Field::bidi_outline_field)
+            .map(|field| Field::bidi_outline_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1647,7 +1647,7 @@ impl<'a> Document<'a> {
     pub fn shape_fields(&self) -> Result<Vec<ShapeField>> {
         self.fields()?
             .iter()
-            .map(Field::shape_field)
+            .map(|field| Field::shape_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1666,7 +1666,7 @@ impl<'a> Document<'a> {
     pub fn legacy_form_fields(&self) -> Result<Vec<LegacyFormField>> {
         self.fields()?
             .iter()
-            .map(Field::legacy_form_field)
+            .map(|field| Field::legacy_form_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1685,7 +1685,7 @@ impl<'a> Document<'a> {
     pub fn private_fields(&self) -> Result<Vec<PrivateField>> {
         self.fields()?
             .iter()
-            .map(Field::private_field)
+            .map(|field| Field::private_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1704,7 +1704,7 @@ impl<'a> Document<'a> {
     pub fn database_fields(&self) -> Result<Vec<DatabaseField>> {
         self.fields()?
             .iter()
-            .map(Field::database_field)
+            .map(|field| Field::database_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1722,7 +1722,7 @@ impl<'a> Document<'a> {
     pub fn user_identity_fields(&self) -> Result<Vec<UserIdentityField>> {
         self.fields()?
             .iter()
-            .map(Field::user_identity_field)
+            .map(|field| Field::user_identity_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1740,7 +1740,7 @@ impl<'a> Document<'a> {
     pub fn advance_fields(&self) -> Result<Vec<AdvanceField>> {
         self.fields()?
             .iter()
-            .map(Field::advance_field)
+            .map(|field| Field::advance_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1759,7 +1759,7 @@ impl<'a> Document<'a> {
     pub fn dde_links(&self) -> Result<Vec<DdeField>> {
         self.fields()?
             .iter()
-            .map(Field::dde_link)
+            .map(|field| Field::dde_link(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1779,7 +1779,7 @@ impl<'a> Document<'a> {
     pub fn external_includes(&self) -> Result<Vec<ExternalIncludeField>> {
         self.fields()?
             .iter()
-            .map(Field::external_include)
+            .map(|field| Field::external_include(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1798,7 +1798,7 @@ impl<'a> Document<'a> {
     pub fn referenced_documents(&self) -> Result<Vec<ReferencedDocumentField>> {
         self.fields()?
             .iter()
-            .map(Field::referenced_document)
+            .map(|field| Field::referenced_document(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1817,7 +1817,7 @@ impl<'a> Document<'a> {
     pub fn link_fields(&self) -> Result<Vec<LinkField>> {
         self.fields()?
             .iter()
-            .map(Field::link)
+            .map(|field| Field::link(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1836,7 +1836,7 @@ impl<'a> Document<'a> {
     pub fn table_of_contents(&self) -> Result<Vec<TableOfContentsField>> {
         self.fields()?
             .iter()
-            .map(Field::table_of_contents)
+            .map(|field| Field::table_of_contents(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1855,7 +1855,7 @@ impl<'a> Document<'a> {
     pub fn table_of_contents_entries(&self) -> Result<Vec<TableOfContentsEntryField>> {
         self.fields()?
             .iter()
-            .map(Field::table_of_contents_entry)
+            .map(|field| Field::table_of_contents_entry(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1873,7 +1873,7 @@ impl<'a> Document<'a> {
     pub fn tables_of_authorities(&self) -> Result<Vec<TableOfAuthoritiesField>> {
         self.fields()?
             .iter()
-            .map(Field::table_of_authorities)
+            .map(|field| Field::table_of_authorities(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1890,7 +1890,7 @@ impl<'a> Document<'a> {
     pub fn table_of_authorities_entries(&self) -> Result<Vec<TableOfAuthoritiesEntryField>> {
         self.fields()?
             .iter()
-            .map(Field::table_of_authorities_entry)
+            .map(|field| Field::table_of_authorities_entry(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1908,7 +1908,7 @@ impl<'a> Document<'a> {
     pub fn indexes(&self) -> Result<Vec<IndexField>> {
         self.fields()?
             .iter()
-            .map(Field::index)
+            .map(|field| Field::index(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1925,7 +1925,7 @@ impl<'a> Document<'a> {
     pub fn index_entries(&self) -> Result<Vec<IndexEntryField>> {
         self.fields()?
             .iter()
-            .map(Field::index_entry)
+            .map(|field| Field::index_entry(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1946,7 +1946,7 @@ impl<'a> Document<'a> {
     pub fn typed_merge_fields(&self) -> Result<Vec<MergeField>> {
         self.fields()?
             .iter()
-            .map(Field::merge_field)
+            .map(|field| Field::merge_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1965,7 +1965,7 @@ impl<'a> Document<'a> {
     pub fn mail_merge_data_fields(&self) -> Result<Vec<MailMergeDataField>> {
         self.fields()?
             .iter()
-            .map(Field::mail_merge_data)
+            .map(|field| Field::mail_merge_data(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -1983,7 +1983,7 @@ impl<'a> Document<'a> {
     pub fn mail_merge_counters(&self) -> Result<Vec<MailMergeCounterField>> {
         self.fields()?
             .iter()
-            .map(Field::mail_merge_counter)
+            .map(|field| Field::mail_merge_counter(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2001,7 +2001,7 @@ impl<'a> Document<'a> {
     pub fn mail_merge_next_fields(&self) -> Result<Vec<MailMergeNextField>> {
         self.fields()?
             .iter()
-            .map(Field::mail_merge_next)
+            .map(|field| Field::mail_merge_next(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2020,7 +2020,7 @@ impl<'a> Document<'a> {
     pub fn mail_merge_conditional_controls(&self) -> Result<Vec<MailMergeConditionalControlField>> {
         self.fields()?
             .iter()
-            .map(Field::mail_merge_conditional_control)
+            .map(|field| Field::mail_merge_conditional_control(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2038,7 +2038,7 @@ impl<'a> Document<'a> {
     pub fn if_fields(&self) -> Result<Vec<IfField>> {
         self.fields()?
             .iter()
-            .map(Field::if_field)
+            .map(|field| Field::if_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2056,7 +2056,7 @@ impl<'a> Document<'a> {
     pub fn compare_fields(&self) -> Result<Vec<CompareField>> {
         self.fields()?
             .iter()
-            .map(Field::compare_field)
+            .map(|field| Field::compare_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2075,7 +2075,7 @@ impl<'a> Document<'a> {
     pub fn reference_fields(&self) -> Result<Vec<ReferenceField>> {
         self.fields()?
             .iter()
-            .map(Field::reference_field)
+            .map(|field| Field::reference_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2094,7 +2094,7 @@ impl<'a> Document<'a> {
     pub fn set_fields(&self) -> Result<Vec<SetField>> {
         self.fields()?
             .iter()
-            .map(Field::set_field)
+            .map(|field| Field::set_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2112,7 +2112,7 @@ impl<'a> Document<'a> {
     pub fn formula_fields(&self) -> Result<Vec<FormulaField>> {
         self.fields()?
             .iter()
-            .map(Field::formula_field)
+            .map(|field| Field::formula_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2130,7 +2130,7 @@ impl<'a> Document<'a> {
     pub fn equations(&self) -> Result<Vec<EquationField>> {
         self.fields()?
             .iter()
-            .map(Field::equation)
+            .map(|field| Field::equation(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2149,7 +2149,7 @@ impl<'a> Document<'a> {
     pub fn sequence_fields(&self) -> Result<Vec<SequenceField>> {
         self.fields()?
             .iter()
-            .map(Field::sequence_field)
+            .map(|field| Field::sequence_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2168,7 +2168,7 @@ impl<'a> Document<'a> {
     pub fn style_reference_fields(&self) -> Result<Vec<StyleReferenceField>> {
         self.fields()?
             .iter()
-            .map(Field::style_reference_field)
+            .map(|field| Field::style_reference_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2186,7 +2186,7 @@ impl<'a> Document<'a> {
     pub fn quote_fields(&self) -> Result<Vec<QuoteField>> {
         self.fields()?
             .iter()
-            .map(Field::quote_field)
+            .map(|field| Field::quote_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2205,7 +2205,7 @@ impl<'a> Document<'a> {
     pub fn symbol_fields(&self) -> Result<Vec<SymbolField>> {
         self.fields()?
             .iter()
-            .map(Field::symbol_field)
+            .map(|field| Field::symbol_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2224,7 +2224,7 @@ impl<'a> Document<'a> {
     pub fn auto_number_fields(&self) -> Result<Vec<AutoNumberField>> {
         self.fields()?
             .iter()
-            .map(Field::auto_number_field)
+            .map(|field| Field::auto_number_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2243,7 +2243,7 @@ impl<'a> Document<'a> {
     pub fn list_number_fields(&self) -> Result<Vec<ListNumberField>> {
         self.fields()?
             .iter()
-            .map(Field::list_number_field)
+            .map(|field| Field::list_number_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2262,7 +2262,7 @@ impl<'a> Document<'a> {
     pub fn prompt_fields(&self) -> Result<Vec<PromptField>> {
         self.fields()?
             .iter()
-            .map(Field::prompt_field)
+            .map(|field| Field::prompt_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
@@ -2282,7 +2282,7 @@ impl<'a> Document<'a> {
     pub fn mail_merge_recipient_fields(&self) -> Result<Vec<MailMergeRecipientField>> {
         self.fields()?
             .iter()
-            .map(Field::mail_merge_recipient_field)
+            .map(|field| Field::mail_merge_recipient_field(field).map_err(OoxmlError::from))
             .filter_map(|result| result.transpose())
             .collect()
     }
