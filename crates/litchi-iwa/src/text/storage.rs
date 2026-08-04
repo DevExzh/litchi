@@ -45,22 +45,12 @@ impl TextStorage {
         &self.text
     }
 
-    /// Get text fragments with their styling
-    pub fn fragments(&self) -> Vec<TextFragment> {
-        self.runs
-            .iter()
-            .filter_map(|run| {
-                let end = (run.offset + run.length).min(self.text.len());
-                if run.offset < self.text.len() && run.offset < end {
-                    Some(TextFragment {
-                        text: self.text[run.offset..end].to_string(),
-                        style: run.style,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect()
+    /// Iterate over text fragments without copying their text.
+    pub fn iter_fragments(&self) -> TextFragmentIter<'_> {
+        TextFragmentIter {
+            text: &self.text,
+            runs: self.runs.iter(),
+        }
     }
 
     /// Check if storage is empty
@@ -91,27 +81,34 @@ pub struct TextRun {
     pub style: Option<u64>,
 }
 
-/// A fragment of text with its associated style
-#[derive(Debug, Clone)]
-pub struct TextFragment {
-    /// The text content
-    pub text: String,
+/// A borrowed fragment of text with its associated style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextFragment<'a> {
+    /// The text content borrowed from its [`TextStorage`].
+    pub text: &'a str,
     /// Optional style reference
     pub style: Option<u64>,
 }
 
-impl TextFragment {
-    /// Create a new text fragment
-    pub fn new(text: String) -> Self {
-        Self { text, style: None }
-    }
+/// Lazy iterator over the non-empty, valid runs in a [`TextStorage`].
+#[derive(Debug)]
+pub struct TextFragmentIter<'a> {
+    text: &'a str,
+    runs: std::slice::Iter<'a, TextRun>,
+}
 
-    /// Create a fragment with style
-    pub fn with_style(text: String, style: u64) -> Self {
-        Self {
-            text,
-            style: Some(style),
-        }
+impl<'a> Iterator for TextFragmentIter<'a> {
+    type Item = TextFragment<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.runs.find_map(|run| {
+            let end = run.offset.checked_add(run.length)?.min(self.text.len());
+            let text = self.text.get(run.offset..end)?;
+            (!text.is_empty()).then_some(TextFragment {
+                text,
+                style: run.style,
+            })
+        })
     }
 }
 
@@ -126,11 +123,21 @@ pub fn parse_storage_archive(text_lines: &[String]) -> Result<TextStorage> {
 
 /// Extract text from multiple storage archives
 pub fn extract_text_from_storages(storages: Vec<TextStorage>) -> String {
-    storages
-        .into_iter()
-        .map(|s| s.plain_text().to_string())
-        .collect::<Vec<_>>()
-        .join("\n")
+    let capacity = storages
+        .iter()
+        .fold(storages.len().saturating_sub(1), |capacity, storage| {
+            capacity.saturating_add(storage.text.len())
+        });
+    let mut text = String::with_capacity(capacity);
+
+    for (index, storage) in storages.into_iter().enumerate() {
+        if index != 0 {
+            text.push('\n');
+        }
+        text.push_str(&storage.text);
+    }
+
+    text
 }
 
 #[cfg(test)]
@@ -146,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn test_text_fragments() {
+    fn test_text_fragments_are_borrowed() {
         let mut storage = TextStorage::from_text("Hello World".to_string());
         storage.runs = vec![
             TextRun {
@@ -161,10 +168,62 @@ mod tests {
             },
         ];
 
-        let fragments = storage.fragments();
-        assert_eq!(fragments.len(), 2);
-        assert_eq!(fragments[0].text, "Hello");
-        assert_eq!(fragments[1].text, "World");
+        let mut fragments = storage.iter_fragments();
+        let first = fragments.next().expect("first fragment");
+        let second = fragments.next().expect("second fragment");
+
+        assert_eq!(first.text, "Hello");
+        assert_eq!(first.style, Some(1));
+        assert_eq!(second.text, "World");
+        assert_eq!(second.style, Some(2));
+        assert!(fragments.next().is_none());
+        assert!(std::ptr::eq(first.text.as_ptr(), storage.text.as_ptr()));
+        assert!(std::ptr::eq(
+            second.text.as_ptr(),
+            storage.text.as_ptr().wrapping_add(6)
+        ));
+    }
+
+    #[test]
+    fn test_text_fragments_skip_malformed_runs() {
+        let storage = TextStorage {
+            text: "éclair".to_string(),
+            runs: vec![
+                TextRun {
+                    offset: usize::MAX,
+                    length: 1,
+                    style: None,
+                },
+                TextRun {
+                    offset: 1,
+                    length: 1,
+                    style: None,
+                },
+                TextRun {
+                    offset: 2,
+                    length: 3,
+                    style: Some(7),
+                },
+            ],
+            identifier: None,
+        };
+
+        let fragments: Vec<_> = storage.iter_fragments().collect();
+        assert_eq!(fragments.len(), 1);
+        assert_eq!(fragments[0].text, "cla");
+        assert_eq!(fragments[0].style, Some(7));
+    }
+
+    #[test]
+    fn test_extract_text_uses_one_output_and_preserves_empty_storages() {
+        let text = extract_text_from_storages(vec![
+            TextStorage::from_text("First".to_string()),
+            TextStorage::new(),
+            TextStorage::from_text("第三".to_string()),
+        ]);
+
+        assert_eq!(text, "First\n\n第三");
+        assert_eq!(text.capacity(), text.len());
     }
 
     #[test]
