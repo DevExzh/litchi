@@ -8,6 +8,7 @@
 mod error;
 
 pub mod alt;
+pub mod bibliography;
 pub mod color;
 pub mod enums;
 pub mod field;
@@ -21,6 +22,13 @@ pub mod settings;
 pub mod statistics;
 pub mod web;
 
+pub use bibliography::{
+    BibliographySource, BibliographySourceStore, BibliographySourceValue,
+    LEGACY_WORD_BIBLIOGRAPHY_NAMESPACE, MAX_BIBLIOGRAPHY_DEPTH, MAX_BIBLIOGRAPHY_SOURCES,
+    MAX_BIBLIOGRAPHY_TEXT_BYTES, MAX_BIBLIOGRAPHY_VALUES, OOXML_BIBLIOGRAPHY_NAMESPACE,
+    STRICT_OOXML_BIBLIOGRAPHY_NAMESPACE, is_bibliography_namespace, is_bibliography_node,
+    is_bibliography_root, parse_bibliography_source_store,
+};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use error::{Error, Result};
 pub use field::{
