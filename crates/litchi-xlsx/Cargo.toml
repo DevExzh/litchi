@@ -9,6 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+base64 = { workspace = true }
 bitflags = { workspace = true }
 caseless = { workspace = true }
 chrono = { workspace = true }

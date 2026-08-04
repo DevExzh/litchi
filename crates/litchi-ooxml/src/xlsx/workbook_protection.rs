@@ -417,6 +417,7 @@ fn finish_credential(
     StrongProtectionPasswordVerifier::new(algorithm_name, hash_value, salt_value, spin_count)
         .map(ProtectionPasswordVerifier::Strong)
         .map(Some)
+        .map_err(OoxmlError::from)
 }
 
 fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {

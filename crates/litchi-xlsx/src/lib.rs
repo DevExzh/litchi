@@ -11,6 +11,7 @@ pub mod cell_watches;
 pub mod chain;
 pub mod column;
 pub mod connections;
+pub mod data_validation;
 mod error;
 pub mod formula;
 pub mod ignored_errors;
@@ -26,6 +27,7 @@ pub mod row;
 pub mod scenarios;
 pub mod sheet;
 pub mod sheet_calculation_properties;
+pub mod sheet_protection;
 pub mod sheet_view;
 pub mod style;
 pub mod views;
@@ -44,6 +46,15 @@ pub use cell_watches::{
     parse_worksheet_cell_watches, write_worksheet_cell_watches,
 };
 pub use column::{Column, Columns, Width, WidthAt};
+pub use data_validation::{
+    DataValidationCollection, DataValidationConformance, DataValidationFormula,
+    DataValidationRange, DataValidationSqref, DataValidationSource, ParsedDataValidation,
+    ParsedDataValidationErrorStyle, ParsedDataValidationImeMode, ParsedDataValidationOperator,
+    ParsedDataValidationType, ValidationListSource, parse_data_validation_collections,
+    replace_data_validation_collections, validate_data_validation_collections,
+    write_data_validation_collections, write_data_validation_core,
+    write_data_validation_extensions,
+};
 pub use error::{
     ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, RemoveBlock, RenameBlock,
     Result, RowEditBlock, TabEditBlock,
@@ -73,6 +84,15 @@ pub use scenarios::{
 pub use sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
     parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
+};
+pub use sheet_protection::{
+    ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeReference,
+    ProtectionRangeReferenceKind, ProtectionRangeSqref, StrongProtectionPasswordVerifier,
+    WorksheetProtectedRange, WorksheetProtectedRangeCollection, WorksheetProtection,
+    WorksheetProtectionConformance, WorksheetProtectionMetadata, parse_worksheet_protection,
+    replace_worksheet_protection, validate_worksheet_protection_metadata,
+    write_worksheet_protection, write_worksheet_protection_core,
+    write_worksheet_protection_extensions,
 };
 pub use sheet_view::{
     PivotAreaType, PivotSelectionAxis, WorksheetCellReference, WorksheetPanePosition,
