@@ -544,7 +544,7 @@ pub use header_footer_content::{
 };
 pub use index::{
     AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,
-    TableIndexSource, TableOfContentsSource, TextAlphabeticalIndexEntryTemplate,
+    TableOfContentsSource, TextAlphabeticalIndexEntryTemplate,
     TextAlphabeticalIndexLevel, TextBibliographyEntryTemplate, TextBibliographyEntryToken,
     TextBibliographyType, TextIndex, TextIndexAttribute, TextIndexBody, TextIndexBodyParagraph,
     TextIndexBodyTitle, TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexContent,

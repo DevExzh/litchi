@@ -207,8 +207,6 @@ impl IllustrationIndexSource {
     }
 }
 
-pub type TableIndexSource = IllustrationIndexSource;
-
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ObjectIndexSource {
     pub scope: Option<TextIndexScope>,
@@ -702,7 +700,7 @@ impl TextIndex {
 
     pub fn table_index(
         name: impl Into<String>,
-        source: TableIndexSource,
+        source: IllustrationIndexSource,
         body: TextIndexBody,
     ) -> Result<Self> {
         caption_index(

@@ -4,7 +4,7 @@ mod writing;
 
 pub use writing::{
     AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,
-    TableIndexSource, TableOfContentsSource, TextAlphabeticalIndexEntryTemplate,
+    TableOfContentsSource, TextAlphabeticalIndexEntryTemplate,
     TextAlphabeticalIndexLevel, TextBibliographyEntryTemplate, TextBibliographyEntryToken,
     TextBibliographyType, TextIndexBody, TextIndexBodyParagraph, TextIndexBodyTitle,
     TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexEntryTemplate,
