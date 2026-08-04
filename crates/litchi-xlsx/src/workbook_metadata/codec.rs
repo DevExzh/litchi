@@ -1,9 +1,4 @@
-//! Typed, bounded SpreadsheetML workbook future-metadata codec.
-//!
-//! The owner implements the `metadata`, `metadataTypes`, `futureMetadata`,
-//! `cellMetadata`, and `valueMetadata` grammar from [MS-XLSX] §2.2.4.4
-//! and the referenced ISO metadata structures. Package relationship and
-//! content-type discovery remains in the OOXML host adapter.
+//! Bounded SpreadsheetML workbook-metadata XML and MCE codec.
 
 use crate::error::{Error, Result, invalid};
 use litchi_ooxml_common::XmlError;
@@ -13,9 +8,15 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
 use std::collections::HashSet;
 
-const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const SML_STRICT: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
-const XDA: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray";
+use super::model::{
+    FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
+    OpaqueMetadataExtension, WorkbookMetadata,
+};
+use super::package::{
+    SPREADSHEETML_NAMESPACE as SML, STRICT_SPREADSHEETML_NAMESPACE as SML_STRICT,
+};
+
+pub(super) const XDA: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray";
 const XLRD: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/richdata";
 const MAX_XML: usize = 16 * 1024 * 1024;
 const MAX_OUTPUT: usize = 32 * 1024 * 1024;
@@ -24,83 +25,25 @@ const MAX_TYPES: usize = 65_536;
 const MAX_FUTURE: usize = 65_536;
 const MAX_BLOCKS: usize = 1_000_000;
 const MAX_RECORDS: usize = 1_000_000;
-const MAX_STRING: usize = 1024 * 1024;
+pub(super) const MAX_STRING: usize = 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_NODES: usize = 2_000_000;
 const OFFICE_MAX_COUNT: u32 = 2_147_483_647;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct MetadataBehavior {
-    pub ghost_row: bool,
-    pub ghost_column: bool,
-    pub edit: bool,
-    pub delete: bool,
-    pub copy: bool,
-    pub paste_all: bool,
-    pub paste_formulas: bool,
-    pub paste_values: bool,
-    pub paste_formats: bool,
-    pub paste_comments: bool,
-    pub paste_data_validation: bool,
-    pub paste_borders: bool,
-    pub paste_column_widths: bool,
-    pub paste_number_formats: bool,
-    pub merge: bool,
-    pub split_first: bool,
-    pub split_all: bool,
-    pub row_column_shift: bool,
-    pub clear_all: bool,
-    pub clear_formats: bool,
-    pub clear_contents: bool,
-    pub clear_comments: bool,
-    pub assign: bool,
-    pub coerce: bool,
-    pub cell_metadata: bool,
-    pub adjust: bool,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MetadataType {
-    pub name: String,
-    pub minimum_supported_version: u32,
-    pub behavior: MetadataBehavior,
+struct Attribute {
+    ns: String,
+    local: String,
+    value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MetadataRecord {
-    /// One-based index into `WorkbookMetadata::types`.
-    pub type_index: u32,
-    /// Zero-based index into the matching future-metadata store.
-    pub value_index: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OpaqueMetadataExtension {
-    pub uri: String,
-    /// Deterministically normalized, inert child XML from the extension.
-    pub payload_xml: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct MetadataBlock {
-    pub records: Vec<MetadataRecord>,
-    pub extensions: Vec<OpaqueMetadataExtension>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FutureMetadata {
-    pub name: String,
-    pub blocks: Vec<MetadataBlock>,
-    pub extensions: Vec<OpaqueMetadataExtension>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorkbookMetadata {
-    pub types: Vec<MetadataType>,
-    pub future: Vec<FutureMetadata>,
-    pub cell_blocks: Vec<MetadataBlock>,
-    pub value_blocks: Vec<MetadataBlock>,
-    pub extensions: Vec<OpaqueMetadataExtension>,
+#[derive(Debug, Clone)]
+struct Node {
+    ns: String,
+    local: String,
+    attrs: Vec<Attribute>,
+    children: Vec<Node>,
+    text: String,
 }
 
 impl WorkbookMetadata {
@@ -554,20 +497,6 @@ fn validate_extensions(values: &[OpaqueMetadataExtension]) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone)]
-struct Attribute {
-    ns: String,
-    local: String,
-    value: String,
-}
-#[derive(Debug, Clone)]
-struct Node {
-    ns: String,
-    local: String,
-    attrs: Vec<Attribute>,
-    children: Vec<Node>,
-    text: String,
-}
 fn parse_mce_dom(xml: &[u8]) -> Result<Node> {
     let mut capabilities = MceCapabilities::ooxml_baseline();
     capabilities
@@ -953,99 +882,4 @@ fn limit(value: impl Into<String>) -> Error {
         "workbook metadata resource limit exceeded: {}",
         value.into()
     ))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample() -> WorkbookMetadata {
-        WorkbookMetadata {
-            types: vec![MetadataType {
-                name: "XLDAPR".into(),
-                minimum_supported_version: 120000,
-                behavior: MetadataBehavior {
-                    copy: true,
-                    paste_all: true,
-                    paste_values: true,
-                    cell_metadata: true,
-                    ..Default::default()
-                },
-            }],
-            future: vec![FutureMetadata {
-                name: "XLDAPR".into(),
-                blocks: vec![MetadataBlock {
-                    records: Vec::new(),
-                    extensions: vec![OpaqueMetadataExtension {
-                        uri: "u".into(),
-                        payload_xml: format!(r#"<p:x xmlns:p="{XDA}" a="1"/>"#).into_bytes(),
-                    }],
-                }],
-                extensions: Vec::new(),
-            }],
-            cell_blocks: vec![MetadataBlock {
-                records: vec![MetadataRecord {
-                    type_index: 1,
-                    value_index: 0,
-                }],
-                extensions: Vec::new(),
-            }],
-            value_blocks: Vec::new(),
-            extensions: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn strict_round_trip_preserves_indices_and_extensions() {
-        let value = sample();
-        let xml = value.to_xml(true).unwrap();
-        let parsed = WorkbookMetadata::parse(&xml).unwrap();
-        assert_eq!(parsed.cell_block(1).unwrap().records[0].type_index, 1);
-        assert!(parsed.cell_block(0).is_none());
-        assert_eq!(parsed.to_xml(true).unwrap(), xml);
-    }
-
-    #[test]
-    fn mce_choice_selects_understood_metadata_branch() {
-        let body = String::from_utf8(sample().to_xml(false).unwrap()).unwrap();
-        let body = body
-            .replace(
-                "<metadataTypes",
-                r#"<mc:AlternateContent><mc:Choice Requires="xda"><metadataTypes"#,
-            )
-            .replace(
-                "</metadataTypes>",
-                "</metadataTypes></mc:Choice><mc:Fallback/></mc:AlternateContent>",
-            );
-        let xml = body.replace(
-            r#"<metadata xmlns=""#,
-            &format!(
-                r#"<metadata xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:xda="{XDA}" xmlns=""#
-            ),
-        );
-        assert_eq!(
-            WorkbookMetadata::parse(xml.as_bytes()).unwrap().types.len(),
-            1
-        );
-    }
-
-    #[test]
-    fn rejects_malformed_and_out_of_bounds_values() {
-        assert!(WorkbookMetadata::parse(br#"<!DOCTYPE x><metadata/>"#).is_err());
-        assert!(WorkbookMetadata::parse(
-            format!(
-                r#"<metadata xmlns="{SML}"><metadataTypes count="2"><metadataType name="x" minSupportedVersion="1"/></metadataTypes></metadata>"#
-            )
-            .as_bytes(),
-        )
-        .is_err());
-
-        let mut value = sample();
-        value.cell_blocks[0].records[0].type_index = 2;
-        assert!(value.to_xml(false).is_err());
-
-        let mut value = sample();
-        value.types[0].name = "x".repeat(MAX_STRING + 1);
-        assert!(value.to_xml(false).is_err());
-    }
 }
