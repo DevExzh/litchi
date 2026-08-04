@@ -290,7 +290,7 @@ impl<'a> TableDataExtractor<'a> {
         let (row_count, column_count) =
             checked_table_dimensions(table_model.number_of_rows, table_model.number_of_columns)?;
         let mut table =
-            NumbersTable::with_dimensions(table_model.table_name.clone(), row_count, column_count)?;
+            NumbersTable::with_dimensions(table_model.table_name, row_count, column_count)?;
 
         // Extract string table for cell text values
         // string_table is a required field, not Optional

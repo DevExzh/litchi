@@ -5807,7 +5807,9 @@ reject ranges outside the declared extent. The leaf suite has 26 tests, the
 IWA suite has 1,499 tests, and the generated Numbers round trip passes. Formula
 values and the generic structured-facade handoff remain the next ownership
 slices. Pages and Keynote table readers now borrow canonical sparse leaf tables
-directly while retaining their format-owned comment and merge sidecars.
+directly while retaining their format-owned comment and merge sidecars;
+read-only comment snapshots use sorted boxed pairs, and Numbers ingress moves
+table names into the adapter without a redundant clone.
 
 The IWA Numbers ingress adapter now protects the leaf ownership seam. It
 validates bounded dimensions before loading referenced data, rejects

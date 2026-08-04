@@ -120,9 +120,10 @@ and package owners follow the same downward-only extraction pattern.
 The Pages and Keynote table readers now consume the same leaf `Table` through
 an ownership-preserving adapter seam. Their public table facades borrow the
 canonical sparse cells directly while retaining format-owned comments and
-merge regions as separate sidecars; the former tuple-keyed cell maps are no
-longer rebuilt in either reader. The generic structured extractor remains the
-last current `NumbersTable::into_parts` consumer and is staged separately.
+merge regions as separate sidecars; read-only comment sidecars are compact
+sorted boxed pairs, and the former tuple-keyed cell maps are no longer rebuilt
+in either reader. The generic structured extractor remains the last current
+`NumbersTable::into_parts` consumer and is staged separately.
 
 The first Numbers wire seam is now `litchi-numbers::cell::wire`. It owns the
 dependency-free, byte-preserving BNC codec, stored-value and cached-scalar

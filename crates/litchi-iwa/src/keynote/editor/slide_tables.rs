@@ -1,6 +1,6 @@
 //! Native table CRUD for Keynote slides.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use super::*;
 use crate::bundle::Bundle;
@@ -162,7 +162,7 @@ pub struct KeynoteSlideTableInfo {
 pub struct KeynoteSlideTable {
     pub info: KeynoteSlideTableInfo,
     semantic_table: litchi_numbers::Table,
-    comments: HashMap<(usize, usize), KeynoteTableCellComment>,
+    comments: Box<[((usize, usize), KeynoteTableCellComment)]>,
     merges: Vec<KeynoteTableCellRegion>,
 }
 
@@ -194,7 +194,10 @@ impl KeynoteSlideTable {
 
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&KeynoteTableCellComment> {
-        self.comments.get(&(row, column))
+        self.comments
+            .binary_search_by_key(&(row, column), |(position, _comment)| *position)
+            .ok()
+            .map(|index| &self.comments[index].1)
     }
 
     /// Iterate over cell comments without exposing the backing map.

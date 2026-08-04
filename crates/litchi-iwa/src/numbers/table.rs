@@ -304,13 +304,22 @@ impl NumbersTable {
         self,
     ) -> crate::Result<(
         litchi_numbers::Table,
-        HashMap<(usize, usize), NumbersCellComment>,
+        Box<[((usize, usize), NumbersCellComment)]>,
     )> {
         let Self {
             model, comments, ..
         } = self;
         let table = model.finish().map_err(map_table_error)?;
-        Ok((table, comments))
+        let mut sorted_comments = Vec::new();
+        sorted_comments.try_reserve(comments.len()).map_err(|_| {
+            crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table semantic comments",
+                amount: comments.len(),
+            })
+        })?;
+        sorted_comments.extend(comments);
+        sorted_comments.sort_unstable_by_key(|(position, _comment)| *position);
+        Ok((table, sorted_comments.into_boxed_slice()))
     }
 
     /// Move the materialized values and comments to another crate-internal

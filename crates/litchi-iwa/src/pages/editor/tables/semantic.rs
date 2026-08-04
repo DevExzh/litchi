@@ -43,7 +43,7 @@ pub struct PagesTable {
     /// Stable identity and dimensions of this table.
     pub info: PagesTableInfo,
     semantic_table: litchi_numbers::Table,
-    comments: HashMap<(usize, usize), PagesTableCellComment>,
+    comments: Box<[((usize, usize), PagesTableCellComment)]>,
     merges: Vec<PagesTableCellRegion>,
 }
 
@@ -74,7 +74,10 @@ impl PagesTable {
 
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&PagesTableCellComment> {
-        self.comments.get(&(row, column))
+        self.comments
+            .binary_search_by_key(&(row, column), |(position, _comment)| *position)
+            .ok()
+            .map(|index| &self.comments[index].1)
     }
 
     /// Iterate over cell comments without exposing the backing map.
