@@ -29,7 +29,7 @@ use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::relationship_attribute_value;
 use crate::xlsx::ole_objects::OleObjectAspect;
 use crate::xlsx::parsers::workbook_parser;
-use crate::xlsx::shape_geometry::XlsxCustomGeometry;
+use crate::xlsx::shape_geometry::CustomGeometry;
 use crate::xlsx::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
 use crate::xlsx::worksheet::WorksheetInfo;
 use litchi_drawingml::geom::Preset;
@@ -199,7 +199,7 @@ pub enum Geometry {
     /// A schema-defined preset (`a:prstGeom`).
     Preset(Preset),
     /// A custom geometry (`a:custGeom`).
-    Custom(Box<XlsxCustomGeometry>),
+    Custom(Box<CustomGeometry>),
 }
 
 impl Geometry {
@@ -212,7 +212,7 @@ impl Geometry {
     }
 
     /// Borrow the custom geometry when this is custom.
-    pub fn custom(&self) -> Option<&XlsxCustomGeometry> {
+    pub fn custom(&self) -> Option<&CustomGeometry> {
         match self {
             Self::Preset(_) => None,
             Self::Custom(geometry) => Some(geometry.as_ref()),
@@ -220,7 +220,7 @@ impl Geometry {
     }
 
     /// Move out the custom geometry when this is custom.
-    pub fn into_custom(self) -> Option<XlsxCustomGeometry> {
+    pub fn into_custom(self) -> Option<CustomGeometry> {
         match self {
             Self::Preset(_) => None,
             Self::Custom(geometry) => Some(*geometry),
@@ -234,8 +234,8 @@ impl From<Preset> for Geometry {
     }
 }
 
-impl From<XlsxCustomGeometry> for Geometry {
-    fn from(geometry: XlsxCustomGeometry) -> Self {
+impl From<CustomGeometry> for Geometry {
+    fn from(geometry: CustomGeometry) -> Self {
         Self::Custom(Box::new(geometry))
     }
 }
@@ -389,7 +389,7 @@ impl XlsxShape {
     }
 
     /// Borrow the declared custom geometry, if any.
-    pub fn custom_geometry(&self) -> Option<&XlsxCustomGeometry> {
+    pub fn custom_geometry(&self) -> Option<&CustomGeometry> {
         self.geometry.as_ref().and_then(Geometry::custom)
     }
 }
@@ -425,7 +425,7 @@ impl XlsxConnectionShape {
     }
 
     /// Borrow the declared custom geometry, if any.
-    pub fn custom_geometry(&self) -> Option<&XlsxCustomGeometry> {
+    pub fn custom_geometry(&self) -> Option<&CustomGeometry> {
         self.geometry.as_ref().and_then(Geometry::custom)
     }
 }

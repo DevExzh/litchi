@@ -1,4 +1,4 @@
-//! Streaming builder that assembles an [`XlsxCustomGeometry`] from the
+//! Streaming builder that assembles an [`CustomGeometry`] from the
 //! `a:custGeom` subtree of a worksheet drawing part.
 //!
 //! The shape inventory parser in [`crate::xlsx::shapes`] drives the builder:
@@ -17,10 +17,9 @@ use crate::error::{OoxmlError, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 use super::{
-    MAX_ADJUST_HANDLES, MAX_CONNECTION_SITES, MAX_GEOMETRY_GUIDES, MAX_GEOMETRY_PATHS,
-    MAX_PATH_COMMANDS, XlsxAdjustHandle, XlsxAdjustValue, XlsxConnectionSite, XlsxCustomGeometry,
-    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
-    XlsxPolarAdjustHandle, XlsxXyAdjustHandle, normalize_xsd_token,
+    AdjustHandle, AdjustValue, ConnectionSite, CustomGeometry, Guide, MAX_ADJUST_HANDLES,
+    MAX_CONNECTION_SITES, MAX_GEOMETRY_GUIDES, MAX_GEOMETRY_PATHS, MAX_PATH_COMMANDS, Path,
+    PathCommand, Point, PolarAdjustHandle, Rectangle, XyAdjustHandle, normalize_xsd_token,
     validate_parsed_custom_geometry,
 };
 
@@ -103,23 +102,23 @@ impl PendingCommandKind {
 #[derive(Debug)]
 struct PendingCommand {
     kind: PendingCommandKind,
-    points: Vec<XlsxGeometryPoint>,
+    points: Vec<Point>,
 }
 
 #[derive(Debug)]
 enum PendingSite {
-    Xy(XlsxXyAdjustHandle),
-    Polar(XlsxPolarAdjustHandle),
-    Connection(XlsxConnectionSite),
+    Xy(XyAdjustHandle),
+    Polar(PolarAdjustHandle),
+    Connection(ConnectionSite),
 }
 
 /// Streaming assembler for one `a:custGeom` subtree.
 #[derive(Debug, Default)]
 pub(crate) struct CustomGeometryBuilder {
-    geometry: XlsxCustomGeometry,
+    geometry: CustomGeometry,
     saw_path_list: bool,
     pending_site: Option<(PendingSite, bool)>,
-    pending_path: Option<XlsxGeometryPath>,
+    pending_path: Option<Path>,
     pending_command: Option<PendingCommand>,
 }
 
@@ -184,7 +183,7 @@ impl CustomGeometryBuilder {
                 El::ArcTo
             },
             (El::Path, b"close") => {
-                self.push_command(XlsxPathCommand::Close)?;
+                self.push_command(PathCommand::Close)?;
                 El::Close
             },
             (El::MoveTo | El::LineTo | El::QuadraticBezierTo | El::CubicBezierTo, b"pt") => {
@@ -212,7 +211,7 @@ impl CustomGeometryBuilder {
     }
 
     /// Finalize the geometry when `a:custGeom` closes.
-    pub(crate) fn finish(self) -> Result<XlsxCustomGeometry> {
+    pub(crate) fn finish(self) -> Result<CustomGeometry> {
         if !self.saw_path_list {
             return Err(invalid("custom geometry is missing its path list"));
         }
@@ -221,7 +220,7 @@ impl CustomGeometryBuilder {
     }
 
     fn open_text_rectangle(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let rectangle = XlsxGeometryRectangle {
+        let rectangle = Rectangle {
             left: required_value(element, b"l", decoder, "text rectangle left edge")?,
             top: required_value(element, b"t", decoder, "text rectangle top edge")?,
             right: required_value(element, b"r", decoder, "text rectangle right edge")?,
@@ -253,40 +252,40 @@ impl CustomGeometryBuilder {
         if target.len() >= MAX_GEOMETRY_GUIDES {
             return Err(limit("guide count"));
         }
-        target.push(XlsxGeometryGuide { name, formula });
+        target.push(Guide { name, formula });
         Ok(())
     }
 
     fn open_xy_handle(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let handle = XlsxXyAdjustHandle {
+        let handle = XyAdjustHandle {
             horizontal_guide: token_attribute(element, b"gdRefX", decoder)?,
             minimum_x: optional_value(element, b"minX", decoder)?,
             maximum_x: optional_value(element, b"maxX", decoder)?,
             vertical_guide: token_attribute(element, b"gdRefY", decoder)?,
             minimum_y: optional_value(element, b"minY", decoder)?,
             maximum_y: optional_value(element, b"maxY", decoder)?,
-            position: XlsxGeometryPoint::default(),
+            position: Point::default(),
         };
         self.open_site(PendingSite::Xy(handle))
     }
 
     fn open_polar_handle(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let handle = XlsxPolarAdjustHandle {
+        let handle = PolarAdjustHandle {
             radius_guide: token_attribute(element, b"gdRefR", decoder)?,
             minimum_radius: optional_value(element, b"minR", decoder)?,
             maximum_radius: optional_value(element, b"maxR", decoder)?,
             angle_guide: token_attribute(element, b"gdRefAng", decoder)?,
             minimum_angle: optional_value(element, b"minAng", decoder)?,
             maximum_angle: optional_value(element, b"maxAng", decoder)?,
-            position: XlsxGeometryPoint::default(),
+            position: Point::default(),
         };
         self.open_site(PendingSite::Polar(handle))
     }
 
     fn open_connection_site(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let site = XlsxConnectionSite {
+        let site = ConnectionSite {
             angle: required_value(element, b"ang", decoder, "connection site angle")?,
-            position: XlsxGeometryPoint::default(),
+            position: Point::default(),
         };
         self.open_site(PendingSite::Connection(site))
     }
@@ -339,14 +338,12 @@ impl CustomGeometryBuilder {
         }
         match site {
             PendingSite::Xy(handle) => {
-                self.geometry
-                    .adjust_handles
-                    .push(XlsxAdjustHandle::Xy(handle));
+                self.geometry.adjust_handles.push(AdjustHandle::Xy(handle));
             },
             PendingSite::Polar(handle) => {
                 self.geometry
                     .adjust_handles
-                    .push(XlsxAdjustHandle::Polar(handle));
+                    .push(AdjustHandle::Polar(handle));
             },
             PendingSite::Connection(connection) => {
                 self.geometry.connection_sites.push(connection);
@@ -359,8 +356,8 @@ impl CustomGeometryBuilder {
         if self.geometry.paths.len() >= MAX_GEOMETRY_PATHS {
             return Err(limit("path count"));
         }
-        let defaults = XlsxGeometryPath::default();
-        let path = XlsxGeometryPath {
+        let defaults = Path::default();
+        let path = Path {
             width: optional_number(element, b"w", decoder, "geometry path width")?
                 .unwrap_or(defaults.width),
             height: optional_number(element, b"h", decoder, "geometry path height")?
@@ -447,13 +444,13 @@ impl CustomGeometryBuilder {
                 .ok_or_else(|| invalid("geometry command point count mismatch"))
         };
         let command = match command.kind {
-            PendingCommandKind::MoveTo => XlsxPathCommand::MoveTo(next()?),
-            PendingCommandKind::LineTo => XlsxPathCommand::LineTo(next()?),
-            PendingCommandKind::QuadraticBezierTo => XlsxPathCommand::QuadraticBezierTo {
+            PendingCommandKind::MoveTo => PathCommand::MoveTo(next()?),
+            PendingCommandKind::LineTo => PathCommand::LineTo(next()?),
+            PendingCommandKind::QuadraticBezierTo => PathCommand::QuadraticBezierTo {
                 control: next()?,
                 end: next()?,
             },
-            PendingCommandKind::CubicBezierTo => XlsxPathCommand::CubicBezierTo {
+            PendingCommandKind::CubicBezierTo => PathCommand::CubicBezierTo {
                 control1: next()?,
                 control2: next()?,
                 end: next()?,
@@ -463,7 +460,7 @@ impl CustomGeometryBuilder {
     }
 
     fn open_arc(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let command = XlsxPathCommand::ArcTo {
+        let command = PathCommand::ArcTo {
             width_radius: required_value(element, b"wR", decoder, "arc width radius")?,
             height_radius: required_value(element, b"hR", decoder, "arc height radius")?,
             start_angle: required_value(element, b"stAng", decoder, "arc start angle")?,
@@ -472,7 +469,7 @@ impl CustomGeometryBuilder {
         self.push_command(command)
     }
 
-    fn push_command(&mut self, command: XlsxPathCommand) -> Result<()> {
+    fn push_command(&mut self, command: PathCommand) -> Result<()> {
         let path = self
             .pending_path
             .as_mut()
@@ -485,8 +482,8 @@ impl CustomGeometryBuilder {
     }
 }
 
-fn point_from_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<XlsxGeometryPoint> {
-    Ok(XlsxGeometryPoint {
+fn point_from_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Point> {
+    Ok(Point {
         x: required_value(element, b"x", decoder, "geometry point x coordinate")?,
         y: required_value(element, b"y", decoder, "geometry point y coordinate")?,
     })
@@ -497,7 +494,7 @@ fn required_value(
     name: &[u8],
     decoder: Decoder,
     description: &str,
-) -> Result<XlsxAdjustValue> {
+) -> Result<AdjustValue> {
     optional_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("{description} attribute is missing")))
 }
@@ -506,7 +503,7 @@ fn optional_value(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: Decoder,
-) -> Result<Option<XlsxAdjustValue>> {
+) -> Result<Option<AdjustValue>> {
     unqualified_attribute_value(element, name, decoder)?
         .map(|value| value.parse())
         .transpose()

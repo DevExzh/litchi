@@ -6,10 +6,10 @@
 //! [`crate::xlsx::writer::shape`].
 
 use super::{
-    MAX_ADJUST_HANDLES, MAX_ANGLE, MAX_CONNECTION_SITES, MAX_COORDINATE, MAX_GEOMETRY_GUIDES,
-    MAX_GEOMETRY_PATHS, MAX_GUIDE_NAME_BYTES, MAX_PATH_COMMANDS, MAX_POSITIVE_COORDINATE,
-    MIN_ANGLE, MIN_COORDINATE, XlsxAdjustHandle, XlsxAdjustValue, XlsxCustomGeometry,
-    XlsxGeometryPath, XlsxGeometryPoint, XlsxPathCommand,
+    AdjustHandle, AdjustValue, CustomGeometry, MAX_ADJUST_HANDLES, MAX_ANGLE, MAX_CONNECTION_SITES,
+    MAX_COORDINATE, MAX_GEOMETRY_GUIDES, MAX_GEOMETRY_PATHS, MAX_GUIDE_NAME_BYTES,
+    MAX_PATH_COMMANDS, MAX_POSITIVE_COORDINATE, MIN_ANGLE, MIN_COORDINATE, Path, PathCommand,
+    Point,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -23,17 +23,17 @@ enum Mode {
 /// The schema requires the `a:pathLst` element but allows it to be empty;
 /// authored geometry additionally requires at least one path so the shape
 /// actually draws something.
-pub(crate) fn validate_custom_geometry(geometry: &XlsxCustomGeometry) -> Result<(), String> {
+pub(crate) fn validate_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
     validate_geometry(geometry, Mode::Author)
 }
 
 /// Validate geometry loaded from a package without imposing the authoring-only
 /// requirement that a path list contain a visible path.
-pub(crate) fn validate_parsed_custom_geometry(geometry: &XlsxCustomGeometry) -> Result<(), String> {
+pub(crate) fn validate_parsed_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
     validate_geometry(geometry, Mode::Parsed)
 }
 
-fn validate_geometry(geometry: &XlsxCustomGeometry, mode: Mode) -> Result<(), String> {
+fn validate_geometry(geometry: &CustomGeometry, mode: Mode) -> Result<(), String> {
     if geometry.adjust_values.len() > MAX_GEOMETRY_GUIDES
         || geometry.guides.len() > MAX_GEOMETRY_GUIDES
     {
@@ -76,9 +76,9 @@ fn validate_geometry(geometry: &XlsxCustomGeometry, mode: Mode) -> Result<(), St
     Ok(())
 }
 
-fn validate_adjust_handle(handle: &XlsxAdjustHandle, mode: Mode) -> Result<(), String> {
+fn validate_adjust_handle(handle: &AdjustHandle, mode: Mode) -> Result<(), String> {
     match handle {
-        XlsxAdjustHandle::Xy(handle) => {
+        AdjustHandle::Xy(handle) => {
             validate_guide_reference(&handle.horizontal_guide, "XY handle horizontal guide", mode)?;
             validate_guide_reference(&handle.vertical_guide, "XY handle vertical guide", mode)?;
             for (value, field) in [
@@ -93,7 +93,7 @@ fn validate_adjust_handle(handle: &XlsxAdjustHandle, mode: Mode) -> Result<(), S
             }
             validate_point(&handle.position, "XY handle position", mode)
         },
-        XlsxAdjustHandle::Polar(handle) => {
+        AdjustHandle::Polar(handle) => {
             validate_guide_reference(&handle.radius_guide, "polar handle radius guide", mode)?;
             validate_guide_reference(&handle.angle_guide, "polar handle angle guide", mode)?;
             for (value, field) in [
@@ -117,7 +117,7 @@ fn validate_adjust_handle(handle: &XlsxAdjustHandle, mode: Mode) -> Result<(), S
     }
 }
 
-fn validate_path(path: &XlsxGeometryPath, mode: Mode) -> Result<(), String> {
+fn validate_path(path: &Path, mode: Mode) -> Result<(), String> {
     if !(0..=MAX_POSITIVE_COORDINATE).contains(&path.width)
         || !(0..=MAX_POSITIVE_COORDINATE).contains(&path.height)
     {
@@ -132,12 +132,12 @@ fn validate_path(path: &XlsxGeometryPath, mode: Mode) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_command(command: &XlsxPathCommand, mode: Mode) -> Result<(), String> {
+fn validate_command(command: &PathCommand, mode: Mode) -> Result<(), String> {
     match command {
-        XlsxPathCommand::MoveTo(point) | XlsxPathCommand::LineTo(point) => {
+        PathCommand::MoveTo(point) | PathCommand::LineTo(point) => {
             validate_point(point, "path command point", mode)
         },
-        XlsxPathCommand::ArcTo {
+        PathCommand::ArcTo {
             width_radius,
             height_radius,
             start_angle,
@@ -148,11 +148,11 @@ fn validate_command(command: &XlsxPathCommand, mode: Mode) -> Result<(), String>
             validate_angle_value(start_angle, "arc start angle", mode)?;
             validate_angle_value(swing_angle, "arc swing angle", mode)
         },
-        XlsxPathCommand::QuadraticBezierTo { control, end } => {
+        PathCommand::QuadraticBezierTo { control, end } => {
             validate_point(control, "path command point", mode)?;
             validate_point(end, "path command point", mode)
         },
-        XlsxPathCommand::CubicBezierTo {
+        PathCommand::CubicBezierTo {
             control1,
             control2,
             end,
@@ -161,36 +161,32 @@ fn validate_command(command: &XlsxPathCommand, mode: Mode) -> Result<(), String>
             validate_point(control2, "path command point", mode)?;
             validate_point(end, "path command point", mode)
         },
-        XlsxPathCommand::Close => Ok(()),
+        PathCommand::Close => Ok(()),
     }
 }
 
-fn validate_point(point: &XlsxGeometryPoint, field: &str, mode: Mode) -> Result<(), String> {
+fn validate_point(point: &Point, field: &str, mode: Mode) -> Result<(), String> {
     validate_coordinate_value(&point.x, field, mode)?;
     validate_coordinate_value(&point.y, field, mode)
 }
 
-fn validate_coordinate_value(
-    value: &XlsxAdjustValue,
-    field: &str,
-    mode: Mode,
-) -> Result<(), String> {
+fn validate_coordinate_value(value: &AdjustValue, field: &str, mode: Mode) -> Result<(), String> {
     match value {
-        XlsxAdjustValue::Value(value) if !(MIN_COORDINATE..=MAX_COORDINATE).contains(value) => {
+        AdjustValue::Value(value) if !(MIN_COORDINATE..=MAX_COORDINATE).contains(value) => {
             Err(format!("{field} is outside ST_Coordinate bounds"))
         },
-        XlsxAdjustValue::Value(_) => Ok(()),
-        XlsxAdjustValue::Guide(name) => validate_guide_name(name, field, mode),
+        AdjustValue::Value(_) => Ok(()),
+        AdjustValue::Guide(name) => validate_guide_name(name, field, mode),
     }
 }
 
-fn validate_angle_value(value: &XlsxAdjustValue, field: &str, mode: Mode) -> Result<(), String> {
+fn validate_angle_value(value: &AdjustValue, field: &str, mode: Mode) -> Result<(), String> {
     match value {
-        XlsxAdjustValue::Value(value) if !(MIN_ANGLE..=MAX_ANGLE).contains(value) => {
+        AdjustValue::Value(value) if !(MIN_ANGLE..=MAX_ANGLE).contains(value) => {
             Err(format!("{field} is outside ST_Angle bounds"))
         },
-        XlsxAdjustValue::Value(_) => Ok(()),
-        XlsxAdjustValue::Guide(name) => validate_guide_name(name, field, mode),
+        AdjustValue::Value(_) => Ok(()),
+        AdjustValue::Guide(name) => validate_guide_name(name, field, mode),
     }
 }
 

@@ -1,21 +1,20 @@
-//! Serializer for [`XlsxCustomGeometry`] into `a:custGeom` markup.
+//! Serializer for [`CustomGeometry`] into `a:custGeom` markup.
 //!
 //! Output is canonical: optional child lists are omitted when empty,
 //! attributes at their ECMA-376 defaults are omitted, and everything written
 //! here parses back through [`crate::xlsx::shapes::parse_drawing_shapes`]
-//! into an identical [`XlsxCustomGeometry`].
+//! into an identical [`CustomGeometry`].
 
 use std::fmt::Write as _;
 
 use litchi_core::xml::escape::escape_xml;
 
 use super::{
-    XlsxAdjustHandle, XlsxAdjustValue, XlsxCustomGeometry, XlsxGeometryGuide, XlsxGeometryPath,
-    XlsxGeometryPoint, XlsxPathCommand, XlsxPathFillMode,
+    AdjustHandle, AdjustValue, CustomGeometry, Guide, Path, PathCommand, PathFillMode, Point,
 };
 
 /// Serialize one custom geometry as its `a:custGeom` element.
-pub(crate) fn write_custom_geometry(xml: &mut String, geometry: &XlsxCustomGeometry) {
+pub(crate) fn write_custom_geometry(xml: &mut String, geometry: &CustomGeometry) {
     xml.push_str("<a:custGeom>");
     write_guide_list(xml, "avLst", &geometry.adjust_values);
     write_guide_list(xml, "gdLst", &geometry.guides);
@@ -52,7 +51,7 @@ pub(crate) fn write_custom_geometry(xml: &mut String, geometry: &XlsxCustomGeome
     xml.push_str("</a:pathLst></a:custGeom>");
 }
 
-fn write_guide_list(xml: &mut String, tag: &str, guides: &[XlsxGeometryGuide]) {
+fn write_guide_list(xml: &mut String, tag: &str, guides: &[Guide]) {
     if guides.is_empty() {
         return;
     }
@@ -68,9 +67,9 @@ fn write_guide_list(xml: &mut String, tag: &str, guides: &[XlsxGeometryGuide]) {
     let _ = write!(xml, "</a:{tag}>");
 }
 
-fn write_adjust_handle(xml: &mut String, handle: &XlsxAdjustHandle) {
+fn write_adjust_handle(xml: &mut String, handle: &AdjustHandle) {
     match handle {
-        XlsxAdjustHandle::Xy(handle) => {
+        AdjustHandle::Xy(handle) => {
             xml.push_str("<a:ahXY");
             write_guide_reference(xml, "gdRefX", &handle.horizontal_guide);
             write_optional_value(xml, "minX", &handle.minimum_x);
@@ -82,7 +81,7 @@ fn write_adjust_handle(xml: &mut String, handle: &XlsxAdjustHandle) {
             write_position(xml, &handle.position);
             xml.push_str("</a:ahXY>");
         },
-        XlsxAdjustHandle::Polar(handle) => {
+        AdjustHandle::Polar(handle) => {
             xml.push_str("<a:ahPolar");
             write_guide_reference(xml, "gdRefR", &handle.radius_guide);
             write_optional_value(xml, "minR", &handle.minimum_radius);
@@ -97,8 +96,8 @@ fn write_adjust_handle(xml: &mut String, handle: &XlsxAdjustHandle) {
     }
 }
 
-fn write_path(xml: &mut String, path: &XlsxGeometryPath) {
-    let defaults = XlsxGeometryPath::default();
+fn write_path(xml: &mut String, path: &Path) {
+    let defaults = Path::default();
     xml.push_str("<a:path");
     if path.width != defaults.width {
         let _ = write!(xml, r#" w="{}""#, path.width);
@@ -106,7 +105,7 @@ fn write_path(xml: &mut String, path: &XlsxGeometryPath) {
     if path.height != defaults.height {
         let _ = write!(xml, r#" h="{}""#, path.height);
     }
-    if path.fill_mode != XlsxPathFillMode::Normal {
+    if path.fill_mode != PathFillMode::Normal {
         let _ = write!(xml, r#" fill="{}""#, path.fill_mode.as_str());
     }
     if path.stroked != defaults.stroked {
@@ -122,19 +121,19 @@ fn write_path(xml: &mut String, path: &XlsxGeometryPath) {
     xml.push_str("</a:path>");
 }
 
-fn write_command(xml: &mut String, command: &XlsxPathCommand) {
+fn write_command(xml: &mut String, command: &PathCommand) {
     match command {
-        XlsxPathCommand::MoveTo(point) => {
+        PathCommand::MoveTo(point) => {
             xml.push_str("<a:moveTo>");
             write_point(xml, point);
             xml.push_str("</a:moveTo>");
         },
-        XlsxPathCommand::LineTo(point) => {
+        PathCommand::LineTo(point) => {
             xml.push_str("<a:lnTo>");
             write_point(xml, point);
             xml.push_str("</a:lnTo>");
         },
-        XlsxPathCommand::ArcTo {
+        PathCommand::ArcTo {
             width_radius,
             height_radius,
             start_angle,
@@ -149,13 +148,13 @@ fn write_command(xml: &mut String, command: &XlsxPathCommand) {
                 value_attribute(swing_angle)
             );
         },
-        XlsxPathCommand::QuadraticBezierTo { control, end } => {
+        PathCommand::QuadraticBezierTo { control, end } => {
             xml.push_str("<a:quadBezTo>");
             write_point(xml, control);
             write_point(xml, end);
             xml.push_str("</a:quadBezTo>");
         },
-        XlsxPathCommand::CubicBezierTo {
+        PathCommand::CubicBezierTo {
             control1,
             control2,
             end,
@@ -166,11 +165,11 @@ fn write_command(xml: &mut String, command: &XlsxPathCommand) {
             write_point(xml, end);
             xml.push_str("</a:cubicBezTo>");
         },
-        XlsxPathCommand::Close => xml.push_str("<a:close/>"),
+        PathCommand::Close => xml.push_str("<a:close/>"),
     }
 }
 
-fn write_point(xml: &mut String, point: &XlsxGeometryPoint) {
+fn write_point(xml: &mut String, point: &Point) {
     let _ = write!(
         xml,
         r#"<a:pt x="{}" y="{}"/>"#,
@@ -179,7 +178,7 @@ fn write_point(xml: &mut String, point: &XlsxGeometryPoint) {
     );
 }
 
-fn write_position(xml: &mut String, position: &XlsxGeometryPoint) {
+fn write_position(xml: &mut String, position: &Point) {
     let _ = write!(
         xml,
         r#"<a:pos x="{}" y="{}"/>"#,
@@ -194,15 +193,15 @@ fn write_guide_reference(xml: &mut String, name: &str, reference: &Option<String
     }
 }
 
-fn write_optional_value(xml: &mut String, name: &str, value: &Option<XlsxAdjustValue>) {
+fn write_optional_value(xml: &mut String, name: &str, value: &Option<AdjustValue>) {
     if let Some(value) = value {
         let _ = write!(xml, r#" {name}="{}""#, value_attribute(value));
     }
 }
 
-fn value_attribute(value: &XlsxAdjustValue) -> String {
+fn value_attribute(value: &AdjustValue) -> String {
     match value {
-        XlsxAdjustValue::Value(value) => value.to_string(),
-        XlsxAdjustValue::Guide(name) => escape_xml(name),
+        AdjustValue::Value(value) => value.to_string(),
+        AdjustValue::Guide(name) => escape_xml(name),
     }
 }

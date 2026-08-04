@@ -6,9 +6,9 @@
 //! handles (`a:ahLst`), connection sites (`a:cxnLst`), an optional text
 //! rectangle (`a:rect`), and a path list (`a:pathLst`) whose paths draw with
 //! move/line/arc/quadratic-Bezier/cubic-Bezier/close commands
-//! (§20.1.9.9–§20.1.9.20). [`XlsxCustomGeometry`] models that structure with
-//! typed path commands ([`XlsxPathCommand`]), typed guide formulas
-//! ([`XlsxGeometryFormula`]), and adjustable values ([`XlsxAdjustValue`])
+//! (§20.1.9.9–§20.1.9.20). [`CustomGeometry`] models that structure with
+//! typed path commands ([`PathCommand`]), typed guide formulas
+//! ([`Formula`]), and adjustable values ([`AdjustValue`])
 //! that carry either a literal or a guide reference, mirroring the
 //! ST_AdjCoordinate/ST_AdjAngle unions.
 //!
@@ -32,7 +32,7 @@ use std::str::FromStr;
 
 use crate::error::{OoxmlError, Result};
 
-pub use formula::XlsxGeometryFormula;
+pub use formula::Formula;
 pub(crate) use validate::{validate_custom_geometry, validate_parsed_custom_geometry};
 
 /// Smallest ST_Coordinate literal (ECMA-376 §20.1.10.16).
@@ -66,33 +66,33 @@ pub(crate) const MAX_GUIDE_NAME_BYTES: usize = 255;
 /// space, or path-space units otherwise; angle literals are 60000ths of a
 /// degree.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum XlsxAdjustValue {
+pub enum AdjustValue {
     /// A literal value.
     Value(i64),
     /// A reference to a geometry guide (ST_GeomGuideName).
     Guide(String),
 }
 
-impl XlsxAdjustValue {
+impl AdjustValue {
     /// A guide reference by name.
     pub fn guide(name: impl Into<String>) -> Self {
         Self::Guide(normalize_xsd_token(&name.into()))
     }
 }
 
-impl Default for XlsxAdjustValue {
+impl Default for AdjustValue {
     fn default() -> Self {
         Self::Value(0)
     }
 }
 
-impl From<i64> for XlsxAdjustValue {
+impl From<i64> for AdjustValue {
     fn from(value: i64) -> Self {
         Self::Value(value)
     }
 }
 
-impl fmt::Display for XlsxAdjustValue {
+impl fmt::Display for AdjustValue {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Value(value) => write!(formatter, "{value}"),
@@ -101,7 +101,7 @@ impl fmt::Display for XlsxAdjustValue {
     }
 }
 
-impl FromStr for XlsxAdjustValue {
+impl FromStr for AdjustValue {
     type Err = OoxmlError;
 
     /// Numeric tokens become literals; any other non-empty token is kept as
@@ -120,16 +120,16 @@ impl FromStr for XlsxAdjustValue {
 
 /// A geometry point (`a:pt`, CT_AdjPoint2D) with adjustable coordinates.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxGeometryPoint {
+pub struct Point {
     /// Horizontal coordinate (`@x`).
-    pub x: XlsxAdjustValue,
+    pub x: AdjustValue,
     /// Vertical coordinate (`@y`).
-    pub y: XlsxAdjustValue,
+    pub y: AdjustValue,
 }
 
-impl XlsxGeometryPoint {
+impl Point {
     /// A point from two adjustable coordinates.
-    pub fn new(x: impl Into<XlsxAdjustValue>, y: impl Into<XlsxAdjustValue>) -> Self {
+    pub fn new(x: impl Into<AdjustValue>, y: impl Into<AdjustValue>) -> Self {
         Self {
             x: x.into(),
             y: y.into(),
@@ -143,16 +143,16 @@ impl XlsxGeometryPoint {
 /// parameters; guides in the guide list (`a:gdLst`) derive further values
 /// from them.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsxGeometryGuide {
+pub struct Guide {
     /// Guide name (`@name`, ST_GeomGuideName).
     pub name: String,
     /// Guide formula (`@fmla`).
-    pub formula: XlsxGeometryFormula,
+    pub formula: Formula,
 }
 
-impl XlsxGeometryGuide {
+impl Guide {
     /// A guide with the given name and formula.
-    pub fn new(name: impl Into<String>, formula: XlsxGeometryFormula) -> Self {
+    pub fn new(name: impl Into<String>, formula: Formula) -> Self {
         Self {
             name: normalize_xsd_token(&name.into()),
             formula,
@@ -170,76 +170,76 @@ pub(crate) fn normalize_xsd_token(value: &str) -> String {
 
 /// An XY adjust handle (`a:ahXY`, CT_XYAdjustHandle).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxXyAdjustHandle {
+pub struct XyAdjustHandle {
     /// Guide updated by horizontal movement (`@gdRefX`), when declared.
     pub horizontal_guide: Option<String>,
     /// Minimum horizontal position (`@minX`), when declared.
-    pub minimum_x: Option<XlsxAdjustValue>,
+    pub minimum_x: Option<AdjustValue>,
     /// Maximum horizontal position (`@maxX`), when declared.
-    pub maximum_x: Option<XlsxAdjustValue>,
+    pub maximum_x: Option<AdjustValue>,
     /// Guide updated by vertical movement (`@gdRefY`), when declared.
     pub vertical_guide: Option<String>,
     /// Minimum vertical position (`@minY`), when declared.
-    pub minimum_y: Option<XlsxAdjustValue>,
+    pub minimum_y: Option<AdjustValue>,
     /// Maximum vertical position (`@maxY`), when declared.
-    pub maximum_y: Option<XlsxAdjustValue>,
+    pub maximum_y: Option<AdjustValue>,
     /// Handle position (`a:pos`).
-    pub position: XlsxGeometryPoint,
+    pub position: Point,
 }
 
 /// A polar adjust handle (`a:ahPolar`, CT_PolarAdjustHandle).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxPolarAdjustHandle {
+pub struct PolarAdjustHandle {
     /// Guide updated by radial movement (`@gdRefR`), when declared.
     pub radius_guide: Option<String>,
     /// Minimum radius (`@minR`), when declared.
-    pub minimum_radius: Option<XlsxAdjustValue>,
+    pub minimum_radius: Option<AdjustValue>,
     /// Maximum radius (`@maxR`), when declared.
-    pub maximum_radius: Option<XlsxAdjustValue>,
+    pub maximum_radius: Option<AdjustValue>,
     /// Guide updated by angular movement (`@gdRefAng`), when declared.
     pub angle_guide: Option<String>,
     /// Minimum angle (`@minAng`), when declared.
-    pub minimum_angle: Option<XlsxAdjustValue>,
+    pub minimum_angle: Option<AdjustValue>,
     /// Maximum angle (`@maxAng`), when declared.
-    pub maximum_angle: Option<XlsxAdjustValue>,
+    pub maximum_angle: Option<AdjustValue>,
     /// Handle position (`a:pos`).
-    pub position: XlsxGeometryPoint,
+    pub position: Point,
 }
 
 /// One adjust handle of the geometry (`a:ahLst` entry).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsxAdjustHandle {
+pub enum AdjustHandle {
     /// An XY handle (`a:ahXY`).
-    Xy(XlsxXyAdjustHandle),
+    Xy(XyAdjustHandle),
     /// A polar handle (`a:ahPolar`).
-    Polar(XlsxPolarAdjustHandle),
+    Polar(PolarAdjustHandle),
 }
 
 /// One connection site (`a:cxn`, CT_ConnectionSite).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxConnectionSite {
+pub struct ConnectionSite {
     /// Site angle (`@ang`, ST_AdjAngle).
-    pub angle: XlsxAdjustValue,
+    pub angle: AdjustValue,
     /// Site position (`a:pos`).
-    pub position: XlsxGeometryPoint,
+    pub position: Point,
 }
 
 /// The geometry text rectangle (`a:rect`, CT_GeomRect).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxGeometryRectangle {
+pub struct Rectangle {
     /// Left edge (`@l`).
-    pub left: XlsxAdjustValue,
+    pub left: AdjustValue,
     /// Top edge (`@t`).
-    pub top: XlsxAdjustValue,
+    pub top: AdjustValue,
     /// Right edge (`@r`).
-    pub right: XlsxAdjustValue,
+    pub right: AdjustValue,
     /// Bottom edge (`@b`).
-    pub bottom: XlsxAdjustValue,
+    pub bottom: AdjustValue,
 }
 
 /// How a geometry path is filled (`a:path@fill`, ST_PathFillMode).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum XlsxPathFillMode {
+pub enum PathFillMode {
     /// The path is not filled (`none`).
     None,
     /// The path is filled normally (`norm`, the ECMA-376 default).
@@ -255,7 +255,7 @@ pub enum XlsxPathFillMode {
     DarkenLess,
 }
 
-impl XlsxPathFillMode {
+impl PathFillMode {
     /// The ST_PathFillMode token for this mode.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -269,7 +269,7 @@ impl XlsxPathFillMode {
     }
 }
 
-impl FromStr for XlsxPathFillMode {
+impl FromStr for PathFillMode {
     type Err = OoxmlError;
 
     fn from_str(token: &str) -> Result<Self> {
@@ -285,7 +285,7 @@ impl FromStr for XlsxPathFillMode {
     }
 }
 
-impl fmt::Display for XlsxPathFillMode {
+impl fmt::Display for PathFillMode {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.as_str())
     }
@@ -294,37 +294,37 @@ impl fmt::Display for XlsxPathFillMode {
 /// One drawing command inside a geometry path (`a:path` children,
 /// ECMA-376 §20.1.9.10–§20.1.9.20).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsxPathCommand {
+pub enum PathCommand {
     /// `a:moveTo` — start a new sub-path at the given point.
-    MoveTo(XlsxGeometryPoint),
+    MoveTo(Point),
     /// `a:lnTo` — draw a straight line to the given point.
-    LineTo(XlsxGeometryPoint),
+    LineTo(Point),
     /// `a:arcTo` — draw an elliptical arc from the current point.
     ArcTo {
         /// Ellipse width radius (`@wR`).
-        width_radius: XlsxAdjustValue,
+        width_radius: AdjustValue,
         /// Ellipse height radius (`@hR`).
-        height_radius: XlsxAdjustValue,
+        height_radius: AdjustValue,
         /// Start angle (`@stAng`), in 60000ths of a degree.
-        start_angle: XlsxAdjustValue,
+        start_angle: AdjustValue,
         /// Swing angle (`@swAng`), in 60000ths of a degree.
-        swing_angle: XlsxAdjustValue,
+        swing_angle: AdjustValue,
     },
     /// `a:quadBezTo` — draw a quadratic Bezier curve.
     QuadraticBezierTo {
         /// Control point (first `a:pt`).
-        control: XlsxGeometryPoint,
+        control: Point,
         /// End point (second `a:pt`).
-        end: XlsxGeometryPoint,
+        end: Point,
     },
     /// `a:cubicBezTo` — draw a cubic Bezier curve.
     CubicBezierTo {
         /// First control point.
-        control1: XlsxGeometryPoint,
+        control1: Point,
         /// Second control point.
-        control2: XlsxGeometryPoint,
+        control2: Point,
         /// End point.
-        end: XlsxGeometryPoint,
+        end: Point,
     },
     /// `a:close` — close the current sub-path.
     Close,
@@ -333,29 +333,29 @@ pub enum XlsxPathCommand {
 /// One geometry path (`a:path`, CT_Path2D) with its coordinate space and
 /// fill/stroke/extrusion attributes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsxGeometryPath {
+pub struct Path {
     /// Width of the path coordinate space (`@w`; 0, the ECMA-376 default,
     /// means path coordinates are EMUs within the shape extent).
     pub width: i64,
     /// Height of the path coordinate space (`@h`; 0 when absent).
     pub height: i64,
     /// Fill mode of the path (`@fill`).
-    pub fill_mode: XlsxPathFillMode,
+    pub fill_mode: PathFillMode,
     /// Whether the path outline is stroked (`@stroke`, default true).
     pub stroked: bool,
     /// Whether 3D extrusion is allowed on the path (`@extrusionOk`,
     /// default true).
     pub extrusion_allowed: bool,
     /// Drawing commands in path order.
-    pub commands: Vec<XlsxPathCommand>,
+    pub commands: Vec<PathCommand>,
 }
 
-impl Default for XlsxGeometryPath {
+impl Default for Path {
     fn default() -> Self {
         Self {
             width: 0,
             height: 0,
-            fill_mode: XlsxPathFillMode::default(),
+            fill_mode: PathFillMode::default(),
             stroked: true,
             extrusion_allowed: true,
             commands: Vec::new(),
@@ -363,7 +363,7 @@ impl Default for XlsxGeometryPath {
     }
 }
 
-impl XlsxGeometryPath {
+impl Path {
     /// An empty path over a `width` by `height` coordinate space with the
     /// ECMA-376 default fill/stroke/extrusion attributes.
     pub fn new(width: i64, height: i64) -> Self {
@@ -375,7 +375,7 @@ impl XlsxGeometryPath {
     }
 
     /// Append a drawing command to the path.
-    pub fn with_command(mut self, command: XlsxPathCommand) -> Self {
+    pub fn with_command(mut self, command: PathCommand) -> Self {
         self.commands.push(command);
         self
     }
@@ -383,41 +383,41 @@ impl XlsxGeometryPath {
 
 /// A custom shape geometry (`a:custGeom`, CT_CustomGeometry2D).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsxCustomGeometry {
+pub struct CustomGeometry {
     /// Adjustable shape parameters (`a:avLst`).
-    pub adjust_values: Vec<XlsxGeometryGuide>,
+    pub adjust_values: Vec<Guide>,
     /// Derived geometry guides (`a:gdLst`).
-    pub guides: Vec<XlsxGeometryGuide>,
+    pub guides: Vec<Guide>,
     /// Adjust handles (`a:ahLst`).
-    pub adjust_handles: Vec<XlsxAdjustHandle>,
+    pub adjust_handles: Vec<AdjustHandle>,
     /// Connection sites (`a:cxnLst`).
-    pub connection_sites: Vec<XlsxConnectionSite>,
+    pub connection_sites: Vec<ConnectionSite>,
     /// Text rectangle (`a:rect`), when declared.
-    pub text_rectangle: Option<XlsxGeometryRectangle>,
+    pub text_rectangle: Option<Rectangle>,
     /// Geometry paths (`a:pathLst`) in drawing order.
-    pub paths: Vec<XlsxGeometryPath>,
+    pub paths: Vec<Path>,
 }
 
-impl XlsxCustomGeometry {
+impl CustomGeometry {
     /// An empty custom geometry.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Append an adjustable parameter to the adjust-value list.
-    pub fn with_adjust_value(mut self, guide: XlsxGeometryGuide) -> Self {
+    pub fn with_adjust_value(mut self, guide: Guide) -> Self {
         self.adjust_values.push(guide);
         self
     }
 
     /// Append a derived guide to the guide list.
-    pub fn with_guide(mut self, guide: XlsxGeometryGuide) -> Self {
+    pub fn with_guide(mut self, guide: Guide) -> Self {
         self.guides.push(guide);
         self
     }
 
     /// Append a path to the path list.
-    pub fn with_path(mut self, path: XlsxGeometryPath) -> Self {
+    pub fn with_path(mut self, path: Path) -> Self {
         self.paths.push(path);
         self
     }

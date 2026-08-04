@@ -2,12 +2,13 @@
 //! XLSX worksheet drawings: parsing, round-tripping through the authoring
 //! pipeline, authoring into a saved workbook, and validation failures.
 
+use litchi_ooxml::xlsx::shape_geometry::{
+    AdjustHandle, AdjustValue, ConnectionSite, CustomGeometry, Formula, Guide, Path, PathCommand,
+    PathFillMode, Point, PolarAdjustHandle, Rectangle, XyAdjustHandle,
+};
 use litchi_ooxml::xlsx::writer::XlsxShapeSpec;
 use litchi_ooxml::xlsx::{
-    Geometry, Workbook, XlsxAdjustHandle, XlsxAdjustValue, XlsxCellMarker, XlsxConnectionSite,
-    XlsxCustomGeometry, XlsxDrawingObject, XlsxEditAs, XlsxEmu, XlsxGeometryFormula,
-    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
-    XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxShapeAnchor, XlsxXyAdjustHandle,
+    Geometry, Workbook, XlsxCellMarker, XlsxDrawingObject, XlsxEditAs, XlsxEmu, XlsxShapeAnchor,
     parse_drawing_shapes,
 };
 use litchi_opc::{OpcPackage, PackURI, constants::relationship_type as rt};
@@ -31,8 +32,8 @@ fn anchored_shape(sp_pr_children: &str) -> String {
     ))
 }
 
-fn value(value: i64) -> XlsxAdjustValue {
-    XlsxAdjustValue::Value(value)
+fn value(value: i64) -> AdjustValue {
+    AdjustValue::Value(value)
 }
 
 fn marker(column: u32, row: u32) -> XlsxCellMarker {
@@ -55,82 +56,76 @@ fn two_cell() -> XlsxShapeAnchor {
 /// A geometry exercising every custGeom construct: adjust values, derived
 /// guides, XY and polar handles, connection sites, a text rectangle, and a
 /// path with every command kind plus non-default path attributes.
-fn full_geometry() -> XlsxCustomGeometry {
-    XlsxCustomGeometry {
-        adjust_values: vec![XlsxGeometryGuide::new(
-            "adj1",
-            XlsxGeometryFormula::literal(50),
-        )],
+fn full_geometry() -> CustomGeometry {
+    CustomGeometry {
+        adjust_values: vec![Guide::new("adj1", Formula::literal(50))],
         guides: vec![
-            XlsxGeometryGuide::new("x1", "*/ adj1 21600 100".parse().unwrap()),
-            XlsxGeometryGuide::new("y1", "pin 0 x1 21600".parse().unwrap()),
+            Guide::new("x1", "*/ adj1 21600 100".parse().unwrap()),
+            Guide::new("y1", "pin 0 x1 21600".parse().unwrap()),
         ],
         adjust_handles: vec![
-            XlsxAdjustHandle::Xy(XlsxXyAdjustHandle {
+            AdjustHandle::Xy(XyAdjustHandle {
                 horizontal_guide: Some("adj1".to_string()),
                 minimum_x: Some(value(0)),
                 maximum_x: Some(value(100)),
-                position: XlsxGeometryPoint::new(XlsxAdjustValue::guide("x1"), value(0)),
-                ..XlsxXyAdjustHandle::default()
+                position: Point::new(AdjustValue::guide("x1"), value(0)),
+                ..XyAdjustHandle::default()
             }),
-            XlsxAdjustHandle::Polar(XlsxPolarAdjustHandle {
+            AdjustHandle::Polar(PolarAdjustHandle {
                 radius_guide: Some("adj1".to_string()),
                 minimum_radius: Some(value(0)),
                 maximum_radius: Some(value(10_800)),
                 angle_guide: Some("adj1".to_string()),
                 minimum_angle: Some(value(0)),
                 maximum_angle: Some(value(21_600_000)),
-                position: XlsxGeometryPoint::new(10_800, 10_800),
+                position: Point::new(10_800, 10_800),
             }),
         ],
         connection_sites: vec![
-            XlsxConnectionSite {
+            ConnectionSite {
                 angle: value(0),
-                position: XlsxGeometryPoint::new(21_600, 10_800),
+                position: Point::new(21_600, 10_800),
             },
-            XlsxConnectionSite {
-                angle: XlsxAdjustValue::guide("adj1"),
-                position: XlsxGeometryPoint::new(XlsxAdjustValue::guide("x1"), value(0)),
+            ConnectionSite {
+                angle: AdjustValue::guide("adj1"),
+                position: Point::new(AdjustValue::guide("x1"), value(0)),
             },
         ],
-        text_rectangle: Some(XlsxGeometryRectangle {
+        text_rectangle: Some(Rectangle {
             left: value(3_600),
-            top: XlsxAdjustValue::guide("y1"),
+            top: AdjustValue::guide("y1"),
             right: value(18_000),
             bottom: value(21_600),
         }),
         paths: vec![
-            XlsxGeometryPath::new(21_600, 21_600)
-                .with_command(XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(0, 10_800)))
-                .with_command(XlsxPathCommand::LineTo(XlsxGeometryPoint::new(10_800, 0)))
-                .with_command(XlsxPathCommand::ArcTo {
+            Path::new(21_600, 21_600)
+                .with_command(PathCommand::MoveTo(Point::new(0, 10_800)))
+                .with_command(PathCommand::LineTo(Point::new(10_800, 0)))
+                .with_command(PathCommand::ArcTo {
                     width_radius: value(10_800),
                     height_radius: value(10_800),
                     start_angle: value(16_200_000),
                     swing_angle: value(5_400_000),
                 })
-                .with_command(XlsxPathCommand::QuadraticBezierTo {
-                    control: XlsxGeometryPoint::new(21_600, 21_600),
-                    end: XlsxGeometryPoint::new(10_800, 21_600),
+                .with_command(PathCommand::QuadraticBezierTo {
+                    control: Point::new(21_600, 21_600),
+                    end: Point::new(10_800, 21_600),
                 })
-                .with_command(XlsxPathCommand::CubicBezierTo {
-                    control1: XlsxGeometryPoint::new(7_200, 21_600),
-                    control2: XlsxGeometryPoint::new(0, 18_000),
-                    end: XlsxGeometryPoint::new(
-                        XlsxAdjustValue::guide("x1"),
-                        XlsxAdjustValue::guide("y1"),
-                    ),
+                .with_command(PathCommand::CubicBezierTo {
+                    control1: Point::new(7_200, 21_600),
+                    control2: Point::new(0, 18_000),
+                    end: Point::new(AdjustValue::guide("x1"), AdjustValue::guide("y1")),
                 })
-                .with_command(XlsxPathCommand::Close),
-            XlsxGeometryPath {
+                .with_command(PathCommand::Close),
+            Path {
                 width: 100,
                 height: 100,
-                fill_mode: XlsxPathFillMode::Darken,
+                fill_mode: PathFillMode::Darken,
                 stroked: false,
                 extrusion_allowed: false,
                 commands: vec![
-                    XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(0, 0)),
-                    XlsxPathCommand::LineTo(XlsxGeometryPoint::new(100, 100)),
+                    PathCommand::MoveTo(Point::new(0, 0)),
+                    PathCommand::LineTo(Point::new(100, 100)),
                 ],
             },
         ],
@@ -174,51 +169,45 @@ fn parses_custom_geometry_from_drawing_xml() {
 
     assert_eq!(
         geometry.adjust_values,
-        vec![XlsxGeometryGuide::new(
-            "adj1",
-            XlsxGeometryFormula::literal(50)
-        )]
+        vec![Guide::new("adj1", Formula::literal(50))]
     );
     assert_eq!(
         geometry.guides,
-        vec![XlsxGeometryGuide::new(
+        vec![Guide::new(
             "x1",
-            XlsxGeometryFormula::MultiplyDivide {
-                x: XlsxAdjustValue::guide("adj1"),
+            Formula::MultiplyDivide {
+                x: AdjustValue::guide("adj1"),
                 y: value(21_600),
                 z: value(100),
             }
         )]
     );
     assert_eq!(geometry.adjust_handles.len(), 2);
-    let XlsxAdjustHandle::Xy(xy) = &geometry.adjust_handles[0] else {
+    let AdjustHandle::Xy(xy) = &geometry.adjust_handles[0] else {
         panic!("expected an XY handle");
     };
     assert_eq!(xy.horizontal_guide.as_deref(), Some("adj1"));
     assert_eq!(xy.minimum_x, Some(value(0)));
     assert_eq!(xy.maximum_x, Some(value(100)));
     assert_eq!(xy.vertical_guide, None);
-    assert_eq!(
-        xy.position,
-        XlsxGeometryPoint::new(XlsxAdjustValue::guide("x1"), value(0))
-    );
-    let XlsxAdjustHandle::Polar(polar) = &geometry.adjust_handles[1] else {
+    assert_eq!(xy.position, Point::new(AdjustValue::guide("x1"), value(0)));
+    let AdjustHandle::Polar(polar) = &geometry.adjust_handles[1] else {
         panic!("expected a polar handle");
     };
     assert_eq!(polar.angle_guide.as_deref(), Some("adj1"));
     assert_eq!(polar.maximum_angle, Some(value(21_600_000)));
-    assert_eq!(polar.position, XlsxGeometryPoint::new(10_800, 10_800));
+    assert_eq!(polar.position, Point::new(10_800, 10_800));
 
     assert_eq!(
         geometry.connection_sites,
-        vec![XlsxConnectionSite {
+        vec![ConnectionSite {
             angle: value(5_400_000),
-            position: XlsxGeometryPoint::new(10_800, 21_600),
+            position: Point::new(10_800, 21_600),
         }]
     );
     assert_eq!(
         geometry.text_rectangle,
-        Some(XlsxGeometryRectangle {
+        Some(Rectangle {
             left: value(0),
             top: value(0),
             right: value(21_600),
@@ -229,30 +218,30 @@ fn parses_custom_geometry_from_drawing_xml() {
     assert_eq!(geometry.paths.len(), 1);
     let path = &geometry.paths[0];
     assert_eq!((path.width, path.height), (21_600, 21_600));
-    assert_eq!(path.fill_mode, XlsxPathFillMode::LightenLess);
+    assert_eq!(path.fill_mode, PathFillMode::LightenLess);
     assert!(!path.stroked);
     assert!(!path.extrusion_allowed);
     assert_eq!(
         path.commands,
         vec![
-            XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(0, 0)),
-            XlsxPathCommand::LineTo(XlsxGeometryPoint::new(21_600, 0)),
-            XlsxPathCommand::ArcTo {
+            PathCommand::MoveTo(Point::new(0, 0)),
+            PathCommand::LineTo(Point::new(21_600, 0)),
+            PathCommand::ArcTo {
                 width_radius: value(10_800),
                 height_radius: value(10_800),
                 start_angle: value(0),
                 swing_angle: value(10_800_000),
             },
-            XlsxPathCommand::QuadraticBezierTo {
-                control: XlsxGeometryPoint::new(10_800, 21_600),
-                end: XlsxGeometryPoint::new(0, 21_600),
+            PathCommand::QuadraticBezierTo {
+                control: Point::new(10_800, 21_600),
+                end: Point::new(0, 21_600),
             },
-            XlsxPathCommand::CubicBezierTo {
-                control1: XlsxGeometryPoint::new(0, 14_400),
-                control2: XlsxGeometryPoint::new(0, 7_200),
-                end: XlsxGeometryPoint::new(0, 0),
+            PathCommand::CubicBezierTo {
+                control1: Point::new(0, 14_400),
+                control2: Point::new(0, 7_200),
+                end: Point::new(0, 0),
             },
-            XlsxPathCommand::Close,
+            PathCommand::Close,
         ]
     );
 }
@@ -269,7 +258,7 @@ fn parses_path_attribute_defaults() {
         .unwrap();
     let path = &geometry.paths[0];
     assert_eq!((path.width, path.height), (0, 0));
-    assert_eq!(path.fill_mode, XlsxPathFillMode::Normal);
+    assert_eq!(path.fill_mode, PathFillMode::Normal);
     assert!(path.stroked);
     assert!(path.extrusion_allowed);
 }
@@ -293,7 +282,7 @@ fn schema_valid_geometry_guide_tokens_are_canonicalized_without_rejection() {
     assert_eq!(geometry.adjust_values[0].name, "my guide");
     assert_eq!(geometry.adjust_values[1].name, "123");
     assert_eq!(geometry.adjust_values[2].name, "");
-    let XlsxAdjustHandle::Xy(handle) = &geometry.adjust_handles[0] else {
+    let AdjustHandle::Xy(handle) = &geometry.adjust_handles[0] else {
         panic!("expected XY handle");
     };
     assert_eq!(handle.horizontal_guide.as_deref(), Some("my guide"));
@@ -420,18 +409,12 @@ fn validation_rejects_invalid_or_ambiguous_authored_geometry() {
 
     // The schema always requires a path list element; authored geometry
     // must also draw at least one path.
-    let empty = XlsxShapeSpec::custom("Empty", two_cell(), XlsxCustomGeometry::new(), "");
+    let empty = XlsxShapeSpec::custom("Empty", two_cell(), CustomGeometry::new(), "");
     assert!(worksheet.add_shape(empty).is_err());
 
-    let numeric_guide = XlsxCustomGeometry::new()
-        .with_adjust_value(XlsxGeometryGuide::new(
-            "123",
-            XlsxGeometryFormula::literal(1),
-        ))
-        .with_path(
-            XlsxGeometryPath::new(0, 0)
-                .with_command(XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(0, 0))),
-        );
+    let numeric_guide = CustomGeometry::new()
+        .with_adjust_value(Guide::new("123", Formula::literal(1)))
+        .with_path(Path::new(0, 0).with_command(PathCommand::MoveTo(Point::new(0, 0))));
     let spec = XlsxShapeSpec::custom("Numeric guide", two_cell(), numeric_guide, "");
     assert!(worksheet.add_shape(spec).is_err());
 

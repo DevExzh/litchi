@@ -26,7 +26,7 @@ use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
 
 use crate::xlsx::shape_geometry::write::write_custom_geometry;
-use crate::xlsx::shape_geometry::{XlsxCustomGeometry, validate_custom_geometry};
+use crate::xlsx::shape_geometry::{CustomGeometry, validate_custom_geometry};
 use crate::xlsx::shapes::{
     Columns, Geometry, XlsxCellMarker, XlsxEditAs, XlsxEmuExtent, XlsxEmuOffset,
     XlsxGroupTransform, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeParagraph, XlsxShapeRun,
@@ -136,7 +136,7 @@ impl XlsxShapeSpec {
     pub fn custom(
         name: impl Into<String>,
         anchor: XlsxShapeAnchor,
-        geometry: XlsxCustomGeometry,
+        geometry: CustomGeometry,
         text: &str,
     ) -> Self {
         Self::with_geometry(name, anchor, geometry.into(), text)
@@ -1252,7 +1252,7 @@ mod tests {
 #[cfg(test)]
 mod group_connection_tests {
     use super::*;
-    use crate::xlsx::shape_geometry::XlsxGeometryPath;
+    use crate::xlsx::shape_geometry::Path;
     use crate::xlsx::shapes::{XlsxCellMarker, XlsxDrawingObject, XlsxEmu, parse_drawing_shapes};
     use crate::xlsx::writer::sheet::MutableWorksheet;
 
@@ -1437,7 +1437,7 @@ mod group_connection_tests {
     fn custom_connector_geometry_round_trips_without_a_preset_state() {
         let start = XlsxShapeSpec::shape("Start", anchor((0, 0), (1, 1)), Preset::Rect, "");
         let end = XlsxShapeSpec::shape("End", anchor((3, 3), (4, 4)), Preset::Rect, "");
-        let geometry = XlsxCustomGeometry::new().with_path(XlsxGeometryPath::new(10, 10));
+        let geometry = CustomGeometry::new().with_path(Path::new(10, 10));
         let connector = XlsxConnectionShapeSpec::new(
             "Custom Link",
             anchor((1, 1), (3, 3)),

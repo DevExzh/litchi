@@ -2,7 +2,7 @@
 //! ST_GeomGuideFormula; ECMA-376 part 1 §20.1.10.11).
 //!
 //! A formula is an operation token followed by space-delimited operands,
-//! each a literal or a guide reference. [`XlsxGeometryFormula`] models every
+//! each a literal or a guide reference. [`Formula`] models every
 //! defined operation with its exact operand count; parsing rejects unknown
 //! operations and wrong arities so authored formulas always serialize back
 //! to a schema-valid token.
@@ -12,156 +12,156 @@ use std::str::FromStr;
 
 use crate::error::{OoxmlError, Result};
 
-use super::XlsxAdjustValue;
+use super::AdjustValue;
 
 /// A geometry-guide formula: one ECMA-376 operation with typed operands.
 ///
 /// Formula semantics quote §20.1.10.11; trigonometric operands are angles in
 /// 60000ths of a degree.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsxGeometryFormula {
+pub enum Formula {
     /// `*/ x y z` — `(x * y) / z`.
     MultiplyDivide {
         /// First factor.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Second factor.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Divisor.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `+- x y z` — `(x + y) - z`.
     AddSubtract {
         /// First addend.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Second addend.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Subtrahend.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `+/ x y z` — `(x + y) / z`.
     AddDivide {
         /// First addend.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Second addend.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Divisor.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `?: x y z` — `y` when `x > 0`, `z` otherwise.
     IfElse {
         /// Condition value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Result when the condition is positive.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Result otherwise.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `abs x` — `|x|`.
     Absolute {
         /// Input value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
     },
     /// `at2 x y` — `atan2(y, x)`.
     ArcTangent {
         /// Horizontal component.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Vertical component.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
     },
     /// `cat2 x y z` — `x * cos(atan2(z, y))`.
     CosineArcTangent {
         /// Scale value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Horizontal component.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Vertical component.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `cos x y` — `x * cos(y)`.
     Cosine {
         /// Scale value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Angle.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
     },
     /// `max x y` — the greater of `x` and `y`.
     Maximum {
         /// First value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Second value.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
     },
     /// `min x y` — the lesser of `x` and `y`.
     Minimum {
         /// First value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Second value.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
     },
     /// `mod x y z` — `sqrt(x² + y² + z²)`.
     Modulus {
         /// First component.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Second component.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Third component.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `pin x y z` — `y` clamped to `[x, z]`.
     Pin {
         /// Lower bound.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Clamped value.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Upper bound.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `sat2 x y z` — `x * sin(atan2(z, y))`.
     SineArcTangent {
         /// Scale value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Horizontal component.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
         /// Vertical component.
-        z: XlsxAdjustValue,
+        z: AdjustValue,
     },
     /// `sin x y` — `x * sin(y)`.
     Sine {
         /// Scale value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Angle.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
     },
     /// `sqrt x` — `sqrt(x)`.
     SquareRoot {
         /// Input value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
     },
     /// `tan x y` — `x * tan(y)`.
     Tangent {
         /// Scale value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
         /// Angle.
-        y: XlsxAdjustValue,
+        y: AdjustValue,
     },
     /// `val x` — the literal or referenced value itself.
     Value {
         /// The value.
-        x: XlsxAdjustValue,
+        x: AdjustValue,
     },
 }
 
-impl XlsxGeometryFormula {
+impl Formula {
     /// A `val` formula holding one literal, the common shape of adjust-value
     /// entries.
     pub fn literal(value: i64) -> Self {
         Self::Value {
-            x: XlsxAdjustValue::Value(value),
+            x: AdjustValue::Value(value),
         }
     }
 
     /// The formula's operands in serialization order.
-    pub fn operands(&self) -> impl Iterator<Item = &XlsxAdjustValue> {
+    pub fn operands(&self) -> impl Iterator<Item = &AdjustValue> {
         match self {
             Self::MultiplyDivide { x, y, z }
             | Self::AddSubtract { x, y, z }
@@ -209,30 +209,26 @@ impl XlsxGeometryFormula {
 
 /// Iterator over a formula's one to three operands.
 struct FormulaOperands<'formula> {
-    operands: [Option<&'formula XlsxAdjustValue>; 3],
+    operands: [Option<&'formula AdjustValue>; 3],
     next: usize,
 }
 
 impl<'formula> FormulaOperands<'formula> {
-    fn one(x: &'formula XlsxAdjustValue) -> Self {
+    fn one(x: &'formula AdjustValue) -> Self {
         Self {
             operands: [Some(x), None, None],
             next: 0,
         }
     }
 
-    fn two(x: &'formula XlsxAdjustValue, y: &'formula XlsxAdjustValue) -> Self {
+    fn two(x: &'formula AdjustValue, y: &'formula AdjustValue) -> Self {
         Self {
             operands: [Some(x), Some(y), None],
             next: 0,
         }
     }
 
-    fn three(
-        x: &'formula XlsxAdjustValue,
-        y: &'formula XlsxAdjustValue,
-        z: &'formula XlsxAdjustValue,
-    ) -> Self {
+    fn three(x: &'formula AdjustValue, y: &'formula AdjustValue, z: &'formula AdjustValue) -> Self {
         Self {
             operands: [Some(x), Some(y), Some(z)],
             next: 0,
@@ -241,7 +237,7 @@ impl<'formula> FormulaOperands<'formula> {
 }
 
 impl<'formula> Iterator for FormulaOperands<'formula> {
-    type Item = &'formula XlsxAdjustValue;
+    type Item = &'formula AdjustValue;
 
     fn next(&mut self) -> Option<Self::Item> {
         let operand = self.operands.get(self.next).copied().flatten()?;
@@ -250,7 +246,7 @@ impl<'formula> Iterator for FormulaOperands<'formula> {
     }
 }
 
-impl fmt::Display for XlsxGeometryFormula {
+impl fmt::Display for Formula {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.operation())?;
         for operand in self.operands() {
@@ -260,7 +256,7 @@ impl fmt::Display for XlsxGeometryFormula {
     }
 }
 
-impl FromStr for XlsxGeometryFormula {
+impl FromStr for Formula {
     type Err = OoxmlError;
 
     fn from_str(text: &str) -> Result<Self> {
@@ -269,7 +265,7 @@ impl FromStr for XlsxGeometryFormula {
             .next()
             .ok_or_else(|| invalid_formula(text, "it has no operation"))?;
         let operands = tokens
-            .map(XlsxAdjustValue::from_str)
+            .map(AdjustValue::from_str)
             .collect::<Result<Vec<_>>>()?;
         let formula = match operation {
             "*/" => {
@@ -352,9 +348,9 @@ impl FromStr for XlsxGeometryFormula {
 /// whose operand count does not match the operation.
 fn take_operands<const COUNT: usize>(
     text: &str,
-    operands: Vec<XlsxAdjustValue>,
-) -> Result<[XlsxAdjustValue; COUNT]> {
-    <[XlsxAdjustValue; COUNT]>::try_from(operands)
+    operands: Vec<AdjustValue>,
+) -> Result<[AdjustValue; COUNT]> {
+    <[AdjustValue; COUNT]>::try_from(operands)
         .map_err(|_| invalid_formula(text, "it has the wrong operand count"))
 }
 

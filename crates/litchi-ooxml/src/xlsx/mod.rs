@@ -208,11 +208,6 @@ pub use printer_settings::{
     parse_worksheet_printer_settings_reference, store_worksheet_printer_settings,
     write_worksheet_printer_settings_reference,
 };
-pub use shape_geometry::{
-    XlsxAdjustHandle, XlsxAdjustValue, XlsxConnectionSite, XlsxCustomGeometry, XlsxGeometryFormula,
-    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
-    XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxXyAdjustHandle,
-};
 pub use shapes::{
     Columns, Coordinate32, Geometry, TextSize, XlsxAnchoredObject, XlsxCellMarker, XlsxClientData,
     XlsxConnectionShape, XlsxDrawingObject, XlsxDrawingOleObject, XlsxEditAs, XlsxEditAsError,
