@@ -1,10 +1,11 @@
 //! Typed native archive construction shared by drawable title and caption editors.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use prost::Message;
 
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::protobuf::{tsa, tsd, tsp, tss, tswp};
 use crate::text::style_registry::{insert_private_style, register_private_style};
 use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
@@ -127,6 +128,106 @@ pub(crate) struct DrawableCaptionSlot {
     pub(crate) object_ids: Vec<u64>,
 }
 
+/// Read-only archive state for one drawable title/caption graph resolution.
+///
+/// The package cache intentionally retains only one parsed component. Keep a
+/// small borrowed object-location index for this operation, while retaining
+/// the component that owns the drawable so all private graph checks can borrow
+/// its already-parsed [`Archive`] without reparsing it.
+struct DrawableCaptionArchives<'package> {
+    object_archives: HashMap<u64, &'package str>,
+    duplicate_objects: HashSet<u64>,
+    drawable_archive_name: &'package str,
+    drawable_archive: Arc<Archive>,
+}
+
+impl<'package> DrawableCaptionArchives<'package> {
+    fn discover(package: &'package IWorkPackage, drawable_object_id: u64) -> Result<Self> {
+        let mut object_archives = HashMap::new();
+        let mut duplicate_objects = HashSet::new();
+        let mut drawable_archive = None;
+
+        for archive_name in package.iwa_entry_names() {
+            let archive = package.parsed_archive(archive_name)?;
+            if archive.object(drawable_object_id).is_some()
+                && drawable_archive
+                    .replace((archive_name, Arc::clone(&archive)))
+                    .is_some()
+            {
+                return Err(Error::Archive(format!(
+                    "object {drawable_object_id} occurs in multiple IWA components"
+                )));
+            }
+            for object in &archive.objects {
+                let Some(identifier) = object.archive_info.identifier else {
+                    continue;
+                };
+                if let Some(previous_archive_name) =
+                    object_archives.insert(identifier, archive_name)
+                    && previous_archive_name != archive_name
+                {
+                    duplicate_objects.insert(identifier);
+                }
+            }
+        }
+
+        let (drawable_archive_name, drawable_archive) = drawable_archive.ok_or_else(|| {
+            Error::InvalidFormat(format!("object {drawable_object_id} is missing"))
+        })?;
+        Ok(Self {
+            object_archives,
+            duplicate_objects,
+            drawable_archive_name,
+            drawable_archive,
+        })
+    }
+
+    fn archive_name(&self, identifier: u64) -> Result<&'package str> {
+        if self.duplicate_objects.contains(&identifier) {
+            return Err(Error::Archive(format!(
+                "object {identifier} occurs in multiple IWA components"
+            )));
+        }
+        self.object_archives
+            .get(&identifier)
+            .copied()
+            .ok_or_else(|| Error::InvalidFormat(format!("object {identifier} is missing")))
+    }
+
+    fn drawable_archive(&self) -> &Archive {
+        self.drawable_archive.as_ref()
+    }
+
+    fn require_exact_message_count(
+        &self,
+        package: &IWorkPackage,
+        object_id: u64,
+        message_type: u32,
+        label: &str,
+        drawable_label: &str,
+    ) -> Result<()> {
+        let archive_name = self.archive_name(object_id)?;
+        if archive_name == self.drawable_archive_name {
+            return require_exact_caption_message_count_in_archive(
+                self.drawable_archive(),
+                object_id,
+                message_type,
+                label,
+                drawable_label,
+            );
+        }
+        package.with_parsed_archive(archive_name, |archive| {
+            require_exact_caption_message_count_in_archive(
+                archive,
+                object_id,
+                message_type,
+                label,
+                drawable_label,
+            )
+        })
+    }
+}
+
 /// Resolve and validate a drawable title or caption graph without assuming a
 /// particular iWork application or drawable type.
 #[allow(deprecated)]
@@ -145,14 +246,15 @@ pub(crate) fn drawable_caption_slot(
                 "{drawable_label} {drawable_object_id} has no native title/caption reference"
             ))
         })?;
-    let drawable_archive_name = unique_object_archive_name(package, drawable_object_id)?;
-    let archive_name = unique_object_archive_name(package, reference_id)?;
+    let archives = DrawableCaptionArchives::discover(package, drawable_object_id)?;
+    let drawable_archive_name = archives.archive_name(drawable_object_id)?;
+    let archive_name = archives.archive_name(reference_id)?;
     if archive_name != drawable_archive_name {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} title/caption object {reference_id} is outside drawable {drawable_object_id}'s component"
         )));
     }
-    let archive = package.archive(&archive_name)?;
+    let archive = archives.drawable_archive();
     let object = archive.object(reference_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "{drawable_label} title/caption object {reference_id} is missing"
@@ -164,7 +266,7 @@ pub(crate) fn drawable_caption_slot(
         .filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)
         .collect::<Vec<_>>();
     if caption_messages.is_empty() {
-        require_exact_caption_message_count(
+        archives.require_exact_message_count(
             package,
             reference_id,
             STANDIN_CAPTION_MESSAGE_TYPE,
@@ -236,7 +338,7 @@ pub(crate) fn drawable_caption_slot(
         (storage_id, STORAGE_MESSAGE_TYPE, "text storage"),
         (placement_id, CAPTION_PLACEMENT_MESSAGE_TYPE, "placement"),
     ] {
-        require_exact_caption_message_count(
+        archives.require_exact_message_count(
             package,
             identifier,
             message_type,
@@ -245,14 +347,14 @@ pub(crate) fn drawable_caption_slot(
         )?;
     }
     for (identifier, label) in [(storage_id, "text storage"), (placement_id, "placement")] {
-        if unique_object_archive_name(package, identifier)? != drawable_archive_name {
+        if archives.archive_name(identifier)? != drawable_archive_name {
             return Err(Error::InvalidFormat(format!(
                 "{drawable_label} title/caption {label} {identifier} is outside drawable {drawable_object_id}'s component"
             )));
         }
     }
     let mut object_ids = vec![reference_id];
-    if unique_object_archive_name(package, style_id)? == drawable_archive_name {
+    if archives.archive_name(style_id)? == drawable_archive_name {
         object_ids.push(style_id);
     }
     object_ids.extend([storage_id, placement_id]);
@@ -561,15 +663,13 @@ fn required_caption_reference(
         })
 }
 
-fn require_exact_caption_message_count(
-    package: &IWorkPackage,
+fn require_exact_caption_message_count_in_archive(
+    archive: &Archive,
     object_id: u64,
     message_type: u32,
     label: &str,
     drawable_label: &str,
 ) -> Result<()> {
-    let archive_name = unique_object_archive_name(package, object_id)?;
-    let archive = package.archive(&archive_name)?;
     let object = archive.object(object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "{drawable_label} title/caption {label} {object_id} is missing"
