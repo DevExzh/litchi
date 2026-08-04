@@ -1,180 +1,63 @@
-//! Bounded, lossless PivotTable-view parts for XLSB authoring.
+//! Compatibility adapter for the owner PivotTable-view framing codec.
 //!
-//! The PivotTable definition stream (MS-XLSB 2.1.7.40) has a large,
-//! extensible record grammar. This type deliberately preserves the complete
-//! stream instead of projecting it through the older partial model in
-//! `pivot_tables.rs`. The package writer uses the parsed view name and cache
-//! identifier to validate PivotChart and PivotCache relationships.
+//! Workbook, worksheet, relationship, and package orchestration remain in
+//! this crate. The bounded BIFF12 framing and lossless stream retention live
+//! in [`litchi_xlsb::pivot_view`].
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use litchi_core::binary;
-use litchi_xlsb::raw::{Header, Kind, Limits, kind};
-use std::io::{Cursor, Read};
-
-const MAX_PIVOT_TABLE_PART_BYTES: usize = 32 * 1024 * 1024;
-const MAX_PIVOT_TABLE_RECORDS: usize = 1_000_000;
 
 /// A PivotTable definition stream with validated enclosing records, preserved verbatim.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XlsbPivotTableViewPart {
-    name: String,
-    cache_id: u32,
-    version_created: u8,
-    bytes: Vec<u8>,
+    inner: litchi_xlsb::pivot_view::PivotTableViewPart,
 }
 
 impl XlsbPivotTableViewPart {
     /// Parse a complete PivotTable part while retaining every original byte.
-    ///
-    /// The enclosing view collection, its name, cache identifier, record
-    /// count, and stream boundaries are validated. Inner records remain
-    /// opaque so extension records and features outside Litchi's typed
-    /// PivotTable model are not discarded.
     pub fn from_bytes(bytes: Vec<u8>) -> XlsbResult<Self> {
-        if bytes.len() > MAX_PIVOT_TABLE_PART_BYTES {
-            return Err(XlsbError::InvalidLength {
-                expected: MAX_PIVOT_TABLE_PART_BYTES,
-                found: bytes.len(),
-            });
-        }
-
-        let mut cursor = Cursor::new(bytes.as_slice());
-        let mut count = 0usize;
-        let mut begin = None;
-        let mut ended = false;
-        while usize::try_from(cursor.position()).unwrap_or(usize::MAX) < bytes.len() {
-            count = count.checked_add(1).ok_or_else(|| {
-                XlsbError::InvalidFormula("PivotTable record count overflow".to_string())
-            })?;
-            if count > MAX_PIVOT_TABLE_RECORDS {
-                return Err(XlsbError::InvalidFormula(
-                    "PivotTable record count exceeds the safety limit".to_string(),
-                ));
-            }
-            let record = read_complete_record(&mut cursor)?;
-            match record.kind {
-                kind::BEGIN_SX_VIEW => {
-                    if begin.is_some() || count != 1 || ended {
-                        return Err(XlsbError::InvalidFormula(
-                            "PivotTable has duplicate or misplaced BrtBeginSXView".to_string(),
-                        ));
-                    }
-                    begin = Some(parse_begin_view(&record.data)?);
-                },
-                kind::END_SX_VIEW => {
-                    if begin.is_none() || ended || !record.data.is_empty() {
-                        return Err(XlsbError::InvalidFormula(
-                            "PivotTable has malformed BrtEndSXView".to_string(),
-                        ));
-                    }
-                    ended = true;
-                    if usize::try_from(cursor.position()).unwrap_or(usize::MAX) != bytes.len() {
-                        return Err(XlsbError::InvalidFormula(
-                            "PivotTable has records after BrtEndSXView".to_string(),
-                        ));
-                    }
-                },
-                _ if begin.is_none() || ended => {
-                    return Err(XlsbError::InvalidFormula(
-                        "PivotTable record lies outside BrtBeginSXView collection".to_string(),
-                    ));
-                },
-                _ => {},
-            }
-        }
-        let (name, cache_id, version_created) = begin.ok_or_else(|| {
-            XlsbError::InvalidFormula("PivotTable omits BrtBeginSXView".to_string())
-        })?;
-        if !ended {
-            return Err(XlsbError::InvalidFormula(
-                "PivotTable omits BrtEndSXView".to_string(),
-            ));
-        }
-        Ok(Self {
-            name,
-            cache_id,
-            version_created,
-            bytes,
-        })
+        litchi_xlsb::pivot_view::PivotTableViewPart::from_bytes(bytes)
+            .map(|inner| Self { inner })
+            .map_err(map_owner_error)
     }
 
     /// Unique PivotTable view name (`irstName`).
     pub fn name(&self) -> &str {
-        &self.name
+        self.inner.name()
     }
 
     /// Workbook PivotCache identifier (`idCache`).
     pub fn cache_id(&self) -> u32 {
-        self.cache_id
+        self.inner.cache_id()
     }
 
     /// Data functionality level that created the view (`bVerSxMacro`).
     pub fn version_created(&self) -> u8 {
-        self.version_created
+        self.inner.version_created()
     }
 
     /// Complete original PivotTable definition stream.
     pub fn as_bytes(&self) -> &[u8] {
-        &self.bytes
+        self.inner.as_bytes()
     }
 }
 
-struct CompleteRecord {
-    kind: Kind,
-    data: Vec<u8>,
-}
-
-fn read_complete_record(cursor: &mut Cursor<&[u8]>) -> XlsbResult<CompleteRecord> {
-    let start = cursor.position();
-    let header = Header::read(cursor, Limits::DEFAULT)?.ok_or_else(|| {
-        XlsbError::InvalidFormula(format!("PivotTable unexpectedly ended at byte {start}"))
-    })?;
-    let remaining = cursor
-        .get_ref()
-        .len()
-        .saturating_sub(usize::try_from(cursor.position()).unwrap_or(usize::MAX));
-    if header.len() > remaining {
-        return Err(XlsbError::InvalidFormula(format!(
-            "PivotTable record {} declares {} bytes with only {remaining} remaining",
-            header.kind(),
-            header.len()
-        )));
+fn map_owner_error(error: litchi_xlsb::pivot_view::Error) -> XlsbError {
+    match error {
+        litchi_xlsb::pivot_view::Error::Wire(error) => XlsbError::Wire(error),
+        litchi_xlsb::pivot_view::Error::InvalidLength { expected, found } => {
+            XlsbError::InvalidLength { expected, found }
+        },
+        litchi_xlsb::pivot_view::Error::InvalidFormula(message) => {
+            XlsbError::InvalidFormula(message)
+        },
+        other => XlsbError::InvalidFormula(other.to_string()),
     }
-    let mut data = vec![0u8; header.len()];
-    cursor.read_exact(&mut data)?;
-    Ok(CompleteRecord {
-        kind: header.kind(),
-        data,
-    })
-}
-
-fn parse_begin_view(data: &[u8]) -> XlsbResult<(String, u32, u8)> {
-    if data.len() < 36 {
-        return Err(XlsbError::InvalidLength {
-            expected: 36,
-            found: data.len(),
-        });
-    }
-    let cache_id = binary::read_u32_le_at(data, 28)?;
-    let (name, consumed) = crate::xlsb::records::decode_string(&data[32..])?;
-    if consumed > data.len() - 32 {
-        return Err(XlsbError::InvalidFormula(
-            "PivotTable view name overruns BrtBeginSXView".to_string(),
-        ));
-    }
-    let units = name.encode_utf16().count();
-    if units == 0 || units > 255 || name.contains('\0') {
-        return Err(XlsbError::InvalidFormula(
-            "PivotTable view name is empty, too long, or contains NUL".to_string(),
-        ));
-    }
-    Ok((name, cache_id, data[0]))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_xlsb::raw::Writer;
+    use litchi_xlsb::raw::{Writer, kind};
 
     fn view_stream(name: &str, cache_id: u32) -> Vec<u8> {
         let mut begin = vec![0u8; 32];

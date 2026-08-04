@@ -15,9 +15,12 @@ pub mod external_link;
 pub mod formula;
 pub mod hyperlinks;
 pub mod merged_cells;
+pub mod pivot_view;
 pub mod raw;
 
 pub use raw::Error;
+
+pub use pivot_view::PivotTableViewPart;
 
 pub use data_validation::{
     DataValidation, DataValidationRecordKind, DataValidationSettings, FormulaBinary,
