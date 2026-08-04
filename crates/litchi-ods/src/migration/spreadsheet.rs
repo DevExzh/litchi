@@ -11,7 +11,7 @@ use super::{
     database_range::parse_database_ranges,
     dde::parse_dde_links,
     label_range::parse_label_ranges,
-    parser::OdsParser,
+    parser::Parser,
     protection::parse_protection,
     style_protection::{
         CellStyleProtection, CellStyleRegistry, ConditionalCellStyle, TableCellProtectionStyle,
@@ -231,7 +231,7 @@ impl Spreadsheet {
         // Parse core components
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
-        let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
+        let named_definitions = Parser::parse_named_definitions(content.xml_content())?;
         super::named_expression::validate_named_definition_collection(&named_definitions)?;
         let content_validations = parse_content_validations(content.xml_content())?;
         let database_ranges = parse_database_ranges(content.xml_content())?;
@@ -731,7 +731,7 @@ impl Spreadsheet {
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
-        let mut sheets = OdsParser::parse_sheets(content.xml_content())?;
+        let mut sheets = Parser::parse_sheets(content.xml_content())?;
         if sheets.len() != self.sheet_protections.len() {
             return Err(Error::InvalidFormat(format!(
                 "sheet protection count {} does not match sheet count {}",
@@ -764,16 +764,16 @@ impl Spreadsheet {
     /// in an owned read-only model.  Use it with consumers such as
     /// `litchi_eval::FormulaEvaluator` without repeatedly reparsing the ODS
     /// package.  The original `Spreadsheet` remains usable for package edits.
-    pub fn evaluation_workbook(&mut self) -> Result<super::OdsWorkbook> {
-        super::OdsWorkbook::from_sheets(self.sheets()?)
+    pub fn evaluation_workbook(&mut self) -> Result<super::Workbook> {
+        super::Workbook::from_sheets(self.sheets()?)
     }
 
     /// Consume this spreadsheet into an immutable shared-workbook snapshot.
     ///
     /// Unlike [`Self::evaluation_workbook`], this avoids retaining the ODS
     /// package after its sheets have been materialized.
-    pub fn into_evaluation_workbook(mut self) -> Result<super::OdsWorkbook> {
-        super::OdsWorkbook::from_sheets(self.sheets()?)
+    pub fn into_evaluation_workbook(mut self) -> Result<super::Workbook> {
+        super::Workbook::from_sheets(self.sheets()?)
     }
 
     /// Return all named ranges and expressions in document order.

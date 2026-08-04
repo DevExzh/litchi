@@ -7,12 +7,12 @@
 //! performed once when the snapshot is created; subsequent cell reads borrow
 //! directly from its compact row storage.
 
-use super::{Cell as OdsCell, CellMatrixSpan, CellValue as OdsCellValue, Sheet, Spreadsheet};
+use super::{Cell, CellMatrixSpan, CellValue, Sheet, Spreadsheet};
 use litchi_core::{
     Error, Result as OdfResult,
     sheet::{
-        Cell as SheetCell, CellIterator, CellValue, Result as SheetResult, RowIterator,
-        WorkbookTrait, Worksheet, WorksheetIterator,
+        Cell as SheetCell, CellIterator, CellValue as EvaluatedValue, Result as SheetResult,
+        RowIterator, WorkbookTrait, Worksheet, WorksheetIterator,
     },
 };
 use std::{borrow::Cow, path::Path};
@@ -25,20 +25,20 @@ use std::{borrow::Cow, path::Path};
 /// stable input to consumers such as `litchi_eval::FormulaEvaluator`, not a
 /// second mutable ODS model.
 #[derive(Debug)]
-pub struct OdsWorkbook {
-    sheets: Vec<OdsWorksheetData>,
+pub struct Workbook {
+    sheets: Vec<WorksheetData>,
     worksheet_names: Vec<String>,
 }
 
 #[derive(Debug)]
-struct OdsWorksheetData {
+struct WorksheetData {
     name: String,
-    rows: Vec<Vec<CellValue>>,
+    rows: Vec<Vec<EvaluatedValue>>,
     present_cells: Vec<(u32, u32)>,
     dimensions: Option<(u32, u32, u32, u32)>,
 }
 
-impl OdsWorkbook {
+impl Workbook {
     /// Open an ODS file and create an immutable evaluation snapshot.
     pub fn open(path: impl AsRef<Path>) -> OdfResult<Self> {
         Spreadsheet::open(path)?.into_evaluation_workbook()
@@ -59,7 +59,7 @@ impl OdsWorkbook {
         let mut evaluation_sheets = Vec::with_capacity(sheets.len());
 
         for sheet in sheets {
-            let sheet = OdsWorksheetData::from_sheet(sheet)?;
+            let sheet = WorksheetData::from_sheet(sheet)?;
             worksheet_names.push(sheet.name.clone());
             evaluation_sheets.push(sheet);
         }
@@ -71,10 +71,10 @@ impl OdsWorkbook {
     }
 }
 
-impl OdsWorksheetData {
+impl WorksheetData {
     fn from_sheet(sheet: Sheet) -> OdfResult<Self> {
         let Sheet { name, rows, .. } = sheet;
-        let mut stored_rows = Vec::<Vec<CellValue>>::new();
+        let mut stored_rows = Vec::<Vec<EvaluatedValue>>::new();
         let mut present_cells = Vec::new();
         let mut max_row = 0u32;
         let mut max_col = 0u32;
@@ -91,7 +91,7 @@ impl OdsWorksheetData {
                 let column_index = one_based_coordinate(cell.col, "column")?;
                 let column_slot = cell.col;
                 if values.len() <= column_slot {
-                    values.resize_with(column_slot.saturating_add(1), || CellValue::Empty);
+                    values.resize_with(column_slot.saturating_add(1), || EvaluatedValue::Empty);
                 }
                 values[column_slot] = convert_cell(cell);
                 present_cells.push((row_index, column_index));
@@ -109,7 +109,7 @@ impl OdsWorksheetData {
         })
     }
 
-    fn value_at(&self, row: u32, column: u32) -> Option<&CellValue> {
+    fn value_at(&self, row: u32, column: u32) -> Option<&EvaluatedValue> {
         let row = row
             .checked_sub(1)
             .and_then(|value| usize::try_from(value).ok())?;
@@ -119,7 +119,7 @@ impl OdsWorksheetData {
         self.rows.get(row)?.get(column)
     }
 
-    fn row_values(&self, row_index: usize) -> SheetResult<Cow<'_, [CellValue]>> {
+    fn row_values(&self, row_index: usize) -> SheetResult<Cow<'_, [EvaluatedValue]>> {
         let Some(max_col) = self.dimensions.map(|(_, _, _, max_col)| max_col) else {
             return Ok(Cow::Borrowed(&[]));
         };
@@ -137,12 +137,12 @@ impl OdsWorksheetData {
 
         let mut values = Vec::with_capacity(max_col);
         values.extend(row.iter().cloned());
-        values.resize_with(max_col, || CellValue::Empty);
+        values.resize_with(max_col, || EvaluatedValue::Empty);
         Ok(Cow::Owned(values))
     }
 }
 
-impl WorkbookTrait for OdsWorkbook {
+impl WorkbookTrait for Workbook {
     fn active_worksheet(&self) -> SheetResult<Box<dyn Worksheet + '_>> {
         self.worksheet_by_index(self.active_sheet_index())
     }
@@ -157,7 +157,7 @@ impl WorkbookTrait for OdsWorkbook {
             .iter()
             .find(|sheet| sheet.name == name)
             .ok_or_else(|| sheet_error(format!("ODS worksheet '{name}' was not found")))?;
-        Ok(Box::new(OdsWorksheet { sheet }))
+        Ok(Box::new(WorksheetView { sheet }))
     }
 
     fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn Worksheet + '_>> {
@@ -166,11 +166,11 @@ impl WorkbookTrait for OdsWorkbook {
                 "ODS worksheet index {index} is outside the workbook"
             ))
         })?;
-        Ok(Box::new(OdsWorksheet { sheet }))
+        Ok(Box::new(WorksheetView { sheet }))
     }
 
     fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
-        Box::new(OdsWorksheetIterator {
+        Box::new(WorksheetIteratorView {
             workbook: self,
             index: 0,
         })
@@ -187,11 +187,11 @@ impl WorkbookTrait for OdsWorkbook {
     }
 }
 
-struct OdsWorksheet<'a> {
-    sheet: &'a OdsWorksheetData,
+struct WorksheetView<'a> {
+    sheet: &'a WorksheetData,
 }
 
-impl Worksheet for OdsWorksheet<'_> {
+impl Worksheet for WorksheetView<'_> {
     fn name(&self) -> &str {
         &self.sheet.name
     }
@@ -214,10 +214,10 @@ impl Worksheet for OdsWorksheet<'_> {
     fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn SheetCell + '_>> {
         validate_one_based(row, "row")?;
         validate_one_based(column, "column")?;
-        Ok(Box::new(OdsSheetCell {
+        Ok(Box::new(CellView {
             row,
             column,
-            value: self.sheet.value_at(row, column).unwrap_or(CellValue::EMPTY),
+            value: self.sheet.value_at(row, column).unwrap_or(EvaluatedValue::EMPTY),
         }))
     }
 
@@ -227,39 +227,39 @@ impl Worksheet for OdsWorksheet<'_> {
     }
 
     fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(OdsCellIterator {
+        Box::new(CellIteratorView {
             sheet: self.sheet,
             index: 0,
         })
     }
 
     fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(OdsRowIterator {
+        Box::new(RowIteratorView {
             sheet: self.sheet,
             index: 0,
         })
     }
 
-    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
+    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [EvaluatedValue]>> {
         self.sheet.row_values(row_idx)
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
+    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, EvaluatedValue>> {
         validate_one_based(row, "row")?;
         validate_one_based(column, "column")?;
         Ok(Cow::Borrowed(
-            self.sheet.value_at(row, column).unwrap_or(CellValue::EMPTY),
+            self.sheet.value_at(row, column).unwrap_or(EvaluatedValue::EMPTY),
         ))
     }
 }
 
-struct OdsSheetCell<'a> {
+struct CellView<'a> {
     row: u32,
     column: u32,
-    value: &'a CellValue,
+    value: &'a EvaluatedValue,
 }
 
-impl SheetCell for OdsSheetCell<'_> {
+impl SheetCell for CellView<'_> {
     fn row(&self) -> u32 {
         self.row
     }
@@ -272,36 +272,36 @@ impl SheetCell for OdsSheetCell<'_> {
         format!("{}{}", column_to_letters(self.column), self.row)
     }
 
-    fn value(&self) -> &CellValue {
+    fn value(&self) -> &EvaluatedValue {
         self.value
     }
 
     fn is_formula(&self) -> bool {
-        matches!(self.value, CellValue::Formula { .. })
+        matches!(self.value, EvaluatedValue::Formula { .. })
     }
 }
 
-struct OdsCellIterator<'a> {
-    sheet: &'a OdsWorksheetData,
+struct CellIteratorView<'a> {
+    sheet: &'a WorksheetData,
     index: usize,
 }
 
-impl<'a> CellIterator<'a> for OdsCellIterator<'a> {
+impl<'a> CellIterator<'a> for CellIteratorView<'a> {
     fn next(&mut self) -> Option<SheetResult<Box<dyn SheetCell + 'a>>> {
         let &(row, column) = self.sheet.present_cells.get(self.index)?;
         self.index += 1;
         let value = self.sheet.value_at(row, column)?;
-        Some(Ok(Box::new(OdsSheetCell { row, column, value })))
+        Some(Ok(Box::new(CellView { row, column, value })))
     }
 }
 
-struct OdsRowIterator<'a> {
-    sheet: &'a OdsWorksheetData,
+struct RowIteratorView<'a> {
+    sheet: &'a WorksheetData,
     index: usize,
 }
 
-impl<'a> RowIterator<'a> for OdsRowIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
+impl<'a> RowIterator<'a> for RowIteratorView<'a> {
+    fn next(&mut self) -> Option<SheetResult<Cow<'a, [EvaluatedValue]>>> {
         if self.index >= self.sheet.rows.len() {
             return None;
         }
@@ -311,21 +311,21 @@ impl<'a> RowIterator<'a> for OdsRowIterator<'a> {
     }
 }
 
-struct OdsWorksheetIterator<'a> {
-    workbook: &'a OdsWorkbook,
+struct WorksheetIteratorView<'a> {
+    workbook: &'a Workbook,
     index: usize,
 }
 
-impl<'a> WorksheetIterator<'a> for OdsWorksheetIterator<'a> {
+impl<'a> WorksheetIterator<'a> for WorksheetIteratorView<'a> {
     fn next(&mut self) -> Option<SheetResult<Box<dyn Worksheet + 'a>>> {
         let sheet = self.workbook.sheets.get(self.index)?;
         self.index += 1;
-        Some(Ok(Box::new(OdsWorksheet { sheet })))
+        Some(Ok(Box::new(WorksheetView { sheet })))
     }
 }
 
-fn convert_cell(cell: OdsCell) -> CellValue {
-    let OdsCell {
+fn convert_cell(cell: Cell) -> EvaluatedValue {
+    let Cell {
         value,
         formula,
         matrix_span,
@@ -339,26 +339,26 @@ fn convert_cell(cell: OdsCell) -> CellValue {
         return cached_value;
     };
 
-    CellValue::Formula {
+    EvaluatedValue::Formula {
         formula: normalize_open_formula(&formula),
-        cached_value: (!matches!(cached_value, CellValue::Empty)).then(|| Box::new(cached_value)),
+        cached_value: (!matches!(cached_value, EvaluatedValue::Empty)).then(|| Box::new(cached_value)),
         is_array: matrix_span.is_some(),
         array_range: matrix_span.and_then(|span| matrix_range(row, col, span)),
     }
 }
 
-fn convert_value(value: OdsCellValue) -> CellValue {
+fn convert_value(value: CellValue) -> EvaluatedValue {
     match value {
-        OdsCellValue::Empty => CellValue::Empty,
-        OdsCellValue::Text(value) => CellValue::String(value),
-        OdsCellValue::Number(value)
-        | OdsCellValue::Currency(value, _)
-        | OdsCellValue::Percentage(value) => CellValue::Float(value),
+        CellValue::Empty => EvaluatedValue::Empty,
+        CellValue::Text(value) => EvaluatedValue::String(value),
+        CellValue::Number(value)
+        | CellValue::Currency(value, _)
+        | CellValue::Percentage(value) => EvaluatedValue::Float(value),
         // The shared value model has an Excel-style serial datetime only.  An
         // ODF date can use an arbitrary null-date setting, so retaining its
         // ISO 8601 lexical representation is safer than inventing a serial.
-        OdsCellValue::Date(value) | OdsCellValue::Time(value) => CellValue::String(value),
-        OdsCellValue::Boolean(value) => CellValue::Bool(value),
+        CellValue::Date(value) | CellValue::Time(value) => EvaluatedValue::String(value),
+        CellValue::Boolean(value) => EvaluatedValue::Bool(value),
     }
 }
 
@@ -707,13 +707,13 @@ mod tests {
         assert_eq!(sheet.dimensions(), Some((1, 1, 2, 2)));
         assert!(matches!(
             sheet.cell_value(1, 1).unwrap().as_ref(),
-            CellValue::Float(value) if *value == 2.0
+            EvaluatedValue::Float(value) if *value == 2.0
         ));
         let formula = sheet.cell_value(2, 1).unwrap();
         assert!(
             matches!(
                 formula.as_ref(),
-                CellValue::Formula { formula, cached_value: None, .. } if formula == "SUM(A1:B1)"
+                EvaluatedValue::Formula { formula, cached_value: None, .. } if formula == "SUM(A1:B1)"
             ),
             "{formula:?}"
         );
@@ -733,16 +733,16 @@ mod tests {
             .set_cell_formula(1, 1, "of:=IF([.A1]>0;[.B1];0)")
             .unwrap();
 
-        let workbook = OdsWorkbook::from_bytes(builder.build().unwrap()).unwrap();
+        let workbook = Workbook::from_bytes(builder.build().unwrap()).unwrap();
         let evaluator = litchi_eval::FormulaEvaluator::new(&workbook);
 
         assert!(matches!(
             evaluator.evaluate_cell("Sheet1", 2, 1).await.unwrap(),
-            CellValue::Float(value) if value == 5.0
+            EvaluatedValue::Float(value) if value == 5.0
         ));
         assert!(matches!(
             evaluator.evaluate_cell("Sheet1", 2, 2).await.unwrap(),
-            CellValue::Float(value) if value == 3.0
+            EvaluatedValue::Float(value) if value == 3.0
         ));
     }
 }

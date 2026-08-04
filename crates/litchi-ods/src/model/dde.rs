@@ -2,7 +2,7 @@
 
 use super::{
     Cell, Row, Sheet,
-    parser::OdsParser,
+    parser::Parser,
     protection::{parse_protection, write_sheet_attributes, write_sheet_options},
     scenario::write_sheet_preamble,
     structure::{
@@ -616,7 +616,7 @@ fn parse_cached_table(raw_table: &str, namespaces: &BTreeMap<String, String>) ->
     wrapper.push_str(&office_prefix);
     wrapper.push_str(":document-content>");
 
-    let mut sheets = OdsParser::parse_sheets(&wrapper)?;
+    let mut sheets = Parser::parse_sheets(&wrapper)?;
     if sheets.len() != 1 {
         return Err(Error::InvalidFormat(format!(
             "DDE cache must contain exactly one table, found {}",
@@ -942,7 +942,7 @@ mod tests {
             conversion_mode: Some(DdeConversionMode::IntoEnglishNumber),
             automatic_update: Some(false),
         };
-        let cached_table = OdsParser::parse_sheets(&format!(
+        let cached_table = Parser::parse_sheets(&format!(
             r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}"><t:table t:name="Cache"/></o:spreadsheet>"#
         ))
         .unwrap()
@@ -963,7 +963,7 @@ mod tests {
 
     #[test]
     fn round_trips_through_builder_and_mutable_packages() {
-        let cached_table = OdsParser::parse_sheets(&format!(
+        let cached_table = Parser::parse_sheets(&format!(
             r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}" xmlns:x="{TEXT_NAMESPACE}" xmlns:l="http://www.w3.org/1999/xlink"><t:table t:name="Cache"><t:table-row><t:table-cell o:value-type="string"><x:p><x:a l:href="https://example.test/">stored</x:a> cache</x:p></t:table-cell></t:table-row></t:table></o:spreadsheet>"#
         ))
         .unwrap()

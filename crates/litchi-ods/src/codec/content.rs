@@ -145,7 +145,7 @@ struct PendingSparklineComplexColor {
 ///
 /// This provides parsing logic specific to spreadsheets,
 /// including sheet, row, and cell parsing with proper type detection.
-pub(crate) struct OdsParser;
+pub(crate) struct Parser;
 
 #[derive(Clone, Copy)]
 enum SheetTextField {
@@ -162,7 +162,7 @@ impl SheetTextField {
     }
 }
 
-impl OdsParser {
+impl Parser {
     /// Parse all sheets from ODS content.xml
     // quick-xml exposes a streaming event source, so the format's nested parser
     // state is intentionally coordinated here without constructing a DOM.
@@ -4295,9 +4295,9 @@ impl RowBuilder {
         namespaces: &BTreeMap<String, String>,
     ) -> Result<Self> {
         let repeated =
-            OdsParser::parse_repeated(element, decoder, namespaces, "number-rows-repeated")?;
+            Parser::parse_repeated(element, decoder, namespaces, "number-rows-repeated")?;
         let (style_name, default_cell_style_name, visibility) =
-            OdsParser::parse_structural_attributes(element, decoder, namespaces)?;
+            Parser::parse_structural_attributes(element, decoder, namespaces)?;
         Ok(Self {
             cells: Vec::new(),
             repeated,
@@ -4680,7 +4680,7 @@ mod tests {
 
     #[test]
     fn test_parse_sheets_basic() {
-        let sheets = OdsParser::parse_sheets(TEST_SHEETS_XML).unwrap();
+        let sheets = Parser::parse_sheets(TEST_SHEETS_XML).unwrap();
         assert_eq!(sheets.len(), 1);
         assert_eq!(sheets[0].name, "Sheet1");
         assert_eq!(sheets[0].rows.len(), 1);
@@ -4688,7 +4688,7 @@ mod tests {
 
     #[test]
     fn test_parse_multiple_sheets() {
-        let sheets = OdsParser::parse_sheets(TEST_MULTIPLE_SHEETS_XML).unwrap();
+        let sheets = Parser::parse_sheets(TEST_MULTIPLE_SHEETS_XML).unwrap();
         assert_eq!(sheets.len(), 2);
         assert_eq!(sheets[0].name, "Sheet1");
         assert_eq!(sheets[1].name, "Sheet2");
@@ -4696,7 +4696,7 @@ mod tests {
 
     #[test]
     fn test_parse_cell_types() {
-        let sheets = OdsParser::parse_sheets(TEST_CELL_TYPES_XML).unwrap();
+        let sheets = Parser::parse_sheets(TEST_CELL_TYPES_XML).unwrap();
         assert_eq!(sheets.len(), 1);
 
         let row = &sheets[0].rows[0];
@@ -4753,7 +4753,7 @@ mod tests {
 
     #[test]
     fn test_parse_formula() {
-        let sheets = OdsParser::parse_sheets(TEST_FORMULA_XML).unwrap();
+        let sheets = Parser::parse_sheets(TEST_FORMULA_XML).unwrap();
         assert_eq!(sheets.len(), 1);
 
         let row = &sheets[0].rows[0];
@@ -4769,7 +4769,7 @@ mod tests {
 
     #[test]
     fn test_parse_repeated_cells() {
-        let sheets = OdsParser::parse_sheets(TEST_REPEATED_CELLS_XML).unwrap();
+        let sheets = Parser::parse_sheets(TEST_REPEATED_CELLS_XML).unwrap();
         assert_eq!(sheets.len(), 1);
 
         let row = &sheets[0].rows[0];
@@ -4806,7 +4806,7 @@ mod tests {
           </t:table-row></t:table></o:spreadsheet></o:body>
         </o:document-content>"#;
 
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let cells = &sheets[0].rows[0].cells;
         assert_eq!(cells.len(), 2);
         for cell in cells {
@@ -4832,7 +4832,7 @@ mod tests {
               t:last-row-spanned="1" x:href="source.ods"/>
           </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
         </o:document-content>"#;
-        assert!(OdsParser::parse_sheets(missing_type).is_err());
+        assert!(Parser::parse_sheets(missing_type).is_err());
 
         let duplicate = r#"<o:document-content
             xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -4845,7 +4845,7 @@ mod tests {
               t:last-row-spanned="1" x:type="simple" x:href="two.ods"/>
           </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
         </o:document-content>"#;
-        assert!(OdsParser::parse_sheets(duplicate).is_err());
+        assert!(Parser::parse_sheets(duplicate).is_err());
     }
 
     #[test]
@@ -4864,7 +4864,7 @@ mod tests {
           </t:table-row></t:table></o:spreadsheet></o:body>
         </o:document-content>"#;
 
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let cells = &sheets[0].rows[0].cells;
         assert_eq!(cells.len(), 2);
         for cell in cells {
@@ -4897,7 +4897,7 @@ mod tests {
               <t:highlighted-range t:direction="from-same-table"/></t:detective>
           </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
         </o:document-content>"#;
-        assert!(OdsParser::parse_sheets(operation_before_range).is_err());
+        assert!(Parser::parse_sheets(operation_before_range).is_err());
 
         let mixed_range = r#"<o:document-content
             xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -4907,7 +4907,7 @@ mod tests {
               t:direction="from-same-table"/></t:detective>
           </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
         </o:document-content>"#;
-        assert!(OdsParser::parse_sheets(mixed_range).is_err());
+        assert!(Parser::parse_sheets(mixed_range).is_err());
 
         let negative_index = operation_before_range
             .replace(
@@ -4918,7 +4918,7 @@ mod tests {
                 r#"<t:highlighted-range t:direction="from-same-table"/>"#,
                 "",
             );
-        assert!(OdsParser::parse_sheets(&negative_index).is_err());
+        assert!(Parser::parse_sheets(&negative_index).is_err());
 
         let nested_child = operation_before_range
             .replace(
@@ -4929,12 +4929,12 @@ mod tests {
                 r#"<t:highlighted-range t:direction="from-same-table"/>"#,
                 r#"<t:highlighted-range t:direction="from-same-table"><t:operation t:name="trace-errors" t:index="1"/></t:highlighted-range>"#,
             );
-        assert!(OdsParser::parse_sheets(&nested_child).is_err());
+        assert!(Parser::parse_sheets(&nested_child).is_err());
     }
 
     #[test]
     fn test_parse_empty_sheet() {
-        let sheets = OdsParser::parse_sheets(TEST_EMPTY_SHEET_XML).unwrap();
+        let sheets = Parser::parse_sheets(TEST_EMPTY_SHEET_XML).unwrap();
         assert_eq!(sheets.len(), 1);
         assert_eq!(sheets[0].name, "EmptySheet");
         assert_eq!(sheets[0].rows.len(), 0);
@@ -4942,7 +4942,7 @@ mod tests {
 
     #[test]
     fn test_parse_span_text() {
-        let sheets = OdsParser::parse_sheets(TEST_SPAN_TEXT_XML).unwrap();
+        let sheets = Parser::parse_sheets(TEST_SPAN_TEXT_XML).unwrap();
         assert_eq!(sheets.len(), 1);
 
         let row = &sheets[0].rows[0];
@@ -4974,7 +4974,7 @@ mod tests {
   </table:table-row></table:table></o:spreadsheet></o:body>
 </o:document-content>"#;
 
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let cells = &sheets[0].rows[0].cells;
         assert_eq!(cells.len(), 2);
         assert_eq!(cells[0].text, "cell value\nline two");
@@ -5003,7 +5003,7 @@ mod tests {
     <office:body><office:spreadsheet><table:table/></office:spreadsheet></office:body>
 </office:document-content>"#;
 
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         assert_eq!(sheets.len(), 1);
         assert_eq!(sheets[0].name, "Sheet1"); // Default name
     }
@@ -5011,7 +5011,7 @@ mod tests {
     #[test]
     fn parses_repeated_rows_and_merged_cell_coordinates() {
         let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:spreadsheet><table:table table:name="Merged"><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>A</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell table:number-rows-spanned="2" table:number-columns-spanned="2" office:value-type="string"><text:p>anchor</text:p></table:table-cell><table:covered-table-cell/><table:table-cell table:number-matrix-rows-spanned="3" table:number-matrix-columns-spanned="2" office:value-type="string"><text:p>C</text:p></table:table-cell></table:table-row><table:table-row><table:covered-table-cell table:number-columns-repeated="2"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let rows = &sheets[0].rows;
         assert_eq!(rows.len(), 4);
         assert_eq!(rows[0].cells[0].text, "A");
@@ -5038,7 +5038,7 @@ mod tests {
     #[test]
     fn parses_sheet_content_with_arbitrary_namespace_prefixes() {
         let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:spreadsheet><t:table t:name="A&amp;B"><t:table-row t:number-rows-repeated="2"><t:table-cell o:value-type="string" t:style-name="Style&amp;One" t:protected="1"><x:p>one<x:s x:c="2"/>two<x:tab/>three<x:line-break/>four</x:p></t:table-cell><t:covered-table-cell/></t:table-row></t:table></o:spreadsheet></o:body></o:document-content>"#;
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         assert_eq!(sheets[0].name, "A&B");
         assert_eq!(sheets[0].rows.len(), 2);
         for (row_index, row) in sheets[0].rows.iter().enumerate() {
@@ -5053,7 +5053,7 @@ mod tests {
     #[test]
     fn parses_repeated_row_and_column_structural_metadata() {
         let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Structure"><t:table-column t:number-columns-repeated="2" t:style-name="Col&amp;Style" t:default-cell-style-name="CellStyle" t:visibility="collapse"/><t:table-column t:visibility="filter"></t:table-column><t:table-row t:number-rows-repeated="2" t:style-name="RowStyle" t:default-cell-style-name="RowCell" t:visibility="filter"><t:table-cell/></t:table-row></t:table></o:spreadsheet></o:body></o:document-content>"#;
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let sheet = &sheets[0];
         assert_eq!(sheet.columns.len(), 3);
         assert_eq!(sheet.columns[0].index, 0);
@@ -5076,7 +5076,7 @@ mod tests {
     #[test]
     fn parses_nested_groups_and_header_ranges() {
         let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Outline"><t:table-column-group t:display="false"><t:table-header-columns><t:table-column/></t:table-header-columns><t:table-column-group><t:table-column t:number-columns-repeated="2"/></t:table-column-group></t:table-column-group><t:table-row-group t:display="false"><t:table-header-rows><t:table-row/></t:table-header-rows><t:table-row-group><t:table-row t:number-rows-repeated="2"/></t:table-row-group></t:table-row-group></t:table></o:spreadsheet></o:body></o:document-content>"#;
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         assert_eq!(
             sheets[0].column_structure,
             vec![TableStructure::Group(TableGroup {
@@ -5108,7 +5108,7 @@ mod tests {
     #[test]
     fn parses_sheet_style_and_print_settings() {
         let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Print" t:style-name="Sheet&amp;Style" t:template-name="TemplateOne" t:use-first-row-styles="true" t:use-last-row-styles="0" t:use-first-column-styles="1" t:use-last-column-styles="false" t:use-banding-rows-styles="true" t:use-banding-columns-styles="false" t:print="false" t:print-ranges="$Print.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4"></t:table></o:spreadsheet></o:body></o:document-content>"#;
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let sheet = &sheets[0];
         assert_eq!(sheet.style.style_name.as_deref(), Some("Sheet&Style"));
         assert_eq!(sheet.style.template_name.as_deref(), Some("TemplateOne"));
@@ -5128,7 +5128,7 @@ mod tests {
     #[test]
     fn parses_sheet_title_description_and_scenario() {
         let xml = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:l="http://www.w3.org/1999/xlink"><o:body><o:spreadsheet><t:table t:name="Scenario"><t:title>Quarter &amp; Forecast</t:title><t:desc><![CDATA[Best < worst]]></t:desc><t:table-source l:type="simple" l:href="../Q1&amp;Q2.ods" l:actuate="onRequest" t:mode="copy-results-only" t:table-name="Source Sheet" t:filter-name="calc8" t:filter-options="A&amp;B" t:refresh-delay="P1DT2H3.5S"/><t:scenario t:scenario-ranges="$Scenario.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4" t:is-active="true" t:display-border="0" t:border-color="#12AbEF" t:copy-back="1" t:copy-styles="false" t:copy-formulas="true" t:comment="Best &amp; worst" t:protected="false"/></t:table></o:spreadsheet></o:body></o:document-content>"##;
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let sheet = &sheets[0];
         assert_eq!(sheet.title.as_deref(), Some("Quarter & Forecast"));
         assert_eq!(sheet.description.as_deref(), Some("Best < worst"));
@@ -5158,49 +5158,49 @@ mod tests {
     #[test]
     fn rejects_invalid_or_dangerous_repetition_counts() {
         let zero = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="0"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(zero).is_err());
+        assert!(Parser::parse_sheets(zero).is_err());
 
         let excessive = format!(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="{}"/></table:table></office:spreadsheet></office:body></office:document-content>"#,
             MAX_EXPANDED_ROWS_PER_SHEET + 1
         );
-        assert!(OdsParser::parse_sheets(&excessive).is_err());
+        assert!(Parser::parse_sheets(&excessive).is_err());
 
         let excessive_columns = format!(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column table:number-columns-repeated="{}"/></table:table></office:spreadsheet></office:body></office:document-content>"#,
             MAX_EXPANDED_COLUMNS_PER_SHEET + 1
         );
-        assert!(OdsParser::parse_sheets(&excessive_columns).is_err());
+        assert!(Parser::parse_sheets(&excessive_columns).is_err());
 
         let invalid_visibility = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column table:visibility="hidden"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(invalid_visibility).is_err());
+        assert!(Parser::parse_sheets(invalid_visibility).is_err());
 
         let invalid_group_display = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row-group table:display="collapsed"><table:table-row/></table:table-row-group></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(invalid_group_display).is_err());
+        assert!(Parser::parse_sheets(invalid_group_display).is_err());
 
         let empty_group = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column-group/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(empty_group).is_err());
+        assert!(Parser::parse_sheets(empty_group).is_err());
 
         let invalid_print = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:print="yes"></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(invalid_print).is_err());
+        assert!(Parser::parse_sheets(invalid_print).is_err());
 
         let invalid_print_ranges = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:print-ranges="'Unclosed Sheet.$A$1"></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(invalid_print_ranges).is_err());
+        assert!(Parser::parse_sheets(invalid_print_ranges).is_err());
 
         let incomplete_scenario = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:scenario table:scenario-ranges=".A1:.B2"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(incomplete_scenario).is_err());
+        assert!(Parser::parse_sheets(incomplete_scenario).is_err());
 
         let invalid_scenario_color = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:scenario table:scenario-ranges=".A1:.B2" table:is-active="false" table:border-color="red"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(invalid_scenario_color).is_err());
+        assert!(Parser::parse_sheets(invalid_scenario_color).is_err());
 
         let duplicate_scenarios = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:scenario table:scenario-ranges=".A1:.B2" table:is-active="false"/><table:scenario table:scenario-ranges=".C1:.D2" table:is-active="true"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(duplicate_scenarios).is_err());
+        assert!(Parser::parse_sheets(duplicate_scenarios).is_err());
 
         let duplicate_titles = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:title>First</table:title><table:title>Second</table:title></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(duplicate_titles).is_err());
+        assert!(Parser::parse_sheets(duplicate_titles).is_err());
 
         let duplicate_descriptions = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:desc>First</table:desc><table:desc>Second</table:desc></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(duplicate_descriptions).is_err());
+        assert!(Parser::parse_sheets(duplicate_descriptions).is_err());
 
         let invalid_sources = [
             r#"<table:table-source xlink:href="a.ods"/>"#,
@@ -5214,11 +5214,11 @@ mod tests {
             let xml = format!(
                 r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:spreadsheet><table:table>{source}</table:table></office:spreadsheet></office:body></office:document-content>"#
             );
-            assert!(OdsParser::parse_sheets(&xml).is_err(), "{source}");
+            assert!(Parser::parse_sheets(&xml).is_err(), "{source}");
         }
 
         let duplicate_sources = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:spreadsheet><table:table><table:table-source xlink:type="simple" xlink:href="a.ods"/><table:table-source xlink:type="simple" xlink:href="b.ods"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-        assert!(OdsParser::parse_sheets(duplicate_sources).is_err());
+        assert!(Parser::parse_sheets(duplicate_sources).is_err());
     }
 
     #[test]
@@ -5527,7 +5527,7 @@ mod tests {
     #[test]
     fn test_parse_invalid_xml() {
         let invalid_xml = "<invalid>unclosed tag";
-        let result = OdsParser::parse_sheets(invalid_xml);
+        let result = Parser::parse_sheets(invalid_xml);
         // The parser may return Ok with empty sheets or Err depending on implementation
         // Either behavior is acceptable - we just verify it doesn't panic
         match result {
@@ -5565,7 +5565,7 @@ mod tests {
               </o:spreadsheet></o:body>
             </o:document-content>"#;
 
-        let definitions = OdsParser::parse_named_definitions(xml).unwrap();
+        let definitions = Parser::parse_named_definitions(xml).unwrap();
         assert_eq!(definitions.len(), 2);
         let NamedDefinition::Range(range) = &definitions[0] else {
             panic!("expected named range");
@@ -5600,7 +5600,7 @@ mod tests {
             xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
             <table:named-expressions><table:named-range table:name="Broken"/>
             </table:named-expressions></office:spreadsheet>"#;
-        assert!(OdsParser::parse_named_definitions(missing_address).is_err());
+        assert!(Parser::parse_named_definitions(missing_address).is_err());
 
         let invalid_usage = r#"<office:spreadsheet
             xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -5608,7 +5608,7 @@ mod tests {
             <table:named-expressions><table:named-range table:name="Broken"
               table:cell-range-address="$Sheet1.$A$1" table:range-usable-as="chart"/>
             </table:named-expressions></office:spreadsheet>"#;
-        assert!(OdsParser::parse_named_definitions(invalid_usage).is_err());
+        assert!(Parser::parse_named_definitions(invalid_usage).is_err());
     }
 
     #[test]
@@ -5626,7 +5626,7 @@ mod tests {
           </o:spreadsheet></o:body>
         </o:document-content>"#;
 
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         assert_eq!(sheets.len(), 2);
         assert_eq!(sheets[0].name, "Visible");
         assert_eq!(sheets[1].name, "Empty");
@@ -5666,7 +5666,7 @@ mod tests {
             attributes = attributes,
         ));
 
-        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let sheets = Parser::parse_sheets(&xml).unwrap();
         let cell = &sheets[0].rows[0].cells[0];
         assert_eq!(cell.text, "See the example site and an internal target.");
         assert_eq!(cell.hyperlinks().len(), 2);
@@ -5709,7 +5709,7 @@ mod tests {
             </t:table-cell>
           </t:table-row></t:table></o:spreadsheet></o:body></o:document-content>"#;
 
-        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheets = Parser::parse_sheets(xml).unwrap();
         let row = &sheets[0].rows[0];
         assert_eq!(row.cells.len(), 2);
         for cell in &row.cells {
@@ -5728,7 +5728,7 @@ mod tests {
             </table:table-cell>"#,
         );
 
-        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let sheets = Parser::parse_sheets(&xml).unwrap();
         let cell = &sheets[0].rows[0].cells[0];
         assert_eq!(cell.text, "before  after");
         assert_eq!(cell.hyperlinks().len(), 1);
@@ -5749,7 +5749,7 @@ mod tests {
             + source[anchor_start..].find("</table:table-cell>").unwrap()
             + "</table:table-cell>".len();
         let sheets =
-            OdsParser::parse_sheets(&hyperlink_document(&source[cell_start..cell_end])).unwrap();
+            Parser::parse_sheets(&hyperlink_document(&source[cell_start..cell_end])).unwrap();
         let cell = sheets
             .iter()
             .flat_map(|sheet| sheet.rows.iter())
@@ -5779,7 +5779,7 @@ mod tests {
             </table:table-cell>"#,
         );
 
-        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let sheets = Parser::parse_sheets(&xml).unwrap();
         let cell = &sheets[0].rows[0].cells[0];
         assert_eq!(cell.hyperlinks()[0].text, "a  b\nc");
     }
@@ -5792,7 +5792,7 @@ mod tests {
             </table:table-cell>"#,
         );
 
-        let error = OdsParser::parse_sheets(&xml)
+        let error = Parser::parse_sheets(&xml)
             .err()
             .expect("parse must fail");
         assert!(error.to_string().contains("xlink:href"));
@@ -5807,7 +5807,7 @@ mod tests {
             </table:table-cell>"#,
         );
 
-        let error = OdsParser::parse_sheets(&xml)
+        let error = Parser::parse_sheets(&xml)
             .err()
             .expect("parse must fail");
         assert!(error.to_string().contains("nested"));
@@ -5824,7 +5824,7 @@ mod tests {
             r#"<table:table-cell office:value-type="string"><text:p>{nested}</text:p></table:table-cell>"#
         ));
 
-        let error = OdsParser::parse_sheets(&xml)
+        let error = Parser::parse_sheets(&xml)
             .err()
             .expect("overly deep rich text must fail");
         assert!(error.to_string().contains("depth limit"));
@@ -5838,7 +5838,7 @@ mod tests {
             </table:table-cell>"#,
         );
 
-        let error = OdsParser::parse_sheets(&xml)
+        let error = Parser::parse_sheets(&xml)
             .err()
             .expect("parse must fail");
         assert!(error.to_string().contains("xlink:type"));
@@ -5850,7 +5850,7 @@ mod tests {
             let xml = hyperlink_document(&format!(
                 r#"<table:table-cell office:value-type="string"><text:p><text:a xlink:href="https://example.com/" {attributes}>x</text:a></text:p></table:table-cell>"#
             ));
-            assert!(OdsParser::parse_sheets(&xml).is_err());
+            assert!(Parser::parse_sheets(&xml).is_err());
         }
     }
 
@@ -5863,7 +5863,7 @@ mod tests {
             </table:table-cell>"#,
         );
 
-        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let sheets = Parser::parse_sheets(&xml).unwrap();
         let cell = &sheets[0].rows[0].cells[0];
         assert!(cell.annotation().is_some());
         assert!(!cell.has_hyperlinks());

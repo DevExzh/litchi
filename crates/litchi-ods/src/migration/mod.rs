@@ -148,7 +148,7 @@ pub use detective::{
     CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
     DetectiveOperationKind,
 };
-pub use evaluation::{OdsWorkbook, normalize_open_formula};
+pub use evaluation::{Workbook, normalize_open_formula};
 pub use hyperlink::CellHyperlink;
 pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use mutable::MutableSpreadsheet;
