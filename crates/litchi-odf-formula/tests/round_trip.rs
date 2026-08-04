@@ -1,7 +1,7 @@
-use litchi_odf_formula::authoring::{self, Display, Variant};
-use litchi_odf_formula::{Content, Formula, Kind};
 use litchi_odf_common::constants::ODF_TEXT;
 use litchi_odf_common::core::PackageWriter;
+use litchi_odf_formula::authoring::{self, Display, Variant};
+use litchi_odf_formula::{Content, Formula, Kind};
 
 const MATHML: &str = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi mathvariant="italic">x</mi><mo>+</mo><mn>1</mn></mrow><annotation encoding="StarMath 5.0">x + 1</annotation></semantics></math>"#;
 
