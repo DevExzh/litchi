@@ -7,47 +7,21 @@ use super::*;
 impl NumbersEditor {
     /// List ordinary text boxes owned by a reachable Numbers sheet.
     pub fn sheet_text_boxes(&self, sheet_id: u64) -> Result<Vec<NumbersTextBoxInfo>> {
-        let (_, _, sheet) = numbers_sheet(&self.package, sheet_id)?;
-        let locations = object_locations(&self.package)?;
-        let text_editor = IWorkTextEditor::from_package(self.package.clone());
+        let mut catalog = NumbersObjectCatalog::build(&self.package)?;
+        let drawable_ids = catalog
+            .sheet_drawable_ids(&self.package, sheet_id)?
+            .to_vec();
         let mut result = Vec::new();
-        for reference in sheet.drawable_infos {
-            let archive_name = locations.get(&reference.identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers sheet {sheet_id} drawable {} is missing",
-                    reference.identifier
-                ))
-            })?;
-            let archive = self.package.archive(archive_name)?;
-            let object = archive.object(reference.identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers sheet {sheet_id} drawable {} is missing",
-                    reference.identifier
-                ))
-            })?;
-            let shape_messages = object
-                .messages
-                .iter()
-                .filter(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
-                .collect::<Vec<_>>();
-            if shape_messages.is_empty() {
+        for drawable_id in drawable_ids {
+            let Some(graph) =
+                catalog.text_box_graph_if_supported(&self.package, sheet_id, drawable_id)?
+            else {
                 continue;
-            }
-            if shape_messages.len() != 1 {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers drawable {} has multiple shape payloads",
-                    reference.identifier
-                )));
-            }
-            let shape = tswp::ShapeInfoArchive::decode(shape_messages[0].data.as_slice())?;
-            if shape.is_text_box != Some(true) {
-                continue;
-            }
-            let graph = numbers_text_box_graph(&self.package, sheet_id, reference.identifier)?;
-            let storage = text_editor.storage(graph.storage_id)?;
+            };
+            let storage = catalog.text_storage_info(&self.package, graph.storage_id)?;
             result.push(NumbersTextBoxInfo {
                 sheet_id,
-                drawable_object_id: reference.identifier,
+                drawable_object_id: drawable_id,
                 storage,
             });
         }

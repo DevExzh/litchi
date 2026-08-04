@@ -8320,6 +8320,88 @@ fn test_package_with_text_box() -> IWorkPackage {
     package
 }
 
+#[test]
+fn numbers_object_catalog_is_bounded_and_measured() {
+    let package = test_package_with_text_box();
+    let archive_count = package.iwa_entry_names().count();
+    let mut catalog = NumbersObjectCatalog::build(&package).unwrap();
+    let storage = catalog.text_storage_info(&package, 53).unwrap();
+    assert_eq!(storage.text, "Source");
+    let stats = catalog.stats();
+
+    assert_eq!(stats.archives_scanned, archive_count);
+    assert_eq!(stats.archive_reads, archive_count + 2);
+    assert_eq!(stats.sheet_objects_scanned, 1);
+    assert!(stats.drawable_objects_scanned >= 1);
+    assert_eq!(stats.drawable_objects_scanned, stats.reference_edges);
+    assert_eq!(stats.semantic_decodes, 3);
+    assert_eq!(stats.peak_live_archives, 1);
+    assert_eq!(stats.retained_payload_bytes, 0);
+
+    let graph = catalog.text_box_graph(&package, 2, 50).unwrap();
+    assert_eq!(graph.storage_id, 53);
+    assert_eq!(catalog.stats(), stats);
+}
+
+#[test]
+fn numbers_object_catalog_rejects_later_duplicate_ids_and_malformed_archives() {
+    let mut duplicate = test_package_with_text_box();
+    let original = duplicate.archive("Index/Document.iwa").unwrap();
+    duplicate
+        .replace_archive("Index/Later.iwa", &original)
+        .unwrap();
+    let error = NumbersObjectCatalog::build(&duplicate).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("appears in both Numbers archives")
+    );
+    assert!(
+        NumbersEditor::from_package(duplicate)
+            .unwrap()
+            .sheet_text_boxes(2)
+            .is_err()
+    );
+
+    let mut malformed = test_package_with_text_box();
+    let compressed = crate::snappy::SnappyStream::compress(&[0x80]).unwrap();
+    malformed
+        .insert_entry("Index/Later.iwa", compressed)
+        .unwrap();
+    assert!(NumbersObjectCatalog::build(&malformed).is_err());
+    assert!(
+        NumbersEditor::from_package(malformed)
+            .unwrap()
+            .sheet_text_boxes(2)
+            .is_err()
+    );
+}
+
+#[test]
+fn numbers_object_catalog_rejects_stale_copy_on_write_generations() {
+    let package = test_package_with_text_box();
+    let catalog = NumbersObjectCatalog::build(&package).unwrap();
+    let mut edited = package.clone();
+    edited
+        .insert_entry("Metadata/catalog-revision", Vec::new())
+        .unwrap();
+
+    assert!(catalog.text_box_graph(&package, 2, 50).is_ok());
+    let error = catalog.text_box_graph(&edited, 2, 50).unwrap_err();
+    assert!(error.to_string().contains("catalog is stale"));
+}
+
+#[test]
+fn numbers_object_catalog_enforces_operation_archive_budget() {
+    let package = test_package_with_text_box();
+    let limits = NumbersObjectCatalogLimits {
+        max_archive_reads: 1,
+        ..Default::default()
+    };
+    let error = NumbersObjectCatalog::build_with_limits(&package, limits).unwrap_err();
+    assert!(error.to_string().contains("archive reads"));
+}
+
 fn test_package_with_text_box_metadata() -> IWorkPackage {
     let mut package = test_package_with_text_box();
     let metadata = PackageMetadata {

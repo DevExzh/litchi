@@ -2,26 +2,890 @@
 
 use super::*;
 use crate::detect::detect_application_from_document;
+use crate::package_metadata::PACKAGE_METADATA_ENTRY;
 use crate::registry::Application;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArchive> {
-    let archive = package.archive("Index/Document.iwa")?;
-    let object = archive
-        .object(1)
-        .ok_or_else(|| Error::InvalidFormat("Numbers root object 1 is missing".to_owned()))?;
-    object
-        .messages
-        .iter()
-        .find(|message| {
-            detect_application_from_document(&message.data) == Some(Application::Numbers)
+    package.with_parsed_archive("Index/Document.iwa", |archive| {
+        let object = archive
+            .object(1)
+            .ok_or_else(|| Error::InvalidFormat("Numbers root object 1 is missing".to_owned()))?;
+        object
+            .messages
+            .iter()
+            .find(|message| {
+                detect_application_from_document(&message.data) == Some(Application::Numbers)
+            })
+            .and_then(|message| tn::DocumentArchive::decode(message.data.as_slice()).ok())
+            .ok_or_else(|| {
+                Error::InvalidFormat("package does not contain a Numbers root document".to_owned())
+            })
+    })
+}
+
+const NUMBERS_CATALOG_DEFAULT_MAX_ARCHIVES: usize = 1_024;
+const NUMBERS_CATALOG_DEFAULT_MAX_ARCHIVE_READS: usize = 2_048;
+const NUMBERS_CATALOG_DEFAULT_MAX_OBJECTS: usize = 1_000_000;
+const NUMBERS_CATALOG_DEFAULT_MAX_SHEETS: usize = 65_536;
+const NUMBERS_CATALOG_DEFAULT_MAX_DRAWABLES: usize = 1_000_000;
+const NUMBERS_CATALOG_DEFAULT_MAX_REFERENCE_EDGES: usize = 2_000_000;
+const NUMBERS_CATALOG_DEFAULT_MAX_SEMANTIC_DECODES: usize = 2_000_000;
+
+/// Bounded work limits for one operation-scoped Numbers object catalog.
+///
+/// These limits deliberately sit above normal iWork document sizes while
+/// keeping a malformed package from forcing an unbounded index or semantic
+/// validation pass. They are operation limits, not package-ingress limits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct NumbersObjectCatalogLimits {
+    pub(super) max_archives: usize,
+    pub(super) max_archive_reads: usize,
+    pub(super) max_objects: usize,
+    pub(super) max_sheets: usize,
+    pub(super) max_drawables: usize,
+    pub(super) max_reference_edges: usize,
+    pub(super) max_semantic_decodes: usize,
+}
+
+impl Default for NumbersObjectCatalogLimits {
+    fn default() -> Self {
+        Self {
+            max_archives: NUMBERS_CATALOG_DEFAULT_MAX_ARCHIVES,
+            max_archive_reads: NUMBERS_CATALOG_DEFAULT_MAX_ARCHIVE_READS,
+            max_objects: NUMBERS_CATALOG_DEFAULT_MAX_OBJECTS,
+            max_sheets: NUMBERS_CATALOG_DEFAULT_MAX_SHEETS,
+            max_drawables: NUMBERS_CATALOG_DEFAULT_MAX_DRAWABLES,
+            max_reference_edges: NUMBERS_CATALOG_DEFAULT_MAX_REFERENCE_EDGES,
+            max_semantic_decodes: NUMBERS_CATALOG_DEFAULT_MAX_SEMANTIC_DECODES,
+        }
+    }
+}
+
+impl NumbersObjectCatalogLimits {
+    fn validate(self) -> Result<()> {
+        if self.max_archives == 0
+            || self.max_archive_reads == 0
+            || self.max_objects == 0
+            || self.max_sheets == 0
+            || self.max_drawables == 0
+            || self.max_reference_edges == 0
+            || self.max_semantic_decodes == 0
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers object catalog limits must be non-zero".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Bounded measurements for one Numbers object-catalog operation.
+///
+/// `archive_reads` counts logical catalog archive visits. It is intentionally
+/// not called decompressions: the package cache may satisfy a visit without
+/// parsing, and the package-level parser has no public observer hook.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct NumbersObjectCatalogStats {
+    pub(super) archive_reads: usize,
+    pub(super) archives_scanned: usize,
+    pub(super) objects_indexed: usize,
+    pub(super) sheet_objects_scanned: usize,
+    pub(super) drawable_objects_scanned: usize,
+    pub(super) reference_edges: usize,
+    pub(super) semantic_decodes: usize,
+    pub(super) peak_live_archives: usize,
+    /// The catalog retains slots and summaries only; it never retains payload
+    /// bytes or an expanded `Archive`.
+    pub(super) retained_payload_bytes: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NumbersObjectSlot {
+    archive_index: u32,
+    object_index: u32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NumbersObjectRecord {
+    slot: NumbersObjectSlot,
+    shape_message_count: u32,
+    caption_message_count: u32,
+    storage_message_count: u32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NumbersShapeSummary {
+    is_text_box: Option<bool>,
+    parent_id: Option<u64>,
+    owned_storage_id: Option<u64>,
+    deprecated_storage_id: Option<u64>,
+    title_id: Option<u64>,
+    caption_id: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NumbersDrawableSummary {
+    owner_sheet_id: u64,
+    slot: NumbersObjectSlot,
+    shape: NumbersShapeSummary,
+}
+
+#[derive(Debug, Clone)]
+struct NumbersSheetSummary {
+    slot: NumbersObjectSlot,
+    drawable_ids: Box<[u64]>,
+}
+
+/// Compact, operation-scoped index for reachable Numbers object graphs.
+///
+/// The catalog owns no parsed archive, protobuf payload, or raw message bytes.
+/// It retains only archive names, object slots, and the small semantic facts
+/// needed to validate ordinary text-box ownership. A mutation revision binds
+/// the catalog to the immutable package generation that was scanned; callers
+/// must discard it after copy-on-write mutation.
+#[derive(Debug)]
+pub(super) struct NumbersObjectCatalog {
+    package_revision: u64,
+    limits: NumbersObjectCatalogLimits,
+    archive_names: Vec<Box<str>>,
+    objects: HashMap<u64, NumbersObjectRecord>,
+    sheets: HashMap<u64, NumbersSheetSummary>,
+    drawable_owners: HashMap<u64, u64>,
+    drawable_owner_counts: HashMap<u64, u32>,
+    duplicate_drawables: HashSet<u64>,
+    drawables: HashMap<u64, NumbersDrawableSummary>,
+    storage_owner_counts: HashMap<u64, u32>,
+    uuid_identifiers: Option<HashSet<u64>>,
+    stats: NumbersObjectCatalogStats,
+}
+
+impl NumbersObjectCatalog {
+    pub(super) fn build(package: &IWorkPackage) -> Result<Self> {
+        Self::build_with_limits(package, NumbersObjectCatalogLimits::default())
+    }
+
+    #[allow(deprecated)]
+    pub(super) fn build_with_limits(
+        package: &IWorkPackage,
+        limits: NumbersObjectCatalogLimits,
+    ) -> Result<Self> {
+        limits.validate()?;
+        let document = numbers_document(package)?;
+        if document.sheets.len() > limits.max_sheets {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers object catalog sheet count {} exceeds the {} sheet budget at Numbers document",
+                document.sheets.len(),
+                limits.max_sheets
+            )));
+        }
+
+        let mut requested_sheet_ids = Vec::with_capacity(document.sheets.len());
+        let mut requested_sheets = HashSet::with_capacity(document.sheets.len());
+        for reference in document.sheets {
+            if !requested_sheets.insert(reference.identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers document repeats sheet object {}",
+                    reference.identifier
+                )));
+            }
+            requested_sheet_ids.push(reference.identifier);
+        }
+
+        let mut catalog = Self {
+            package_revision: package.mutation_revision(),
+            limits,
+            archive_names: Vec::new(),
+            objects: HashMap::new(),
+            sheets: HashMap::with_capacity(requested_sheet_ids.len()),
+            drawable_owners: HashMap::new(),
+            drawable_owner_counts: HashMap::new(),
+            duplicate_drawables: HashSet::new(),
+            drawables: HashMap::new(),
+            storage_owner_counts: HashMap::new(),
+            uuid_identifiers: None,
+            stats: NumbersObjectCatalogStats::default(),
+        };
+
+        for archive_name in package.iwa_entry_names() {
+            if catalog.archive_names.len() >= limits.max_archives {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers object catalog archive count {} exceeds the {} archive budget at {archive_name}",
+                    catalog.archive_names.len().saturating_add(1),
+                    limits.max_archives
+                )));
+            }
+            let archive_index = u32::try_from(catalog.archive_names.len()).map_err(|_| {
+                Error::InvalidFormat("Numbers object catalog archive index exceeds u32".to_owned())
+            })?;
+            catalog
+                .archive_names
+                .push(archive_name.to_owned().into_boxed_str());
+            catalog.with_archive(package, archive_name, |catalog, archive| {
+                catalog.stats.archives_scanned = catalog
+                    .stats
+                    .archives_scanned
+                    .checked_add(1)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "Numbers object catalog archive counter overflow".to_owned(),
+                        )
+                    })?;
+                for (object_index, object) in archive.objects.iter().enumerate() {
+                    if catalog.objects.len() >= limits.max_objects {
+                        return Err(Error::InvalidFormat(format!(
+                            "Numbers object catalog object count {} exceeds the {} object budget at {archive_name}",
+                            catalog.objects.len().saturating_add(1),
+                            limits.max_objects
+                        )));
+                    }
+                    let identifier = object.archive_info.identifier.ok_or_else(|| {
+                        Error::Archive(format!(
+                            "Object in {archive_name} has no identifier"
+                        ))
+                    })?;
+                    if let Some(previous) = catalog.objects.get(&identifier) {
+                        let previous_archive = catalog.archive_name(previous.slot.archive_index)?;
+                        return Err(Error::Archive(format!(
+                            "Object {identifier} appears in both Numbers archives {previous_archive} and {archive_name}"
+                        )));
+                    }
+                    let object_index = u32::try_from(object_index).map_err(|_| {
+                        Error::InvalidFormat(
+                            "Numbers object catalog object index exceeds u32".to_owned(),
+                        )
+                    })?;
+                    let record = NumbersObjectRecord {
+                        slot: NumbersObjectSlot {
+                            archive_index,
+                            object_index,
+                        },
+                        shape_message_count: u32::try_from(
+                            object
+                                .messages
+                                .iter()
+                                .filter(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+                                .count(),
+                        )
+                        .map_err(|_| {
+                            Error::InvalidFormat(
+                                "Numbers shape message count exceeds u32".to_owned(),
+                            )
+                        })?,
+                        caption_message_count: u32::try_from(
+                            object
+                                .messages
+                                .iter()
+                                .filter(|message| {
+                                    message.type_ == STANDIN_CAPTION_MESSAGE_TYPE
+                                })
+                                .count(),
+                        )
+                        .map_err(|_| {
+                            Error::InvalidFormat(
+                                "Numbers caption message count exceeds u32".to_owned(),
+                            )
+                        })?,
+                        storage_message_count: u32::try_from(
+                            object
+                                .messages
+                                .iter()
+                                .filter(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
+                                .count(),
+                        )
+                        .map_err(|_| {
+                            Error::InvalidFormat(
+                                "Numbers storage message count exceeds u32".to_owned(),
+                            )
+                        })?,
+                    };
+                    catalog.objects.insert(identifier, record);
+                    catalog.stats.objects_indexed = catalog
+                        .stats
+                        .objects_indexed
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "Numbers object catalog object counter overflow".to_owned(),
+                            )
+                        })?;
+
+                    if requested_sheets.contains(&identifier) {
+                        catalog.record_semantic_decode(format!("sheet object {identifier}"))?;
+                        let (_, sheet) = decode_sheet(object)?;
+                        catalog.stats.sheet_objects_scanned = catalog
+                            .stats
+                            .sheet_objects_scanned
+                            .checked_add(1)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "Numbers object catalog sheet counter overflow".to_owned(),
+                                )
+                            })?;
+                        let drawable_ids = sheet
+                            .drawable_infos
+                            .into_iter()
+                            .map(|reference| reference.identifier)
+                            .collect::<Vec<_>>();
+                        for drawable_id in &drawable_ids {
+                            catalog.stats.reference_edges = catalog
+                                .stats
+                                .reference_edges
+                                .checked_add(1)
+                                .ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "Numbers object catalog reference counter overflow"
+                                            .to_owned(),
+                                    )
+                                })?;
+                            if catalog.stats.reference_edges > limits.max_reference_edges {
+                                return Err(Error::InvalidFormat(format!(
+                                    "Numbers object catalog reference count {} exceeds the {} edge budget at sheet {identifier} drawable {drawable_id}",
+                                    catalog.stats.reference_edges,
+                                    limits.max_reference_edges
+                                )));
+                            }
+                            let count = catalog
+                                .drawable_owner_counts
+                                .entry(*drawable_id)
+                                .or_insert(0);
+                            *count = count.checked_add(1).ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "Numbers drawable ownership counter overflow".to_owned(),
+                                )
+                            })?;
+                            if *count > 1 {
+                                catalog.duplicate_drawables.insert(*drawable_id);
+                            } else {
+                                catalog
+                                    .drawable_owners
+                                    .insert(*drawable_id, identifier);
+                            }
+                        }
+                        if catalog.drawable_owner_counts.len() > limits.max_drawables {
+                            return Err(Error::InvalidFormat(format!(
+                                "Numbers object catalog drawable count {} exceeds the {} drawable budget at sheet {identifier}",
+                                catalog.drawable_owner_counts.len(),
+                                limits.max_drawables
+                            )));
+                        }
+                        catalog.sheets.insert(
+                            identifier,
+                            NumbersSheetSummary {
+                                slot: record.slot,
+                                drawable_ids: drawable_ids.into_boxed_slice(),
+                            },
+                        );
+                    }
+                }
+                Ok(())
+            })?;
+        }
+
+        for sheet_id in requested_sheet_ids {
+            if !catalog.sheets.contains_key(&sheet_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers sheet object {sheet_id} is missing"
+                )));
+            }
+        }
+
+        let mut drawable_ids_by_archive = BTreeMap::<u32, Vec<u64>>::new();
+        for drawable_id in catalog.drawable_owners.keys().copied() {
+            let record = catalog.objects.get(&drawable_id).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers drawable {drawable_id} is missing from the object catalog"
+                ))
+            })?;
+            drawable_ids_by_archive
+                .entry(record.slot.archive_index)
+                .or_default()
+                .push(drawable_id);
+        }
+        for drawable_ids in drawable_ids_by_archive.values_mut() {
+            drawable_ids.sort_unstable();
+        }
+
+        for (archive_index, drawable_ids) in drawable_ids_by_archive {
+            let archive_name = catalog.archive_name(archive_index)?.to_owned();
+            catalog.with_archive(package, &archive_name, |catalog, archive| {
+                for drawable_id in drawable_ids {
+                    let record = *catalog.objects.get(&drawable_id).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers drawable {drawable_id} is missing from the object catalog"
+                        ))
+                    })?;
+                    let object = archive
+                        .objects
+                        .get(usize::try_from(record.slot.object_index).map_err(|_| {
+                            Error::InvalidFormat(
+                                "Numbers drawable object index does not fit usize".to_owned(),
+                            )
+                        })?)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "Numbers drawable {drawable_id} object slot is out of bounds"
+                            ))
+                        })?;
+                    if object.archive_info.identifier != Some(drawable_id) {
+                        return Err(Error::InvalidFormat(format!(
+                            "Numbers drawable {drawable_id} object slot does not match its identifier"
+                        )));
+                    }
+                    catalog.stats.drawable_objects_scanned = catalog
+                        .stats
+                        .drawable_objects_scanned
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "Numbers object catalog drawable counter overflow".to_owned(),
+                            )
+                        })?;
+                    let owner_sheet_id = *catalog.drawable_owners.get(&drawable_id).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers drawable {drawable_id} has no owning sheet"
+                        ))
+                    })?;
+                    if record.shape_message_count == 0 {
+                        continue;
+                    }
+                    let drawable_owner_count = *catalog
+                        .drawable_owner_counts
+                        .get(&drawable_id)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "Numbers drawable {drawable_id} has no owner count"
+                            ))
+                        })?;
+                    let mut decoded_shape = None;
+                    for message in object
+                        .messages
+                        .iter()
+                        .filter(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+                    {
+                        catalog.record_semantic_decode(format!("drawable object {drawable_id}"))?;
+                        let shape = tswp::ShapeInfoArchive::decode(message.data.as_slice())?;
+                        if record.shape_message_count == 1 {
+                            decoded_shape = Some(NumbersShapeSummary {
+                                is_text_box: shape.is_text_box,
+                                parent_id: shape
+                                    .super_
+                                    .super_
+                                    .parent
+                                    .as_ref()
+                                    .map(|reference| reference.identifier),
+                                owned_storage_id: shape
+                                    .owned_storage
+                                    .as_ref()
+                                    .map(|reference| reference.identifier),
+                                deprecated_storage_id: shape
+                                    .deprecated_storage
+                                    .as_ref()
+                                    .map(|reference| reference.identifier),
+                                title_id: shape
+                                    .super_
+                                    .super_
+                                    .title
+                                    .as_ref()
+                                    .map(|reference| reference.identifier),
+                                caption_id: shape
+                                    .super_
+                                    .super_
+                                    .caption
+                                    .as_ref()
+                                    .map(|reference| reference.identifier),
+                            });
+                        }
+                        if let Some(storage_id) = shape
+                            .owned_storage
+                            .as_ref()
+                            .map(|reference| reference.identifier)
+                        {
+                            let owner_count = catalog
+                                .storage_owner_counts
+                                .entry(storage_id)
+                                .or_insert(0);
+                            *owner_count = owner_count
+                                .checked_add(drawable_owner_count)
+                                .ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "Numbers storage ownership counter overflow".to_owned(),
+                                    )
+                                })?;
+                        }
+                    }
+                    if let Some(shape) = decoded_shape {
+                        catalog.drawables.insert(
+                            drawable_id,
+                            NumbersDrawableSummary {
+                                owner_sheet_id,
+                                slot: record.slot,
+                                shape,
+                            },
+                        );
+                    }
+                }
+                Ok(())
+            })?;
+        }
+
+        if catalog
+            .drawables
+            .values()
+            .any(|drawable| drawable.shape.is_text_box == Some(true))
+        {
+            if package.contains_entry(PACKAGE_METADATA_ENTRY) {
+                catalog.record_semantic_decode(PACKAGE_METADATA_ENTRY)?;
+            }
+            catalog.uuid_identifiers =
+                component_uuid_identifiers(package, DOCUMENT_COMPONENT_IDENTIFIER)?;
+        }
+        Ok(catalog)
+    }
+
+    fn with_archive<T, F>(
+        &mut self,
+        package: &IWorkPackage,
+        archive_name: &str,
+        read: F,
+    ) -> Result<T>
+    where
+        F: FnOnce(&mut Self, &Archive) -> Result<T>,
+    {
+        if self.stats.archive_reads >= self.limits.max_archive_reads {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers object catalog archive reads {} exceed the {} operation budget at {archive_name}",
+                self.stats.archive_reads.saturating_add(1),
+                self.limits.max_archive_reads
+            )));
+        }
+        self.stats.archive_reads += 1;
+        self.stats.peak_live_archives = self.stats.peak_live_archives.max(1);
+        package.with_parsed_archive(archive_name, |archive| read(self, archive))
+    }
+
+    fn record_semantic_decode(&mut self, path: impl std::fmt::Display) -> Result<()> {
+        if self.stats.semantic_decodes >= self.limits.max_semantic_decodes {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers object catalog semantic decodes {} exceed the {} operation budget at {path}",
+                self.stats.semantic_decodes.saturating_add(1),
+                self.limits.max_semantic_decodes
+            )));
+        }
+        self.stats.semantic_decodes += 1;
+        Ok(())
+    }
+
+    fn archive_name(&self, archive_index: u32) -> Result<&str> {
+        self.archive_names
+            .get(usize::try_from(archive_index).map_err(|_| {
+                Error::InvalidFormat("Numbers archive index does not fit usize".to_owned())
+            })?)
+            .map(Box::<str>::as_ref)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers object catalog archive slot {archive_index} is missing"
+                ))
+            })
+    }
+
+    fn ensure_current(&self, package: &IWorkPackage) -> Result<()> {
+        if package.mutation_revision() != self.package_revision {
+            return Err(Error::InvalidFormat(
+                "Numbers object catalog is stale after package mutation".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn sheet_drawable_ids<'a>(
+        &'a self,
+        package: &IWorkPackage,
+        sheet_id: u64,
+    ) -> Result<&'a [u64]> {
+        self.ensure_current(package)?;
+        self.sheets
+            .get(&sheet_id)
+            .map(|sheet| sheet.drawable_ids.as_ref())
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Numbers sheet object {sheet_id} is not reachable exactly once"
+                ))
+            })
+    }
+
+    #[cfg(test)]
+    pub(super) fn stats(&self) -> NumbersObjectCatalogStats {
+        self.stats
+    }
+
+    #[cfg(test)]
+    pub(super) fn text_box_graph(
+        &self,
+        package: &IWorkPackage,
+        sheet_id: u64,
+        drawable_id: u64,
+    ) -> Result<NumbersTextBoxGraph> {
+        self.ensure_current(package)?;
+        self.text_box_graph_current(sheet_id, drawable_id)
+    }
+
+    pub(super) fn text_box_graph_if_supported(
+        &self,
+        package: &IWorkPackage,
+        sheet_id: u64,
+        drawable_id: u64,
+    ) -> Result<Option<NumbersTextBoxGraph>> {
+        self.ensure_current(package)?;
+        let record = self.objects.get(&drawable_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers drawable {drawable_id} is missing from the object catalog"
+            ))
+        })?;
+        if record.shape_message_count == 0 {
+            return Ok(None);
+        }
+        if record.shape_message_count != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers drawable {drawable_id} must have exactly one shape payload"
+            )));
+        }
+        let Some(drawable) = self.drawables.get(&drawable_id) else {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers drawable {drawable_id} shape payload is unavailable"
+            )));
+        };
+        if drawable.shape.is_text_box != Some(true) {
+            return Ok(None);
+        }
+        self.text_box_graph_current(sheet_id, drawable_id).map(Some)
+    }
+
+    pub(super) fn text_storage_info(
+        &mut self,
+        package: &IWorkPackage,
+        storage_id: u64,
+    ) -> Result<TextStorageInfo> {
+        self.ensure_current(package)?;
+        let record = *self.objects.get(&storage_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers text storage {storage_id} is missing from the object catalog"
+            ))
+        })?;
+        let archive_name = self.archive_name(record.slot.archive_index)?.to_owned();
+        self.with_archive(package, &archive_name, |catalog, archive| {
+            let object = archive
+                .objects
+                .get(usize::try_from(record.slot.object_index).map_err(|_| {
+                    Error::InvalidFormat(
+                        "Numbers text storage object index does not fit usize".to_owned(),
+                    )
+                })?)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers text storage {storage_id} object slot is out of bounds"
+                    ))
+                })?;
+            if object.archive_info.identifier != Some(storage_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers text storage {storage_id} object slot does not match its identifier"
+                )));
+            }
+            let mut found = None;
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if !STORAGE_MESSAGE_TYPES.contains(&message.type_) {
+                    continue;
+                }
+                catalog.record_semantic_decode(format!(
+                    "storage object {storage_id} message {message_index}"
+                ))?;
+                let storage = match tswp::StorageArchive::decode(message.data.as_slice()) {
+                    Ok(storage) => storage,
+                    Err(_error)
+                        if message.type_ == 2_022
+                            && tswp::ParagraphStyleArchive::decode(message.data.as_slice())
+                                .is_ok() =>
+                    {
+                        continue;
+                    },
+                    Err(error) => {
+                        return Err(Error::InvalidFormat(format!(
+                            "iWork text storage {storage_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
+                        )));
+                    },
+                };
+                if found.is_some() {
+                    return Err(Error::InvalidFormat(format!(
+                        "iWork text storage {storage_id} must have exactly one writable payload"
+                    )));
+                }
+                found = Some((message.type_, storage));
+            }
+            let (message_type, storage) = found.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers text storage {storage_id} has no writable payload"
+                ))
+            })?;
+            Ok(TextStorageInfo {
+                object_id: storage_id,
+                message_type,
+                kind: storage.kind,
+                text: storage.text.concat(),
+            })
         })
-        .and_then(|message| tn::DocumentArchive::decode(message.data.as_slice()).ok())
-        .ok_or_else(|| {
-            Error::InvalidFormat("package does not contain a Numbers root document".to_owned())
+    }
+
+    fn text_box_graph_current(
+        &self,
+        sheet_id: u64,
+        drawable_id: u64,
+    ) -> Result<NumbersTextBoxGraph> {
+        let sheet = self.sheets.get(&sheet_id).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not reachable exactly once"
+            ))
+        })?;
+        let record = self.objects.get(&drawable_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers drawable {drawable_id} is missing from the object catalog"
+            ))
+        })?;
+        if record.shape_message_count != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers drawable {drawable_id} must have exactly one shape payload"
+            )));
+        }
+        if sheet
+            .drawable_ids
+            .iter()
+            .filter(|identifier| **identifier == drawable_id)
+            .count()
+            != 1
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet {sheet_id} does not own drawable {drawable_id} exactly once"
+            )));
+        }
+        if self.duplicate_drawables.contains(&drawable_id)
+            || self.drawable_owner_counts.get(&drawable_id).copied() != Some(1)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers drawable {drawable_id} is owned more than once"
+            )));
+        }
+        let drawable = self.drawables.get(&drawable_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers drawable {drawable_id} is missing from the object catalog"
+            ))
+        })?;
+        let shape = drawable.shape;
+        if shape.is_text_box != Some(true) {
+            return Err(Error::ParseError(format!(
+                "Numbers drawable {drawable_id} is not an ordinary text box"
+            )));
+        }
+        if drawable.owner_sheet_id != sheet_id {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} has a different owning sheet"
+            )));
+        }
+        if drawable.slot.archive_index != sheet.slot.archive_index {
+            let archive_name = self.archive_name(sheet.slot.archive_index)?;
+            return Err(Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} is outside sheet component {archive_name}"
+            )));
+        }
+        if shape.parent_id != Some(sheet_id) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} does not name sheet {sheet_id} as its parent"
+            )));
+        }
+        let storage_id = shape.owned_storage_id.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} has no owned storage"
+            ))
+        })?;
+        if shape.deprecated_storage_id != Some(storage_id) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} has inconsistent storage ownership"
+            )));
+        }
+        let title_id = shape.title_id.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} has no title stand-in"
+            ))
+        })?;
+        let caption_id = shape.caption_id.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} has no caption stand-in"
+            ))
+        })?;
+        let object_ids = vec![drawable_id, caption_id, title_id, storage_id];
+        if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} has aliased private objects"
+            )));
+        }
+
+        for (identifier, kind) in [
+            (caption_id, "caption stand-in"),
+            (title_id, "title stand-in"),
+            (storage_id, "storage"),
+        ] {
+            let record = self.objects.get(&identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers text-box {kind} {identifier} is missing"))
+            })?;
+            if record.slot.archive_index != sheet.slot.archive_index {
+                let archive_name = self.archive_name(sheet.slot.archive_index)?;
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers text-box {kind} {identifier} is outside {archive_name}"
+                )));
+            }
+            let count = if identifier == storage_id {
+                record.storage_message_count
+            } else {
+                record.caption_message_count
+            };
+            if count != 1 {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers text-box {kind} {identifier} must have exactly one expected payload"
+                )));
+            }
+        }
+
+        if self.storage_owner_counts.get(&storage_id).copied() != Some(1) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers text box {drawable_id} has a storage {storage_id} with multiple owners"
+            )));
+        }
+
+        let uuid_object_ids = match &self.uuid_identifiers {
+            Some(mapped) => {
+                let mapped_count = object_ids
+                    .iter()
+                    .filter(|identifier| mapped.contains(identifier))
+                    .count();
+                if mapped_count != object_ids.len() {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers text box {drawable_id} is missing document-component UUID mappings"
+                    )));
+                }
+                object_ids.clone()
+            },
+            None => Vec::new(),
+        };
+
+        Ok(NumbersTextBoxGraph {
+            sheet_id,
+            archive_name: self.archive_name(sheet.slot.archive_index)?.to_owned(),
+            drawable_id,
+            storage_id,
+            object_ids,
+            uuid_object_ids,
         })
+    }
 }
 
 pub(super) fn numbers_sheet_drawable_owners(package: &IWorkPackage) -> Result<HashMap<u64, u64>> {
