@@ -1,6 +1,7 @@
 //! Semantic read and delete operations for Keynote slide transitions.
 
 use super::*;
+use litchi_keynote::transition::Effect;
 
 const TRANSITION_ANIMATION_TYPE: &str = "Transition";
 const NO_EFFECT_DURATION_SECONDS: f64 = 1.0;
@@ -8,13 +9,13 @@ const NO_EFFECT_DURATION_SECONDS: f64 = 1.0;
 impl KeynoteTransitionSettings {
     /// Whether the slide has a visible transition effect.
     pub fn has_effect(&self) -> bool {
-        !matches!(self.effect, None | Some(KeynoteTransitionEffect::None))
+        !matches!(self.effect, None | Some(Effect::None))
     }
 
     pub(super) fn without_effect(&self) -> Self {
         Self {
             animation_type: Some(TRANSITION_ANIMATION_TYPE.to_owned()),
-            effect: Some(KeynoteTransitionEffect::None),
+            effect: Some(Effect::None),
             duration: Some(NO_EFFECT_DURATION_SECONDS),
             direction: None,
             delay: self.delay,

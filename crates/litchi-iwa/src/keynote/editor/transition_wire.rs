@@ -2,6 +2,7 @@
 
 use super::transition::KeynoteTransitionSettings;
 use super::*;
+use litchi_keynote::transition::Effect;
 
 const SLIDE_TRANSITION_FIELD: u32 = 4;
 const TRANSITION_ATTRIBUTES_FIELD: u32 = 2;
@@ -95,7 +96,7 @@ pub(super) fn patch_transition_settings_wire(
         settings
             .effect
             .as_ref()
-            .map(KeynoteTransitionEffect::as_identifier)
+            .map(Effect::identifier)
             .map(str::as_bytes),
     )?;
     for (field_number, current, replacement) in [

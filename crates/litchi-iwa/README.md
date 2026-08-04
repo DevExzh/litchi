@@ -1146,7 +1146,7 @@ let layout = keynote.default_slide_layout()?;
 let fresh = keynote.add_slide(layout)?;
 keynote.set_slide_title(fresh.index, "New from theme")?;
 let mut transition = keynote.slides()?[0].transition.clone().expect("transition");
-transition.effect = Some(litchi_iwa::keynote::KeynoteTransitionEffect::Dissolve);
+transition.effect = Some(litchi_iwa::keynote::Effect::Dissolve);
 transition.duration = Some(1.5);
 transition.custom_parameters.acceleration =
     Some(litchi_iwa::keynote::KeynoteTransitionAcceleration::EaseInOut);

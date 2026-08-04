@@ -5766,8 +5766,11 @@ bounded owner slice.
 The IWA migration has now established a value-model seam. `litchi-iwa-text`
 owns `TextStorage`, `TextRun`, and borrowed `TextFragment` values; `litchi-pages`
 owns `Section` and `SectionType`; and `litchi-keynote` owns `Slide`, `Show`,
-build-animation, and transition values. The old implementations were removed
-from the extracted value owners, while the monolith still has migration
+build-animation, and transition values. Its `transition::Effect` now owns the
+lossless native transition-effect identifiers and canonical-known-value check;
+the monolith retains only archive-boundary transition settings and wire
+mutation. The old implementations were removed from the extracted value owners,
+while the monolith still has migration
 adapters where existing reader/editor surfaces need archive-boundary context.
 These adapters are staged ownership work, not a compatibility API. No archive,
 protobuf, or application decoder was moved into these value crates.

@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteEditor, KeynoteTransitionEffect};
+use litchi_iwa::keynote::{Effect, KeynoteEditor};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -14,9 +14,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<usize>()?;
     let effect = match arguments.next().ok_or("missing effect")?.as_str() {
         "none" => None,
-        "dissolve" => Some(KeynoteTransitionEffect::Dissolve),
-        "magic-move" => Some(KeynoteTransitionEffect::MagicMove),
-        identifier => Some(KeynoteTransitionEffect::from_identifier(identifier)),
+        "dissolve" => Some(Effect::Dissolve),
+        "magic-move" => Some(Effect::MagicMove),
+        identifier => Some(Effect::from_identifier(identifier)),
     };
     if arguments.next().is_some() {
         return Err("unexpected extra argument".into());

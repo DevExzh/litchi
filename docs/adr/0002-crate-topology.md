@@ -96,6 +96,10 @@ the allocation-bearing rich-text values shared by the format leaves. It has no
 archive, protobuf, or application dependency. `litchi-pages` owns the concise
 `Section`/`SectionType` vocabulary, and `litchi-keynote` owns `Slide`, `Show`,
 build, and transition values; both depend downward on `litchi-iwa-text` only.
+The leaf's `transition::Effect` owns the lossless native transition-effect
+identifier vocabulary, including canonical known variants and lossless unknown
+identifiers; IWA retains transition archive decoding, wire patching, and
+transactional validation at the format boundary.
 The existing `litchi-iwa` package reader temporarily consumes these leaf values
 through private migration adapters. The direct edges are present in the
 canonical boundary graph because the adapters are already dependency-safe;

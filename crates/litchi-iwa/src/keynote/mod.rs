@@ -36,6 +36,7 @@ pub mod editor;
 
 pub use creation::KeynoteDocumentBuilder;
 pub use document::KeynoteDocument;
+pub use editor::Effect;
 pub use editor::{
     KeynoteBuildAcceleration, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,
     KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildStart, KeynoteBuildTimingCurve,
@@ -88,11 +89,10 @@ pub use editor::{
     KeynoteTableSortDirection, KeynoteTableSortOrder, KeynoteTableSortRowRange,
     KeynoteTableSortRule, KeynoteTableSortScope, KeynoteTableTitleSettings,
     KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
-    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionEffect,
-    KeynoteTransitionMosaicType, KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
-    RemovedKeynoteSlideAudio, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage,
-    RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape, RemovedKeynoteSlideTable,
-    RemovedKeynoteTextBox,
+    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
+    KeynoteTransitionSettings, KeynoteTransitionTextDelivery, RemovedKeynoteSlideAudio,
+    RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideMovie,
+    RemovedKeynoteSlideShape, RemovedKeynoteSlideTable, RemovedKeynoteTextBox,
 };
 pub use litchi_keynote::{
     BuildAnimation, BuildAnimationType, Show, Slide, SlideTransition, TransitionType,

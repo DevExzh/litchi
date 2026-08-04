@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod transition;
+
 use litchi_iwa_text::TextStorage;
 
 /// A Keynote slide and its extracted semantic content.

@@ -2,6 +2,7 @@
 
 use super::transition_wire::{patch_transition_settings_wire, transition_settings_from_wire};
 use super::*;
+use litchi_keynote::transition::Effect;
 
 const SLIDE_ARCHIVE_MESSAGE_TYPE: u32 = 5;
 
@@ -152,7 +153,7 @@ impl KeynoteTransitionTextDelivery {
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteTransitionSettings {
     pub animation_type: Option<String>,
-    pub effect: Option<KeynoteTransitionEffect>,
+    pub effect: Option<Effect>,
     pub duration: Option<f64>,
     pub direction: Option<KeynoteTransitionDirection>,
     pub delay: Option<f64>,
@@ -198,10 +199,7 @@ impl KeynoteTransitionSettings {
         let animation = attributes.animation_attributes.as_ref()?;
         Some(Self {
             animation_type: animation.animation_type.clone(),
-            effect: animation
-                .effect
-                .as_deref()
-                .map(KeynoteTransitionEffect::from_identifier),
+            effect: animation.effect.as_deref().map(Effect::from_identifier),
             duration: animation.duration,
             direction: animation
                 .direction
@@ -246,7 +244,7 @@ impl KeynoteEditor {
     /// Create or replace a slide's modern transition fields transactionally.
     ///
     /// Current Keynote slides encode “no effect” as a modern transition whose
-    /// typed effect is [`KeynoteTransitionEffect::None`], so replacing that
+    /// typed effect is [`Effect::None`], so replacing that
     /// value creates a visible transition without fabricating a new archive.
     ///
     /// Legacy-only transitions are rejected so the editor never guesses which
@@ -395,12 +393,7 @@ fn validate_transition_settings(settings: &KeynoteTransitionSettings) -> Result<
         .animation_type
         .as_deref()
         .into_iter()
-        .chain(
-            settings
-                .effect
-                .as_ref()
-                .map(KeynoteTransitionEffect::as_identifier),
-        )
+        .chain(settings.effect.as_ref().map(Effect::identifier))
         .chain(
             settings
                 .animation_parameters

@@ -5065,11 +5065,11 @@ mod soundtrack_items;
 mod soundtrack_wire;
 mod text_box_create;
 mod transition;
-mod transition_effect;
 mod transition_lifecycle;
 mod transition_wire;
 
 use builds::*;
+pub use litchi_keynote::transition::Effect;
 pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
 pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
 pub use slide_background::KeynoteSlideBackground;
@@ -5135,7 +5135,6 @@ pub use transition::{
     KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
     KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
 };
-pub use transition_effect::KeynoteTransitionEffect;
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};
 #[cfg(test)]
 mod operation_cache_tests;
