@@ -13,8 +13,11 @@ pub mod facade;
 pub mod model;
 pub mod package;
 
-pub use facade::*;
-pub use model::*;
+pub use facade::{Builder, Presentation};
+
+// Keep implementation modules ergonomic internally without flattening their
+// semantic vocabulary into the public crate root.
+pub(crate) use model::*;
 
 pub use litchi_odf_common::core;
 pub use litchi_odf_common::rdf;

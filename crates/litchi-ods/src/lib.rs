@@ -10,6 +10,8 @@ pub mod facade;
 pub mod model;
 pub mod package;
 
-pub use facade::{Builder, MutableSpreadsheet, Spreadsheet};
+pub use facade::{
+    Builder, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression,
+    NamedRange, NamedRangeUsage, Spreadsheet,
+};
 pub use litchi_odf_common::rdf;
-pub use model::*;
