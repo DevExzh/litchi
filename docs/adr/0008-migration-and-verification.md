@@ -3949,6 +3949,49 @@ remains environment-blocked before compilation because `pkg-config`/fontconfig
 is unavailable. This is functional and boundary evidence; native Office and
 performance evidence remain governed by the evidence levels below.
 
+## XLSB data validation, XLSX workbook metadata, and DOCX bibliography follow-up
+
+The next disjoint owner batch moves three bounded format-owned XML/record
+seams out of the migration host while retaining package traversal, relationship
+provenance, formula-context binding, and historical error/API paths as explicit
+adapters:
+
+- BIFF12 classic and Office 2013 data-validation records, collection settings,
+  inline-list payload validation, formula-token retention, range limits, and
+  semantic validation models now live in `litchi-xlsb::data_validation`. The
+  host keeps worksheet record traversal and text-formula compilation/writing,
+  implements the owner formula-resolution and binary-formula bridges, and maps
+  owner failures to `XlsbError`.
+- SpreadsheetML workbook `metadataTypes`, `futureMetadata`, `cellMetadata`,
+  `valueMetadata`, and inert extension XML now live in
+  `litchi-xlsx::workbook_metadata`. The host keeps the workbook relationship,
+  content-type, no-outbound-relationship, and OPC discovery checks.
+- Word bibliography `Sources`/`Source` namespace-aware parsing, scalar paths,
+  style metadata, strict/transitional/legacy namespace recognition, and
+  bounded Custom XML payload handling now live in `litchi-docx::bibliography`.
+  The host keeps Custom XML item discovery, relationship/part provenance, and
+  the existing source CRUD writer compatibility surface. Bibliography styles,
+  citation matching, XSLT, and external resources remain inert.
+
+The checked-in specification anchors are `[MS-XLSB]` §§2.4.55--2.4.56,
+2.4.356--2.4.358, 2.5.36--2.5.37, 2.5.58--2.5.66, 2.5.98.8, and 2.5.156;
+`[MS-XLSX]` §2.2.4.4 plus the referenced SpreadsheetML metadata structures;
+and `[MS-OE376]` Part 4 §2.16.5.11 with normative variation §2.1.494 for
+the BIBLIOGRAPHY vocabulary and field compatibility. These anchors cover the
+record payloads, metadata ordering/counts, future extensions, stored scalar
+paths, and strict/transitional/legacy namespace behavior implemented here.
+
+The owner suites pass 114 XLSB, 367 XLSX, and 248 DOCX tests. The default
+`litchi-ooxml` package test target passes 1,530 host library tests plus its
+integration and doctest targets; the focused owner and host commands pass as
+well. Owner all-feature all-target strict Clippy, host default all-target
+strict Clippy, formatting, diff, and the crate-boundary audit pass: 35
+workspace packages, 107 internal dependency declarations, and the same 13
+explicitly scheduled debt edges remain. The all-features host test and full
+workspace test commands remain environment-blocked before compilation because
+`pkg-config`/fontconfig is unavailable. No native Office or performance claim
+is made for this batch.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

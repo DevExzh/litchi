@@ -41,6 +41,8 @@ pub const MAX_BIBLIOGRAPHY_SOURCES: usize = 65_536;
 pub const MAX_BIBLIOGRAPHY_VALUES: usize = 1_000_000;
 /// Maximum bytes retained for one XML text or attribute value.
 pub const MAX_BIBLIOGRAPHY_TEXT_BYTES: usize = 4 * 1024 * 1024;
+/// Maximum serialized Custom XML payload accepted by the standalone codec.
+pub const MAX_BIBLIOGRAPHY_XML_BYTES: usize = 32 * 1024 * 1024;
 
 /// Parsed bibliography XML semantics without package provenance.
 ///
@@ -169,6 +171,11 @@ impl BibliographySourceValue {
 
 /// Parse one bounded bibliography source-store XML payload.
 pub fn parse_bibliography_source_store(xml: &[u8]) -> Result<BibliographySourceStore> {
+    if xml.len() > MAX_BIBLIOGRAPHY_XML_BYTES {
+        return Err(invalid(format!(
+            "bibliography XML exceeds {MAX_BIBLIOGRAPHY_XML_BYTES} bytes"
+        )));
+    }
     let root = parse_xml_tree(xml)?;
     if !is_bibliography_root(
         root.namespace.as_deref().unwrap_or_default(),
@@ -317,6 +324,11 @@ pub struct XmlAttribute {
 /// the host's inert source CRUD adapter.
 #[doc(hidden)]
 pub fn parse_xml_tree(xml: &[u8]) -> Result<XmlNode> {
+    if xml.len() > MAX_BIBLIOGRAPHY_XML_BYTES {
+        return Err(invalid(format!(
+            "bibliography XML exceeds {MAX_BIBLIOGRAPHY_XML_BYTES} bytes"
+        )));
+    }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::new();
