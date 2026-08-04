@@ -1,6 +1,6 @@
 //! XLSB cells reader implementation
 
-use crate::xlsb::cell::{CellHeader, XlsbCell};
+use crate::xlsb::cell::{Cell, CellHeader};
 use crate::xlsb::data_validation::{
     DataValidationSettings, Validation, parse_collection_settings, parse_dval_list,
 };
@@ -10,10 +10,8 @@ use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::Stream;
 use crate::xlsb::shared_strings::SharedString;
-use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
-use crate::xlsb::worksheet::{
-    XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
-};
+use crate::xlsb::web_extension_bindings::Binding;
+use crate::xlsb::worksheet::{AutoFilter, ColumnInfo, RowInfo, SheetProtection, StrongProtection};
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use litchi_xlsb::conditional_formatting::{
@@ -93,7 +91,7 @@ impl Dimensions {
 
 /// XLSB cells reader
 #[allow(dead_code)]
-pub struct XlsbCellsReader<'a, RS>
+pub struct CellsReader<'a, RS>
 where
     RS: Read + Seek,
 {
@@ -112,15 +110,15 @@ where
     /// Hyperlinks found in the worksheet
     pub hyperlinks: Vec<Hyperlink>,
     /// Column formatting records found before sheet data.
-    pub column_infos: Vec<XlsbColumnInfo>,
+    pub column_infos: Vec<ColumnInfo>,
     /// Row header metadata found within sheet data.
-    pub row_infos: Vec<XlsbRowInfo>,
+    pub row_infos: Vec<RowInfo>,
     /// Worksheet AutoFilter range.
-    pub auto_filter: Option<XlsbAutoFilter>,
+    pub auto_filter: Option<AutoFilter>,
     /// Worksheet protection settings.
-    pub sheet_protection: Option<XlsbSheetProtection>,
+    pub sheet_protection: Option<SheetProtection>,
     /// ISO strong password-verifier metadata.
-    pub strong_sheet_protection: Option<XlsbStrongProtection>,
+    pub strong_sheet_protection: Option<StrongProtection>,
     /// Classic worksheet data-validation rules.
     pub data_validations: Vec<Validation>,
     /// UI settings from the classic validation collection.
@@ -130,13 +128,13 @@ where
     /// Classic and Office 2013 conditional-formatting blocks in stream order.
     pub conditional_formattings: Vec<Formatting>,
     /// Inert Office Add-in bindings from the worksheet WEBEXTENSIONS collection.
-    pub web_extension_bindings: Vec<XlsbWebExtensionBinding>,
+    pub web_extension_bindings: Vec<Binding>,
     /// Sheet views from the worksheet WSVIEWS collection.
     pub sheet_views: Vec<crate::xlsb::sheet_view::SheetView>,
     saw_web_extension_collection: bool,
 }
 
-impl<'a, RS> XlsbCellsReader<'a, RS>
+impl<'a, RS> CellsReader<'a, RS>
 where
     RS: Read + Seek,
 {
@@ -187,7 +185,7 @@ where
             }
         }
 
-        Ok(XlsbCellsReader {
+        Ok(CellsReader {
             iter,
             shared_strings,
             formula_context,
@@ -220,7 +218,7 @@ where
         self.dimensions
     }
 
-    pub fn next_cell(&mut self) -> XlsbResult<Option<XlsbCell>> {
+    pub fn next_cell(&mut self) -> XlsbResult<Option<Cell>> {
         loop {
             self.buf.clear();
             let typ = if let Some((typ, data)) = self.pending_record.take() {
@@ -263,7 +261,7 @@ where
                     // BrtCellBlank
                     if self.buf.len() >= 8 => {
                         let header = cell_header.unwrap();
-                        return Ok(Some(XlsbCell::new_styled(
+                        return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
                             CellValue::Empty,
@@ -275,7 +273,7 @@ where
                         let header = cell_header.unwrap();
                         let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk");
                         let value = Self::cell_value_from_number(cursor.read_rk()?);
-                        return Ok(Some(XlsbCell::new_styled(
+                        return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
                             value,
@@ -297,7 +295,7 @@ where
                             0x2B => "#GETTING_DATA",
                             _ => "#ERR!",
                         };
-                        return Ok(Some(XlsbCell::new_styled(
+                        return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
                             CellValue::Error(error_msg.to_string()),
@@ -309,7 +307,7 @@ where
                         let header = cell_header.unwrap();
                         let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool");
                         let value = cursor.read_bool8()?;
-                        return Ok(Some(XlsbCell::new_styled(
+                        return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
                             CellValue::Bool(value),
@@ -320,7 +318,7 @@ where
                     if self.buf.len() >= 16 => {
                         let header = cell_header.unwrap();
                         let value = binary::read_f64_le_at(&self.buf, 8)?;
-                        return Ok(Some(XlsbCell::new_styled(
+                        return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
                             CellValue::Float(value),
@@ -331,7 +329,7 @@ where
                     if self.buf.len() >= 8 => {
                         let header = cell_header.unwrap();
                         let (string, _) = super::records::decode_string(&self.buf[8..])?;
-                        return Ok(Some(XlsbCell::new_styled(
+                        return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
                             CellValue::String(string),
@@ -347,7 +345,7 @@ where
                         } else {
                             CellValue::Error("Invalid SST index".to_string())
                         };
-                        return Ok(Some(XlsbCell::new_styled(
+                        return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
                             value,
@@ -362,7 +360,7 @@ where
                     }
                     let header = cell_header.unwrap();
                     let rich_string = SharedString::parse(&self.buf[8..])?;
-                    return Ok(Some(XlsbCell::new_rich_string(
+                    return Ok(Some(Cell::new_rich_string(
                         self.current_row,
                         header,
                         rich_string,
@@ -458,7 +456,7 @@ where
         }
     }
 
-    fn parse_column_info(data: &[u8], cell_xf_count: usize) -> XlsbResult<XlsbColumnInfo> {
+    fn parse_column_info(data: &[u8], cell_xf_count: usize) -> XlsbResult<ColumnInfo> {
         if data.len() != 18 {
             return Err(XlsbError::InvalidLength {
                 expected: 18,
@@ -494,7 +492,7 @@ where
                 val: format!("0x{flags:04X}"),
             });
         }
-        Ok(XlsbColumnInfo {
+        Ok(ColumnInfo {
             first_column,
             last_column,
             width: f64::from(width_raw) / 256.0,
@@ -512,7 +510,7 @@ where
         data: &[u8],
         cell_xf_count: usize,
         previous_row: Option<u32>,
-    ) -> XlsbResult<XlsbRowInfo> {
+    ) -> XlsbResult<RowInfo> {
         if data.len() < 17 {
             return Err(XlsbError::InvalidLength {
                 expected: 17,
@@ -588,7 +586,7 @@ where
             column_spans.push((first, last));
         }
 
-        Ok(XlsbRowInfo {
+        Ok(RowInfo {
             row,
             style_id: style_applied.then_some(raw_style_id),
             height: (flags2 & 0x20 != 0).then_some(f64::from(height_twips) / 20.0),
@@ -671,7 +669,7 @@ where
         })
     }
 
-    fn resolve_formula_record(&mut self, parsed: ParsedFormulaCell) -> XlsbResult<XlsbCell> {
+    fn resolve_formula_record(&mut self, parsed: ParsedFormulaCell) -> XlsbResult<Cell> {
         let position = (self.current_row, parsed.header.col);
         let exp_cell = parsed.formula.exp_cell()?;
 
@@ -741,7 +739,7 @@ where
         };
 
         if let Some(group) = group {
-            Ok(XlsbCell::new_grouped_formula(
+            Ok(Cell::new_grouped_formula(
                 position.0,
                 parsed.header,
                 parsed.cached_value,
@@ -756,7 +754,7 @@ where
                 crate::xlsb::utils::cell_reference(position.0, position.1)
             )))
         } else {
-            Ok(XlsbCell::new_formula_binary(
+            Ok(Cell::new_formula_binary(
                 position.0,
                 parsed.header,
                 parsed.cached_value,
@@ -947,7 +945,7 @@ where
                             val: "binding count exceeds 65,536".to_string(),
                         });
                     }
-                    let binding = XlsbWebExtensionBinding::parse_payload(&self.buf, |index| {
+                    let binding = Binding::parse_payload(&self.buf, |index| {
                         self.formula_context.is_internal_single_sheet_xti(index)
                     })?;
                     if !app_refs.insert(binding.application_reference.clone()) {
@@ -1807,7 +1805,7 @@ where
         })
     }
 
-    fn parse_auto_filter(data: &[u8]) -> XlsbResult<XlsbAutoFilter> {
+    fn parse_auto_filter(data: &[u8]) -> XlsbResult<AutoFilter> {
         if data.len() != 16 {
             return Err(XlsbError::InvalidLength {
                 expected: 16,
@@ -1830,7 +1828,7 @@ where
                 ),
             });
         }
-        Ok(XlsbAutoFilter {
+        Ok(AutoFilter {
             first_row,
             last_row,
             first_column,
@@ -1861,7 +1859,7 @@ where
         }
     }
 
-    fn parse_sheet_protection(data: &[u8]) -> XlsbResult<XlsbSheetProtection> {
+    fn parse_sheet_protection(data: &[u8]) -> XlsbResult<SheetProtection> {
         if data.len() != 66 {
             return Err(XlsbError::InvalidLength {
                 expected: 66,
@@ -1880,7 +1878,7 @@ where
             }
             *flag = value != 0;
         }
-        Ok(XlsbSheetProtection {
+        Ok(SheetProtection {
             password_hash: (password != 0).then_some(password),
             locked: flags[0],
             allow_edit_objects: flags[1],
@@ -1901,7 +1899,7 @@ where
         })
     }
 
-    fn sheet_protection_flags(protection: &XlsbSheetProtection) -> [bool; 16] {
+    fn sheet_protection_flags(protection: &SheetProtection) -> [bool; 16] {
         [
             protection.locked,
             protection.allow_edit_objects,
@@ -1922,9 +1920,7 @@ where
         ]
     }
 
-    fn parse_strong_sheet_protection(
-        data: &[u8],
-    ) -> XlsbResult<(XlsbStrongProtection, [bool; 16])> {
+    fn parse_strong_sheet_protection(data: &[u8]) -> XlsbResult<(StrongProtection, [bool; 16])> {
         if data.len() < 83 {
             return Err(XlsbError::InvalidLength {
                 expected: 83,
@@ -1971,7 +1967,7 @@ where
             });
         }
         Ok((
-            XlsbStrongProtection {
+            StrongProtection {
                 spin_count,
                 hash,
                 salt,
@@ -2115,7 +2111,7 @@ mod tests {
 
     #[test]
     fn decodes_and_validates_cell_style_header() {
-        type Reader<'a> = XlsbCellsReader<'a, std::io::Cursor<&'a [u8]>>;
+        type Reader<'a> = CellsReader<'a, std::io::Cursor<&'a [u8]>>;
 
         let header = [7, 0, 0, 0, 0x34, 0x12, 0, 1];
         assert_eq!(
@@ -2140,7 +2136,7 @@ mod tests {
 
     #[test]
     fn parses_iso_sheet_protection_metadata_and_matching_flags() {
-        type Reader<'a> = XlsbCellsReader<'a, std::io::Cursor<&'a [u8]>>;
+        type Reader<'a> = CellsReader<'a, std::io::Cursor<&'a [u8]>>;
         let flags = [
             true, false, true, false, true, false, true, false, true, false, true, false, true,
             false, true, false,
@@ -2184,7 +2180,7 @@ mod tests {
         writer.write_record(kind::END_SHEET, &[]).unwrap();
         let formula_context = FormulaResolutionContext::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
-        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().unwrap().is_none());
         assert_eq!(reader.sheet_protection.unwrap(), protection);
         assert_eq!(reader.strong_sheet_protection.unwrap(), strong);
@@ -2195,7 +2191,7 @@ mod tests {
         let bytes = rich_string_worksheet();
         let formula_context = FormulaResolutionContext::default();
         let iter = Stream::new(std::io::Cursor::new(bytes));
-        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
 
         let cell = reader.next_cell().unwrap().unwrap();
         assert_eq!(cell.row(), 4);
@@ -2249,7 +2245,7 @@ mod tests {
 
         let formula_context = FormulaResolutionContext::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
-        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
             reader.next_cell(),
             Err(XlsbError::Unrecognized { .. })
@@ -2275,7 +2271,7 @@ mod tests {
 
         let formula_context = FormulaResolutionContext::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
-        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
             reader.next_cell(),
             Err(XlsbError::Unrecognized { .. })
@@ -2403,7 +2399,7 @@ mod tests {
 
         let formula_context = FormulaResolutionContext::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
-        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().unwrap().is_none());
         let parsed = &reader.conditional_formattings[0];
         assert_eq!(parsed.record_kind, RecordKind::Extension14);
@@ -2456,7 +2452,7 @@ mod tests {
 
         let formula_context = FormulaResolutionContext::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
-        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().is_err());
     }
 }

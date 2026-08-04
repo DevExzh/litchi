@@ -5,7 +5,7 @@ use crate::xlsb::chartsheet::{
     XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView,
 };
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::worksheet::XlsbStrongProtection;
+use crate::xlsb::worksheet::StrongProtection;
 use crate::xlsx::WorksheetChart;
 use litchi_xlsb::raw::Writer;
 use litchi_xlsb::raw::kind as rt;
@@ -254,7 +254,7 @@ fn validate_color(color: XlsbChartSheetColor) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_strong_protection(value: &XlsbStrongProtection) -> XlsbResult<()> {
+fn validate_strong_protection(value: &StrongProtection) -> XlsbResult<()> {
     if value.spin_count > MAX_SPIN_COUNT
         || value.hash.is_empty()
         || value.hash.len() > MAX_PROTECTION_BYTES
@@ -317,7 +317,7 @@ fn write_views<W: Write>(writer: &mut Writer<W>, views: &[XlsbChartSheetView]) -
 fn write_protection<W: Write>(
     writer: &mut Writer<W>,
     classic: Option<XlsbChartSheetProtection>,
-    strong: Option<&XlsbStrongProtection>,
+    strong: Option<&StrongProtection>,
 ) -> XlsbResult<()> {
     let Some(classic) = classic else {
         return Ok(());

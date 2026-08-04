@@ -8,7 +8,7 @@
 use crate::xlsb::chartsheet::model::*;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::walker::{RecordWalker, malformed};
-use crate::xlsb::worksheet::XlsbStrongProtection;
+use crate::xlsb::worksheet::StrongProtection;
 use litchi_xlsb::raw::{Cursor, kind as rt};
 
 // `BrtCsProp` flags word (MS-XLSB 2.4.344).
@@ -88,7 +88,7 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResu
     let mut seen_cs_prop = false;
     // Strong protection parsed from `BrtCsProtectionIso`, pending the classic
     // `BrtCsProtection` record that MS-XLSB 2.4.346 requires immediately after.
-    let mut pending_iso_protection: Option<(XlsbStrongProtection, bool, bool)> = None;
+    let mut pending_iso_protection: Option<(StrongProtection, bool, bool)> = None;
     while let Some(record) = walker.next()? {
         if pending_iso_protection.is_some() && record.kind() != rt::CS_PROTECTION {
             return Err(malformed(
@@ -259,7 +259,7 @@ fn parse_cs_protection(data: &[u8]) -> XlsbResult<XlsbChartSheetProtection> {
 /// Returns the strong protection data plus the `fLocked` and `fObjects`
 /// flags, which the immediately following `BrtCsProtection` record must
 /// repeat.
-fn parse_cs_protection_iso(data: &[u8]) -> XlsbResult<(XlsbStrongProtection, bool, bool)> {
+fn parse_cs_protection_iso(data: &[u8]) -> XlsbResult<(StrongProtection, bool, bool)> {
     let mut cursor = Cursor::new(data, "BrtCsProtectionIso");
     let spin_count = cursor.read_u32()?;
     if spin_count > MAX_SPIN_COUNT {
@@ -282,7 +282,7 @@ fn parse_cs_protection_iso(data: &[u8]) -> XlsbResult<(XlsbStrongProtection, boo
         .ok_or_else(|| malformed("BrtCsProtectionIso", "null or empty szAlgName"))?;
     cursor.finish()?;
     Ok((
-        XlsbStrongProtection {
+        StrongProtection {
             spin_count,
             hash: hash.to_vec(),
             salt: salt.to_vec(),

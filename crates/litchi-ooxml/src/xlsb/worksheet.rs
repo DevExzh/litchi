@@ -1,14 +1,14 @@
 //! Worksheet implementation for XLSB files
 
-use crate::xlsb::cell::XlsbCell;
+use crate::xlsb::cell::Cell;
 use crate::xlsb::comments::Comment;
 use crate::xlsb::data_validation::{DataValidationSettings, Validation};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::sheet_view::SheetView;
-use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
+use crate::xlsb::web_extension_bindings::Binding;
 use litchi_core::sheet::{
-    Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
+    Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet as SheetWorksheet,
 };
 use litchi_xlsb::conditional_formatting::Formatting;
 use std::borrow::Cow;
@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 
 /// Width, style, visibility, and outline metadata for an XLSB column range.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsbColumnInfo {
+pub struct ColumnInfo {
     /// First zero-based column covered by this record.
     pub first_column: u32,
     /// Last zero-based column covered by this record, inclusive.
@@ -41,7 +41,7 @@ pub struct XlsbColumnInfo {
 
 /// Formatting, visibility, and occupied-column metadata for an XLSB row.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsbRowInfo {
+pub struct RowInfo {
     /// Zero-based row index.
     pub row: u32,
     /// Applied row style, absent when `fGhostDirty` is clear.
@@ -66,7 +66,7 @@ pub struct XlsbRowInfo {
 
 /// Cell range governed by a worksheet AutoFilter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbAutoFilter {
+pub struct AutoFilter {
     /// First zero-based row, inclusive.
     pub first_row: u32,
     /// Last zero-based row, inclusive.
@@ -79,7 +79,7 @@ pub struct XlsbAutoFilter {
 
 /// Worksheet protection state and permissions from `BrtSheetProtection`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbSheetProtection {
+pub struct SheetProtection {
     /// Legacy password verifier, absent when the stored value is zero.
     pub password_hash: Option<u16>,
     /// Whether the worksheet and locked-cell contents are protected.
@@ -103,7 +103,7 @@ pub struct XlsbSheetProtection {
 
 /// Strong password-verifier metadata from `BrtSheetProtectionIso`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsbStrongProtection {
+pub struct StrongProtection {
     /// Number of password-hash iterations, at most 10,000,000.
     pub spin_count: u32,
     /// Calculated password hash bytes.
@@ -116,31 +116,31 @@ pub struct XlsbStrongProtection {
 
 /// XLSB worksheet implementation
 #[derive(Debug, Clone)]
-pub struct XlsbWorksheet {
+pub struct Worksheet {
     name: String,
-    cells: BTreeMap<(u32, u32), XlsbCell>,
+    cells: BTreeMap<(u32, u32), Cell>,
     max_row: u32,
     max_col: u32,
     merged_cells: Vec<MergedCell>,
     hyperlinks: Vec<Hyperlink>,
     comments: Vec<Comment>,
-    column_infos: Vec<XlsbColumnInfo>,
-    row_infos: Vec<XlsbRowInfo>,
-    auto_filter: Option<XlsbAutoFilter>,
-    sheet_protection: Option<XlsbSheetProtection>,
-    strong_sheet_protection: Option<XlsbStrongProtection>,
+    column_infos: Vec<ColumnInfo>,
+    row_infos: Vec<RowInfo>,
+    auto_filter: Option<AutoFilter>,
+    sheet_protection: Option<SheetProtection>,
+    strong_sheet_protection: Option<StrongProtection>,
     data_validations: Vec<Validation>,
     data_validation_settings: Option<DataValidationSettings>,
     data_validation14_settings: Option<DataValidationSettings>,
     conditional_formattings: Vec<Formatting>,
-    web_extension_bindings: Vec<XlsbWebExtensionBinding>,
+    web_extension_bindings: Vec<Binding>,
     sheet_views: Vec<SheetView>,
 }
 
-impl XlsbWorksheet {
+impl Worksheet {
     /// Create a new worksheet
     pub fn new(name: String) -> Self {
-        XlsbWorksheet {
+        Worksheet {
             name,
             cells: BTreeMap::new(),
             max_row: 0,
@@ -163,7 +163,7 @@ impl XlsbWorksheet {
     }
 
     /// Add a cell to the worksheet
-    pub fn add_cell(&mut self, cell: XlsbCell) {
+    pub fn add_cell(&mut self, cell: Cell) {
         let pos = (cell.row(), cell.column());
         self.max_row = self.max_row.max(cell.row());
         self.max_col = self.max_col.max(cell.column());
@@ -171,7 +171,7 @@ impl XlsbWorksheet {
     }
 
     /// Get cell at position
-    pub fn get_cell(&self, row: u32, col: u32) -> Option<&XlsbCell> {
+    pub fn get_cell(&self, row: u32, col: u32) -> Option<&Cell> {
         self.cells.get(&(row, col))
     }
 
@@ -190,23 +190,23 @@ impl XlsbWorksheet {
         self.comments.push(comment);
     }
 
-    pub(crate) fn set_column_infos(&mut self, infos: Vec<XlsbColumnInfo>) {
+    pub(crate) fn set_column_infos(&mut self, infos: Vec<ColumnInfo>) {
         self.column_infos = infos;
     }
 
-    pub(crate) fn set_row_infos(&mut self, infos: Vec<XlsbRowInfo>) {
+    pub(crate) fn set_row_infos(&mut self, infos: Vec<RowInfo>) {
         self.row_infos = infos;
     }
 
-    pub(crate) fn set_auto_filter(&mut self, auto_filter: Option<XlsbAutoFilter>) {
+    pub(crate) fn set_auto_filter(&mut self, auto_filter: Option<AutoFilter>) {
         self.auto_filter = auto_filter;
     }
 
-    pub(crate) fn set_sheet_protection(&mut self, sheet_protection: Option<XlsbSheetProtection>) {
+    pub(crate) fn set_sheet_protection(&mut self, sheet_protection: Option<SheetProtection>) {
         self.sheet_protection = sheet_protection;
     }
 
-    pub(crate) fn set_strong_sheet_protection(&mut self, protection: Option<XlsbStrongProtection>) {
+    pub(crate) fn set_strong_sheet_protection(&mut self, protection: Option<StrongProtection>) {
         self.strong_sheet_protection = protection;
     }
 
@@ -225,7 +225,7 @@ impl XlsbWorksheet {
         self.conditional_formattings = conditional_formattings;
     }
 
-    pub(crate) fn set_web_extension_bindings(&mut self, bindings: Vec<XlsbWebExtensionBinding>) {
+    pub(crate) fn set_web_extension_bindings(&mut self, bindings: Vec<Binding>) {
         self.web_extension_bindings = bindings;
     }
 
@@ -249,27 +249,27 @@ impl XlsbWorksheet {
     }
 
     /// Column-range formatting and visibility records in stream order.
-    pub fn column_infos(&self) -> &[XlsbColumnInfo] {
+    pub fn column_infos(&self) -> &[ColumnInfo] {
         &self.column_infos
     }
 
     /// Row formatting, visibility, and occupied-column records in row order.
-    pub fn row_infos(&self) -> &[XlsbRowInfo] {
+    pub fn row_infos(&self) -> &[RowInfo] {
         &self.row_infos
     }
 
     /// Worksheet AutoFilter range, if present.
-    pub fn auto_filter(&self) -> Option<XlsbAutoFilter> {
+    pub fn auto_filter(&self) -> Option<AutoFilter> {
         self.auto_filter
     }
 
     /// Worksheet protection state and allowed operations, if enabled.
-    pub fn sheet_protection(&self) -> Option<XlsbSheetProtection> {
+    pub fn sheet_protection(&self) -> Option<SheetProtection> {
         self.sheet_protection
     }
 
     /// Strong password-verifier metadata, if the ISO protection record exists.
-    pub fn strong_sheet_protection(&self) -> Option<&XlsbStrongProtection> {
+    pub fn strong_sheet_protection(&self) -> Option<&StrongProtection> {
         self.strong_sheet_protection.as_ref()
     }
 
@@ -294,7 +294,7 @@ impl XlsbWorksheet {
     }
 
     /// Inert Office Add-in range bindings in worksheet stream order.
-    pub fn web_extension_bindings(&self) -> &[XlsbWebExtensionBinding] {
+    pub fn web_extension_bindings(&self) -> &[Binding] {
         &self.web_extension_bindings
     }
 
@@ -307,7 +307,7 @@ impl XlsbWorksheet {
     }
 }
 
-impl Worksheet for XlsbWorksheet {
+impl SheetWorksheet for Worksheet {
     fn name(&self) -> &str {
         &self.name
     }
@@ -333,7 +333,7 @@ impl Worksheet for XlsbWorksheet {
             Some(cell) => Ok(Box::new(cell.clone())),
             None => {
                 // Return empty cell for missing positions
-                let empty_cell = XlsbCell::new(row, column, CellValue::Empty);
+                let empty_cell = Cell::new(row, column, CellValue::Empty);
                 Ok(Box::new(empty_cell))
             },
         }
@@ -383,7 +383,7 @@ impl Worksheet for XlsbWorksheet {
 
 /// Cell iterator for XLSB worksheets
 struct XlsbCellIterator<'a> {
-    cells: Vec<&'a XlsbCell>,
+    cells: Vec<&'a Cell>,
     index: usize,
 }
 
@@ -401,7 +401,7 @@ impl<'a> CellIterator<'a> for XlsbCellIterator<'a> {
 
 /// Row iterator for XLSB worksheets
 struct XlsbRowIterator<'a> {
-    worksheet: &'a XlsbWorksheet,
+    worksheet: &'a Worksheet,
     current_row: usize,
 }
 

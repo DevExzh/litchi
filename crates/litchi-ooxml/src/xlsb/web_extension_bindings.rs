@@ -13,7 +13,7 @@ const MAX_APP_REF_CODE_UNITS: usize = 32_767;
 
 /// The reference range encoded by a `BrtWebExtension` FRT formula.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsbWebExtensionRange {
+pub struct Range {
     /// Index into the workbook's `ExternSheet` (`Xti`) collection.
     pub external_sheet_index: u16,
     pub first_row: u32,
@@ -24,14 +24,14 @@ pub struct XlsbWebExtensionRange {
 
 /// One binary worksheet-side Office Add-in binding.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsbWebExtensionBinding {
+pub struct Binding {
     pub application_reference: String,
-    pub range: XlsbWebExtensionRange,
+    pub range: Range,
     /// Exact `FRTFormula`, retained for lossless authoring.
     pub formula: CellParsedFormula,
 }
 
-impl XlsbWebExtensionBinding {
+impl Binding {
     /// Construct and validate a binding from its native formula.
     ///
     /// `valid_external_sheet` must verify that the referenced XTI resolves to
@@ -102,7 +102,7 @@ impl XlsbWebExtensionBinding {
 pub fn parse_xlsb_web_extension_bindings(
     records: &[u8],
     mut valid_external_sheet: impl FnMut(u16) -> bool,
-) -> XlsbResult<Vec<XlsbWebExtensionBinding>> {
+) -> XlsbResult<Vec<Binding>> {
     let mut iterator = Records::new(records);
     let begin = iterator
         .next()
@@ -124,9 +124,8 @@ pub fn parse_xlsb_web_extension_bindings(
                 if bindings.len() == MAX_BINDINGS {
                     return Err(invalid("WEBEXTENSIONS", "binding count exceeds 65,536"));
                 }
-                let binding = XlsbWebExtensionBinding::parse_payload(record.payload(), |index| {
-                    valid_external_sheet(index)
-                })?;
+                let binding =
+                    Binding::parse_payload(record.payload(), |index| valid_external_sheet(index))?;
                 if !app_refs.insert(binding.application_reference.clone()) {
                     return Err(invalid("WEBEXTENSIONS", "duplicate binding appRef"));
                 }
@@ -161,9 +160,7 @@ pub fn parse_xlsb_web_extension_bindings(
 }
 
 /// Serialize a complete `WEBEXTENSIONS` record collection.
-pub fn write_xlsb_web_extension_bindings(
-    bindings: &[XlsbWebExtensionBinding],
-) -> XlsbResult<Vec<u8>> {
+pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> XlsbResult<Vec<u8>> {
     if bindings.is_empty() || bindings.len() > MAX_BINDINGS {
         return Err(invalid(
             "WEBEXTENSIONS",
@@ -186,7 +183,7 @@ pub fn write_xlsb_web_extension_bindings(
 
 /// Require every binary worksheet `appRef` to resolve to one package binding.
 pub fn validate_xlsb_web_extension_apprefs<'a>(
-    worksheet_bindings: &[XlsbWebExtensionBinding],
+    worksheet_bindings: &[Binding],
     package_bindings: impl IntoIterator<Item = &'a web::Binding>,
 ) -> XlsbResult<()> {
     PackageAppRefs::new(package_bindings)?.validate(worksheet_bindings)
@@ -230,10 +227,7 @@ impl<'a> PackageAppRefs<'a> {
         Ok(Self { values })
     }
 
-    pub(crate) fn validate(
-        &self,
-        worksheet_bindings: &[XlsbWebExtensionBinding],
-    ) -> XlsbResult<()> {
+    pub(crate) fn validate(&self, worksheet_bindings: &[Binding]) -> XlsbResult<()> {
         if worksheet_bindings.len() > MAX_BINDINGS {
             return Err(invalid(
                 "WEBEXTENSIONS",
@@ -255,7 +249,7 @@ impl<'a> PackageAppRefs<'a> {
     }
 }
 
-fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensionRange> {
+fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<Range> {
     if formula
         .rgce
         .first()
@@ -285,7 +279,7 @@ fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensio
             row,
             col,
             ..
-        } => Ok(XlsbWebExtensionRange {
+        } => Ok(Range {
             external_sheet_index: sheet_index,
             first_row: row,
             last_row: row,
@@ -299,7 +293,7 @@ fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensio
             col_first,
             col_last,
             ..
-        } => Ok(XlsbWebExtensionRange {
+        } => Ok(Range {
             external_sheet_index: sheet_index,
             first_row: row_first,
             last_row: row_last,
@@ -419,14 +413,14 @@ mod tests {
         }
     }
 
-    fn binding() -> XlsbWebExtensionBinding {
+    fn binding() -> Binding {
         // Public context-free compilation intentionally rejects 3D formulas;
         // construct the canonical PtgArea3d token directly.
         let binary = CellParsedFormula {
             rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
             rgcb: Vec::new(),
         };
-        XlsbWebExtensionBinding::new("sales-table", binary, |index| index == 0).unwrap()
+        Binding::new("sales-table", binary, |index| index == 0).unwrap()
     }
 
     #[test]
@@ -434,7 +428,7 @@ mod tests {
         let binding = binding();
         let payload = binding.to_payload().unwrap();
         assert_eq!(
-            XlsbWebExtensionBinding::parse_payload(&payload, |index| index == 0).unwrap(),
+            Binding::parse_payload(&payload, |index| index == 0).unwrap(),
             binding
         );
         let collection = write_xlsb_web_extension_bindings(std::slice::from_ref(&binding)).unwrap();
@@ -448,12 +442,12 @@ mod tests {
     fn rejects_invalid_xti_local_refs_and_trailing_payload() {
         let binding = binding();
         let payload = binding.to_payload().unwrap();
-        assert!(XlsbWebExtensionBinding::parse_payload(&payload, |_| false).is_err());
+        assert!(Binding::parse_payload(&payload, |_| false).is_err());
         let local = FormulaCompiler::compile("$A$1:$B$4").unwrap();
-        assert!(XlsbWebExtensionBinding::new("local", local, |_| true).is_err());
+        assert!(Binding::new("local", local, |_| true).is_err());
         let mut trailing = payload;
         trailing.push(0);
-        assert!(XlsbWebExtensionBinding::parse_payload(&trailing, |_| true).is_err());
+        assert!(Binding::parse_payload(&trailing, |_| true).is_err());
     }
 
     #[test]

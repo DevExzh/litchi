@@ -185,7 +185,7 @@ pub(crate) mod drawing_write;
 pub mod formula;
 pub mod web_extension_bindings;
 
-pub use cell::XlsbCell;
+pub use cell::Cell;
 pub use chartsheet::{
     XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
     XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView, parse_chart_sheet_part,
@@ -230,16 +230,15 @@ pub use table::{
 };
 pub use vba_project::{VbaProject, VbaProjectSignature, VbaProjectSignatureKind};
 pub use web_extension_bindings::{
-    XlsbWebExtensionBinding, XlsbWebExtensionRange, parse_xlsb_web_extension_bindings,
-    validate_xlsb_web_extension_apprefs, write_xlsb_web_extension_bindings,
+    Binding, parse_xlsb_web_extension_bindings, validate_xlsb_web_extension_apprefs,
+    write_xlsb_web_extension_bindings,
 };
 pub use workbook::XlsbWorkbook;
 pub use worksheet::{
-    XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
-    XlsbWorksheet,
+    AutoFilter, ColumnInfo, RowInfo, SheetProtection, StrongProtection, Worksheet,
 };
 // Re-export writer types for convenience
 pub use writer::{
-    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, SheetProtection,
-    StylesWriter, XlsbWorkbookWriter,
+    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, StylesWriter,
+    XlsbWorkbookWriter,
 };

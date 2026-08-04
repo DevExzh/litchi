@@ -1,6 +1,6 @@
 //! Workbook implementation for XLSB files
 
-use crate::xlsb::XlsbCell;
+use crate::xlsb::Cell;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::external_link::{
     CachedValue, DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
@@ -22,7 +22,7 @@ use crate::xlsb::vba_project::{
     store_vba_project as store_workbook_vba_project,
 };
 use crate::xlsb::web_extension_bindings::PackageAppRefs;
-use crate::xlsb::worksheet::XlsbWorksheet;
+use crate::xlsb::worksheet::Worksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use litchi_ooxml_common::embedded;
@@ -50,7 +50,7 @@ const OLE_DATA_SOURCE_RELATIONSHIP_TYPES: &[&str] = &[
 #[allow(dead_code)]
 pub struct XlsbWorkbook {
     package: OpcPackage,
-    worksheets: Vec<XlsbWorksheet>,
+    worksheets: Vec<Worksheet>,
     worksheet_rel_ids: Vec<Option<String>>,
     formula_context: FormulaResolutionContext,
     shared_strings: Vec<SharedString>,
@@ -671,7 +671,7 @@ impl XlsbWorkbook {
     }
 
     /// Resolve a parsed cell's style reference to its cell XF.
-    pub fn style_for_cell(&self, cell: &XlsbCell) -> Option<&CellFormat> {
+    pub fn style_for_cell(&self, cell: &Cell) -> Option<&CellFormat> {
         self.styles.get_cell_format(cell.style_id() as usize)
     }
 
@@ -1407,7 +1407,7 @@ impl XlsbWorkbook {
     }
 
     /// Load a concrete XLSB worksheet by index, including related comments.
-    pub fn worksheet(&self, index: usize) -> XlsbResult<XlsbWorksheet> {
+    pub fn worksheet(&self, index: usize) -> XlsbResult<Worksheet> {
         if index >= self.formula_context.worksheet_names.len() {
             return Err(crate::error::OoxmlError::InvalidFormat(format!(
                 "Worksheet index {} out of bounds",
@@ -1683,11 +1683,11 @@ impl XlsbWorkbook {
         formula_context: &FormulaResolutionContext,
         sheet_index: usize,
         cell_xf_count: usize,
-    ) -> XlsbResult<XlsbWorksheet> {
-        let mut worksheet = XlsbWorksheet::new(name);
+    ) -> XlsbResult<Worksheet> {
+        let mut worksheet = Worksheet::new(name);
         let iter = crate::xlsb::records::Stream::new(cursor);
         let formula_context = formula_context.for_sheet(sheet_index);
-        let mut cells_reader = crate::xlsb::cells_reader::XlsbCellsReader::new(
+        let mut cells_reader = crate::xlsb::cells_reader::CellsReader::new(
             iter,
             shared_strings,
             &formula_context,

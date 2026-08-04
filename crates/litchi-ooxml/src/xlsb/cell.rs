@@ -6,7 +6,7 @@ use crate::xlsb::formula::{
 };
 use crate::xlsb::records::CellRecord;
 use crate::xlsb::shared_strings::SharedString;
-use litchi_core::sheet::{Cell, CellValue};
+use litchi_core::sheet::{Cell as SheetCell, CellValue};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,7 +20,7 @@ pub(crate) struct CellHeader {
 ///
 /// Dynamically sized values precede compact coordinate and flag metadata.
 #[derive(Debug, Clone)]
-pub struct XlsbCell {
+pub struct Cell {
     /// Cell value (largest field, aligned first)
     value: CellValue,
     /// Row index (0-based)
@@ -43,10 +43,10 @@ pub struct XlsbCell {
     formula_flags: u16,
 }
 
-impl XlsbCell {
+impl Cell {
     /// Create a new XLSB cell
     pub fn new(row: u32, col: u32, value: CellValue) -> Self {
-        XlsbCell {
+        Cell {
             row,
             col,
             style_id: 0,
@@ -62,7 +62,7 @@ impl XlsbCell {
 
     /// Create a new XLSB cell from a formula
     pub fn new_formula(row: u32, col: u32, value: CellValue) -> Self {
-        XlsbCell {
+        Cell {
             row,
             col,
             style_id: 0,
@@ -295,7 +295,7 @@ impl XlsbCell {
             },
         };
 
-        Some(XlsbCell {
+        Some(Cell {
             row: record.row,
             col: record.col as u32,
             style_id: 0,
@@ -352,7 +352,7 @@ impl XlsbCell {
     }
 }
 
-impl Cell for XlsbCell {
+impl SheetCell for Cell {
     fn row(&self) -> u32 {
         self.row
     }

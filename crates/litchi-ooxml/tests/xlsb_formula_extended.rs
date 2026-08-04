@@ -1,6 +1,6 @@
 use litchi_ooxml::xlsb::formula::{
-    FormulaExternalTableReference, FormulaParser, FormulaTableColumns, FormulaTableDataType,
-    FormulaTableNamedColumns, FormulaTableReference, FormulaTableRowType, FormulaToken,
+    ExternalTableReference, FormulaParser, TableColumns, TableDataType, TableNamedColumns,
+    TableReference, TableRowType, Token,
 };
 
 fn utf16(value: &str) -> Vec<u8> {
@@ -14,13 +14,13 @@ fn parses_resident_and_nonresident_ptg_list() {
     ];
     assert_eq!(
         FormulaParser::new(&resident).parse().unwrap(),
-        vec![FormulaToken::TableReference(FormulaTableReference {
+        vec![Token::TableReference(TableReference {
             sheet_index: 2,
-            row_type: Some(FormulaTableRowType::DataAndHeaders),
-            columns: Some(FormulaTableColumns::Range { first: 1, last: 3 }),
+            row_type: Some(TableRowType::DataAndHeaders),
+            columns: Some(TableColumns::Range { first: 1, last: 3 }),
             square_bracket_space: false,
             comma_space: false,
-            data_type: FormulaTableDataType::Reference,
+            data_type: TableDataType::Reference,
             invalid: false,
             list_index: Some(7),
             external: None,
@@ -40,19 +40,19 @@ fn parses_resident_and_nonresident_ptg_list() {
     let parsed = FormulaParser::with_extra(&token, &extra).parse().unwrap();
     assert_eq!(
         parsed,
-        vec![FormulaToken::TableReference(FormulaTableReference {
+        vec![Token::TableReference(TableReference {
             sheet_index: 4,
             row_type: None,
             columns: None,
             square_bracket_space: false,
             comma_space: false,
-            data_type: FormulaTableDataType::Reference,
+            data_type: TableDataType::Reference,
             invalid: false,
             list_index: None,
-            external: Some(FormulaExternalTableReference {
+            external: Some(ExternalTableReference {
                 table: "Sales".into(),
-                row_type: FormulaTableRowType::DataAndHeaders,
-                columns: FormulaTableNamedColumns::Range {
+                row_type: TableRowType::DataAndHeaders,
+                columns: TableNamedColumns::Range {
                     first: "From".into(),
                     last: "To".into()
                 },
@@ -74,9 +74,9 @@ fn parses_ptg_sx_name_and_rejects_reserved_extended_fields() {
         FormulaParser::new(&[0x18, 0x1D, 5, 0, 0, 0])
             .parse()
             .unwrap(),
-        vec![FormulaToken::PivotName(5)]
+        vec![Token::PivotName(5)]
     );
-    let pivot = FormulaToken::PivotName(5);
+    let pivot = Token::PivotName(5);
     let (token, extra) = pivot.to_extended_binary().unwrap();
     assert!(extra.is_empty());
     assert_eq!(FormulaParser::new(&token).parse().unwrap(), vec![pivot]);

@@ -13,7 +13,7 @@
 //! verifiers, and hash data are stored verbatim and are never dereferenced,
 //! verified, or executed.
 
-use crate::xlsb::worksheet::XlsbStrongProtection;
+use crate::xlsb::worksheet::StrongProtection;
 
 /// Visibility state of a chart sheet, from `BrtBundleSh hsState`
 /// (MS-XLSB 2.4.718).
@@ -148,7 +148,7 @@ pub struct XlsbChartSheet {
     /// Classic chart sheet protection, when present.
     pub protection: Option<XlsbChartSheetProtection>,
     /// ISO strong password data from `BrtCsProtectionIso`, when present.
-    pub strong_protection: Option<XlsbStrongProtection>,
+    pub strong_protection: Option<StrongProtection>,
     /// Page layout and printing settings, when present.
     pub page_setup: Option<XlsbChartSheetPageSetup>,
     /// Relationship identifier of the Drawings part from `BrtDrawing`
