@@ -177,25 +177,23 @@ impl<'a> DocumentPart<'a> {
     /// # Performance
     ///
     /// Uses one-pass, namespace-aware zero-copy parsing.
-    pub fn elements(&self) -> Result<Vec<crate::docx::DocxElement>> {
-        use crate::docx::DocxElement;
+    pub fn elements(&self) -> Result<Vec<crate::docx::Element>> {
+        use crate::docx::Element;
 
         Ok(self
             .blocks()?
             .into_iter()
             .filter_map(|block| match block {
-                crate::docx::DocumentBlock::Paragraph(paragraph) => {
-                    Some(DocxElement::Paragraph(paragraph))
-                },
-                crate::docx::DocumentBlock::Table(table) => Some(DocxElement::Table(table)),
-                crate::docx::DocumentBlock::Alt(_) => None,
+                crate::docx::Block::Paragraph(paragraph) => Some(Element::Paragraph(paragraph)),
+                crate::docx::Block::Table(table) => Some(Element::Table(table)),
+                crate::docx::Block::Alt(_) => None,
             })
             .collect())
     }
 
     /// Get paragraphs, tables, and alternative-format anchors in document order.
-    pub fn blocks(&self) -> Result<Vec<crate::docx::DocumentBlock>> {
-        use crate::docx::DocumentBlock;
+    pub fn blocks(&self) -> Result<Vec<crate::docx::Block>> {
+        use crate::docx::Block;
 
         let source = self.get_raw_arc();
         let mut alts = scan(source.as_slice())?;
@@ -203,20 +201,20 @@ impl<'a> DocumentPart<'a> {
         for (target, start, length) in active_block_ranges(source.as_slice())? {
             let block_source = Arc::clone(&source);
             elements.push(if target == 0 {
-                DocumentBlock::Paragraph(Box::new(Paragraph::from_arc_range(
+                Block::Paragraph(Box::new(Paragraph::from_arc_range(
                     block_source,
                     start,
                     length,
                 )))
             } else if target == 1 {
-                DocumentBlock::Table(Box::new(Table::from_arc_range(block_source, start, length)))
+                Block::Table(Box::new(Table::from_arc_range(block_source, start, length)))
             } else {
                 let chunk = alts.remove(&start).ok_or_else(|| {
                     crate::error::OoxmlError::InvalidFormat(
                         "ordered altChunk lacks parsed anchor metadata".into(),
                     )
                 })?;
-                DocumentBlock::Alt(Box::new(chunk))
+                Block::Alt(Box::new(chunk))
             });
         }
         Ok(elements)
@@ -228,10 +226,8 @@ impl<'a> DocumentPart<'a> {
             .blocks()?
             .into_iter()
             .filter_map(|block| match block {
-                crate::docx::DocumentBlock::Alt(chunk) => Some(*chunk),
-                crate::docx::DocumentBlock::Paragraph(_) | crate::docx::DocumentBlock::Table(_) => {
-                    None
-                },
+                crate::docx::Block::Alt(chunk) => Some(*chunk),
+                crate::docx::Block::Paragraph(_) | crate::docx::Block::Table(_) => None,
             })
             .collect())
     }
@@ -240,7 +236,7 @@ impl<'a> DocumentPart<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::docx::DocxElement;
+    use crate::docx::Element;
     use litchi_opc::packuri::PackURI;
     use litchi_opc::part::BlobPart;
 
@@ -282,10 +278,10 @@ mod tests {
 
         let elements = document.elements().unwrap();
         assert_eq!(elements.len(), 4);
-        assert!(matches!(elements[0], DocxElement::Paragraph(_)));
-        assert!(matches!(elements[1], DocxElement::Table(_)));
-        assert!(matches!(elements[2], DocxElement::Paragraph(_)));
-        assert!(matches!(elements[3], DocxElement::Paragraph(_)));
+        assert!(matches!(elements[0], Element::Paragraph(_)));
+        assert!(matches!(elements[1], Element::Table(_)));
+        assert!(matches!(elements[2], Element::Paragraph(_)));
+        assert!(matches!(elements[3], Element::Paragraph(_)));
     }
 
     #[test]
