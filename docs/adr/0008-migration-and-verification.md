@@ -3648,6 +3648,37 @@ reopened-package regression covering the public statistics snapshot. This is
 functional and boundary evidence only; native Office and performance evidence
 remain governed by the evidence levels below.
 
+## Spreadsheet views, legacy comments, and hyperlink owner follow-up
+
+The next concrete-crate migration batch closes four format-specific semantic
+and codec seams while retaining compatibility paths in the OOXML host:
+
+- SpreadsheetML worksheet-view parsing now lives in `litchi-xlsx::sheet_view`.
+  The owner validates A1 cell and range references locally, models panes,
+  selections, pivot selections, and retained extensions, and owns the bounded
+  MCE-aware codec. `litchi-ooxml::xlsx::sheet_view` remains a thin adapter.
+- PresentationML legacy comment values, XML codecs, and package-graph CRUD now
+  live in `litchi-pptx::comments`. Presentation traversal and historical host
+  paths remain adapters, with typed PPTX errors crossing the boundary.
+- WordprocessingML hyperlink values and paragraph/document extraction now live
+  in `litchi-docx::hyperlink`. Relationship resolution remains an explicit
+  host-provided input, and the host document and paragraph APIs preserve their
+  historical return types and paths.
+- The XLSB `BrtHLink` range codec now lives in `litchi-xlsb::hyperlinks`, using
+  the validated BIFF12 cursor and writer. Worksheet relationship creation and
+  package orchestration remain in `litchi-ooxml`, while the host writer uses the
+  fallible owner serialization path.
+
+These migrations were checked against the corresponding checked-in
+`[MS-XLSX]` worksheet-view, `[MS-PPTX]` legacy-comment, `[MS-OE376]`/
+`[MS-DOCX]` hyperlink, and `[MS-XLSB]` section 2.4.693 specifications. The
+owner crates pass 17 XLSB, 285 XLSX, 115 PPTX, and 136 DOCX unit tests, strict
+all-features Clippy, and workspace formatting and boundary checks. The full
+`litchi-ooxml` package suite passes, including 1,844 host unit tests and its
+integration and doctest surfaces. This is functional and boundary evidence;
+native Office and performance evidence remain governed by the evidence levels
+below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
