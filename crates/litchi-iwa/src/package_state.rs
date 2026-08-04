@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::{Arc, Condvar, Mutex};
 
-use crate::archive::Archive;
+use crate::archive::{Archive, ArchiveLimits};
 use crate::{Error, Result};
 
 type SharedArchiveResult = std::result::Result<Arc<Archive>, Arc<Error>>;
@@ -83,6 +83,7 @@ enum ArchiveLookup {
 pub(crate) struct PackageState {
     pub(crate) entries: Vec<(String, Vec<u8>)>,
     positions: HashMap<String, usize>,
+    archive_limits: ArchiveLimits,
     parsed_archive: Mutex<ArchiveCache>,
 }
 
@@ -97,6 +98,7 @@ impl Clone for PackageState {
         Self {
             entries: self.entries.clone(),
             positions: self.positions.clone(),
+            archive_limits: self.archive_limits,
             // Never carry active flights into a copy-on-write generation. A
             // flight is tied to the exact immutable entry bytes in its source
             // state; the detached state must be able to parse independently.
@@ -109,10 +111,14 @@ impl Clone for PackageState {
 }
 
 impl PackageState {
-    pub(crate) fn from_entries(entries: Vec<(String, Vec<u8>)>) -> Self {
+    pub(crate) fn from_entries(
+        entries: Vec<(String, Vec<u8>)>,
+        archive_limits: ArchiveLimits,
+    ) -> Self {
         let mut state = Self {
             entries,
             positions: HashMap::new(),
+            archive_limits,
             parsed_archive: Mutex::new(ArchiveCache::default()),
         };
         state.rebuild_positions();
@@ -137,7 +143,7 @@ impl PackageState {
     /// decompression or protobuf parsing.
     pub(crate) fn get_or_parse_archive<F>(&self, name: &str, parse: F) -> Result<Arc<Archive>>
     where
-        F: FnOnce() -> Result<Archive>,
+        F: FnOnce(ArchiveLimits) -> Result<Archive>,
     {
         let lookup = self.lookup_archive(name);
         let flight = match lookup {
@@ -148,7 +154,7 @@ impl PackageState {
             ArchiveLookup::Parse(flight) => flight,
         };
 
-        let parsed = match panic::catch_unwind(AssertUnwindSafe(parse)) {
+        let parsed = match panic::catch_unwind(AssertUnwindSafe(|| parse(self.archive_limits))) {
             Ok(result) => result.map(Arc::new),
             Err(payload) => {
                 self.publish_archive(

@@ -14,9 +14,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use plist::Value;
-use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
+use soapberry_zip::office::{ArchiveLimits as ZipArchiveLimits, ArchiveReader};
 
-use crate::archive::{Archive, ArchiveObject};
+use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::zip_utils::parse_iwa_files_from_archive_with_limits;
 use crate::{Error, Result};
@@ -39,6 +39,7 @@ pub struct BundleLimits {
     max_entry_bytes: u64,
     max_total_bytes: u64,
     max_iwa_stream_bytes: usize,
+    iwa_archive_limits: IwaArchiveLimits,
 }
 
 impl BundleLimits {
@@ -108,6 +109,7 @@ impl BundleLimits {
             max_entry_bytes,
             max_total_bytes,
             max_iwa_stream_bytes,
+            iwa_archive_limits: IwaArchiveLimits::default(),
         })
     }
 
@@ -136,19 +138,39 @@ impl BundleLimits {
         self.max_iwa_stream_bytes
     }
 
-    pub(crate) fn archive_limits(self) -> ArchiveLimits {
-        ArchiveLimits {
+    /// Resource budget retained for one IWA archive parse.
+    pub const fn archive_limits(self) -> IwaArchiveLimits {
+        self.iwa_archive_limits
+    }
+
+    pub(crate) fn zip_archive_limits(self) -> ZipArchiveLimits {
+        ZipArchiveLimits {
             max_files: self.max_entries,
             max_entry_size: self.max_entry_bytes,
             max_total_size: self.max_total_bytes,
         }
     }
 
-    pub(crate) fn snappy_limits(self) -> Result<SnappyLimits> {
-        SnappyLimits::new(
+    /// Set the checked resource budget applied to every parsed IWA archive in
+    /// this bundle, including archives inside a nested `Index.zip`.
+    pub fn with_archive_limits(mut self, limits: IwaArchiveLimits) -> Result<Self> {
+        limits.with_archive_bytes(limits.max_archive_bytes())?;
+        self.iwa_archive_limits = limits;
+        Ok(self)
+    }
+
+    pub(crate) fn effective_archive_limits(self) -> Result<IwaArchiveLimits> {
+        self.iwa_archive_limits.with_archive_bytes(
             self.max_iwa_stream_bytes
-                .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
-            self.max_iwa_stream_bytes,
+                .min(self.iwa_archive_limits.max_archive_bytes()),
+        )
+    }
+
+    pub(crate) fn snappy_limits(self) -> Result<SnappyLimits> {
+        let max_stream_bytes = self.effective_archive_limits()?.max_archive_bytes();
+        SnappyLimits::new(
+            max_stream_bytes.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
+            max_stream_bytes,
         )
     }
 
@@ -171,6 +193,7 @@ impl Default for BundleLimits {
             max_entry_bytes: Self::MAX_ENTRY_BYTES,
             max_total_bytes: Self::MAX_TOTAL_BYTES,
             max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
+            iwa_archive_limits: IwaArchiveLimits::default(),
         }
     }
 }
@@ -491,7 +514,7 @@ impl Bundle {
         limits.check_input_size(input_size, "iWork bundle input")?;
 
         // Parse IWA files from the ZIP archive
-        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
+        let archive = ArchiveReader::new_with_limits(bytes, limits.zip_archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive: {}", e)))?;
         let archives = parse_iwa_files_from_archive_with_limits(&archive, limits)?;
 
@@ -645,7 +668,7 @@ impl Bundle {
         let index_zip_path = bundle_path.join("Index.zip");
         let data = read_bounded_file(&index_zip_path, limits, "iWork Index.zip")?;
 
-        let archive = ArchiveReader::new_with_limits(&data, limits.archive_limits())
+        let archive = ArchiveReader::new_with_limits(&data, limits.zip_archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
 
         parse_iwa_files_from_archive_with_limits(&archive, limits)
@@ -658,7 +681,7 @@ impl Bundle {
     ) -> Result<HashMap<String, Archive>> {
         let data = read_bounded_file(bundle_path, limits, "iWork bundle")?;
 
-        let archive = ArchiveReader::new_with_limits(&data, limits.archive_limits())
+        let archive = ArchiveReader::new_with_limits(&data, limits.zip_archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
 
         parse_iwa_files_from_archive_with_limits(&archive, limits)
@@ -666,7 +689,7 @@ impl Bundle {
 
     /// Parse a ZIP archive from raw bytes and extract all IWA files
     fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<HashMap<String, Archive>> {
-        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
+        let archive = ArchiveReader::new_with_limits(bytes, limits.zip_archive_limits())
             .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive from bytes: {}", e)))?;
 
         parse_iwa_files_from_archive_with_limits(&archive, limits)
@@ -1273,7 +1296,7 @@ fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, RawMessage};
     use std::fs;
 
     #[test]
@@ -1398,6 +1421,50 @@ mod tests {
         );
         assert_eq!(metadata.latest_build_version(), Some("7029"));
         assert_eq!(metadata.document_identifier(), None);
+    }
+
+    #[test]
+    fn custom_archive_limits_reach_nested_index_before_materialization() -> crate::Result<()> {
+        let source = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 99,
+                        data: vec![1, 2, 3],
+                    }],
+                )?,
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: 100,
+                        data: vec![4, 5, 6],
+                    }],
+                )?,
+            ],
+        };
+        let compressed = SnappyStream::compress(&source.to_bytes()?)?;
+        let mut index_writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        index_writer
+            .write_stored("Index/Document.iwa", &compressed)
+            .unwrap();
+        let index = index_writer.finish_to_bytes().unwrap();
+        let mut outer_writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        outer_writer
+            .write_stored("legacy.pages/Index.zip", &index)
+            .unwrap();
+        let bytes = outer_writer.finish_to_bytes().unwrap();
+
+        let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
+        let limits = BundleLimits::default().with_archive_limits(archive_limits)?;
+        let error = Bundle::from_archive_bytes_with_limits(&bytes, limits).unwrap_err();
+        assert!(error.to_string().contains("IWA object limit exceeded"));
+
+        let byte_limits = IwaArchiveLimits::default().with_archive_bytes(1)?;
+        let limits = BundleLimits::default().with_archive_limits(byte_limits)?;
+        let error = Bundle::from_archive_bytes_with_limits(&bytes, limits).unwrap_err();
+        assert!(error.to_string().contains("Snappy block expands"));
+        Ok(())
     }
 
     #[test]

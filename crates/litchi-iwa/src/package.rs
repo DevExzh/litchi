@@ -6,10 +6,12 @@ use std::io::Write;
 use std::path::{Component, Path};
 use std::sync::Arc;
 
-use soapberry_zip::office::{ArchiveLimits, ArchiveReader, StreamingArchiveWriter};
+use soapberry_zip::office::{
+    ArchiveLimits as ZipArchiveLimits, ArchiveReader, StreamingArchiveWriter,
+};
 use tempfile::NamedTempFile;
 
-use crate::archive::Archive;
+use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
 use crate::{Error, Result};
@@ -292,6 +294,7 @@ pub struct PackageLimits {
     max_entry_bytes: u64,
     max_total_bytes: u64,
     max_iwa_stream_bytes: usize,
+    iwa_archive_limits: IwaArchiveLimits,
 }
 
 impl PackageLimits {
@@ -332,6 +335,7 @@ impl PackageLimits {
             max_entry_bytes,
             max_total_bytes,
             max_iwa_stream_bytes,
+            iwa_archive_limits: IwaArchiveLimits::default(),
         };
         limits.validate()
     }
@@ -392,6 +396,17 @@ impl PackageLimits {
         self.validate()
     }
 
+    /// Set the checked resource budget applied to every parsed or serialized
+    /// IWA archive in this package.
+    ///
+    /// The effective archive byte ceiling is the lower of this budget and
+    /// [`Self::max_iwa_stream_bytes`], so a caller cannot make decompression
+    /// allocate beyond the package's stream budget.
+    pub fn with_archive_limits(mut self, limits: IwaArchiveLimits) -> Result<Self> {
+        self.iwa_archive_limits = limits;
+        self.validate()
+    }
+
     /// Maximum bytes read from one package path or byte slice.
     pub const fn max_input_bytes(self) -> u64 {
         self.max_input_bytes
@@ -417,19 +432,31 @@ impl PackageLimits {
         self.max_iwa_stream_bytes
     }
 
-    fn archive_limits(self) -> ArchiveLimits {
-        ArchiveLimits {
+    /// Resource budget retained for one IWA archive parse or serialization.
+    pub const fn archive_limits(self) -> IwaArchiveLimits {
+        self.iwa_archive_limits
+    }
+
+    pub(crate) fn zip_archive_limits(self) -> ZipArchiveLimits {
+        ZipArchiveLimits {
             max_files: self.max_entries,
             max_entry_size: self.max_entry_bytes,
             max_total_size: self.max_total_bytes,
         }
     }
 
-    fn snappy_limits(self) -> Result<SnappyLimits> {
-        SnappyLimits::new(
+    pub(crate) fn effective_archive_limits(self) -> Result<IwaArchiveLimits> {
+        self.iwa_archive_limits.with_archive_bytes(
             self.max_iwa_stream_bytes
-                .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
-            self.max_iwa_stream_bytes,
+                .min(self.iwa_archive_limits.max_archive_bytes()),
+        )
+    }
+
+    fn snappy_limits(self) -> Result<SnappyLimits> {
+        let max_stream_bytes = self.effective_archive_limits()?.max_archive_bytes();
+        SnappyLimits::new(
+            max_stream_bytes.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
+            max_stream_bytes,
         )
         .map_err(|error| Error::Snappy(error.to_string()))
     }
@@ -445,10 +472,10 @@ impl PackageLimits {
     }
 
     fn check_iwa_stream_size(self, size: usize) -> Result<()> {
-        if size > self.max_iwa_stream_bytes {
+        let limit = self.effective_archive_limits()?.max_archive_bytes();
+        if size > limit {
             return Err(Error::Snappy(format!(
-                "IWA stream is {size} bytes, exceeding the {} byte limit",
-                self.max_iwa_stream_bytes
+                "IWA stream is {size} bytes, exceeding the {limit} byte limit"
             )));
         }
         Ok(())
@@ -463,6 +490,7 @@ impl Default for PackageLimits {
             max_entry_bytes: Self::MAX_ENTRY_BYTES,
             max_total_bytes: Self::MAX_TOTAL_BYTES,
             max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
+            iwa_archive_limits: IwaArchiveLimits::default(),
         }
     }
 }
@@ -497,7 +525,7 @@ impl IWorkPackage {
             Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
         })?;
         limits.check_input_size(input_size, "iWork package input")?;
-        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
+        let archive = ArchiveReader::new_with_limits(bytes, limits.zip_archive_limits())
             .map_err(|error| Error::Bundle(format!("Failed to open iWork ZIP: {error}")))?;
         if is_encrypted_iwork_archive(&archive) {
             return Err(Error::InvalidFormat(
@@ -527,8 +555,9 @@ impl IWorkPackage {
             })?;
             entries.push((name.to_owned(), data));
         }
+        let archive_limits = limits.effective_archive_limits()?;
         Ok(Self {
-            state: Arc::new(PackageState::from_entries(entries)),
+            state: Arc::new(PackageState::from_entries(entries, archive_limits)),
             limits,
             mutation_revision: 0,
         })
@@ -555,13 +584,12 @@ impl IWorkPackage {
             Error::InvalidFormat("legacy package index length does not fit u64".to_owned())
         })?;
         limits.check_input_size(index_size, "legacy iWork Index.zip")?;
-        let index = ArchiveReader::new_with_limits(&index_data, limits.archive_limits()).map_err(
-            |error| {
+        let index = ArchiveReader::new_with_limits(&index_data, limits.zip_archive_limits())
+            .map_err(|error| {
                 Error::Bundle(format!(
                     "Failed to open legacy package index {index_name}: {error}"
                 ))
-            },
-        )?;
+            })?;
 
         let mut entries = Vec::new();
         let mut seen = HashSet::new();
@@ -598,8 +626,9 @@ impl IWorkPackage {
             })?;
             entries.push((name.to_owned(), data));
         }
+        let archive_limits = limits.effective_archive_limits()?;
         Ok(Self {
-            state: Arc::new(PackageState::from_entries(entries)),
+            state: Arc::new(PackageState::from_entries(entries, archive_limits)),
             limits,
             mutation_revision: 0,
         })
@@ -736,7 +765,8 @@ impl IWorkPackage {
     /// Parse a compressed `.iwa` package member.
     pub fn archive(&self, name: &str) -> Result<Archive> {
         let normalized = normalize_entry_name(name);
-        self.parse_archive(normalized)
+        let limits = self.limits.effective_archive_limits()?;
+        self.parse_archive(normalized, limits)
     }
 
     /// Borrow a parsed `.iwa` package member through a bounded read cache.
@@ -756,10 +786,10 @@ impl IWorkPackage {
     pub(crate) fn parsed_archive(&self, name: &str) -> Result<Arc<Archive>> {
         let normalized = normalize_entry_name(name);
         self.state
-            .get_or_parse_archive(normalized, || self.parse_archive(normalized))
+            .get_or_parse_archive(normalized, |limits| self.parse_archive(normalized, limits))
     }
 
-    fn parse_archive(&self, normalized: &str) -> Result<Archive> {
+    fn parse_archive(&self, normalized: &str, archive_limits: IwaArchiveLimits) -> Result<Archive> {
         if !normalized.ends_with(".iwa") {
             return Err(Error::Bundle(format!(
                 "Package entry {normalized} is not an IWA component"
@@ -777,7 +807,7 @@ impl IWorkPackage {
             &mut std::io::Cursor::new(compressed),
             self.limits.snappy_limits()?,
         )?;
-        Archive::parse(stream.data())
+        Archive::parse_with_limits(stream.data(), archive_limits)
     }
 
     /// Serialize and replace a parsed `.iwa` package member.
@@ -789,7 +819,7 @@ impl IWorkPackage {
                 "Package entry {normalized} is not an IWA component"
             )));
         }
-        let data = archive.to_bytes()?;
+        let data = archive.to_bytes_with_limits(self.limits.effective_archive_limits()?)?;
         self.limits.check_iwa_stream_size(data.len())?;
         let compressed = SnappyStream::compress(&data)?;
         self.insert_entry(normalized, compressed)
@@ -818,7 +848,7 @@ impl IWorkPackage {
         let position = self
             .entry_position(before)
             .ok_or_else(|| Error::Bundle(format!("IWA insertion anchor not found: {before}")))?;
-        let data = archive.to_bytes()?;
+        let data = archive.to_bytes_with_limits(self.limits.effective_archive_limits()?)?;
         self.limits.check_iwa_stream_size(data.len())?;
         let compressed = SnappyStream::compress(&data)?;
         self.validate_entry_update(None, &compressed)?;
@@ -837,7 +867,7 @@ impl IWorkPackage {
     {
         let mut archive = self.archive(name)?;
         update(&mut archive)?;
-        archive.validate()?;
+        archive.validate_with_limits(self.limits.effective_archive_limits()?)?;
         self.replace_archive(name, &archive)?;
         Ok(())
     }
@@ -1244,6 +1274,21 @@ mod tests {
         }
     }
 
+    fn archive_with_two_objects() -> Archive {
+        let mut archive = archive();
+        archive.objects.push(
+            ArchiveObject::new(
+                2,
+                vec![RawMessage {
+                    type_: 100,
+                    data: vec![4, 5, 6],
+                }],
+            )
+            .unwrap(),
+        );
+        archive
+    }
+
     fn legacy_package() -> Vec<u8> {
         let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
         let mut index = StreamingArchiveWriter::new();
@@ -1360,12 +1405,37 @@ mod tests {
         let error = package
             .replace_archive("Index/Other.iwa", &archive())
             .unwrap_err();
-        assert!(error.to_string().contains("IWA stream is"));
+        assert!(error.to_string().contains("IWA header byte"));
 
         let file = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(file.path(), &bytes).unwrap();
         let error = IWorkPackage::open_with_limits(file.path(), input_limits).unwrap_err();
         assert!(error.to_string().contains("iWork package input"));
+    }
+
+    #[test]
+    fn custom_archive_limits_reach_lazy_parse_before_payload_allocation() -> crate::Result<()> {
+        let source = archive_with_two_objects();
+        let decompressed = source.to_bytes()?;
+        let compressed = SnappyStream::compress(&decompressed)?;
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("Index/Document.iwa", &compressed)
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
+        let package_limits = PackageLimits::default().with_archive_limits(archive_limits)?;
+        let package = IWorkPackage::from_bytes_with_limits(&bytes, package_limits)?;
+        let error = package.archive("Index/Document.iwa").unwrap_err();
+        assert!(error.to_string().contains("IWA object limit exceeded"));
+
+        let byte_limits = IwaArchiveLimits::default().with_archive_bytes(1)?;
+        let package_limits = PackageLimits::default().with_archive_limits(byte_limits)?;
+        let package = IWorkPackage::from_bytes_with_limits(&bytes, package_limits)?;
+        let error = package.archive("Index/Document.iwa").unwrap_err();
+        assert!(error.to_string().contains("Snappy block expands"));
+        Ok(())
     }
 
     #[test]
@@ -1543,7 +1613,7 @@ mod tests {
                 let parse_count = Arc::clone(&parse_count);
                 thread::spawn(move || {
                     ready.wait();
-                    state.get_or_parse_archive("Index/Document.iwa", || {
+                    state.get_or_parse_archive("Index/Document.iwa", |_| {
                         if parse_count.fetch_add(1, Ordering::SeqCst) == 0 {
                             first_parse_started.wait();
                         }
@@ -1579,7 +1649,7 @@ mod tests {
                 let parse_count = Arc::clone(&parse_count);
                 thread::spawn(move || {
                     ready.wait();
-                    state.get_or_parse_archive("Index/Document.iwa", || {
+                    state.get_or_parse_archive("Index/Document.iwa", |_| {
                         if parse_count.fetch_add(1, Ordering::SeqCst) == 0 {
                             first_parse_started.wait();
                         }
@@ -1598,7 +1668,7 @@ mod tests {
 
         let retry_count = AtomicUsize::new(0);
         let retry = state
-            .get_or_parse_archive("Index/Document.iwa", || {
+            .get_or_parse_archive("Index/Document.iwa", |_| {
                 retry_count.fetch_add(1, Ordering::SeqCst);
                 Ok(archive())
             })

@@ -73,12 +73,13 @@ pub fn parse_iwa_files_from_archive_with_limits(
         Error::InvalidFormat("legacy iWork package index length does not fit u64".to_owned())
     })?;
     limits.check_input_size(index_size, "legacy iWork Index.zip")?;
-    let index =
-        ArchiveReader::new_with_limits(&index_data, limits.archive_limits()).map_err(|error| {
+    let index = ArchiveReader::new_with_limits(&index_data, limits.zip_archive_limits()).map_err(
+        |error| {
             Error::Bundle(format!(
                 "Failed to open legacy package index {index_name}: {error}"
             ))
-        })?;
+        },
+    )?;
     let archives = parse_direct_iwa_files(&index, limits)?;
     if archives.is_empty() {
         return Err(Error::InvalidFormat(format!(
@@ -117,7 +118,10 @@ fn parse_direct_iwa_files(
                 SnappyStream::decompress_with_limits(&mut cursor, limits.snappy_limits()?)?;
 
             // Parse archive
-            let iwa_archive = Archive::parse(decompressed.data())?;
+            let iwa_archive = Archive::parse_with_limits(
+                decompressed.data(),
+                limits.effective_archive_limits()?,
+            )?;
             archives.insert(name.to_string(), iwa_archive);
         }
     }
