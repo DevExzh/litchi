@@ -1,11 +1,6 @@
 //! XLSB cells reader implementation
 
 use crate::xlsb::cell::{CellHeader, XlsbCell};
-use crate::xlsb::conditional_formatting::{
-    CfRuleType, Cfvo, ColorScale, ConditionalFormatColor, ConditionalFormatIcon,
-    ConditionalFormatting, ConditionalFormattingRecordKind, ConditionalFormattingRule, DataBar,
-    DataBar14, IconSet, IconSet14, icon_count14, parse_classic_header, parse_rule_extension_guid,
-};
 use crate::xlsb::data_validation::{
     DataValidation, DataValidationSettings, parse_collection_settings, parse_dval_list,
 };
@@ -23,6 +18,10 @@ use crate::xlsb::worksheet::{
 };
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
+use litchi_xlsb::conditional_formatting::{
+    AxisPosition14, Bar, Bar14, Color, Formatting, Icon, IconSet, IconSet14, RecordKind, Rule,
+    RuleType, Scale, Value, icon_count14, parse_classic_header, parse_rule_extension_guid,
+};
 use litchi_xlsb::raw::{Cursor, kind};
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
@@ -36,11 +35,11 @@ struct ParsedFormulaCell {
 }
 
 fn build_color_scale(
-    cfvos: Vec<Cfvo>,
-    colors: Vec<ConditionalFormatColor>,
+    cfvos: Vec<Value>,
+    colors: Vec<Color>,
     record: &'static str,
     extension14: bool,
-) -> XlsbResult<ColorScale> {
+) -> XlsbResult<Scale> {
     if !(cfvos.len() == 2 || cfvos.len() == 3) || colors.len() != cfvos.len() {
         return Err(XlsbError::Unrecognized {
             typ: record.to_string(),
@@ -66,7 +65,7 @@ fn build_color_scale(
     let min_color_record = colors.next().expect("validated color count");
     let mid_color_record = if has_middle { colors.next() } else { None };
     let max_color_record = colors.next().expect("validated color count");
-    Ok(ColorScale {
+    Ok(Scale {
         min_cfvo,
         mid_cfvo: middle_cfvo,
         max_cfvo,
@@ -131,7 +130,7 @@ where
     /// UI settings from the Office 2013 validation collection.
     pub data_validation14_settings: Option<DataValidationSettings>,
     /// Classic and Office 2013 conditional-formatting blocks in stream order.
-    pub conditional_formattings: Vec<ConditionalFormatting>,
+    pub conditional_formattings: Vec<Formatting>,
     /// Inert Office Add-in bindings from the worksheet WEBEXTENSIONS collection.
     pub web_extension_bindings: Vec<XlsbWebExtensionBinding>,
     /// Sheet views from the worksheet WSVIEWS collection.
@@ -902,7 +901,7 @@ where
                 },
                 kind::BEGIN_COND_FORMATTING14 => {
                     let (mut formatting, count, base) =
-                        ConditionalFormatting::parse_extension14_header_with_base(&self.buf)?;
+                        Formatting::parse_extension14_header_with_base(&self.buf)?;
                     self.consume_extension_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
@@ -989,7 +988,7 @@ where
     fn resolve_conditional_formatting_links(&mut self) -> XlsbResult<()> {
         let mut classic = HashMap::new();
         for formatting in &self.conditional_formattings {
-            if formatting.record_kind != ConditionalFormattingRecordKind::Classic {
+            if formatting.record_kind != RecordKind::Classic {
                 continue;
             }
             for rule in &formatting.rules {
@@ -1017,7 +1016,7 @@ where
 
         let mut matched = HashSet::new();
         for formatting in &mut self.conditional_formattings {
-            if formatting.record_kind != ConditionalFormattingRecordKind::Extension14 {
+            if formatting.record_kind != RecordKind::Extension14 {
                 continue;
             }
             for rule in &mut formatting.rules {
@@ -1168,7 +1167,7 @@ where
 
     fn consume_conditional_formatting(
         &mut self,
-        formatting: &mut ConditionalFormatting,
+        formatting: &mut Formatting,
         expected_count: u32,
         base: (u32, u32),
     ) -> XlsbResult<()> {
@@ -1178,11 +1177,7 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::BEGIN_CF_RULE => {
-                    let mut rule = ConditionalFormattingRule::parse_with_context(
-                        &self.buf,
-                        base,
-                        self.formula_context,
-                    )?;
+                    let mut rule = Rule::parse_with_context(&self.buf, base, self.formula_context)?;
                     if formatting
                         .rules
                         .iter()
@@ -1228,7 +1223,7 @@ where
 
     fn consume_extension_conditional_formatting(
         &mut self,
-        formatting: &mut ConditionalFormatting,
+        formatting: &mut Formatting,
         expected_count: u32,
         base: (u32, u32),
     ) -> XlsbResult<()> {
@@ -1238,7 +1233,7 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::BEGIN_CF_RULE14 => {
-                    let mut rule = ConditionalFormattingRule::parse_extension14_with_context(
+                    let mut rule = Rule::parse_extension14_with_context(
                         &self.buf,
                         base,
                         self.formula_context,
@@ -1294,7 +1289,7 @@ where
 
     fn consume_extension_conditional_rule(
         &mut self,
-        rule: &mut ConditionalFormattingRule,
+        rule: &mut Rule,
         base: (u32, u32),
     ) -> XlsbResult<()> {
         loop {
@@ -1354,17 +1349,17 @@ where
             }
         }
         let valid_visual = match rule.rule_type {
-            CfRuleType::ColorScale => {
+            RuleType::ColorScale => {
                 rule.color_scale14.is_some()
                     && rule.data_bar14.is_none()
                     && rule.icon_set14.is_none()
             },
-            CfRuleType::DataBar => {
+            RuleType::DataBar => {
                 rule.color_scale14.is_none()
                     && rule.data_bar14.is_some()
                     && rule.icon_set14.is_none()
             },
-            CfRuleType::IconSet => {
+            RuleType::IconSet => {
                 rule.color_scale14.is_none()
                     && rule.data_bar14.is_none()
                     && rule.icon_set14.is_some()
@@ -1384,11 +1379,7 @@ where
         Ok(())
     }
 
-    fn consume_conditional_rule(
-        &mut self,
-        rule: &mut ConditionalFormattingRule,
-        base: (u32, u32),
-    ) -> XlsbResult<()> {
+    fn consume_conditional_rule(&mut self, rule: &mut Rule, base: (u32, u32)) -> XlsbResult<()> {
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
@@ -1450,13 +1441,13 @@ where
             }
         }
         let valid_visual = match rule.rule_type {
-            crate::xlsb::conditional_formatting::CfRuleType::ColorScale => {
+            RuleType::ColorScale => {
                 rule.color_scale.is_some() && rule.data_bar.is_none() && rule.icon_set.is_none()
             },
-            crate::xlsb::conditional_formatting::CfRuleType::DataBar => {
+            RuleType::DataBar => {
                 rule.color_scale.is_none() && rule.data_bar.is_some() && rule.icon_set.is_none()
             },
-            crate::xlsb::conditional_formatting::CfRuleType::IconSet => {
+            RuleType::IconSet => {
                 rule.color_scale.is_none() && rule.data_bar.is_none() && rule.icon_set.is_some()
             },
             _ => rule.color_scale.is_none() && rule.data_bar.is_none() && rule.icon_set.is_none(),
@@ -1470,7 +1461,7 @@ where
         Ok(())
     }
 
-    fn consume_color_scale(&mut self, base: (u32, u32)) -> XlsbResult<ColorScale> {
+    fn consume_color_scale(&mut self, base: (u32, u32)) -> XlsbResult<Scale> {
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
         loop {
@@ -1478,12 +1469,12 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO if colors.is_empty() => cfvos.push(Cfvo::parse_with_context(
+                kind::CFVO if colors.is_empty() => cfvos.push(Value::parse_with_context(
                     &self.buf,
                     base,
                     self.formula_context,
                 )?),
-                kind::COLOR => colors.push(ConditionalFormatColor::parse(&self.buf)?),
+                kind::COLOR => colors.push(Color::parse(&self.buf)?),
                 kind::END_COLOR_SCALE if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
@@ -1529,7 +1520,7 @@ where
             typ: "BrtBeginColorScale collection".to_string(),
             val: "missing maximum color".to_string(),
         })?;
-        Ok(ColorScale {
+        Ok(Scale {
             min_cfvo,
             mid_cfvo: middle_cfvo,
             max_cfvo,
@@ -1542,7 +1533,7 @@ where
         })
     }
 
-    fn consume_color_scale14(&mut self, base: (u32, u32)) -> XlsbResult<ColorScale> {
+    fn consume_color_scale14(&mut self, base: (u32, u32)) -> XlsbResult<Scale> {
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
         loop {
@@ -1551,9 +1542,9 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::CFVO14 if colors.is_empty() => cfvos.push(
-                    Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
+                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
                 ),
-                kind::COLOR14 => colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?),
+                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
                 kind::END_COLOR_SCALE14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
@@ -1566,7 +1557,7 @@ where
         build_color_scale(cfvos, colors, "BrtBeginColorScale14 collection", true)
     }
 
-    fn consume_data_bar(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<DataBar> {
+    fn consume_data_bar(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<Bar> {
         if begin.len() != 3 || begin[0] > begin[1] || begin[1] > 100 || begin[2] > 1 {
             return Err(XlsbError::Unrecognized {
                 typ: "BrtBeginDatabar".to_string(),
@@ -1580,14 +1571,12 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO if color.is_none() => cfvos.push(Cfvo::parse_with_context(
+                kind::CFVO if color.is_none() => cfvos.push(Value::parse_with_context(
                     &self.buf,
                     base,
                     self.formula_context,
                 )?),
-                kind::COLOR if color.is_none() => {
-                    color = Some(ConditionalFormatColor::parse(&self.buf)?)
-                },
+                kind::COLOR if color.is_none() => color = Some(Color::parse(&self.buf)?),
                 kind::END_DATABAR if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
@@ -1609,7 +1598,7 @@ where
                 val: "invalid minimum/maximum threshold type".to_string(),
             });
         }
-        let [min_cfvo, max_cfvo]: [Cfvo; 2] =
+        let [min_cfvo, max_cfvo]: [Value; 2] =
             cfvos.try_into().map_err(|_| XlsbError::Unrecognized {
                 typ: "BrtBeginDatabar collection".to_string(),
                 val: "invalid threshold count".to_string(),
@@ -1618,7 +1607,7 @@ where
             typ: "BrtBeginDatabar collection".to_string(),
             val: "missing color".to_string(),
         })?;
-        Ok(DataBar {
+        Ok(Bar {
             min_cfvo,
             max_cfvo,
             color: color_record.argb.unwrap_or(0),
@@ -1634,8 +1623,8 @@ where
         begin: &[u8],
         base: (u32, u32),
         priority: i32,
-    ) -> XlsbResult<DataBar14> {
-        let header = DataBar14::parse_header(begin)?;
+    ) -> XlsbResult<Bar14> {
+        let header = Bar14::parse_header(begin)?;
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
         loop {
@@ -1644,9 +1633,9 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::CFVO14 if colors.is_empty() => cfvos.push(
-                    Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
+                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
                 ),
-                kind::COLOR14 => colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?),
+                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
                 kind::END_DATABAR14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
@@ -1669,17 +1658,14 @@ where
             + usize::from(header.border)
             + usize::from(header.custom_negative_fill)
             + usize::from(header.custom_negative_border && header.border)
-            + usize::from(
-                header.axis_position
-                    != crate::xlsb::conditional_formatting::DataBarAxisPosition14::None,
-            );
+            + usize::from(header.axis_position != AxisPosition14::None);
         if colors.len() != expected_colors {
             return Err(XlsbError::Unrecognized {
                 typ: "BrtBeginDatabar14 collection".to_string(),
                 val: format!("expected {expected_colors} colors, found {}", colors.len()),
             });
         }
-        let [min_cfvo, max_cfvo]: [Cfvo; 2] = cfvos.try_into().expect("validated two thresholds");
+        let [min_cfvo, max_cfvo]: [Value; 2] = cfvos.try_into().expect("validated two thresholds");
         let mut colors = colors.into_iter();
         let positive_color = (priority != -1).then(|| colors.next()).flatten();
         let border_color = header.border.then(|| colors.next()).flatten();
@@ -1687,11 +1673,10 @@ where
         let negative_border_color = (header.custom_negative_border && header.border)
             .then(|| colors.next())
             .flatten();
-        let axis_color = (header.axis_position
-            != crate::xlsb::conditional_formatting::DataBarAxisPosition14::None)
+        let axis_color = (header.axis_position != AxisPosition14::None)
             .then(|| colors.next())
             .flatten();
-        Ok(DataBar14 {
+        Ok(Bar14 {
             min_cfvo,
             max_cfvo,
             positive_color,
@@ -1740,7 +1725,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO => cfvos.push(Cfvo::parse_with_context(
+                kind::CFVO => cfvos.push(Value::parse_with_context(
                     &self.buf,
                     base,
                     self.formula_context,
@@ -1788,9 +1773,9 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::CFVO14 if icons.is_empty() => cfvos.push(
-                    Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
+                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
                 ),
-                kind::CF_ICON => icons.push(ConditionalFormatIcon::parse(&self.buf)?),
+                kind::CF_ICON => icons.push(Icon::parse(&self.buf)?),
                 kind::END_ICON_SET14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(XlsbError::Unrecognized {
@@ -2092,10 +2077,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::conditional_formatting::{
-        ConditionalFormattingRecordKind, ConditionalFormattingRule14Metadata, DataBarAxisPosition14,
-    };
     use litchi_core::sheet::Cell;
+    use litchi_xlsb::conditional_formatting::{AxisPosition14, RecordKind, RuleMetadata};
     use litchi_xlsb::raw::Writer;
 
     fn rich_string_worksheet() -> Vec<u8> {
@@ -2305,8 +2288,8 @@ mod tests {
 
     #[test]
     fn reads_office_2013_conditional_formatting_visualizations() {
-        fn metadata(priority: i32) -> ConditionalFormattingRule14Metadata {
-            ConditionalFormattingRule14Metadata {
+        fn metadata(priority: i32) -> RuleMetadata {
+            RuleMetadata {
                 priority,
                 unused: priority as u32,
                 guid: [priority as u8; 16],
@@ -2315,36 +2298,33 @@ mod tests {
             }
         }
 
-        let mut color_rule = ConditionalFormattingRule::new(CfRuleType::ColorScale, 1);
+        let mut color_rule = Rule::new(RuleType::ColorScale, 1);
         color_rule.extension14 = Some(metadata(1));
-        let color_thresholds = [Cfvo::new(2, None), Cfvo::new(3, None)];
-        let color_records = [
-            ConditionalFormatColor::from_argb(0xffff_0000),
-            ConditionalFormatColor::from_argb(0xff00_ff00),
-        ];
+        let color_thresholds = [Value::new(2, None), Value::new(3, None)];
+        let color_records = [Color::from_argb(0xffff_0000), Color::from_argb(0xff00_ff00)];
 
-        let mut bar_rule = ConditionalFormattingRule::new(CfRuleType::DataBar, 2);
+        let mut bar_rule = Rule::new(RuleType::DataBar, 2);
         bar_rule.extension14 = Some(metadata(2));
-        let bar = DataBar14::new(
-            Cfvo::new(8, None),
-            Cfvo::new(9, None),
-            ConditionalFormatColor::from_argb(0xff44_72c4),
+        let bar = Bar14::new(
+            Value::new(8, None),
+            Value::new(9, None),
+            Color::from_argb(0xff44_72c4),
         );
 
-        let mut icon_rule = ConditionalFormattingRule::new(CfRuleType::IconSet, 3);
+        let mut icon_rule = Rule::new(RuleType::IconSet, 3);
         icon_rule.extension14 = Some(metadata(3));
         let mut icon_thresholds = vec![
-            Cfvo::new(1, Some("0".to_string())),
-            Cfvo::new(1, Some("33".to_string())),
-            Cfvo::new(1, Some("67".to_string())),
+            Value::new(1, Some("0".to_string())),
+            Value::new(1, Some("33".to_string())),
+            Value::new(1, Some("67".to_string())),
         ];
         for threshold in &mut icon_thresholds {
             threshold.save_greater_than_or_equal = true;
         }
         let icon_set = IconSet14::new(18, icon_thresholds.clone());
 
-        let mut formatting = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
-        formatting.record_kind = ConditionalFormattingRecordKind::Extension14;
+        let mut formatting = Formatting::new(vec!["A1:A10".to_string()]);
+        formatting.record_kind = RecordKind::Extension14;
         formatting.rules = vec![color_rule.clone(), bar_rule.clone(), icon_rule.clone()];
 
         let mut worksheet = Vec::new();
@@ -2430,10 +2410,7 @@ mod tests {
         let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().unwrap().is_none());
         let parsed = &reader.conditional_formattings[0];
-        assert_eq!(
-            parsed.record_kind,
-            ConditionalFormattingRecordKind::Extension14
-        );
+        assert_eq!(parsed.record_kind, RecordKind::Extension14);
         assert_eq!(parsed.rules.len(), 3);
         assert_eq!(
             parsed.rules[0]
@@ -2445,7 +2422,7 @@ mod tests {
             2
         );
         let parsed_bar = parsed.rules[1].data_bar14.as_ref().unwrap();
-        assert_eq!(parsed_bar.axis_position, DataBarAxisPosition14::Automatic);
+        assert_eq!(parsed_bar.axis_position, AxisPosition14::Automatic);
         assert_eq!(parsed_bar.positive_color.unwrap().argb, Some(0xff44_72c4));
         let parsed_icons = parsed.rules[2].icon_set14.as_ref().unwrap();
         assert_eq!(parsed_icons.icon_set_type, 18);

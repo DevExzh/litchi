@@ -3055,7 +3055,7 @@ mod tests {
         let rule = &formatting[0].rules[0];
         assert_eq!(
             rule.rule_type,
-            crate::xlsb::conditional_formatting::CfRuleType::CellIs
+            litchi_xlsb::conditional_formatting::RuleType::CellIs
         );
         assert_eq!(rule.template, 0);
         assert_eq!(rule.dxf_id, Some(0));

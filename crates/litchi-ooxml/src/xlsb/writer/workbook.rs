@@ -1496,17 +1496,16 @@ impl Default for XlsbWorkbookWriter {
 mod tests {
     use super::*;
     use crate::xlsb::comments::Comment;
-    use crate::xlsb::conditional_formatting::{
-        CfRuleType, Cfvo, ColorScale, ConditionalFormatColor, ConditionalFormatting,
-        ConditionalFormattingRecordKind, ConditionalFormattingRule,
-        ConditionalFormattingRule14Metadata, DataBar, DataBar14, IconSet,
-    };
     use crate::xlsb::data_validation::{
         DataValidation, DataValidationRecordKind, DataValidationSettings,
     };
     use crate::xlsb::{SharedStringRun, SheetProtection};
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use litchi_xlsb::calc::{Delta, Mode, Opts, Threads};
+    use litchi_xlsb::conditional_formatting::{
+        Bar, Bar14, Color, Formatting, IconSet, RecordKind, Rule, RuleMetadata, RuleType, Scale,
+        Value,
+    };
     use std::io::Cursor;
 
     #[test]
@@ -2371,38 +2370,38 @@ mod tests {
         let mut workbook = XlsbWorkbookWriter::new();
         let mut sheet = MutableXlsbWorksheet::new("Formatted");
         sheet.set_cell(0, 0, 5);
-        let mut formatting = ConditionalFormatting::new(vec!["A1:A10 C1:C10".to_string()]);
+        let mut formatting = Formatting::new(vec!["A1:A10 C1:C10".to_string()]);
         formatting.pivot_only = true;
 
-        let mut expression = ConditionalFormattingRule::new(CfRuleType::Expression, 1);
+        let mut expression = Rule::new(RuleType::Expression, 1);
         expression.formula_texts.push("Source!A1>0".to_string());
         expression.stop_if_true = true;
         formatting.add_rule(expression);
 
-        let mut scale = ConditionalFormattingRule::new(CfRuleType::ColorScale, 2);
-        scale.color_scale = Some(ColorScale::new(
-            Cfvo::new(2, None),
-            Cfvo::new(7, Some("Source!A1".to_string())),
+        let mut scale = Rule::new(RuleType::ColorScale, 2);
+        scale.color_scale = Some(Scale::new(
+            Value::new(2, None),
+            Value::new(7, Some("Source!A1".to_string())),
             0xffff_0000,
             0xff00_ff00,
         ));
         formatting.add_rule(scale);
 
-        let mut bar = ConditionalFormattingRule::new(CfRuleType::DataBar, 3);
-        bar.data_bar = Some(DataBar::new(
-            Cfvo::new(2, None),
-            Cfvo::new(3, None),
+        let mut bar = Rule::new(RuleType::DataBar, 3);
+        bar.data_bar = Some(Bar::new(
+            Value::new(2, None),
+            Value::new(3, None),
             0xff44_72c4,
         ));
         formatting.add_rule(bar);
 
-        let mut icons = ConditionalFormattingRule::new(CfRuleType::IconSet, 4);
+        let mut icons = Rule::new(RuleType::IconSet, 4);
         icons.icon_set = Some(IconSet::new(
             0,
             vec![
-                Cfvo::new(1, Some("0".to_string())),
-                Cfvo::new(4, Some("33".to_string())),
-                Cfvo::new(4, Some("67".to_string())),
+                Value::new(1, Some("0".to_string())),
+                Value::new(4, Some("33".to_string())),
+                Value::new(4, Some("67".to_string())),
             ],
         ));
         formatting.add_rule(icons);
@@ -2438,24 +2437,20 @@ mod tests {
         let mut workbook = XlsbWorkbookWriter::new();
         let mut sheet = MutableXlsbWorksheet::new("Formatted");
         sheet.set_cell(0, 0, 5);
-        let mut formatting = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
-        formatting.record_kind = ConditionalFormattingRecordKind::Extension14;
+        let mut formatting = Formatting::new(vec!["A1:A10".to_string()]);
+        formatting.record_kind = RecordKind::Extension14;
 
-        let mut rule = ConditionalFormattingRule::new(CfRuleType::DataBar, 1);
-        rule.extension14 = Some(ConditionalFormattingRule14Metadata {
+        let mut rule = Rule::new(RuleType::DataBar, 1);
+        rule.extension14 = Some(RuleMetadata {
             priority: 1,
             unused: 0xCAFE_BABE,
             guid: [0x2a; 16],
             guid_present: true,
             linked_classic_priority: None,
         });
-        let mut maximum = Cfvo::new(7, Some("Source!A1".to_string()));
+        let mut maximum = Value::new(7, Some("Source!A1".to_string()));
         maximum.greater_than_or_equal = false;
-        let mut bar = DataBar14::new(
-            Cfvo::new(8, None),
-            maximum,
-            ConditionalFormatColor::from_argb(0xff44_72c4),
-        );
+        let mut bar = Bar14::new(Value::new(8, None), maximum, Color::from_argb(0xff44_72c4));
         bar.min_length = 4;
         bar.max_length = 96;
         bar.gradient = false;
@@ -2473,10 +2468,7 @@ mod tests {
         let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
         let formatting = &worksheet.conditional_formattings()[0];
-        assert_eq!(
-            formatting.record_kind,
-            ConditionalFormattingRecordKind::Extension14
-        );
+        assert_eq!(formatting.record_kind, RecordKind::Extension14);
         let rule = &formatting.rules[0];
         assert_eq!(rule.extension14.unwrap().unused, 0xCAFE_BABE);
         let bar = rule.data_bar14.as_ref().unwrap();
@@ -2495,37 +2487,37 @@ mod tests {
         let mut sheet = MutableXlsbWorksheet::new("Formatted");
         sheet.set_cell(0, 0, -5);
 
-        let mut classic = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
-        let mut classic_rule = ConditionalFormattingRule::new(CfRuleType::DataBar, 1);
+        let mut classic = Formatting::new(vec!["A1:A10".to_string()]);
+        let mut classic_rule = Rule::new(RuleType::DataBar, 1);
         classic_rule.classic_extension_guid = Some(guid);
-        classic_rule.data_bar = Some(DataBar::new(
-            Cfvo::new(2, None),
-            Cfvo::new(3, None),
+        classic_rule.data_bar = Some(Bar::new(
+            Value::new(2, None),
+            Value::new(3, None),
             0xff44_72c4,
         ));
         classic.add_rule(classic_rule);
         sheet.add_conditional_formatting(classic);
 
-        let mut extension = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
-        extension.record_kind = ConditionalFormattingRecordKind::Extension14;
-        let mut extension_rule = ConditionalFormattingRule::new(CfRuleType::DataBar, 0);
+        let mut extension = Formatting::new(vec!["A1:A10".to_string()]);
+        extension.record_kind = RecordKind::Extension14;
+        let mut extension_rule = Rule::new(RuleType::DataBar, 0);
         extension_rule.template = 0;
-        extension_rule.extension14 = Some(ConditionalFormattingRule14Metadata {
+        extension_rule.extension14 = Some(RuleMetadata {
             priority: -1,
             unused: 0,
             guid,
             guid_present: true,
             linked_classic_priority: Some(1),
         });
-        let mut bar = DataBar14::new(
-            Cfvo::new(8, None),
-            Cfvo::new(9, None),
-            ConditionalFormatColor::from_argb(0xff44_72c4),
+        let mut bar = Bar14::new(
+            Value::new(8, None),
+            Value::new(9, None),
+            Color::from_argb(0xff44_72c4),
         );
         bar.min_length = 0;
         bar.max_length = 100;
         bar.positive_color = None;
-        bar.negative_color = Some(ConditionalFormatColor::from_argb(0xffff_0000));
+        bar.negative_color = Some(Color::from_argb(0xffff_0000));
         bar.custom_negative_fill = true;
         extension_rule.data_bar14 = Some(bar);
         extension.add_rule(extension_rule);

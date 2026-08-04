@@ -160,9 +160,6 @@ pub mod named_ranges;
 /// Data validation support
 pub mod data_validation;
 
-/// Conditional formatting support
-pub mod conditional_formatting;
-
 /// PivotCache definition stream parsing (MS-XLSB 2.1.7.38)
 pub mod pivot;
 

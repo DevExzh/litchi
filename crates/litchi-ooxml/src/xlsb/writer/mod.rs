@@ -57,9 +57,6 @@ pub(crate) mod bin_range;
 /// Data validation writer (BrtBeginDVals / BrtDVal / BrtEndDVals)
 pub(crate) mod data_validation;
 
-/// Conditional formatting writer (BrtBeginCondFormatting / BrtBeginCFRule / …)
-pub(crate) mod conditional_formatting;
-
 // Re-export main types for public API
 pub use crate::xlsb::drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
 pub use crate::xlsb::external_link::{

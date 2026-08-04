@@ -1,7 +1,6 @@
 //! Mutable XLSB worksheet for CRUD operations
 
 use crate::xlsb::comments::Comment;
-use crate::xlsb::conditional_formatting::{Cfvo, ConditionalFormatting, ConditionalFormattingRule};
 use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
@@ -16,6 +15,7 @@ use crate::xlsb::sheet_view::{
 };
 use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use litchi_core::sheet::CellValue;
+use litchi_xlsb::conditional_formatting::{Formatting, Rule, Value};
 use litchi_xlsb::raw::Writer;
 use litchi_xlsb::raw::kind;
 use std::collections::{BTreeMap, HashSet};
@@ -134,7 +134,7 @@ pub struct MutableXlsbWorksheet {
     data_validation_settings: DataValidationSettings,
     data_validation14_settings: DataValidationSettings,
     /// Conditional formatting rules.
-    conditional_formattings: Vec<ConditionalFormatting>,
+    conditional_formattings: Vec<Formatting>,
     /// Inert Office Add-in range bindings.
     web_extension_bindings: Vec<XlsbWebExtensionBinding>,
     /// Array and shared formula definitions. Cell records contain only a
@@ -191,9 +191,9 @@ enum ConditionalValueLocation {
 }
 
 fn conditional_value_mut(
-    rule: &mut ConditionalFormattingRule,
+    rule: &mut Rule,
     location: ConditionalValueLocation,
-) -> Option<&mut Cfvo> {
+) -> Option<&mut Value> {
     match location {
         ConditionalValueLocation::ColorScaleMin => {
             rule.color_scale.as_mut().map(|scale| &mut scale.min_cfvo)
@@ -1390,22 +1390,22 @@ impl MutableXlsbWorksheet {
     ///
     /// ```ignore
     /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
-    /// use litchi_ooxml::xlsb::conditional_formatting::{
-    ///     ConditionalFormatting, ConditionalFormattingRule, CfRuleType,
+    /// use litchi_xlsb::conditional_formatting::{
+    ///     Formatting, Rule, RuleType,
     /// };
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
-    /// let mut cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
-    /// let rule = ConditionalFormattingRule::new(CfRuleType::CellIs, 1);
+    /// let mut cf = Formatting::new(vec!["A1:A10".to_string()]);
+    /// let rule = Rule::new(RuleType::CellIs, 1);
     /// cf.add_rule(rule);
     /// sheet.add_conditional_formatting(cf);
     /// ```
-    pub fn add_conditional_formatting(&mut self, cf: ConditionalFormatting) {
+    pub fn add_conditional_formatting(&mut self, cf: Formatting) {
         self.conditional_formattings.push(cf);
     }
 
     /// Get all conditional formatting blocks.
-    pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
+    pub fn conditional_formattings(&self) -> &[Formatting] {
         &self.conditional_formattings
     }
 
@@ -1616,7 +1616,7 @@ impl MutableXlsbWorksheet {
 
         // Write conditional formatting if present
         if !self.conditional_formattings.is_empty() {
-            crate::xlsb::writer::conditional_formatting::write_conditional_formattings(
+            litchi_xlsb::conditional_formatting::write_conditional_formattings(
                 writer,
                 &self.conditional_formattings,
             )?;
@@ -2512,12 +2512,12 @@ impl MutableXlsbWorksheet {
 mod tests {
     use super::*;
     use crate::xlsb::comments::Comment;
-    use crate::xlsb::conditional_formatting::ConditionalFormatting;
     use crate::xlsb::data_validation::DataValidation;
     use crate::xlsb::hyperlinks::Hyperlink;
     use crate::xlsb::merged_cells::MergedCell;
     use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
     use litchi_core::binary;
+    use litchi_xlsb::conditional_formatting::Formatting;
     use litchi_xlsb::raw::Records;
     use std::io::Cursor;
 
@@ -2774,7 +2774,7 @@ mod tests {
     #[test]
     fn test_add_conditional_formatting() {
         let mut sheet = MutableXlsbWorksheet::new("Sheet1");
-        let cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+        let cf = Formatting::new(vec!["A1:A10".to_string()]);
         sheet.add_conditional_formatting(cf);
 
         assert_eq!(sheet.conditional_formattings().len(), 1);

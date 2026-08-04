@@ -207,6 +207,38 @@ impl From<litchi_xlsb::hyperlinks::Error> for XlsbError {
     }
 }
 
+impl From<litchi_xlsb::conditional_formatting::Error> for XlsbError {
+    fn from(error: litchi_xlsb::conditional_formatting::Error) -> Self {
+        match error {
+            litchi_xlsb::conditional_formatting::Error::InvalidLength { expected, found } => {
+                Self::InvalidLength { expected, found }
+            },
+            litchi_xlsb::conditional_formatting::Error::InvalidFormula(message) => {
+                Self::InvalidFormula(message)
+            },
+            litchi_xlsb::conditional_formatting::Error::InvalidCellReference(reference) => {
+                Self::InvalidCellReference(reference)
+            },
+            litchi_xlsb::conditional_formatting::Error::Encoding(message) => {
+                Self::Encoding(message)
+            },
+            litchi_xlsb::conditional_formatting::Error::UnsupportedFeature(feature) => {
+                Self::UnsupportedFeature(feature)
+            },
+            litchi_xlsb::conditional_formatting::Error::Unrecognized { typ, val } => {
+                Self::Unrecognized { typ, val }
+            },
+            litchi_xlsb::conditional_formatting::Error::Wire(error) => Self::from(error),
+            litchi_xlsb::conditional_formatting::Error::Formula(error) => Self::from(error),
+            litchi_xlsb::conditional_formatting::Error::Io(error) => Self::Io(error),
+            error => Self::Unrecognized {
+                typ: "conditional-formatting".to_string(),
+                val: error.to_string(),
+            },
+        }
+    }
+}
+
 impl From<litchi_core::binary::BinaryError> for XlsbError {
     fn from(err: litchi_core::binary::BinaryError) -> Self {
         XlsbError::Encoding(err.to_string())

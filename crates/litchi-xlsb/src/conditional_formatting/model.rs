@@ -1,8 +1,8 @@
 //! Package-neutral conditional-formatting values for XLSB.
 //!
 //! The canonical vocabulary is deliberately concise. Binary framing, formula
-//! resolution, and record validation remain in `codec.rs`; the host only sees
-//! compatibility aliases from `mod.rs`.
+//! resolution, and record validation remain in `codec.rs`; worksheet/package
+//! traversal remains in the host.
 
 use crate::formula::CellParsedFormula;
 

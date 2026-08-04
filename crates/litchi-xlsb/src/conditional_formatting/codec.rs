@@ -16,10 +16,6 @@ use thiserror::Error;
 
 /// Result type for conditional-formatting codecs.
 pub type Result<T> = std::result::Result<T, Error>;
-/// Historical internal spelling retained for the compatibility adapter.
-pub type XlsbResult<T> = Result<T>;
-/// Historical internal error spelling retained for the compatibility adapter.
-pub type XlsbError = Error;
 
 /// Strict conditional-formatting codec error.
 #[derive(Debug, Error)]
@@ -92,10 +88,10 @@ impl FormulaResolution for EmptyFormulaResolution {
 struct FormulaCompiler;
 
 impl FormulaCompiler {
-    fn compile(input: &str) -> XlsbResult<CellParsedFormula> {
+    fn compile(input: &str) -> Result<CellParsedFormula> {
         let input = input.strip_prefix('=').unwrap_or(input).trim();
         if input.is_empty() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "conditional-format formula is empty".to_string(),
             ));
         }
@@ -103,7 +99,7 @@ impl FormulaCompiler {
         let mut rgcb = Vec::new();
         compile_formula_expression(input, &mut rgce, &mut rgcb)?;
         if rgce.is_empty() || rgce.len() > MAX_CELL_FORMULA_BYTES {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "compiled conditional-format formula length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
                 rgce.len()
             )));
@@ -112,14 +108,10 @@ impl FormulaCompiler {
     }
 }
 
-fn compile_formula_expression(
-    input: &str,
-    rgce: &mut Vec<u8>,
-    rgcb: &mut Vec<u8>,
-) -> XlsbResult<()> {
+fn compile_formula_expression(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) -> Result<()> {
     let input = input.trim();
     if input.is_empty() {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "conditional-format formula has an empty operand".to_string(),
         ));
     }
@@ -182,7 +174,7 @@ fn compile_formula_expression(
     if let Some(value) = parse_formula_string(input)? {
         let units = value.encode_utf16().count();
         let units = u16::try_from(units)
-            .map_err(|_| XlsbError::InvalidFormula("formula string is too long".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("formula string is too long".to_string()))?;
         rgce.push(crate::formula::ptg_types::PTG_STR);
         rgce.extend_from_slice(&units.to_le_bytes());
         rgce.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
@@ -201,7 +193,7 @@ fn compile_formula_expression(
     }
     if let Ok(number) = input.parse::<f64>() {
         if !number.is_finite() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "formula number is not finite".to_string(),
             ));
         }
@@ -223,17 +215,17 @@ fn compile_formula_expression(
     }
     if let Some((first, last)) = input.split_once(':') {
         let Some((first_row, first_col, first_bits)) = parse_formula_reference(first.trim()) else {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "invalid conditional-format range {input:?}"
             )));
         };
         let Some((last_row, last_col, last_bits)) = parse_formula_reference(last.trim()) else {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "invalid conditional-format range {input:?}"
             )));
         };
         if first_row > last_row || first_col > last_col {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "conditional-format range is reversed".to_string(),
             ));
         }
@@ -245,15 +237,15 @@ fn compile_formula_expression(
         return Ok(());
     }
 
-    Err(XlsbError::UnsupportedFeature(format!(
+    Err(Error::UnsupportedFeature(format!(
         "conditional-format formula construct {input:?} is not supported by the owner-local emitter"
     )))
 }
 
-fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) -> XlsbResult<()> {
+fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) -> Result<()> {
     let rows = split_formula_list(input, ';');
     if rows.is_empty() || rows.iter().any(|row| row.trim().is_empty()) {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "conditional-format array has an empty row".to_string(),
         ));
     }
@@ -263,16 +255,16 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
         .collect::<Vec<_>>();
     let column_count = columns[0].len();
     if column_count == 0 || columns.iter().any(|row| row.len() != column_count) {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "conditional-format array rows have different widths".to_string(),
         ));
     }
     let row_count = u32::try_from(columns.len())
-        .map_err(|_| XlsbError::InvalidFormula("array row count overflow".to_string()))?;
+        .map_err(|_| Error::InvalidFormula("array row count overflow".to_string()))?;
     let column_count = u32::try_from(column_count)
-        .map_err(|_| XlsbError::InvalidFormula("array column count overflow".to_string()))?;
+        .map_err(|_| Error::InvalidFormula("array column count overflow".to_string()))?;
     if row_count > 1_048_576 || column_count > 16_384 {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "conditional-format array exceeds worksheet bounds".to_string(),
         ));
     }
@@ -293,7 +285,7 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
         match value {
             FormulaArrayValue::Number(value) => {
                 if !value.is_finite() {
-                    return Err(XlsbError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "conditional-format array number is not finite".to_string(),
                     ));
                 }
@@ -302,9 +294,7 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
             },
             FormulaArrayValue::String(value) => {
                 let units = u16::try_from(value.encode_utf16().count()).map_err(|_| {
-                    XlsbError::InvalidFormula(
-                        "conditional-format array string is too long".to_string(),
-                    )
+                    Error::InvalidFormula("conditional-format array string is too long".to_string())
                 })?;
                 rgcb.push(1);
                 rgcb.extend_from_slice(&units.to_le_bytes());
@@ -317,7 +307,7 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
     Ok(())
 }
 
-fn parse_formula_array_value(input: &str) -> XlsbResult<FormulaArrayValue> {
+fn parse_formula_array_value(input: &str) -> Result<FormulaArrayValue> {
     if let Some(value) = parse_formula_string(input)? {
         return Ok(FormulaArrayValue::String(value));
     }
@@ -328,17 +318,17 @@ fn parse_formula_array_value(input: &str) -> XlsbResult<FormulaArrayValue> {
         return Ok(FormulaArrayValue::Error(error));
     }
     let value = input.parse::<f64>().map_err(|_| {
-        XlsbError::InvalidFormula(format!("invalid conditional-format array value {input:?}"))
+        Error::InvalidFormula(format!("invalid conditional-format array value {input:?}"))
     })?;
     Ok(FormulaArrayValue::Number(value))
 }
 
-fn parse_formula_string(input: &str) -> XlsbResult<Option<String>> {
+fn parse_formula_string(input: &str) -> Result<Option<String>> {
     if !input.starts_with('"') {
         return Ok(None);
     }
     if !input.ends_with('"') || input.len() < 2 {
-        return Err(XlsbError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "unterminated conditional-format string".to_string(),
         ));
     }
@@ -527,7 +517,7 @@ impl CellRange {
         }
     }
 
-    fn parse(value: &str) -> XlsbResult<Self> {
+    fn parse(value: &str) -> Result<Self> {
         let value = value.trim();
         let (first, last) = value.split_once(':').unwrap_or((value, value));
         let (row_first, col_first) = parse_cell_reference(first)?;
@@ -535,7 +525,7 @@ impl CellRange {
         Ok(Self::new(row_first, row_last, col_first, col_last))
     }
 
-    fn write<W: Write>(&self, writer: &mut W) -> XlsbResult<()> {
+    fn write<W: Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_all(&self.row_first.to_le_bytes())?;
         writer.write_all(&self.row_last.to_le_bytes())?;
         writer.write_all(&self.col_first.to_le_bytes())?;
@@ -544,7 +534,7 @@ impl CellRange {
     }
 }
 
-fn parse_range_list(value: &str) -> XlsbResult<Vec<CellRange>> {
+fn parse_range_list(value: &str) -> Result<Vec<CellRange>> {
     value
         .split([',', ' '])
         .filter(|part| !part.is_empty())
@@ -552,7 +542,7 @@ fn parse_range_list(value: &str) -> XlsbResult<Vec<CellRange>> {
         .collect()
 }
 
-fn write_bin_range_list<W: Write>(ranges: &[CellRange], writer: &mut W) -> XlsbResult<()> {
+fn write_bin_range_list<W: Write>(ranges: &[CellRange], writer: &mut W) -> Result<()> {
     let count = i32::try_from(ranges.len())
         .map_err(|_| invalid("BinRangeList", "range count overflows i32"))?;
     writer.write_all(&count.to_le_bytes())?;
@@ -585,7 +575,7 @@ fn cell_reference(row: u32, column: u32) -> String {
     format!("{}{}", column_index_to_name(column), row)
 }
 
-fn parse_cell_reference(value: &str) -> XlsbResult<(u32, u32)> {
+fn parse_cell_reference(value: &str) -> Result<(u32, u32)> {
     let normalized = value.trim().to_ascii_uppercase();
     let mut column = String::new();
     let mut row = String::new();
@@ -593,7 +583,7 @@ fn parse_cell_reference(value: &str) -> XlsbResult<(u32, u32)> {
     for character in normalized.chars() {
         if character.is_ascii_alphabetic() {
             if digit_seen {
-                return Err(XlsbError::InvalidCellReference(normalized));
+                return Err(Error::InvalidCellReference(normalized));
             }
             column.push(character);
         } else if character.is_ascii_digit() {
@@ -604,23 +594,23 @@ fn parse_cell_reference(value: &str) -> XlsbResult<(u32, u32)> {
         }
     }
     if column.is_empty() || row.is_empty() {
-        return Err(XlsbError::InvalidCellReference(normalized));
+        return Err(Error::InvalidCellReference(normalized));
     }
     let mut column_index = 0_u32;
     for character in column.bytes() {
         if !character.is_ascii_uppercase() {
-            return Err(XlsbError::InvalidCellReference(normalized));
+            return Err(Error::InvalidCellReference(normalized));
         }
         column_index = column_index
             .checked_mul(26)
             .and_then(|value| value.checked_add(u32::from(character - b'A' + 1)))
-            .ok_or_else(|| XlsbError::InvalidCellReference(normalized.clone()))?;
+            .ok_or_else(|| Error::InvalidCellReference(normalized.clone()))?;
     }
     let row_index = row
         .parse::<u32>()
-        .map_err(|_| XlsbError::InvalidCellReference(normalized.clone()))?;
+        .map_err(|_| Error::InvalidCellReference(normalized.clone()))?;
     if row_index == 0 || column_index == 0 {
-        return Err(XlsbError::InvalidCellReference(normalized));
+        return Err(Error::InvalidCellReference(normalized));
     }
     Ok((row_index - 1, column_index - 1))
 }
@@ -631,7 +621,7 @@ fn parse_sqref_header(
     data: &[u8],
     record: &'static str,
     maximum_ranges: usize,
-) -> XlsbResult<(Vec<FrtRange>, usize)> {
+) -> Result<(Vec<FrtRange>, usize)> {
     let mut cursor = FrtCursor::new(data, record);
     if cursor.read_u32()? != 0x02 {
         return Err(invalid(record, "FRTHeader is not sqref-only"));
@@ -669,7 +659,7 @@ fn parse_sqref_header(
     Ok((ranges, cursor.offset))
 }
 
-fn serialize_sqref_header(ranges: &[FrtRange]) -> XlsbResult<Vec<u8>> {
+fn serialize_sqref_header(ranges: &[FrtRange]) -> Result<Vec<u8>> {
     if ranges.is_empty() || ranges.len() > i32::MAX as usize {
         return Err(invalid(
             "FRTHeader",
@@ -700,7 +690,7 @@ fn parse_formula_header(
     data: &[u8],
     record: &'static str,
     maximum_formulas: usize,
-) -> XlsbResult<(Vec<CellParsedFormula>, usize)> {
+) -> Result<(Vec<CellParsedFormula>, usize)> {
     let mut cursor = FrtCursor::new(data, record);
     let flags = cursor.read_u32()?;
     if flags & !0x04 != 0 {
@@ -721,7 +711,7 @@ fn parse_formula_header(
         }
         formulas
             .try_reserve(count)
-            .map_err(|_| XlsbError::Unrecognized {
+            .map_err(|_| Error::Unrecognized {
                 typ: record.to_string(),
                 val: "formula allocation exceeds bounded capacity".to_string(),
             })?;
@@ -735,7 +725,7 @@ fn parse_formula_header(
 fn serialize_formula_header(
     formulas: &[CellParsedFormula],
     maximum_formulas: usize,
-) -> XlsbResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     if formulas.len() > maximum_formulas {
         return Err(invalid(
             "FRTHeader",
@@ -757,7 +747,7 @@ fn serialize_formula_header(
     );
     for formula in formulas {
         if formula.rgce.is_empty() || formula.rgce.len() > MAX_CELL_FORMULA_BYTES {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "FRT formula token length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
                 formula.rgce.len()
             )));
@@ -794,7 +784,7 @@ impl<'a> FrtCursor<'a> {
         }
     }
 
-    fn take(&mut self, count: usize) -> XlsbResult<&'a [u8]> {
+    fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self
             .offset
             .checked_add(count)
@@ -802,7 +792,7 @@ impl<'a> FrtCursor<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsbError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
@@ -810,7 +800,7 @@ impl<'a> FrtCursor<'a> {
         Ok(bytes)
     }
 
-    fn read_u32(&mut self) -> XlsbResult<u32> {
+    fn read_u32(&mut self) -> Result<u32> {
         let bytes = self.take(4)?;
         Ok(u32::from_le_bytes(
             bytes.try_into().expect("four-byte field"),
@@ -821,7 +811,7 @@ impl<'a> FrtCursor<'a> {
         self.data.len().saturating_sub(self.offset)
     }
 
-    fn read_formula(&mut self) -> XlsbResult<CellParsedFormula> {
+    fn read_formula(&mut self) -> Result<CellParsedFormula> {
         let flags = self.read_u32()?;
         if flags != 2 {
             return Err(invalid(
@@ -834,7 +824,7 @@ impl<'a> FrtCursor<'a> {
         let cb = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula ancillary length overflow"))?;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "FRT formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
             )));
         }
@@ -858,9 +848,9 @@ pub fn icon_count14(icon_set_type: u8) -> usize {
     }
 }
 
-pub fn parse_rule_extension_guid(data: &[u8]) -> XlsbResult<[u8; 16]> {
+pub fn parse_rule_extension_guid(data: &[u8]) -> Result<[u8; 16]> {
     if data.len() != 20 {
-        return Err(XlsbError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 20,
             found: data.len(),
         });
@@ -878,9 +868,9 @@ pub fn serialize_rule_extension_guid(guid: [u8; 16]) -> [u8; 20] {
 }
 
 impl Value {
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 24 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 24,
                 found: data.len(),
             });
@@ -893,7 +883,7 @@ impl Value {
         data: &[u8],
         base: (u32, u32),
         context: &impl FormulaResolution,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let mut cursor = CfCursor::new(data, "BrtCFVO");
         let cfvo_type = u8::try_from(cursor.read_u32()?)
             .map_err(|_| invalid("BrtCFVO", "CFVO type overflow"))?;
@@ -950,7 +940,7 @@ impl Value {
     }
 
     /// Parse an Office 2013 `BrtCFVO14` record.
-    pub fn parse_extension14(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse_extension14(data: &[u8]) -> Result<Self> {
         let context = EmptyFormulaResolution;
         Self::parse_extension14_with_context(data, (0, 0), &context)
     }
@@ -959,7 +949,7 @@ impl Value {
         data: &[u8],
         base: (u32, u32),
         context: &impl FormulaResolution,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let (formulas, header_size) = parse_formula_header(data, "BrtCFVO14", 1)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtCFVO14");
         let cfvo_type = u8::try_from(cursor.read_u32()?)
@@ -1022,58 +1012,64 @@ impl Value {
     }
 
     /// Serialize an Office 2013 `BrtCFVO14` payload using its binary formula.
-    pub fn serialize_extension14(&self) -> XlsbResult<Vec<u8>> {
+    pub fn serialize_extension14(&self) -> Result<Vec<u8>> {
+        self.serialize_extension14_with(
+            self.formula_binary.as_ref(),
+            self.numeric_value,
+            self.save_greater_than_or_equal,
+        )
+    }
+
+    fn serialize_extension14_with(
+        &self,
+        formula_binary: Option<&CellParsedFormula>,
+        numeric_value: f64,
+        save_greater_than_or_equal: bool,
+    ) -> Result<Vec<u8>> {
         if !matches!(self.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9) {
             return Err(invalid(
                 "BrtCFVO14",
                 format!("invalid type {}", self.cfvo_type),
             ));
         }
-        if !self.numeric_value.is_finite() {
+        if !numeric_value.is_finite() {
             return Err(invalid("BrtCFVO14", "non-finite numeric parameter"));
         }
-        if self.formula_binary.is_none()
+        if formula_binary.is_none()
             && matches!(self.cfvo_type, 4 | 5)
-            && !(0.0..=100.0).contains(&self.numeric_value)
+            && !(0.0..=100.0).contains(&numeric_value)
         {
             return Err(invalid(
                 "BrtCFVO14",
-                format!(
-                    "percentage parameter {} outside 0..=100",
-                    self.numeric_value
-                ),
+                format!("percentage parameter {} outside 0..=100", numeric_value),
             ));
         }
-        if matches!(self.cfvo_type, 2 | 3 | 8 | 9) && self.formula_binary.is_some() {
+        if matches!(self.cfvo_type, 2 | 3 | 8 | 9) && formula_binary.is_some() {
             return Err(invalid(
                 "BrtCFVO14",
                 "automatic/min/max threshold contains a formula",
             ));
         }
-        if self.cfvo_type == 7 && self.formula_binary.is_none() {
+        if self.cfvo_type == 7 && formula_binary.is_none() {
             return Err(invalid("BrtCFVO14", "formula threshold omits its formula"));
         }
-        let formulas = self.formula_binary.as_slice();
+        let formulas = formula_binary.map_or(&[][..], std::slice::from_ref);
         let mut data = serialize_formula_header(formulas, 1)?;
         data.extend_from_slice(&u32::from(self.cfvo_type).to_le_bytes());
-        data.extend_from_slice(&self.numeric_value.to_le_bytes());
-        data.extend_from_slice(&u32::from(self.save_greater_than_or_equal).to_le_bytes());
+        data.extend_from_slice(&numeric_value.to_le_bytes());
+        data.extend_from_slice(&u32::from(save_greater_than_or_equal).to_le_bytes());
         data.extend_from_slice(&u32::from(self.greater_than_or_equal).to_le_bytes());
         data.extend_from_slice(
-            &u32::try_from(
-                self.formula_binary
-                    .as_ref()
-                    .map_or(0, |formula| formula.rgce.len()),
-            )
-            .map_err(|_| XlsbError::InvalidFormula("formula is too large".to_string()))?
-            .to_le_bytes(),
+            &u32::try_from(formula_binary.map_or(0, |formula| formula.rgce.len()))
+                .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?
+                .to_le_bytes(),
         );
         Ok(data)
     }
 }
 
 impl Color {
-    pub fn theme(index: u8, tint: i16) -> XlsbResult<Self> {
+    pub fn theme(index: u8, tint: i16) -> Result<Self> {
         if index > 0x0b {
             return Err(invalid("BrtColor", format!("theme color index {index}")));
         }
@@ -1087,14 +1083,14 @@ impl Color {
         })
     }
 
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 8 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             });
         }
-        let raw: [u8; 8] = data.try_into().map_err(|_| XlsbError::InvalidLength {
+        let raw: [u8; 8] = data.try_into().map_err(|_| Error::InvalidLength {
             expected: 8,
             found: data.len(),
         })?;
@@ -1127,7 +1123,7 @@ impl Color {
         })
     }
 
-    pub fn to_bytes(self) -> XlsbResult<[u8; 8]> {
+    pub fn to_bytes(self) -> Result<[u8; 8]> {
         if self.color_type > 3 || (self.color_type == 3 && self.index > 0x0b) {
             return Err(invalid("BrtColor", "invalid color type or theme index"));
         }
@@ -1168,9 +1164,9 @@ impl Color {
     }
 
     /// Parse an Office 2013 `BrtColor14` payload.
-    pub fn parse_extension14(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse_extension14(data: &[u8]) -> Result<Self> {
         if data.len() != 12 {
-            return Err(XlsbError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 12,
                 found: data.len(),
             });
@@ -1182,7 +1178,7 @@ impl Color {
     }
 
     /// Serialize an Office 2013 `BrtColor14` payload.
-    pub fn serialize_extension14(self) -> XlsbResult<[u8; 12]> {
+    pub fn serialize_extension14(self) -> Result<[u8; 12]> {
         let mut data = [0; 12];
         data[4..].copy_from_slice(&self.to_bytes()?);
         Ok(data)
@@ -1212,7 +1208,7 @@ impl AxisPosition14 {
 }
 
 impl Bar14 {
-    pub fn parse_header(data: &[u8]) -> XlsbResult<BarHeader14> {
+    pub fn parse_header(data: &[u8]) -> Result<BarHeader14> {
         let mut cursor = CfCursor::new(data, "BrtBeginDatabar14");
         if cursor.read_u32()? != 0 {
             return Err(invalid("BrtBeginDatabar14", "nonzero FRTBlank"));
@@ -1246,7 +1242,7 @@ impl Bar14 {
         })
     }
 
-    pub fn serialize_header(&self) -> XlsbResult<Vec<u8>> {
+    pub fn serialize_header(&self) -> Result<Vec<u8>> {
         if self.min_length > self.max_length
             || self.max_length > 100
             || self.unused_flags & 0x0f != 0
@@ -1273,7 +1269,7 @@ impl Bar14 {
 }
 
 impl Icon {
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let mut cursor = CfCursor::new(data, "BrtCFIcon");
         if cursor.read_u32()? != 0 {
             return Err(invalid("BrtCFIcon", "nonzero FRTBlank"));
@@ -1287,7 +1283,7 @@ impl Icon {
         Ok(value)
     }
 
-    pub fn serialize(self) -> XlsbResult<[u8; 12]> {
+    pub fn serialize(self) -> Result<[u8; 12]> {
         self.validate()?;
         let mut data = [0; 12];
         data[4..8].copy_from_slice(&self.icon_set.to_le_bytes());
@@ -1295,7 +1291,7 @@ impl Icon {
         Ok(data)
     }
 
-    fn validate(self) -> XlsbResult<()> {
+    fn validate(self) -> Result<()> {
         if self.icon_set == -1 {
             if self.index == -1 {
                 return Ok(());
@@ -1311,7 +1307,7 @@ impl Icon {
 }
 
 impl IconSet14 {
-    pub fn parse_header(data: &[u8]) -> XlsbResult<IconHeader14> {
+    pub fn parse_header(data: &[u8]) -> Result<IconHeader14> {
         let mut cursor = CfCursor::new(data, "BrtBeginIconSet14");
         if cursor.read_u32()? != 0 {
             return Err(invalid("BrtBeginIconSet14", "nonzero FRTBlank"));
@@ -1335,7 +1331,7 @@ impl IconSet14 {
         })
     }
 
-    pub fn serialize_header(&self) -> XlsbResult<Vec<u8>> {
+    pub fn serialize_header(&self) -> Result<Vec<u8>> {
         if self.icon_set_type > 19 || self.unused_flags & !0x78 != 0 {
             return Err(invalid("BrtBeginIconSet14", "invalid icon-set header"));
         }
@@ -1352,7 +1348,7 @@ impl IconSet14 {
 }
 
 impl Rule {
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let context = EmptyFormulaResolution;
         Self::parse_with_context(data, (0, 0), &context)
     }
@@ -1361,7 +1357,7 @@ impl Rule {
         data: &[u8],
         base: (u32, u32),
         context: &impl FormulaResolution,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let mut cursor = CfCursor::new(data, "BrtBeginCFRule");
         let rule_type_raw = cursor.read_u32()?;
         let rule_type = RuleType::from_u32(rule_type_raw).ok_or_else(|| {
@@ -1507,7 +1503,7 @@ impl Rule {
     }
 
     /// Parse an Office 2013 `BrtBeginCFRule14` payload.
-    pub fn parse_extension14(data: &[u8]) -> XlsbResult<Self> {
+    pub fn parse_extension14(data: &[u8]) -> Result<Self> {
         let context = EmptyFormulaResolution;
         Self::parse_extension14_with_context(data, (0, 0), &context)
     }
@@ -1516,7 +1512,7 @@ impl Rule {
         data: &[u8],
         base: (u32, u32),
         context: &impl FormulaResolution,
-    ) -> XlsbResult<Self> {
+    ) -> Result<Self> {
         let (formulas, header_size) = parse_formula_header(data, "BrtBeginCFRule14", 2)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginCFRule14");
         let rule_type_raw = cursor.read_u32()?;
@@ -1680,7 +1676,7 @@ impl Rule {
     }
 
     /// Serialize an Office 2013 `BrtBeginCFRule14` payload.
-    pub fn serialize_extension14(&self) -> XlsbResult<Vec<u8>> {
+    pub fn serialize_extension14(&self) -> Result<Vec<u8>> {
         let metadata = self.extension14.ok_or_else(|| {
             invalid(
                 "BrtBeginCFRule14",
@@ -1765,7 +1761,7 @@ impl Rule {
         for formula in &slots {
             payload.extend_from_slice(
                 &u32::try_from(formula.map_or(0, |formula| formula.rgce.len()))
-                    .map_err(|_| XlsbError::InvalidFormula("formula is too large".to_string()))?
+                    .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?
                     .to_le_bytes(),
             );
         }
@@ -1779,12 +1775,12 @@ impl Rule {
 
 impl Formatting {
     /// Parse an Office 2013 `BrtBeginConditionalFormatting14` payload.
-    pub fn parse_extension14_header(data: &[u8]) -> XlsbResult<(Self, u32)> {
+    pub fn parse_extension14_header(data: &[u8]) -> Result<(Self, u32)> {
         let (formatting, count, _) = Self::parse_extension14_header_with_base(data)?;
         Ok((formatting, count))
     }
 
-    pub fn parse_extension14_header_with_base(data: &[u8]) -> XlsbResult<(Self, u32, (u32, u32))> {
+    pub fn parse_extension14_header_with_base(data: &[u8]) -> Result<(Self, u32, (u32, u32))> {
         let (ranges, header_size) =
             parse_sqref_header(data, "BrtBeginConditionalFormatting14", i32::MAX as usize)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginConditionalFormatting14");
@@ -1817,7 +1813,7 @@ impl Formatting {
     }
 
     /// Serialize an Office 2013 `BrtBeginConditionalFormatting14` payload.
-    pub fn serialize_extension14_header(&self) -> XlsbResult<Vec<u8>> {
+    pub fn serialize_extension14_header(&self) -> Result<Vec<u8>> {
         let mut ranges = Vec::new();
         for range_list in &self.ranges {
             for range in range_list
@@ -1841,7 +1837,7 @@ impl Formatting {
     }
 }
 
-pub fn parse_classic_header(data: &[u8]) -> XlsbResult<(Formatting, u32, (u32, u32))> {
+pub fn parse_classic_header(data: &[u8]) -> Result<(Formatting, u32, (u32, u32))> {
     let mut cursor = CfCursor::new(data, "BrtBeginConditionalFormatting");
     let count = cursor.read_u32()?;
     let pivot_only = cursor.read_bool32()?;
@@ -1872,7 +1868,7 @@ pub fn parse_classic_header(data: &[u8]) -> XlsbResult<(Formatting, u32, (u32, u
     ))
 }
 
-pub fn validate_template(rule_type: RuleType, template: u32) -> XlsbResult<()> {
+pub fn validate_template(rule_type: RuleType, template: u32) -> Result<()> {
     let valid = match rule_type {
         RuleType::CellIs => template == 0,
         RuleType::Expression => matches!(template, 1 | 7..=12 | 15..=27 | 29 | 30),
@@ -1891,7 +1887,7 @@ pub fn validate_template(rule_type: RuleType, template: u32) -> XlsbResult<()> {
     }
 }
 
-fn validate_extension14_template(rule_type: RuleType, template: u32) -> XlsbResult<()> {
+fn validate_extension14_template(rule_type: RuleType, template: u32) -> Result<()> {
     if rule_type == RuleType::DataBar && template == 0 {
         Ok(())
     } else {
@@ -1909,7 +1905,7 @@ pub fn validate_formula_count(
     template: u32,
     parameter: u32,
     count: usize,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let expected = if rule_type == RuleType::CellIs {
         if matches!(parameter, 1 | 2) { 2 } else { 1 }
     } else if rule_type == RuleType::Expression && matches!(template, 1 | 8..=12 | 15..=24) {
@@ -1940,7 +1936,7 @@ fn validate_formula_slots(
     template: u32,
     parameter: u32,
     slots: &[Option<CellParsedFormula>; 3],
-) -> XlsbResult<()> {
+) -> Result<()> {
     let expected = if rule_type == RuleType::CellIs {
         [true, matches!(parameter, 1 | 2), false]
     } else if rule_type == RuleType::Expression && matches!(template, 1 | 8..=12 | 15..=24) {
@@ -1971,7 +1967,7 @@ fn validate_parameter_and_flags(
     above_average: bool,
     bottom: bool,
     percent: bool,
-) -> XlsbResult<()> {
+) -> Result<()> {
     let valid_parameter = match (rule_type, template) {
         (RuleType::CellIs, 0) => (1..=8).contains(&parameter),
         (RuleType::Expression, 8) => parameter <= 3,
@@ -2015,7 +2011,7 @@ fn render_formula(
     formula: &CellParsedFormula,
     base: (u32, u32),
     context: &impl FormulaResolution,
-) -> XlsbResult<String> {
+) -> Result<String> {
     let tokens =
         FormulaParser::with_base_cell_and_extra(&formula.rgce, &formula.rgcb, base.0, base.1)
             .parse()?;
@@ -2032,7 +2028,7 @@ fn format_number(value: f64) -> String {
     }
 }
 
-fn effective_rule_parameter(rule: &Rule) -> XlsbResult<u32> {
+fn effective_rule_parameter(rule: &Rule) -> Result<u32> {
     if rule.rule_type != RuleType::CellIs {
         if rule.operator.is_some() {
             return Err(invalid(
@@ -2052,10 +2048,10 @@ fn effective_rule_parameter(rule: &Rule) -> XlsbResult<u32> {
     Ok(parameter)
 }
 
-fn effective_rule_formulas(rule: &Rule) -> XlsbResult<Vec<CellParsedFormula>> {
+fn effective_rule_formulas(rule: &Rule) -> Result<Vec<CellParsedFormula>> {
     if !rule.formulas.is_empty() {
         if !rule.formula_extras.is_empty() && rule.formula_extras.len() != rule.formulas.len() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "conditional-format ancillary stream count does not match formulas".to_string(),
             ));
         }
@@ -2065,7 +2061,7 @@ fn effective_rule_formulas(rule: &Rule) -> XlsbResult<Vec<CellParsedFormula>> {
             .enumerate()
             .map(|(index, rgce)| {
                 if rgce.is_empty() || rgce.len() > MAX_CELL_FORMULA_BYTES {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "conditional-format formula length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
                         rgce.len()
                     )));
@@ -2083,7 +2079,7 @@ fn effective_rule_formulas(rule: &Rule) -> XlsbResult<Vec<CellParsedFormula>> {
         .collect()
 }
 
-fn validate_rule_text(template: u32, text: Option<&str>, record: &'static str) -> XlsbResult<()> {
+fn validate_rule_text(template: u32, text: Option<&str>, record: &'static str) -> Result<()> {
     if template == 8 {
         if text.is_none_or(|text| text.is_empty() || text.encode_utf16().count() > 255) {
             return Err(invalid(record, "invalid text parameter"));
@@ -2094,7 +2090,7 @@ fn validate_rule_text(template: u32, text: Option<&str>, record: &'static str) -
     Ok(())
 }
 
-fn write_nullable_string(data: &mut Vec<u8>, value: Option<&str>) -> XlsbResult<()> {
+fn write_nullable_string(data: &mut Vec<u8>, value: Option<&str>) -> Result<()> {
     let Some(value) = value else {
         data.extend_from_slice(&u32::MAX.to_le_bytes());
         return Ok(());
@@ -2111,8 +2107,8 @@ fn write_nullable_string(data: &mut Vec<u8>, value: Option<&str>) -> XlsbResult<
     Ok(())
 }
 
-fn invalid(typ: impl Into<String>, val: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
+fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: typ.into(),
         val: val.into(),
     }
@@ -2133,7 +2129,7 @@ impl<'a> CfCursor<'a> {
         }
     }
 
-    fn take(&mut self, size: usize) -> XlsbResult<&'a [u8]> {
+    fn take(&mut self, size: usize) -> Result<&'a [u8]> {
         let end = self
             .offset
             .checked_add(size)
@@ -2141,7 +2137,7 @@ impl<'a> CfCursor<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsbError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
@@ -2149,16 +2145,16 @@ impl<'a> CfCursor<'a> {
         Ok(bytes)
     }
 
-    fn read_u16(&mut self) -> XlsbResult<u16> {
+    fn read_u16(&mut self) -> Result<u16> {
         let bytes = self.take(2)?;
         Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
     }
 
-    fn read_u8(&mut self) -> XlsbResult<u8> {
+    fn read_u8(&mut self) -> Result<u8> {
         Ok(self.take(1)?[0])
     }
 
-    fn read_bool8(&mut self) -> XlsbResult<bool> {
+    fn read_bool8(&mut self) -> Result<bool> {
         match self.read_u8()? {
             0 => Ok(false),
             1 => Ok(true),
@@ -2166,37 +2162,35 @@ impl<'a> CfCursor<'a> {
         }
     }
 
-    fn read_u32(&mut self) -> XlsbResult<u32> {
+    fn read_u32(&mut self) -> Result<u32> {
         let bytes = self.take(4)?;
         Ok(u32::from_le_bytes(
             bytes.try_into().expect("four-byte field"),
         ))
     }
 
-    fn read_i32(&mut self) -> XlsbResult<i32> {
+    fn read_i32(&mut self) -> Result<i32> {
         let bytes = self.take(4)?;
         Ok(i32::from_le_bytes(
             bytes.try_into().expect("four-byte field"),
         ))
     }
 
-    fn read_array<const N: usize>(&mut self) -> XlsbResult<[u8; N]> {
-        self.take(N)?
-            .try_into()
-            .map_err(|_| XlsbError::InvalidLength {
-                expected: N,
-                found: self.data.len().saturating_sub(self.offset),
-            })
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N]> {
+        self.take(N)?.try_into().map_err(|_| Error::InvalidLength {
+            expected: N,
+            found: self.data.len().saturating_sub(self.offset),
+        })
     }
 
-    fn read_f64(&mut self) -> XlsbResult<f64> {
+    fn read_f64(&mut self) -> Result<f64> {
         let bytes = self.take(8)?;
         Ok(f64::from_le_bytes(
             bytes.try_into().expect("eight-byte field"),
         ))
     }
 
-    fn read_bool32(&mut self) -> XlsbResult<bool> {
+    fn read_bool32(&mut self) -> Result<bool> {
         match self.read_u32()? {
             0 => Ok(false),
             1 => Ok(true),
@@ -2204,7 +2198,7 @@ impl<'a> CfCursor<'a> {
         }
     }
 
-    fn read_nullable_string(&mut self) -> XlsbResult<Option<String>> {
+    fn read_nullable_string(&mut self) -> Result<Option<String>> {
         let count = self.read_u32()?;
         if count == u32::MAX {
             return Ok(None);
@@ -2221,13 +2215,13 @@ impl<'a> CfCursor<'a> {
             .collect::<Vec<_>>();
         String::from_utf16(&units)
             .map(Some)
-            .map_err(|error| XlsbError::Encoding(format!("invalid UTF-16: {error}")))
+            .map_err(|error| Error::Encoding(format!("invalid UTF-16: {error}")))
     }
 
-    fn read_formula(&mut self) -> XlsbResult<CellParsedFormula> {
+    fn read_formula(&mut self) -> Result<CellParsedFormula> {
         let cce = self.read_u32()? as usize;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
-            return Err(XlsbError::InvalidFormula(format!(
+            return Err(Error::InvalidFormula(format!(
                 "conditional-format formula length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
             )));
         }
@@ -2237,11 +2231,7 @@ impl<'a> CfCursor<'a> {
         Ok(CellParsedFormula { rgce, rgcb })
     }
 
-    fn read_ranges(
-        &mut self,
-        minimum: usize,
-        maximum: usize,
-    ) -> XlsbResult<Vec<(u32, u32, u32, u32)>> {
+    fn read_ranges(&mut self, minimum: usize, maximum: usize) -> Result<Vec<(u32, u32, u32, u32)>> {
         let raw_count = self.read_u32()? as i32;
         let count = usize::try_from(raw_count)
             .map_err(|_| invalid(self.record, "NULL range collection"))?;
@@ -2268,11 +2258,11 @@ impl<'a> CfCursor<'a> {
         Ok(ranges)
     }
 
-    fn finish(self) -> XlsbResult<()> {
+    fn finish(self) -> Result<()> {
         if self.offset == self.data.len() {
             Ok(())
         } else {
-            Err(XlsbError::InvalidLength {
+            Err(Error::InvalidLength {
                 expected: self.offset,
                 found: self.data.len(),
             })
@@ -2883,7 +2873,7 @@ mod writer_tests {
 pub fn write_conditional_formattings<W: Write>(
     writer: &mut Writer<W>,
     cond_fmts: &[Formatting],
-) -> XlsbResult<()> {
+) -> Result<()> {
     validate_extension_links(cond_fmts)?;
     let mut priorities = HashSet::new();
     for rule in cond_fmts.iter().flat_map(|formatting| &formatting.rules) {
@@ -2908,7 +2898,7 @@ pub fn write_conditional_formattings<W: Write>(
     Ok(())
 }
 
-fn validate_extension_links(cond_fmts: &[Formatting]) -> XlsbResult<()> {
+fn validate_extension_links(cond_fmts: &[Formatting]) -> Result<()> {
     let mut classic = HashMap::new();
     for formatting in cond_fmts {
         if formatting.record_kind != RecordKind::Classic {
@@ -2995,7 +2985,7 @@ fn validate_extension_links(cond_fmts: &[Formatting]) -> XlsbResult<()> {
 fn write_single_cond_formatting<W: Write>(
     writer: &mut Writer<W>,
     formatting: &Formatting,
-) -> XlsbResult<()> {
+) -> Result<()> {
     writer.write_record(
         kind::BEGIN_COND_FORMATTING,
         &serialize_cond_formatting_header(formatting)?,
@@ -3015,7 +3005,7 @@ fn write_single_cond_formatting<W: Write>(
 fn write_single_cond_formatting14<W: Write>(
     writer: &mut Writer<W>,
     formatting: &Formatting,
-) -> XlsbResult<()> {
+) -> Result<()> {
     writer.write_record(
         kind::BEGIN_COND_FORMATTING14,
         &formatting.serialize_extension14_header()?,
@@ -3029,7 +3019,7 @@ fn write_single_cond_formatting14<W: Write>(
     Ok(())
 }
 
-fn serialize_cond_formatting_header(formatting: &Formatting) -> XlsbResult<Vec<u8>> {
+fn serialize_cond_formatting_header(formatting: &Formatting) -> Result<Vec<u8>> {
     let rule_count = u32::try_from(formatting.rules.len())
         .map_err(|_| invalid("BrtBeginConditionalFormatting", "too many rules"))?;
     let mut ranges = Vec::new();
@@ -3049,7 +3039,7 @@ fn serialize_cond_formatting_header(formatting: &Formatting) -> XlsbResult<Vec<u
     Ok(payload)
 }
 
-fn serialize_cf_rule(rule: &Rule) -> XlsbResult<Vec<u8>> {
+fn serialize_cf_rule(rule: &Rule) -> Result<Vec<u8>> {
     validate_rule_metadata(rule)?;
     let parameter = effective_parameter(rule)?;
     let formulas = effective_formulas(rule)?;
@@ -3093,7 +3083,7 @@ fn serialize_cf_rule(rule: &Rule) -> XlsbResult<Vec<u8>> {
     for formula in &slots {
         let size = formula.map_or(0, |formula| formula.rgce.len());
         let size = u32::try_from(size)
-            .map_err(|_| XlsbError::InvalidFormula("formula is too large".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?;
         payload.extend_from_slice(&size.to_le_bytes());
     }
     write_nullable_wide_string(&mut payload, rule.text.as_deref())?;
@@ -3103,7 +3093,7 @@ fn serialize_cf_rule(rule: &Rule) -> XlsbResult<Vec<u8>> {
     Ok(payload)
 }
 
-fn validate_rule_metadata(rule: &Rule) -> XlsbResult<()> {
+fn validate_rule_metadata(rule: &Rule) -> Result<()> {
     if rule.extension14.is_some()
         || rule.color_scale14.is_some()
         || rule.data_bar14.is_some()
@@ -3172,7 +3162,7 @@ fn validate_rule_metadata(rule: &Rule) -> XlsbResult<()> {
     validate_rule_flags_and_parameter(rule, effective_parameter(rule)?)
 }
 
-fn validate_rule_flags_and_parameter(rule: &Rule, parameter: u32) -> XlsbResult<()> {
+fn validate_rule_flags_and_parameter(rule: &Rule, parameter: u32) -> Result<()> {
     let valid_parameter = match (rule.rule_type, rule.template) {
         (RuleType::CellIs, 0) => (1..=8).contains(&parameter),
         (RuleType::Expression, 8) => parameter <= 3,
@@ -3219,7 +3209,7 @@ fn validate_rule_flags_and_parameter(rule: &Rule, parameter: u32) -> XlsbResult<
     Ok(())
 }
 
-fn effective_parameter(rule: &Rule) -> XlsbResult<u32> {
+fn effective_parameter(rule: &Rule) -> Result<u32> {
     if rule.rule_type != RuleType::CellIs {
         if rule.operator.is_some() {
             return Err(invalid(
@@ -3239,10 +3229,10 @@ fn effective_parameter(rule: &Rule) -> XlsbResult<u32> {
     Ok(parameter)
 }
 
-fn effective_formulas(rule: &Rule) -> XlsbResult<Vec<CellParsedFormula>> {
+fn effective_formulas(rule: &Rule) -> Result<Vec<CellParsedFormula>> {
     if !rule.formulas.is_empty() {
         if !rule.formula_extras.is_empty() && rule.formula_extras.len() != rule.formulas.len() {
-            return Err(XlsbError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "conditional-format ancillary stream count does not match formulas".to_string(),
             ));
         }
@@ -3252,7 +3242,7 @@ fn effective_formulas(rule: &Rule) -> XlsbResult<Vec<CellParsedFormula>> {
             .enumerate()
             .map(|(index, rgce)| {
                 if rgce.is_empty() || rgce.len() > MAX_CELL_FORMULA_BYTES {
-                    return Err(XlsbError::InvalidFormula(format!(
+                    return Err(Error::InvalidFormula(format!(
                         "conditional-format formula length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
                         rgce.len()
                     )));
@@ -3270,7 +3260,7 @@ fn effective_formulas(rule: &Rule) -> XlsbResult<Vec<CellParsedFormula>> {
         .collect()
 }
 
-fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> XlsbResult<()> {
+fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Result<()> {
     match rule.rule_type {
         RuleType::ColorScale => {
             let scale = rule.color_scale.as_ref().expect("validated color scale");
@@ -3339,7 +3329,7 @@ fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Xl
     Ok(())
 }
 
-fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> XlsbResult<()> {
+fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Result<()> {
     if rule.color_scale.is_some() || rule.data_bar.is_some() || rule.icon_set.is_some() {
         return Err(invalid(
             "BrtBeginCFRule14",
@@ -3443,7 +3433,7 @@ fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> 
     Ok(())
 }
 
-fn validate_scale_thresholds14(scale: &Scale) -> XlsbResult<()> {
+fn validate_scale_thresholds14(scale: &Scale) -> Result<()> {
     if matches!(scale.min_cfvo.cfvo_type, 3 | 8 | 9)
         || matches!(scale.max_cfvo.cfvo_type, 2 | 8 | 9)
     {
@@ -3473,7 +3463,7 @@ fn validate_scale_thresholds14(scale: &Scale) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_data_bar14(bar: &Bar14, priority: i32) -> XlsbResult<()> {
+fn validate_data_bar14(bar: &Bar14, priority: i32) -> Result<()> {
     if matches!(bar.min_cfvo.cfvo_type, 3 | 9) || matches!(bar.max_cfvo.cfvo_type, 2 | 8) {
         return Err(invalid(
             "BrtBeginDatabar14",
@@ -3494,7 +3484,7 @@ fn validate_data_bar14(bar: &Bar14, priority: i32) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_icon_set14(set: &IconSet14) -> XlsbResult<()> {
+fn validate_icon_set14(set: &IconSet14) -> Result<()> {
     let expected = icon_count14(set.icon_set_type);
     if expected == 0 || set.cfvos.len() != expected {
         return Err(invalid(
@@ -3525,28 +3515,28 @@ fn validate_icon_set14(set: &IconSet14) -> XlsbResult<()> {
     Ok(())
 }
 
-fn write_cfvo14<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> XlsbResult<()> {
-    let mut cfvo = cfvo.clone();
-    cfvo.formula_binary = effective_cfvo_formula(&cfvo)?;
-    if cfvo.formula_binary.is_none() && matches!(cfvo.cfvo_type, 1 | 4 | 5) {
-        cfvo.numeric_value = cfvo
-            .value
+fn write_cfvo14<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
+    let formula = effective_cfvo_formula(cfvo)?;
+    let numeric_value = if formula.is_none() && matches!(cfvo.cfvo_type, 1 | 4 | 5) {
+        cfvo.value
             .as_deref()
             .and_then(|value| value.parse().ok())
-            .unwrap_or(cfvo.numeric_value);
-    }
-    if icon_set {
-        cfvo.save_greater_than_or_equal = true;
-    }
-    writer.write_record(kind::CFVO14, &cfvo.serialize_extension14()?)?;
+            .unwrap_or(cfvo.numeric_value)
+    } else {
+        cfvo.numeric_value
+    };
+    writer.write_record(
+        kind::CFVO14,
+        &cfvo.serialize_extension14_with(
+            formula.as_ref(),
+            numeric_value,
+            icon_set || cfvo.save_greater_than_or_equal,
+        )?,
+    )?;
     Ok(())
 }
 
-fn write_color14<W: Write>(
-    writer: &mut Writer<W>,
-    record: Color,
-    legacy_argb: u32,
-) -> XlsbResult<()> {
+fn write_color14<W: Write>(writer: &mut Writer<W>, record: Color, legacy_argb: u32) -> Result<()> {
     let record = if record.argb == Some(legacy_argb) || (record.argb.is_none() && legacy_argb == 0)
     {
         record
@@ -3557,7 +3547,7 @@ fn write_color14<W: Write>(
     Ok(())
 }
 
-fn validate_scale_thresholds(scale: &Scale) -> XlsbResult<()> {
+fn validate_scale_thresholds(scale: &Scale) -> Result<()> {
     validate_boundary_thresholds(&scale.min_cfvo, &scale.max_cfvo, "BrtBeginColorScale")?;
     if scale.mid_cfvo.is_some() != scale.mid_color_record.is_some()
         || scale.mid_cfvo.is_some() != scale.mid_color.is_some()
@@ -3580,7 +3570,7 @@ fn validate_scale_thresholds(scale: &Scale) -> XlsbResult<()> {
     Ok(())
 }
 
-fn validate_boundary_thresholds(minimum: &Value, maximum: &Value, record: &str) -> XlsbResult<()> {
+fn validate_boundary_thresholds(minimum: &Value, maximum: &Value, record: &str) -> Result<()> {
     if minimum.cfvo_type == 3 || maximum.cfvo_type == 2 {
         return Err(invalid(
             record,
@@ -3590,7 +3580,7 @@ fn validate_boundary_thresholds(minimum: &Value, maximum: &Value, record: &str) 
     Ok(())
 }
 
-fn icon_count(icon_set_type: u8) -> XlsbResult<usize> {
+fn icon_count(icon_set_type: u8) -> Result<usize> {
     match icon_set_type {
         0..=7 => Ok(3),
         8..=12 => Ok(4),
@@ -3599,7 +3589,7 @@ fn icon_count(icon_set_type: u8) -> XlsbResult<usize> {
     }
 }
 
-fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> XlsbResult<()> {
+fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
     if !matches!(cfvo.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7) {
         return Err(invalid(
             "BrtCFVO",
@@ -3637,7 +3627,7 @@ fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) ->
     let formula_size = formula.as_ref().map_or(0, |formula| formula.rgce.len());
     payload.extend_from_slice(
         &u32::try_from(formula_size)
-            .map_err(|_| XlsbError::InvalidFormula("formula is too large".to_string()))?
+            .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?
             .to_le_bytes(),
     );
     if let Some(formula) = formula {
@@ -3647,7 +3637,7 @@ fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) ->
     Ok(())
 }
 
-fn effective_cfvo_formula(cfvo: &Value) -> XlsbResult<Option<CellParsedFormula>> {
+fn effective_cfvo_formula(cfvo: &Value) -> Result<Option<CellParsedFormula>> {
     if let Some(formula) = &cfvo.formula_binary {
         return Ok(Some(formula.clone()));
     }
@@ -3663,11 +3653,7 @@ fn effective_cfvo_formula(cfvo: &Value) -> XlsbResult<Option<CellParsedFormula>>
     Ok(None)
 }
 
-fn write_color<W: Write>(
-    writer: &mut Writer<W>,
-    record: Color,
-    legacy_argb: u32,
-) -> XlsbResult<()> {
+fn write_color<W: Write>(writer: &mut Writer<W>, record: Color, legacy_argb: u32) -> Result<()> {
     let record = if record.argb == Some(legacy_argb) || (record.argb.is_none() && legacy_argb == 0)
     {
         record
@@ -3678,18 +3664,19 @@ fn write_color<W: Write>(
     Ok(())
 }
 
-fn write_nullable_wide_string(payload: &mut Vec<u8>, value: Option<&str>) -> XlsbResult<()> {
+fn write_nullable_wide_string(payload: &mut Vec<u8>, value: Option<&str>) -> Result<()> {
     let Some(value) = value else {
         payload.extend_from_slice(&u32::MAX.to_le_bytes());
         return Ok(());
     };
-    let utf16 = value.encode_utf16().collect::<Vec<_>>();
+    let units = value.encode_utf16().count();
     payload.extend_from_slice(
-        &u32::try_from(utf16.len())
-            .map_err(|_| XlsbError::Encoding("conditional-format text is too long".to_string()))?
+        &u32::try_from(units)
+            .map_err(|_| Error::Encoding("conditional-format text is too long".to_string()))?
             .to_le_bytes(),
     );
-    for unit in utf16 {
+    payload.reserve(units.saturating_mul(2));
+    for unit in value.encode_utf16() {
         payload.extend_from_slice(&unit.to_le_bytes());
     }
     Ok(())

@@ -2,7 +2,6 @@
 
 use crate::xlsb::cell::XlsbCell;
 use crate::xlsb::comments::Comment;
-use crate::xlsb::conditional_formatting::ConditionalFormatting;
 use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
@@ -11,6 +10,7 @@ use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
 };
+use litchi_xlsb::conditional_formatting::Formatting;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
@@ -132,7 +132,7 @@ pub struct XlsbWorksheet {
     data_validations: Vec<DataValidation>,
     data_validation_settings: Option<DataValidationSettings>,
     data_validation14_settings: Option<DataValidationSettings>,
-    conditional_formattings: Vec<ConditionalFormatting>,
+    conditional_formattings: Vec<Formatting>,
     web_extension_bindings: Vec<XlsbWebExtensionBinding>,
     sheet_views: Vec<SheetView>,
 }
@@ -221,10 +221,7 @@ impl XlsbWorksheet {
         self.data_validations = validations;
     }
 
-    pub(crate) fn set_conditional_formattings(
-        &mut self,
-        conditional_formattings: Vec<ConditionalFormatting>,
-    ) {
+    pub(crate) fn set_conditional_formattings(&mut self, conditional_formattings: Vec<Formatting>) {
         self.conditional_formattings = conditional_formattings;
     }
 
@@ -292,7 +289,7 @@ impl XlsbWorksheet {
     }
 
     /// Conditional-formatting blocks in worksheet stream order.
-    pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
+    pub fn conditional_formattings(&self) -> &[Formatting] {
         &self.conditional_formattings
     }
 
