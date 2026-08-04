@@ -442,7 +442,9 @@ impl PagesEditor {
     pub fn remove_body_audio(&mut self, drawable_object_id: u64) -> Result<RemovedPagesAudio> {
         let source = body_audio_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(crate::comments::DrawableObjectId::from_object_id(
+            drawable_object_id,
+        )?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;

@@ -9,7 +9,8 @@ use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
+    CommentStorageId, DrawableCommentInfo, DrawableCommentReplyInfo, DrawableObjectId,
+    IWorkDrawableCommentEditor, IWorkDrawableInfo,
 };
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
@@ -3432,7 +3433,7 @@ impl KeynoteEditor {
             })?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableObjectId::from_object_id(drawable_object_id)?)?;
         let mut staged = comments.into_package();
         patch_slide_drawable_references(
             &mut staged,
@@ -3488,7 +3489,7 @@ impl KeynoteEditor {
     ) -> Result<Option<DrawableCommentInfo>> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .comment(drawable_object_id)
+            .comment(DrawableObjectId::from_object_id(drawable_object_id)?)
     }
 
     /// Create or replace a direct drawable comment on one slide.
@@ -3500,7 +3501,7 @@ impl KeynoteEditor {
     ) -> Result<()> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.set_comment(drawable_object_id, text)?;
+        comments.set_comment(DrawableObjectId::from_object_id(drawable_object_id)?, text)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -3515,7 +3516,7 @@ impl KeynoteEditor {
     ) -> Result<()> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableObjectId::from_object_id(drawable_object_id)?)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -3530,7 +3531,7 @@ impl KeynoteEditor {
     ) -> Result<Vec<DrawableCommentReplyInfo>> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .replies(drawable_object_id)
+            .replies(DrawableObjectId::from_object_id(drawable_object_id)?)
     }
 
     /// Add a reply to a direct comment on one slide drawable.
@@ -3542,7 +3543,8 @@ impl KeynoteEditor {
     ) -> Result<u64> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        let reply_id = comments.add_reply(drawable_object_id, text)?;
+        let reply_id =
+            comments.add_reply(DrawableObjectId::from_object_id(drawable_object_id)?, text)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -3559,7 +3561,11 @@ impl KeynoteEditor {
     ) -> Result<u64> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
+        let reply_id = comments.set_reply(
+            DrawableObjectId::from_object_id(drawable_object_id)?,
+            CommentStorageId::from_object_id(reply_storage_object_id)?,
+            text,
+        )?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -3575,7 +3581,10 @@ impl KeynoteEditor {
     ) -> Result<()> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
+        comments.remove_reply(
+            DrawableObjectId::from_object_id(drawable_object_id)?,
+            CommentStorageId::from_object_id(reply_storage_object_id)?,
+        )?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);

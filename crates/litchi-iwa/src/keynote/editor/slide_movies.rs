@@ -724,7 +724,9 @@ impl KeynoteEditor {
             working.require_slide_media_kind(slide_index, drawable_object_id, expected_kind)?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(working.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(crate::comments::DrawableObjectId::from_object_id(
+            drawable_object_id,
+        )?)?;
         let mut staged = comments.into_package();
         patch_slide_drawable_references(
             &mut staged,

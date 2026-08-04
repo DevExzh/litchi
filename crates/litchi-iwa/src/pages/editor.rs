@@ -2242,7 +2242,7 @@ impl PagesEditor {
             })?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableObjectId::from_object_id(drawable_object_id)?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = graph.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
@@ -2291,7 +2291,7 @@ impl PagesEditor {
     pub fn drawable_comment(&self, drawable_object_id: u64) -> Result<Option<DrawableCommentInfo>> {
         self.require_drawable(drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .comment(drawable_object_id)
+            .comment(DrawableObjectId::from_object_id(drawable_object_id)?)
     }
 
     /// Create or replace a direct comment on a reachable Pages drawable.
@@ -2302,7 +2302,7 @@ impl PagesEditor {
     ) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.set_comment(drawable_object_id, text)?;
+        comments.set_comment(DrawableObjectId::from_object_id(drawable_object_id)?, text)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
@@ -2311,7 +2311,7 @@ impl PagesEditor {
     pub fn clear_drawable_comment(&mut self, drawable_object_id: u64) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableObjectId::from_object_id(drawable_object_id)?)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
