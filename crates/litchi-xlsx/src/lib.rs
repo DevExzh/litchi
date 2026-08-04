@@ -16,6 +16,7 @@ pub mod color;
 pub mod column;
 pub mod conditional_formatting;
 pub mod connections;
+pub mod custom_data;
 pub mod data_consolidation;
 pub mod data_validation;
 mod error;
@@ -90,6 +91,9 @@ pub use conditional_formatting::{
     DifferentialNumberFormat, Direction, ExtensionAssociation, IconSet, IconSet14, Icons, Kind,
     NamedColor, Operator, Period, SpreadsheetColor, TokenError, ValueKind,
     parse_conditional_formattings, parse_differential_formats,
+};
+pub use custom_data::{
+    ExtensionList, Properties, parse_properties, validate_workbook_root, write_properties,
 };
 pub use data_consolidation::{
     WorksheetDataConsolidation, WorksheetDataConsolidationConformance,

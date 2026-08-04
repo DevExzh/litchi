@@ -1,71 +1,58 @@
 /// Document variables support for Word documents.
 ///
-/// Document variables are inert name-value pairs stored in `settings.xml` and
-/// referenced by fields such as `DOCVARIABLE`.
-use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
+/// The collection and standalone WordprocessingML codec live in
+/// `litchi-docx`.  This adapter retains the historical host API and keeps OPC
+/// part and markup-compatibility concerns at the package boundary.
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
-use quick_xml::Decoder;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{NamespaceResolver, ResolveResult};
-use quick_xml::reader::NsReader;
 
-const MAX_DOCUMENT_VARIABLES: usize = 4096;
-const MAX_DOCUMENT_VARIABLE_XML_BYTES: usize = 8 * 1024 * 1024;
-const MAX_DOCUMENT_VARIABLE_DEPTH: usize = 64;
-const MAX_DOCUMENT_VARIABLE_NAME_CHARS: usize = 255;
-const MAX_DOCUMENT_VARIABLE_VALUE_CHARS: usize = 65_280;
+#[cfg(test)]
+const MAX_DOCUMENT_VARIABLES: usize = litchi_docx::variables::MAX_DOCUMENT_VARIABLES;
+const MAX_DOCUMENT_VARIABLE_XML_BYTES: usize =
+    litchi_docx::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES;
 
 /// Deterministic insertion-order collection of document variables.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentVariables {
-    variables: Vec<(String, String)>,
+    inner: litchi_docx::DocumentVariables,
 }
 
 impl DocumentVariables {
     /// Create an empty collection.
     pub const fn new() -> Self {
         Self {
-            variables: Vec::new(),
+            inner: litchi_docx::DocumentVariables::new(),
         }
     }
 
     /// Get a variable value by its case-sensitive OOXML name.
     pub fn get(&self, name: &str) -> Option<&str> {
-        self.variables
-            .iter()
-            .find(|(candidate, _)| candidate == name)
-            .map(|(_, value)| value.as_str())
+        self.inner.get(name)
     }
 
     /// Check whether a variable exists.
     pub fn contains(&self, name: &str) -> bool {
-        self.get(name).is_some()
+        self.inner.contains(name)
     }
 
     /// Return variable names in deterministic insertion order.
     pub fn names(&self) -> Vec<&str> {
-        self.variables
-            .iter()
-            .map(|(name, _)| name.as_str())
-            .collect()
+        self.inner.names()
     }
 
     /// Iterate in deterministic insertion order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.variables
-            .iter()
-            .map(|(name, value)| (name.as_str(), value.as_str()))
+        self.inner.iter()
     }
 
     /// Number of variables.
     pub fn count(&self) -> usize {
-        self.variables.len()
+        self.inner.count()
     }
 
     /// Whether the collection is empty.
     pub fn is_empty(&self) -> bool {
-        self.variables.is_empty()
+        self.inner.is_empty()
     }
 
     /// Insert or replace a variable without changing an existing entry's order.
@@ -74,90 +61,35 @@ impl DocumentVariables {
         name: impl Into<String>,
         value: impl Into<String>,
     ) -> Result<Option<String>> {
-        let name = name.into();
-        let value = value.into();
-        validate_document_variable(&name, &value)?;
-        if let Some((_, existing)) = self
-            .variables
-            .iter_mut()
-            .find(|(candidate, _)| candidate == &name)
-        {
-            return Ok(Some(std::mem::replace(existing, value)));
-        }
-        if self.variables.len() >= MAX_DOCUMENT_VARIABLES {
-            return Err(OoxmlError::InvalidFormat(format!(
-                "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
-            )));
-        }
-        self.variables.push((name, value));
-        Ok(None)
+        self.inner.insert(name, value).map_err(map_docx_error)
     }
 
     /// Remove a variable while preserving the order of all remaining entries.
     pub fn remove(&mut self, name: &str) -> Option<String> {
-        let index = self
-            .variables
-            .iter()
-            .position(|(candidate, _)| candidate == name)?;
-        Some(self.variables.remove(index).1)
+        self.inner.remove(name)
     }
 
     /// Remove all variables.
     pub fn clear(&mut self) {
-        self.variables.clear();
+        self.inner.clear();
     }
 
     /// Serialize a standalone transitional `w:docVars` element.
     pub fn to_xml(&self) -> Result<String> {
-        self.validate()?;
-        let mut xml = String::new();
-        xml.push_str(
-            r#"<w:docVars xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
-        );
-        self.write_entries(&mut xml, "w");
-        xml.push_str("</w:docVars>");
-        Ok(xml)
+        self.inner.to_xml().map_err(map_docx_error)
     }
 
+    /// Validate the collection for the host settings patcher.
     pub(crate) fn validate(&self) -> Result<()> {
-        if self.variables.len() > MAX_DOCUMENT_VARIABLES {
-            return Err(OoxmlError::InvalidFormat(format!(
-                "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
-            )));
-        }
-        for (name, value) in &self.variables {
-            validate_document_variable(name, value)?;
-        }
-        Ok(())
+        self.inner.validate().map_err(map_docx_error)
     }
 
+    /// Append `docVar` children for the host settings patcher.
     pub(crate) fn write_entries(&self, xml: &mut String, prefix: &str) {
-        for (name, value) in &self.variables {
-            xml.push('<');
-            if !prefix.is_empty() {
-                xml.push_str(prefix);
-                xml.push(':');
-            }
-            xml.push_str("docVar");
-            xml.push(' ');
-            if !prefix.is_empty() {
-                xml.push_str(prefix);
-                xml.push(':');
-            }
-            xml.push_str("name=\"");
-            escape_attribute(xml, name);
-            xml.push_str("\" ");
-            if !prefix.is_empty() {
-                xml.push_str(prefix);
-                xml.push(':');
-            }
-            xml.push_str("val=\"");
-            escape_attribute(xml, value);
-            xml.push_str("\"/>");
-        }
+        self.inner.write_entries(xml, prefix);
     }
 
-    /// Extract variables from a `settings.xml` part without evaluating fields.
+    /// Extract variables from a `settings.xml` part after MCE preprocessing.
     pub(crate) fn extract_from_settings_part(part: &dyn Part) -> Result<Self> {
         if part.blob().len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
             return Err(OoxmlError::InvalidFormat(format!(
@@ -168,235 +100,34 @@ impl DocumentVariables {
         Self::extract_from_xml(xml.as_ref())
     }
 
+    /// Extract variables from a settings XML payload without package access.
     pub(crate) fn extract_from_xml(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
-            return Err(OoxmlError::InvalidFormat(format!(
-                "settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
-            )));
-        }
-        let mut reader = NsReader::from_reader(xml);
-        let mut variables = Self::new();
-        let mut depth = 0usize;
-        let mut saw_root = false;
-        let mut saw_doc_vars = false;
-        let mut doc_vars_depth = None;
-        let mut open_doc_var_depth = None;
-
-        loop {
-            let decoder = reader.decoder();
-            let event = reader
-                .read_event()
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?
-                .into_owned();
-            let resolver = reader.resolver().clone();
-            let (namespace, event) = resolver.resolve_event(event);
-
-            match event {
-                Event::Start(element) => {
-                    depth = depth.checked_add(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat("document-variable XML nesting overflow".into())
-                    })?;
-                    if depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                        return Err(OoxmlError::InvalidFormat(format!(
-                            "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                        )));
-                    }
-                    if depth == 1 {
-                        validate_settings_root(&namespace, &element, saw_root)?;
-                        saw_root = true;
-                    } else if depth == 2
-                        && is_wordprocessing_namespace(&namespace)
-                        && element.local_name().as_ref() == b"docVars"
-                    {
-                        begin_doc_vars(&mut saw_doc_vars, &mut doc_vars_depth, depth)?;
-                    } else if depth == 3
-                        && doc_vars_depth == Some(2)
-                        && is_wordprocessing_namespace(&namespace)
-                        && element.local_name().as_ref() == b"docVar"
-                    {
-                        push_parsed_variable(&mut variables, &element, decoder, &resolver)?;
-                        open_doc_var_depth = Some(depth);
-                    } else if is_wordprocessing_namespace(&namespace)
-                        && matches!(element.local_name().as_ref(), b"docVars" | b"docVar")
-                    {
-                        return Err(OoxmlError::InvalidFormat(
-                            "misplaced or nested document-variable element".into(),
-                        ));
-                    } else if doc_vars_depth.is_some() && is_wordprocessing_namespace(&namespace) {
-                        return Err(OoxmlError::InvalidFormat(
-                            "unexpected WordprocessingML child in docVars".into(),
-                        ));
-                    }
-                },
-                Event::Empty(element) => {
-                    let child_depth = depth.checked_add(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat("document-variable XML nesting overflow".into())
-                    })?;
-                    if child_depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                        return Err(OoxmlError::InvalidFormat(format!(
-                            "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                        )));
-                    }
-                    if child_depth == 1 {
-                        validate_settings_root(&namespace, &element, saw_root)?;
-                        saw_root = true;
-                    } else if child_depth == 2
-                        && is_wordprocessing_namespace(&namespace)
-                        && element.local_name().as_ref() == b"docVars"
-                    {
-                        begin_doc_vars(&mut saw_doc_vars, &mut doc_vars_depth, child_depth)?;
-                        doc_vars_depth = None;
-                    } else if child_depth == 3
-                        && doc_vars_depth == Some(2)
-                        && is_wordprocessing_namespace(&namespace)
-                        && element.local_name().as_ref() == b"docVar"
-                    {
-                        push_parsed_variable(&mut variables, &element, decoder, &resolver)?;
-                    } else if is_wordprocessing_namespace(&namespace)
-                        && matches!(element.local_name().as_ref(), b"docVars" | b"docVar")
-                    {
-                        return Err(OoxmlError::InvalidFormat(
-                            "misplaced or nested document-variable element".into(),
-                        ));
-                    } else if doc_vars_depth.is_some() && is_wordprocessing_namespace(&namespace) {
-                        return Err(OoxmlError::InvalidFormat(
-                            "unexpected WordprocessingML child in docVars".into(),
-                        ));
-                    }
-                },
-                Event::End(_) => {
-                    if open_doc_var_depth == Some(depth) {
-                        open_doc_var_depth = None;
-                    }
-                    if doc_vars_depth == Some(depth) {
-                        doc_vars_depth = None;
-                    }
-                    depth = depth.checked_sub(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat("invalid document-variable XML nesting".into())
-                    })?;
-                },
-                Event::Text(text)
-                    if (open_doc_var_depth.is_some() || doc_vars_depth == Some(depth))
-                        && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
-                {
-                    return Err(OoxmlError::InvalidFormat(
-                        "document-variable elements cannot contain text".into(),
-                    ));
-                },
-                Event::CData(text)
-                    if (open_doc_var_depth.is_some() || doc_vars_depth == Some(depth))
-                        && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
-                {
-                    return Err(OoxmlError::InvalidFormat(
-                        "document-variable elements cannot contain text".into(),
-                    ));
-                },
-                Event::Eof if depth != 0 => {
-                    return Err(OoxmlError::InvalidFormat(
-                        "unterminated document-variable settings XML".into(),
-                    ));
-                },
-                Event::Eof => break,
-                _ => {},
-            }
-        }
-        if !saw_root {
-            return Err(OoxmlError::InvalidFormat(
-                "settings part has no settings root".into(),
-            ));
-        }
-        Ok(variables)
+        litchi_docx::parse_document_variables(xml)
+            .map(Self::from_inner)
+            .map_err(map_docx_error)
     }
-}
 
-fn validate_settings_root(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-    saw_root: bool,
-) -> Result<()> {
-    if saw_root
-        || !is_wordprocessing_namespace(namespace)
-        || element.local_name().as_ref() != b"settings"
-    {
-        return Err(OoxmlError::InvalidFormat(
-            "document variables require one Word settings root".into(),
-        ));
-    }
-    Ok(())
-}
-
-fn begin_doc_vars(
-    saw_doc_vars: &mut bool,
-    doc_vars_depth: &mut Option<usize>,
-    depth: usize,
-) -> Result<()> {
-    if std::mem::replace(saw_doc_vars, true) {
-        return Err(OoxmlError::InvalidFormat(
-            "duplicate docVars container".into(),
-        ));
-    }
-    *doc_vars_depth = Some(depth);
-    Ok(())
-}
-
-fn push_parsed_variable(
-    variables: &mut DocumentVariables,
-    element: &BytesStart<'_>,
-    decoder: Decoder,
-    resolver: &NamespaceResolver,
-) -> Result<()> {
-    let name = word_attribute_value(element, b"name", decoder, resolver)?.ok_or_else(|| {
-        OoxmlError::InvalidFormat("document variable name attribute is required".into())
-    })?;
-    let value = word_attribute_value(element, b"val", decoder, resolver)?.ok_or_else(|| {
-        OoxmlError::InvalidFormat("document variable val attribute is required".into())
-    })?;
-    validate_document_variable(&name, &value)?;
-    if variables.contains(&name) {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "duplicate document variable name {name:?}"
-        )));
-    }
-    if variables.variables.len() >= MAX_DOCUMENT_VARIABLES {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
-        )));
-    }
-    variables.variables.push((name, value));
-    Ok(())
-}
-
-fn validate_document_variable(name: &str, value: &str) -> Result<()> {
-    let name_chars = name.chars().count();
-    if !(1..=MAX_DOCUMENT_VARIABLE_NAME_CHARS).contains(&name_chars) {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "document variable name must contain 1 to {MAX_DOCUMENT_VARIABLE_NAME_CHARS} characters"
-        )));
-    }
-    if value.chars().count() > MAX_DOCUMENT_VARIABLE_VALUE_CHARS {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "document variable value exceeds {MAX_DOCUMENT_VARIABLE_VALUE_CHARS} characters"
-        )));
-    }
-    Ok(())
-}
-
-fn escape_attribute(output: &mut String, value: &str) {
-    for character in value.chars() {
-        match character {
-            '&' => output.push_str("&amp;"),
-            '<' => output.push_str("&lt;"),
-            '>' => output.push_str("&gt;"),
-            '"' => output.push_str("&quot;"),
-            '\'' => output.push_str("&apos;"),
-            _ => output.push(character),
-        }
+    fn from_inner(inner: litchi_docx::DocumentVariables) -> Self {
+        Self { inner }
     }
 }
 
 impl Default for DocumentVariables {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn map_docx_error(error: litchi_docx::Error) -> OoxmlError {
+    match error {
+        litchi_docx::Error::Opc(error) => OoxmlError::Opc(error),
+        litchi_docx::Error::Xml(message) => OoxmlError::Xml(message),
+        litchi_docx::Error::Invalid(message) => OoxmlError::InvalidFormat(message),
+        litchi_docx::Error::Mce(error) => OoxmlError::from(error),
+        litchi_docx::Error::Allocation { resource, source } => {
+            OoxmlError::Allocation { resource, source }
+        },
+        other => OoxmlError::InvalidFormat(other.to_string()),
     }
 }
 

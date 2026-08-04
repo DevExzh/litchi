@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod calc;
+pub mod comments;
 pub mod conditional_formatting;
 pub mod data_validation;
 pub mod date_utils;

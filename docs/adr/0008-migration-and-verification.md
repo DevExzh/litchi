@@ -4036,6 +4036,41 @@ workspace tests remain environment-blocked before compilation because
 `pkg-config`/fontconfig is unavailable. No native Office or performance claim
 is made for this batch.
 
+## DOCX variables, XLSB comments, and XLSX custom-data owner follow-up
+
+This batch applies the layered-module and concise-name rule across all three
+owner crates. Each new owner surface has a small `mod.rs` facade plus semantic
+`model.rs` and `codec.rs` layers; format-owned structs do not repeat the
+module prefix. Existing host paths remain compatibility adapters while their
+legacy flat modules are migrated in later disjoint batches.
+
+- `litchi-docx::variables` owns `DocumentVariables` and the bounded
+  WordprocessingML codec. The host retains OPC-part access, MCE preprocessing,
+  and the historical `litchi_ooxml` error/API boundary.
+- `litchi-xlsb::comments` owns `Comment`, `CommentRun`, BIFF12 record framing,
+  and rich-string validation. The host retains `SharedStringRun` conversion
+  and the historical comment model.
+- `litchi-xlsx::custom_data` owns concise `Properties` and `ExtensionList`
+  models plus their bounded XML codec. The host retains opaque payloads,
+  package relationships, content types, and atomic load/store orchestration.
+
+The checked-in specification anchors are `[MS-OE376]` §2.1.411 for `docVar`;
+`[MS-XLSB]` §§2.1.7.8, 2.4.30--2.4.33, 2.4.340--2.4.341, and
+2.4.387--2.4.390 for the comments grammar and records; and `[MS-XLSX]`
+§§2.1.2--2.1.3, 2.4.35, 2.6.34, and 2.6.66 for custom-data parts,
+`datastoreItem`, `embeddedDataId`, and `CT_DatastoreItem`.
+
+The owner unit suites pass 253 DOCX, 89 XLSB, and 390 XLSX tests, with their
+available integration and doctest targets passing. The no-default-features
+`litchi-ooxml` all-target suite passes 1,504 host library tests plus its
+integration and doctest targets. Owner all-feature all-target strict Clippy,
+host no-default-feature all-target strict Clippy, formatting, diff, and the
+crate-boundary audit pass: 35 workspace packages, 107 internal dependency
+declarations, and the same 13 explicitly scheduled debt edges remain. Host
+all-features tests/Clippy and the full workspace test remain blocked before
+compilation because `pkg-config`/fontconfig is unavailable. No native Office
+or performance claim is made for this batch.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

@@ -20,6 +20,7 @@ pub mod mail_merge;
 pub mod modern_comments;
 pub mod settings;
 pub mod statistics;
+pub mod variables;
 pub mod web;
 
 pub use bibliography::{
@@ -80,3 +81,4 @@ pub use statistics::{
     DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
     estimate_line_count, estimate_page_count,
 };
+pub use variables::{DocumentVariables, parse_document_variables};
