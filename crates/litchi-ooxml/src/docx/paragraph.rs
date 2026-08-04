@@ -979,7 +979,7 @@ impl Paragraph {
     /// }
     /// ```
     pub fn hyperlinks(&self, rels: &Relationships) -> Result<Vec<Hyperlink>> {
-        Hyperlink::extract_from_paragraph(self.xml_bytes(), rels)
+        Ok(Hyperlink::extract_from_paragraph(self.xml_bytes(), rels)?)
     }
 }
 

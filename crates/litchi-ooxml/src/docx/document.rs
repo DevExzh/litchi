@@ -1060,7 +1060,7 @@ impl<'a> Document<'a> {
         let rels = main_part.rels();
         let xml_bytes = self.part.xml_bytes();
 
-        Hyperlink::extract_from_document(xml_bytes, rels)
+        Ok(Hyperlink::extract_from_document(xml_bytes, rels)?)
     }
 
     /// Get the number of `<w:hyperlink>` element hyperlinks in the document.
