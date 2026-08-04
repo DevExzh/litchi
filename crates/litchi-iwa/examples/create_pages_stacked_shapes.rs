@@ -1,6 +1,7 @@
 //! Create overlapping Pages shapes and move one to the front without a template.
 
 use litchi_iwa::DrawableLayerMove;
+use litchi_iwa::comments::DrawableObjectId;
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapePreset,
@@ -34,7 +35,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ShapePreset::Ellipse,
         solid_color(0.12, 0.38, 0.92)?,
     )?;
-    editor.move_body_drawable(first.drawable_object_id, DrawableLayerMove::ToFront)?;
+    editor.move_body_drawable(
+        DrawableObjectId::from_object_id(first.drawable_object_id)?,
+        DrawableLayerMove::ToFront,
+    )?;
     editor.save(output)?;
     println!(
         "moved Pages drawable {} ahead of {}",
