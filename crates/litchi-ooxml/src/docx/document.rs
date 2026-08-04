@@ -2647,38 +2647,46 @@ impl<'a> Document<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn statistics(&self) -> Result<DocumentStatistics> {
-        let mut stats = DocumentStatistics::new();
-
         // Get all text content
         let text = self.text()?;
 
         // Calculate text statistics
-        stats.set_word_count(count_words(&text));
-        stats.set_character_count(count_characters(&text));
-        stats.set_character_count_no_spaces(count_characters_no_spaces(&text));
+        let word_count = count_words(&text);
+        let character_count = count_characters(&text);
+        let character_count_no_spaces = count_characters_no_spaces(&text);
 
         // Get paragraph and table counts
-        stats.set_paragraph_count(self.paragraph_count()?);
-        stats.set_table_count(self.table_count()?);
+        let paragraph_count = self.paragraph_count()?;
+        let table_count = self.table_count()?;
 
         // Estimate lines and pages (80 chars/line, 45 lines/page)
         let line_count = estimate_line_count(&text, 80);
-        stats.set_line_count(line_count);
-        stats.set_page_count(estimate_page_count(line_count, 45));
+        let page_count = estimate_page_count(line_count, 45);
 
         // Count images and drawings across all paragraphs
-        let mut image_count = 0;
-        let mut drawing_count = 0;
+        let mut image_count = 0usize;
+        let mut drawing_count = 0usize;
 
         for para in self.paragraphs()? {
-            image_count += para.images()?.len();
-            drawing_count += para.drawing_objects()?.len();
+            image_count = image_count
+                .checked_add(para.images()?.len())
+                .ok_or_else(|| OoxmlError::InvalidFormat("DOCX image count overflow".into()))?;
+            drawing_count = drawing_count
+                .checked_add(para.drawing_objects()?.len())
+                .ok_or_else(|| OoxmlError::InvalidFormat("DOCX drawing count overflow".into()))?;
         }
 
-        stats.set_image_count(image_count);
-        stats.set_drawing_count(drawing_count);
-
-        Ok(stats)
+        Ok(DocumentStatistics::from_counts(
+            word_count,
+            character_count,
+            character_count_no_spaces,
+            paragraph_count,
+            line_count,
+            page_count,
+            table_count,
+            image_count,
+            drawing_count,
+        ))
     }
 
     // ========================================

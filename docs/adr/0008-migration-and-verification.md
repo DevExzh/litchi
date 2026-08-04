@@ -3628,6 +3628,26 @@ intact. Pointer-identity tests cover both ownership branches. These are
 structural copy and transaction guarantees, not measured latency, allocation,
 or throughput claims; ADR 0005 performance evidence remains outstanding.
 
+## DOCX, PPTX, and XLSB semantic owner follow-up
+
+The next concrete-crate migration batch closes three more pure-value seams while
+leaving package traversal in the format adapter:
+
+- DOCX formatting values and document statistics now live in `litchi-docx`.
+  For these seams, `litchi-ooxml::docx` retains compatibility re-exports and
+  owns only document traversal, including the checked aggregation of image and
+  drawing counts.
+- PPTX image/text formatting values now live in `litchi-pptx`; the OOXML host
+  retains its historical module path as a re-export.
+- XLSB date serial utilities now live in `litchi-xlsb`. The 1900/1904 date
+  system selection remains compatible with the workbook `f1904` flag described
+  by `[MS-XLSB]` section 3.7.
+
+The owner crates retain focused unit coverage, and the DOCX adapter has a
+reopened-package regression covering the public statistics snapshot. This is
+functional and boundary evidence only; native Office and performance evidence
+remain governed by the evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
