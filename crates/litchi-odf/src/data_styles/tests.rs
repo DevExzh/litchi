@@ -29,11 +29,11 @@ fn parses_all_seven_containers_and_all_standard_tokens() {
         <number:text-style style:name="x"><number:text-content/><number:text> </number:text><number:text-content/></number:text-style>
     "##,
     );
-    let styles = parse_data_styles_xml(&xml, OdfDataStylePart::Flat).unwrap();
+    let styles = parse_data_styles_xml(&xml, Part::Flat).unwrap();
     assert_eq!(styles.styles.len(), 9);
     for style in &styles.styles {
-        let fragment = style.to_xml_fragment(OdfDataStyleVersion::V1_3).unwrap();
-        let reparsed = parse_data_styles_xml(&doc13(&fragment), OdfDataStylePart::Flat).unwrap();
+        let fragment = style.to_xml_fragment(Version::V1_3).unwrap();
+        let reparsed = parse_data_styles_xml(&doc13(&fragment), Part::Flat).unwrap();
         assert_eq!(reparsed.styles[0].kind, style.kind);
         assert_eq!(reparsed.styles[0].parts, style.parts);
     }
@@ -44,12 +44,12 @@ fn reads_libreoffice_12_aliases_but_writes_them_only_as_standard_13() {
     let xml = doc12(
         r#"<number:number-style style:name="n"><loext:fill-character> </loext:fill-character><number:number loext:min-decimal-places="2"/></number:number-style>"#,
     );
-    let style = parse_data_styles_xml(&xml, OdfDataStylePart::Flat)
+    let style = parse_data_styles_xml(&xml, Part::Flat)
         .unwrap()
         .styles
         .remove(0);
-    assert!(style.to_xml_fragment(OdfDataStyleVersion::V1_2).is_err());
-    let out = style.to_xml_fragment(OdfDataStyleVersion::V1_3).unwrap();
+    assert!(style.to_xml_fragment(Version::V1_2).is_err());
+    let out = style.to_xml_fragment(Version::V1_3).unwrap();
     assert!(out.contains("number:fill-character"));
     assert!(out.contains("number:min-decimal-places=\"2\""));
     assert!(!out.contains("loext:"));
@@ -83,21 +83,18 @@ fn parses_yielddisc_n122_n126_n170() {
             "</number:date-style>"
         )
     );
-    let parsed = parse_data_styles_xml(&doc12(&body), OdfDataStylePart::Flat).unwrap();
+    let parsed = parse_data_styles_xml(&doc12(&body), Part::Flat).unwrap();
     assert_eq!(parsed.styles.len(), 3);
     assert_eq!(parsed.styles[0].maps.len(), 1);
     assert_eq!(parsed.styles[1].maps.len(), 3);
-    assert!(matches!(
-        parsed.styles[2].parts[0],
-        OdfDataStylePartToken::DayOfWeek(_)
-    ));
+    assert!(matches!(parsed.styles[2].parts[0], Token::DayOfWeek(_)));
 }
 
 #[test]
 fn accepts_odfdo_default_style_shapes() {
     let body = r#"<number:boolean-style style:name="bool"><number:boolean/></number:boolean-style><number:currency-style style:name="cur"><number:text>-</number:text><number:number number:decimal-places="2" number:min-integer-digits="1" number:grouping="true"/><number:text> </number:text><number:currency-symbol number:language="fr" number:country="FR">€</number:currency-symbol></number:currency-style><number:date-style style:name="date"><number:year number:style="long"/><number:text>-</number:text><number:month number:style="long"/><number:text>-</number:text><number:day number:style="long"/></number:date-style><number:number-style style:name="num"><number:number number:decimal-places="2" number:min-integer-digits="1"/></number:number-style><number:percentage-style style:name="pct"><number:number number:decimal-places="2" number:min-integer-digits="1"/><number:text>%</number:text></number:percentage-style><number:time-style style:name="time"><number:hours number:style="long"/><number:text>:</number:text><number:minutes number:style="long"/><number:text>:</number:text><number:seconds number:style="long"/></number:time-style>"#;
     assert_eq!(
-        parse_data_styles_xml(&doc12(body), OdfDataStylePart::Flat)
+        parse_data_styles_xml(&doc12(body), Part::Flat)
             .unwrap()
             .styles
             .len(),
@@ -122,19 +119,19 @@ fn rejects_wrong_namespace_order_cardinality_and_lexicals() {
     ];
     for body in invalid {
         assert!(
-            parse_data_styles_xml(&doc13(body), OdfDataStylePart::Flat).is_err(),
+            parse_data_styles_xml(&doc13(body), Part::Flat).is_err(),
             "accepted {body}"
         );
     }
-    assert!(parse_data_styles_xml(&doc12(r#"<number:number-style style:name="n"><number:number number:min-decimal-places="1"/></number:number-style>"#), OdfDataStylePart::Flat).is_err());
+    assert!(parse_data_styles_xml(&doc12(r#"<number:number-style style:name="n"><number:number number:min-decimal-places="1"/></number:number-style>"#), Part::Flat).is_err());
 }
 
 #[test]
 fn accepts_exact_xsd_integer_and_double_lexicals() {
     let body = r#"<number:number-style style:name="plus"><number:number number:decimal-places="+2" number:min-integer-digits="+1" number:display-factor="+1.5"/></number:number-style><number:number-style style:name="inf"><number:number number:display-factor="INF"/></number:number-style><number:number-style style:name="neg"><number:number number:display-factor="-INF"/></number:number-style><number:number-style style:name="nan"><number:number number:display-factor="NaN"/></number:number-style>"#;
-    let parsed = parse_data_styles_xml(&doc13(body), OdfDataStylePart::Flat).unwrap();
+    let parsed = parse_data_styles_xml(&doc13(body), Part::Flat).unwrap();
     let factor = |index: usize| match &parsed.styles[index].parts[0] {
-        OdfDataStylePartToken::Number(value) => value.display_factor.unwrap(),
+        Token::Number(value) => value.display_factor.unwrap(),
         _ => panic!("expected number token"),
     };
     assert_eq!(factor(0), 1.5);
@@ -143,19 +140,19 @@ fn accepts_exact_xsd_integer_and_double_lexicals() {
     assert!(factor(3).is_nan());
     assert!(
         parsed.styles[1]
-            .to_xml_fragment(OdfDataStyleVersion::V1_3)
+            .to_xml_fragment(Version::V1_3)
             .unwrap()
             .contains("display-factor=\"INF\"")
     );
     assert!(
         parsed.styles[2]
-            .to_xml_fragment(OdfDataStyleVersion::V1_3)
+            .to_xml_fragment(Version::V1_3)
             .unwrap()
             .contains("display-factor=\"-INF\"")
     );
     assert!(
         parsed.styles[3]
-            .to_xml_fragment(OdfDataStyleVersion::V1_3)
+            .to_xml_fragment(Version::V1_3)
             .unwrap()
             .contains("display-factor=\"NaN\"")
     );
@@ -163,9 +160,9 @@ fn accepts_exact_xsd_integer_and_double_lexicals() {
         let body = format!(
             r#"<number:number-style style:name="bad"><number:number number:display-factor="{lexical}"/></number:number-style>"#
         );
-        assert!(parse_data_styles_xml(&doc13(&body), OdfDataStylePart::Flat).is_err());
+        assert!(parse_data_styles_xml(&doc13(&body), Part::Flat).is_err());
     }
-    assert!(parse_data_styles_xml(&doc13(r#"<number:number-style style:name="bad"><number:number number:decimal-places="++1"/></number:number-style>"#), OdfDataStylePart::Flat).is_err());
+    assert!(parse_data_styles_xml(&doc13(r#"<number:number-style style:name="bad"><number:number number:decimal-places="++1"/></number:number-style>"#), Part::Flat).is_err());
 }
 
 #[test]
@@ -173,19 +170,16 @@ fn lossless_insert_replace_remove_preserves_unrelated_markup() {
     let original = doc13(
         "<!--keep--><number:number-style style:name=\"other\"><number:number/></number:number-style><x:keep xmlns:x=\"urn:x\"/>",
     );
-    let mut style =
-        OdfDataStyle::new("new", OdfDataStyleKind::Number, OdfDataStyleSection::Styles).unwrap();
-    style
-        .parts
-        .push(OdfDataStylePartToken::Number(OdfNumberToken::default()));
+    let mut style = Style::new("new", Kind::Number, Section::Styles).unwrap();
+    style.parts.push(Token::Number(NumberToken::default()));
     let inserted = set_data_style_xml(&original, &style).unwrap();
     assert!(inserted.contains("<!--keep--><number:number-style style:name=\"other\""));
     assert!(inserted.contains("<x:keep xmlns:x=\"urn:x\"/>"));
-    style.parts = vec![OdfDataStylePartToken::Text("-".into())];
+    style.parts = vec![Token::Text("-".into())];
     let replaced = set_data_style_xml(&inserted, &style).unwrap();
     assert!(replaced.contains("<number:text>-</number:text>"));
     assert_eq!(
-        remove_data_style_xml(&replaced, OdfDataStyleSection::Styles, "new").unwrap(),
+        remove_data_style_xml(&replaced, Section::Styles, "new").unwrap(),
         original
     );
 }
@@ -193,16 +187,11 @@ fn lossless_insert_replace_remove_preserves_unrelated_markup() {
 #[test]
 fn expands_empty_target_container_and_enforces_caps() {
     let xml = format!("{HEAD_13}</office:styles><office:automatic-styles/></office:document>");
-    let mut style = OdfDataStyle::new(
-        "auto",
-        OdfDataStyleKind::Text,
-        OdfDataStyleSection::AutomaticStyles,
-    )
-    .unwrap();
-    style.parts.push(OdfDataStylePartToken::TextContent);
+    let mut style = Style::new("auto", Kind::Text, Section::AutomaticStyles).unwrap();
+    style.parts.push(Token::TextContent);
     let output = set_data_style_xml(&xml, &style).unwrap();
     assert!(output.contains("<office:automatic-styles><number:text-style"));
     let huge = "x".repeat(MAX_VALUE_BYTES + 1);
-    style.parts = vec![OdfDataStylePartToken::Text(huge)];
-    assert!(style.validate(OdfDataStyleVersion::V1_3).is_err());
+    style.parts = vec![Token::Text(huge)];
+    assert!(style.validate(Version::V1_3).is_err());
 }

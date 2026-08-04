@@ -49,28 +49,3 @@ pub(crate) use codec::{
     take_i64, take_versioned_bool, take_versioned_i64, take_versioned_u64, validate_cell_address,
     validate_locale, validate_name, validate_optional_string, validate_text,
 };
-// Historical public names remain aliases. The declarations above are the
-// single canonical ODF data-style vocabulary.
-pub type OdfDataStylePart = Part;
-pub type OdfDataStyleSection = Section;
-pub type OdfDataStyleVersion = Version;
-pub type OdfDataStyleKind = Kind;
-pub type OdfShortLong = ShortLong;
-pub type OdfTransliterationStyle = TransliterationStyle;
-pub type OdfFormatSource = FormatSource;
-pub type OdfNumberLocale = Locale;
-pub type OdfDataStyleTextProperties = TextProperties;
-pub type OdfNumberToken = NumberToken;
-pub type OdfEmbeddedText = EmbeddedText;
-pub type OdfScientificNumberToken = Scientific;
-pub type OdfFractionToken = Fraction;
-pub type OdfCurrencySymbolToken = Currency;
-pub type OdfCalendarToken = Calendar;
-pub type OdfMonthToken = Month;
-pub type OdfWeekOfYearToken = WeekOfYear;
-pub type OdfClockToken = Clock;
-pub type OdfSecondsToken = Seconds;
-pub type OdfDataStylePartToken = Token;
-pub type OdfDataStyleMap = Map;
-pub type OdfDataStyle = Style;
-pub type OdfDataStyles = Styles;
