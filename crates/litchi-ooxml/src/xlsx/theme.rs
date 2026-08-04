@@ -130,7 +130,7 @@ fn parse_hex_rgb(value: &str, context: &str) -> SheetResult<[u8; 3]> {
 
 /// A parsed XLSX theme part.
 #[derive(Debug, Clone)]
-pub struct XlsxTheme {
+pub struct Theme {
     name: Option<String>,
     color_scheme_name: String,
     colors: [ThemeColorValue; 12],
@@ -140,7 +140,7 @@ pub struct XlsxTheme {
     format_scheme_xml: String,
 }
 
-impl XlsxTheme {
+impl Theme {
     /// The theme name (`a:theme name`), when present.
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn parses_theme_colors_and_fonts() {
-        let theme = XlsxTheme::parse(THEME).unwrap();
+        let theme = Theme::parse(THEME).unwrap();
         assert_eq!(theme.name(), Some("Office"));
         assert_eq!(theme.color_scheme_name(), "Office");
         assert_eq!(theme.major_font(), Some("Cambria"));
@@ -401,12 +401,12 @@ mod tests {
         let bad = THEME
             .replace("<a:lt1>", "<a:dk2>")
             .replace("</a:lt1>", "</a:dk2>");
-        assert!(XlsxTheme::parse(&bad).is_err());
+        assert!(Theme::parse(&bad).is_err());
         // Missing a slot.
         let bad = THEME.replace("<a:folHlink><a:srgbClr val=\"800080\"/></a:folHlink>", "");
-        assert!(XlsxTheme::parse(&bad).is_err());
+        assert!(Theme::parse(&bad).is_err());
         // Bad hex.
         let bad = THEME.replace("4F81BD", "4F81BZ");
-        assert!(XlsxTheme::parse(&bad).is_err());
+        assert!(Theme::parse(&bad).is_err());
     }
 }

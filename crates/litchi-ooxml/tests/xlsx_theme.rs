@@ -1,6 +1,6 @@
 //! Tests for the XLSX theme part reader against real workbooks.
 
-use litchi_ooxml::xlsx::theme::{ThemeColorSlot, ThemeColorValue, XlsxTheme};
+use litchi_ooxml::xlsx::theme::{Theme, ThemeColorSlot, ThemeColorValue};
 use litchi_ooxml::xlsx::{Workbook, template};
 use std::path::PathBuf;
 
@@ -12,7 +12,7 @@ fn fixture(name: &str) -> PathBuf {
 
 #[test]
 fn parses_the_default_writer_theme_template() {
-    let theme = XlsxTheme::parse(template::default_theme_xml()).unwrap();
+    let theme = Theme::parse(template::default_theme_xml()).unwrap();
     assert_eq!(theme.color_scheme_name(), "Office");
     assert!(theme.major_font().is_some());
     assert!(theme.minor_font().is_some());
