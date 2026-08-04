@@ -92,6 +92,55 @@ const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
 const EMPTY_TABLE_POSITION_OFFSET: f32 = 40.0;
 const CONDITIONAL_STYLE_NO_APPLIED_RULE: u32 = 15;
 
+/// Numbers-owned table editing vocabulary.
+pub mod table {
+    /// Cell-level table editing vocabulary.
+    pub mod cell {
+        use crate::shapes::ShapeStroke;
+
+        /// One edge of a zero-based native Numbers table cell.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+        pub enum BorderSide {
+            Left,
+            Right,
+            Top,
+            Bottom,
+        }
+
+        /// Effective explicit borders stored for one native Numbers table cell.
+        ///
+        /// `None` means the table style supplies the edge, or a later native
+        /// stroke run explicitly clears it.
+        #[derive(Clone, Copy, Debug, Default, PartialEq)]
+        pub struct Borders {
+            pub left: Option<ShapeStroke>,
+            pub right: Option<ShapeStroke>,
+            pub top: Option<ShapeStroke>,
+            pub bottom: Option<ShapeStroke>,
+        }
+
+        impl Borders {
+            pub const fn get(self, side: BorderSide) -> Option<ShapeStroke> {
+                match side {
+                    BorderSide::Left => self.left,
+                    BorderSide::Right => self.right,
+                    BorderSide::Top => self.top,
+                    BorderSide::Bottom => self.bottom,
+                }
+            }
+
+            pub(crate) fn set(&mut self, side: BorderSide, stroke: Option<ShapeStroke>) {
+                match side {
+                    BorderSide::Left => self.left = stroke,
+                    BorderSide::Right => self.right = stroke,
+                    BorderSide::Top => self.top = stroke,
+                    BorderSide::Bottom => self.bottom = stroke,
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct NumbersTextBoxGraph {
     sheet_id: u64,

@@ -3403,7 +3403,7 @@ fn grows_and_truncates_blank_table_edges_with_uid_maps() {
 #[test]
 fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    let side = crate::table_cell_border::TableCellBorderSide::Bottom;
+    let side = crate::numbers::editor::table::cell::BorderSide::Bottom;
     assert_eq!(editor.table_cell_borders(10, 1, 2).unwrap().get(side), None);
 
     let stroke = crate::shapes::ShapeStroke::new(
@@ -3581,7 +3581,7 @@ fn table_cell_border_rejects_invalid_coordinates_transactionally() {
                 10,
                 usize::MAX,
                 0,
-                crate::table_cell_border::TableCellBorderSide::Top,
+                crate::numbers::editor::table::cell::BorderSide::Top,
                 stroke,
             )
             .is_err()
@@ -3637,7 +3637,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
             10,
             1,
             1,
-            crate::table_cell_border::TableCellBorderSide::Top,
+            crate::numbers::editor::table::cell::BorderSide::Top,
             crate::shapes::ShapeStroke::new(
                 crate::shapes::RgbaColor::black(),
                 crate::shapes::StrokeWidth::ONE,

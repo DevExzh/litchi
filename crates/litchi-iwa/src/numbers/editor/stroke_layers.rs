@@ -5,10 +5,10 @@
 //! edited axis. This module keeps existing borders attached to their original
 //! cells when the editor inserts or removes a blank row or column.
 
+use super::table::cell::{BorderSide, Borders};
 use super::*;
 use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
 use crate::shapes::{empty_stroke_archive, stroke_from_native, stroke_to_native};
-use crate::table_cell_border::{TableCellBorderSide, TableCellBorders};
 use crate::wire::patch_length_delimited_field;
 
 const STROKE_SIDECAR_MESSAGE_TYPE: u32 = 6_305;
@@ -124,21 +124,21 @@ impl LayerSide {
         }
     }
 
-    const fn from_public(side: TableCellBorderSide) -> Self {
+    const fn from_public(side: BorderSide) -> Self {
         match side {
-            TableCellBorderSide::Left => Self::Left,
-            TableCellBorderSide::Right => Self::Right,
-            TableCellBorderSide::Top => Self::Top,
-            TableCellBorderSide::Bottom => Self::Bottom,
+            BorderSide::Left => Self::Left,
+            BorderSide::Right => Self::Right,
+            BorderSide::Top => Self::Top,
+            BorderSide::Bottom => Self::Bottom,
         }
     }
 
-    const fn public(self) -> TableCellBorderSide {
+    const fn public(self) -> BorderSide {
         match self {
-            Self::Left => TableCellBorderSide::Left,
-            Self::Right => TableCellBorderSide::Right,
-            Self::Top => TableCellBorderSide::Top,
-            Self::Bottom => TableCellBorderSide::Bottom,
+            Self::Left => BorderSide::Left,
+            Self::Right => BorderSide::Right,
+            Self::Top => BorderSide::Top,
+            Self::Bottom => BorderSide::Bottom,
         }
     }
 
@@ -171,7 +171,7 @@ pub(crate) fn cell_borders(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TableCellBorders> {
+) -> Result<Borders> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let (row, column, dimensions) = validated_cell_coordinates(&descriptor.model, row, column)?;
     let sidecar_id = descriptor
@@ -186,7 +186,7 @@ pub(crate) fn cell_borders(
     let sidecar = decoded_sidecar(package, &locations, sidecar_id)?;
     validate_sidecar_dimensions(&sidecar, dimensions)?;
 
-    let mut borders = TableCellBorders::default();
+    let mut borders = Borders::default();
     let mut seen_layers = HashSet::new();
     for side in LayerSide::ALL {
         let (fixed_index, traversal_index) = side.coordinate(row, column);
@@ -243,7 +243,7 @@ pub(crate) fn set_cell_border(
     table_id: u64,
     row: usize,
     column: usize,
-    public_side: TableCellBorderSide,
+    public_side: BorderSide,
     stroke: Option<crate::shapes::ShapeStroke>,
 ) -> Result<()> {
     let descriptor = attached_table_descriptor(package, table_id)?;

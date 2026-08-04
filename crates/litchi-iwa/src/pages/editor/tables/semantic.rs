@@ -1,6 +1,10 @@
+Warning: truncated output (original token count: 31422)
+Total output lines: 3697
+
 //! Semantic table models and transactional Pages table editing.
 
 use super::*;
+use crate::numbers::editor::table::cell::{BorderSide, Borders};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1785,181 +1789,7 @@ impl PagesEditor {
         Ok(changed)
     }
 
-    /// Read one numbered body-table paragraph's number-label size.
-    pub fn table_cell_paragraph_list_number_scale(
-        &self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-    ) -> Result<PagesTableCellParagraphListNumberScale> {
-        self.require_body_table(model_object_id)?;
-        crate::numbers::editor::table_cell_paragraph_list_number_scale_in_package(
-            self.package(),
-            model_object_id,
-            row,
-            column,
-            paragraph,
-        )
-    }
-
-    /// Set one numbered body-table paragraph's number-label size.
-    pub fn set_table_cell_paragraph_list_number_scale(
-        &mut self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-        scale: PagesTableCellParagraphListNumberScale,
-    ) -> Result<()> {
-        self.require_body_table(model_object_id)?;
-        let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_cell_paragraph_list_number_scale_in_package(
-            &mut staged,
-            model_object_id,
-            row,
-            column,
-            paragraph,
-            scale,
-        )?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        verified.require_body_table(model_object_id)?;
-        if verified.table_cell_paragraph_list_number_scale(
-            model_object_id,
-            row,
-            column,
-            paragraph,
-        )? != scale
-        {
-            return Err(Error::InvalidFormat(
-                "Pages table-cell paragraph list-number scale failed package validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
-    /// Restore the standard 100% number-label size.
-    pub fn reset_table_cell_paragraph_list_number_scale(
-        &mut self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-    ) -> Result<bool> {
-        self.require_body_table(model_object_id)?;
-        let mut staged = self.package().clone();
-        let changed =
-            crate::numbers::editor::reset_table_cell_paragraph_list_number_scale_in_package(
-                &mut staged,
-                model_object_id,
-                row,
-                column,
-                paragraph,
-            )?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            verified.require_body_table(model_object_id)?;
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read one body-table paragraph's effective text-bullet marker.
-    pub fn table_cell_paragraph_list_bullet(
-        &self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-    ) -> Result<PagesTableCellParagraphListBullet> {
-        self.require_body_table(model_object_id)?;
-        crate::numbers::editor::table_cell_paragraph_list_bullet_in_package(
-            self.package(),
-            model_object_id,
-            row,
-            column,
-            paragraph,
-        )
-    }
-
-    /// Set one body-table paragraph's text-bullet marker.
-    pub fn set_table_cell_paragraph_list_bullet(
-        &mut self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-        bullet: &PagesTableCellParagraphListBullet,
-    ) -> Result<()> {
-        self.require_body_table(model_object_id)?;
-        let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_cell_paragraph_list_bullet_in_package(
-            &mut staged,
-            model_object_id,
-            row,
-            column,
-            paragraph,
-            bullet,
-        )?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        verified.require_body_table(model_object_id)?;
-        if verified.table_cell_paragraph_list_bullet(model_object_id, row, column, paragraph)?
-            != *bullet
-        {
-            return Err(Error::InvalidFormat(
-                "Pages table-cell paragraph text bullet failed package validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
-    /// Restore Apple's standard `•` marker for one body-table paragraph.
-    pub fn reset_table_cell_paragraph_list_bullet(
-        &mut self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-    ) -> Result<bool> {
-        self.require_body_table(model_object_id)?;
-        let mut staged = self.package().clone();
-        let changed = crate::numbers::editor::reset_table_cell_paragraph_list_bullet_in_package(
-            &mut staged,
-            model_object_id,
-            row,
-            column,
-            paragraph,
-        )?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            verified.require_body_table(model_object_id)?;
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read one body-table paragraph's effective bullet size and baseline.
-    pub fn table_cell_paragraph_list_bullet_geometry(
-        &self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-    ) -> Result<PagesTableCellParagraphListBulletGeometry> {
-        self.require_body_table(model_object_id)?;
-        crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
-            self.package(),
-            model_object_id,
-            row,
-            column,
-            paragraph,
-        )
-    }
-
-    /// Set one body-table paragraph's bullet size and baseline.
-    pub fn set_table_cell_paragraph_list_bullet_geometry(
+    /// Read one numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
         &mut self,
         model_object_id: u64,
         row: usize,
@@ -3192,7 +3022,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellBorders> {
+    ) -> Result<Borders> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_borders_in_package(
             self.package(),
@@ -3208,7 +3038,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: PagesTableCellBorderSide,
+        side: BorderSide,
         stroke: crate::shapes::ShapeStroke,
     ) -> Result<()> {
         self.update_table_cell_border(model_object_id, row, column, side, Some(stroke))
@@ -3220,7 +3050,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: PagesTableCellBorderSide,
+        side: BorderSide,
     ) -> Result<()> {
         self.update_table_cell_border(model_object_id, row, column, side, None)
     }
@@ -3230,7 +3060,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: PagesTableCellBorderSide,
+        side: BorderSide,
         stroke: Option<crate::shapes::ShapeStroke>,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;

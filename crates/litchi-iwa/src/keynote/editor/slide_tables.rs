@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 use crate::bundle::Bundle;
+use crate::numbers::editor::table::cell::{BorderSide, Borders};
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
@@ -60,9 +61,6 @@ pub type KeynoteTableColumnInsertion = crate::numbers::TableColumnInsertion;
 /// A validated native merged-cell rectangle.
 pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::shapes::RgbaColor as KeynoteTableCellTextColor;
-pub use crate::table_cell_border::{
-    TableCellBorderSide as KeynoteTableCellBorderSide, TableCellBorders as KeynoteTableCellBorders,
-};
 pub use crate::table_cell_data_format::{
     TableCellCheckboxFormat as KeynoteTableCellCheckboxFormat,
     TableCellCurrencyFormat as KeynoteTableCellCurrencyFormat,
@@ -3839,7 +3837,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellBorders> {
+    ) -> Result<Borders> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_borders_in_package(
             self.package(),
@@ -3856,7 +3854,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: KeynoteTableCellBorderSide,
+        side: BorderSide,
         stroke: crate::shapes::ShapeStroke,
     ) -> Result<()> {
         self.update_slide_table_cell_border(
@@ -3876,7 +3874,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: KeynoteTableCellBorderSide,
+        side: BorderSide,
     ) -> Result<()> {
         self.update_slide_table_cell_border(slide_index, model_object_id, row, column, side, None)
     }
@@ -3887,7 +3885,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: KeynoteTableCellBorderSide,
+        side: BorderSide,
         stroke: Option<crate::shapes::ShapeStroke>,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;

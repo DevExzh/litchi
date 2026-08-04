@@ -1,6 +1,7 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::CellValue;
+use crate::numbers::editor::table::cell::BorderSide;
 use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
     TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
@@ -116,14 +117,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
         crate::shapes::StrokePattern::Solid,
     );
     editor
-        .set_slide_table_cell_border(
-            0,
-            table.model_object_id,
-            2,
-            1,
-            KeynoteTableCellBorderSide::Top,
-            stroke,
-        )
+        .set_slide_table_cell_border(0, table.model_object_id, 2, 1, BorderSide::Top, stroke)
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -135,13 +129,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
         Some(stroke)
     );
     reopened
-        .clear_slide_table_cell_border(
-            0,
-            table.model_object_id,
-            2,
-            1,
-            KeynoteTableCellBorderSide::Top,
-        )
+        .clear_slide_table_cell_border(0, table.model_object_id, 2, 1, BorderSide::Top)
         .unwrap();
     assert_eq!(
         reopened
