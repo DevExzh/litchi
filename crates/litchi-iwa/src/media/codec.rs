@@ -9,7 +9,7 @@ use prost::Message;
 
 use crate::package::IWorkPackage;
 use crate::protobuf;
-use crate::varint::{decode_varint_from_bytes, encode_varint};
+use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
 use crate::{Error, Result};
 
 use super::model::{EmbeddedMediaAsset, MediaAsset, MediaLimits, MediaType};
@@ -562,7 +562,7 @@ pub(crate) fn patch_package_metadata(
                 })?;
                 let patched = patch_data_info(data_info, digest, materialized_length)?;
                 output.extend_from_slice(&metadata[field.start..field.key_end]);
-                output.extend(encode_varint(patched.len() as u64));
+                encode_varint_into(&mut output, patched.len() as u64);
                 output.extend_from_slice(&patched);
                 continue;
             }
@@ -656,13 +656,13 @@ pub(crate) fn append_data_info(
 }
 
 fn append_wire_varint(output: &mut Vec<u8>, field_number: u64, value: u64) {
-    output.extend(encode_varint(field_number << 3));
-    output.extend(encode_varint(value));
+    encode_varint_into(output, field_number << 3);
+    encode_varint_into(output, value);
 }
 
 fn append_wire_bytes(output: &mut Vec<u8>, field_number: u64, value: &[u8]) {
-    output.extend(encode_varint((field_number << 3) | 2));
-    output.extend(encode_varint(value.len() as u64));
+    encode_varint_into(output, (field_number << 3) | 2);
+    encode_varint_into(output, value.len() as u64);
     output.extend_from_slice(value);
 }
 
@@ -732,7 +732,7 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
                     ));
                 }
                 output.extend_from_slice(&data[field.start..field.key_end]);
-                output.extend(encode_varint(digest.len() as u64));
+                encode_varint_into(&mut output, digest.len() as u64);
                 output.extend_from_slice(digest);
             },
             18 => {
@@ -748,19 +748,19 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
                     ));
                 }
                 output.extend_from_slice(&data[field.start..field.key_end]);
-                output.extend(encode_varint(materialized_length));
+                encode_varint_into(&mut output, materialized_length);
             },
             _ => output.extend_from_slice(&data[field.start..field.end]),
         }
     }
     if digest_count == 0 {
-        output.extend(encode_varint((2 << 3) | 2));
-        output.extend(encode_varint(digest.len() as u64));
+        encode_varint_into(&mut output, (2 << 3) | 2);
+        encode_varint_into(&mut output, digest.len() as u64);
         output.extend_from_slice(digest);
     }
     if length_count == 0 {
-        output.extend(encode_varint(18 << 3));
-        output.extend(encode_varint(materialized_length));
+        encode_varint_into(&mut output, 18 << 3);
+        encode_varint_into(&mut output, materialized_length);
     }
     Ok(output)
 }

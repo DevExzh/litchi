@@ -7,7 +7,7 @@ use sha1::{Digest, Sha1};
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::package::{IWorkPackage, PackageLimits};
-use crate::varint::encode_varint;
+use litchi_iwa_common::varint::encode_varint;
 
 use super::*;
 

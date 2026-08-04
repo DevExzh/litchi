@@ -11,6 +11,7 @@ rust-version.workspace = true
 [dependencies]
 chrono        = { workspace = true }
 litchi-core   = { workspace = true }
+litchi-iwa-common = { workspace = true }
 litchi-iwa-core = { workspace = true }
 litchi-iwa-graph = { workspace = true }
 litchi-iwa-protos = { workspace = true }

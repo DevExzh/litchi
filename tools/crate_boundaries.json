@@ -82,6 +82,7 @@
     ],
     "litchi-iwa": [
       "litchi-core",
+      "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-graph",
       "litchi-iwa-protos",

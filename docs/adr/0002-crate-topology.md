@@ -61,6 +61,13 @@ ADR 0023 records the target ODF family split: independent `litchi-odt`,
 facade wiring. No family crate depends on the umbrella or on another concrete
 family crate.
 
+The IWA subtree follows the same downward-only rule. `litchi-iwa-common` is
+the foundational, dependency-neutral layer for bounded varint and protobuf
+wire primitives; `litchi-iwa` and future `litchi-pages`, `litchi-numbers`, and
+`litchi-keynote` owners may depend on it. The common crate must not depend on
+an archive, graph, facade, or concrete iWork format crate, and concrete format
+owners retain their own object-model and package-topology semantics.
+
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,
 `plot_area`, `reader`, and `writer`; the public codec verbs are the short
