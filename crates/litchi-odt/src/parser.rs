@@ -2,7 +2,7 @@
 //!
 //! This module provides parsing functionality that is specific to OpenDocument Text
 //! documents (.odt). For generic ODF element parsing (paragraphs, tables, lists, etc.)
-//! that works across all ODF formats, see `crate::elements::parser::DocumentParser`.
+//! that works across all ODF formats, see `crate::elements::parser::Parser`.
 
 use crate::elements::xml::{
     DC_NAMESPACE, META_NAMESPACE, OFFICE_NAMESPACE, TEXT_NAMESPACE, XLINK_NAMESPACE, XML_NAMESPACE,
@@ -25,7 +25,7 @@ const MAX_SEMANTIC_ITEMS: usize = 1_000_000;
 /// - Sections (protected content, different formatting)
 /// - Headers and footers
 ///
-/// For generic element parsing (paragraphs, tables, etc.), use `DocumentParser`
+/// For generic element parsing (paragraphs, tables, etc.), use `Parser`
 /// from `crate::elements::parser` instead.
 pub struct Parser;
 

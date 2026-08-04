@@ -10,7 +10,7 @@ use crate::TextIndex;
 use crate::TextIndexMark;
 use crate::core::{MetaXmlPatch, OwnedPackage, PackageWriter, Structure, patch_meta_xml};
 use crate::elements::field::{DynamicTextField, FieldParser};
-use crate::elements::parser::DocumentOrderElement;
+use crate::elements::parser::OrderElement;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, Hyperlink, List, Paragraph};
 use crate::header_footer::{
@@ -123,13 +123,13 @@ impl MutableDocument {
         let elements = source_elements
             .into_iter()
             .map(|element| match element {
-                DocumentOrderElement::Paragraph(paragraph) => DocumentElement::Paragraph(paragraph),
-                DocumentOrderElement::NumberedParagraph(paragraph) => {
+                OrderElement::Paragraph(paragraph) => DocumentElement::Paragraph(paragraph),
+                OrderElement::NumberedParagraph(paragraph) => {
                     DocumentElement::Paragraph(paragraph.into_paragraph())
                 },
-                DocumentOrderElement::Heading(heading) => DocumentElement::Heading(heading),
-                DocumentOrderElement::Table(table) => DocumentElement::Table(table),
-                DocumentOrderElement::List(list) => DocumentElement::List(list),
+                OrderElement::Heading(heading) => DocumentElement::Heading(heading),
+                OrderElement::Table(table) => DocumentElement::Table(table),
+                OrderElement::List(list) => DocumentElement::List(list),
             })
             .collect();
         let source_package = Some(doc.into_package());
@@ -2983,7 +2983,7 @@ impl Default for MutableDocument {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elements::parser::DocumentOrderElement;
+    use crate::elements::parser::OrderElement;
     use crate::elements::table::{TableCell, TableRow};
     use crate::elements::text::{ListItem, Paragraph};
     use crate::{DocumentBuilder, PageUsage};
@@ -3043,11 +3043,11 @@ mod tests {
             .unwrap()
             .iter()
             .map(|element| match element {
-                DocumentOrderElement::Paragraph(_) => "paragraph",
-                DocumentOrderElement::NumberedParagraph(_) => "numbered-paragraph",
-                DocumentOrderElement::Heading(_) => "heading",
-                DocumentOrderElement::Table(_) => "table",
-                DocumentOrderElement::List(_) => "list",
+                OrderElement::Paragraph(_) => "paragraph",
+                OrderElement::NumberedParagraph(_) => "numbered-paragraph",
+                OrderElement::Heading(_) => "heading",
+                OrderElement::Table(_) => "table",
+                OrderElement::List(_) => "list",
             })
             .collect()
     }
@@ -3231,7 +3231,7 @@ mod tests {
         );
 
         let elements = round_trip.elements().unwrap();
-        let DocumentOrderElement::Table(table) = &elements[1] else {
+        let OrderElement::Table(table) = &elements[1] else {
             panic!("second element should remain a table");
         };
         assert_eq!(table.name(), Some("Data"));
@@ -3248,7 +3248,7 @@ mod tests {
             "Cell content"
         );
 
-        let DocumentOrderElement::List(list) = &elements[3] else {
+        let OrderElement::List(list) = &elements[3] else {
             panic!("fourth element should remain a list");
         };
         let items = list.items().unwrap();

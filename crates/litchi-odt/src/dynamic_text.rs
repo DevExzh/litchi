@@ -720,7 +720,7 @@ mod page_variable_family_mutation_tests {
 mod document_metadata_fixed_field_mutation_tests {
     use super::*;
     use crate::elements::field::{
-        DocumentMetadataFieldKind, DocumentMetadataFieldValue, DynamicTextField, FieldDuration,
+        DynamicTextField, FieldDuration, MetadataFieldKind, MetadataFieldValue,
     };
 
     const XML: &str = r#"<o:document-content
@@ -732,8 +732,8 @@ mod document_metadata_fixed_field_mutation_tests {
     #[test]
     fn document_metadata_fixed_field_mutation_is_namespace_aware_and_bounded() {
         let replacement = DynamicTextField::DocumentMetadata {
-            kind: DocumentMetadataFieldKind::EditingDuration,
-            value: Some(DocumentMetadataFieldValue::Duration(
+            kind: MetadataFieldKind::EditingDuration,
+            value: Some(MetadataFieldValue::Duration(
                 FieldDuration::new("PT3H").unwrap(),
             )),
             fixed: Some(true),
@@ -748,7 +748,7 @@ mod document_metadata_fixed_field_mutation_tests {
             &replaced,
             0,
             &DynamicTextField::DocumentMetadata {
-                kind: DocumentMetadataFieldKind::ModificationTime,
+                kind: MetadataFieldKind::ModificationTime,
                 value: None,
                 fixed: None,
                 data_style_name: None,
@@ -767,7 +767,7 @@ mod document_metadata_fixed_field_mutation_tests {
 #[cfg(test)]
 mod document_identity_fixed_field_mutation_tests {
     use super::*;
-    use crate::elements::field::{DocumentIdentityFieldKind, DynamicTextField};
+    use crate::elements::field::{DynamicTextField, IdentityFieldKind};
 
     const XML: &str = r#"<o:document-content
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -778,7 +778,7 @@ mod document_identity_fixed_field_mutation_tests {
     #[test]
     fn document_identity_fixed_field_mutation_is_namespace_aware_and_bounded() {
         let replacement = DynamicTextField::DocumentIdentity {
-            kind: DocumentIdentityFieldKind::Creator,
+            kind: IdentityFieldKind::Creator,
             fixed: Some(false),
             display_text: "new creator".to_string(),
         };
@@ -790,7 +790,7 @@ mod document_identity_fixed_field_mutation_tests {
             &replaced,
             0,
             &DynamicTextField::DocumentIdentity {
-                kind: DocumentIdentityFieldKind::Keywords,
+                kind: IdentityFieldKind::Keywords,
                 fixed: None,
                 display_text: "one, two".to_string(),
             },

@@ -1,8 +1,8 @@
 use litchi_odt::elements::field::{
-    CalculatedFieldValue, CrossReferenceFormat, DocumentStatisticKind, DropDownLabel,
-    DynamicTextField, FieldValueType, FormulaFieldDisplay, MeasureKind, NoteReferenceClass,
-    NoteReferenceFormat, PlaceholderType, SequenceNumberFormat, SequenceReferenceFormat,
-    UserFieldDisplay, VariableSetDisplay,
+    CalculatedFieldValue, CrossReferenceFormat, DropDownLabel, DynamicTextField, FieldValueType,
+    FormulaFieldDisplay, MeasureKind, NoteReferenceClass, NoteReferenceFormat, PlaceholderType,
+    SequenceNumberFormat, SequenceReferenceFormat, StatisticKind, UserFieldDisplay,
+    VariableSetDisplay,
 };
 use litchi_odt::{Document, DocumentBuilder, MutableDocument};
 mod support;
@@ -1035,13 +1035,13 @@ fn cross_references_reject_invalid_classes_formats_namespaces_attributes_and_bou
 #[test]
 fn document_statistics_round_trip_all_seven_kinds_and_numbering_modes() {
     let kinds = [
-        DocumentStatisticKind::Page,
-        DocumentStatisticKind::Paragraph,
-        DocumentStatisticKind::Word,
-        DocumentStatisticKind::Character,
-        DocumentStatisticKind::Table,
-        DocumentStatisticKind::Image,
-        DocumentStatisticKind::Object,
+        StatisticKind::Page,
+        StatisticKind::Paragraph,
+        StatisticKind::Word,
+        StatisticKind::Character,
+        StatisticKind::Table,
+        StatisticKind::Image,
+        StatisticKind::Object,
     ];
     for (index, kind) in kinds.into_iter().enumerate() {
         let number_format = match index % 3 {
@@ -1069,7 +1069,7 @@ fn document_statistics_parse_style_aliases_and_support_mutation() {
         r#"<t:word-count xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" s:num-format="a" s:num-letter-sync="1">ten</t:word-count>"#,
     );
     let replacement = DynamicTextField::DocumentStatistic {
-        kind: DocumentStatisticKind::Page,
+        kind: StatisticKind::Page,
         number_format: Some(SequenceNumberFormat::new("1", None).unwrap()),
         display_text: "12".to_string(),
     };
@@ -1077,12 +1077,12 @@ fn document_statistics_parse_style_aliases_and_support_mutation() {
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::DocumentStatistic {
-            kind: DocumentStatisticKind::Word,
+            kind: StatisticKind::Word,
             ..
         }
     ));
     let inserted = DynamicTextField::DocumentStatistic {
-        kind: DocumentStatisticKind::Image,
+        kind: StatisticKind::Image,
         number_format: None,
         display_text: "3".to_string(),
     };
@@ -1110,13 +1110,13 @@ fn document_statistics_reject_invalid_numbering_namespaces_attributes_and_bounds
         );
     }
     let oversized = DynamicTextField::DocumentStatistic {
-        kind: DocumentStatisticKind::Character,
+        kind: StatisticKind::Character,
         number_format: None,
         display_text: "x".repeat(65_537),
     };
     assert!(oversized.validate().is_err());
     let forbidden = DynamicTextField::DocumentStatistic {
-        kind: DocumentStatisticKind::Table,
+        kind: StatisticKind::Table,
         number_format: None,
         display_text: "1\u{0}".to_string(),
     };

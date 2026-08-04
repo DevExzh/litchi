@@ -777,7 +777,7 @@ pub enum NoteReferenceClass {
 
 /// Kind of cached ODF document statistic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DocumentStatisticKind {
+pub enum StatisticKind {
     Page,
     Paragraph,
     Word,
@@ -787,7 +787,7 @@ pub enum DocumentStatisticKind {
     Object,
 }
 
-impl DocumentStatisticKind {
+impl StatisticKind {
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::Page => "text:page-count",
@@ -803,7 +803,7 @@ impl DocumentStatisticKind {
 
 /// One of the eight temporal/revision ODF document-metadata fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DocumentMetadataFieldKind {
+pub enum MetadataFieldKind {
     CreationDate,
     CreationTime,
     PrintDate,
@@ -814,7 +814,7 @@ pub enum DocumentMetadataFieldKind {
     ModificationTime,
 }
 
-impl DocumentMetadataFieldKind {
+impl MetadataFieldKind {
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::CreationDate => "text:creation-date",
@@ -835,7 +835,7 @@ impl DocumentMetadataFieldKind {
 
 /// Strict typed value attribute for a temporal document-metadata field.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DocumentMetadataFieldValue {
+pub enum MetadataFieldValue {
     Date(FieldDateValue),
     Time(FieldTimeValue),
     Duration(FieldDuration),
@@ -843,7 +843,7 @@ pub enum DocumentMetadataFieldValue {
 
 /// One of the nine fixed string/identity document-metadata fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DocumentIdentityFieldKind {
+pub enum IdentityFieldKind {
     InitialCreator,
     Description,
     PrintedBy,
@@ -857,7 +857,7 @@ pub enum DocumentIdentityFieldKind {
     AuthorInitials,
 }
 
-impl DocumentIdentityFieldKind {
+impl IdentityFieldKind {
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::InitialCreator => "text:initial-creator",
@@ -1611,7 +1611,7 @@ pub enum DynamicTextField {
         display_text: String,
     },
     DocumentStatistic {
-        kind: DocumentStatisticKind,
+        kind: StatisticKind,
         number_format: Option<SequenceNumberFormat>,
         display_text: String,
     },
@@ -1677,8 +1677,8 @@ pub enum DynamicTextField {
     },
     /// Cached presentation and optional fixed value of a metadata field.
     DocumentMetadata {
-        kind: DocumentMetadataFieldKind,
-        value: Option<DocumentMetadataFieldValue>,
+        kind: MetadataFieldKind,
+        value: Option<MetadataFieldValue>,
         fixed: Option<bool>,
         data_style_name: Option<String>,
         display_text: String,
@@ -1688,7 +1688,7 @@ pub enum DynamicTextField {
     /// Author fields retain stored text only and never read or modify host
     /// identity data.
     DocumentIdentity {
-        kind: DocumentIdentityFieldKind,
+        kind: IdentityFieldKind,
         fixed: Option<bool>,
         display_text: String,
     },
@@ -3058,13 +3058,13 @@ impl DynamicTextField {
             } => {
                 if let Some(value) = value {
                     match value {
-                        DocumentMetadataFieldValue::Date(value) => {
+                        MetadataFieldValue::Date(value) => {
                             element.set_attribute("text:date-value", value.as_str());
                         },
-                        DocumentMetadataFieldValue::Time(value) => {
+                        MetadataFieldValue::Time(value) => {
                             element.set_attribute("text:time-value", value.as_str());
                         },
-                        DocumentMetadataFieldValue::Duration(value) => {
+                        MetadataFieldValue::Duration(value) => {
                             element.set_attribute("text:duration", value.as_str());
                         },
                     }
@@ -3631,13 +3631,13 @@ impl Field {
                     &["style:num-format", "style:num-letter-sync"],
                 )?;
                 let kind = match self.field_type() {
-                    "text:page-count" => DocumentStatisticKind::Page,
-                    "text:paragraph-count" => DocumentStatisticKind::Paragraph,
-                    "text:word-count" => DocumentStatisticKind::Word,
-                    "text:character-count" => DocumentStatisticKind::Character,
-                    "text:table-count" => DocumentStatisticKind::Table,
-                    "text:image-count" => DocumentStatisticKind::Image,
-                    "text:object-count" => DocumentStatisticKind::Object,
+                    "text:page-count" => StatisticKind::Page,
+                    "text:paragraph-count" => StatisticKind::Paragraph,
+                    "text:word-count" => StatisticKind::Word,
+                    "text:character-count" => StatisticKind::Character,
+                    "text:table-count" => StatisticKind::Table,
+                    "text:image-count" => StatisticKind::Image,
+                    "text:object-count" => StatisticKind::Object,
                     _ => unreachable!(),
                 };
                 DynamicTextField::DocumentStatistic {
@@ -3841,57 +3841,57 @@ impl Field {
             | "text:modification-date"
             | "text:modification-time" => {
                 let kind = match self.field_type() {
-                    "text:creation-date" => DocumentMetadataFieldKind::CreationDate,
-                    "text:creation-time" => DocumentMetadataFieldKind::CreationTime,
-                    "text:print-date" => DocumentMetadataFieldKind::PrintDate,
-                    "text:print-time" => DocumentMetadataFieldKind::PrintTime,
-                    "text:editing-cycles" => DocumentMetadataFieldKind::EditingCycles,
-                    "text:editing-duration" => DocumentMetadataFieldKind::EditingDuration,
-                    "text:modification-date" => DocumentMetadataFieldKind::ModificationDate,
-                    "text:modification-time" => DocumentMetadataFieldKind::ModificationTime,
+                    "text:creation-date" => MetadataFieldKind::CreationDate,
+                    "text:creation-time" => MetadataFieldKind::CreationTime,
+                    "text:print-date" => MetadataFieldKind::PrintDate,
+                    "text:print-time" => MetadataFieldKind::PrintTime,
+                    "text:editing-cycles" => MetadataFieldKind::EditingCycles,
+                    "text:editing-duration" => MetadataFieldKind::EditingDuration,
+                    "text:modification-date" => MetadataFieldKind::ModificationDate,
+                    "text:modification-time" => MetadataFieldKind::ModificationTime,
                     _ => unreachable!(),
                 };
                 let allowed = match kind {
-                    DocumentMetadataFieldKind::CreationDate
-                    | DocumentMetadataFieldKind::PrintDate
-                    | DocumentMetadataFieldKind::ModificationDate => {
+                    MetadataFieldKind::CreationDate
+                    | MetadataFieldKind::PrintDate
+                    | MetadataFieldKind::ModificationDate => {
                         &["text:fixed", "style:data-style-name", "text:date-value"][..]
                     },
-                    DocumentMetadataFieldKind::CreationTime
-                    | DocumentMetadataFieldKind::PrintTime
-                    | DocumentMetadataFieldKind::ModificationTime => {
+                    MetadataFieldKind::CreationTime
+                    | MetadataFieldKind::PrintTime
+                    | MetadataFieldKind::ModificationTime => {
                         &["text:fixed", "style:data-style-name", "text:time-value"][..]
                     },
-                    DocumentMetadataFieldKind::EditingDuration => {
+                    MetadataFieldKind::EditingDuration => {
                         &["text:fixed", "style:data-style-name", "text:duration"][..]
                     },
-                    DocumentMetadataFieldKind::EditingCycles => &["text:fixed"][..],
+                    MetadataFieldKind::EditingCycles => &["text:fixed"][..],
                 };
                 reject_unknown_field_attributes(self, allowed)?;
                 let value = match kind {
-                    DocumentMetadataFieldKind::CreationDate
-                    | DocumentMetadataFieldKind::PrintDate
-                    | DocumentMetadataFieldKind::ModificationDate => self
+                    MetadataFieldKind::CreationDate
+                    | MetadataFieldKind::PrintDate
+                    | MetadataFieldKind::ModificationDate => self
                         .element
                         .get_attribute("text:date-value")
                         .map(FieldDateValue::new)
                         .transpose()?
-                        .map(DocumentMetadataFieldValue::Date),
-                    DocumentMetadataFieldKind::CreationTime
-                    | DocumentMetadataFieldKind::PrintTime
-                    | DocumentMetadataFieldKind::ModificationTime => self
+                        .map(MetadataFieldValue::Date),
+                    MetadataFieldKind::CreationTime
+                    | MetadataFieldKind::PrintTime
+                    | MetadataFieldKind::ModificationTime => self
                         .element
                         .get_attribute("text:time-value")
                         .map(FieldTimeValue::new)
                         .transpose()?
-                        .map(DocumentMetadataFieldValue::Time),
-                    DocumentMetadataFieldKind::EditingDuration => self
+                        .map(MetadataFieldValue::Time),
+                    MetadataFieldKind::EditingDuration => self
                         .element
                         .get_attribute("text:duration")
                         .map(FieldDuration::new)
                         .transpose()?
-                        .map(DocumentMetadataFieldValue::Duration),
-                    DocumentMetadataFieldKind::EditingCycles => None,
+                        .map(MetadataFieldValue::Duration),
+                    MetadataFieldKind::EditingCycles => None,
                 };
                 let result = DynamicTextField::DocumentMetadata {
                     kind,
@@ -3917,15 +3917,15 @@ impl Field {
             | "text:author-initials" => {
                 reject_unknown_field_attributes(self, &["text:fixed"])?;
                 let kind = match self.field_type() {
-                    "text:initial-creator" => DocumentIdentityFieldKind::InitialCreator,
-                    "text:description" => DocumentIdentityFieldKind::Description,
-                    "text:printed-by" => DocumentIdentityFieldKind::PrintedBy,
-                    "text:title" => DocumentIdentityFieldKind::Title,
-                    "text:subject" => DocumentIdentityFieldKind::Subject,
-                    "text:keywords" => DocumentIdentityFieldKind::Keywords,
-                    "text:creator" => DocumentIdentityFieldKind::Creator,
-                    "text:author-name" => DocumentIdentityFieldKind::AuthorName,
-                    "text:author-initials" => DocumentIdentityFieldKind::AuthorInitials,
+                    "text:initial-creator" => IdentityFieldKind::InitialCreator,
+                    "text:description" => IdentityFieldKind::Description,
+                    "text:printed-by" => IdentityFieldKind::PrintedBy,
+                    "text:title" => IdentityFieldKind::Title,
+                    "text:subject" => IdentityFieldKind::Subject,
+                    "text:keywords" => IdentityFieldKind::Keywords,
+                    "text:creator" => IdentityFieldKind::Creator,
+                    "text:author-name" => IdentityFieldKind::AuthorName,
+                    "text:author-initials" => IdentityFieldKind::AuthorInitials,
                     _ => unreachable!(),
                 };
                 DynamicTextField::DocumentIdentity {
@@ -4037,32 +4037,29 @@ fn set_data_style(element: &mut Element, value: Option<&str>) {
 }
 
 fn validate_document_metadata_value(
-    kind: DocumentMetadataFieldKind,
-    value: Option<&DocumentMetadataFieldValue>,
+    kind: MetadataFieldKind,
+    value: Option<&MetadataFieldValue>,
     aggregate: &mut usize,
 ) -> Result<()> {
     match (kind, value) {
         (_, None) => Ok(()),
+        (MetadataFieldKind::CreationDate, Some(MetadataFieldValue::Date(value))) => {
+            value.validate(aggregate)
+        },
+        (MetadataFieldKind::CreationTime, Some(MetadataFieldValue::Time(value))) => {
+            value.validate(aggregate)
+        },
         (
-            DocumentMetadataFieldKind::CreationDate,
-            Some(DocumentMetadataFieldValue::Date(value)),
-        ) => value.validate(aggregate),
-        (
-            DocumentMetadataFieldKind::CreationTime,
-            Some(DocumentMetadataFieldValue::Time(value)),
-        ) => value.validate(aggregate),
-        (
-            DocumentMetadataFieldKind::PrintDate | DocumentMetadataFieldKind::ModificationDate,
-            Some(DocumentMetadataFieldValue::Date(value)),
+            MetadataFieldKind::PrintDate | MetadataFieldKind::ModificationDate,
+            Some(MetadataFieldValue::Date(value)),
         ) if value.kind() == DateValueKind::Date => value.validate(aggregate),
         (
-            DocumentMetadataFieldKind::PrintTime | DocumentMetadataFieldKind::ModificationTime,
-            Some(DocumentMetadataFieldValue::Time(value)),
+            MetadataFieldKind::PrintTime | MetadataFieldKind::ModificationTime,
+            Some(MetadataFieldValue::Time(value)),
         ) if value.kind() == TimeValueKind::Time => value.validate(aggregate),
-        (
-            DocumentMetadataFieldKind::EditingDuration,
-            Some(DocumentMetadataFieldValue::Duration(value)),
-        ) => value.validate("text:duration", aggregate),
+        (MetadataFieldKind::EditingDuration, Some(MetadataFieldValue::Duration(value))) => {
+            value.validate("text:duration", aggregate)
+        },
         _ => Err(Error::InvalidFormat(format!(
             "value type is not permitted by {}",
             kind.element_name()
@@ -7902,8 +7899,8 @@ mod document_metadata_fixed_field_tests {
     }
 
     fn metadata_field(
-        kind: DocumentMetadataFieldKind,
-        value: Option<DocumentMetadataFieldValue>,
+        kind: MetadataFieldKind,
+        value: Option<MetadataFieldValue>,
         display_text: &str,
     ) -> DynamicTextField {
         DynamicTextField::DocumentMetadata {
@@ -7921,51 +7918,51 @@ mod document_metadata_fixed_field_tests {
     fn document_metadata_fixed_fields_round_trip_all_eight_standard_elements() {
         let fields = vec![
             metadata_field(
-                DocumentMetadataFieldKind::CreationDate,
-                Some(DocumentMetadataFieldValue::Date(
+                MetadataFieldKind::CreationDate,
+                Some(MetadataFieldValue::Date(
                     FieldDateValue::new("2024-02-29T23:59:59Z").unwrap(),
                 )),
                 "created date & <cached>",
             ),
             metadata_field(
-                DocumentMetadataFieldKind::CreationTime,
-                Some(DocumentMetadataFieldValue::Time(
+                MetadataFieldKind::CreationTime,
+                Some(MetadataFieldValue::Time(
                     FieldTimeValue::new("2024-02-29T24:00:00+14:00").unwrap(),
                 )),
                 "created time",
             ),
             metadata_field(
-                DocumentMetadataFieldKind::PrintDate,
-                Some(DocumentMetadataFieldValue::Date(
+                MetadataFieldKind::PrintDate,
+                Some(MetadataFieldValue::Date(
                     FieldDateValue::new("2025-01-31-05:00").unwrap(),
                 )),
                 "print date",
             ),
             metadata_field(
-                DocumentMetadataFieldKind::PrintTime,
-                Some(DocumentMetadataFieldValue::Time(
+                MetadataFieldKind::PrintTime,
+                Some(MetadataFieldValue::Time(
                     FieldTimeValue::new("12:34:56.789Z").unwrap(),
                 )),
                 "print time",
             ),
-            metadata_field(DocumentMetadataFieldKind::EditingCycles, None, "42"),
+            metadata_field(MetadataFieldKind::EditingCycles, None, "42"),
             metadata_field(
-                DocumentMetadataFieldKind::EditingDuration,
-                Some(DocumentMetadataFieldValue::Duration(
+                MetadataFieldKind::EditingDuration,
+                Some(MetadataFieldValue::Duration(
                     FieldDuration::new("P999999999999Y11M30DT23H59M59.5S").unwrap(),
                 )),
                 "edited duration",
             ),
             metadata_field(
-                DocumentMetadataFieldKind::ModificationDate,
-                Some(DocumentMetadataFieldValue::Date(
+                MetadataFieldKind::ModificationDate,
+                Some(MetadataFieldValue::Date(
                     FieldDateValue::new("-12345-12-31Z").unwrap(),
                 )),
                 "modified date",
             ),
             metadata_field(
-                DocumentMetadataFieldKind::ModificationTime,
-                Some(DocumentMetadataFieldValue::Time(
+                MetadataFieldKind::ModificationTime,
+                Some(MetadataFieldValue::Time(
                     FieldTimeValue::new("00:00:00+05:30").unwrap(),
                 )),
                 "modified time",
@@ -7999,7 +7996,7 @@ mod document_metadata_fixed_field_tests {
         assert!(matches!(
             &fields[0],
             DynamicTextField::DocumentMetadata {
-                kind: DocumentMetadataFieldKind::CreationDate,
+                kind: MetadataFieldKind::CreationDate,
                 value: None,
                 fixed: None,
                 data_style_name: None,
@@ -8009,7 +8006,7 @@ mod document_metadata_fixed_field_tests {
         assert!(matches!(
             &fields[4],
             DynamicTextField::DocumentMetadata {
-                kind: DocumentMetadataFieldKind::EditingCycles,
+                kind: MetadataFieldKind::EditingCycles,
                 fixed: Some(true),
                 ..
             }
@@ -8037,8 +8034,8 @@ mod document_metadata_fixed_field_tests {
         }
 
         let mismatched = metadata_field(
-            DocumentMetadataFieldKind::PrintDate,
-            Some(DocumentMetadataFieldValue::Date(
+            MetadataFieldKind::PrintDate,
+            Some(MetadataFieldValue::Date(
                 FieldDateValue::new("2024-01-01T00:00:00Z").unwrap(),
             )),
             "bad",
@@ -8054,7 +8051,7 @@ mod document_metadata_fixed_field_tests {
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
         let oversized = DynamicTextField::DocumentMetadata {
-            kind: DocumentMetadataFieldKind::EditingCycles,
+            kind: MetadataFieldKind::EditingCycles,
             value: None,
             fixed: None,
             data_style_name: None,
@@ -8062,7 +8059,7 @@ mod document_metadata_fixed_field_tests {
         };
         assert!(oversized.to_xml_fragment().is_err());
         let forbidden = DynamicTextField::DocumentMetadata {
-            kind: DocumentMetadataFieldKind::EditingCycles,
+            kind: MetadataFieldKind::EditingCycles,
             value: None,
             fixed: None,
             data_style_name: None,
@@ -8089,15 +8086,15 @@ mod document_identity_fixed_field_tests {
     #[test]
     fn document_identity_fixed_fields_round_trip_all_nine_standard_elements() {
         let kinds = [
-            DocumentIdentityFieldKind::InitialCreator,
-            DocumentIdentityFieldKind::Description,
-            DocumentIdentityFieldKind::PrintedBy,
-            DocumentIdentityFieldKind::Title,
-            DocumentIdentityFieldKind::Subject,
-            DocumentIdentityFieldKind::Keywords,
-            DocumentIdentityFieldKind::Creator,
-            DocumentIdentityFieldKind::AuthorName,
-            DocumentIdentityFieldKind::AuthorInitials,
+            IdentityFieldKind::InitialCreator,
+            IdentityFieldKind::Description,
+            IdentityFieldKind::PrintedBy,
+            IdentityFieldKind::Title,
+            IdentityFieldKind::Subject,
+            IdentityFieldKind::Keywords,
+            IdentityFieldKind::Creator,
+            IdentityFieldKind::AuthorName,
+            IdentityFieldKind::AuthorInitials,
         ];
         let fields = kinds
             .into_iter()
@@ -8171,13 +8168,13 @@ mod document_identity_fixed_field_tests {
         assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
 
         let oversized = DynamicTextField::DocumentIdentity {
-            kind: DocumentIdentityFieldKind::Description,
+            kind: IdentityFieldKind::Description,
             fixed: None,
             display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
         };
         assert!(oversized.to_xml_fragment().is_err());
         let forbidden = DynamicTextField::DocumentIdentity {
-            kind: DocumentIdentityFieldKind::Title,
+            kind: IdentityFieldKind::Title,
             fixed: Some(true),
             display_text: "bad\u{0}".to_string(),
         };

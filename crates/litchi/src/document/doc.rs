@@ -624,7 +624,7 @@ impl Document {
             #[cfg(feature = "odf")]
             DocumentImpl::Odt(doc) => {
                 use super::DocumentElement;
-                use litchi_odt::elements::parser::DocumentOrderElement;
+                use litchi_odt::elements::parser::OrderElement;
                 use litchi_odt::elements::text::Paragraph as ElementParagraph;
 
                 // Get ODF-specific elements and convert to unified API types
@@ -635,17 +635,17 @@ impl Document {
                 let mut elements = Vec::new();
                 for element in odf_elements {
                     match element {
-                        DocumentOrderElement::Paragraph(para) => {
+                        OrderElement::Paragraph(para) => {
                             elements
                                 .push(DocumentElement::Paragraph(Box::new(Paragraph::Odt(para))));
                         },
-                        DocumentOrderElement::NumberedParagraph(para) => {
+                        OrderElement::NumberedParagraph(para) => {
                             // Numbered paragraphs reach the unified API as paragraphs
                             elements.push(DocumentElement::Paragraph(Box::new(Paragraph::Odt(
                                 para.into_paragraph(),
                             ))));
                         },
-                        DocumentOrderElement::Heading(heading) => {
+                        OrderElement::Heading(heading) => {
                             // Convert heading to paragraph for unified API
                             if let Ok(text) = heading.text() {
                                 let mut para = ElementParagraph::new();
@@ -658,12 +658,12 @@ impl Document {
                                 )));
                             }
                         },
-                        DocumentOrderElement::Table(table) => {
+                        OrderElement::Table(table) => {
                             elements.push(DocumentElement::Table(Box::new(Table::Odt(Box::new(
                                 table,
                             )))));
                         },
-                        DocumentOrderElement::List(_list) => {
+                        OrderElement::List(_list) => {
                             // Lists are typically expanded to paragraphs in text extraction
                             // Skip in the unified document element API for now
                         },

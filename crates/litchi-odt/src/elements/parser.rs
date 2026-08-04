@@ -24,7 +24,7 @@ const MAX_DOCUMENT_DEPTH: usize = 4_096;
 
 /// Represents a document element in its original position
 #[derive(Debug, Clone)]
-pub enum DocumentOrderElement {
+pub enum OrderElement {
     /// A paragraph or heading element
     Paragraph(Paragraph),
     /// A `text:numbered-paragraph` element with explicit list numbering
@@ -48,9 +48,9 @@ pub enum DocumentOrderElement {
 /// - `crate::parser::Parser` for ODT-specific features (track changes, comments, sections)
 /// - `OdsParser` for ODS-specific features (cell formulas, named ranges)
 /// - `OdpParser` for ODP-specific features (slide transitions, animations)
-pub struct DocumentParser;
+pub struct Parser;
 
-impl DocumentParser {
+impl Parser {
     /// Parse all document elements from XML content in document order.
     ///
     /// This function reads through the XML content once and extracts all major
@@ -62,12 +62,12 @@ impl DocumentParser {
     ///
     /// # Returns
     ///
-    /// A vector of `DocumentOrderElement` in the order they appear in the document.
+    /// A vector of `OrderElement` in the order they appear in the document.
     ///
     /// # Example
     ///
     /// ```no_run
-    /// use litchi_odt::elements::parser::DocumentParser;
+    /// use litchi_odt::elements::parser::Parser;
     ///
     /// let xml = r#"<office:text>
     ///     <text:p>First paragraph</text:p>
@@ -75,10 +75,10 @@ impl DocumentParser {
     ///     <text:p>Second paragraph</text:p>
     /// </office:text>"#;
     ///
-    /// let elements = DocumentParser::parse_elements_in_order(xml).unwrap();
+    /// let elements = Parser::parse_elements_in_order(xml).unwrap();
     /// assert_eq!(elements.len(), 3);
     /// ```
-    pub fn parse_elements_in_order(xml_content: &str) -> Result<Vec<DocumentOrderElement>> {
+    pub fn parse_elements_in_order(xml_content: &str) -> Result<Vec<OrderElement>> {
         let mut reader = NsReader::from_str(xml_content);
         reader.config_mut().expand_empty_elements = true;
         let mut buf = Vec::new();
@@ -228,7 +228,7 @@ impl DocumentParser {
                                 && tag == "text:p"
                                 && let Ok(para) = Paragraph::from_element(element)
                             {
-                                elements.push(DocumentOrderElement::Paragraph(para));
+                                elements.push(OrderElement::Paragraph(para));
                             }
                         },
                         "text:numbered-paragraph" if table_depth == 0 && list_depth == 0 => {
@@ -238,7 +238,7 @@ impl DocumentParser {
                                 && let Ok(para) =
                                     super::text::NumberedParagraph::from_element(element)
                             {
-                                elements.push(DocumentOrderElement::NumberedParagraph(para));
+                                elements.push(OrderElement::NumberedParagraph(para));
                             }
                         },
                         "text:h" if table_depth == 0 && list_depth == 0 => {
@@ -247,7 +247,7 @@ impl DocumentParser {
                                 && tag == "text:h"
                                 && let Ok(heading) = Heading::from_element(element)
                             {
-                                elements.push(DocumentOrderElement::Heading(heading));
+                                elements.push(OrderElement::Heading(heading));
                             }
                         },
                         "table:table" if table_depth == 1 => {
@@ -257,7 +257,7 @@ impl DocumentParser {
                                 && tag == "table:table"
                                 && let Ok(table) = Table::from_element(element)
                             {
-                                elements.push(DocumentOrderElement::Table(table));
+                                elements.push(OrderElement::Table(table));
                             }
                         },
                         "table:table" => {
@@ -270,7 +270,7 @@ impl DocumentParser {
                                 && tag == "text:list"
                                 && let Ok(list) = List::from_element(element)
                             {
-                                elements.push(DocumentOrderElement::List(list));
+                                elements.push(OrderElement::List(list));
                             }
                         },
                         "text:list" => {
@@ -321,8 +321,8 @@ impl DocumentParser {
 
         for element in elements {
             match element {
-                DocumentOrderElement::Paragraph(para) => paragraphs.push(para),
-                DocumentOrderElement::Heading(heading) => {
+                OrderElement::Paragraph(para) => paragraphs.push(para),
+                OrderElement::Heading(heading) => {
                     // Convert heading to paragraph for unified handling
                     if let Ok(text) = heading.text() {
                         let mut para = Paragraph::new();
@@ -349,7 +349,7 @@ impl DocumentParser {
         let mut tables = Vec::new();
 
         for element in elements {
-            if let DocumentOrderElement::Table(table) = element {
+            if let OrderElement::Table(table) = element {
                 tables.push(table);
             }
         }

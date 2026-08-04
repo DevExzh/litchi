@@ -322,14 +322,14 @@ impl Document {
     ///
     /// # Returns
     ///
-    /// A vector of `DocumentOrderElement` containing all paragraphs, headings, tables, and
+    /// A vector of `OrderElement` containing all paragraphs, headings, tables, and
     /// lists in the order they appear in the document.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use litchi_odt::Document;
-    /// use litchi_odt::elements::parser::DocumentOrderElement;
+    /// use litchi_odt::elements::parser::OrderElement;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -337,19 +337,19 @@ impl Document {
     ///
     /// for element in elements {
     ///     match element {
-    ///         DocumentOrderElement::Paragraph(para) => {
+    ///         OrderElement::Paragraph(para) => {
     ///             println!("Paragraph: {}", para.text()?);
     ///         },
-    ///         DocumentOrderElement::NumberedParagraph(para) => {
+    ///         OrderElement::NumberedParagraph(para) => {
     ///             println!("Numbered paragraph: {}", para.text()?);
     ///         },
-    ///         DocumentOrderElement::Heading(heading) => {
+    ///         OrderElement::Heading(heading) => {
     ///             println!("Heading: {}", heading.text()?);
     ///         },
-    ///         DocumentOrderElement::Table(table) => {
+    ///         OrderElement::Table(table) => {
     ///             println!("Table with {} rows", table.row_count()?);
     ///         },
-    ///         DocumentOrderElement::List(_) => {
+    ///         OrderElement::List(_) => {
     ///             println!("List element");
     ///         },
     ///     }
@@ -357,11 +357,11 @@ impl Document {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn elements(&self) -> Result<Vec<crate::elements::parser::DocumentOrderElement>> {
-        use crate::elements::parser::DocumentParser;
+    pub fn elements(&self) -> Result<Vec<crate::elements::parser::OrderElement>> {
+        use crate::elements::parser::Parser;
 
         // Parse all elements in document order using the generic ODF parser
-        DocumentParser::parse_elements_in_order(self.content.xml_content())
+        Parser::parse_elements_in_order(self.content.xml_content())
     }
 
     /// Get document metadata.
@@ -1706,7 +1706,7 @@ mod text_model_tests {
     use super::*;
     use crate::constants;
     use crate::core::PackageWriter;
-    use crate::elements::parser::DocumentOrderElement;
+    use crate::elements::parser::OrderElement;
 
     fn document(content: &str) -> Document {
         let mut writer = PackageWriter::new();
@@ -1730,12 +1730,12 @@ mod text_model_tests {
 
         let elements = document.elements().unwrap();
         assert_eq!(elements.len(), 2);
-        let DocumentOrderElement::Heading(heading) = &elements[0] else {
+        let OrderElement::Heading(heading) = &elements[0] else {
             panic!("first document element is not a heading");
         };
         assert_eq!(heading.level(), Some(2));
         assert_eq!(heading.text().unwrap(), "Title & More");
-        let DocumentOrderElement::Paragraph(paragraph) = &elements[1] else {
+        let OrderElement::Paragraph(paragraph) = &elements[1] else {
             panic!("second document element is not a paragraph");
         };
         assert_eq!(paragraph.text().unwrap(), "ABC  D!");

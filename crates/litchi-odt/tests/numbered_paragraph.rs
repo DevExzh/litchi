@@ -2,7 +2,7 @@
 //! attributes.
 
 use litchi_odt::elements::element::ElementBase;
-use litchi_odt::elements::parser::{DocumentOrderElement, DocumentParser};
+use litchi_odt::elements::parser::{OrderElement, Parser};
 
 const CONTENT: &str = concat!(
     r#"<?xml version="1.0"?><office:document-content "#,
@@ -18,9 +18,9 @@ const CONTENT: &str = concat!(
 
 #[test]
 fn numbered_paragraphs_are_extracted_with_numbering_attributes() {
-    let elements = DocumentParser::parse_elements_in_order(CONTENT).unwrap();
+    let elements = Parser::parse_elements_in_order(CONTENT).unwrap();
     assert_eq!(elements.len(), 3);
-    let DocumentOrderElement::NumberedParagraph(para) = &elements[1] else {
+    let OrderElement::NumberedParagraph(para) = &elements[1] else {
         panic!("expected a numbered paragraph, got {:?}", elements.len())
     };
     assert_eq!(para.text().unwrap(), "Numbered item");
@@ -33,8 +33,8 @@ fn numbered_paragraphs_are_extracted_with_numbering_attributes() {
 
 #[test]
 fn numbered_paragraphs_convert_to_plain_paragraphs() {
-    let elements = DocumentParser::parse_elements_in_order(CONTENT).unwrap();
-    let DocumentOrderElement::NumberedParagraph(para) = elements.into_iter().nth(1).unwrap() else {
+    let elements = Parser::parse_elements_in_order(CONTENT).unwrap();
+    let OrderElement::NumberedParagraph(para) = elements.into_iter().nth(1).unwrap() else {
         panic!()
     };
     let plain = para.into_paragraph();
@@ -43,11 +43,11 @@ fn numbered_paragraphs_convert_to_plain_paragraphs() {
 
 #[test]
 fn surrounding_paragraphs_are_unaffected() {
-    let elements = DocumentParser::parse_elements_in_order(CONTENT).unwrap();
-    let DocumentOrderElement::Paragraph(before) = &elements[0] else {
+    let elements = Parser::parse_elements_in_order(CONTENT).unwrap();
+    let OrderElement::Paragraph(before) = &elements[0] else {
         panic!()
     };
-    let DocumentOrderElement::Paragraph(after) = &elements[2] else {
+    let OrderElement::Paragraph(after) = &elements[2] else {
         panic!()
     };
     assert_eq!(before.text().unwrap(), "Before");
@@ -57,8 +57,8 @@ fn surrounding_paragraphs_are_unaffected() {
 #[test]
 fn invalid_numbering_attributes_are_reported() {
     let bad = CONTENT.replace("text:level=\"2\"", "text:level=\"two\"");
-    let elements = DocumentParser::parse_elements_in_order(&bad).unwrap();
-    let DocumentOrderElement::NumberedParagraph(para) = &elements[1] else {
+    let elements = Parser::parse_elements_in_order(&bad).unwrap();
+    let OrderElement::NumberedParagraph(para) = &elements[1] else {
         panic!()
     };
     assert!(para.level().unwrap().is_err());

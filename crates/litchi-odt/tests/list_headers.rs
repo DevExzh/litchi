@@ -5,7 +5,7 @@
 //! must be reachable from the structured list model and not only through the
 //! flattened text.
 
-use litchi_odt::elements::parser::{DocumentOrderElement, DocumentParser};
+use litchi_odt::elements::parser::{OrderElement, Parser};
 use litchi_odt::elements::text::TextElements;
 use litchi_odt::elements::text::{ListHeader, Paragraph};
 
@@ -22,11 +22,11 @@ const LIST_XML: &str = concat!(
 );
 
 fn parsed_list() -> litchi_odt::elements::text::List {
-    let elements = DocumentParser::parse_elements_in_order(LIST_XML).unwrap();
+    let elements = Parser::parse_elements_in_order(LIST_XML).unwrap();
     elements
         .into_iter()
         .find_map(|element| match element {
-            DocumentOrderElement::List(list) => Some(list),
+            OrderElement::List(list) => Some(list),
             _ => None,
         })
         .expect("document contains one list")
@@ -59,11 +59,11 @@ fn a_list_without_a_header_reports_none() {
         "<text:list-header><text:p>lead in</text:p><text:p>still lead in</text:p></text:list-header>",
         "",
     );
-    let elements = DocumentParser::parse_elements_in_order(&xml).unwrap();
+    let elements = Parser::parse_elements_in_order(&xml).unwrap();
     let list = elements
         .into_iter()
         .find_map(|element| match element {
-            DocumentOrderElement::List(list) => Some(list),
+            OrderElement::List(list) => Some(list),
             _ => None,
         })
         .expect("document contains one list");
