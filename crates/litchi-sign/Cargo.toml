@@ -22,3 +22,6 @@ subtle      = { workspace = true }
 thiserror   = { workspace = true }
 x509-cert   = { workspace = true }
 zeroize     = { workspace = true }
+
+[lints]
+workspace = true

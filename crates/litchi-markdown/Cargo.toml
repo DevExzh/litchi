@@ -11,3 +11,6 @@ rust-version.workspace = true
 [dependencies]
 litchi-core = { workspace = true }
 phf         = { workspace = true }
+
+[lints]
+workspace = true

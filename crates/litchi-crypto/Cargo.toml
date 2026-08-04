@@ -27,3 +27,6 @@ sha1 = { workspace = true }
 subtle = { workspace = true }
 thiserror = { workspace = true, optional = true }
 zeroize = { workspace = true }
+
+[lints]
+workspace = true

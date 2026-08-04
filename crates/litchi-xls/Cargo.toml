@@ -25,3 +25,6 @@ rand               = { workspace = true }
 rc4                = { workspace = true }
 zerocopy           = { workspace = true }
 zeroize            = { workspace = true }
+
+[lints]
+workspace = true

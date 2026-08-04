@@ -16,3 +16,6 @@ litchi-core     = { workspace = true }
 smallvec        = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }
+
+[lints]
+workspace = true

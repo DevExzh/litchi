@@ -18,3 +18,6 @@ litchi-odraw = { workspace = true }
 ryu          = { workspace = true }
 xml-minifier = { workspace = true }
 zerocopy     = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

@@ -17,3 +17,6 @@ litchi-opc = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
 unicode-normalization = { workspace = true }
+
+[lints]
+workspace = true

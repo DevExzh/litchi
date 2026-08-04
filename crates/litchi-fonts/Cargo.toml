@@ -14,3 +14,6 @@ font-kit    = { workspace = true }
 litchi-core = { workspace = true }
 roaring     = { workspace = true }
 thiserror   = { workspace = true }
+
+[lints]
+workspace = true
