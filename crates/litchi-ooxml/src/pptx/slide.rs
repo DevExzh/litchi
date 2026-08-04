@@ -694,7 +694,7 @@ impl<'a> Slide<'a> {
     ///
     /// Targets are validated against shape IDs on the current slide. Unsupported
     /// timing subtrees remain inert and are not interpreted.
-    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+    pub fn animations(&self) -> Result<crate::pptx::animations::Sequence> {
         self.part.animations()
     }
 
@@ -906,7 +906,7 @@ impl<'a> SlideLayout<'a> {
     }
 
     /// Parse the timing metadata declared by this slide layout.
-    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+    pub fn animations(&self) -> Result<crate::pptx::animations::Sequence> {
         self.part.animations()
     }
 
@@ -1120,7 +1120,7 @@ impl<'a> SlideMaster<'a> {
     }
 
     /// Parse the timing metadata declared by this slide master.
-    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+    pub fn animations(&self) -> Result<crate::pptx::animations::Sequence> {
         self.part.animations()
     }
 

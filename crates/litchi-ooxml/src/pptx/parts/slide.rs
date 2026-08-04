@@ -1026,8 +1026,8 @@ impl<'a> SlidePart<'a> {
     }
 
     /// Parse the simple shape-animation metadata in this slide's timing tree.
-    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
-        Ok(crate::pptx::animations::AnimationSequence::parse_slide_xml(
+    pub fn animations(&self) -> Result<crate::pptx::animations::Sequence> {
+        Ok(crate::pptx::animations::Sequence::parse_slide_xml(
             self.xml_bytes(),
         )?)
     }
@@ -1110,8 +1110,8 @@ impl<'a> SlideLayoutPart<'a> {
     }
 
     /// Parse the timing metadata declared by this slide layout.
-    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
-        Ok(crate::pptx::animations::AnimationSequence::parse_slide_xml(
+    pub fn animations(&self) -> Result<crate::pptx::animations::Sequence> {
+        Ok(crate::pptx::animations::Sequence::parse_slide_xml(
             self.xml_bytes(),
         )?)
     }
@@ -1204,8 +1204,8 @@ impl<'a> SlideMasterPart<'a> {
     }
 
     /// Parse the timing metadata declared by this slide master.
-    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
-        Ok(crate::pptx::animations::AnimationSequence::parse_slide_xml(
+    pub fn animations(&self) -> Result<crate::pptx::animations::Sequence> {
+        Ok(crate::pptx::animations::Sequence::parse_slide_xml(
             self.xml_bytes(),
         )?)
     }

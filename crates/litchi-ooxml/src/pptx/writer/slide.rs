@@ -1,5 +1,5 @@
 use crate::error::{OoxmlError, Result};
-use crate::pptx::animations::{Animation, AnimationEffect, AnimationSequence, AnimationTrigger};
+use crate::pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
 use crate::pptx::media::{Media, MediaFormat};
 use crate::pptx::parts::Comment;
 /// Slide types and implementation for PPTX presentations.
@@ -30,7 +30,7 @@ pub struct MutableSlide {
     /// Media elements (audio/video) on the slide
     pub(crate) media: Vec<Media>,
     /// Animations on the slide
-    pub(crate) animations: AnimationSequence,
+    pub(crate) animations: Sequence,
     /// Whether the slide has been modified
     pub(crate) modified: bool,
 }
@@ -82,7 +82,7 @@ impl MutableSlide {
             background: None,
             comments: Vec::new(),
             media: Vec::new(),
-            animations: AnimationSequence::new(),
+            animations: Sequence::new(),
             modified: false,
         }
     }
@@ -688,15 +688,15 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi_ooxml::pptx::{MutablePresentation, AnimationEffect};
+    /// use litchi_ooxml::pptx::{MutablePresentation, Effect};
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
     /// slide.add_text_box("Animated Text", 914400, 914400, 2743200, 914400);
-    /// slide.add_animation(3, AnimationEffect::Fade); // Shape ID 3 is the text box
+    /// slide.add_animation(3, Effect::Fade); // Shape ID 3 is the text box
     /// ```
-    pub fn add_animation(&mut self, shape_id: u32, effect: AnimationEffect) {
-        let animation = Animation::new(shape_id, effect);
+    pub fn add_animation(&mut self, shape_id: u32, effect: Effect) {
+        let animation = EffectInstance::new(shape_id, effect);
         self.animations.add(animation);
         self.modified = true;
     }
@@ -712,12 +712,12 @@ impl MutableSlide {
     pub fn add_animation_with_options(
         &mut self,
         shape_id: u32,
-        effect: AnimationEffect,
-        trigger: AnimationTrigger,
+        effect: Effect,
+        trigger: Trigger,
         duration_ms: u32,
         delay_ms: u32,
     ) {
-        let animation = Animation::new(shape_id, effect)
+        let animation = EffectInstance::new(shape_id, effect)
             .with_trigger(trigger)
             .with_duration(duration_ms)
             .with_delay(delay_ms);
@@ -726,7 +726,7 @@ impl MutableSlide {
     }
 
     /// Get the animations on this slide.
-    pub fn animations(&self) -> &AnimationSequence {
+    pub fn animations(&self) -> &Sequence {
         &self.animations
     }
 
@@ -737,7 +737,7 @@ impl MutableSlide {
 
     /// Clear all animations from the slide.
     pub fn clear_animations(&mut self) {
-        self.animations = AnimationSequence::new();
+        self.animations = Sequence::new();
         self.modified = true;
     }
 
@@ -1176,7 +1176,7 @@ impl MutableSlide {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pptx::animations::{AnimationEffect, AnimationTrigger};
+    use crate::pptx::animations::{Effect, Trigger};
 
     #[test]
     fn test_mutable_slide_new() {
@@ -1380,7 +1380,7 @@ mod tests {
     fn test_add_animation() {
         let mut slide = MutableSlide::new(256);
         slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
-        slide.add_animation(3, AnimationEffect::Fade);
+        slide.add_animation(3, Effect::Fade);
         assert_eq!(slide.animation_count(), 1);
         assert!(slide.is_modified());
     }
@@ -1389,79 +1389,72 @@ mod tests {
     fn test_add_animation_with_options() {
         let mut slide = MutableSlide::new(256);
         slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
-        slide.add_animation_with_options(
-            3,
-            AnimationEffect::FlyIn,
-            AnimationTrigger::OnClick,
-            500,
-            100,
-        );
+        slide.add_animation_with_options(3, Effect::FlyIn, Trigger::OnClick, 500, 100);
         assert_eq!(slide.animation_count(), 1);
     }
 
     #[test]
     fn simple_animation_timing_round_trips_through_slide_xml() {
         use crate::pptx::animations::{
-            Animation, AnimationDirection, AnimationFill, AnimationProgress, AnimationRepeat,
-            AnimationRestart, AnimationSequence, AnimationSpeed, AnimationSyncBehavior,
-            AnimationTimeFilter, AnimationTimePoint, Duration, NormalizedTime,
+            Direction, Duration, EffectInstance, Fill, MotionFraction, NormalizedTime, Repeat,
+            Restart, Sequence, Speed, SyncBehavior, TimeFilter, TimePoint,
         };
 
         let mut slide = MutableSlide::new(256);
         slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
         slide.animations.add(
-            Animation::new(3, AnimationEffect::FlyIn)
-                .with_trigger(AnimationTrigger::OnClick)
+            EffectInstance::new(3, Effect::FlyIn)
+                .with_trigger(Trigger::OnClick)
                 .with_duration(Duration::Indefinite)
                 .with_delay(15)
-                .with_direction(AnimationDirection::UpRight),
+                .with_direction(Direction::UpRight),
         );
         slide.animations.add(
-            Animation::new(3, AnimationEffect::Wipe)
-                .with_trigger(AnimationTrigger::WithPrevious)
+            EffectInstance::new(3, Effect::Wipe)
+                .with_trigger(Trigger::WithPrevious)
                 .with_duration_ms(750)
                 .with_delay(25)
-                .with_direction(AnimationDirection::DownLeft),
+                .with_direction(Direction::DownLeft),
         );
         slide.animations.add(
-            Animation::new(3, AnimationEffect::GrowShrink)
-                .with_trigger(AnimationTrigger::AfterPrevious)
+            EffectInstance::new(3, Effect::GrowShrink)
+                .with_trigger(Trigger::AfterPrevious)
                 .with_duration_ms(900)
                 .with_delay(35),
         );
         slide.animations.add(
-            Animation::new(3, AnimationEffect::Split)
-                .with_trigger(AnimationTrigger::WithPrevious)
+            EffectInstance::new(3, Effect::Split)
+                .with_trigger(Trigger::WithPrevious)
                 .with_duration_ms(650)
-                .with_direction(AnimationDirection::VerticalOut),
+                .with_direction(Direction::VerticalOut),
         );
         slide.animations.add(
-            Animation::new(3, AnimationEffect::Zoom)
-                .with_trigger(AnimationTrigger::AfterPrevious)
+            EffectInstance::new(3, Effect::Zoom)
+                .with_trigger(Trigger::AfterPrevious)
                 .with_duration_ms(800)
-                .with_direction(AnimationDirection::InFromScreenCenter)
-                .with_fill(AnimationFill::Freeze)
-                .with_restart(AnimationRestart::WhenNotActive)
+                .with_direction(Direction::InFromScreenCenter)
+                .with_fill(Fill::Freeze)
+                .with_restart(Restart::WhenNotActive)
                 .with_auto_reverse(true)
-                .with_repeat(AnimationRepeat::Finite(2500))
-                .with_speed(AnimationSpeed::new(125000).unwrap())
-                .with_acceleration(AnimationProgress::new(20000).unwrap())
-                .with_deceleration(AnimationProgress::new(15000).unwrap())
+                .with_repeat(Repeat::Finite(2500))
+                .with_speed(Speed::new(125000).unwrap())
+                .with_acceleration(MotionFraction::new(20000).unwrap())
+                .with_deceleration(MotionFraction::new(15000).unwrap())
                 .with_display(false)
                 .with_repeat_duration(Duration::Indefinite)
-                .with_sync_behavior(AnimationSyncBehavior::CanSlip)
+                .with_sync_behavior(SyncBehavior::CanSlip)
                 .with_after_effect(true)
                 .with_time_filter(
-                    AnimationTimeFilter::new(vec![
-                        AnimationTimePoint::new(
+                    TimeFilter::new(vec![
+                        TimePoint::new(
                             NormalizedTime::from_millionths(0).unwrap(),
                             NormalizedTime::from_millionths(0).unwrap(),
                         ),
-                        AnimationTimePoint::new(
+                        TimePoint::new(
                             NormalizedTime::from_millionths(500_000).unwrap(),
                             NormalizedTime::from_millionths(250_000).unwrap(),
                         ),
-                        AnimationTimePoint::new(
+                        TimePoint::new(
                             NormalizedTime::from_millionths(1_000_000).unwrap(),
                             NormalizedTime::from_millionths(1_000_000).unwrap(),
                         ),
@@ -1471,24 +1464,24 @@ mod tests {
         );
 
         let xml = slide.to_xml().unwrap();
-        let parsed = AnimationSequence::parse_slide_xml(xml.as_bytes()).unwrap();
+        let parsed = Sequence::parse_slide_xml(xml.as_bytes()).unwrap();
         assert_eq!(parsed, slide.animations);
     }
 
     #[test]
     fn slide_serialization_rejects_invalid_animation_targets_and_timing() {
         use crate::pptx::animations::{
-            Animation, AnimationDirection, AnimationRepeat, Duration, MAX_TIMING_MILLISECONDS,
+            Direction, Duration, EffectInstance, MAX_TIMING_MILLISECONDS, Repeat,
         };
 
         let mut slide = MutableSlide::new(256);
         slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
-        slide.add_animation(99, AnimationEffect::Fade);
+        slide.add_animation(99, Effect::Fade);
         assert!(slide.to_xml().is_err());
 
         slide.clear_animations();
         slide.animations.add(
-            Animation::new(3, AnimationEffect::Fade)
+            EffectInstance::new(3, Effect::Fade)
                 .with_duration(Duration::Finite(MAX_TIMING_MILLISECONDS + 1)),
         );
         assert!(slide.to_xml().is_err());
@@ -1496,13 +1489,13 @@ mod tests {
         slide.clear_animations();
         slide
             .animations
-            .add(Animation::new(3, AnimationEffect::Fade).with_direction(AnimationDirection::Left));
+            .add(EffectInstance::new(3, Effect::Fade).with_direction(Direction::Left));
         assert!(slide.to_xml().is_err());
 
         slide.clear_animations();
         slide.animations.add(
-            Animation::new(3, AnimationEffect::Fade)
-                .with_repeat(AnimationRepeat::Finite(MAX_TIMING_MILLISECONDS + 1)),
+            EffectInstance::new(3, Effect::Fade)
+                .with_repeat(Repeat::Finite(MAX_TIMING_MILLISECONDS + 1)),
         );
         assert!(slide.to_xml().is_err());
     }
@@ -1511,7 +1504,7 @@ mod tests {
     fn test_clear_animations() {
         let mut slide = MutableSlide::new(256);
         slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
-        slide.add_animation(3, AnimationEffect::Fade);
+        slide.add_animation(3, Effect::Fade);
         assert_eq!(slide.animation_count(), 1);
 
         slide.clear_animations();

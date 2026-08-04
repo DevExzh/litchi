@@ -1,13 +1,13 @@
 use crate::error::{OoxmlError, Result};
 use litchi_opc::{OpcPackage, PackURI};
 
-use super::animations::AnimationSequence;
+use super::animations::Sequence;
 
 #[allow(dead_code)]
 pub(super) fn parse_package_slide(
     package: &OpcPackage,
     slide_part_name: &PackURI,
-) -> Result<AnimationSequence> {
+) -> Result<Sequence> {
     litchi_pptx::animations::parse_package_slide(package, slide_part_name).map_err(OoxmlError::from)
 }
 
@@ -95,33 +95,28 @@ const OLE_REL: [&str; 2] = [
 mod tests {
     use super::*;
     use crate::pptx::animations::{
-        Animation, AnimationDiagramBuild, AnimationEffect, AnimationGraphicBuild, AnimationGroupId,
-        AnimationOleChartBuild,
+        DiagramBuild, Effect, EffectInstance, GraphicBuild, GroupId, OleChartBuild,
     };
     use litchi_opc::{Part, part::BlobPart};
 
     const SLIDE: &str = "/ppt/slides/slide1.xml";
 
     fn timing(kind: &str, shape_id: u32, group_id: u32) -> String {
-        let mut sequence = AnimationSequence::new();
-        sequence.add(Animation::new(shape_id, AnimationEffect::Fade).with_group_id(group_id));
+        let mut sequence = Sequence::new();
+        sequence.add(EffectInstance::new(shape_id, Effect::Fade).with_group_id(group_id));
         match kind {
-            "chart" => sequence.add_graphic_build(AnimationGraphicBuild::chart(
-                shape_id,
-                AnimationGroupId::new(group_id),
-            )),
-            "diagram" => sequence.add_graphic_build(AnimationGraphicBuild::diagram(
-                shape_id,
-                AnimationGroupId::new(group_id),
-            )),
-            "ole-diagram" => sequence.add_diagram_build(AnimationDiagramBuild::new(
-                shape_id,
-                AnimationGroupId::new(group_id),
-            )),
-            "ole-chart" => sequence.add_ole_chart_build(AnimationOleChartBuild::new(
-                shape_id,
-                AnimationGroupId::new(group_id),
-            )),
+            "chart" => {
+                sequence.add_graphic_build(GraphicBuild::chart(shape_id, GroupId::new(group_id)))
+            },
+            "diagram" => {
+                sequence.add_graphic_build(GraphicBuild::diagram(shape_id, GroupId::new(group_id)))
+            },
+            "ole-diagram" => {
+                sequence.add_diagram_build(DiagramBuild::new(shape_id, GroupId::new(group_id)))
+            },
+            "ole-chart" => {
+                sequence.add_ole_chart_build(OleChartBuild::new(shape_id, GroupId::new(group_id)))
+            },
             _ => unreachable!(),
         }
         sequence.to_xml()
@@ -186,9 +181,7 @@ mod tests {
             &[("rIdChart", CHART_REL[0], "../charts/chart1.xml", false)],
             &[("/ppt/charts/chart1.xml", CHART_CT)],
         );
-        assert!(
-            AnimationSequence::from_package_slide(&chart, &PackURI::new(SLIDE).unwrap()).is_ok()
-        );
+        assert!(Sequence::from_package_slide(&chart, &PackURI::new(SLIDE).unwrap()).is_ok());
 
         let diagram_xml = slide(
             &host(
@@ -231,9 +224,7 @@ mod tests {
                 ("/ppt/diagrams/colors1.xml", DIAGRAM_COLORS_CT),
             ],
         );
-        assert!(
-            AnimationSequence::from_package_slide(&diagram, &PackURI::new(SLIDE).unwrap()).is_ok()
-        );
+        assert!(Sequence::from_package_slide(&diagram, &PackURI::new(SLIDE).unwrap()).is_ok());
 
         for kind in ["ole-diagram", "ole-chart"] {
             let ole_xml = slide(
@@ -245,9 +236,7 @@ mod tests {
                 &[("rIdOle", OLE_REL[0], "../embeddings/oleObject1.bin", false)],
                 &[("/ppt/embeddings/oleObject1.bin", OLE_CT)],
             );
-            assert!(
-                AnimationSequence::from_package_slide(&ole, &PackURI::new(SLIDE).unwrap()).is_ok()
-            );
+            assert!(Sequence::from_package_slide(&ole, &PackURI::new(SLIDE).unwrap()).is_ok());
         }
     }
 
@@ -306,10 +295,7 @@ mod tests {
             ),
         ];
         for package in cases {
-            assert!(
-                AnimationSequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap())
-                    .is_err()
-            );
+            assert!(Sequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap()).is_err());
         }
     }
 
@@ -339,10 +325,7 @@ mod tests {
                     ("/ppt/charts/chart2.xml", CHART_CT),
                 ],
             );
-            assert!(
-                AnimationSequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap())
-                    .is_err()
-            );
+            assert!(Sequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap()).is_err());
         }
     }
 
@@ -357,9 +340,7 @@ mod tests {
             &[("same", DIAGRAM_DATA_REL[0], "../diagrams/data1.xml", false)],
             &[("/ppt/diagrams/data1.xml", DIAGRAM_DATA_CT)],
         );
-        assert!(
-            AnimationSequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap()).is_err()
-        );
+        assert!(Sequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap()).is_err());
 
         let oversized = vec![b' '; MAX_SLIDE_XML + 1];
         let oversized_slide = PackURI::new(SLIDE).unwrap();
@@ -369,9 +350,7 @@ mod tests {
             SLIDE_CT.into(),
             oversized,
         )));
-        assert!(
-            AnimationSequence::from_package_slide(&oversized_package, &oversized_slide).is_err()
-        );
+        assert!(Sequence::from_package_slide(&oversized_package, &oversized_slide).is_err());
     }
 
     #[test]
@@ -390,9 +369,7 @@ mod tests {
             )],
             &[("/ppt/charts/chartEx1.xml", CHARTEX_CT)],
         );
-        assert!(
-            AnimationSequence::from_package_slide(&direct, &PackURI::new(SLIDE).unwrap()).is_ok()
-        );
+        assert!(Sequence::from_package_slide(&direct, &PackURI::new(SLIDE).unwrap()).is_ok());
 
         let choice = host_with_uri(r#"<c:chart r:id="rIdChartEx"/>"#, CHARTEX_URI);
         let mc_host = format!(
@@ -410,7 +387,7 @@ mod tests {
             )],
             &[("/ppt/charts/chartEx2.xml", CHARTEX_CT)],
         );
-        AnimationSequence::from_package_slide(&mc, &PackURI::new(SLIDE).unwrap())
+        Sequence::from_package_slide(&mc, &PackURI::new(SLIDE).unwrap())
             .expect("Office-style ChartEx AlternateContent should validate");
 
         let strict_timing = timing("chart", 5, 3)
@@ -440,7 +417,7 @@ mod tests {
             )],
             &[("/ppt/charts/chartEx3.xml", CHARTEX_CT)],
         );
-        AnimationSequence::from_package_slide(&strict, &PackURI::new(SLIDE).unwrap())
+        Sequence::from_package_slide(&strict, &PackURI::new(SLIDE).unwrap())
             .expect("strict ChartEx host should validate");
     }
 
@@ -481,10 +458,7 @@ mod tests {
             ),
         ];
         for package in cases {
-            assert!(
-                AnimationSequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap())
-                    .is_err()
-            );
+            assert!(Sequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap()).is_err());
         }
     }
 
@@ -520,10 +494,7 @@ mod tests {
                 )],
                 &[("/ppt/charts/chartEx1.xml", CHARTEX_CT)],
             );
-            assert!(
-                AnimationSequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap())
-                    .is_err()
-            );
+            assert!(Sequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap()).is_err());
         }
     }
 
@@ -541,8 +512,7 @@ mod tests {
                 &[("/ppt/charts/chartEx1.xml", CHARTEX_CT)],
             );
             assert_eq!(
-                AnimationSequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap())
-                    .is_ok(),
+                Sequence::from_package_slide(&package, &PackURI::new(SLIDE).unwrap()).is_ok(),
                 valid,
             );
         }

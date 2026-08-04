@@ -100,9 +100,7 @@ pub mod vba_project;
 pub mod view_properties;
 pub mod writer;
 
-pub use animations::{
-    Animation, AnimationDirection, AnimationEffect, AnimationSequence, AnimationTrigger,
-};
+pub use animations::{Direction, Effect, EffectInstance, Sequence};
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use changes_information::{
     CHANGES_INFORMATION_CONTENT_TYPE, CHANGES_INFORMATION_RELATIONSHIP_TYPE, ChangesData,

@@ -1,5 +1,5 @@
 use litchi_ooxml::PackURI;
-use litchi_ooxml::pptx::{AnimationEffect, Package};
+use litchi_ooxml::pptx::{Effect, Package};
 use tempfile::NamedTempFile;
 
 const LAYOUT_XML: &[u8] =
@@ -16,18 +16,12 @@ fn layout_and_master_timing_metadata_is_exposed() {
     let layout_animations = slide.layout().unwrap().animations().unwrap();
     assert_eq!(layout_animations.len(), 1);
     assert_eq!(layout_animations.animations[0].shape_id, 3);
-    assert_eq!(
-        layout_animations.animations[0].effect,
-        AnimationEffect::Fade
-    );
+    assert_eq!(layout_animations.animations[0].effect, Effect::Fade);
 
     let master_animations = slide.master().unwrap().animations().unwrap();
     assert_eq!(master_animations.len(), 1);
     assert_eq!(master_animations.animations[0].shape_id, 4);
-    assert_eq!(
-        master_animations.animations[0].effect,
-        AnimationEffect::Fade
-    );
+    assert_eq!(master_animations.animations[0].effect, Effect::Fade);
 }
 
 fn package_with_timing_xml() -> Package {
