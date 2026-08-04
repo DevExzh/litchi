@@ -1,9 +1,7 @@
 //! Typed creation and canonical serialization for standalone ODF charts.
 
-use super::document::{ChartDocument, ChartElement, parse_chart_content};
-use super::semantic::{
-    ChartAxisDimension, ChartDataSourceLabels, ChartGridClass, ChartLegendPosition,
-};
+use super::document::{Document, Element, parse_chart_content};
+use super::semantic::{DataSourceLabels, Dimension, GridClass, LegendPosition};
 use crate::{constants, core::PackageWriter};
 use litchi_core::{Error, Result};
 use litchi_odf_common::calculation::{Settings, write};
@@ -21,7 +19,7 @@ const MAX_EXPANDED_CELLS: u64 = 16_777_216;
 
 /// An extension attribute retained by expanded XML name.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartExtensionAttribute {
+pub struct ExtensionAttribute {
     pub namespace_uri: Option<String>,
     pub local_name: String,
     pub value: String,
@@ -29,24 +27,24 @@ pub struct ChartExtensionAttribute {
 
 /// An extension subtree retained without interpreting vendor behavior.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartExtensionElement {
+pub struct ExtensionElement {
     pub namespace_uri: Option<String>,
     pub local_name: String,
-    pub attributes: Vec<ChartExtensionAttribute>,
+    pub attributes: Vec<ExtensionAttribute>,
     pub text: String,
-    pub children: Vec<ChartExtensionElement>,
+    pub children: Vec<ExtensionElement>,
 }
 
-impl ChartExtensionElement {
+impl ExtensionElement {
     /// Clone a retained read-only element into an owned extension subtree.
-    pub fn from_retained(element: &ChartElement) -> Self {
+    pub fn from_retained(element: &Element) -> Self {
         Self {
             namespace_uri: element.namespace_uri().map(str::to_string),
             local_name: element.local_name().to_string(),
             attributes: element
                 .attributes()
                 .iter()
-                .map(|attribute| ChartExtensionAttribute {
+                .map(|attribute| ExtensionAttribute {
                     namespace_uri: attribute.namespace_uri().map(str::to_string),
                     local_name: attribute.local_name().to_string(),
                     value: attribute.value().to_string(),
@@ -60,22 +58,22 @@ impl ChartExtensionElement {
 
 /// Unknown attributes and child elements attached to a typed chart node.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartExtensions {
-    pub attributes: Vec<ChartExtensionAttribute>,
-    pub children: Vec<ChartExtensionElement>,
+pub struct Extensions {
+    pub attributes: Vec<ExtensionAttribute>,
+    pub children: Vec<ExtensionElement>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartText {
+pub struct Text {
     pub text: String,
     pub cell_range: Option<String>,
     pub style_name: Option<String>,
     pub x: Option<String>,
     pub y: Option<String>,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
-impl ChartText {
+impl Text {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
@@ -85,126 +83,126 @@ impl ChartText {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartLegendSpec {
-    pub position: ChartLegendPosition,
+pub struct LegendSpec {
+    pub position: LegendPosition,
     pub style_name: Option<String>,
     pub title: Option<String>,
     pub x: Option<String>,
     pub y: Option<String>,
     pub expansion: Option<String>,
     pub expansion_aspect_ratio: Option<String>,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
-impl Default for ChartLegendSpec {
+impl Default for LegendSpec {
     fn default() -> Self {
         Self {
-            position: ChartLegendPosition::End,
+            position: LegendPosition::End,
             style_name: None,
             title: None,
             x: None,
             y: None,
             expansion: None,
             expansion_aspect_ratio: None,
-            extensions: ChartExtensions::default(),
+            extensions: Extensions::default(),
         }
     }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartStyleElement {
+pub struct StyleElement {
     pub style_name: Option<String>,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartGridSpec {
-    pub class: ChartGridClass,
+pub struct GridSpec {
+    pub class: GridClass,
     pub style_name: Option<String>,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartDataLabelSpec {
+pub struct DataLabelSpec {
     pub text: Option<String>,
     pub style_name: Option<String>,
     pub x: Option<String>,
     pub y: Option<String>,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartDataPointSpec {
+pub struct DataPointSpec {
     pub repeated: u32,
     pub style_name: Option<String>,
-    pub label: Option<ChartDataLabelSpec>,
-    pub extensions: ChartExtensions,
+    pub label: Option<DataLabelSpec>,
+    pub extensions: Extensions,
 }
 
-impl Default for ChartDataPointSpec {
+impl Default for DataPointSpec {
     fn default() -> Self {
         Self {
             repeated: 1,
             style_name: None,
             label: None,
-            extensions: ChartExtensions::default(),
+            extensions: Extensions::default(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartDomainSpec {
+pub struct DomainSpec {
     pub cell_range_address: String,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartEquationSpec {
+pub struct EquationSpec {
     pub display_equation: bool,
     pub display_r_square: bool,
     pub style_name: Option<String>,
     pub x: Option<String>,
     pub y: Option<String>,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartRegressionSpec {
+pub struct RegressionSpec {
     pub style_name: Option<String>,
-    pub equation: Option<ChartEquationSpec>,
-    pub extensions: ChartExtensions,
+    pub equation: Option<EquationSpec>,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartSeriesSpec {
+pub struct SeriesSpec {
     pub xml_id: Option<String>,
     pub class: Option<String>,
     pub values_cell_range_address: Option<String>,
     pub label_cell_address: Option<String>,
     pub attached_axis: Option<String>,
     pub style_name: Option<String>,
-    pub domains: Vec<ChartDomainSpec>,
-    pub data_points: Vec<ChartDataPointSpec>,
-    pub data_label: Option<ChartDataLabelSpec>,
-    pub mean_value: Option<ChartStyleElement>,
-    pub error_indicator: Option<ChartStyleElement>,
-    pub regression_curves: Vec<ChartRegressionSpec>,
-    pub extensions: ChartExtensions,
+    pub domains: Vec<DomainSpec>,
+    pub data_points: Vec<DataPointSpec>,
+    pub data_label: Option<DataLabelSpec>,
+    pub mean_value: Option<StyleElement>,
+    pub error_indicator: Option<StyleElement>,
+    pub regression_curves: Vec<RegressionSpec>,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartAxisSpec {
-    pub dimension: ChartAxisDimension,
+pub struct AxisSpec {
+    pub dimension: Dimension,
     pub name: Option<String>,
     pub style_name: Option<String>,
-    pub title: Option<ChartText>,
+    pub title: Option<Text>,
     pub categories_cell_range_address: Option<String>,
-    pub grids: Vec<ChartGridSpec>,
-    pub extensions: ChartExtensions,
+    pub grids: Vec<GridSpec>,
+    pub extensions: Extensions,
 }
 
-impl ChartAxisSpec {
-    pub fn new(dimension: ChartAxisDimension) -> Self {
+impl AxisSpec {
+    pub fn new(dimension: Dimension) -> Self {
         Self {
             dimension,
             name: None,
@@ -212,32 +210,32 @@ impl ChartAxisSpec {
             title: None,
             categories_cell_range_address: None,
             grids: Vec::new(),
-            extensions: ChartExtensions::default(),
+            extensions: Extensions::default(),
         }
     }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartPlotAreaSpec {
+pub struct PlotAreaSpec {
     pub cell_range_address: Option<String>,
-    pub data_source_labels: Option<ChartDataSourceLabels>,
+    pub data_source_labels: Option<DataSourceLabels>,
     pub style_name: Option<String>,
     pub x: Option<String>,
     pub y: Option<String>,
     pub width: Option<String>,
     pub height: Option<String>,
-    pub axes: Vec<ChartAxisSpec>,
-    pub series: Vec<ChartSeriesSpec>,
-    pub wall: Option<ChartStyleElement>,
-    pub floor: Option<ChartStyleElement>,
-    pub stock_gain_marker: Option<ChartStyleElement>,
-    pub stock_loss_marker: Option<ChartStyleElement>,
-    pub stock_range_line: Option<ChartStyleElement>,
-    pub extensions: ChartExtensions,
+    pub axes: Vec<AxisSpec>,
+    pub series: Vec<SeriesSpec>,
+    pub wall: Option<StyleElement>,
+    pub floor: Option<StyleElement>,
+    pub stock_gain_marker: Option<StyleElement>,
+    pub stock_loss_marker: Option<StyleElement>,
+    pub stock_range_line: Option<StyleElement>,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub enum ChartCachedValue {
+pub enum CachedValue {
     #[default]
     Empty,
     Float(f64),
@@ -253,15 +251,15 @@ pub enum ChartCachedValue {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct ChartCachedCell {
-    pub value: ChartCachedValue,
+pub struct CachedCell {
+    pub value: CachedValue,
     /// An OpenDocument formula stored as inert text; this crate never evaluates it.
     pub formula: Option<String>,
     pub repeated: u32,
 }
 
-impl ChartCachedCell {
-    pub fn new(value: ChartCachedValue) -> Self {
+impl CachedCell {
+    pub fn new(value: CachedValue) -> Self {
         Self {
             value,
             formula: None,
@@ -271,28 +269,28 @@ impl ChartCachedCell {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct ChartCachedRow {
-    pub cells: Vec<ChartCachedCell>,
+pub struct CachedRow {
+    pub cells: Vec<CachedCell>,
     pub repeated: u32,
 }
 
-impl ChartCachedRow {
-    pub fn new(cells: Vec<ChartCachedCell>) -> Self {
+impl CachedRow {
+    pub fn new(cells: Vec<CachedCell>) -> Self {
         Self { cells, repeated: 1 }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChartCachedTable {
+pub struct CachedTable {
     pub name: String,
     pub columns: u32,
     pub header_columns: u32,
-    pub header_rows: Vec<ChartCachedRow>,
-    pub rows: Vec<ChartCachedRow>,
-    pub extensions: ChartExtensions,
+    pub header_rows: Vec<CachedRow>,
+    pub rows: Vec<CachedRow>,
+    pub extensions: Extensions,
 }
 
-impl ChartCachedTable {
+impl CachedTable {
     pub fn new(name: impl Into<String>, columns: u32) -> Self {
         Self {
             name: name.into(),
@@ -300,29 +298,29 @@ impl ChartCachedTable {
             header_columns: 0,
             header_rows: Vec::new(),
             rows: Vec::new(),
-            extensions: ChartExtensions::default(),
+            extensions: Extensions::default(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChartDefinition {
+pub struct Definition {
     pub class: String,
     pub style_name: Option<String>,
     pub width: Option<String>,
     pub height: Option<String>,
-    pub title: Option<ChartText>,
-    pub subtitle: Option<ChartText>,
-    pub footer: Option<ChartText>,
-    pub legend: Option<ChartLegendSpec>,
-    pub plot_area: ChartPlotAreaSpec,
-    pub cached_table: Option<ChartCachedTable>,
+    pub title: Option<Text>,
+    pub subtitle: Option<Text>,
+    pub footer: Option<Text>,
+    pub legend: Option<LegendSpec>,
+    pub plot_area: PlotAreaSpec,
+    pub cached_table: Option<CachedTable>,
     /// Inert cached-formula recalculation metadata; never executed by this crate.
     pub calculation_settings: Option<Settings>,
-    pub extensions: ChartExtensions,
+    pub extensions: Extensions,
 }
 
-impl ChartDefinition {
+impl Definition {
     pub fn new(class: impl Into<String>) -> Self {
         Self {
             class: class.into(),
@@ -333,10 +331,10 @@ impl ChartDefinition {
             subtitle: None,
             footer: None,
             legend: None,
-            plot_area: ChartPlotAreaSpec::default(),
+            plot_area: PlotAreaSpec::default(),
             cached_table: None,
             calculation_settings: None,
-            extensions: ChartExtensions::default(),
+            extensions: Extensions::default(),
         }
     }
 
@@ -368,18 +366,18 @@ impl ChartDefinition {
     }
 }
 
-impl ChartDocument {
+impl Document {
     /// Create a new packaged `.odc` document from a typed chart definition.
-    pub fn create(definition: &ChartDefinition) -> Result<Self> {
+    pub fn create(definition: &Definition) -> Result<Self> {
         Self::create_with_mimetype(definition, constants::ODF_CHART)
     }
 
     /// Create a new packaged `.otc` chart template.
-    pub fn create_template(definition: &ChartDefinition) -> Result<Self> {
+    pub fn create_template(definition: &Definition) -> Result<Self> {
         Self::create_with_mimetype(definition, constants::ODF_CHART_TEMPLATE)
     }
 
-    fn create_with_mimetype(definition: &ChartDefinition, mimetype: &str) -> Result<Self> {
+    fn create_with_mimetype(definition: &Definition, mimetype: &str) -> Result<Self> {
         let content = serialize_chart_content(definition)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(mimetype)?;
@@ -388,7 +386,7 @@ impl ChartDocument {
     }
 
     /// Replace the typed chart content while preserving safe package entries.
-    pub fn set_definition(&mut self, definition: &ChartDefinition) -> Result<()> {
+    pub fn set_definition(&mut self, definition: &Definition) -> Result<()> {
         let content = serialize_chart_content(definition)?;
         let parsed = parse_chart_content(&content)?;
         self.package.replace_content_xml(content)?;
@@ -401,7 +399,7 @@ impl ChartDocument {
 ///
 /// The output contains no executable behavior. Formula attributes in cached
 /// cells are emitted only as escaped, opaque strings.
-pub fn serialize_chart_content(definition: &ChartDefinition) -> Result<String> {
+pub fn serialize_chart_content(definition: &Definition) -> Result<String> {
     definition.validate()?;
     let namespaces = NamespaceMap::for_definition(definition)?;
     let mut out = String::with_capacity(4096);
@@ -421,7 +419,7 @@ pub fn serialize_chart_content(definition: &ChartDefinition) -> Result<String> {
     Ok(out)
 }
 
-fn write_definition(out: &mut String, chart: &ChartDefinition, ns: &NamespaceMap) -> Result<()> {
+fn write_definition(out: &mut String, chart: &Definition, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:chart");
     attr(out, "chart:class", &chart.class)?;
     opt_attr(out, "chart:style-name", chart.style_name.as_deref())?;
@@ -453,7 +451,7 @@ fn write_definition(out: &mut String, chart: &ChartDefinition, ns: &NamespaceMap
 fn write_text_element(
     out: &mut String,
     local: &str,
-    value: &ChartText,
+    value: &Text,
     ns: &NamespaceMap,
 ) -> Result<()> {
     out.push_str("<chart:");
@@ -474,7 +472,7 @@ fn write_text_element(
     Ok(())
 }
 
-fn write_legend(out: &mut String, value: &ChartLegendSpec, ns: &NamespaceMap) -> Result<()> {
+fn write_legend(out: &mut String, value: &LegendSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:legend");
     attr(
         out,
@@ -506,7 +504,7 @@ fn write_legend(out: &mut String, value: &ChartLegendSpec, ns: &NamespaceMap) ->
     Ok(())
 }
 
-fn write_plot_area(out: &mut String, value: &ChartPlotAreaSpec, ns: &NamespaceMap) -> Result<()> {
+fn write_plot_area(out: &mut String, value: &PlotAreaSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:plot-area");
     opt_attr(
         out,
@@ -553,7 +551,7 @@ fn write_plot_area(out: &mut String, value: &ChartPlotAreaSpec, ns: &NamespaceMa
     Ok(())
 }
 
-fn write_axis(out: &mut String, value: &ChartAxisSpec, ns: &NamespaceMap) -> Result<()> {
+fn write_axis(out: &mut String, value: &AxisSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:axis");
     attr(out, "chart:dimension", axis_dimension(value.dimension))?;
     opt_attr(out, "chart:name", value.name.as_deref())?;
@@ -586,7 +584,7 @@ fn write_axis(out: &mut String, value: &ChartAxisSpec, ns: &NamespaceMap) -> Res
     Ok(())
 }
 
-fn write_series(out: &mut String, value: &ChartSeriesSpec, ns: &NamespaceMap) -> Result<()> {
+fn write_series(out: &mut String, value: &SeriesSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:series");
     opt_attr(out, "xml:id", value.xml_id.as_deref())?;
     opt_attr(out, "chart:class", value.class.as_deref())?;
@@ -636,8 +634,8 @@ fn write_series(out: &mut String, value: &ChartSeriesSpec, ns: &NamespaceMap) ->
     Ok(())
 }
 
-pub(crate) fn serialize_chart_axis_fragment(value: &ChartAxisSpec) -> Result<String> {
-    let mut definition = ChartDefinition::new("chart:line");
+pub(crate) fn serialize_chart_axis_fragment(value: &AxisSpec) -> Result<String> {
+    let mut definition = Definition::new("chart:line");
     definition.plot_area.axes.push(value.clone());
     definition.validate()?;
     let namespaces = NamespaceMap::for_definition(&definition)?;
@@ -647,15 +645,15 @@ pub(crate) fn serialize_chart_axis_fragment(value: &ChartAxisSpec) -> Result<Str
     Ok(output)
 }
 
-pub(crate) fn serialize_chart_series_fragment(value: &ChartSeriesSpec) -> Result<String> {
-    let mut definition = ChartDefinition::new(
+pub(crate) fn serialize_chart_series_fragment(value: &SeriesSpec) -> Result<String> {
+    let mut definition = Definition::new(
         value
             .class
             .clone()
             .unwrap_or_else(|| "chart:line".to_string()),
     );
     if let Some(axis) = &value.attached_axis {
-        let mut attached = ChartAxisSpec::new(ChartAxisDimension::Y);
+        let mut attached = AxisSpec::new(Dimension::Y);
         attached.name = Some(axis.clone());
         definition.plot_area.axes.push(attached);
     }
@@ -685,7 +683,7 @@ fn add_fragment_namespaces(
     Ok(())
 }
 
-fn write_data_point(out: &mut String, value: &ChartDataPointSpec, ns: &NamespaceMap) -> Result<()> {
+fn write_data_point(out: &mut String, value: &DataPointSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:data-point");
     if value.repeated != 1 {
         attr(out, "chart:repeated", &value.repeated.to_string())?;
@@ -705,7 +703,7 @@ fn write_data_point(out: &mut String, value: &ChartDataPointSpec, ns: &Namespace
     Ok(())
 }
 
-fn write_data_label(out: &mut String, value: &ChartDataLabelSpec, ns: &NamespaceMap) -> Result<()> {
+fn write_data_label(out: &mut String, value: &DataLabelSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:data-label");
     opt_attr(out, "chart:style-name", value.style_name.as_deref())?;
     opt_attr(out, "svg:x", value.x.as_deref())?;
@@ -726,11 +724,7 @@ fn write_data_label(out: &mut String, value: &ChartDataLabelSpec, ns: &Namespace
     Ok(())
 }
 
-fn write_regression(
-    out: &mut String,
-    value: &ChartRegressionSpec,
-    ns: &NamespaceMap,
-) -> Result<()> {
+fn write_regression(out: &mut String, value: &RegressionSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:regression-curve");
     opt_attr(out, "chart:style-name", value.style_name.as_deref())?;
     write_extension_attributes(out, &value.extensions.attributes, ns)?;
@@ -763,7 +757,7 @@ fn write_regression(
 fn write_style_element(
     out: &mut String,
     local: &str,
-    value: &ChartStyleElement,
+    value: &StyleElement,
     ns: &NamespaceMap,
 ) -> Result<()> {
     out.push_str("<chart:");
@@ -782,7 +776,7 @@ fn write_style_element(
     Ok(())
 }
 
-fn write_table(out: &mut String, table: &ChartCachedTable, ns: &NamespaceMap) -> Result<()> {
+fn write_table(out: &mut String, table: &CachedTable, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<table:table");
     attr(out, "table:name", &table.name)?;
     write_extension_attributes(out, &table.extensions.attributes, ns)?;
@@ -827,7 +821,7 @@ fn write_table(out: &mut String, table: &ChartCachedTable, ns: &NamespaceMap) ->
     Ok(())
 }
 
-fn write_row(out: &mut String, row: &ChartCachedRow) -> Result<()> {
+fn write_row(out: &mut String, row: &CachedRow) -> Result<()> {
     out.push_str("<table:table-row");
     if row.repeated != 1 {
         attr(out, "table:number-rows-repeated", &row.repeated.to_string())?;
@@ -840,7 +834,7 @@ fn write_row(out: &mut String, row: &ChartCachedRow) -> Result<()> {
     Ok(())
 }
 
-fn write_cell(out: &mut String, cell: &ChartCachedCell) -> Result<()> {
+fn write_cell(out: &mut String, cell: &CachedCell) -> Result<()> {
     out.push_str("<table:table-cell");
     if cell.repeated != 1 {
         attr(
@@ -851,39 +845,39 @@ fn write_cell(out: &mut String, cell: &ChartCachedCell) -> Result<()> {
     }
     opt_attr(out, "table:formula", cell.formula.as_deref())?;
     let text = match &cell.value {
-        ChartCachedValue::Empty => None,
-        ChartCachedValue::Float(value) => {
+        CachedValue::Empty => None,
+        CachedValue::Float(value) => {
             attr(out, "office:value-type", "float")?;
             attr(out, "office:value", &value.to_string())?;
             None
         },
-        ChartCachedValue::Percentage(value) => {
+        CachedValue::Percentage(value) => {
             attr(out, "office:value-type", "percentage")?;
             attr(out, "office:value", &value.to_string())?;
             None
         },
-        ChartCachedValue::Currency { value, currency } => {
+        CachedValue::Currency { value, currency } => {
             attr(out, "office:value-type", "currency")?;
             attr(out, "office:value", &value.to_string())?;
             attr(out, "office:currency", currency)?;
             None
         },
-        ChartCachedValue::Boolean(value) => {
+        CachedValue::Boolean(value) => {
             attr(out, "office:value-type", "boolean")?;
             attr(out, "office:boolean-value", bool_xml(*value))?;
             None
         },
-        ChartCachedValue::Date(value) => {
+        CachedValue::Date(value) => {
             attr(out, "office:value-type", "date")?;
             attr(out, "office:date-value", value)?;
             None
         },
-        ChartCachedValue::Time(value) => {
+        CachedValue::Time(value) => {
             attr(out, "office:value-type", "time")?;
             attr(out, "office:time-value", value)?;
             None
         },
-        ChartCachedValue::String(value) => {
+        CachedValue::String(value) => {
             attr(out, "office:value-type", "string")?;
             Some(value)
         },
@@ -898,7 +892,7 @@ fn write_cell(out: &mut String, cell: &ChartCachedCell) -> Result<()> {
     Ok(())
 }
 
-fn validate_plot_area(plot: &ChartPlotAreaSpec) -> Result<()> {
+fn validate_plot_area(plot: &PlotAreaSpec) -> Result<()> {
     validate_optional_range(plot.cell_range_address.as_deref(), "plot-area range")?;
     validate_optional_name(plot.style_name.as_deref(), "plot-area style name")?;
     for scalar in [
@@ -1014,7 +1008,7 @@ fn validate_plot_area(plot: &ChartPlotAreaSpec) -> Result<()> {
     validate_extensions(&plot.extensions)
 }
 
-fn validate_table(table: &ChartCachedTable) -> Result<()> {
+fn validate_table(table: &CachedTable) -> Result<()> {
     validate_name(&table.name, "cached table name")?;
     if table.columns == 0 {
         return invalid("cached table column count must be nonzero");
@@ -1040,17 +1034,17 @@ fn validate_table(table: &ChartCachedTable) -> Result<()> {
                 .ok_or_else(|| {
                     Error::InvalidFormat("cached table column count overflow".to_string())
                 })?;
-            if let ChartCachedValue::Float(v)
-            | ChartCachedValue::Percentage(v)
-            | ChartCachedValue::Currency { value: v, .. } = &cell.value
+            if let CachedValue::Float(v)
+            | CachedValue::Percentage(v)
+            | CachedValue::Currency { value: v, .. } = &cell.value
                 && !v.is_finite()
             {
                 return invalid("cached numeric chart values must be finite");
             }
-            if let ChartCachedValue::Currency { currency, .. } = &cell.value {
+            if let CachedValue::Currency { currency, .. } = &cell.value {
                 validate_name(currency, "currency code")?;
             }
-            if let ChartCachedValue::Date(v) | ChartCachedValue::Time(v) = &cell.value {
+            if let CachedValue::Date(v) | CachedValue::Time(v) = &cell.value {
                 validate_scalar(v, "cached date/time value")?;
             }
             if let Some(formula) = &cell.formula {
@@ -1067,7 +1061,7 @@ fn validate_table(table: &ChartCachedTable) -> Result<()> {
     validate_extensions(&table.extensions)
 }
 
-fn validate_text(value: &ChartText) -> Result<()> {
+fn validate_text(value: &Text) -> Result<()> {
     validate_xml_chars(&value.text, "chart text")?;
     validate_optional_range(value.cell_range.as_deref(), "chart text cell range")?;
     validate_optional_name(value.style_name.as_deref(), "chart text style name")?;
@@ -1076,7 +1070,7 @@ fn validate_text(value: &ChartText) -> Result<()> {
     validate_extensions(&value.extensions)
 }
 
-fn validate_data_label(value: &ChartDataLabelSpec) -> Result<()> {
+fn validate_data_label(value: &DataLabelSpec) -> Result<()> {
     if let Some(text) = &value.text {
         validate_xml_chars(text, "data label text")?;
     }
@@ -1084,12 +1078,12 @@ fn validate_data_label(value: &ChartDataLabelSpec) -> Result<()> {
     validate_extensions(&value.extensions)
 }
 
-fn validate_style_element(value: &ChartStyleElement) -> Result<()> {
+fn validate_style_element(value: &StyleElement) -> Result<()> {
     validate_optional_name(value.style_name.as_deref(), "chart style name")?;
     validate_extensions(&value.extensions)
 }
 
-fn validate_extensions(value: &ChartExtensions) -> Result<()> {
+fn validate_extensions(value: &Extensions) -> Result<()> {
     let mut names = BTreeSet::new();
     for attribute in &value.attributes {
         validate_local_name(&attribute.local_name, "extension attribute")?;
@@ -1108,13 +1102,13 @@ fn validate_extensions(value: &ChartExtensions) -> Result<()> {
     Ok(())
 }
 
-fn validate_extension_element(value: &ChartExtensionElement, depth: usize) -> Result<()> {
+fn validate_extension_element(value: &ExtensionElement, depth: usize) -> Result<()> {
     if depth >= 128 {
         return invalid("extension subtree exceeds 128 levels");
     }
     validate_local_name(&value.local_name, "extension element")?;
     validate_xml_chars(&value.text, "extension text")?;
-    let extensions = ChartExtensions {
+    let extensions = Extensions {
         attributes: value.attributes.clone(),
         children: Vec::new(),
     };
@@ -1217,7 +1211,7 @@ struct NamespaceMap {
     by_uri: BTreeMap<String, String>,
 }
 impl NamespaceMap {
-    fn for_definition(value: &ChartDefinition) -> Result<Self> {
+    fn for_definition(value: &Definition) -> Result<Self> {
         let mut uris = BTreeSet::new();
         collect_extensions(&value.extensions, &mut uris);
         collect_plot_extensions(&value.plot_area, &mut uris);
@@ -1272,7 +1266,7 @@ impl NamespaceMap {
     }
 }
 
-fn collect_plot_extensions(value: &ChartPlotAreaSpec, uris: &mut BTreeSet<String>) {
+fn collect_plot_extensions(value: &PlotAreaSpec, uris: &mut BTreeSet<String>) {
     collect_extensions(&value.extensions, uris);
     for axis in &value.axes {
         collect_extensions(&axis.extensions, uris);
@@ -1323,7 +1317,7 @@ fn collect_plot_extensions(value: &ChartPlotAreaSpec, uris: &mut BTreeSet<String
         collect_extensions(&v.extensions, uris);
     }
 }
-fn collect_extensions(value: &ChartExtensions, uris: &mut BTreeSet<String>) {
+fn collect_extensions(value: &Extensions, uris: &mut BTreeSet<String>) {
     for a in &value.attributes {
         if let Some(uri) = &a.namespace_uri {
             uris.insert(uri.clone());
@@ -1333,7 +1327,7 @@ fn collect_extensions(value: &ChartExtensions, uris: &mut BTreeSet<String>) {
         collect_extension_element(c, uris);
     }
 }
-fn collect_extension_element(value: &ChartExtensionElement, uris: &mut BTreeSet<String>) {
+fn collect_extension_element(value: &ExtensionElement, uris: &mut BTreeSet<String>) {
     if let Some(uri) = &value.namespace_uri {
         uris.insert(uri.clone());
     }
@@ -1349,7 +1343,7 @@ fn collect_extension_element(value: &ChartExtensionElement, uris: &mut BTreeSet<
 
 fn write_extension_attributes(
     out: &mut String,
-    values: &[ChartExtensionAttribute],
+    values: &[ExtensionAttribute],
     ns: &NamespaceMap,
 ) -> Result<()> {
     for value in values {
@@ -1367,7 +1361,7 @@ fn write_extension_attributes(
 }
 fn write_extension_children(
     out: &mut String,
-    values: &[ChartExtensionElement],
+    values: &[ExtensionElement],
     ns: &NamespaceMap,
 ) -> Result<()> {
     for value in values {
@@ -1377,7 +1371,7 @@ fn write_extension_children(
 }
 fn write_extension_element(
     out: &mut String,
-    value: &ChartExtensionElement,
+    value: &ExtensionElement,
     ns: &NamespaceMap,
 ) -> Result<()> {
     out.push('<');
@@ -1446,37 +1440,37 @@ fn escape_attribute(out: &mut String, value: &str) -> Result<()> {
 fn bool_xml(value: bool) -> &'static str {
     if value { "true" } else { "false" }
 }
-fn axis_dimension(value: ChartAxisDimension) -> &'static str {
+fn axis_dimension(value: Dimension) -> &'static str {
     match value {
-        ChartAxisDimension::X => "x",
-        ChartAxisDimension::Y => "y",
-        ChartAxisDimension::Z => "z",
+        Dimension::X => "x",
+        Dimension::Y => "y",
+        Dimension::Z => "z",
     }
 }
-fn grid_class(value: ChartGridClass) -> &'static str {
+fn grid_class(value: GridClass) -> &'static str {
     match value {
-        ChartGridClass::Major => "major",
-        ChartGridClass::Minor => "minor",
+        GridClass::Major => "major",
+        GridClass::Minor => "minor",
     }
 }
-fn data_source_labels(value: ChartDataSourceLabels) -> &'static str {
+fn data_source_labels(value: DataSourceLabels) -> &'static str {
     match value {
-        ChartDataSourceLabels::None => "none",
-        ChartDataSourceLabels::Row => "row",
-        ChartDataSourceLabels::Column => "column",
-        ChartDataSourceLabels::Both => "both",
+        DataSourceLabels::None => "none",
+        DataSourceLabels::Row => "row",
+        DataSourceLabels::Column => "column",
+        DataSourceLabels::Both => "both",
     }
 }
-fn legend_position(value: ChartLegendPosition) -> &'static str {
+fn legend_position(value: LegendPosition) -> &'static str {
     match value {
-        ChartLegendPosition::Start => "start",
-        ChartLegendPosition::End => "end",
-        ChartLegendPosition::Top => "top",
-        ChartLegendPosition::Bottom => "bottom",
-        ChartLegendPosition::TopStart => "top-start",
-        ChartLegendPosition::TopEnd => "top-end",
-        ChartLegendPosition::BottomStart => "bottom-start",
-        ChartLegendPosition::BottomEnd => "bottom-end",
+        LegendPosition::Start => "start",
+        LegendPosition::End => "end",
+        LegendPosition::Top => "top",
+        LegendPosition::Bottom => "bottom",
+        LegendPosition::TopStart => "top-start",
+        LegendPosition::TopEnd => "top-end",
+        LegendPosition::BottomStart => "bottom-start",
+        LegendPosition::BottomEnd => "bottom-end",
     }
 }
 
@@ -1484,48 +1478,48 @@ fn legend_position(value: ChartLegendPosition) -> &'static str {
 mod tests {
     use super::*;
 
-    fn sample() -> ChartDefinition {
-        let mut chart = ChartDefinition::new("chart:line");
-        chart.title = Some(ChartText::new("Quarterly revenue"));
-        chart.legend = Some(ChartLegendSpec::default());
-        let mut x = ChartAxisSpec::new(ChartAxisDimension::X);
+    fn sample() -> Definition {
+        let mut chart = Definition::new("chart:line");
+        chart.title = Some(Text::new("Quarterly revenue"));
+        chart.legend = Some(LegendSpec::default());
+        let mut x = AxisSpec::new(Dimension::X);
         x.name = Some("x-axis".to_string());
         x.categories_cell_range_address = Some("local-table.A2:.A4".to_string());
-        let mut y = ChartAxisSpec::new(ChartAxisDimension::Y);
+        let mut y = AxisSpec::new(Dimension::Y);
         y.name = Some("y-axis".to_string());
-        y.grids.push(ChartGridSpec {
-            class: ChartGridClass::Major,
+        y.grids.push(GridSpec {
+            class: GridClass::Major,
             style_name: None,
-            extensions: ChartExtensions::default(),
+            extensions: Extensions::default(),
         });
         chart.plot_area.axes = vec![x, y];
-        chart.plot_area.series.push(ChartSeriesSpec {
+        chart.plot_area.series.push(SeriesSpec {
             values_cell_range_address: Some("local-table.B2:.B4".to_string()),
             label_cell_address: Some("local-table.B1".to_string()),
             attached_axis: Some("y-axis".to_string()),
-            data_points: vec![ChartDataPointSpec {
+            data_points: vec![DataPointSpec {
                 repeated: 3,
-                ..ChartDataPointSpec::default()
+                ..DataPointSpec::default()
             }],
-            mean_value: Some(ChartStyleElement::default()),
-            regression_curves: vec![ChartRegressionSpec {
-                equation: Some(ChartEquationSpec {
+            mean_value: Some(StyleElement::default()),
+            regression_curves: vec![RegressionSpec {
+                equation: Some(EquationSpec {
                     display_equation: true,
                     display_r_square: true,
-                    ..ChartEquationSpec::default()
+                    ..EquationSpec::default()
                 }),
-                ..ChartRegressionSpec::default()
+                ..RegressionSpec::default()
             }],
-            ..ChartSeriesSpec::default()
+            ..SeriesSpec::default()
         });
-        let mut table = ChartCachedTable::new("local-table", 2);
-        table.header_rows.push(ChartCachedRow::new(vec![
-            ChartCachedCell::new(ChartCachedValue::String("Quarter".into())),
-            ChartCachedCell::new(ChartCachedValue::String("Revenue".into())),
+        let mut table = CachedTable::new("local-table", 2);
+        table.header_rows.push(CachedRow::new(vec![
+            CachedCell::new(CachedValue::String("Quarter".into())),
+            CachedCell::new(CachedValue::String("Revenue".into())),
         ]));
-        table.rows.push(ChartCachedRow::new(vec![
-            ChartCachedCell::new(ChartCachedValue::String("Q1".into())),
-            ChartCachedCell::new(ChartCachedValue::Float(10.0)),
+        table.rows.push(CachedRow::new(vec![
+            CachedCell::new(CachedValue::String("Q1".into())),
+            CachedCell::new(CachedValue::Float(10.0)),
         ]));
         chart.cached_table = Some(table);
         chart
@@ -1533,9 +1527,9 @@ mod tests {
 
     #[test]
     fn standalone_odc_package_roundtrip() {
-        let document = ChartDocument::create(&sample()).unwrap();
+        let document = Document::create(&sample()).unwrap();
         let bytes = document.to_bytes();
-        let reopened = ChartDocument::from_bytes(bytes).unwrap();
+        let reopened = Document::from_bytes(bytes).unwrap();
         assert_eq!(reopened.mimetype(), constants::ODF_CHART);
         assert_eq!(
             reopened.chart().attribute(Some(CHART_NAMESPACE), "class"),
@@ -1557,8 +1551,8 @@ mod tests {
         let mut definition = sample();
         definition.cached_table.as_mut().unwrap().rows[0].cells[1].formula =
             Some("of:=SUM([.B2:.B4])&\"x\"".into());
-        let mut document = ChartDocument::create(&definition).unwrap();
-        definition.title = Some(ChartText::new("Changed"));
+        let mut document = Document::create(&definition).unwrap();
+        definition.title = Some(Text::new("Changed"));
         document.set_definition(&definition).unwrap();
         let content = crate::OpenDocumentPackage::from_bytes(document.to_bytes())
             .unwrap()

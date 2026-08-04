@@ -303,14 +303,11 @@ pub use notes_configuration::{
     reason = "ODT facade exposes ODF chart models for embedded charts"
 )]
 pub use odc::{
-    ChartAttribute, ChartAxis, ChartAxisDimension, ChartAxisSpec, ChartAxisUpdate, ChartCachedCell,
-    ChartCachedRow, ChartCachedTable, ChartCachedValue, ChartDataLabelSpec, ChartDataPoint,
-    ChartDataPointSpec, ChartDataSourceLabels, ChartDefinition, ChartDocument, ChartDomainSpec,
-    ChartElement, ChartElementKind, ChartEquationSpec, ChartExtensionAttribute,
-    ChartExtensionElement, ChartExtensions, ChartGrid, ChartGridClass, ChartGridSpec, ChartLegend,
-    ChartLegendPosition, ChartLegendSpec, ChartPlotArea, ChartPlotAreaSpec, ChartRegressionSpec,
-    ChartSeries, ChartSeriesSpec, ChartSeriesUpdate, ChartStyleElement, ChartText,
-    serialize_chart_content,
+    Attribute, Axis, AxisSpec, AxisUpdate, CachedCell, CachedRow, CachedTable, CachedValue,
+    DataLabelSpec, DataPoint, DataPointSpec, DataSourceLabels, Definition, Dimension, DomainSpec,
+    Element, ElementKind, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions, Grid,
+    GridClass, GridSpec, Legend, LegendPosition, LegendSpec, PlotArea, PlotAreaSpec,
+    RegressionSpec, Series, SeriesSpec, SeriesUpdate, StyleElement, Text, serialize_chart_content,
 };
 #[allow(unused_imports, reason = "ODT facade exposes outline style semantics")]
 pub use outline_style::{

@@ -1,9 +1,7 @@
 //! Lossless axis and series mutation for standalone and embedded chart documents.
 
 use super::authoring::{serialize_chart_axis_fragment, serialize_chart_series_fragment};
-use super::{
-    ChartAxis, ChartAxisDimension, ChartAxisSpec, ChartDocument, ChartSeries, ChartSeriesSpec,
-};
+use super::{Axis, AxisSpec, Dimension, Document, Series, SeriesSpec};
 use crate::odc::document::parse_chart_content;
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
@@ -21,14 +19,14 @@ const MAX_DEPTH: usize = 128;
 const MAX_ITEMS: usize = 65_536;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ChartAxisUpdate {
-    pub dimension: Option<ChartAxisDimension>,
+pub struct AxisUpdate {
+    pub dimension: Option<Dimension>,
     pub name: Option<Option<String>>,
     pub style_name: Option<Option<String>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ChartSeriesUpdate {
+pub struct SeriesUpdate {
     pub xml_id: Option<Option<String>>,
     pub class: Option<Option<String>>,
     pub values_cell_range_address: Option<Option<String>>,
@@ -45,7 +43,7 @@ struct Span {
 #[derive(Clone)]
 struct AxisEntry {
     span: Span,
-    dimension: ChartAxisDimension,
+    dimension: Dimension,
     name: Option<String>,
     style: Option<String>,
 }
@@ -67,22 +65,22 @@ struct PlotScan {
     empty_plot: Option<Span>,
 }
 
-impl ChartDocument {
+impl Document {
     /// Find an axis by its plot-area-unique name.
-    pub fn find_axis(&self, name: &str) -> Option<ChartAxis<'_>> {
+    pub fn find_axis(&self, name: &str) -> Option<Axis<'_>> {
         self.plot_area()?
             .axes()
             .find(|axis| axis.name() == Some(name))
     }
 
     /// Find a series by its document-unique `xml:id`.
-    pub fn find_series(&self, xml_id: &str) -> Option<ChartSeries<'_>> {
+    pub fn find_series(&self, xml_id: &str) -> Option<Series<'_>> {
         self.plot_area()?
             .series()
             .find(|series| series.xml_id() == Some(xml_id))
     }
 
-    pub fn add_axis(&mut self, axis: &ChartAxisSpec) -> Result<usize> {
+    pub fn add_axis(&mut self, axis: &AxisSpec) -> Result<usize> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let updated = insert_into_plot(
@@ -96,7 +94,7 @@ impl ChartDocument {
         Ok(index)
     }
 
-    pub fn replace_axis(&mut self, index: usize, axis: &ChartAxisSpec) -> Result<()> {
+    pub fn replace_axis(&mut self, index: usize, axis: &AxisSpec) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let span = &scan
@@ -112,14 +110,14 @@ impl ChartDocument {
         )?)
     }
 
-    pub fn update_axis(&mut self, index: usize, update: &ChartAxisUpdate) -> Result<()> {
+    pub fn update_axis(&mut self, index: usize, update: &AxisUpdate) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let entry = scan
             .axes
             .get(index)
             .ok_or_else(|| bounds("axis", index, scan.axes.len()))?;
-        let mut axis = ChartAxisSpec::new(update.dimension.unwrap_or(entry.dimension));
+        let mut axis = AxisSpec::new(update.dimension.unwrap_or(entry.dimension));
         axis.name = update.name.clone().unwrap_or_else(|| entry.name.clone());
         axis.style_name = update
             .style_name
@@ -163,7 +161,7 @@ impl ChartDocument {
         self.commit_chart_xml(swap(&xml, left, right)?)
     }
 
-    pub fn add_series(&mut self, series: &ChartSeriesSpec) -> Result<usize> {
+    pub fn add_series(&mut self, series: &SeriesSpec) -> Result<usize> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let updated = insert_into_plot(
@@ -177,7 +175,7 @@ impl ChartDocument {
         Ok(index)
     }
 
-    pub fn replace_series(&mut self, index: usize, series: &ChartSeriesSpec) -> Result<()> {
+    pub fn replace_series(&mut self, index: usize, series: &SeriesSpec) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let span = &scan
@@ -193,14 +191,14 @@ impl ChartDocument {
         )?)
     }
 
-    pub fn update_series(&mut self, index: usize, update: &ChartSeriesUpdate) -> Result<()> {
+    pub fn update_series(&mut self, index: usize, update: &SeriesUpdate) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let entry = scan
             .series
             .get(index)
             .ok_or_else(|| bounds("series", index, scan.series.len()))?;
-        let series = ChartSeriesSpec {
+        let series = SeriesSpec {
             xml_id: update
                 .xml_id
                 .clone()
@@ -222,7 +220,7 @@ impl ChartDocument {
                 .style_name
                 .clone()
                 .unwrap_or_else(|| entry.style.clone()),
-            ..ChartSeriesSpec::default()
+            ..SeriesSpec::default()
         };
         let replacement = serialize_chart_series_fragment(&series)?;
         let original = start_tag(&xml[entry.span.start..entry.span.end])?;
@@ -434,9 +432,9 @@ enum AxisOrSeries {
 }
 fn axis_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<AxisEntry> {
     let dimension = match chart_attr(reader, element, b"dimension")?.as_deref() {
-        Some("x") => ChartAxisDimension::X,
-        Some("y") => ChartAxisDimension::Y,
-        Some("z") => ChartAxisDimension::Z,
+        Some("x") => Dimension::X,
+        Some("y") => Dimension::Y,
+        Some("z") => Dimension::Z,
         Some(value) => return invalid(format!("invalid chart axis dimension '{value}'")),
         None => return invalid("chart axis lacks dimension"),
     };
@@ -632,28 +630,28 @@ fn invalid<T>(value: impl Into<String>) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChartDefinition, ChartStyleElement};
+    use crate::{Definition, StyleElement};
 
     #[test]
     fn mixed_and_three_dimensional_chart_mutations_are_atomic() {
-        let mut definition = ChartDefinition::new("chart:bar");
-        let mut x = ChartAxisSpec::new(ChartAxisDimension::X);
+        let mut definition = Definition::new("chart:bar");
+        let mut x = AxisSpec::new(Dimension::X);
         x.name = Some("x".to_string());
-        let mut y = ChartAxisSpec::new(ChartAxisDimension::Y);
+        let mut y = AxisSpec::new(Dimension::Y);
         y.name = Some("y".to_string());
         definition.plot_area.axes = vec![x, y];
-        definition.plot_area.wall = Some(ChartStyleElement::default());
-        definition.plot_area.floor = Some(ChartStyleElement::default());
-        definition.plot_area.stock_range_line = Some(ChartStyleElement::default());
-        definition.plot_area.series.push(ChartSeriesSpec {
+        definition.plot_area.wall = Some(StyleElement::default());
+        definition.plot_area.floor = Some(StyleElement::default());
+        definition.plot_area.stock_range_line = Some(StyleElement::default());
+        definition.plot_area.series.push(SeriesSpec {
             xml_id: Some("bars".to_string()),
             class: Some("chart:bar".to_string()),
             attached_axis: Some("y".to_string()),
             ..Default::default()
         });
-        let mut document = ChartDocument::create(&definition).unwrap();
+        let mut document = Document::create(&definition).unwrap();
         document
-            .add_series(&ChartSeriesSpec {
+            .add_series(&SeriesSpec {
                 xml_id: Some("line".to_string()),
                 class: Some("chart:line".to_string()),
                 attached_axis: Some("y".to_string()),
@@ -666,7 +664,7 @@ mod tests {
         document
             .update_series(
                 0,
-                &ChartSeriesUpdate {
+                &SeriesUpdate {
                     style_name: Some(Some("seriesStyle".to_string())),
                     ..Default::default()
                 },

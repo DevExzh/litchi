@@ -2,9 +2,10 @@
 
 use crate::core::{OwnedPackage, PackageWriter};
 use crate::elements::xml::namespaced_attribute;
+use crate::odc::{Definition, Document, serialize_chart_content};
 use crate::{
-    ChartDefinition, ChartDocument, EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart,
-    EmbeddedObjectSource, InlineObjectRoot, constants, serialize_chart_content,
+    EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
+    constants,
 };
 use litchi_core::{Error, Result};
 pub(crate) use litchi_odf_common::package::{Addition, rebuild_package, splice};
@@ -64,7 +65,7 @@ pub(crate) fn open_embedded_chart(
     content: &str,
     styles: Option<&str>,
     index: usize,
-) -> Result<ChartDocument> {
+) -> Result<Document> {
     let current_objects = objects(package, content, styles)?;
     let object = select_chart_object(&current_objects, index)?;
     match &object.source {
@@ -87,7 +88,7 @@ pub(crate) fn replace_embedded_chart(
     content: &str,
     styles: Option<&str>,
     index: usize,
-    definition: &ChartDefinition,
+    definition: &Definition,
 ) -> Result<Vec<u8>> {
     let objects = objects(package, content, styles)?;
     let object = select_chart_object(&objects, index)?;
@@ -170,7 +171,7 @@ pub(crate) fn add_embedded_chart(
     styles: Option<&str>,
     host: EmbeddedChartHost<'_>,
     storage: EmbeddedChartStorage,
-    definition: &ChartDefinition,
+    definition: &Definition,
 ) -> Result<(Vec<u8>, usize)> {
     let current = objects(package, content, styles)?;
     let index = current
@@ -265,7 +266,7 @@ fn open_subdocument(
     source: &OwnedPackage,
     root: &str,
     media_type: Option<&str>,
-) -> Result<ChartDocument> {
+) -> Result<Document> {
     let media_type = media_type.ok_or_else(|| {
         Error::InvalidFormat("embedded chart root has no manifest media type".to_string())
     })?;
@@ -322,10 +323,10 @@ fn open_subdocument(
         });
         writer.add_file_with_media_type(relative, &bytes, entry_media)?;
     }
-    ChartDocument::from_bytes(writer.finish_to_bytes()?)
+    Document::from_bytes(writer.finish_to_bytes()?)
 }
 
-fn open_inline(xml: &str) -> Result<ChartDocument> {
+fn open_inline(xml: &str) -> Result<Document> {
     if xml.len() > MAX_CONTENT_BYTES {
         return invalid("inline chart exceeds content size limit");
     }
@@ -334,7 +335,7 @@ fn open_inline(xml: &str) -> Result<ChartDocument> {
     let mut writer = PackageWriter::new();
     writer.set_mimetype(&media_type)?;
     writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
-    ChartDocument::from_bytes(writer.finish_to_bytes()?)
+    Document::from_bytes(writer.finish_to_bytes()?)
 }
 
 fn inline_chart_mimetype(xml: &str) -> Result<String> {

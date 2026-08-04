@@ -1229,7 +1229,7 @@ impl Document {
     }
 
     /// Open one inert embedded chart as a standalone chart document.
-    pub fn embedded_chart(&self, index: usize) -> Result<crate::ChartDocument> {
+    pub fn embedded_chart(&self, index: usize) -> Result<crate::odc::Document> {
         crate::package::charts::open_embedded_chart(
             &self.package,
             self.content.xml_content(),
@@ -1239,7 +1239,7 @@ impl Document {
     }
 
     /// Append a packaged chart object to the text body.
-    pub fn add_embedded_chart(&mut self, definition: &crate::ChartDefinition) -> Result<usize> {
+    pub fn add_embedded_chart(&mut self, definition: &crate::odc::Definition) -> Result<usize> {
         self.add_embedded_chart_with_storage(
             definition,
             crate::EmbeddedChartStorage::PackageSubdocument,
@@ -1249,7 +1249,7 @@ impl Document {
     /// Append a chart object using an explicit storage form.
     pub fn add_embedded_chart_with_storage(
         &mut self,
-        definition: &crate::ChartDefinition,
+        definition: &crate::odc::Definition,
         storage: crate::EmbeddedChartStorage,
     ) -> Result<usize> {
         let (bytes, index) = crate::package::charts::add_embedded_chart(
@@ -1267,7 +1267,7 @@ impl Document {
     pub fn replace_embedded_chart(
         &mut self,
         index: usize,
-        definition: &crate::ChartDefinition,
+        definition: &crate::odc::Definition,
     ) -> Result<()> {
         let bytes = crate::package::charts::replace_embedded_chart(
             &self.package,

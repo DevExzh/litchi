@@ -1,20 +1,20 @@
 //! Zero-copy typed views over retained standalone-chart XML.
 
-use super::{ChartDocument, ChartElement, ChartElementKind};
+use super::{Document, Element, ElementKind};
 use litchi_core::{Error, Result};
 
 const CHART_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
 const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartAxisDimension {
+pub enum Dimension {
     X,
     Y,
     Z,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartDataSourceLabels {
+pub enum DataSourceLabels {
     None,
     Row,
     Column,
@@ -22,7 +22,7 @@ pub enum ChartDataSourceLabels {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartLegendPosition {
+pub enum LegendPosition {
     Start,
     End,
     Top,
@@ -34,18 +34,18 @@ pub enum ChartLegendPosition {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartGridClass {
+pub enum GridClass {
     Major,
     Minor,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ChartPlotArea<'a> {
-    element: &'a ChartElement,
+pub struct PlotArea<'a> {
+    element: &'a Element,
 }
 
-impl<'a> ChartPlotArea<'a> {
-    pub fn element(self) -> &'a ChartElement {
+impl<'a> PlotArea<'a> {
+    pub fn element(self) -> &'a Element {
         self.element
     }
 
@@ -54,46 +54,46 @@ impl<'a> ChartPlotArea<'a> {
             .attribute(Some(TABLE_NAMESPACE), "cell-range-address")
     }
 
-    pub fn data_source_labels(self) -> Result<ChartDataSourceLabels> {
+    pub fn data_source_labels(self) -> Result<DataSourceLabels> {
         match chart_attribute(self.element, "data-source-has-labels") {
-            None | Some("none") => Ok(ChartDataSourceLabels::None),
-            Some("row") => Ok(ChartDataSourceLabels::Row),
-            Some("column") => Ok(ChartDataSourceLabels::Column),
-            Some("both") => Ok(ChartDataSourceLabels::Both),
+            None | Some("none") => Ok(DataSourceLabels::None),
+            Some("row") => Ok(DataSourceLabels::Row),
+            Some("column") => Ok(DataSourceLabels::Column),
+            Some("both") => Ok(DataSourceLabels::Both),
             Some(value) => Err(invalid(format!(
                 "invalid chart:data-source-has-labels '{value}'"
             ))),
         }
     }
 
-    pub fn axes(self) -> impl Iterator<Item = ChartAxis<'a>> + 'a {
+    pub fn axes(self) -> impl Iterator<Item = Axis<'a>> + 'a {
         self.element
-            .children_of_kind(ChartElementKind::Axis)
-            .map(|element| ChartAxis { element })
+            .children_of_kind(ElementKind::Axis)
+            .map(|element| Axis { element })
     }
 
-    pub fn series(self) -> impl Iterator<Item = ChartSeries<'a>> + 'a {
+    pub fn series(self) -> impl Iterator<Item = Series<'a>> + 'a {
         self.element
-            .children_of_kind(ChartElementKind::Series)
-            .map(|element| ChartSeries { element })
+            .children_of_kind(ElementKind::Series)
+            .map(|element| Series { element })
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ChartAxis<'a> {
-    element: &'a ChartElement,
+pub struct Axis<'a> {
+    element: &'a Element,
 }
 
-impl<'a> ChartAxis<'a> {
-    pub fn element(self) -> &'a ChartElement {
+impl<'a> Axis<'a> {
+    pub fn element(self) -> &'a Element {
         self.element
     }
 
-    pub fn dimension(self) -> Result<ChartAxisDimension> {
+    pub fn dimension(self) -> Result<Dimension> {
         match chart_attribute(self.element, "dimension") {
-            Some("x") => Ok(ChartAxisDimension::X),
-            Some("y") => Ok(ChartAxisDimension::Y),
-            Some("z") => Ok(ChartAxisDimension::Z),
+            Some("x") => Ok(Dimension::X),
+            Some("y") => Ok(Dimension::Y),
+            Some("z") => Ok(Dimension::Z),
             Some(value) => Err(invalid(format!("invalid chart:dimension '{value}'"))),
             None => Err(invalid("chart:axis requires chart:dimension")),
         }
@@ -109,30 +109,30 @@ impl<'a> ChartAxis<'a> {
 
     pub fn categories_range(self) -> Option<&'a str> {
         self.element
-            .children_of_kind(ChartElementKind::Categories)
+            .children_of_kind(ElementKind::Categories)
             .next()
             .and_then(|categories| {
                 categories.attribute(Some(TABLE_NAMESPACE), "cell-range-address")
             })
     }
 
-    pub fn grids(self) -> impl Iterator<Item = ChartGrid<'a>> + 'a {
+    pub fn grids(self) -> impl Iterator<Item = Grid<'a>> + 'a {
         self.element
-            .children_of_kind(ChartElementKind::Grid)
-            .map(|element| ChartGrid { element })
+            .children_of_kind(ElementKind::Grid)
+            .map(|element| Grid { element })
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ChartGrid<'a> {
-    element: &'a ChartElement,
+pub struct Grid<'a> {
+    element: &'a Element,
 }
 
-impl ChartGrid<'_> {
-    pub fn class(self) -> Result<ChartGridClass> {
+impl Grid<'_> {
+    pub fn class(self) -> Result<GridClass> {
         match chart_attribute(self.element, "class") {
-            Some("major") => Ok(ChartGridClass::Major),
-            Some("minor") => Ok(ChartGridClass::Minor),
+            Some("major") => Ok(GridClass::Major),
+            Some("minor") => Ok(GridClass::Minor),
             Some(value) => Err(invalid(format!("invalid chart:grid class '{value}'"))),
             None => Err(invalid("chart:grid requires chart:class")),
         }
@@ -140,12 +140,12 @@ impl ChartGrid<'_> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ChartSeries<'a> {
-    element: &'a ChartElement,
+pub struct Series<'a> {
+    element: &'a Element,
 }
 
-impl<'a> ChartSeries<'a> {
-    pub fn element(self) -> &'a ChartElement {
+impl<'a> Series<'a> {
+    pub fn element(self) -> &'a Element {
         self.element
     }
 
@@ -173,24 +173,24 @@ impl<'a> ChartSeries<'a> {
 
     pub fn domains(self) -> impl Iterator<Item = &'a str> + 'a {
         self.element
-            .children_of_kind(ChartElementKind::Domain)
+            .children_of_kind(ElementKind::Domain)
             .filter_map(|domain| domain.attribute(Some(TABLE_NAMESPACE), "cell-range-address"))
     }
 
-    pub fn data_points(self) -> impl Iterator<Item = ChartDataPoint<'a>> + 'a {
+    pub fn data_points(self) -> impl Iterator<Item = DataPoint<'a>> + 'a {
         self.element
-            .children_of_kind(ChartElementKind::DataPoint)
-            .map(|element| ChartDataPoint { element })
+            .children_of_kind(ElementKind::DataPoint)
+            .map(|element| DataPoint { element })
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ChartDataPoint<'a> {
-    element: &'a ChartElement,
+pub struct DataPoint<'a> {
+    element: &'a Element,
 }
 
-impl<'a> ChartDataPoint<'a> {
-    pub fn element(self) -> &'a ChartElement {
+impl<'a> DataPoint<'a> {
+    pub fn element(self) -> &'a Element {
         self.element
     }
 
@@ -213,43 +213,43 @@ impl<'a> ChartDataPoint<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ChartLegend<'a> {
-    element: &'a ChartElement,
+pub struct Legend<'a> {
+    element: &'a Element,
 }
 
-impl ChartLegend<'_> {
-    pub fn position(self) -> Result<ChartLegendPosition> {
+impl Legend<'_> {
+    pub fn position(self) -> Result<LegendPosition> {
         match chart_attribute(self.element, "legend-position") {
-            None | Some("end") => Ok(ChartLegendPosition::End),
-            Some("start") => Ok(ChartLegendPosition::Start),
-            Some("top") => Ok(ChartLegendPosition::Top),
-            Some("bottom") => Ok(ChartLegendPosition::Bottom),
-            Some("top-start") => Ok(ChartLegendPosition::TopStart),
-            Some("top-end") => Ok(ChartLegendPosition::TopEnd),
-            Some("bottom-start") => Ok(ChartLegendPosition::BottomStart),
-            Some("bottom-end") => Ok(ChartLegendPosition::BottomEnd),
+            None | Some("end") => Ok(LegendPosition::End),
+            Some("start") => Ok(LegendPosition::Start),
+            Some("top") => Ok(LegendPosition::Top),
+            Some("bottom") => Ok(LegendPosition::Bottom),
+            Some("top-start") => Ok(LegendPosition::TopStart),
+            Some("top-end") => Ok(LegendPosition::TopEnd),
+            Some("bottom-start") => Ok(LegendPosition::BottomStart),
+            Some("bottom-end") => Ok(LegendPosition::BottomEnd),
             Some(value) => Err(invalid(format!("invalid chart:legend-position '{value}'"))),
         }
     }
 }
 
-impl ChartDocument {
-    pub fn plot_area(&self) -> Option<ChartPlotArea<'_>> {
+impl Document {
+    pub fn plot_area(&self) -> Option<PlotArea<'_>> {
         self.chart()
-            .children_of_kind(ChartElementKind::PlotArea)
+            .children_of_kind(ElementKind::PlotArea)
             .next()
-            .map(|element| ChartPlotArea { element })
+            .map(|element| PlotArea { element })
     }
 
-    pub fn legend(&self) -> Option<ChartLegend<'_>> {
+    pub fn legend(&self) -> Option<Legend<'_>> {
         self.chart()
-            .children_of_kind(ChartElementKind::Legend)
+            .children_of_kind(ElementKind::Legend)
             .next()
-            .map(|element| ChartLegend { element })
+            .map(|element| Legend { element })
     }
 }
 
-fn chart_attribute<'a>(element: &'a ChartElement, local_name: &str) -> Option<&'a str> {
+fn chart_attribute<'a>(element: &'a Element, local_name: &str) -> Option<&'a str> {
     element.attribute(Some(CHART_NAMESPACE), local_name)
 }
 
@@ -263,7 +263,7 @@ mod tests {
     use crate::constants;
     use crate::core::PackageWriter;
 
-    fn document(body: &str) -> ChartDocument {
+    fn document(body: &str) -> Document {
         let content = format!(
             r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:c="{CHART_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}"><o:body><o:chart><c:chart><c:legend c:legend-position="bottom-end"/><c:plot-area t:cell-range-address="Data.A1:C4" c:data-source-has-labels="both">{body}</c:plot-area></c:chart></o:chart></o:body></o:document-content>"#
         );
@@ -272,7 +272,7 @@ mod tests {
         writer
             .add_file(constants::ODF_CONTENT, content.as_bytes())
             .unwrap();
-        ChartDocument::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+        Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
     }
 
     #[test]
@@ -282,20 +282,17 @@ mod tests {
         );
         assert_eq!(
             document.legend().unwrap().position().unwrap(),
-            ChartLegendPosition::BottomEnd
+            LegendPosition::BottomEnd
         );
         let plot = document.plot_area().unwrap();
         assert_eq!(plot.cell_range_address(), Some("Data.A1:C4"));
-        assert_eq!(
-            plot.data_source_labels().unwrap(),
-            ChartDataSourceLabels::Both
-        );
+        assert_eq!(plot.data_source_labels().unwrap(), DataSourceLabels::Both);
         let axis = plot.axes().next().unwrap();
-        assert_eq!(axis.dimension().unwrap(), ChartAxisDimension::X);
+        assert_eq!(axis.dimension().unwrap(), Dimension::X);
         assert_eq!(axis.categories_range(), Some("Data.A2:A4"));
         assert_eq!(
             axis.grids().next().unwrap().class().unwrap(),
-            ChartGridClass::Major
+            GridClass::Major
         );
         let series = plot.series().next().unwrap();
         assert_eq!(series.values_range(), Some("Data.B2:B4"));

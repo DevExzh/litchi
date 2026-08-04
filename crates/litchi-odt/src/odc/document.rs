@@ -16,7 +16,7 @@ const CHART_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
 /// A recognized element in the standard ODF chart vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum ChartElementKind {
+pub enum ElementKind {
     Chart,
     Title,
     Subtitle,
@@ -47,13 +47,13 @@ pub enum ChartElementKind {
 
 /// One decoded XML attribute with its expanded namespace name.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartAttribute {
+pub struct Attribute {
     namespace_uri: Option<String>,
     local_name: String,
     value: String,
 }
 
-impl ChartAttribute {
+impl Attribute {
     pub fn namespace_uri(&self) -> Option<&str> {
         self.namespace_uri.as_deref()
     }
@@ -69,15 +69,15 @@ impl ChartAttribute {
 
 /// An ordered element in the standalone chart's complete XML subtree.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartElement {
+pub struct Element {
     namespace_uri: Option<String>,
     local_name: String,
-    attributes: Vec<ChartAttribute>,
+    attributes: Vec<Attribute>,
     text: String,
-    children: Vec<ChartElement>,
+    children: Vec<Element>,
 }
 
-impl ChartElement {
+impl Element {
     pub fn namespace_uri(&self) -> Option<&str> {
         self.namespace_uri.as_deref()
     }
@@ -86,40 +86,40 @@ impl ChartElement {
         &self.local_name
     }
 
-    pub fn kind(&self) -> ChartElementKind {
+    pub fn kind(&self) -> ElementKind {
         if self.namespace_uri() != Some(CHART_NAMESPACE) {
-            return ChartElementKind::Other;
+            return ElementKind::Other;
         }
         match self.local_name.as_str() {
-            "chart" => ChartElementKind::Chart,
-            "title" => ChartElementKind::Title,
-            "subtitle" => ChartElementKind::Subtitle,
-            "footer" => ChartElementKind::Footer,
-            "legend" => ChartElementKind::Legend,
-            "plot-area" => ChartElementKind::PlotArea,
-            "wall" => ChartElementKind::Wall,
-            "floor" => ChartElementKind::Floor,
-            "axis" => ChartElementKind::Axis,
-            "categories" => ChartElementKind::Categories,
-            "grid" => ChartElementKind::Grid,
-            "series" => ChartElementKind::Series,
-            "domain" => ChartElementKind::Domain,
-            "data-point" => ChartElementKind::DataPoint,
-            "data-label" => ChartElementKind::DataLabel,
-            "mean-value" => ChartElementKind::MeanValue,
-            "error-indicator" => ChartElementKind::ErrorIndicator,
-            "regression-curve" => ChartElementKind::RegressionCurve,
-            "equation" => ChartElementKind::Equation,
-            "stock-gain-marker" => ChartElementKind::StockGainMarker,
-            "stock-loss-marker" => ChartElementKind::StockLossMarker,
-            "stock-range-line" => ChartElementKind::StockRangeLine,
-            "symbol-image" => ChartElementKind::SymbolImage,
-            "label-separator" => ChartElementKind::LabelSeparator,
-            _ => ChartElementKind::Other,
+            "chart" => ElementKind::Chart,
+            "title" => ElementKind::Title,
+            "subtitle" => ElementKind::Subtitle,
+            "footer" => ElementKind::Footer,
+            "legend" => ElementKind::Legend,
+            "plot-area" => ElementKind::PlotArea,
+            "wall" => ElementKind::Wall,
+            "floor" => ElementKind::Floor,
+            "axis" => ElementKind::Axis,
+            "categories" => ElementKind::Categories,
+            "grid" => ElementKind::Grid,
+            "series" => ElementKind::Series,
+            "domain" => ElementKind::Domain,
+            "data-point" => ElementKind::DataPoint,
+            "data-label" => ElementKind::DataLabel,
+            "mean-value" => ElementKind::MeanValue,
+            "error-indicator" => ElementKind::ErrorIndicator,
+            "regression-curve" => ElementKind::RegressionCurve,
+            "equation" => ElementKind::Equation,
+            "stock-gain-marker" => ElementKind::StockGainMarker,
+            "stock-loss-marker" => ElementKind::StockLossMarker,
+            "stock-range-line" => ElementKind::StockRangeLine,
+            "symbol-image" => ElementKind::SymbolImage,
+            "label-separator" => ElementKind::LabelSeparator,
+            _ => ElementKind::Other,
         }
     }
 
-    pub fn attributes(&self) -> &[ChartAttribute] {
+    pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
 
@@ -129,7 +129,7 @@ impl ChartElement {
             .find(|attribute| {
                 attribute.namespace_uri() == namespace_uri && attribute.local_name == local_name
             })
-            .map(ChartAttribute::value)
+            .map(Attribute::value)
     }
 
     /// Return direct character content, excluding descendant text.
@@ -137,11 +137,11 @@ impl ChartElement {
         &self.text
     }
 
-    pub fn children(&self) -> &[ChartElement] {
+    pub fn children(&self) -> &[Element] {
         &self.children
     }
 
-    pub fn children_of_kind(&self, kind: ChartElementKind) -> impl Iterator<Item = &ChartElement> {
+    pub fn children_of_kind(&self, kind: ElementKind) -> impl Iterator<Item = &Element> {
         self.children
             .iter()
             .filter(move |child| child.kind() == kind)
@@ -160,12 +160,12 @@ impl ChartElement {
 }
 
 /// A validated standalone OpenDocument chart or chart template.
-pub struct ChartDocument {
+pub struct Document {
     pub(crate) package: OpenDocumentPackage,
-    pub(crate) chart: ChartElement,
+    pub(crate) chart: Element,
 }
 
-impl ChartDocument {
+impl Document {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         Self::from_reader(file)
@@ -197,7 +197,7 @@ impl ChartDocument {
         self.package.mimetype()
     }
 
-    pub fn chart(&self) -> &ChartElement {
+    pub fn chart(&self) -> &Element {
         &self.chart
     }
 
@@ -240,7 +240,7 @@ impl ChartDocument {
     }
 }
 
-pub(crate) fn parse_chart_content(xml: &str) -> Result<ChartElement> {
+pub(crate) fn parse_chart_content(xml: &str) -> Result<Element> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -448,7 +448,7 @@ fn push_node(
     element: &quick_xml::events::BytesStart<'_>,
     namespace_uri: Option<String>,
     local_name: String,
-    stack: &mut Vec<ChartElement>,
+    stack: &mut Vec<Element>,
     node_count: &mut usize,
 ) -> Result<()> {
     let node = make_node(reader, element, namespace_uri, local_name, node_count)?;
@@ -462,7 +462,7 @@ fn make_node(
     resolved_namespace_uri: Option<String>,
     local_name: String,
     node_count: &mut usize,
-) -> Result<ChartElement> {
+) -> Result<Element> {
     *node_count = node_count
         .checked_add(1)
         .ok_or_else(|| Error::InvalidFormat("chart node count overflow".to_string()))?;
@@ -486,7 +486,7 @@ fn make_node(
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace_uri = namespace_uri(&namespace)?;
         let local_name = decode_name(local.as_ref(), "attribute")?;
-        if attributes.iter().any(|existing: &ChartAttribute| {
+        if attributes.iter().any(|existing: &Attribute| {
             existing.namespace_uri == namespace_uri && existing.local_name == local_name
         }) {
             return Err(Error::InvalidFormat(format!(
@@ -504,13 +504,13 @@ fn make_node(
                 "chart attribute exceeds 1 MiB".to_string(),
             ));
         }
-        attributes.push(ChartAttribute {
+        attributes.push(Attribute {
             namespace_uri,
             local_name,
             value,
         });
     }
-    Ok(ChartElement {
+    Ok(Element {
         namespace_uri: resolved_namespace_uri,
         local_name,
         attributes,
@@ -519,7 +519,7 @@ fn make_node(
     })
 }
 
-fn append_text(node: &mut ChartElement, value: &str) -> Result<()> {
+fn append_text(node: &mut Element, value: &str) -> Result<()> {
     if node.text.len().saturating_add(value.len()) > 16 * 1_048_576 {
         return Err(Error::InvalidFormat(
             "chart text node exceeds 16 MiB".to_string(),
@@ -608,26 +608,26 @@ mod tests {
     #[test]
     fn parses_complete_namespace_aware_chart_subtree_losslessly() {
         let bytes = package(constants::ODF_CHART, chart_xml());
-        let document = ChartDocument::from_bytes(bytes.clone()).unwrap();
+        let document = Document::from_bytes(bytes.clone()).unwrap();
         assert!(!document.is_template());
-        assert_eq!(document.chart().kind(), ChartElementKind::Chart);
+        assert_eq!(document.chart().kind(), ElementKind::Chart);
         assert_eq!(
             document.chart().attribute(Some(CHART_NAMESPACE), "class"),
             Some("c:bar")
         );
         let title = document
             .chart()
-            .children_of_kind(ChartElementKind::Title)
+            .children_of_kind(ElementKind::Title)
             .next()
             .unwrap();
         assert_eq!(title.all_text(), "Revenue & margin");
         let plot = document
             .chart()
-            .children_of_kind(ChartElementKind::PlotArea)
+            .children_of_kind(ElementKind::PlotArea)
             .next()
             .unwrap();
-        assert_eq!(plot.children_of_kind(ChartElementKind::Axis).count(), 1);
-        assert_eq!(plot.children_of_kind(ChartElementKind::Series).count(), 2);
+        assert_eq!(plot.children_of_kind(ElementKind::Axis).count(), 1);
+        assert_eq!(plot.children_of_kind(ElementKind::Series).count(), 2);
         let table = document
             .chart()
             .children()
@@ -643,14 +643,14 @@ mod tests {
     #[test]
     fn accepts_chart_templates_and_readers() {
         let bytes = package(constants::ODF_CHART_TEMPLATE, chart_xml());
-        let document = ChartDocument::from_reader(Cursor::new(bytes.clone())).unwrap();
+        let document = Document::from_reader(Cursor::new(bytes.clone())).unwrap();
         assert!(document.is_template());
         assert_eq!(document.into_bytes(), bytes);
     }
 
     #[test]
     fn rejects_other_families_and_invalid_chart_structure() {
-        assert!(ChartDocument::from_bytes(package(constants::ODF_DRAWING, chart_xml())).is_err());
+        assert!(Document::from_bytes(package(constants::ODF_DRAWING, chart_xml())).is_err());
         for xml in [
             r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:chart/></o:body></o:document-content>"#,
             r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:c="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><o:body><o:chart><c:chart>"#,
@@ -658,7 +658,7 @@ mod tests {
             r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:c="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><o:body/><o:body><o:chart><c:chart><c:plot-area/></c:chart></o:chart></o:body></o:document-content>"#,
         ] {
             assert!(
-                ChartDocument::from_bytes(package(constants::ODF_CHART, xml)).is_err(),
+                Document::from_bytes(package(constants::ODF_CHART, xml)).is_err(),
                 "accepted {xml}"
             );
         }
@@ -667,12 +667,12 @@ mod tests {
     #[test]
     fn rejects_duplicate_expanded_attributes_and_excessive_depth() {
         let duplicate = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:c="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:x="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><o:body><o:chart><c:chart c:class="c:bar" x:class="c:line"><c:plot-area/></c:chart></o:chart></o:body></o:document-content>"#;
-        assert!(ChartDocument::from_bytes(package(constants::ODF_CHART, duplicate)).is_err());
+        assert!(Document::from_bytes(package(constants::ODF_CHART, duplicate)).is_err());
 
         let nested = "<c:series>".repeat(129) + &"</c:series>".repeat(129);
         let deep = format!(
             r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE}" xmlns:c="{CHART_NAMESPACE}"><o:body><o:chart><c:chart>{nested}</c:chart></o:chart></o:body></o:document-content>"#
         );
-        assert!(ChartDocument::from_bytes(package(constants::ODF_CHART, &deep)).is_err());
+        assert!(Document::from_bytes(package(constants::ODF_CHART, &deep)).is_err());
     }
 }
