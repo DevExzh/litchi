@@ -266,7 +266,7 @@ fn read_local_fill_uses_stroke(data: &[u8]) -> Result<Option<bool>> {
     let Some(field) = singular_field(extension, RADAR_FILL_USES_STROKE_FIELD, 0)? else {
         return Ok(None);
     };
-    let (value, length) = crate::varint::decode_varint_from_bytes(
+    let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
         &extension[field.key_end..field.end],
     )
     .map_err(|error| Error::InvalidFormat(format!("invalid Radar style boolean: {error}")))?;

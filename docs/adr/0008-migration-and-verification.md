@@ -4451,6 +4451,14 @@ The migration exit for this family is deletion of the duplicate facade-local
 all callers have moved, focused owner adapters may remain private, but they
 must preserve bounded-input policy and must not make the common structured
 wire errors untyped by accident.
+The varint portion of this exit is now complete: every facade caller imports
+`litchi-iwa-common::varint`, the duplicate `litchi-iwa::varint` module is gone,
+and the common bounded decoder/error type is the sole owner. The remaining
+facade-local physical kernel is `wire.rs`; its parser and patch helpers are the
+next low-level ownership slice. Canonical chart readers use the common
+`encoded_len` check instead of allocating temporary varint vectors, and the
+reference-line reader decodes directly from its borrowed payload while mapping
+malformed values to the typed format error.
 
 Checked-in anchors are `[MS-OE376]` §§2.1.444--2.1.462 for Word frameset/web
 settings behavior and §2.1.1170 for PowerPoint programmable tags; `[MS-XLSX]`
@@ -5762,7 +5770,7 @@ private adapter for the remaining reader/editor migration. The BNC wire slice
 now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
 CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
 the monolith retains only a private module alias plus its archive/protobuf
-callers. Its 19 leaf tests, 1,497 IWA tests, boundary check, and native Numbers
+callers. Its 19 leaf tests, 1,494 IWA tests, boundary check, and native Numbers
 open/edit/save/reopen smoke cover the extraction. The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain
@@ -5772,8 +5780,10 @@ The physical IWA substrate slice is complete as well: raw schemas remain in
 `litchi-iwa-protos`, bounded archive and Snappy framing remain in
 `litchi-iwa-core`, the facade owns no duplicate Snappy codec, and its callers
 use the allocation-conscious slice API. The core framing suite has 17 passing
-tests. Next, extract Numbers table/sheet/formula values and then migrate the
-Pages/Keynote reader boundaries.
+tests. The facade varint exit is now complete too: `varint.rs` was deleted,
+all callers use the common bounded implementation, and the IWA suite still
+passes 1,494 tests. Next, extract the remaining wire helpers, then Numbers
+table/sheet/formula values and the Pages/Keynote reader boundaries.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains

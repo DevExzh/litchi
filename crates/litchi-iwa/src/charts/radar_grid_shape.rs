@@ -136,11 +136,10 @@ fn read_optional_native_shape(extension: &[u8]) -> Result<Option<u64>> {
             "radar grid-shape field {RADAR_RADIUS_GRIDLINE_CURVE_FIELD} is not a varint"
         )));
     }
-    let (value, length) =
-        crate::varint::decode_varint_from_bytes(&extension[field.payload_start..field.end])
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid radar grid-shape value: {error}"))
-            })?;
+    let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
+        &extension[field.payload_start..field.end],
+    )
+    .map_err(|error| Error::InvalidFormat(format!("invalid radar grid-shape value: {error}")))?;
     if field.payload_start + length != field.end {
         return Err(Error::InvalidFormat(
             "radar grid-shape varint has trailing bytes".to_owned(),

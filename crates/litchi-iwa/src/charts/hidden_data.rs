@@ -131,7 +131,7 @@ fn strict_optional_skip_hidden_data(data: &[u8]) -> Result<Option<bool>> {
             "chart skip-hidden-data field {CHART_SKIP_HIDDEN_DATA_FIELD} is not a varint"
         )));
     }
-    let (value, consumed) = crate::varint::decode_varint_from_bytes(
+    let (value, consumed) = litchi_iwa_common::varint::decode_varint_from_bytes(
         &data[field.key_end..field.end],
     )
     .map_err(|error| {

@@ -2633,8 +2633,9 @@ fn required_u32_varint(data: &[u8], field_number: u32) -> Result<u32> {
         )));
     }
     let field = matches[0];
-    let (value, length) = crate::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
-        .map_err(|error| Error::InvalidFormat(format!("invalid protobuf varint: {error}")))?;
+    let (value, length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+            .map_err(|error| Error::InvalidFormat(format!("invalid protobuf varint: {error}")))?;
     if field.key_end + length != field.end {
         return Err(Error::InvalidFormat(
             "protobuf varint field has trailing bytes".to_owned(),
@@ -3189,8 +3190,8 @@ mod tests {
                     &[8, 1],
                     |entry| {
                         let mut entry = entry.to_vec();
-                        entry.extend(crate::varint::encode_varint(8));
-                        entry.extend(crate::varint::encode_varint(0));
+                        entry.extend(litchi_iwa_common::varint::encode_varint(8));
+                        entry.extend(litchi_iwa_common::varint::encode_varint(0));
                         Ok(entry)
                     },
                 )?;
@@ -3221,8 +3222,10 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 
     fn test_package(storage: StorageArchive) -> IWorkPackage {

@@ -82,10 +82,11 @@ directly.
 The physical IWA substrate is layered beneath the application crate:
 `litchi-iwa-protos` owns the generated raw schemas, and `litchi-iwa-core`
 depends on it for bounded archive framing and checksum-free Snappy encoding.
-`litchi-iwa` consumes the core's typed, slice-based codec directly; its former
-633-line duplicate Snappy implementation is gone. The core layer does not open
-packages, resolve application message IDs, or own document topology, while the
-facade retains those application-level responsibilities.
+`litchi-iwa` consumes the core's typed, slice-based codecs directly; its former
+633-line duplicate Snappy implementation and 172-line varint kernel are gone.
+The core layer does not open packages, resolve application message IDs, or own
+document topology, while the facade retains those application-level
+responsibilities.
 
 The first extracted semantic value layer is `litchi-iwa-text`, which owns only
 the allocation-bearing rich-text values shared by the format leaves. It has no

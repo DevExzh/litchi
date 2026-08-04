@@ -109,10 +109,11 @@ fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<O
             field.wire_type
         )));
     }
-    let (value, length) = crate::varint::decode_varint_from_bytes(
-        &data[field.payload_start..field.end],
-    )
-    .map_err(|error| Error::InvalidFormat(format!("invalid iWork table {label}: {error}")))?;
+    let (value, length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.payload_start..field.end])
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid iWork table {label}: {error}"))
+            })?;
     if field.payload_start + length != field.end {
         return Err(Error::InvalidFormat(format!(
             "iWork table {label} contains trailing bytes"

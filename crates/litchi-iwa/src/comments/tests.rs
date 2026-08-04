@@ -187,8 +187,8 @@ fn package_metadata(package: &IWorkPackage) -> tsp::PackageMetadata {
 }
 
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> Vec<u8> {
-    let mut field = crate::varint::encode_varint(u64::from(field_number) << 3);
-    field.extend(crate::varint::encode_varint(value));
+    let mut field = litchi_iwa_common::varint::encode_varint(u64::from(field_number) << 3);
+    field.extend(litchi_iwa_common::varint::encode_varint(value));
     data.extend_from_slice(&field);
     field
 }

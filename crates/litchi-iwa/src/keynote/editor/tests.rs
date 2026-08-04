@@ -5504,8 +5504,8 @@ fn cloned_slide_rejects_duplicate_reference_identifiers_transactionally() {
                 &[5],
                 |reference| {
                     let mut reference = reference.to_vec();
-                    reference.extend(crate::varint::encode_varint(8));
-                    reference.extend(crate::varint::encode_varint(5));
+                    reference.extend(litchi_iwa_common::varint::encode_varint(8));
+                    reference.extend(litchi_iwa_common::varint::encode_varint(5));
                     Ok(reference)
                 },
             )?;
@@ -5585,8 +5585,10 @@ fn reference(identifier: u64) -> Reference {
 }
 
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-    data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-    data.extend(crate::varint::encode_varint(value));
+    data.extend(litchi_iwa_common::varint::encode_varint(
+        u64::from(field_number) << 3,
+    ));
+    data.extend(litchi_iwa_common::varint::encode_varint(value));
 }
 
 fn unknown_varint(field_number: u32, value: u64) -> Vec<u8> {
@@ -5596,14 +5598,14 @@ fn unknown_varint(field_number: u32, value: u64) -> Vec<u8> {
 }
 
 fn append_unknown_fixed64(data: &mut Vec<u8>, field_number: u32, value: u64) {
-    data.extend(crate::varint::encode_varint(
+    data.extend(litchi_iwa_common::varint::encode_varint(
         (u64::from(field_number) << 3) | 1,
     ));
     data.extend(value.to_le_bytes());
 }
 
 fn append_unknown_fixed32(data: &mut Vec<u8>, field_number: u32, value: u32) {
-    data.extend(crate::varint::encode_varint(
+    data.extend(litchi_iwa_common::varint::encode_varint(
         (u64::from(field_number) << 3) | 5,
     ));
     data.extend(value.to_le_bytes());

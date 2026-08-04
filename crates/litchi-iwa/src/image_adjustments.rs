@@ -347,7 +347,7 @@ mod tests {
         assert_duplicate_rejected(duplicate_outer, requested);
 
         let mut duplicate_inner = native.encode_to_vec();
-        duplicate_inner.extend(crate::varint::encode_varint(
+        duplicate_inner.extend(litchi_iwa_common::varint::encode_varint(
             (u64::from(EXPOSURE_FIELD) << 3) | 5,
         ));
         duplicate_inner.extend(native.exposure.unwrap().to_bits().to_le_bytes());
@@ -392,7 +392,9 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 }

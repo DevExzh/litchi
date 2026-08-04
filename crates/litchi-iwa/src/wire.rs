@@ -876,8 +876,8 @@ mod tests {
     use super::*;
 
     fn varint_field(number: u32, value: u64) -> Vec<u8> {
-        let mut field = crate::varint::encode_varint(u64::from(number) << 3);
-        field.extend(crate::varint::encode_varint(value));
+        let mut field = litchi_iwa_common::varint::encode_varint(u64::from(number) << 3);
+        field.extend(litchi_iwa_common::varint::encode_varint(value));
         field
     }
 
@@ -954,9 +954,9 @@ mod tests {
     #[test]
     fn nested_scalar_patch_retains_unknown_ancestors() {
         let mut inner = varint_field(99, 1234);
-        let key = crate::varint::encode_varint((u64::from(4_u32) << 3) | 2);
+        let key = litchi_iwa_common::varint::encode_varint((u64::from(4_u32) << 3) | 2);
         let mut outer = key;
-        outer.extend(crate::varint::encode_varint(inner.len() as u64));
+        outer.extend(litchi_iwa_common::varint::encode_varint(inner.len() as u64));
         outer.append(&mut inner);
         outer.extend(varint_field(100, 5678));
         let baseline = outer.clone();
@@ -1082,7 +1082,7 @@ mod tests {
                 .iter()
                 .find(|field| field.number == 1)
                 .ok_or_else(|| Error::InvalidFormat("missing identifier".to_owned()))?;
-            let (value, _) = crate::varint::decode_varint_from_bytes(
+            let (value, _) = litchi_iwa_common::varint::decode_varint_from_bytes(
                 &leaf[identifier.payload_start..identifier.end],
             )
             .map_err(|error| Error::InvalidFormat(format!("invalid identifier: {error}")))?;
@@ -1097,7 +1097,7 @@ mod tests {
                 .iter()
                 .find(|field| field.number == 1)
                 .ok_or_else(|| Error::InvalidFormat("missing identifier".to_owned()))?;
-            let (value, _) = crate::varint::decode_varint_from_bytes(
+            let (value, _) = litchi_iwa_common::varint::decode_varint_from_bytes(
                 &leaf[identifier.payload_start..identifier.end],
             )
             .map_err(|error| Error::InvalidFormat(format!("invalid identifier: {error}")))?;

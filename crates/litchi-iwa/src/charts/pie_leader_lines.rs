@@ -152,14 +152,13 @@ fn strict_optional_visibility(data: &[u8]) -> Result<Option<ChartPieLeaderLineVi
             "chart pie leader-line visibility is not a varint".to_owned(),
         ));
     }
-    let (value, consumed) = crate::varint::decode_varint_from_bytes(
-        &data[field.key_end..field.end],
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "chart pie leader-line visibility is invalid: {error}"
-        ))
-    })?;
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "chart pie leader-line visibility is invalid: {error}"
+                ))
+            })?;
     if field.key_end + consumed != field.end {
         return Err(Error::InvalidFormat(
             "chart pie leader-line visibility is not canonical".to_owned(),

@@ -579,8 +579,8 @@ fn table_data_list_segments_preserve_unknown_fields_and_reject_duplicates() {
     let duplicate =
         crate::wire::transform_length_delimited_fields_at_path(&original, &[3], |entry| {
             let mut entry = entry.to_vec();
-            entry.extend(crate::varint::encode_varint(16));
-            entry.extend(crate::varint::encode_varint(1));
+            entry.extend(litchi_iwa_common::varint::encode_varint(16));
+            entry.extend(litchi_iwa_common::varint::encode_varint(1));
             Ok(entry)
         })
         .unwrap();
@@ -648,8 +648,8 @@ fn tile_wire_mutations_preserve_unknown_rows_and_restore_exactly() {
     let duplicate =
         crate::wire::transform_length_delimited_fields_at_path(&original, &[5], |row| {
             let mut row = row.to_vec();
-            row.extend(crate::varint::encode_varint(8));
-            row.extend(crate::varint::encode_varint(0));
+            row.extend(litchi_iwa_common::varint::encode_varint(8));
+            row.extend(litchi_iwa_common::varint::encode_varint(0));
             Ok(row)
         })
         .unwrap();
@@ -712,8 +712,8 @@ fn header_bucket_wire_mutations_preserve_unknown_entries_and_restore_exactly() {
     let duplicate =
         crate::wire::transform_length_delimited_fields_at_path(&original, &[2], |header| {
             let mut header = header.to_vec();
-            header.extend(crate::varint::encode_varint(8));
-            header.extend(crate::varint::encode_varint(0));
+            header.extend(litchi_iwa_common::varint::encode_varint(8));
+            header.extend(litchi_iwa_common::varint::encode_varint(0));
             Ok(header)
         })
         .unwrap();
@@ -3153,8 +3153,8 @@ fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
     assert_eq!(cloned_tile.to_owner_id, cloned.2.internal_formula_owner_id);
     assert_eq!(cloned_tile.from_to_range[0].from_coord.row, Some(3));
     let suffix = |field: u32, value: u64| {
-        let mut data = crate::varint::encode_varint(u64::from(field) << 3);
-        data.extend(crate::varint::encode_varint(value));
+        let mut data = litchi_iwa_common::varint::encode_varint(u64::from(field) << 3);
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
         data
     };
     let range_suffix = suffix(99, 990);
@@ -7139,7 +7139,9 @@ fn table_title_settings_reject_malformed_wire_transactionally() {
             let object = archive.object_mut(10).unwrap();
             let message = object.messages[0].clone();
             let mut data = message.data;
-            data.extend(crate::varint::encode_varint((u64::from(22_u32) << 3) | 2));
+            data.extend(litchi_iwa_common::varint::encode_varint(
+                (u64::from(22_u32) << 3) | 2,
+            ));
             data.push(0);
             object.replace_message(
                 0,
@@ -8197,8 +8199,8 @@ fn test_package_with_comments(shared: bool) -> IWorkPackage {
 }
 
 fn add_unknown_comment_storage_field(package: &mut IWorkPackage, storage_id: u64) -> Vec<u8> {
-    let mut unknown = crate::varint::encode_varint(99 << 3);
-    unknown.extend(crate::varint::encode_varint(999));
+    let mut unknown = litchi_iwa_common::varint::encode_varint(99 << 3);
+    unknown.extend(litchi_iwa_common::varint::encode_varint(999));
     package
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(storage_id).unwrap();
@@ -8212,8 +8214,10 @@ fn add_unknown_comment_storage_field(package: &mut IWorkPackage, storage_id: u64
 }
 
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-    data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-    data.extend(crate::varint::encode_varint(value));
+    data.extend(litchi_iwa_common::varint::encode_varint(
+        u64::from(field_number) << 3,
+    ));
+    data.extend(litchi_iwa_common::varint::encode_varint(value));
 }
 
 #[allow(deprecated)]

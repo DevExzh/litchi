@@ -197,7 +197,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             &extension[unknown.key_end..unknown.end],
-            crate::varint::encode_varint(73)
+            litchi_iwa_common::varint::encode_varint(73)
         );
     }
 

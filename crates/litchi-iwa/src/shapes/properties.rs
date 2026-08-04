@@ -288,19 +288,21 @@ mod tests {
         };
 
         let mut duplicate = drawable.encode_to_vec();
-        duplicate.extend(crate::varint::encode_varint(5 << 3));
+        duplicate.extend(litchi_iwa_common::varint::encode_varint(5 << 3));
         duplicate.push(1);
         assert!(patch_drawable_properties(&duplicate, &current, &replacement).is_err());
 
         let mut malformed = drawable.encode_to_vec();
-        malformed.extend(crate::varint::encode_varint((8 << 3) | 2));
+        malformed.extend(litchi_iwa_common::varint::encode_varint((8 << 3) | 2));
         malformed.push(3);
         malformed.push(b'x');
         assert!(patch_drawable_properties(&malformed, &current, &replacement).is_err());
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 }

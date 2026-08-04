@@ -161,7 +161,6 @@ pub mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.
 pub mod table_lock;
 pub mod theme;
-pub mod varint;
 pub(crate) mod wire;
 pub mod zip_utils;
 

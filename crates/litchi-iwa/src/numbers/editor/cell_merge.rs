@@ -1688,8 +1688,10 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 
     fn install_uuid_host_references(package: &mut IWorkPackage, row: u32, column: u32) {

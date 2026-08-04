@@ -179,11 +179,11 @@ mod tests {
         .encode_to_vec();
         append_unknown_varint(&mut second, 99, 20_001);
 
-        let mut original = crate::varint::encode_varint(90_u64 << 3);
-        original.extend(crate::varint::encode_varint(1));
+        let mut original = litchi_iwa_common::varint::encode_varint(90_u64 << 3);
+        original.extend(litchi_iwa_common::varint::encode_varint(1));
         append_length_delimited_field(&mut original, 7, &first).unwrap();
-        original.extend(crate::varint::encode_varint(91_u64 << 3));
-        original.extend(crate::varint::encode_varint(2));
+        original.extend(litchi_iwa_common::varint::encode_varint(91_u64 << 3));
+        original.extend(litchi_iwa_common::varint::encode_varint(2));
         append_length_delimited_field(&mut original, 7, &second).unwrap();
 
         let reordered = reorder_reference_field(&original, 7, &[10, 20], &[20, 10]).unwrap();
@@ -221,7 +221,9 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 }

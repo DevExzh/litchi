@@ -506,8 +506,9 @@ fn required_varint(data: &[u8], field_number: u32, context: &str) -> Result<u64>
             "{context} must contain varint field {field_number} exactly once"
         )));
     };
-    let (value, length) = crate::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
-        .map_err(|error| Error::InvalidFormat(format!("invalid {context}: {error}")))?;
+    let (value, length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+            .map_err(|error| Error::InvalidFormat(format!("invalid {context}: {error}")))?;
     if field.key_end + length != field.end {
         return Err(Error::InvalidFormat(format!(
             "{context} has trailing varint bytes"

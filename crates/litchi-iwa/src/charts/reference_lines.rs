@@ -1172,8 +1172,19 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "chart reference-line field {field_number} is not a varint"
         )));
     }
-    let mut cursor = std::io::Cursor::new(&data[field.payload_start..field.end]);
-    Ok(Some(crate::varint::decode_varint(&mut cursor)?))
+    let payload = &data[field.payload_start..field.end];
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "chart reference-line field {field_number} is invalid: {error}"
+            ))
+        })?;
+    if consumed != payload.len() || litchi_iwa_common::varint::encoded_len(value) != consumed {
+        return Err(Error::InvalidFormat(format!(
+            "chart reference-line field {field_number} is not canonically encoded"
+        )));
+    }
+    Ok(Some(value))
 }
 
 fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {

@@ -87,8 +87,8 @@ fn semantic_body_update_and_clear_are_transactional() {
 fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
     let mut package = test_package("Body");
     let unknown = {
-        let mut field = crate::varint::encode_varint(99 << 3);
-        field.extend(crate::varint::encode_varint(999));
+        let mut field = litchi_iwa_common::varint::encode_varint(99 << 3);
+        field.extend(litchi_iwa_common::varint::encode_varint(999));
         field
     };
     package
@@ -169,7 +169,7 @@ fn page_layout_rejects_duplicate_scalar_fields_transactionally() {
             for width in [612.0_f32, 640.0] {
                 message
                     .data
-                    .extend(crate::varint::encode_varint((30 << 3) | 5));
+                    .extend(litchi_iwa_common::varint::encode_varint((30 << 3) | 5));
                 message.data.extend(width.to_bits().to_le_bytes());
             }
             Ok(object.replace_message(0, message).map(|_| ())?)
@@ -469,8 +469,8 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         text: vec!["Body".to_owned()],
         ..Default::default()
     };
-    let mut fill_payload = crate::varint::encode_varint(99 << 3);
-    fill_payload.extend(crate::varint::encode_varint(7));
+    let mut fill_payload = litchi_iwa_common::varint::encode_varint(99 << 3);
+    fill_payload.extend(litchi_iwa_common::varint::encode_varint(7));
     let mut section_data = SectionArchive {
         inherit_previous_header_footer: Some(true),
         section_template_first_page_different: Some(false),
@@ -486,8 +486,8 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     .encode_to_vec();
     section_data =
         patch_length_delimited_field(&section_data, 30, true, Some(&fill_payload)).unwrap();
-    let mut unknown_section_field = crate::varint::encode_varint(101 << 3);
-    unknown_section_field.extend(crate::varint::encode_varint(999));
+    let mut unknown_section_field = litchi_iwa_common::varint::encode_varint(101 << 3);
+    unknown_section_field.extend(litchi_iwa_common::varint::encode_varint(999));
     section_data.extend_from_slice(&unknown_section_field);
 
     let objects = vec![
@@ -600,7 +600,9 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(section_id).unwrap();
             let mut message = object.messages[0].clone();
-            message.data.extend(crate::varint::encode_varint(17 << 3));
+            message
+                .data
+                .extend(litchi_iwa_common::varint::encode_varint(17 << 3));
             message.data.push(0);
             Ok(object.replace_message(0, message).map(|_| ())?)
         })
@@ -693,8 +695,8 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
         ..Default::default()
     }
     .encode_to_vec();
-    let mut unknown_color_field = crate::varint::encode_varint(99 << 3);
-    unknown_color_field.extend(crate::varint::encode_varint(123));
+    let mut unknown_color_field = litchi_iwa_common::varint::encode_varint(99 << 3);
+    unknown_color_field.extend(litchi_iwa_common::varint::encode_varint(123));
     color_payload.extend_from_slice(&unknown_color_field);
     let mut fill_payload = tsd::FillArchive {
         color: Some(tsp::Color {
@@ -706,8 +708,8 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     .encode_to_vec();
     fill_payload =
         patch_length_delimited_field(&fill_payload, 1, true, Some(&color_payload)).unwrap();
-    let mut unknown_fill_field = crate::varint::encode_varint(100 << 3);
-    unknown_fill_field.extend(crate::varint::encode_varint(456));
+    let mut unknown_fill_field = litchi_iwa_common::varint::encode_varint(100 << 3);
+    unknown_fill_field.extend(litchi_iwa_common::varint::encode_varint(456));
     fill_payload.extend_from_slice(&unknown_fill_field);
     let mut section_data = SectionArchive {
         name: Some("Blank".to_owned()),
@@ -1926,8 +1928,8 @@ fn reference(identifier: u64) -> Reference {
 }
 
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> Vec<u8> {
-    let mut field = crate::varint::encode_varint(u64::from(field_number) << 3);
-    field.extend(crate::varint::encode_varint(value));
+    let mut field = litchi_iwa_common::varint::encode_varint(u64::from(field_number) << 3);
+    field.extend(litchi_iwa_common::varint::encode_varint(value));
     data.extend_from_slice(&field);
     field
 }

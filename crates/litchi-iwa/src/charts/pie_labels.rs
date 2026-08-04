@@ -177,14 +177,13 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
             "chart pie label field {field_number} is not a varint"
         )));
     }
-    let (value, consumed) = crate::varint::decode_varint_from_bytes(
-        &data[field.key_end..field.end],
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "chart pie label field {field_number} is invalid: {error}"
-        ))
-    })?;
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "chart pie label field {field_number} is invalid: {error}"
+                ))
+            })?;
     if field.key_end + consumed != field.end || value > 1 {
         return Err(Error::InvalidFormat(format!(
             "chart pie label field {field_number} is not a canonical boolean"

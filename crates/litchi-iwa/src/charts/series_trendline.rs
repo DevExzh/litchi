@@ -589,20 +589,19 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "chart series trendline field {field_number} is not a varint"
         )));
     }
-    let (value, consumed) = crate::varint::decode_varint_from_bytes(
-        &data[field.key_end..field.end],
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "chart series trendline field {field_number} is invalid: {error}"
-        ))
-    })?;
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "chart series trendline field {field_number} is invalid: {error}"
+                ))
+            })?;
     if consumed != field.end - field.key_end {
         return Err(Error::InvalidFormat(format!(
             "chart series trendline field {field_number} has trailing bytes"
         )));
     }
-    if data[field.key_end..field.end] != crate::varint::encode_varint(value) {
+    if litchi_iwa_common::varint::encoded_len(value) != consumed {
         return Err(Error::InvalidFormat(format!(
             "chart series trendline field {field_number} is not canonically encoded"
         )));
@@ -736,7 +735,7 @@ mod tests {
         assert!(read_trendline(&malformed_bool).is_err());
 
         extension.clear();
-        extension.extend(crate::varint::encode_varint(
+        extension.extend(litchi_iwa_common::varint::encode_varint(
             u64::from(SHOW_TRENDLINE_FIELD) << 3,
         ));
         extension.extend([0x81, 0x00]);

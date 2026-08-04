@@ -177,18 +177,17 @@ fn strict_optional_i32(data: &[u8], field_number: u32) -> Result<Option<i32>> {
             "chart series style field {field_number} is not a varint"
         )));
     }
-    let (value, consumed) = crate::varint::decode_varint_from_bytes(
-        &data[field.key_end..field.end],
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "chart series style field {field_number} is invalid: {error}"
-        ))
-    })?;
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "chart series style field {field_number} is invalid: {error}"
+                ))
+            })?;
     let decoded = value as i32;
     let encoded = decoded as i64 as u64;
     if consumed != field.end - field.key_end
-        || data[field.key_end..field.end] != crate::varint::encode_varint(value)
+        || litchi_iwa_common::varint::encoded_len(value) != consumed
         || (encoded != value && value > i32::MAX as u64)
     {
         return Err(Error::InvalidFormat(format!(
