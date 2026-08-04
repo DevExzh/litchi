@@ -1,9 +1,10 @@
 use litchi_odt::{Document, DocumentBuilder, MutableDocument, OpenDocumentPackage};
 use litchi_odt::header_footer_properties::{
-    BackgroundRepeat, HeaderFooterBorder, HeaderFooterBorderStyle, HeaderFooterColor,
+    HeaderFooterBorder, HeaderFooterBorderStyle, HeaderFooterColor,
     HeaderFooterLength, HeaderFooterShadow, HeaderFooterStyleProperties, PageHeaderFooterRegion,
     parse_page_layout_header_footer_properties,
 };
+use litchi_odt::section_properties::BackgroundRepeat;
 
 const PREFIX: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:v="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink"><office:automatic-styles><s:page-layout s:name="pm1">"#;
 fn doc(body: &str) -> String {
