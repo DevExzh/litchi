@@ -942,7 +942,7 @@ mod tests {
     #[test]
     fn parses_real_libreoffice_style() {
         let fixture = include_str!(
-            "../../../test-data/libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg"
+            "../../../../test-data/libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg"
         );
         let begin = fixture
             .find(r#"<style:style style:name="Text" style:family="graphic">"#)

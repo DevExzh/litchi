@@ -5,7 +5,8 @@
 //! `style:use-optimal-column-width`, `fo:break-before`, `fo:break-after`) and no child
 //! elements. Unknown attributes, children, or text are rejected.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, TableRowBreak};
+use super::row::TableRowBreak;
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,

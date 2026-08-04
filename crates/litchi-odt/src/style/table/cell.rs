@@ -6,12 +6,13 @@
 //! optional `style:background-image` child. Unknown attributes, children, or text are
 //! rejected.
 
-use crate::{
-    FlatOpenDocument, HorizontalBackgroundPosition, OpenDocumentPackage, TableRowBackgroundColor,
-    TableRowBackgroundImage, TableRowBackgroundPosition, TableRowBackgroundRepeat,
-    TableRowBackgroundSource, TableRowOpacity, TableShadow, TableWritingMode,
-    VerticalBackgroundPosition,
+use super::row::{
+    HorizontalBackgroundPosition, TableRowBackgroundColor, TableRowBackgroundImage,
+    TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource,
+    TableRowOpacity, VerticalBackgroundPosition,
 };
+use super::table::{TableShadow, TableWritingMode};
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,

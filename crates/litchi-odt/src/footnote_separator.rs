@@ -331,7 +331,7 @@ pub fn parse_style_footnote_separators(xml: &str) -> Result<Vec<StyleFootnoteSep
 pub(crate) fn parse_page_layout_property_footnote_separators(
     xml: &str,
 ) -> Result<Vec<StyleFootnoteSeparator>> {
-    let (wrapped, _, _) = crate::style_columns::scoped_property_xml(xml)?;
+    let (wrapped, _, _) = crate::style::columns::scoped_property_xml(xml)?;
     parse_style_footnote_separators(&wrapped)
 }
 
@@ -461,7 +461,7 @@ pub(crate) fn replace_page_layout_footnote_separator(
     if let Some(properties) = &layout.properties {
         let existing = parse_page_layout_property_footnote_separators(&properties.xml)?;
         let new_properties = if existing.is_empty() {
-            crate::style_columns::insert_before_end(
+            crate::style::columns::insert_before_end(
                 &properties.xml,
                 &fragment,
                 "style:page-layout-properties",
@@ -469,7 +469,7 @@ pub(crate) fn replace_page_layout_footnote_separator(
         } else {
             replace_first(&properties.xml, &fragment)?
         };
-        return crate::style_columns::self_contained_layout(&layout.xml.replacen(
+        return crate::style::columns::self_contained_layout(&layout.xml.replacen(
             &properties.xml,
             &new_properties,
             1,
@@ -478,7 +478,7 @@ pub(crate) fn replace_page_layout_footnote_separator(
     let properties = format!(
         r#"<style:page-layout-properties xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">{fragment}</style:page-layout-properties>"#,
     );
-    crate::style_columns::self_contained_layout(&crate::style_columns::insert_before_end(
+    crate::style::columns::self_contained_layout(&crate::style::columns::insert_before_end(
         &layout.xml,
         &properties,
         "style:page-layout",
@@ -486,7 +486,7 @@ pub(crate) fn replace_page_layout_footnote_separator(
 }
 
 fn replace_first(xml: &str, replacement: &str) -> Result<String> {
-    let (wrapped, prefix, suffix) = crate::style_columns::scoped_property_xml(xml)?;
+    let (wrapped, prefix, suffix) = crate::style::columns::scoped_property_xml(xml)?;
     let mut reader = NsReader::from_str(&wrapped);
     let mut buffer = Vec::new();
     let mut active: Option<(usize, usize)> = None;

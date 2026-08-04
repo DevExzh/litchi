@@ -111,12 +111,6 @@ pub mod ruby_family;
 pub mod section_properties;
 pub mod settings;
 pub mod style;
-pub mod style_columns;
-pub mod table_cell_properties;
-pub mod table_column_properties;
-pub mod table_properties;
-pub mod table_row_properties;
-pub mod text_properties;
 pub mod variable_declaration;
 
 #[allow(
@@ -364,6 +358,14 @@ pub use settings::{
 };
 #[allow(
     unused_imports,
+    reason = "ODT facade exposes named page-layout style semantics"
+)]
+pub use style::columns::{
+    MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
+    StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
+};
+#[allow(
+    unused_imports,
     reason = "ODT facade exposes paragraph style semantics"
 )]
 pub use style::paragraph::border::{
@@ -426,16 +428,8 @@ pub use style::paragraph::writing_mode::{
     ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
     set_paragraph_style_writing_mode_xml,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes named page-layout style semantics"
-)]
-pub use style_columns::{
-    MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
-    StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
-};
 #[allow(unused_imports, reason = "ODT facade exposes table style semantics")]
-pub use table_cell_properties::{
+pub use style::table::cell::{
     CellBorder, CellBorderWidths, CellDirection, CellGlyphOrientationVertical, CellLength,
     CellProtect, CellRotationAlign, CellRotationAngle, CellTextAlignSource, CellVerticalAlign,
     CellWrapOption, TableCellProperties, TableCellStyleProperties, TableCellStylePropertiesSet,
@@ -445,31 +439,31 @@ pub use table_cell_properties::{
     unused_imports,
     reason = "ODT facade exposes table-column style semantics"
 )]
-pub use table_column_properties::{
+pub use style::table::column::{
     TableColumnLength, TableColumnProperties, TableColumnRelWidth, TableColumnStyleProperties,
     TableColumnStylePropertiesSet, parse_table_column_style_properties,
     set_table_column_style_properties_xml,
-};
-#[allow(unused_imports, reason = "ODT facade exposes table style semantics")]
-pub use table_properties::{
-    TableAlignment, TableBorderModel, TablePageNumber, TableProperties, TableShadow,
-    TableStyleMeasure, TableStylePercent, TableStyleProperties, TableStylePropertiesSet,
-    TableStyleWidth, TableWritingMode, parse_table_style_properties,
-    set_table_style_properties_xml,
 };
 #[allow(
     unused_imports,
     reason = "ODT facade exposes table-row style semantics"
 )]
-pub use table_row_properties::{
+pub use style::table::row::{
     HorizontalBackgroundPosition, TableRowBackgroundColor, TableRowBackgroundImage,
     TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak,
     TableRowKeepTogether, TableRowLength, TableRowOpacity, TableRowProperties,
     TableRowStyleProperties, TableRowStylePropertiesSet, VerticalBackgroundPosition,
     parse_table_row_style_properties, set_table_row_style_properties_xml,
 };
+#[allow(unused_imports, reason = "ODT facade exposes table style semantics")]
+pub use style::table::table::{
+    TableAlignment, TableBorderModel, TablePageNumber, TableProperties, TableShadow,
+    TableStyleMeasure, TableStylePercent, TableStyleProperties, TableStylePropertiesSet,
+    TableStyleWidth, TableWritingMode, parse_table_style_properties,
+    set_table_style_properties_xml,
+};
 #[allow(unused_imports, reason = "ODT facade exposes text style semantics")]
-pub use text_properties::{
+pub use style::text::{
     TextProperty, TextPropertyKind, TextPropertyNamespace, TextPropertyValue, TextStyleProperties,
     TextStylePropertiesSet, TextStyleRecord, parse_text_style_properties,
     set_text_style_properties_xml,

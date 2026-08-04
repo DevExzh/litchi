@@ -516,7 +516,7 @@ fn store_child(
 ) -> Result<()> {
     match kind {
         ChildKind::Properties => {
-            let mut parsed = crate::style_columns::parse_page_layout_property_columns(&xml)?;
+            let mut parsed = crate::style::columns::parse_page_layout_property_columns(&xml)?;
             if parsed.len() > 1 {
                 return Err(Error::InvalidFormat(
                     "page-layout-properties has multiple style:columns children".to_string(),

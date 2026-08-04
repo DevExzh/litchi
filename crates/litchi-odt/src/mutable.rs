@@ -2052,7 +2052,7 @@ impl MutableDocument {
                     "page layout '{page_layout_name}' does not exist"
                 ))
             })?;
-        let replacement = crate::style_columns::replace_page_layout_columns(layout, columns)?;
+        let replacement = crate::style::columns::replace_page_layout_columns(layout, columns)?;
         self.styles_xml = Some(set_page_layout_xml(styles, page_layout_name, &replacement)?);
         Ok(())
     }

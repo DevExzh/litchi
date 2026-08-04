@@ -1,11 +1,11 @@
 //! Complete typed ODF `style:table-properties` support.
 
-use crate::{
-    FlatOpenDocument, HorizontalBackgroundPosition, OpenDocumentPackage, TableRowBackgroundColor,
-    TableRowBackgroundImage, TableRowBackgroundPosition, TableRowBackgroundRepeat,
-    TableRowBackgroundSource, TableRowBreak, TableRowKeepTogether, TableRowOpacity,
-    VerticalBackgroundPosition,
+use super::row::{
+    HorizontalBackgroundPosition, TableRowBackgroundColor, TableRowBackgroundImage,
+    TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak,
+    TableRowKeepTogether, TableRowOpacity, VerticalBackgroundPosition,
 };
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
