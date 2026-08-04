@@ -5,11 +5,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod auto_filter;
 pub mod calculation_properties;
 pub mod cell;
 pub mod cell_watches;
 pub mod chain;
+pub mod color;
 pub mod column;
+pub mod conditional_formatting;
 pub mod connections;
 pub mod data_consolidation;
 pub mod data_validation;
@@ -18,6 +21,7 @@ pub mod formula;
 pub mod ignored_errors;
 pub mod layout;
 pub mod merge;
+pub mod named_sheet_view;
 mod outline;
 pub mod outline_properties;
 pub mod page_margins;
@@ -32,13 +36,22 @@ pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
+pub mod sort;
 pub mod style;
+pub mod timelines;
 pub mod views;
 pub mod volatile_dependencies;
 pub mod web;
 mod workbook;
 pub mod xml_maps;
 
+pub use auto_filter::{
+    AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,
+    CustomFilters, DateGroupItem, DateTimeGrouping, DynamicFilter, DynamicFilterType,
+    FilterColumnDefinition, FilterColumnPayload, FilterIconSet, FilterItem, FilterRange,
+    FilterValues, IconFilter, SortConditionDefinition, SortStateDefinition, Top10Filter,
+    parse_auto_filter, parse_auto_filter_fragment, write_auto_filter_fragment,
+};
 pub use calculation_properties::{
     WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
     parse_workbook_calculation_properties,
@@ -48,7 +61,16 @@ pub use cell_watches::{
     CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
     parse_worksheet_cell_watches, write_worksheet_cell_watches,
 };
+pub use color::{ParseRgbError, Rgb};
 pub use column::{Column, Columns, Width, WidthAt};
+pub use conditional_formatting::{
+    Axis, CellRangeRef, ColorRole, ColorScale, ConditionalFormatPayload, ConditionalFormatValue,
+    ConditionalFormatting, ConditionalFormattingRule, ConditionalFormattingSource, DataBar,
+    DifferentialFormat, DifferentialFormatComponent, DifferentialFormatRef,
+    DifferentialNumberFormat, Direction, ExtensionAssociation, IconSet, IconSet14, Icons, Kind,
+    NamedColor, Operator, Period, SpreadsheetColor, TokenError, ValueKind,
+    parse_conditional_formattings, parse_differential_formats,
+};
 pub use data_consolidation::{
     WorksheetDataConsolidation, WorksheetDataConsolidationConformance,
     WorksheetDataConsolidationFunction, WorksheetDataConsolidationRangeReference,
@@ -75,6 +97,14 @@ pub use ignored_errors::{
 };
 pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
+};
+pub use named_sheet_view::{
+    NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewDifferentialFormat,
+    NamedSheetViewExtension, NamedSheetViewFilter, NamedSheetViewGuid, NamedSheetViewIconSet,
+    NamedSheetViewMarkup, NamedSheetViewRange, NamedSheetViewSortCondition,
+    NamedSheetViewSortConditionKind, NamedSheetViewSortRule, NamedSheetViewSortRules,
+    NamedSheetViews, load_worksheet_named_sheet_views, parse_named_sheet_views,
+    remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views, write_named_sheet_views,
 };
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
@@ -124,7 +154,17 @@ pub use sheet_view::{
     WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
     WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
 };
+pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
+pub use timelines::{
+    PivotFilterType, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
+    TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI,
+    TIMELINES_RELATIONSHIP_TYPE, Timeline, TimelineCacheDefinition, TimelineCachePivotTable,
+    TimelineLevel, TimelineOpaqueXml, TimelinePivotFilter, TimelineRange, TimelineState, Timelines,
+    WorkbookTimelineCache, WorksheetTimelines, load_timeline_caches, load_timelines,
+    parse_timeline_cache_definition, parse_timelines, store_timeline_caches,
+    store_worksheet_timelines, write_timeline_cache_definition, write_timelines,
+};
 pub use views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
 };

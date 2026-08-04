@@ -19,6 +19,7 @@ litchi-opc = { workspace = true }
 litchi-sheet = { workspace = true }
 once_cell = { workspace = true }
 quick-xml = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 unicode-normalization = { workspace = true }
 

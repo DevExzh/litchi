@@ -3782,6 +3782,47 @@ all-features Clippy remains environment-blocked before compilation because
 evidence; native Office and performance evidence remain governed by the
 evidence levels below.
 
+## XLSX filters, views, timelines, and DOCX modern-comment owner follow-up
+
+The next owner batch moves five format-specific seams out of the migration host
+while retaining package traversal, relationship orchestration, and historical
+error/API surfaces in explicit adapters:
+
+- WordprocessingML modern comment metadata (`commentsExtended`, `people`,
+  `commentsIds`, and `commentsExtensible`) now lives in
+  `litchi-docx::modern_comments`. The host retains document-part and
+  relationship traversal and maps the typed owner errors to its historical
+  `OoxmlError` boundary.
+- SpreadsheetML conditional-formatting values and RGB parsing now live in
+  `litchi-xlsx::{conditional_formatting,color}`. The host styles adapter
+  re-exports the owner RGB type, while the conditional-formatting shim keeps
+  worksheet traversal and legacy error conversion at the host boundary.
+- SpreadsheetML sort states, auto-filters, and timeline cache/worksheet
+  graphs now live in `litchi-xlsx::{sort,auto_filter,timelines}`. Host
+  worksheet/workbook graph code remains responsible for relationship and part
+  lifecycle operations.
+- SpreadsheetML named sheet views now live in `litchi-xlsx::named_sheet_view`.
+  The owner composes the owner sort/filter models and checked
+  `litchi-sheet` addresses; the host retains worksheet discovery and package
+  graph integration as an adapter.
+
+The checked-in specification anchors are `[MS-DOCX]` §§2.1.2--2.1.5,
+2.2.13, 2.5.1.5, 2.5.1.9, 2.5.3.2, 2.5.3.4, 2.8.1.1, 2.8.3.2, 2.10.1.1,
+and 2.10.3.2; and `[MS-XLSX]` §§2.1.7--2.1.8, 2.2.2.2, 2.3.5--2.3.8,
+2.4.6, 2.4.49--2.4.58, 2.4.88, 2.6.1--2.6.2, 2.6.98--2.6.118, and
+2.6.210--2.6.211. These anchors cover the conditional-formatting,
+auto-filter/sort, timeline, named-sheet-view, and modern-comment structures
+implemented by this batch.
+
+The all-feature owner suites pass 349 XLSX and 235 DOCX unit tests; DOCX's
+doctest targets also pass. The complete `litchi-ooxml` package surface passes
+1,609 host unit tests plus its integration and doctest targets. Owner
+all-target strict Clippy, host default all-target strict Clippy, formatting,
+diff, and crate-boundary checks pass. Host all-features Clippy remains
+environment-blocked before compilation because `pkg-config`/fontconfig is
+unavailable. This is functional and boundary evidence; native Office and
+performance evidence remain governed by the evidence levels below.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
