@@ -527,6 +527,12 @@ impl Table {
             .take_while(move |cell| checked_range.contains(cell.position())))
     }
 
+    /// Iterates over all materialized sparse cells in row-major order.
+    #[must_use]
+    pub fn iter_cells(&self) -> impl ExactSizeIterator<Item = &Cell> + '_ {
+        self.cells.iter()
+    }
+
     /// Returns the number of materialized cells.
     #[must_use]
     pub fn cell_count(&self) -> usize {
@@ -894,6 +900,10 @@ mod tests {
         assert_eq!(positions, [Position::new(0, 3), Position::new(2, 1)]);
         assert_eq!(table.get(Position::new(2, 1)), Some(&Value::Number(3.0)));
         assert_eq!(table.cell_count(), 2);
+        assert_eq!(
+            table.iter_cells().map(Cell::position).collect::<Vec<_>>(),
+            positions
+        );
     }
 
     #[test]

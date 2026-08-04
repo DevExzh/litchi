@@ -42,7 +42,7 @@ pub struct PagesTableInfo {
 pub struct PagesTable {
     /// Stable identity and dimensions of this table.
     pub info: PagesTableInfo,
-    cells: HashMap<(usize, usize), PagesCellValue>,
+    semantic_table: litchi_numbers::Table,
     comments: HashMap<(usize, usize), PagesTableCellComment>,
     merges: Vec<PagesTableCellRegion>,
 }
@@ -50,19 +50,26 @@ pub struct PagesTable {
 impl PagesTable {
     /// Borrow a materialized cell value, or return `None` for an empty cell.
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&PagesCellValue> {
-        self.cells.get(&(row, column))
+        let position = litchi_numbers::Position::try_from_usize(row, column).ok()?;
+        self.semantic_table.get(position)
     }
 
     /// Iterate over materialized cells without exposing the backing map.
     pub fn iter_cells(&self) -> impl Iterator<Item = ((usize, usize), &PagesCellValue)> + '_ {
-        self.cells
-            .iter()
-            .map(|(position, value)| (*position, value))
+        self.semantic_table.iter_cells().map(|cell| {
+            (
+                (
+                    cell.position().row() as usize,
+                    cell.position().column() as usize,
+                ),
+                cell.value(),
+            )
+        })
     }
 
     /// Return the number of materialized cells, including explicit empty cells.
     pub fn cell_count(&self) -> usize {
-        self.cells.len()
+        self.semantic_table.cell_count()
     }
 
     /// Borrow the comment attached to a materialized cell, if any.
@@ -125,10 +132,10 @@ impl PagesEditor {
                     "Pages object {model_object_id} has no native table model"
                 ))
             })?;
-        let (cells, comments) = table.into_parts();
+        let (semantic_table, comments) = table.into_semantic_parts()?;
         Ok(PagesTable {
             info,
-            cells,
+            semantic_table,
             comments,
             merges: crate::numbers::editor::table_cell_merges_in_package(
                 self.package(),

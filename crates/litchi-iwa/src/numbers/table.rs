@@ -295,7 +295,22 @@ impl NumbersTable {
     /// remain available through the adapter while the document readers and
     /// editors migrate to the canonical leaf model.
     pub(crate) fn into_semantic(self) -> crate::Result<litchi_numbers::Table> {
-        self.model.finish().map_err(map_table_error)
+        self.into_semantic_parts().map(|(table, _comments)| table)
+    }
+
+    /// Consume the archive adapter while moving its canonical sparse table
+    /// and format-owned comment sidecar independently.
+    pub(crate) fn into_semantic_parts(
+        self,
+    ) -> crate::Result<(
+        litchi_numbers::Table,
+        HashMap<(usize, usize), NumbersCellComment>,
+    )> {
+        let Self {
+            model, comments, ..
+        } = self;
+        let table = model.finish().map_err(map_table_error)?;
+        Ok((table, comments))
     }
 
     /// Move the materialized values and comments to another crate-internal
