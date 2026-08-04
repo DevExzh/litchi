@@ -64,15 +64,15 @@ pub use numbering::{
 };
 pub use settings::{
     ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatFlag, CompatibilityOption,
-    CompatibilitySetting, DocumentView, MAX_LANGUAGE_TAG_LENGTH, MAX_SETTINGS_XML_BYTES,
-    MAX_SETTINGS_XML_DEPTH, MAX_SETTINGS_XML_NODES, MAX_SMART_TAG_NAME_CHARS,
-    MAX_SMART_TAG_NAMESPACE_URI_CHARS, MAX_SMART_TAG_URL_CHARS, NoteNumberFormat,
-    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ParseCompatFlagError,
-    ParseNoteNumberFormatError, ParseNotePositionError, ProofState, ProofingState, ProtectionType,
-    Settings, SmartTagType, ThemeFontLanguages, validate_smart_tag_type,
+    CompatibilitySetting, MAX_LANGUAGE_TAG_LENGTH, MAX_SETTINGS_XML_BYTES, MAX_SETTINGS_XML_DEPTH,
+    MAX_SETTINGS_XML_NODES, MAX_SMART_TAG_NAME_CHARS, MAX_SMART_TAG_NAMESPACE_URI_CHARS,
+    MAX_SMART_TAG_URL_CHARS, NoteNumberFormat, NoteNumberingProperties, NoteNumberingRestart,
+    NotePosition, ParseCompatFlagError, ParseNoteNumberFormatError, ParseNotePositionError,
+    ProofState, ProofingState, ProtectionType, Settings, SmartTagType, ThemeFontLanguages, View,
+    validate_smart_tag_type,
 };
 pub use statistics::{
-    DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
-    estimate_line_count, estimate_page_count,
+    Statistics, count_characters, count_characters_no_spaces, count_words, estimate_line_count,
+    estimate_page_count,
 };
-pub use variables::{DocumentVariables, parse_document_variables};
+pub use variables::{Variables, parse_variables};

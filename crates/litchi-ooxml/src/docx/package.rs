@@ -23,7 +23,7 @@ use crate::docx::writer::MutableDocument;
 use crate::encryption::{Limits, Mode};
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
-use litchi_docx::DocumentVariables;
+use litchi_docx::Variables;
 use litchi_docx::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_relationship};
 use litchi_docx::{font, glossary, web as docx_web};
 use litchi_drawingml::diagram::{
@@ -2410,7 +2410,7 @@ impl Package {
     }
 
     /// Read the document variables stored in `settings.xml`.
-    pub fn document_variables(&self) -> Result<Option<DocumentVariables>> {
+    pub fn document_variables(&self) -> Result<Option<Variables>> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
             return Ok(None);

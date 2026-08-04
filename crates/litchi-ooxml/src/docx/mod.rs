@@ -140,10 +140,10 @@ pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use settings::{
     AttachedTemplate, ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatFlag,
-    CompatibilityOption, CompatibilitySetting, DocumentSettings, DocumentView,
-    MAX_LANGUAGE_TAG_LENGTH, NoteNumberingProperties, NoteNumberingRestart, NotePosition,
-    ParseCompatFlagError, ParseNotePositionError, ProofState, ProofingState, ProtectionType,
-    SmartTagType, ThemeFontLanguages,
+    CompatibilityOption, CompatibilitySetting, DocumentSettings, MAX_LANGUAGE_TAG_LENGTH,
+    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ParseCompatFlagError,
+    ParseNotePositionError, ProofState, ProofingState, ProtectionType, SmartTagType,
+    ThemeFontLanguages, View,
 };
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
@@ -151,7 +151,7 @@ pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
 use litchi_docx::alt::Chunk;
 pub use litchi_drawingml::diagram::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use litchi_drawingml::geom::{Preset, TextPreset};
-pub use statistics::DocumentStatistics;
+pub use statistics::Statistics;
 pub use styles::{Outline, Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use textbox::{

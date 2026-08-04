@@ -10,7 +10,7 @@ use crate::docx::namespace::{
     STRICT_WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace, word_attribute_value,
 };
 use crate::error::{OoxmlError, Result};
-use litchi_docx::DocumentVariables;
+use litchi_docx::Variables;
 use litchi_docx::numbering::Format;
 use litchi_opc::part::Part;
 use quick_xml::XmlVersion;
@@ -40,7 +40,7 @@ const MAX_SETTINGS_XML_DEPTH: usize = 256;
 ///
 /// Markup-compatibility preprocessing and OPC ownership remain host concerns;
 /// the validated model and XML codec belong to `litchi-docx`.
-pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<DocumentVariables> {
+pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<Variables> {
     let limit = litchi_docx::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES;
     if part.blob().len() > limit {
         return Err(OoxmlError::InvalidFormat(format!(
@@ -48,7 +48,7 @@ pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<DocumentVari
         )));
     }
     let xml = litchi_ooxml_common::mce::process_part(part)?;
-    Ok(litchi_docx::parse_document_variables(xml.as_ref())?)
+    Ok(litchi_docx::parse_variables(xml.as_ref())?)
 }
 
 /// An inert reference to the external template associated with a document.
@@ -107,12 +107,12 @@ pub struct DocumentSettings {
 pub use litchi_docx::settings::{
     COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI, ColorSchemeIndex,
     ColorSchemeMapping, ColorSchemeSlot, CompatFlag, CompatibilityOption, CompatibilitySetting,
-    DocumentView, MAX_LANGUAGE_TAG_LENGTH, MAX_SETTINGS_XML_BYTES as OWNER_MAX_SETTINGS_XML_BYTES,
+    MAX_LANGUAGE_TAG_LENGTH, MAX_SETTINGS_XML_BYTES as OWNER_MAX_SETTINGS_XML_BYTES,
     MAX_SETTINGS_XML_DEPTH as OWNER_MAX_SETTINGS_XML_DEPTH,
     MAX_SETTINGS_XML_NODES as OWNER_MAX_SETTINGS_XML_NODES, NoteNumberFormat,
     NoteNumberingProperties, NoteNumberingRestart, NotePosition, ParseCompatFlagError,
     ParseNoteNumberFormatError, ParseNotePositionError, ProofState, ProofingState, ProtectionType,
-    SmartTagType, ThemeFontLanguages,
+    SmartTagType, ThemeFontLanguages, View,
 };
 
 type OwnedSettings = litchi_docx::settings::Settings<Format>;
@@ -220,7 +220,7 @@ impl DocumentSettings {
 
     /// Return the document view mode (`w:view`), when specified.
     #[inline]
-    pub fn view(&self) -> Option<DocumentView> {
+    pub fn view(&self) -> Option<View> {
         self.values.view()
     }
 
@@ -732,7 +732,7 @@ fn parse_setting(
             }
             let value = required_attribute(element, b"val", decoder, resolver, "view mode")?;
             settings.values.set_view(Some(
-                DocumentView::from_xml(&value)
+                View::from_xml(&value)
                     .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
             ));
         },
@@ -1125,12 +1125,9 @@ pub(crate) fn patch_mail_merge(
     Ok(output)
 }
 
-pub(crate) fn patch_document_variables(
-    xml: &[u8],
-    variables: &DocumentVariables,
-) -> Result<Vec<u8>> {
+pub(crate) fn patch_document_variables(xml: &[u8], variables: &Variables) -> Result<Vec<u8>> {
     variables.validate()?;
-    DocumentVariables::from_xml(xml)?;
+    Variables::from_xml(xml)?;
     let layout = scan_settings_xml_layout(xml)?;
     let replacement = if variables.is_empty() {
         String::new()
@@ -1616,7 +1613,7 @@ fn is_after_doc_vars(local_name: &[u8]) -> bool {
     )
 }
 
-fn document_variables_element(layout: &SettingsXmlLayout, variables: &DocumentVariables) -> String {
+fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables) -> String {
     let prefix = layout
         .word_prefix
         .as_deref()
@@ -2156,7 +2153,7 @@ mod tests {
         let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:writeProtection/><w:view w:val="print"/><w:proofState w:spelling="clean" w:grammar="dirty"/><w:defaultTabStop w:val="720"/><w:themeFontLang w:val="en-US" w:eastAsia="ja-JP" w:bidi="ar-SA"/><w:clrSchemeMapping w:bg1="light1" w:t1="dark1" w:hyperlink="hyperlink"/></w:settings>"#;
         let settings = DocumentSettings::extract_from_xml(xml).unwrap();
         assert!(settings.is_write_protected());
-        assert_eq!(settings.view(), Some(DocumentView::Print));
+        assert_eq!(settings.view(), Some(View::Print));
         let proofing = settings.proofing_state().unwrap();
         assert_eq!(proofing.spelling(), Some(ProofState::Clean));
         assert_eq!(proofing.grammar(), Some(ProofState::Dirty));
@@ -2184,7 +2181,7 @@ mod tests {
         let strict = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:writeProtection s:val="off"/><s:view s:val="web"/><s:proofState/></s:settings>"#;
         let settings = DocumentSettings::extract_from_xml(strict).unwrap();
         assert!(!settings.is_write_protected());
-        assert_eq!(settings.view(), Some(DocumentView::Web));
+        assert_eq!(settings.view(), Some(View::Web));
         let proofing = settings.proofing_state().unwrap();
         assert_eq!(proofing.spelling(), None);
         assert_eq!(proofing.grammar(), None);
@@ -2193,17 +2190,17 @@ mod tests {
     #[test]
     fn editing_settings_enums_round_trip() {
         for (raw, expected) in [
-            ("none", DocumentView::None),
-            ("print", DocumentView::Print),
-            ("outline", DocumentView::Outline),
-            ("masterPages", DocumentView::MasterPages),
-            ("normal", DocumentView::Normal),
-            ("web", DocumentView::Web),
+            ("none", View::None),
+            ("print", View::Print),
+            ("outline", View::Outline),
+            ("masterPages", View::MasterPages),
+            ("normal", View::Normal),
+            ("web", View::Web),
         ] {
-            assert_eq!(DocumentView::from_xml(raw).unwrap(), expected);
+            assert_eq!(View::from_xml(raw).unwrap(), expected);
             assert_eq!(expected.as_str(), raw);
         }
-        assert!(DocumentView::from_xml("immersive").is_err());
+        assert!(View::from_xml("immersive").is_err());
 
         for (raw, expected) in [("clean", ProofState::Clean), ("dirty", ProofState::Dirty)] {
             assert_eq!(ProofState::from_xml(raw).unwrap(), expected);
@@ -2541,7 +2538,7 @@ mod tests {
     #[test]
     fn patches_document_variables_without_touching_unrelated_settings() {
         let xml = br#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><!--before--><q:compat/><q:docVars><q:docVar q:name="old" q:val="old-value"/></q:docVars><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#;
-        let mut variables = DocumentVariables::new();
+        let mut variables = Variables::new();
         variables.insert("Company & Team", "A < B").unwrap();
         variables.insert("empty", "").unwrap();
         let patched =
@@ -2563,7 +2560,7 @@ mod tests {
 
     #[test]
     fn inserts_document_variables_into_empty_strict_root_in_schema_order() {
-        let mut variables = DocumentVariables::new();
+        let mut variables = Variables::new();
         variables.insert("strict", "value").unwrap();
         let empty = br#"<settings xmlns="http://purl.oclc.org/ooxml/wordprocessingml/main"/>"#;
         assert_eq!(

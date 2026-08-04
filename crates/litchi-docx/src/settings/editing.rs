@@ -40,7 +40,7 @@ impl ProtectionType {
 
 /// Document view mode from `w:view` (`ST_View`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DocumentView {
+pub enum View {
     /// No explicit view is specified.
     None,
     /// Print layout view.
@@ -55,7 +55,7 @@ pub enum DocumentView {
     Web,
 }
 
-impl DocumentView {
+impl View {
     /// Parse the schema token.
     pub fn from_xml(value: &str) -> Result<Self> {
         match value {

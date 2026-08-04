@@ -8,8 +8,9 @@
 mod codec;
 mod model;
 
-pub use codec::parse_document_variables;
+pub use codec::parse_variables;
 pub use model::{
-    DocumentVariables, MAX_DOCUMENT_VARIABLE_DEPTH, MAX_DOCUMENT_VARIABLE_NAME_CHARS,
+    MAX_DOCUMENT_VARIABLE_DEPTH, MAX_DOCUMENT_VARIABLE_NAME_CHARS,
     MAX_DOCUMENT_VARIABLE_VALUE_CHARS, MAX_DOCUMENT_VARIABLE_XML_BYTES, MAX_DOCUMENT_VARIABLES,
+    Variables,
 };

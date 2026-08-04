@@ -463,7 +463,7 @@ fn parse_setting(
                 return Err(invalid("duplicate view setting"));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "view mode")?;
-            settings.view = Some(DocumentView::from_xml(&value)?);
+            settings.view = Some(View::from_xml(&value)?);
         },
         b"proofState" => {
             if std::mem::replace(&mut seen.proofing_state, true) {

@@ -13,7 +13,7 @@
 /// Statistics are calculated on-demand. For large documents, consider
 /// caching the results if you need to access them multiple times.
 #[derive(Debug, Clone, Default)]
-pub struct DocumentStatistics {
+pub struct Statistics {
     /// Total word count
     word_count: usize,
 
@@ -42,7 +42,7 @@ pub struct DocumentStatistics {
     drawing_count: usize,
 }
 
-impl DocumentStatistics {
+impl Statistics {
     /// Create new document statistics.
     pub fn new() -> Self {
         Self::default()
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_document_statistics() {
-        let stats = DocumentStatistics::from_counts(100, 500, 450, 10, 12, 1, 2, 3, 4);
+        let stats = Statistics::from_counts(100, 500, 450, 10, 12, 1, 2, 3, 4);
 
         assert_eq!(stats.word_count(), 100);
         assert_eq!(stats.character_count(), 500);

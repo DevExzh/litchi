@@ -3,7 +3,7 @@ use super::compatibility::{
     COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI, CompatibilityOption,
     CompatibilitySetting,
 };
-use super::editing::{DocumentView, ProofingState, ProtectionType, ThemeFontLanguages};
+use super::editing::{ProofingState, ProtectionType, ThemeFontLanguages, View};
 use super::notes::{NoteNumberFormat, NoteNumberingProperties};
 
 /// Format-owned scalar settings extracted from a Word settings part.
@@ -18,7 +18,7 @@ pub struct Settings<F = NoteNumberFormat> {
     pub(crate) footnote_properties: Option<NoteNumberingProperties<F>>,
     pub(crate) endnote_properties: Option<NoteNumberingProperties<F>>,
     pub(crate) write_protection: bool,
-    pub(crate) view: Option<DocumentView>,
+    pub(crate) view: Option<View>,
     pub(crate) proofing_state: Option<ProofingState>,
     pub(crate) default_tab_stop_twips: Option<u32>,
     pub(crate) theme_font_languages: Option<ThemeFontLanguages>,
@@ -113,7 +113,7 @@ impl<F> Settings<F> {
     }
 
     /// Set the document view mode.
-    pub fn set_view(&mut self, value: Option<DocumentView>) -> &mut Self {
+    pub fn set_view(&mut self, value: Option<View>) -> &mut Self {
         self.view = value;
         self
     }
@@ -213,7 +213,7 @@ impl<F: Copy> Settings<F> {
 
     /// Return the document view mode, when specified.
     #[inline]
-    pub const fn view(&self) -> Option<DocumentView> {
+    pub const fn view(&self) -> Option<View> {
         self.view
     }
 

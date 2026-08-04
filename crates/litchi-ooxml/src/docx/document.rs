@@ -24,15 +24,15 @@ use crate::docx::settings::DocumentSettings;
 use crate::docx::settings::extract_document_variables;
 use crate::docx::smart_tag::SmartTag;
 use crate::docx::statistics::{
-    DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
-    estimate_line_count, estimate_page_count,
+    Statistics, count_characters, count_characters_no_spaces, count_words, estimate_line_count,
+    estimate_page_count,
 };
 use crate::docx::styles::Styles;
 use crate::docx::table::Table;
 use crate::docx::theme::Theme;
 use crate::docx::writer::Watermark;
 use crate::error::{OoxmlError, Result};
-use litchi_docx::DocumentVariables;
+use litchi_docx::Variables;
 use litchi_docx::alt::{Chunk, Part, Target, is_relationship};
 use litchi_docx::numbering::{Collection, Suffix};
 use litchi_docx::web;
@@ -2486,7 +2486,7 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn document_variables(&self) -> Result<Option<DocumentVariables>> {
+    pub fn document_variables(&self) -> Result<Option<Variables>> {
         let main_part = self.opc.main_document_part()?;
         const STRICT_SETTINGS_RELATIONSHIP: &str =
             "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
@@ -2641,7 +2641,7 @@ impl<'a> Document<'a> {
     /// println!("Pages (estimate): {}", stats.page_count());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn statistics(&self) -> Result<DocumentStatistics> {
+    pub fn statistics(&self) -> Result<Statistics> {
         // Get all text content
         let text = self.text()?;
 
@@ -2671,7 +2671,7 @@ impl<'a> Document<'a> {
                 .ok_or_else(|| OoxmlError::InvalidFormat("DOCX drawing count overflow".into()))?;
         }
 
-        Ok(DocumentStatistics::from_counts(
+        Ok(Statistics::from_counts(
             word_count,
             character_count,
             character_count_no_spaces,

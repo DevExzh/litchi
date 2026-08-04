@@ -1,6 +1,4 @@
-use super::model::{
-    DocumentVariables, MAX_DOCUMENT_VARIABLE_DEPTH, MAX_DOCUMENT_VARIABLE_XML_BYTES,
-};
+use super::model::{MAX_DOCUMENT_VARIABLE_DEPTH, MAX_DOCUMENT_VARIABLE_XML_BYTES, Variables};
 use crate::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -14,10 +12,10 @@ const TRANSITIONAL_WORD_NAMESPACE: &[u8] =
 /// Strict WordprocessingML namespace.
 const STRICT_WORD_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
 
-impl DocumentVariables {
+impl Variables {
     /// Parse a bounded Word settings XML payload.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
-        parse_document_variables(xml)
+        parse_variables(xml)
     }
 
     /// Serialize a standalone transitional `w:docVars` element.
@@ -61,14 +59,14 @@ impl DocumentVariables {
 }
 
 /// Parse document variables from a bounded Word settings XML payload.
-pub fn parse_document_variables(xml: &[u8]) -> Result<DocumentVariables> {
+pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
     if xml.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
         return Err(invalid(format!(
             "settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
         )));
     }
     let mut reader = NsReader::from_reader(xml);
-    let mut variables = DocumentVariables::new();
+    let mut variables = Variables::new();
     let mut depth = 0usize;
     let mut saw_root = false;
     let mut saw_doc_vars = false;
@@ -212,7 +210,7 @@ fn begin_doc_vars(
 }
 
 fn push_parsed_variable(
-    variables: &mut DocumentVariables,
+    variables: &mut Variables,
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
@@ -294,13 +292,13 @@ mod tests {
 
     #[test]
     fn serializes_and_parses_escaped_values() {
-        let mut variables = DocumentVariables::new();
+        let mut variables = Variables::new();
         variables
             .insert("Company & Team", "A < B && C \"yes\"")
             .unwrap();
         variables.insert("empty", "").unwrap();
         let xml = variables.to_xml().unwrap();
-        let reparsed = parse_document_variables(
+        let reparsed = parse_variables(
             format!(
                 r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docVars>{}</w:docVars></w:settings>"#,
                 xml.trim_start_matches("<w:docVars xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">")
@@ -328,9 +326,9 @@ mod tests {
             r#"<w:docVars><w:docVar w:name="x" w:val="1"><w:docVar w:name="y" w:val="2"/></w:docVar></w:docVars>"#,
             r#"<w:docVar w:name="x" w:val="1"/>"#,
         ] {
-            assert!(parse_document_variables(wrap(content).as_bytes()).is_err());
+            assert!(parse_variables(wrap(content).as_bytes()).is_err());
         }
         let oversized = vec![b' '; MAX_DOCUMENT_VARIABLE_XML_BYTES + 1];
-        assert!(parse_document_variables(&oversized).is_err());
+        assert!(parse_variables(&oversized).is_err());
     }
 }

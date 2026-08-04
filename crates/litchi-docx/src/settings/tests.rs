@@ -25,7 +25,7 @@ fn parses_requested_settings_values_in_both_dialects() {
             settings.footnote_properties().unwrap().format(),
             Some(NoteNumberFormat::LowerRoman)
         );
-        assert_eq!(settings.view(), Some(DocumentView::Print));
+        assert_eq!(settings.view(), Some(View::Print));
         assert_eq!(
             settings.proofing_state().unwrap().spelling(),
             Some(ProofState::Clean)

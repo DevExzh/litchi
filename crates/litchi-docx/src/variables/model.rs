@@ -13,11 +13,11 @@ pub const MAX_DOCUMENT_VARIABLE_VALUE_CHARS: usize = 65_280;
 
 /// Deterministic insertion-order collection of document variables.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentVariables {
+pub struct Variables {
     variables: Vec<(String, String)>,
 }
 
-impl DocumentVariables {
+impl Variables {
     /// Create an empty collection.
     pub const fn new() -> Self {
         Self {
@@ -132,7 +132,7 @@ impl DocumentVariables {
     }
 }
 
-impl Default for DocumentVariables {
+impl Default for Variables {
     fn default() -> Self {
         Self::new()
     }
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn insertion_order_replace_remove_and_clear_are_deterministic() {
-        let mut variables = DocumentVariables::new();
+        let mut variables = Variables::new();
         assert_eq!(variables.insert("first", "one").unwrap(), None);
         assert_eq!(variables.insert("second", "two").unwrap(), None);
         assert_eq!(
@@ -178,14 +178,14 @@ mod tests {
 
     #[test]
     fn enforces_word_name_value_and_count_boundaries() {
-        let mut variables = DocumentVariables::new();
+        let mut variables = Variables::new();
         assert!(variables.insert("", "value").is_err());
         assert!(variables.insert("名".repeat(255), "").is_ok());
         assert!(variables.insert("名".repeat(256), "value").is_err());
         assert!(variables.insert("maximum", "x".repeat(65_280)).is_ok());
         assert!(variables.insert("too-long", "x".repeat(65_281)).is_err());
 
-        let mut count = DocumentVariables::new();
+        let mut count = Variables::new();
         for index in 0..MAX_DOCUMENT_VARIABLES {
             count.insert(format!("v{index}"), "x").unwrap();
         }
