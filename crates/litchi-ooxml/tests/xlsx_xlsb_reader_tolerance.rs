@@ -7,8 +7,8 @@
 
 use litchi_core::sheet::Worksheet as WorksheetTrait;
 use litchi_core::sheet::traits::WorkbookTrait;
-use litchi_ooxml::xlsb::Workbook;
-use litchi_ooxml::xlsx::Workbook;
+use litchi_ooxml::xlsb::Workbook as XlsbWorkbook;
+use litchi_ooxml::xlsx::Workbook as XlsxWorkbook;
 use litchi_ooxml::xlsx::external_links::ExternalLinkKind;
 use std::fs::File;
 use std::path::PathBuf;
@@ -32,7 +32,7 @@ fn opens_workbooks_using_microsoft_external_link_path_relationships() {
         ("test-data/ooxml/xlsx/external-link-path-missing.xlsx", 1),
         ("test-data/ooxml/xlsx/external-link-path-startup.xlsx", 1),
     ] {
-        let workbook = Workbook::open(fixture(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let workbook = XlsxWorkbook::open(fixture(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(workbook.worksheet_count(), expected_sheets, "{name}");
     }
 }
@@ -43,7 +43,7 @@ fn opens_workbooks_using_microsoft_external_link_path_relationships() {
 #[test]
 fn opens_workbook_whose_external_cache_uses_multi_letter_columns() {
     let path = fixture("test-data/ooxml/xlsx/external-cache-multi-letter-column.xlsx");
-    let workbook = Workbook::open(&path).unwrap();
+    let workbook = XlsxWorkbook::open(&path).unwrap();
     assert!(workbook.worksheet_count() > 0);
     // At least one cached reference must carry a two-letter column, which is
     // exactly what the old single-letter scan could not represent.
@@ -77,7 +77,7 @@ fn opens_workbook_whose_external_cache_uses_multi_letter_columns() {
 #[test]
 fn opens_workbook_with_unrecognised_sheet_state() {
     let path = fixture("test-data/ooxml/xlsx/sheet-state-show.xlsx");
-    let workbook = Workbook::open(&path).unwrap();
+    let workbook = XlsxWorkbook::open(&path).unwrap();
     assert_eq!(workbook.worksheet_count(), 2);
     assert_eq!(workbook.worksheet_names(), ["стр1", "стр2"]);
 }
@@ -87,7 +87,7 @@ fn opens_workbook_with_unrecognised_sheet_state() {
 #[test]
 fn opens_workbook_with_duplicate_defined_names() {
     let path = fixture("test-data/ooxml/xlsx/duplicate-defined-names.xlsx");
-    let workbook = Workbook::open(&path).unwrap();
+    let workbook = XlsxWorkbook::open(&path).unwrap();
     assert!(workbook.worksheet_count() > 0);
 }
 
@@ -97,7 +97,7 @@ fn opens_workbook_with_duplicate_defined_names() {
 #[test]
 fn opens_workbook_whose_shared_string_count_hint_is_unusable() {
     let path = fixture("test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx");
-    let workbook = Workbook::open(&path).unwrap();
+    let workbook = XlsxWorkbook::open(&path).unwrap();
     assert!(workbook.worksheet_count() > 0);
     let sheet = workbook.worksheet_by_index(0).unwrap();
     // The shared strings must actually be resolvable, not merely counted.
@@ -124,7 +124,7 @@ fn opens_workbook_whose_shared_string_count_hint_is_unusable() {
 #[test]
 fn opens_xlsb_whose_pivot_cache_stream_starts_with_a_future_record_block() {
     let path = fixture("test-data/ooxml/xlsb/pivot-cache-ac-prefixed.xlsb");
-    let workbook = Workbook::new(File::open(&path).unwrap()).unwrap();
+    let workbook = XlsbWorkbook::new(File::open(&path).unwrap()).unwrap();
     assert!(workbook.worksheet_count() > 0);
     assert!(
         !workbook.pivot_cache_definitions().is_empty(),
@@ -138,7 +138,7 @@ fn opens_xlsb_whose_pivot_cache_stream_starts_with_a_future_record_block() {
 #[test]
 fn opens_xlsb_containing_an_empty_cell_formula_token_stream() {
     let path = fixture("test-data/ooxml/xlsb/bug66682.xlsb");
-    let workbook = Workbook::new(File::open(&path).unwrap()).unwrap();
+    let workbook = XlsbWorkbook::new(File::open(&path).unwrap()).unwrap();
     assert!(workbook.worksheet_count() > 0);
     // The sheet must still be walkable, not merely present.
     let sheet = workbook.worksheet(0).unwrap();

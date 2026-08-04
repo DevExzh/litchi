@@ -32,7 +32,7 @@ const MAX_ENCODED_BINARY_BYTES: usize = MAX_BINARY_BYTES * 2;
 /// workbook encrypted, and this crate neither validates passwords nor enforces
 /// any of the requested locks.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorkbookProtectionMetadata {
+pub struct Metadata {
     workbook_verifier: Option<ProtectionPasswordVerifier>,
     revisions_verifier: Option<ProtectionPasswordVerifier>,
     lock_structure: bool,
@@ -40,7 +40,7 @@ pub struct WorkbookProtectionMetadata {
     lock_revision: bool,
 }
 
-impl WorkbookProtectionMetadata {
+impl Metadata {
     /// Create empty workbook-protection metadata.
     pub fn new() -> Self {
         Self::default()
@@ -107,7 +107,7 @@ struct RawCredential {
 }
 
 /// Parse an optional `workbookProtection` element from a complete `workbook.xml` part.
-pub fn parse_workbook_protection(xml: &[u8]) -> Result<Option<WorkbookProtectionMetadata>> {
+pub fn parse_workbook_protection(xml: &[u8]) -> Result<Option<Metadata>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("workbook XML is too large"));
     }
@@ -120,7 +120,7 @@ pub fn parse_workbook_protection(xml: &[u8]) -> Result<Option<WorkbookProtection
 /// The returned element uses canonical uppercase hexadecimal legacy verifiers
 /// and canonical base64 for strong verifier byte strings. Passwords are never
 /// accepted or derived by this codec.
-pub fn write_workbook_protection(value: &WorkbookProtectionMetadata) -> Result<String> {
+pub fn write_workbook_protection(value: &Metadata) -> Result<String> {
     let mut xml = String::with_capacity(256);
     xml.push_str("<workbookProtection");
     write_verifier(&mut xml, "workbook", value.workbook_verifier.as_ref())?;
@@ -200,7 +200,7 @@ fn write_xml_attribute(xml: &mut String, name: &str, value: &str) -> Result<()> 
     Ok(())
 }
 
-fn parse_selected(xml: &[u8]) -> Result<Option<WorkbookProtectionMetadata>> {
+fn parse_selected(xml: &[u8]) -> Result<Option<Metadata>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -316,8 +316,8 @@ fn parse_protection_element(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<WorkbookProtectionMetadata> {
-    let mut value = WorkbookProtectionMetadata::default();
+) -> Result<Metadata> {
+    let mut value = Metadata::default();
     let mut workbook = RawCredential::default();
     let mut revisions = RawCredential::default();
     let mut seen = HashSet::new();
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn writes_and_reparses_all_typed_protection_attributes() {
-        let mut metadata = WorkbookProtectionMetadata::new();
+        let mut metadata = Metadata::new();
         metadata.set_workbook_verifier(Some(ProtectionPasswordVerifier::Strong(
             StrongProtectionPasswordVerifier::new("SHA-512", vec![1, 2, 3], vec![4, 5, 6], 100_000)
                 .unwrap(),
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn writer_escapes_future_algorithm_names_without_weakening_validation() {
-        let mut metadata = WorkbookProtectionMetadata::new();
+        let mut metadata = Metadata::new();
         metadata.set_revisions_verifier(Some(ProtectionPasswordVerifier::Strong(
             StrongProtectionPasswordVerifier::new("future&hash", vec![1], vec![2], 0).unwrap(),
         )));

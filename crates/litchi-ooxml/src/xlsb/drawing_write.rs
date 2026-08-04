@@ -5,7 +5,7 @@
 
 use crate::xlsb::Image;
 use crate::xlsb::error::{Error, Result};
-use crate::xlsx::WorksheetChart;
+use crate::xlsx::Chart;
 use crate::xlsx::writer::shape::{ConnectionShapeSpec, GroupSpec, ShapeEmitter, ShapeSpec};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as _;
@@ -15,7 +15,7 @@ const MAX_DRAWING_XML_BYTES: usize = 16 * 1024 * 1024;
 const CHART_SHEET_EXTENT_X: u64 = 8_582_025;
 const CHART_SHEET_EXTENT_Y: u64 = 5_838_825;
 
-pub(crate) fn validate_chart(chart: &WorksheetChart) -> Result<()> {
+pub(crate) fn validate_chart(chart: &Chart) -> Result<()> {
     crate::xlsx::chart::validate_chart_anchor(&chart.anchor)?;
     crate::xlsb::chart_resources::validate_chart_resources(chart)
 }
@@ -43,7 +43,7 @@ pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> Result<Vec<u8>> {
 
 pub(crate) fn serialize_drawing(
     images: &[Image],
-    charts: &[WorksheetChart],
+    charts: &[Chart],
     shapes: &[ShapeSpec],
     groups: &[GroupSpec],
     connections: &[ConnectionShapeSpec],

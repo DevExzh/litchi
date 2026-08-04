@@ -12,9 +12,7 @@ use crate::xlsx::active_x::{
     replace_on_worksheet as replace_worksheet_active_x,
     store_on_worksheet as store_worksheet_active_x,
 };
-use crate::xlsx::calculation_properties::{
-    WorkbookCalculationProperties, parse_workbook_calculation_properties,
-};
+use crate::xlsx::calculation_properties::{Properties as CalculationProperties, parse};
 use crate::xlsx::chart::chart_external_data_content_type;
 use crate::xlsx::data_validation::{
     Collection, parse_data_validation_collections, replace_data_validation_collections,
@@ -43,7 +41,7 @@ use crate::xlsx::volatile_dependencies::{
     remove_from_package as remove_volatile_dependencies,
     store_in_package as store_volatile_dependencies,
 };
-use crate::xlsx::workbook_protection::{WorkbookProtectionMetadata, parse_workbook_protection};
+use crate::xlsx::workbook_protection::{Metadata as WorkbookProtection, parse_workbook_protection};
 use crate::xlsx::writer::workbook::{
     generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
     generate_pivot_table_definition_xml, render_pivot_table_sheet_cells,
@@ -71,9 +69,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::sync::Arc;
 
 use super::parsers::workbook_parser;
-use super::worksheet::{
-    ArrayFormula, Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator,
-};
+use super::worksheet::{ArrayFormula, Info, Worksheet, WorksheetIterator as XlsxWorksheetIterator};
 
 fn next_active_x_relationship_id(
     occupied: &mut HashSet<String>,
@@ -190,7 +186,7 @@ pub struct Workbook {
     /// Actual main-workbook part location resolved from the package relationship.
     workbook_uri: PackURI,
     /// Cached worksheet information
-    worksheets: Vec<WorksheetInfo>,
+    worksheets: Vec<Info>,
     /// Cached worksheet names for zero-copy returns
     worksheet_names: Vec<String>,
     /// Active worksheet index (0-based)
@@ -209,7 +205,7 @@ pub struct Workbook {
     /// Whether the workbook uses the 1904 date system
     is_1904_date_system: bool,
     /// Effective workbook formula calculation policy.
-    calculation_properties: Option<WorkbookCalculationProperties>,
+    calculation_properties: Option<CalculationProperties>,
     /// Inert workbook calculation order from `calcChain.xml`.
     chain: Option<Chain>,
     /// Namespace family of the cached calculation chain, retained on writer materialization.
@@ -804,7 +800,7 @@ impl Workbook {
 
         // Extract sheets from workbook.xml
         let mut details = workbook_parser::parse_workbook_details(content)?;
-        let calculation_properties = parse_workbook_calculation_properties(content.as_bytes())?;
+        let calculation_properties = parse(content.as_bytes())?;
         Self::apply_defined_name_print_settings(&details.defined_names, &mut details.sheets);
 
         // Cache worksheet names for zero-copy returns
@@ -861,7 +857,7 @@ impl Workbook {
     }
 
     /// Effective workbook formula calculation policy, when `calcPr` is present.
-    pub fn calculation_properties(&self) -> Option<&WorkbookCalculationProperties> {
+    pub fn calculation_properties(&self) -> Option<&CalculationProperties> {
         self.calculation_properties.as_ref()
     }
 
@@ -1038,7 +1034,7 @@ impl Workbook {
     ///
     /// Password verifier values remain opaque: this method never accepts or
     /// checks a password, and it does not enforce the requested locks.
-    pub fn workbook_protection_metadata(&self) -> SheetResult<Option<WorkbookProtectionMetadata>> {
+    pub fn workbook_protection_metadata(&self) -> SheetResult<Option<WorkbookProtection>> {
         let workbook_part = self.package.get_part(&self.workbook_uri)?;
         parse_workbook_protection(workbook_part.blob()).map_err(Into::into)
     }
@@ -1386,10 +1382,7 @@ impl Workbook {
     }
 
     /// Apply sheet-scoped print-area and print-title defined names.
-    fn apply_defined_name_print_settings(
-        defined_names: &[NamedRange],
-        worksheets: &mut [WorksheetInfo],
-    ) {
+    fn apply_defined_name_print_settings(defined_names: &[NamedRange], worksheets: &mut [Info]) {
         for defined_name in defined_names {
             let Some(sheet_idx) = defined_name
                 .local_sheet_id
@@ -1650,7 +1643,7 @@ impl Workbook {
     }
 
     /// Resolve a worksheet through the relationship declared by workbook.xml.
-    pub(crate) fn worksheet_part_uri(&self, worksheet: &WorksheetInfo) -> SheetResult<PackURI> {
+    pub(crate) fn worksheet_part_uri(&self, worksheet: &Info) -> SheetResult<PackURI> {
         use litchi_opc::constants::relationship_type as rt;
 
         let workbook_part = self.package.get_part(&self.workbook_uri)?;
@@ -2225,7 +2218,7 @@ impl Workbook {
     /// order (interleaved with worksheets) and is emitted on save as a
     /// `/xl/chartsheets/` part with its own drawing and chart parts. The
     /// chart can be a classic chart or a pivot chart built with
-    /// `WorksheetChart::into_pivot_chart`; the pivot-table binding is
+    /// `Chart::into_pivot_chart`; the pivot-table binding is
     /// validated at save time like worksheet pivot charts.
     ///
     /// # Arguments
@@ -2235,10 +2228,10 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ooxml::xlsx::{Workbook, WorksheetChart, ChartAnchor};
+    /// use litchi_ooxml::xlsx::{Chart, Workbook, ChartAnchor};
     ///
     /// let mut wb = Workbook::create()?;
-    /// let chart = WorksheetChart::bar_chart(
+    /// let chart = Chart::bar_chart(
     ///     "Sales", "Sheet1!$A$2:$A$4", "Sheet1!$B$2:$B$4",
     ///     ChartAnchor::new(0, 0, 10, 15),
     /// )?;
@@ -2249,7 +2242,7 @@ impl Workbook {
     pub fn add_chart_sheet(
         &mut self,
         name: &str,
-        chart: crate::xlsx::WorksheetChart,
+        chart: crate::xlsx::Chart,
     ) -> SheetResult<&mut crate::xlsx::writer::MutableChartSheet> {
         if self.mutable_data.is_none() {
             self.mutable_data = Some(MutableWorkbookData::new());
@@ -4562,7 +4555,7 @@ impl Workbook {
     /// verifiers or caller-supplied strong verifier metadata. Verifiers remain
     /// advisory and inert: this crate does not validate passwords or enforce
     /// an editing policy.
-    pub fn set_workbook_protection(&mut self, protection: WorkbookProtectionMetadata) {
+    pub fn set_workbook_protection(&mut self, protection: WorkbookProtection) {
         if self.mutable_data.is_none() {
             self.mutable_data = Some(MutableWorkbookData::new());
         }
@@ -4779,7 +4772,7 @@ fn validate_threaded_comment_people<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{Workbook, WorkbookProtectionMetadata, validate_threaded_comment_people};
+    use super::{Workbook, WorkbookProtection, validate_threaded_comment_people};
     use crate::xlsx::active_x::{
         Control, ControlSet, Descriptor, LoadedControl, Persistence, Property,
     };
@@ -4795,9 +4788,9 @@ mod tests {
     use litchi_xlsx::threaded_comments::{Comment, Mention, People, Person};
 
     use crate::xlsx::{
-        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
+        Chart, ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
         ProtectionPasswordVerifier, Relationship, RelationshipTarget,
-        StrongProtectionPasswordVerifier, Table, TableColumn, WorksheetChart,
+        StrongProtectionPasswordVerifier, Table, TableColumn,
     };
 
     #[test]
@@ -5256,7 +5249,7 @@ mod tests {
 
     #[test]
     fn saves_and_reloads_complete_typed_workbook_protection() {
-        let mut protection = WorkbookProtectionMetadata::new();
+        let mut protection = WorkbookProtection::new();
         protection.set_workbook_verifier(Some(ProtectionPasswordVerifier::Strong(
             StrongProtectionPasswordVerifier::new("SHA-512", vec![1, 2, 3], vec![4, 5, 6], 100_000)
                 .unwrap(),
@@ -5303,7 +5296,7 @@ mod tests {
                 Some("Logo"),
             )
             .unwrap();
-        let mut worksheet_chart = WorksheetChart::bar_chart(
+        let mut worksheet_chart = Chart::bar_chart(
             "Revenue",
             "Sheet1!$A$2:$A$4",
             "Sheet1!$B$2:$B$4",
@@ -5542,7 +5535,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("dangling-chart-relationship.xlsx");
         let mut workbook = Workbook::create().unwrap();
-        let mut chart = WorksheetChart::bar_chart(
+        let mut chart = Chart::bar_chart(
             "Revenue",
             "Sheet1!$A$2:$A$4",
             "Sheet1!$B$2:$B$4",

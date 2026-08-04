@@ -16,7 +16,7 @@ mod tests {
 
     #[test]
     fn reads_poi_libreoffice_and_synthetic_package_through_worksheet_accessor() {
-        use crate::xlsx::{Workbook, Worksheet, WorksheetInfo};
+        use crate::xlsx::{Info, Workbook, Worksheet};
         use std::fs;
         use std::path::Path;
         use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,7 +25,7 @@ mod tests {
             let workbook = Workbook::open(path).unwrap();
             let mut worksheet = Worksheet::new(
                 &workbook,
-                WorksheetInfo {
+                Info {
                     name: "Sheet1".into(),
                     relationship_id: relationship_id.into(),
                     sheet_id: 1,

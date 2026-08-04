@@ -20,7 +20,7 @@ use crate::pivot::PivotTable;
 use crate::xlsx::drawing::parse_drawing_xml;
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::pivot::read_pivot_tables;
-use crate::xlsx::worksheet::WorksheetInfo;
+use crate::xlsx::worksheet::Info;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, unqualified_attribute_value,
 };
@@ -770,7 +770,7 @@ fn parse_u32(value: &str, description: &str) -> Result<u32> {
         .map_err(|_| invalid(format!("invalid {description} '{value}'")))
 }
 
-fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<WorksheetInfo>> {
+fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<Info>> {
     if xml.len() > MAX_WORKBOOK_BYTES {
         return Err(limit("workbook XML bytes"));
     }
@@ -783,7 +783,7 @@ fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<WorksheetInfo>> {
 fn load_pivot_charts_for_sheet(
     package: &OpcPackage,
     workbook_part: &dyn Part,
-    sheet: &WorksheetInfo,
+    sheet: &Info,
     tables: &[PivotTable],
 ) -> Result<Option<(PackURI, PivotChartSheetKind, Vec<PivotChart>)>> {
     let relationship = workbook_part
@@ -903,7 +903,7 @@ fn load_pivot_charts_for_sheet(
 fn resolve_pivot_table<'a>(
     chart_uri: &PackURI,
     pivot_source: &PivotChartSource,
-    sheet: &WorksheetInfo,
+    sheet: &Info,
     tables: &'a [PivotTable],
 ) -> Result<&'a PivotTable> {
     let (sheet_prefix, table_name) = split_pivot_source_name(&pivot_source.name);
@@ -1757,13 +1757,13 @@ mod tests {
 
     #[test]
     fn authored_pivot_chart_round_trips_through_save() {
-        use crate::xlsx::{ChartAnchor, Workbook, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor, Workbook};
 
         let mut workbook = workbook_with_pivot_table();
         {
             let worksheet = workbook.worksheet_mut(0).unwrap();
             // An ordinary chart coexists with the pivot chart in one drawing.
-            let ordinary = WorksheetChart::bar_chart(
+            let ordinary = Chart::bar_chart(
                 "Raw Data",
                 "Sheet1!$A$2:$A$3",
                 "Sheet1!$C$2:$C$3",
@@ -1771,7 +1771,7 @@ mod tests {
             )
             .unwrap();
             worksheet.add_chart(ordinary);
-            let pivot = WorksheetChart::bar_chart(
+            let pivot = Chart::bar_chart(
                 "Sales by Region",
                 "Sheet1!$E$2:$E$3",
                 "Sheet1!$F$2:$F$3",
@@ -1818,12 +1818,12 @@ mod tests {
 
     #[test]
     fn authored_pivot_chart_with_unknown_table_fails_save() {
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor};
 
         let mut workbook = workbook_with_pivot_table();
         {
             let worksheet = workbook.worksheet_mut(0).unwrap();
-            let chart = WorksheetChart::bar_chart(
+            let chart = Chart::bar_chart(
                 "Dangling",
                 "Sheet1!$A$2:$A$3",
                 "Sheet1!$C$2:$C$3",
@@ -1840,7 +1840,7 @@ mod tests {
         // An empty pivot table name is rejected immediately.
         let mut workbook = workbook_with_pivot_table();
         let worksheet = workbook.worksheet_mut(0).unwrap();
-        let chart = WorksheetChart::bar_chart(
+        let chart = Chart::bar_chart(
             "Empty",
             "Sheet1!$A$2:$A$3",
             "Sheet1!$C$2:$C$3",
@@ -1852,10 +1852,10 @@ mod tests {
 
     #[test]
     fn authored_pivot_chartsheet_round_trips_through_save() {
-        use crate::xlsx::{ChartAnchor, Workbook, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor, Workbook};
 
         let mut workbook = workbook_with_pivot_table();
-        let chart = WorksheetChart::bar_chart(
+        let chart = Chart::bar_chart(
             "Sales by Region",
             "Sheet1!$E$2:$E$3",
             "Sheet1!$F$2:$F$3",

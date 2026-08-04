@@ -12,7 +12,7 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
 use std::collections::HashSet;
 
-impl WorksheetControls {
+impl Controls {
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_XML {
             return Err(limit("worksheet XML bytes"));
@@ -81,7 +81,7 @@ impl WorksheetControls {
                 .first()
                 .map(parse_control_properties)
                 .transpose()?;
-            controls.push(WorksheetControl {
+            controls.push(Control {
                 shape_id,
                 relationship_id,
                 name,
@@ -123,12 +123,12 @@ impl WorksheetControls {
 /// An empty value removes the collection. Controls selected only through an MCE
 /// `AlternateContent` branch are rejected because rewriting that branch would not
 /// be byte-preserving.
-pub fn replace_worksheet_controls_xml(xml: &[u8], controls: &WorksheetControls) -> Result<Vec<u8>> {
-    let parsed = WorksheetControls::parse(xml)?;
+pub fn replace_controls_xml(xml: &[u8], controls: &Controls) -> Result<Vec<u8>> {
+    let parsed = Controls::parse(xml)?;
     if !controls.controls.is_empty() {
         validate_controls(controls)?;
     }
-    let location = worksheet_controls_span(xml)?;
+    let location = controls_span(xml)?;
     if !parsed.controls.is_empty() && location.span.is_none() {
         return Err(invalid(
             "MCE-selected controls cannot be mutated as a direct worksheet child",
@@ -235,7 +235,7 @@ impl Descriptor {
     }
 }
 
-fn controls_fragment(value: &WorksheetControls, strict: bool) -> Result<Vec<u8>> {
+fn controls_fragment(value: &Controls, strict: bool) -> Result<Vec<u8>> {
     validate_controls(value)?;
     let rel = if strict { REL_STRICT } else { REL };
     let xdr = if strict { XDR_STRICT } else { XDR };
@@ -255,13 +255,13 @@ fn controls_fragment(value: &WorksheetControls, strict: bool) -> Result<Vec<u8>>
     Ok(out.into_bytes())
 }
 
-pub(super) struct WorksheetControlsLocation {
+pub(super) struct ControlsLocation {
     pub(super) strict: bool,
     pub(super) span: Option<(usize, usize)>,
     pub(super) insertion: usize,
 }
 
-pub(super) fn worksheet_controls_span(xml: &[u8]) -> Result<WorksheetControlsLocation> {
+pub(super) fn controls_span(xml: &[u8]) -> Result<ControlsLocation> {
     if xml.len() > MAX_XML {
         return Err(limit("worksheet XML bytes"));
     }
@@ -349,7 +349,7 @@ pub(super) fn worksheet_controls_span(xml: &[u8]) -> Result<WorksheetControlsLoc
     if !root || depth != 0 || controls_start.is_some() {
         return Err(invalid("invalid worksheet XML"));
     }
-    Ok(WorksheetControlsLocation {
+    Ok(ControlsLocation {
         strict,
         span: controls_span,
         insertion: insertion.ok_or_else(|| invalid("missing worksheet closing element"))?,
@@ -782,7 +782,7 @@ fn parse_property_object(node: &Node, depth: usize, count: &mut usize) -> Result
     }
 }
 
-pub(super) fn validate_controls(value: &WorksheetControls) -> Result<()> {
+pub(super) fn validate_controls(value: &Controls) -> Result<()> {
     if value.controls.is_empty() || value.controls.len() > MAX_CONTROLS {
         return Err(invalid("controls requires 1..65535 controls"));
     }
@@ -946,7 +946,7 @@ fn insert_rel_id(ids: &mut HashSet<String>, id: &str) -> Result<()> {
     }
 }
 
-fn write_control(out: &mut String, c: &WorksheetControl) {
+fn write_control(out: &mut String, c: &Control) {
     out.push_str("<control");
     qattr(out, "shapeId", &c.shape_id.to_string());
     qattr(out, "r:id", &c.relationship_id);

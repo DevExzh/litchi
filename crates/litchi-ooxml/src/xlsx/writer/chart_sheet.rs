@@ -8,7 +8,7 @@
 //! mutable model and the part XML emission; the save pipeline in
 //! `xlsx::workbook` wires the parts and relationships into the package.
 
-use super::sheet::WorksheetChart;
+use crate::xlsx::Chart as DrawingChart;
 use crate::xlsx::chartsheet::{Chart, Conformance, Margins, View, write_chartsheet};
 use litchi_core::sheet::Result as SheetResult;
 
@@ -35,11 +35,11 @@ const CHART_NAME_ID: u32 = 1;
 pub struct MutableChartSheet {
     name: String,
     sheet_id: u32,
-    chart: WorksheetChart,
+    chart: DrawingChart,
 }
 
 impl MutableChartSheet {
-    pub(crate) fn new(name: String, sheet_id: u32, chart: WorksheetChart) -> Self {
+    pub(crate) fn new(name: String, sheet_id: u32, chart: DrawingChart) -> Self {
         Self {
             name,
             sheet_id,
@@ -58,13 +58,13 @@ impl MutableChartSheet {
     }
 
     /// The chart hosted on this chartsheet.
-    pub fn chart(&self) -> &WorksheetChart {
+    pub fn chart(&self) -> &DrawingChart {
         &self.chart
     }
 
     /// Mutable access to the hosted chart, for example to bind it to a
-    /// pivot table with `WorksheetChart::into_pivot_chart`.
-    pub fn chart_mut(&mut self) -> &mut WorksheetChart {
+    /// pivot table with `Chart::into_pivot_chart`.
+    pub fn chart_mut(&mut self) -> &mut DrawingChart {
         &mut self.chart
     }
 }
@@ -73,7 +73,7 @@ impl MutableChartSheet {
 ///
 /// Chart external data, user shapes, and additional relationships are only
 /// wired for worksheet drawings today and are rejected here.
-pub(crate) fn validate_chart_sheet_chart(chart: &WorksheetChart) -> SheetResult<()> {
+pub(crate) fn validate_chart_sheet_chart(chart: &DrawingChart) -> SheetResult<()> {
     if chart.external_data_part.is_some() {
         return Err("chartsheet charts do not support external data parts".into());
     }
@@ -218,8 +218,8 @@ mod tests {
         ))
     }
 
-    fn bar_chart() -> WorksheetChart {
-        crate::xlsx::WorksheetChart::bar_chart(
+    fn bar_chart() -> DrawingChart {
+        crate::xlsx::Chart::bar_chart(
             "Sales",
             "Sheet1!$A$2:$A$3",
             "Sheet1!$B$2:$B$3",

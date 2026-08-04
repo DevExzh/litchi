@@ -14,7 +14,7 @@ mod tests {
     // tables. This deterministic package is therefore synthetic rather than mislabeled corpus data.
     #[test]
     fn immutable_worksheet_accessor_reads_synthetic_package() {
-        use crate::xlsx::{Workbook, Worksheet, WorksheetInfo};
+        use crate::xlsx::{Info, Workbook, Worksheet};
         use std::fs;
         use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -54,7 +54,7 @@ mod tests {
         let workbook = Workbook::open(&path).unwrap();
         let mut worksheet = Worksheet::new(
             &workbook,
-            WorksheetInfo {
+            Info {
                 name: "Result".into(),
                 relationship_id: "rId1".into(),
                 sheet_id: 1,

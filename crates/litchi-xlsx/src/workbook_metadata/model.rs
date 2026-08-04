@@ -42,7 +42,7 @@ pub struct MetadataType {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataRecord {
-    /// One-based index into `WorkbookMetadata::types`.
+    /// One-based index into `Metadata::types`.
     pub type_index: u32,
     /// Zero-based index into the matching future-metadata store.
     pub value_index: u32,
@@ -69,7 +69,7 @@ pub struct FutureMetadata {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorkbookMetadata {
+pub struct Metadata {
     pub types: Vec<MetadataType>,
     pub future: Vec<FutureMetadata>,
     pub cell_blocks: Vec<MetadataBlock>,

@@ -8,7 +8,7 @@ mod package;
 pub(crate) mod reader;
 
 pub use litchi_xlsx::threaded_comments::{
-    Comment, Comments, Graph, Mention, People, Person, SheetPart, WorkbookPart,
+    Comment, Comments, CommentsPart, Graph, Mention, People, PeoplePart, Person,
 };
 pub use package::{
     add_threaded_comment, add_threaded_comment_person, add_threaded_comment_reply,

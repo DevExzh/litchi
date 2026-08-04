@@ -89,7 +89,7 @@ pub struct DataModelPayload {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkbookDataModel {
+pub struct DataModel {
     pub definition: DataModelDefinition,
     pub payload: DataModelPayload,
 }
@@ -168,10 +168,7 @@ pub fn write_data_model(value: &DataModelDefinition) -> Result<Vec<u8>> {
 }
 
 /// Load the singleton workbook Data Model and retain its MS-XLDM payload inertly.
-pub fn load_data_model(
-    package: &OpcPackage,
-    workbook_name: &PackURI,
-) -> Result<Option<WorkbookDataModel>> {
+pub fn load_data_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Option<DataModel>> {
     let workbook = package.get_part(workbook_name)?;
     let workbook_root = parse_document(workbook.blob())?;
     let (_, definition) = workbook_definition(&workbook_root)?;
@@ -216,7 +213,7 @@ pub fn load_data_model(
     }
     reject_inbound_relationships(package, part.partname())?;
     validate_connections(package, workbook_name, &definition)?;
-    Ok(Some(WorkbookDataModel {
+    Ok(Some(DataModel {
         definition,
         payload: DataModelPayload {
             part_name: part.partname().to_string(),
@@ -229,7 +226,7 @@ pub fn load_data_model(
 pub fn store_data_model(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
-    value: &WorkbookDataModel,
+    value: &DataModel,
 ) -> Result<()> {
     validate_definition(&value.definition, false)?;
     validate_payload(&value.payload)?;
@@ -1031,8 +1028,8 @@ mod tests {
         package.add_part(Box::new(BlobPart::new(connections, CONNECTIONS_CONTENT_TYPE.into(), format!(r#"<connections xmlns="{SML}"><connection id="1" name="ModelConnection" refreshedVersion="7"/></connections>"#).into_bytes())));
         (package, workbook)
     }
-    fn model() -> WorkbookDataModel {
-        WorkbookDataModel {
+    fn model() -> DataModel {
+        DataModel {
             definition: definition(),
             payload: DataModelPayload {
                 part_name: DATA_MODEL_PART_NAME.into(),
@@ -1109,7 +1106,7 @@ mod tests {
             store_data_model(
                 &mut package,
                 &workbook,
-                &WorkbookDataModel {
+                &DataModel {
                     definition: value,
                     payload: model().payload
                 }

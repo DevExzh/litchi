@@ -4,8 +4,8 @@ use super::codec::{MAX_STRING, XDA};
 use super::model::*;
 use super::package::SPREADSHEETML_NAMESPACE as SML;
 
-fn sample() -> WorkbookMetadata {
-    WorkbookMetadata {
+fn sample() -> Metadata {
+    Metadata {
         types: vec![MetadataType {
             name: "XLDAPR".into(),
             minimum_supported_version: 120000,
@@ -44,7 +44,7 @@ fn sample() -> WorkbookMetadata {
 fn strict_round_trip_preserves_indices_and_extensions() {
     let value = sample();
     let xml = value.to_xml(true).unwrap();
-    let parsed = WorkbookMetadata::parse(&xml).unwrap();
+    let parsed = Metadata::parse(&xml).unwrap();
     assert_eq!(parsed.cell_block(1).unwrap().records[0].type_index, 1);
     assert!(parsed.cell_block(0).is_none());
     assert_eq!(parsed.to_xml(true).unwrap(), xml);
@@ -68,16 +68,13 @@ fn mce_choice_selects_understood_metadata_branch() {
                 r#"<metadata xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:xda="{XDA}" xmlns=""#
             ),
         );
-    assert_eq!(
-        WorkbookMetadata::parse(xml.as_bytes()).unwrap().types.len(),
-        1
-    );
+    assert_eq!(Metadata::parse(xml.as_bytes()).unwrap().types.len(), 1);
 }
 
 #[test]
 fn rejects_malformed_and_out_of_bounds_values() {
-    assert!(WorkbookMetadata::parse(br#"<!DOCTYPE x><metadata/>"#).is_err());
-    assert!(WorkbookMetadata::parse(
+    assert!(Metadata::parse(br#"<!DOCTYPE x><metadata/>"#).is_err());
+    assert!(Metadata::parse(
             format!(
                 r#"<metadata xmlns="{SML}"><metadataTypes count="2"><metadataType name="x" minSupportedVersion="1"/></metadataTypes></metadata>"#
             )

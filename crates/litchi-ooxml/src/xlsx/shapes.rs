@@ -31,7 +31,7 @@ use crate::xlsx::ole_objects::OleObjectAspect;
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::shape_geometry::CustomGeometry;
 use crate::xlsx::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
-use crate::xlsx::worksheet::WorksheetInfo;
+use crate::xlsx::worksheet::Info;
 use litchi_drawingml::geom::Preset;
 use litchi_drawingml::text::parse_bool;
 pub use litchi_drawingml::text::{
@@ -1491,7 +1491,7 @@ fn check_marker_bounds(marker: CellMarker) -> Result<()> {
     Ok(())
 }
 
-fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<WorksheetInfo>> {
+fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<Info>> {
     if xml.len() > MAX_WORKBOOK_BYTES {
         return Err(limit("workbook XML bytes"));
     }
@@ -1504,7 +1504,7 @@ fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<WorksheetInfo>> {
 fn load_shapes_for_sheet(
     package: &OpcPackage,
     workbook_part: &dyn Part,
-    sheet: &WorksheetInfo,
+    sheet: &Info,
 ) -> Result<Shapes> {
     let relationship = workbook_part
         .rels()

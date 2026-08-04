@@ -2,13 +2,13 @@
 
 use litchi_core::sheet::Result as SheetResult;
 
-use crate::xlsx::worksheet::WorksheetInfo;
+use crate::xlsx::worksheet::Info;
 use crate::xlsx::writer::NamedRange;
 
 pub(crate) use litchi_xlsx::raw::PivotCache as PivotCacheInfo;
 
 pub(crate) struct WorkbookParseResult {
-    pub(crate) sheets: Vec<WorksheetInfo>,
+    pub(crate) sheets: Vec<Info>,
     pub(crate) active_sheet_index: usize,
     pub(crate) uses_1904_date_system: bool,
     pub(crate) defined_names: Vec<NamedRange>,
@@ -34,7 +34,7 @@ pub(crate) fn parse_workbook_details(content: &str) -> SheetResult<WorkbookParse
 }
 
 /// Parse workbook metadata, returning sheets, the active sheet index, and the date system.
-pub fn parse_workbook_xml(content: &str) -> SheetResult<(Vec<WorksheetInfo>, usize, bool)> {
+pub fn parse_workbook_xml(content: &str) -> SheetResult<(Vec<Info>, usize, bool)> {
     parse_workbook_details(content).map(|details| {
         (
             details.sheets,
@@ -45,14 +45,14 @@ pub fn parse_workbook_xml(content: &str) -> SheetResult<(Vec<WorksheetInfo>, usi
 }
 
 /// Parse a standalone `sheet` element.
-pub fn parse_sheet_xml(sheet_xml: &str) -> SheetResult<Option<WorksheetInfo>> {
+pub fn parse_sheet_xml(sheet_xml: &str) -> SheetResult<Option<Info>> {
     litchi_xlsx::raw::parse_sheet(sheet_xml)
         .map(|sheet| sheet.map(adapt_sheet))
         .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
 }
 
-fn adapt_sheet(sheet: litchi_xlsx::raw::Sheet) -> WorksheetInfo {
-    WorksheetInfo {
+fn adapt_sheet(sheet: litchi_xlsx::raw::Sheet) -> Info {
+    Info {
         name: sheet.name,
         relationship_id: sheet.relationship_id,
         sheet_id: sheet.sheet_id,

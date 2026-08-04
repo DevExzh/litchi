@@ -12,7 +12,7 @@ use super::sheet::{MutableWorksheet, NamedRange, Visibility};
 use super::strings::MutableSharedStrings;
 use super::styles::StylesBuilder;
 use crate::xlsx::ProtectionPasswordVerifier;
-pub use crate::xlsx::workbook_protection::WorkbookProtectionMetadata as WorkbookProtection;
+pub use crate::xlsx::workbook_protection::Metadata as WorkbookProtection;
 use crate::xlsx::workbook_protection::write_workbook_protection;
 use litchi_xlsx::threaded_comments::People;
 
@@ -636,12 +636,12 @@ impl MutableWorkbookData {
     /// The name must be a valid Excel sheet name and unique (case-insensitive)
     /// across worksheets and chartsheets. Charts with external-data parts,
     /// user-shapes parts, or additional relationships are rejected; pivot
-    /// charts created with `WorksheetChart::into_pivot_chart` are supported
+    /// charts created with `Chart::into_pivot_chart` are supported
     /// and validated at save time like worksheet pivot charts.
     pub fn add_chart_sheet(
         &mut self,
         name: &str,
-        chart: super::sheet::WorksheetChart,
+        chart: super::sheet::Chart,
     ) -> SheetResult<&mut super::chart_sheet::MutableChartSheet> {
         super::chart_sheet::validate_chart_sheet_chart(&chart)?;
         self.validate_new_sheet_name(name)?;
@@ -2246,8 +2246,8 @@ mod tests {
         assert_eq!(wb.pivot_tables[0].dest_sheet_index, 1);
     }
 
-    fn bar_chart() -> crate::xlsx::WorksheetChart {
-        crate::xlsx::WorksheetChart::bar_chart(
+    fn bar_chart() -> crate::xlsx::Chart {
+        crate::xlsx::Chart::bar_chart(
             "Sales",
             "Sheet1!$A$2:$A$3",
             "Sheet1!$B$2:$B$3",

@@ -267,7 +267,7 @@ pub(crate) fn validate_chart_anchor(anchor: &ChartAnchor) -> Result<()> {
 
 pub(crate) fn write_worksheet_chart_anchors(
     xml: &mut String,
-    charts: &[WorksheetChart],
+    charts: &[Chart],
     object_id_offset: usize,
     relationship_id_offset: usize,
 ) -> Result<()> {
@@ -332,7 +332,7 @@ pub(crate) fn write_worksheet_chart_anchors(
 ///
 /// Contains the chart model and its positioning information.
 #[derive(Debug, Clone)]
-pub struct WorksheetChart {
+pub struct Chart {
     /// The chart model containing all chart data and configuration
     pub chart: ChartModel,
     /// Position and size of the chart in the worksheet
@@ -345,7 +345,7 @@ pub struct WorksheetChart {
     pub additional_relationships: Vec<Relationship>,
 }
 
-impl WorksheetChart {
+impl Chart {
     /// Create a new worksheet chart.
     pub fn new(chart: ChartModel, anchor: ChartAnchor) -> Self {
         Self {
@@ -431,7 +431,7 @@ impl WorksheetChart {
     /// # Example
     ///
     /// ```rust,ignore
-    /// let chart = WorksheetChart::bar_chart(
+    /// let chart = Chart::bar_chart(
     ///     "Sales Data",
     ///     "Sheet1!$A$2:$A$10",
     ///     "Sheet1!$B$2:$B$10",
@@ -773,9 +773,9 @@ impl WorksheetChart {
 }
 
 /// Parse a chart from chart XML and drawing anchor.
-pub fn parse_chart_from_xml(chart_xml: &[u8], anchor: ChartAnchor) -> Result<WorksheetChart> {
+pub fn parse_chart_from_xml(chart_xml: &[u8], anchor: ChartAnchor) -> Result<Chart> {
     let chart = litchi_drawingml::chart::reader::read(chart_xml)?;
-    Ok(WorksheetChart::new(chart, anchor))
+    Ok(Chart::new(chart, anchor))
 }
 
 fn for_each_series_mut(chart: &mut ChartModel, mut apply: impl FnMut(&mut Series)) {

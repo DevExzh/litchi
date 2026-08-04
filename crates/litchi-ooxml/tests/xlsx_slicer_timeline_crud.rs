@@ -1,9 +1,9 @@
+use litchi_ooxml::xlsx::slicer_cache::{Definition, parse_slicer_cache_definition};
 use litchi_ooxml::xlsx::timelines::{Range, State};
 use litchi_ooxml::xlsx::{
-    CacheDefinition, FilterType, Level, Slicer, SlicerCacheDefinition, View, add_slicer,
-    add_slicer_cache, add_timeline, add_timeline_cache, find_slicer, find_slicer_cache,
-    find_timeline, find_timeline_cache, parse_slicer_cache_definition, parse_slicers,
-    remove_slicer, remove_slicer_cache, remove_timeline, remove_timeline_cache,
+    CacheDefinition, FilterType, Level, Slicer, View, add_slicer, add_slicer_cache, add_timeline,
+    add_timeline_cache, find_slicer, find_slicer_cache, find_timeline, find_timeline_cache,
+    parse_slicers, remove_slicer, remove_slicer_cache, remove_timeline, remove_timeline_cache,
     reorder_slicer_caches, reorder_slicers, reorder_timeline_caches, reorder_timelines,
     replace_slicer, replace_slicer_cache, replace_timeline, replace_timeline_cache, update_slicer,
     update_slicer_cache, update_timeline, update_timeline_cache,
@@ -40,7 +40,7 @@ fn package() -> (OpcPackage, PackURI) {
     (package, worksheet)
 }
 
-fn slicer_cache(name: &str, source: &str) -> SlicerCacheDefinition {
+fn slicer_cache(name: &str, source: &str) -> Definition {
     parse_slicer_cache_definition(
         format!(r#"<slicerCacheDefinition xmlns="{X14}" name="{name}" sourceName="{source}"><data><tabular pivotCacheId="5"><items count="2"><i x="1"/><i x="0" s="1"/></items></tabular></data></slicerCacheDefinition>"#).as_bytes(),
     )

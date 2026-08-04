@@ -148,7 +148,7 @@ pub struct MutableWorksheet {
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
     pivot_table_views: Vec<litchi_xlsb::pivot_view::Part>,
     /// Typed DrawingML charts anchored on this sheet.
-    charts: Vec<crate::xlsx::WorksheetChart>,
+    charts: Vec<crate::xlsx::Chart>,
     /// Typed image parts anchored in the same Drawings part.
     images: Vec<crate::xlsb::Image>,
     /// Cached sum of encoded image bytes for constant-time safety checks.
@@ -1145,7 +1145,7 @@ impl MutableWorksheet {
     /// relationship in the binary `BrtDrawing` record. Pivot charts are
     /// resolved against PivotTable views attached to this workbook at save
     /// time.
-    pub fn add_chart(&mut self, chart: crate::xlsx::WorksheetChart) -> Result<()> {
+    pub fn add_chart(&mut self, chart: crate::xlsx::Chart) -> Result<()> {
         if self.charts.len() >= crate::xlsb::drawing_write::MAX_CHARTS_PER_SHEET {
             return Err(Error::InvalidFormula(
                 "worksheet chart count exceeds the safety limit".to_string(),
@@ -1157,12 +1157,12 @@ impl MutableWorksheet {
     }
 
     /// Typed DrawingML charts in drawing order.
-    pub fn charts(&self) -> &[crate::xlsx::WorksheetChart] {
+    pub fn charts(&self) -> &[crate::xlsx::Chart] {
         &self.charts
     }
 
     /// Remove one chart by drawing order.
-    pub fn remove_chart(&mut self, index: usize) -> Result<crate::xlsx::WorksheetChart> {
+    pub fn remove_chart(&mut self, index: usize) -> Result<crate::xlsx::Chart> {
         if index >= self.charts.len() {
             return Err(Error::InvalidFormula(format!(
                 "chart index {index} is out of bounds for {} charts",

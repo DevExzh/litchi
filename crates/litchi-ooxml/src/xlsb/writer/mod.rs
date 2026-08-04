@@ -69,10 +69,9 @@ pub use crate::xlsx::writer::{
     ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, Geometry, GroupSpec, ShapeSpec,
 };
 pub use crate::xlsx::{
-    BodyProperties, CellMarker, ChartAnchor, Columns, Coordinate32, EditAs, Emu, EmuExtent,
+    BodyProperties, CellMarker, Chart, ChartAnchor, Columns, Coordinate32, EditAs, Emu, EmuExtent,
     EmuOffset, GroupTransform, Paragraph, Preset, Run, ShapeAnchor, TextInsets, TextSize,
-    WorksheetChart, XlsxTextAutofit, XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor,
-    XlsxTextWrap,
+    XlsxTextAutofit, XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap,
 };
 pub use chartsheet::MutableChartSheet;
 pub use litchi_xlsb::pivot_view::Part;

@@ -42,7 +42,7 @@ const MAX_STRING: usize = 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_NODES: usize = 400_000;
 
-pub use codec::replace_worksheet_controls_xml;
+pub use codec::replace_controls_xml;
 pub use model::*;
 pub use package::{
     load_from_worksheet, remove_from_worksheet, replace_on_worksheet, store_on_worksheet,

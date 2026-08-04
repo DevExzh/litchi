@@ -9,7 +9,7 @@ use litchi_opc::{OpcPackage, PackURI, Part};
 
 use super::reader::{read_persons, read_threaded_comments};
 use litchi_xlsx::threaded_comments::{
-    Comment, Comments, Graph, People, Person, SheetPart, WorkbookPart, validate_graph,
+    Comment, Comments, CommentsPart, Graph, People, PeoplePart, Person, validate_graph,
     write_comments, write_persons,
 };
 
@@ -18,7 +18,7 @@ pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<Graph> {
     let workbook = package.main_document_part()?;
     let persons_relationship = one_internal_relationship(workbook, rt::PERSONS, "persons")?;
     let persons = match (persons_relationship, read_persons(package)?) {
-        (Some((relationship_id, part_name)), Some(persons)) => Some(WorkbookPart {
+        (Some((relationship_id, part_name)), Some(persons)) => Some(PeoplePart {
             relationship_id,
             part_name: part_name.to_string(),
             persons,
@@ -46,7 +46,7 @@ pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<Graph> {
         };
         let comments = read_threaded_comments(package, &worksheet_name)?
             .ok_or("inconsistent threaded-comments relationship graph")?;
-        worksheets.push(SheetPart {
+        worksheets.push(CommentsPart {
             worksheet_part_name: worksheet_name.to_string(),
             relationship_id,
             part_name: part_name.to_string(),
@@ -79,7 +79,7 @@ pub fn find_threaded_comment_person(
 pub fn add_threaded_comment_person(
     package: &mut OpcPackage,
     person: Person,
-) -> SheetResult<WorkbookPart> {
+) -> SheetResult<PeoplePart> {
     let mut graph = load_threaded_comment_graph(package)?;
     if graph.persons.as_ref().is_some_and(|part| {
         part.persons
@@ -100,7 +100,7 @@ pub fn add_threaded_comment_person(
     let workbook_name = package.main_document_part()?.partname().clone();
     let part_name = next_person_part_name(package)?;
     let relationship_id = next_relationship_id(package.get_part(&workbook_name)?, "rIdPersons")?;
-    let part = WorkbookPart {
+    let part = PeoplePart {
         relationship_id: relationship_id.clone(),
         part_name: part_name.to_string(),
         persons: People {
@@ -273,7 +273,7 @@ pub fn add_threaded_comment(
     package: &mut OpcPackage,
     worksheet_part_name: &PackURI,
     comment: Comment,
-) -> SheetResult<SheetPart> {
+) -> SheetResult<CommentsPart> {
     let mut graph = load_threaded_comment_graph(package)?;
     if graph.worksheets.iter().any(|sheet| {
         sheet
@@ -302,7 +302,7 @@ pub fn add_threaded_comment(
         package.get_part(worksheet_part_name)?,
         "rIdThreadedComments",
     )?;
-    let part = SheetPart {
+    let part = CommentsPart {
         worksheet_part_name: worksheet_part_name.to_string(),
         relationship_id: relationship_id.clone(),
         part_name: part_name.to_string(),
@@ -337,7 +337,7 @@ pub fn add_threaded_comment_reply(
     cell_ref: &str,
     parent_id: &str,
     mut reply: Comment,
-) -> SheetResult<SheetPart> {
+) -> SheetResult<CommentsPart> {
     let parent = find_threaded_comment(package, worksheet_part_name, cell_ref, parent_id)?
         .ok_or("threaded-comment parent was not found at the requested cell")?;
     if parent.parent_id.is_some() {
@@ -495,7 +495,7 @@ pub fn reorder_threaded_comments(
     Ok(ordered)
 }
 
-fn commit_person_part(package: &mut OpcPackage, part: &WorkbookPart) -> SheetResult<()> {
+fn commit_person_part(package: &mut OpcPackage, part: &PeoplePart) -> SheetResult<()> {
     let xml = write_persons(&part.persons)?.into_bytes();
     let part_name = PackURI::new(&part.part_name)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
@@ -503,7 +503,7 @@ fn commit_person_part(package: &mut OpcPackage, part: &WorkbookPart) -> SheetRes
     Ok(())
 }
 
-fn commit_comment_part(package: &mut OpcPackage, part: &SheetPart) -> SheetResult<()> {
+fn commit_comment_part(package: &mut OpcPackage, part: &CommentsPart) -> SheetResult<()> {
     let xml = write_comments(&part.comments)?.into_bytes();
     let part_name = PackURI::new(&part.part_name)?;
     package.get_part_mut(&part_name)?.set_blob(xml);

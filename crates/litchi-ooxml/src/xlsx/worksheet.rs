@@ -42,8 +42,8 @@ use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
 use super::{
-    ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
-    RelationshipTarget, WorksheetChart,
+    Chart, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
+    RelationshipTarget,
     chart::{
         chart_external_data_content_type, is_chart_external_data_relationship_type,
         is_chart_user_shapes_relationship_type, parse_chart_from_xml,
@@ -62,7 +62,7 @@ use litchi_xlsx::web::Bindings;
 
 /// Information about a worksheet
 #[derive(Debug, Clone)]
-pub struct WorksheetInfo {
+pub struct Info {
     /// Worksheet name
     pub name: String,
     /// Relationship ID for the worksheet
@@ -176,7 +176,7 @@ pub struct Worksheet<'a> {
     /// Reference to the parent workbook
     workbook: &'a Workbook,
     /// Worksheet information
-    info: WorksheetInfo,
+    info: Info,
     /// Cached cell data (row -> column -> value)
     cells: HashMap<u32, HashMap<u32, CellValue>>,
     /// Cell style indices (row -> column -> style_index)
@@ -243,12 +243,12 @@ pub struct Worksheet<'a> {
     tables: Vec<Table>,
     query_tables: Vec<QueryTablePart>,
     images: Vec<Image>,
-    charts: Vec<WorksheetChart>,
+    charts: Vec<Chart>,
 }
 
 impl<'a> Worksheet<'a> {
     /// Create a new worksheet.
-    pub fn new(workbook: &'a Workbook, info: WorksheetInfo) -> Self {
+    pub fn new(workbook: &'a Workbook, info: Info) -> Self {
         Self {
             workbook,
             info,
@@ -378,7 +378,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Charts embedded in this worksheet's drawing part.
-    pub fn charts(&self) -> &[WorksheetChart] {
+    pub fn charts(&self) -> &[Chart] {
         &self.charts
     }
 
@@ -1626,7 +1626,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Get worksheet information.
-    pub fn info(&self) -> &WorksheetInfo {
+    pub fn info(&self) -> &Info {
         &self.info
     }
 
@@ -2345,7 +2345,7 @@ impl<'a> WorksheetTrait for Worksheet<'a> {
 
 /// Iterator over worksheets in a workbook
 pub struct WorksheetIterator<'a> {
-    worksheets: Vec<WorksheetInfo>,
+    worksheets: Vec<Info>,
     workbook: &'a Workbook,
     index: usize,
 }
@@ -2366,7 +2366,7 @@ fn image_format(content_type: &str) -> Option<&'static str> {
 
 impl<'a> WorksheetIterator<'a> {
     /// Create a new worksheet iterator.
-    pub fn new(worksheets: Vec<WorksheetInfo>, workbook: &'a Workbook) -> Self {
+    pub fn new(worksheets: Vec<Info>, workbook: &'a Workbook) -> Self {
         Self {
             worksheets,
             workbook,

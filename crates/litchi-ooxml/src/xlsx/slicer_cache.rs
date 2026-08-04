@@ -20,9 +20,8 @@ use std::collections::{HashSet, TryReserveError};
 use litchi_xlsx::slicer_cache as owner;
 
 pub use owner::{
-    SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, SlicerCacheData,
-    SlicerCacheDataKind, SlicerCacheDefinition, SlicerCacheExtensionList, SlicerCachePivotTable,
-    WorkbookSlicerCache,
+    Cache, Data, DataKind, Definition, ExtensionList, PivotTable, SLICER_CACHE_CONTENT_TYPE,
+    SLICER_CACHE_RELATIONSHIP_TYPE,
 };
 
 const X14: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
@@ -57,16 +56,16 @@ fn map_owner_error(error: litchi_xlsx::Error) -> OoxmlError {
     }
 }
 
-pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition> {
-    owner::parse_slicer_cache_definition(xml).map_err(map_owner_error)
+pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<Definition> {
+    owner::parse(xml).map_err(map_owner_error)
 }
 
-pub fn write_slicer_cache_definition(value: &SlicerCacheDefinition) -> Result<Vec<u8>> {
-    owner::write_slicer_cache_definition(value).map_err(map_owner_error)
+pub fn write_slicer_cache_definition(value: &Definition) -> Result<Vec<u8>> {
+    owner::write(value).map_err(map_owner_error)
 }
 
-fn validate_definition(value: &SlicerCacheDefinition) -> Result<()> {
-    owner::validate_slicer_cache_definition(value).map_err(map_owner_error)
+fn validate_definition(value: &Definition) -> Result<()> {
+    owner::validate(value).map_err(map_owner_error)
 }
 
 /// A byte sink that makes every growth and output-size check explicit.
@@ -124,7 +123,7 @@ impl BoundedXml {
     }
 }
 
-pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<WorkbookSlicerCache>> {
+pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<Cache>> {
     let workbook = package.main_document_part()?;
     let references = parse_workbook_references(workbook.blob())?;
     validate_cache_graph(package, workbook, &references)?;
@@ -139,7 +138,7 @@ pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<WorkbookSlicerCach
             ))
         })?;
         let target = relationship.target_partname()?;
-        output.push(WorkbookSlicerCache {
+        output.push(Cache {
             relationship_id,
             part_name: target.to_string(),
             definition: parse_slicer_cache_definition(package.get_part(&target)?.blob())?,
@@ -153,7 +152,7 @@ pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<WorkbookSlicerCach
     Ok(output)
 }
 
-pub fn store_slicer_cache(package: &mut OpcPackage, value: &WorkbookSlicerCache) -> Result<()> {
+pub fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Result<()> {
     validate_relationship_id(&value.relationship_id)?;
     validate_definition(&value.definition)?;
     let xml = write_slicer_cache_definition(&value.definition)?;
@@ -195,7 +194,7 @@ pub fn store_slicer_cache(package: &mut OpcPackage, value: &WorkbookSlicerCache)
             ))
         })?;
         let target = relationship.target_partname()?;
-        existing.push(WorkbookSlicerCache {
+        existing.push(Cache {
             relationship_id: id.clone(),
             part_name: target.to_string(),
             definition: parse_slicer_cache_definition(package.get_part(&target)?.blob())?,
@@ -332,7 +331,7 @@ fn validate_cache_graph(
     Ok(())
 }
 
-fn validate_cache_collection(values: &[WorkbookSlicerCache]) -> Result<()> {
+fn validate_cache_collection(values: &[Cache]) -> Result<()> {
     if values.len() > MAX_CACHE_COUNT {
         return Err(limit("cache count"));
     }
@@ -1150,8 +1149,8 @@ mod tests {
         (package, workbook, worksheet)
     }
 
-    fn cache() -> WorkbookSlicerCache {
-        WorkbookSlicerCache {
+    fn cache() -> Cache {
+        Cache {
             relationship_id: "rIdCache".into(),
             part_name: "/xl/slicerCaches/slicerCache1.xml".into(),
             definition: parse_slicer_cache_definition(microsoft().as_bytes()).unwrap(),
@@ -1165,14 +1164,8 @@ mod tests {
             (&value.name[..], &value.source_name[..]),
             ("Slicer_State", "State")
         );
-        assert_eq!(
-            value.pivot_tables,
-            vec![SlicerCachePivotTable::new(1, "PivotTable1")]
-        );
-        assert_eq!(
-            value.data.as_ref().unwrap().kind(),
-            SlicerCacheDataKind::Tabular
-        );
+        assert_eq!(value.pivot_tables, vec![PivotTable::new(1, "PivotTable1")]);
+        assert_eq!(value.data.as_ref().unwrap().kind(), DataKind::Tabular);
         assert_eq!(
             parse_slicer_cache_definition(&write_slicer_cache_definition(&value).unwrap()).unwrap(),
             value

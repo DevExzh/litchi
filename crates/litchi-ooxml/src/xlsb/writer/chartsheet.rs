@@ -3,7 +3,7 @@
 use crate::xlsb::chartsheet::{ChartSheet, Color, ColorType, PageSetup, Protection, State, View};
 use crate::xlsb::error::{Error, Result};
 use crate::xlsb::worksheet::StrongProtection;
-use crate::xlsx::WorksheetChart;
+use crate::xlsx::Chart;
 use litchi_xlsb::raw::Writer;
 use litchi_xlsb::raw::kind as rt;
 use std::io::Write;
@@ -23,13 +23,13 @@ const MAX_PAPER_SIZE: u32 = i32::MAX as u32 - 1;
 #[derive(Debug, Clone)]
 pub struct MutableChartSheet {
     metadata: ChartSheet,
-    chart: WorksheetChart,
+    chart: Chart,
     printer_settings: Option<Vec<u8>>,
 }
 
 impl MutableChartSheet {
     /// Create a visible chart sheet with one default workbook view.
-    pub fn new(name: impl Into<String>, chart: WorksheetChart) -> Self {
+    pub fn new(name: impl Into<String>, chart: Chart) -> Self {
         let name = name.into();
         Self {
             metadata: ChartSheet {
@@ -74,12 +74,12 @@ impl MutableChartSheet {
     }
 
     /// The hosted DrawingML chart.
-    pub fn chart(&self) -> &WorksheetChart {
+    pub fn chart(&self) -> &Chart {
         &self.chart
     }
 
     /// Mutably configure the hosted DrawingML chart.
-    pub fn chart_mut(&mut self) -> &mut WorksheetChart {
+    pub fn chart_mut(&mut self) -> &mut Chart {
         &mut self.chart
     }
 

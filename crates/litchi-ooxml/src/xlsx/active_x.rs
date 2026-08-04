@@ -11,8 +11,8 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsx::active_x as owner;
 
 pub use owner::{
-    Binary, ControlProperties, Font, Marker, ObjectAnchor, Persistence, Picture, PreviewImage,
-    Property, PropertyObject, WorksheetControl as Control,
+    Binary, Control, ControlProperties, Font, Marker, ObjectAnchor, Persistence, Picture,
+    PreviewImage, Property, PropertyObject,
 };
 
 /// The worksheet `controls` collection.
@@ -23,7 +23,7 @@ pub struct Controls {
 
 impl Controls {
     pub fn parse(xml: &[u8]) -> Result<Self> {
-        owner::WorksheetControls::parse(xml)
+        owner::Controls::parse(xml)
             .map(Self::from_owner)
             .map_err(map_owner_error)
     }
@@ -32,13 +32,13 @@ impl Controls {
         self.to_owner().to_xml(strict).map_err(map_owner_error)
     }
 
-    fn to_owner(&self) -> owner::WorksheetControls {
-        owner::WorksheetControls {
+    fn to_owner(&self) -> owner::Controls {
+        owner::Controls {
             controls: self.controls.clone(),
         }
     }
 
-    fn from_owner(value: owner::WorksheetControls) -> Self {
+    fn from_owner(value: owner::Controls) -> Self {
         Self {
             controls: value.controls,
         }
@@ -146,7 +146,7 @@ impl LoadedControl {
 /// Replace the direct worksheet `controls` collection while preserving
 /// unrelated worksheet bytes.
 pub fn replace_controls_xml(xml: &[u8], controls: &Controls) -> Result<Vec<u8>> {
-    owner::replace_worksheet_controls_xml(xml, &controls.to_owner()).map_err(map_owner_error)
+    owner::replace_controls_xml(xml, &controls.to_owner()).map_err(map_owner_error)
 }
 
 /// Load one worksheet's complete inert ActiveX graph.

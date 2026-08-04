@@ -6,8 +6,8 @@
 
 use crate::xlsb::error::{Error, Result};
 use crate::xlsx::{
-    ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
-    RelationshipTarget, WorksheetChart,
+    Chart, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
+    RelationshipTarget,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
@@ -37,15 +37,13 @@ pub(crate) struct ResolvedChartGraph {
 }
 
 /// Validate a chart's complete package-resource model without mutating it.
-pub(crate) fn validate_chart_resources(chart: &WorksheetChart) -> Result<()> {
+pub(crate) fn validate_chart_resources(chart: &Chart) -> Result<()> {
     let (external_id, user_shapes_id) = validate_chart_resource_metadata(chart)?;
     validated_chart_xml(chart, external_id.as_deref(), user_shapes_id.as_deref())?;
     Ok(())
 }
 
-fn validate_chart_resource_metadata(
-    chart: &WorksheetChart,
-) -> Result<(Option<String>, Option<String>)> {
+fn validate_chart_resource_metadata(chart: &Chart) -> Result<(Option<String>, Option<String>)> {
     if chart.chart.external_data.is_some() != chart.external_data_part.is_some() {
         return Err(invalid(
             "chart external-data metadata and package payload disagree",
@@ -133,10 +131,7 @@ fn validate_chart_resource_metadata(
 }
 
 /// Build one Chart part and all of its internal related resource parts.
-pub(crate) fn author_chart_graph(
-    chart: &WorksheetChart,
-    chart_index: usize,
-) -> Result<AuthoredChartGraph> {
+pub(crate) fn author_chart_graph(chart: &Chart, chart_index: usize) -> Result<AuthoredChartGraph> {
     let (planned_external_id, planned_user_shapes_id) = validate_chart_resource_metadata(chart)?;
     let chart_name = format!("chart{chart_index}.xml");
     let mut chart_part = BlobPart::new(
@@ -560,9 +555,7 @@ fn author_relationship_target(
     }
 }
 
-fn planned_special_relationship_ids(
-    chart: &WorksheetChart,
-) -> Result<(Option<String>, Option<String>)> {
+fn planned_special_relationship_ids(chart: &Chart) -> Result<(Option<String>, Option<String>)> {
     let mut used = chart
         .additional_relationships
         .iter()
@@ -604,7 +597,7 @@ fn planned_special_relationship_ids(
 }
 
 fn validated_chart_xml(
-    chart: &WorksheetChart,
+    chart: &Chart,
     external_data_id: Option<&str>,
     user_shapes_id: Option<&str>,
 ) -> Result<Vec<u8>> {
@@ -700,12 +693,12 @@ fn limit(what: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsx::{ChartAnchor, WorksheetChart};
+    use crate::xlsx::{Chart, ChartAnchor};
     use litchi_drawingml::chart::ChartExternalData;
 
     #[test]
     fn reader_refuses_missing_external_data_relationship() {
-        let mut worksheet_chart = WorksheetChart::bar_chart(
+        let mut worksheet_chart = Chart::bar_chart(
             "Missing",
             "Data!$A$1:$A$2",
             "Data!$B$1:$B$2",

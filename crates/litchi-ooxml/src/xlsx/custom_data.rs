@@ -40,7 +40,7 @@ pub struct CustomDataPayload {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkbookCustomData {
+pub struct CustomData {
     pub properties_relationship_id: String,
     pub properties_part_name: String,
     pub properties: CustomDataProperties,
@@ -60,10 +60,7 @@ pub fn write_custom_data_properties(value: &CustomDataProperties) -> Result<Vec<
 
 /// Load every Custom Data Properties part related from the workbook and its
 /// optional opaque Custom Data payload.
-pub fn load_custom_data(
-    package: &OpcPackage,
-    workbook_name: &PackURI,
-) -> Result<Vec<WorkbookCustomData>> {
+pub fn load_custom_data(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<CustomData>> {
     reject_root_relationships(package)?;
     let workbook = package.get_part(workbook_name)?;
     owner::validate_workbook_root(workbook.blob()).map_err(map_owner_error)?;
@@ -175,7 +172,7 @@ pub fn load_custom_data(
             } else {
                 (None, None)
             };
-        output.push(WorkbookCustomData {
+        output.push(CustomData {
             properties_relationship_id: relationship.r_id().to_owned(),
             properties_part_name: target.to_string(),
             properties,
@@ -222,7 +219,7 @@ pub fn load_custom_data(
 pub fn store_custom_data(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
-    stores: &[WorkbookCustomData],
+    stores: &[CustomData],
 ) -> Result<()> {
     if stores.is_empty() {
         return Err(invalid("at least one Custom Data store is required"));
@@ -323,7 +320,7 @@ pub fn store_custom_data(
     Ok(())
 }
 
-fn validate_store_set(stores: &[WorkbookCustomData]) -> Result<()> {
+fn validate_store_set(stores: &[CustomData]) -> Result<()> {
     if stores.len() > MAX_STORES {
         return Err(limit("store count"));
     }
@@ -436,8 +433,8 @@ mod tests {
     fn properties() -> CustomDataProperties {
         CustomDataProperties { id: "Storage-1".into(), extension_list: Some(CustomDataExtensionList { xml: format!(r#"<x14:extLst xmlns:x14="{X14}"><x14:ext uri="urn:test"><v:opaque xmlns:v="urn:vendor" value="kept"/></x14:ext></x14:extLst>"#).into_bytes() }) }
     }
-    fn store() -> WorkbookCustomData {
-        WorkbookCustomData {
+    fn store() -> CustomData {
+        CustomData {
             properties_relationship_id: "rIdProps1".into(),
             properties_part_name: "/xl/customData/itemProps1.xml".into(),
             properties: properties(),

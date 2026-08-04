@@ -44,7 +44,7 @@ pub struct ControlProperties {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetControl {
+pub struct Control {
     pub shape_id: u32,
     pub relationship_id: String,
     pub name: Option<String>,
@@ -52,8 +52,8 @@ pub struct WorksheetControl {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorksheetControls {
-    pub controls: Vec<WorksheetControl>,
+pub struct Controls {
+    pub controls: Vec<Control>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -107,7 +107,7 @@ pub struct PreviewImage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedControl {
-    pub control: WorksheetControl,
+    pub control: Control,
     pub descriptor_uri: PackURI,
     pub descriptor: Descriptor,
     pub binaries: Vec<Binary>,

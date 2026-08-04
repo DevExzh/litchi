@@ -11,14 +11,14 @@ use quick_xml::reader::NsReader;
 
 /// Workbook formula calculation mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum WorkbookCalculationMode {
+pub enum Mode {
     Manual,
     #[default]
     Automatic,
     AutomaticExceptTables,
 }
 
-impl WorkbookCalculationMode {
+impl Mode {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "manual" => Ok(Self::Manual),
@@ -31,13 +31,13 @@ impl WorkbookCalculationMode {
 
 /// Cell-reference style used by formulas in the workbook.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum WorkbookReferenceMode {
+pub enum ReferenceMode {
     #[default]
     A1,
     R1C1,
 }
 
-impl WorkbookReferenceMode {
+impl ReferenceMode {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "A1" => Ok(Self::A1),
@@ -49,11 +49,11 @@ impl WorkbookReferenceMode {
 
 /// Effective workbook calculation policy from `calcPr`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorkbookCalculationProperties {
+pub struct Properties {
     calculation_id: u32,
-    calculation_mode: WorkbookCalculationMode,
+    calculation_mode: Mode,
     full_calculation_on_load: bool,
-    reference_mode: WorkbookReferenceMode,
+    reference_mode: ReferenceMode,
     iterative_calculation: bool,
     iteration_count: u32,
     iteration_delta: f64,
@@ -65,18 +65,18 @@ pub struct WorkbookCalculationProperties {
     force_full_calculation: bool,
 }
 
-impl WorkbookCalculationProperties {
+impl Properties {
     /// Calculation-engine identifier. Excel's effective default is zero.
     pub fn calculation_id(&self) -> u32 {
         self.calculation_id
     }
-    pub fn calculation_mode(&self) -> WorkbookCalculationMode {
+    pub fn calculation_mode(&self) -> Mode {
         self.calculation_mode
     }
     pub fn full_calculation_on_load(&self) -> bool {
         self.full_calculation_on_load
     }
-    pub fn reference_mode(&self) -> WorkbookReferenceMode {
+    pub fn reference_mode(&self) -> ReferenceMode {
         self.reference_mode
     }
     pub fn iterative_calculation(&self) -> bool {
@@ -112,9 +112,9 @@ impl WorkbookCalculationProperties {
 #[derive(Default)]
 struct Builder {
     calculation_id: Option<u32>,
-    calculation_mode: Option<WorkbookCalculationMode>,
+    calculation_mode: Option<Mode>,
     full_calculation_on_load: Option<bool>,
-    reference_mode: Option<WorkbookReferenceMode>,
+    reference_mode: Option<ReferenceMode>,
     iterative_calculation: Option<bool>,
     iteration_count: Option<u32>,
     iteration_delta: Option<f64>,
@@ -127,8 +127,8 @@ struct Builder {
 }
 
 impl Builder {
-    fn finish(self) -> WorkbookCalculationProperties {
-        WorkbookCalculationProperties {
+    fn finish(self) -> Properties {
+        Properties {
             calculation_id: self.calculation_id.unwrap_or(0),
             calculation_mode: self.calculation_mode.unwrap_or_default(),
             full_calculation_on_load: self.full_calculation_on_load.unwrap_or(false),
@@ -147,9 +147,7 @@ impl Builder {
 }
 
 /// Parse the workbook's direct `calcPr` child without executing calculations.
-pub fn parse_workbook_calculation_properties(
-    xml: &[u8],
-) -> Result<Option<WorkbookCalculationProperties>> {
+pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
     let processed =
         process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
@@ -263,7 +261,7 @@ fn parse_attributes(
             )?,
             b"calcMode" => set_once(
                 &mut builder.calculation_mode,
-                WorkbookCalculationMode::parse(&value)?,
+                Mode::parse(&value)?,
                 "calcMode",
             )?,
             b"fullCalcOnLoad" => set_once(
@@ -273,7 +271,7 @@ fn parse_attributes(
             )?,
             b"refMode" => set_once(
                 &mut builder.reference_mode,
-                WorkbookReferenceMode::parse(&value)?,
+                ReferenceMode::parse(&value)?,
                 "refMode",
             )?,
             b"iterate" => set_once(
@@ -397,15 +395,13 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorkbookCalculationProperties>> {
-        parse_workbook_calculation_properties(
-            format!(r#"<workbook xmlns="{NS}">{child}</workbook>"#).as_bytes(),
-        )
+    fn parse_xml(child: &str) -> Result<Option<Properties>> {
+        parse(format!(r#"<workbook xmlns="{NS}">{child}</workbook>"#).as_bytes())
     }
 
     #[test]
     fn parses_all_attributes_and_effective_defaults() {
-        let value = parse(concat!(
+        let value = parse_xml(concat!(
             r#"<calcPr calcId="42" calcMode="autoNoTable" fullCalcOnLoad="1" "#,
             r#"refMode="R1C1" iterate="true" iterateCount="250" iterateDelta="1E-4" "#,
             r#"fullPrecision="0" calcCompleted="false" calcOnSave="0" concurrentCalc="false" "#,
@@ -414,12 +410,9 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(value.calculation_id(), 42);
-        assert_eq!(
-            value.calculation_mode(),
-            WorkbookCalculationMode::AutomaticExceptTables
-        );
+        assert_eq!(value.calculation_mode(), Mode::AutomaticExceptTables);
         assert!(value.full_calculation_on_load());
-        assert_eq!(value.reference_mode(), WorkbookReferenceMode::R1C1);
+        assert_eq!(value.reference_mode(), ReferenceMode::R1C1);
         assert!(value.iterative_calculation());
         assert_eq!(value.iteration_count(), 250);
         assert_eq!(value.iteration_delta(), 0.0001);
@@ -430,14 +423,11 @@ mod tests {
         assert_eq!(value.concurrent_manual_count(), Some(6));
         assert!(value.force_full_calculation());
 
-        let defaults = parse("<calcPr/>").unwrap().unwrap();
+        let defaults = parse_xml("<calcPr/>").unwrap().unwrap();
         assert_eq!(defaults.calculation_id(), 0);
-        assert_eq!(
-            defaults.calculation_mode(),
-            WorkbookCalculationMode::Automatic
-        );
+        assert_eq!(defaults.calculation_mode(), Mode::Automatic);
         assert!(!defaults.full_calculation_on_load());
-        assert_eq!(defaults.reference_mode(), WorkbookReferenceMode::A1);
+        assert_eq!(defaults.reference_mode(), ReferenceMode::A1);
         assert!(!defaults.iterative_calculation());
         assert_eq!(defaults.iteration_count(), 100);
         assert_eq!(defaults.iteration_delta(), 0.001);
@@ -453,11 +443,8 @@ mod tests {
     fn supports_strict_namespace_and_mce_fallback() {
         let strict = br#"<workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><calcPr calcMode="manual"/></workbook>"#;
         assert_eq!(
-            parse_workbook_calculation_properties(strict)
-                .unwrap()
-                .unwrap()
-                .calculation_mode(),
-            WorkbookCalculationMode::Manual
+            parse(strict).unwrap().unwrap().calculation_mode(),
+            Mode::Manual
         );
         let mce = format!(
             concat!(
@@ -468,11 +455,8 @@ mod tests {
             NS
         );
         assert_eq!(
-            parse_workbook_calculation_properties(mce.as_bytes())
-                .unwrap()
-                .unwrap()
-                .reference_mode(),
-            WorkbookReferenceMode::R1C1
+            parse(mce.as_bytes()).unwrap().unwrap().reference_mode(),
+            ReferenceMode::R1C1
         );
     }
 
@@ -489,33 +473,31 @@ mod tests {
             r#"<calcPr><child/></calcPr>"#,
             r#"<wrapper><calcPr calcId="1"/></wrapper>"#,
         ] {
-            let result = parse(child);
+            let result = parse_xml(child);
             if child.starts_with("<wrapper>") {
                 assert!(result.unwrap().is_none());
             } else {
                 assert!(result.is_err(), "expected rejection for {child}");
             }
         }
-        assert!(parse("<calcPr/><calcPr/>").is_err());
-        assert!(parse(r#"<calcPr calcId="1" calcId="2"/>"#).is_err());
+        assert!(parse_xml("<calcPr/><calcPr/>").is_err());
+        assert!(parse_xml(r#"<calcPr calcId="1" calcId="2"/>"#).is_err());
     }
 
     #[test]
     fn rejects_entity_references_inside_calc_pr() {
         for reference in ["&amp;", "&#x20;"] {
             let child = format!("<calcPr>{reference}</calcPr>");
-            assert!(parse(&child).is_err(), "expected rejection for {child}");
+            assert!(parse_xml(&child).is_err(), "expected rejection for {child}");
         }
     }
 
-    fn fixture(bytes: &[u8]) -> WorkbookCalculationProperties {
+    fn fixture(bytes: &[u8]) -> Properties {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
             .unwrap();
-        parse_workbook_calculation_properties(part.blob())
-            .unwrap()
-            .unwrap()
+        parse(part.blob()).unwrap().unwrap()
     }
 
     #[test]
@@ -524,10 +506,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/poi/test-data/spreadsheet/47889.xlsx"
         )));
-        assert_eq!(
-            iterative.calculation_mode(),
-            WorkbookCalculationMode::Automatic
-        );
+        assert_eq!(iterative.calculation_mode(), Mode::Automatic);
         assert!(iterative.iterative_calculation());
         assert_eq!(iterative.iteration_count(), 100);
         assert_eq!(iterative.iteration_delta(), 0.001);
@@ -557,7 +536,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx"
         )));
-        assert_eq!(r1c1.reference_mode(), WorkbookReferenceMode::R1C1);
+        assert_eq!(r1c1.reference_mode(), ReferenceMode::R1C1);
         assert_eq!(r1c1.iteration_count(), 100);
         assert_eq!(r1c1.iteration_delta(), 0.001);
     }

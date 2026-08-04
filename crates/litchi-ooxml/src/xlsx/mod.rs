@@ -98,8 +98,8 @@ pub use auto_filter::{
 };
 pub use cell::Cell;
 pub use chart::{
-    ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
-    RelationshipTarget, WorksheetChart,
+    Chart, ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
+    Relationship, RelationshipTarget,
 };
 pub use conditional_formatting::{
     Association, Axis, Color, ColorRole, ColorScale, Component, DataBar, Differential,
@@ -123,10 +123,7 @@ pub use external_links::{
     ExternalOleTarget, ExternalRow, ExternalSheetData, ExternalWorkbookLink,
     ExternalWorkbookTarget,
 };
-pub use litchi_xlsx::calculation_properties::{
-    WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
-    parse_workbook_calculation_properties,
-};
+pub use litchi_xlsx::calculation_properties::{Mode, Properties, ReferenceMode, parse};
 pub use litchi_xlsx::cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };
@@ -143,7 +140,7 @@ pub use query_table::{
 pub use revisions::{
     RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
     RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
-    RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, WorkbookRevisions,
+    RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, Revisions,
     load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
     store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
 };
@@ -202,10 +199,9 @@ pub use sheet_protection::{
 };
 pub use sheet_view::parse_worksheet_views;
 pub use slicer_cache::{
-    SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, SlicerCacheData,
-    SlicerCacheDataKind, SlicerCacheDefinition, SlicerCacheExtensionList, SlicerCachePivotTable,
-    WorkbookSlicerCache, load_slicer_caches, parse_slicer_cache_definition, store_slicer_cache,
-    write_slicer_cache_definition,
+    Data, DataKind, Definition, ExtensionList, PivotTable, SLICER_CACHE_CONTENT_TYPE,
+    SLICER_CACHE_RELATIONSHIP_TYPE, load_slicer_caches, parse_slicer_cache_definition,
+    store_slicer_cache, write_slicer_cache_definition,
 };
 pub use slicer_timeline_crud::{
     add_slicer, add_slicer_cache, add_timeline, add_timeline_cache, find_slicer, find_slicer_cache,
@@ -244,12 +240,9 @@ pub use volatile_dependencies::{
     store_in_package as store_volatile_dependencies_in_package,
 };
 pub use workbook::Workbook;
-pub use workbook_protection::{
-    WorkbookProtectionMetadata, parse_workbook_protection, write_workbook_protection,
-};
+pub use workbook_protection::{parse_workbook_protection, write_workbook_protection};
 pub use worksheet::{
-    ArrayFormula, AutoFilter, ColumnInfo, Comment, Hyperlink, PageBreak, RowInfo, Worksheet,
-    WorksheetInfo,
+    ArrayFormula, AutoFilter, ColumnInfo, Comment, Hyperlink, Info, PageBreak, RowInfo, Worksheet,
 };
 pub use xml_maps::{
     XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema,
@@ -303,16 +296,15 @@ pub use timelines::{
 pub mod custom_data;
 pub use custom_data::{
     CUSTOM_DATA_CONTENT_TYPE, CUSTOM_DATA_PROPERTIES_CONTENT_TYPE,
-    CUSTOM_DATA_PROPERTIES_RELATIONSHIP_TYPE, CUSTOM_DATA_RELATIONSHIP_TYPE,
-    CustomDataExtensionList, CustomDataPayload, CustomDataProperties, WorkbookCustomData,
-    load_custom_data, parse_custom_data_properties, store_custom_data,
-    write_custom_data_properties,
+    CUSTOM_DATA_PROPERTIES_RELATIONSHIP_TYPE, CUSTOM_DATA_RELATIONSHIP_TYPE, CustomData,
+    CustomDataExtensionList, CustomDataPayload, CustomDataProperties, load_custom_data,
+    parse_custom_data_properties, store_custom_data, write_custom_data_properties,
 };
 pub mod data_model;
 pub use data_model::{
-    DATA_MODEL_CONTENT_TYPE, DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, DataModelDefinition,
-    DataModelOpaqueXml, DataModelPayload, DataModelRelationship, DataModelTable, WorkbookDataModel,
-    load_data_model, parse_data_model, store_data_model, write_data_model,
+    DATA_MODEL_CONTENT_TYPE, DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, DataModel,
+    DataModelDefinition, DataModelOpaqueXml, DataModelPayload, DataModelRelationship,
+    DataModelTable, load_data_model, parse_data_model, store_data_model, write_data_model,
 };
 pub mod xldm;
 pub use xldm::{

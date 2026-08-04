@@ -1,9 +1,8 @@
 //! OPC package graph lifecycle for inert ActiveX resources.
 
 use super::codec::{
-    bounded, collect_binary_ids_descriptor, relationship_ids_in_xml,
-    replace_worksheet_controls_xml, validate_controls, validate_descriptor,
-    worksheet_controls_span,
+    bounded, collect_binary_ids_descriptor, controls_span, relationship_ids_in_xml,
+    replace_controls_xml, validate_controls, validate_descriptor,
 };
 use super::model::*;
 use super::{
@@ -23,7 +22,7 @@ pub fn load_from_worksheet(package: &OpcPackage, worksheet_uri: &PackURI) -> Res
             worksheet.content_type(),
         ));
     }
-    let parsed = WorksheetControls::parse(worksheet.blob())?;
+    let parsed = Controls::parse(worksheet.blob())?;
     let referenced: HashSet<&str> = parsed
         .controls
         .iter()
@@ -189,7 +188,7 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) 
         return Ok(false);
     }
     let worksheet_xml = package.get_part(worksheet_uri)?.blob().to_vec();
-    let updated = replace_worksheet_controls_xml(&worksheet_xml, &WorksheetControls::default())?;
+    let updated = replace_controls_xml(&worksheet_xml, &Controls::default())?;
     let control_ids: Vec<String> = loaded
         .controls
         .iter()
@@ -267,7 +266,7 @@ fn prepare_graph(
             worksheet.content_type(),
         ));
     }
-    let existing = WorksheetControls::parse(worksheet.blob())?;
+    let existing = Controls::parse(worksheet.blob())?;
     if require_empty
         && (!existing.controls.is_empty()
             || worksheet
@@ -277,15 +276,15 @@ fn prepare_graph(
     {
         return Err(invalid("worksheet already has an ActiveX control graph"));
     }
-    let controls = WorksheetControls {
+    let controls = Controls {
         controls: value
             .controls
             .iter()
             .map(|item| item.control.clone())
             .collect(),
     };
-    let worksheet_xml = replace_worksheet_controls_xml(worksheet.blob(), &controls)?;
-    let strict = worksheet_controls_span(worksheet.blob())?.strict;
+    let worksheet_xml = replace_controls_xml(worksheet.blob(), &controls)?;
+    let strict = controls_span(worksheet.blob())?.strict;
 
     let mut occupied_ids: HashSet<String> = worksheet
         .rels()
@@ -442,7 +441,7 @@ fn validate_control_set(value: &ControlSet) -> Result<()> {
     if value.controls.is_empty() || value.controls.len() > MAX_CONTROLS {
         return Err(invalid("ActiveX control set requires 1..65535 controls"));
     }
-    validate_controls(&WorksheetControls {
+    validate_controls(&Controls {
         controls: value
             .controls
             .iter()
@@ -596,7 +595,7 @@ mod tests {
         let xml = format!(
             r#"<worksheet xmlns="{SML_STRICT}" xmlns:r="{REL_STRICT}" xmlns:xdr="{XDR_STRICT}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="{X14}"><mc:AlternateContent><mc:Choice Requires="x14"><controls><mc:AlternateContent><mc:Choice Requires="x14"><control shapeId="7" r:id="rId1" name="safe"><controlPr macro="inert"><anchor moveWithCells="true"><from><xdr:col>1</xdr:col><xdr:colOff>2</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>4</xdr:rowOff></from><to><xdr:col>5</xdr:col><xdr:colOff>6</xdr:colOff><xdr:row>7</xdr:row><xdr:rowOff>8</xdr:rowOff></to></anchor></controlPr></control></mc:Choice></mc:AlternateContent></controls></mc:Choice><mc:Fallback/></mc:AlternateContent></worksheet>"#
         );
-        let controls = WorksheetControls::parse(xml.as_bytes()).unwrap();
+        let controls = Controls::parse(xml.as_bytes()).unwrap();
         assert_eq!(
             controls.controls[0]
                 .properties
@@ -607,7 +606,7 @@ mod tests {
             Some("inert")
         );
         let canonical = controls.to_xml(true).unwrap();
-        assert_eq!(WorksheetControls::parse(&canonical).unwrap(), controls);
+        assert_eq!(Controls::parse(&canonical).unwrap(), controls);
     }
 
     #[test]
@@ -728,8 +727,8 @@ mod tests {
 
     #[test]
     fn malformed_and_resource_matrix() {
-        assert!(WorksheetControls::parse(br#"<!DOCTYPE x><worksheet/>"#).is_err());
-        assert!(WorksheetControls::parse(format!(r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><controls><control shapeId="0" r:id="x"/></controls></worksheet>"#).as_bytes()).is_err());
+        assert!(Controls::parse(br#"<!DOCTYPE x><worksheet/>"#).is_err());
+        assert!(Controls::parse(format!(r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><controls><control shapeId="0" r:id="x"/></controls></worksheet>"#).as_bytes()).is_err());
         assert!(
             Descriptor::parse(
                 format!(r#"<ax:ocx xmlns:ax="{AX}" ax:classid="x" ax:persistence="bad"/>"#)
@@ -772,7 +771,7 @@ mod tests {
     fn binary_control(descriptor_uri: &str, binary_uri: &str) -> ControlSet {
         ControlSet {
             controls: vec![LoadedControl {
-                control: WorksheetControl {
+                control: Control {
                     shape_id: 42,
                     relationship_id: "rIdControl".into(),
                     name: Some("Generated control".into()),
@@ -918,8 +917,6 @@ mod tests {
         let xml = format!(
             r#"<worksheet xmlns="{SML}" xmlns:r="{REL}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="{X14}"><mc:AlternateContent><mc:Choice Requires="x14"><controls><control shapeId="1" r:id="rId1"/></controls></mc:Choice></mc:AlternateContent></worksheet>"#
         );
-        assert!(
-            replace_worksheet_controls_xml(xml.as_bytes(), &WorksheetControls::default()).is_err()
-        );
+        assert!(replace_controls_xml(xml.as_bytes(), &Controls::default()).is_err());
     }
 }

@@ -63,7 +63,7 @@ pub struct Comments {
 
 /// A workbook persons part plus its host relationship identity.
 #[derive(Debug, Clone)]
-pub struct WorkbookPart {
+pub struct PeoplePart {
     /// Relationship ID on the workbook part.
     pub relationship_id: String,
     /// OPC part name retained by the host adapter.
@@ -74,7 +74,7 @@ pub struct WorkbookPart {
 
 /// A worksheet threaded-comments part plus its host relationship identity.
 #[derive(Debug, Clone)]
-pub struct SheetPart {
+pub struct CommentsPart {
     /// Worksheet OPC part name retained by the host adapter.
     pub worksheet_part_name: String,
     /// Relationship ID on the worksheet part.
@@ -89,7 +89,7 @@ pub struct SheetPart {
 #[derive(Debug, Clone, Default)]
 pub struct Graph {
     /// Optional workbook-level people part.
-    pub persons: Option<WorkbookPart>,
+    pub persons: Option<PeoplePart>,
     /// Worksheet comment parts in deterministic host order.
-    pub worksheets: Vec<SheetPart>,
+    pub worksheets: Vec<CommentsPart>,
 }

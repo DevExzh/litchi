@@ -12,7 +12,7 @@ use crate::error::{OoxmlError, Result};
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::pivot::read_pivot_tables;
 use crate::xlsx::slicer_cache::{
-    SlicerCacheDefinition, WorkbookSlicerCache, load_slicer_caches, store_slicer_cache,
+    Cache as SlicerCache, Definition as SlicerDefinition, load_slicer_caches, store_slicer_cache,
     write_slicer_cache_definition,
 };
 use crate::xlsx::slicers::{
@@ -216,7 +216,7 @@ pub fn reorder_slicers(
     Ok(ordered)
 }
 
-pub fn find_slicer_cache(package: &OpcPackage, name: &str) -> Result<Option<WorkbookSlicerCache>> {
+pub fn find_slicer_cache(package: &OpcPackage, name: &str) -> Result<Option<SlicerCache>> {
     Ok(load_slicer_caches(package)?
         .into_iter()
         .find(|cache| cache.definition.name.eq_ignore_ascii_case(name)))
@@ -224,10 +224,10 @@ pub fn find_slicer_cache(package: &OpcPackage, name: &str) -> Result<Option<Work
 
 pub fn add_slicer_cache(
     package: &mut OpcPackage,
-    definition: SlicerCacheDefinition,
-) -> Result<WorkbookSlicerCache> {
+    definition: SlicerDefinition,
+) -> Result<SlicerCache> {
     let workbook_name = package.main_document_part()?.partname().clone();
-    let value = WorkbookSlicerCache {
+    let value = SlicerCache {
         relationship_id: next_relationship_id(package.get_part(&workbook_name)?, "rIdSlicerCache")?,
         part_name: next_part_name(package, "/xl/slicerCaches/slicerCache%d.xml")?.to_string(),
         definition,
@@ -240,7 +240,7 @@ pub fn add_slicer_cache(
 
 pub fn update_slicer_cache<F>(package: &mut OpcPackage, name: &str, update: F) -> Result<bool>
 where
-    F: FnOnce(&mut SlicerCacheDefinition),
+    F: FnOnce(&mut SlicerDefinition),
 {
     let mut caches = load_slicer_caches(package)?;
     let Some(index) = caches
@@ -264,7 +264,7 @@ where
 pub fn replace_slicer_cache(
     package: &mut OpcPackage,
     name: &str,
-    replacement: SlicerCacheDefinition,
+    replacement: SlicerDefinition,
 ) -> Result<bool> {
     if !replacement.name.eq_ignore_ascii_case(name) {
         return Err(invalid("replacement Slicer Cache name must match"));
@@ -319,7 +319,7 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
 pub fn reorder_slicer_caches(
     package: &mut OpcPackage,
     ordered_names: &[String],
-) -> Result<Vec<WorkbookSlicerCache>> {
+) -> Result<Vec<SlicerCache>> {
     let caches = reorder_by_key(
         load_slicer_caches(package)?,
         ordered_names,
@@ -710,7 +710,7 @@ pub fn reorder_timelines(
     Ok(ordered)
 }
 
-fn validate_slicer_cache_set(package: &OpcPackage, caches: &[WorkbookSlicerCache]) -> Result<()> {
+fn validate_slicer_cache_set(package: &OpcPackage, caches: &[SlicerCache]) -> Result<()> {
     let mut names = HashSet::new();
     let mut uids = HashSet::new();
     let any_uid = caches.iter().any(|cache| cache.definition.uid.is_some());
@@ -735,10 +735,7 @@ fn validate_slicer_cache_set(package: &OpcPackage, caches: &[WorkbookSlicerCache
     validate_slicer_cache_pivot_links(package, caches)
 }
 
-fn validate_slicer_cache_pivot_links(
-    package: &OpcPackage,
-    caches: &[WorkbookSlicerCache],
-) -> Result<()> {
+fn validate_slicer_cache_pivot_links(package: &OpcPackage, caches: &[SlicerCache]) -> Result<()> {
     let workbook = package.main_document_part()?;
     let details = workbook_parser::parse_workbook_details(
         std::str::from_utf8(workbook.blob()).map_err(|e| invalid(e.to_string()))?,
@@ -830,7 +827,7 @@ fn validate_timeline_cache_set(package: &OpcPackage, caches: &[Cache]) -> Result
 fn validate_slicer_views(
     package: &OpcPackage,
     replacement: Option<(&str, &Slicers)>,
-    caches: &[WorkbookSlicerCache],
+    caches: &[SlicerCache],
 ) -> Result<()> {
     let cache_names: HashSet<String> = caches
         .iter()
@@ -890,7 +887,7 @@ fn validate_timeline_views(sheets: &[TimelinePart], caches: &[Cache]) -> Result<
     Ok(())
 }
 
-fn validate_slicer_cache_reference(slicer: &Slicer, caches: &[WorkbookSlicerCache]) -> Result<()> {
+fn validate_slicer_cache_reference(slicer: &Slicer, caches: &[SlicerCache]) -> Result<()> {
     if caches
         .iter()
         .any(|cache| cache.definition.name.eq_ignore_ascii_case(&slicer.cache))

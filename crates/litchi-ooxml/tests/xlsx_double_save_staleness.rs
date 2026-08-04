@@ -1,8 +1,8 @@
-use litchi_ooxml::xlsx::{ChartAnchor, Workbook, WorksheetChart};
+use litchi_ooxml::xlsx::{Chart, ChartAnchor, Workbook};
 use litchi_opc::{OpcPackage, PackURI};
 
-fn bar_chart() -> WorksheetChart {
-    WorksheetChart::bar_chart(
+fn bar_chart() -> Chart {
+    Chart::bar_chart(
         "Sales",
         "Sheet1!$A$2:$A$3",
         "Sheet1!$B$2:$B$3",

@@ -42,7 +42,7 @@ struct XmlAttribute {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SlicerCacheDataKind {
+pub enum DataKind {
     Olap,
     Tabular,
 }
@@ -50,20 +50,20 @@ pub enum SlicerCacheDataKind {
 /// The complete `data` subtree, retained inertly after validating its exact
 /// one-of OLAP/tabular discriminator.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlicerCacheData {
-    kind: SlicerCacheDataKind,
+pub struct Data {
+    kind: DataKind,
     xml: Vec<u8>,
 }
 
-impl SlicerCacheData {
+impl Data {
     pub fn new(xml: Vec<u8>) -> Result<Self> {
         let wrapped = wrap_fragment(&xml)?;
-        let definition = parse_slicer_cache_definition(&wrapped)?;
+        let definition = parse(&wrapped)?;
         definition
             .data
             .ok_or_else(|| invalid("expected one Slicer Cache data fragment"))
     }
-    pub fn kind(&self) -> SlicerCacheDataKind {
+    pub fn kind(&self) -> DataKind {
         self.kind
     }
     pub fn xml(&self) -> &[u8] {
@@ -74,12 +74,12 @@ impl SlicerCacheData {
 /// The complete optional `extLst` subtree, retained inertly and never used to
 /// resolve relationships.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlicerCacheExtensionList(Vec<u8>);
+pub struct ExtensionList(Vec<u8>);
 
-impl SlicerCacheExtensionList {
+impl ExtensionList {
     pub fn new(xml: Vec<u8>) -> Result<Self> {
         let wrapped = wrap_fragment(&xml)?;
-        let definition = parse_slicer_cache_definition(&wrapped)?;
+        let definition = parse(&wrapped)?;
         definition
             .extension_list
             .ok_or_else(|| invalid("expected one Slicer Cache extLst fragment"))
@@ -90,13 +90,13 @@ impl SlicerCacheExtensionList {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlicerCachePivotTable {
+pub struct PivotTable {
     pub tab_id: u32,
     pub name: String,
     xml_attributes: Vec<XmlAttribute>,
 }
 
-impl SlicerCachePivotTable {
+impl PivotTable {
     pub fn new(tab_id: u32, name: impl Into<String>) -> Self {
         Self {
             tab_id,
@@ -107,17 +107,17 @@ impl SlicerCachePivotTable {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlicerCacheDefinition {
+pub struct Definition {
     pub name: String,
     pub source_name: String,
     pub uid: Option<String>,
-    pub pivot_tables: Vec<SlicerCachePivotTable>,
-    pub data: Option<SlicerCacheData>,
-    pub extension_list: Option<SlicerCacheExtensionList>,
+    pub pivot_tables: Vec<PivotTable>,
+    pub data: Option<Data>,
+    pub extension_list: Option<ExtensionList>,
     xml_attributes: Vec<XmlAttribute>,
 }
 
-impl SlicerCacheDefinition {
+impl Definition {
     pub fn new(name: impl Into<String>, source_name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -132,10 +132,10 @@ impl SlicerCacheDefinition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkbookSlicerCache {
+pub struct Cache {
     pub relationship_id: String,
     pub part_name: String,
-    pub definition: SlicerCacheDefinition,
+    pub definition: Definition,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,7 +149,7 @@ struct Capture {
     kind: CaptureKind,
     start: usize,
     parent_depth: usize,
-    data_kind: Option<SlicerCacheDataKind>,
+    data_kind: Option<DataKind>,
 }
 
 /// A byte sink that makes every growth and output-size check explicit.
@@ -211,7 +211,7 @@ impl BoundedXml {
     }
 }
 
-pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition> {
+pub fn parse(xml: &[u8]) -> Result<Definition> {
     if xml.len() > MAX_PART_BYTES {
         return Err(limit("part bytes"));
     }
@@ -222,10 +222,10 @@ pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
-    let mut definition: Option<SlicerCacheDefinition> = None;
+    let mut definition: Option<Definition> = None;
     let mut stage = 0u8;
     let mut in_pivots = false;
-    let mut open_pivot: Option<(usize, SlicerCachePivotTable)> = None;
+    let mut open_pivot: Option<(usize, PivotTable)> = None;
     let mut capture: Option<Capture> = None;
     let mut total_inert = 0usize;
     let mut events = 0usize;
@@ -354,7 +354,7 @@ pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition
                             let definition = definition
                                 .as_mut()
                                 .ok_or_else(|| invalid("missing Slicer Cache definition"))?;
-                            definition.extension_list = Some(SlicerCacheExtensionList(bytes));
+                            definition.extension_list = Some(ExtensionList(bytes));
                             stage = 3;
                         },
                         _ => return Err(invalid("unexpected or out-of-order Slicer Cache child")),
@@ -387,10 +387,10 @@ pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition
                                 let kind = active.data_kind.ok_or_else(|| {
                                     invalid("Slicer Cache data requires an olap or tabular child")
                                 })?;
-                                target.data = Some(SlicerCacheData { kind, xml: bytes });
+                                target.data = Some(Data { kind, xml: bytes });
                             },
                             CaptureKind::Extension => {
-                                target.extension_list = Some(SlicerCacheExtensionList(bytes))
+                                target.extension_list = Some(ExtensionList(bytes))
                             },
                         }
                         capture = None;
@@ -461,12 +461,12 @@ pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition
         return Err(invalid("incomplete Slicer Cache XML"));
     }
     let value = definition.ok_or_else(|| invalid("missing Slicer Cache definition"))?;
-    validate_slicer_cache_definition(&value)?;
+    validate(&value)?;
     Ok(value)
 }
 
-pub fn write_slicer_cache_definition(value: &SlicerCacheDefinition) -> Result<Vec<u8>> {
-    validate_slicer_cache_definition(value)?;
+pub fn write(value: &Definition) -> Result<Vec<u8>> {
+    validate(value)?;
     let mut output = BoundedXml::new(MAX_PART_BYTES, "serialized part bytes");
     output.append(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")?;
     output.append(b"<x14:slicerCacheDefinition xmlns:x14=\"")?;
@@ -514,7 +514,7 @@ fn parse_root_attributes(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
     decoder: Decoder,
-) -> Result<SlicerCacheDefinition> {
+) -> Result<Definition> {
     let mut name = None;
     let mut source_name = None;
     let mut uid = None;
@@ -552,7 +552,7 @@ fn parse_root_attributes(
             _ => retain_attribute(&mut xml_attributes, &mut retained_bytes, raw, value)?,
         }
     }
-    Ok(SlicerCacheDefinition {
+    Ok(Definition {
         name: name.ok_or_else(|| invalid("Slicer Cache requires name"))?,
         source_name: source_name.ok_or_else(|| invalid("Slicer Cache requires sourceName"))?,
         uid,
@@ -567,7 +567,7 @@ fn parse_pivot_table(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
     decoder: Decoder,
-) -> Result<SlicerCachePivotTable> {
+) -> Result<PivotTable> {
     let mut tab_id = None;
     let mut name = None;
     let mut xml_attributes = Vec::new();
@@ -600,7 +600,7 @@ fn parse_pivot_table(
             _ => retain_attribute(&mut xml_attributes, &mut retained_bytes, raw, value)?,
         }
     }
-    let value = SlicerCachePivotTable {
+    let value = PivotTable {
         tab_id: tab_id.ok_or_else(|| invalid("pivotTable requires tabId"))?,
         name: name.ok_or_else(|| invalid("pivotTable requires name"))?,
         xml_attributes,
@@ -638,7 +638,7 @@ fn reject_attributes(
     Ok(())
 }
 
-pub fn validate_slicer_cache_definition(value: &SlicerCacheDefinition) -> Result<()> {
+pub fn validate(value: &Definition) -> Result<()> {
     validate_name(&value.name)?;
     validate_required_string(&value.source_name, "Slicer Cache sourceName")?;
     if let Some(uid) = &value.uid {
@@ -678,7 +678,7 @@ pub fn validate_slicer_cache_definition(value: &SlicerCacheDefinition) -> Result
     Ok(())
 }
 
-fn validate_pivot(value: &SlicerCachePivotTable) -> Result<()> {
+fn validate_pivot(value: &PivotTable) -> Result<()> {
     validate_required_string(&value.name, "pivotTable name")?;
     validate_xml_attributes(&value.xml_attributes)
 }
@@ -859,7 +859,7 @@ fn retain_attribute(
     Ok(())
 }
 
-fn push_pivot(value: &mut SlicerCacheDefinition, pivot: SlicerCachePivotTable) -> Result<()> {
+fn push_pivot(value: &mut Definition, pivot: PivotTable) -> Result<()> {
     if value.pivot_tables.len() >= MAX_PIVOT_TABLES {
         return Err(limit("pivot table count"));
     }
@@ -892,13 +892,13 @@ fn retained(xml: &[u8], start: usize, end: usize, total: &mut usize) -> Result<V
     Ok(retained)
 }
 
-fn data_kind(namespace: &ResolveResult<'_>, local: &[u8]) -> Result<SlicerCacheDataKind> {
+fn data_kind(namespace: &ResolveResult<'_>, local: &[u8]) -> Result<DataKind> {
     if !exact(namespace, X14) {
         return Err(invalid("Slicer Cache data source has the wrong namespace"));
     }
     match local {
-        b"olap" => Ok(SlicerCacheDataKind::Olap),
-        b"tabular" => Ok(SlicerCacheDataKind::Tabular),
+        b"olap" => Ok(DataKind::Olap),
+        b"tabular" => Ok(DataKind::Tabular),
         _ => Err(invalid("Slicer Cache data requires olap or tabular")),
     }
 }
@@ -1042,23 +1042,14 @@ mod tests {
 
     #[test]
     fn microsoft_example_is_typed_and_round_trips() {
-        let value = parse_slicer_cache_definition(microsoft().as_bytes()).unwrap();
+        let value = parse(microsoft().as_bytes()).unwrap();
         assert_eq!(
             (&value.name[..], &value.source_name[..]),
             ("Slicer_State", "State")
         );
-        assert_eq!(
-            value.pivot_tables,
-            vec![SlicerCachePivotTable::new(1, "PivotTable1")]
-        );
-        assert_eq!(
-            value.data.as_ref().unwrap().kind(),
-            SlicerCacheDataKind::Tabular
-        );
-        assert_eq!(
-            parse_slicer_cache_definition(&write_slicer_cache_definition(&value).unwrap()).unwrap(),
-            value
-        );
+        assert_eq!(value.pivot_tables, vec![PivotTable::new(1, "PivotTable1")]);
+        assert_eq!(value.data.as_ref().unwrap().kind(), DataKind::Tabular);
+        assert_eq!(parse(&write(&value).unwrap()).unwrap(), value);
     }
 
     #[test]
@@ -1086,12 +1077,9 @@ mod tests {
             ),
         ];
         for xml in cases {
-            assert!(
-                parse_slicer_cache_definition(xml.as_bytes()).is_err(),
-                "accepted {xml}"
-            );
+            assert!(parse(xml.as_bytes()).is_err(), "accepted {xml}");
         }
-        assert!(parse_slicer_cache_definition(&vec![b' '; MAX_PART_BYTES + 1]).is_err());
+        assert!(parse(&vec![b' '; MAX_PART_BYTES + 1]).is_err());
         let mut deep = String::new();
         for _ in 0..=MAX_DEPTH {
             deep.push_str("<x14:x>");
@@ -1102,7 +1090,7 @@ mod tests {
         let xml = format!(
             r#"<x14:slicerCacheDefinition xmlns:x14="{X14}" name="Cache" sourceName="Field"><x14:data><x14:tabular>{deep}</x14:tabular></x14:data></x14:slicerCacheDefinition>"#
         );
-        assert!(parse_slicer_cache_definition(xml.as_bytes()).is_err());
+        assert!(parse(xml.as_bytes()).is_err());
     }
 
     #[test]
@@ -1110,9 +1098,9 @@ mod tests {
         let malformed = format!(
             r#"<x14:slicerCacheDefinition xmlns:x14="{X14}" name="Cache" sourceName="Field"><x14:pivotTables><x14:pivotTable tabId="1" name="P"></x14:pivotTables></x14:slicerCacheDefinition>"#
         );
-        assert!(parse_slicer_cache_definition(malformed.as_bytes()).is_err());
+        assert!(parse(malformed.as_bytes()).is_err());
         let wrong_namespace = r#"<x14:slicerCacheDefinition xmlns:x14="wrong" name="Cache" sourceName="Field"></x14:slicerCacheDefinition>"#;
-        assert!(parse_slicer_cache_definition(wrong_namespace.as_bytes()).is_err());
+        assert!(parse(wrong_namespace.as_bytes()).is_err());
         let mut bomb = format!(
             r#"<x14:slicerCacheDefinition xmlns:x14="{X14}" name="Cache" sourceName="Field">"#
         );
@@ -1120,19 +1108,19 @@ mod tests {
             bomb.push_str("<!--x-->");
         }
         bomb.push_str("</x14:slicerCacheDefinition>");
-        assert!(parse_slicer_cache_definition(bomb.as_bytes()).is_err());
+        assert!(parse(bomb.as_bytes()).is_err());
     }
 
     #[test]
     fn writer_rejects_invalid_and_oversized_retained_values() {
-        let mut invalid = SlicerCacheDefinition::new("Cache", "Field");
+        let mut invalid = Definition::new("Cache", "Field");
         invalid.name = "bad\u{0}".into();
-        assert!(write_slicer_cache_definition(&invalid).is_err());
-        let mut oversized = SlicerCacheDefinition::new("Cache", "Field");
-        oversized.data = Some(SlicerCacheData {
-            kind: SlicerCacheDataKind::Tabular,
+        assert!(write(&invalid).is_err());
+        let mut oversized = Definition::new("Cache", "Field");
+        oversized.data = Some(Data {
+            kind: DataKind::Tabular,
             xml: vec![b'x'; MAX_INERT_SUBTREE_BYTES + 1],
         });
-        assert!(write_slicer_cache_definition(&oversized).is_err());
+        assert!(write(&oversized).is_err());
     }
 }

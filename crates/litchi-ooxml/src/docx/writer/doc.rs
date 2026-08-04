@@ -2,7 +2,9 @@ use crate::docx::OfficeMath;
 use crate::docx::parts::document_part::active_block_ranges;
 /// Document writer implementation for DOCX.
 use crate::error::{OoxmlError, Result};
-use litchi_docx::alt::{Chunk, Conformance, Rel, scan};
+#[cfg(test)]
+use litchi_docx::alt::Rel;
+use litchi_docx::alt::{Chunk, Conformance, scan};
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types

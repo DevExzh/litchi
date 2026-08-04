@@ -34,8 +34,8 @@ pub use super::super::format::{
 
 // Import chart types
 pub use super::super::chart::{
-    ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
-    RelationshipTarget, WorksheetChart,
+    Chart, ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
+    Relationship, RelationshipTarget,
 };
 
 // Import from other writer modules
@@ -411,7 +411,7 @@ pub struct MutableWorksheet {
     /// Merged cell ranges (start_row, start_col, end_row, end_col)
     merged_cells: Vec<(u32, u32, u32, u32)>,
     /// Charts in this worksheet
-    charts: Vec<WorksheetChart>,
+    charts: Vec<Chart>,
     /// Data validation rules
     validations: Vec<DataValidation>,
     /// Complete typed core and Office 2010 validation collections.
@@ -799,12 +799,12 @@ impl MutableWorksheet {
     ///
     /// # Arguments
     ///
-    /// * `chart` - The WorksheetChart to add with its positioning
+    /// * `chart` - The Chart to add with its positioning
     ///
     /// # Example
     ///
     /// ```rust,ignore
-    /// let chart = WorksheetChart::bar_chart(
+    /// let chart = Chart::bar_chart(
     ///     "Sales Data",
     ///     "Sheet1!$A$2:$A$10",
     ///     "Sheet1!$B$2:$B$10",
@@ -812,14 +812,14 @@ impl MutableWorksheet {
     /// )?;
     /// worksheet.add_chart(chart);
     /// ```
-    pub fn add_chart(&mut self, chart: WorksheetChart) {
+    pub fn add_chart(&mut self, chart: Chart) {
         self.charts.push(chart);
         self.modified = true;
     }
 
     /// Add a pivot chart bound to a pivot table by name.
     ///
-    /// The chart (built with the `WorksheetChart` constructors) is converted
+    /// The chart (built with the `Chart` constructors) is converted
     /// into a pivot chart: its pivot source is set to `pivot_table_name` and
     /// every series without an extension list receives the default
     /// all-visible drop-zone options. The name is validated against the
@@ -828,14 +828,10 @@ impl MutableWorksheet {
     ///
     /// # Arguments
     ///
-    /// * `chart` - The WorksheetChart to add with its positioning
+    /// * `chart` - The Chart to add with its positioning
     /// * `pivot_table_name` - Name of the pivot table the chart binds to,
     ///   optionally sheet-qualified (for example `Sheet1!PivotTable1`)
-    pub fn add_pivot_chart(
-        &mut self,
-        chart: WorksheetChart,
-        pivot_table_name: &str,
-    ) -> SheetResult<()> {
+    pub fn add_pivot_chart(&mut self, chart: Chart, pivot_table_name: &str) -> SheetResult<()> {
         if pivot_table_name.is_empty() {
             return Err("pivot table name cannot be empty".into());
         }
@@ -845,12 +841,12 @@ impl MutableWorksheet {
     }
 
     /// Get the charts in this worksheet.
-    pub fn charts(&self) -> &[WorksheetChart] {
+    pub fn charts(&self) -> &[Chart] {
         &self.charts
     }
 
     /// Get a mutable reference to the charts in this worksheet.
-    pub fn charts_mut(&mut self) -> &mut Vec<WorksheetChart> {
+    pub fn charts_mut(&mut self) -> &mut Vec<Chart> {
         self.modified = true;
         &mut self.charts
     }
@@ -862,7 +858,7 @@ impl MutableWorksheet {
     }
 
     /// Remove a chart at the specified index.
-    pub fn remove_chart(&mut self, index: usize) -> Option<WorksheetChart> {
+    pub fn remove_chart(&mut self, index: usize) -> Option<Chart> {
         if index < self.charts.len() {
             self.modified = true;
             Some(self.charts.remove(index))
@@ -4430,7 +4426,7 @@ mod tests {
         assert!(ws.add_image(vec![1], "png", 3, 1, 2, 2, None).is_err());
         assert!(ws.add_image(vec![1], "webp", 1, 1, 2, 2, None).is_err());
 
-        let mut chart = WorksheetChart::bar_chart(
+        let mut chart = Chart::bar_chart(
             "Revenue",
             "Sheet1!$A$1:$A$2",
             "Sheet1!$B$1:$B$2",

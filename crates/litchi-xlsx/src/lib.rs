@@ -55,10 +55,10 @@ pub mod workbook_metadata;
 pub mod xml_maps;
 
 pub use active_x::{
-    Binary, ControlProperties, ControlSet, Descriptor, Font, LoadedControl, Marker, ObjectAnchor,
-    Persistence, Picture, PreviewImage, Property, PropertyObject, WorksheetControl,
-    WorksheetControls, load_from_worksheet, remove_from_worksheet, replace_on_worksheet,
-    replace_worksheet_controls_xml, store_on_worksheet,
+    Binary, Control, ControlProperties, ControlSet, Controls, Descriptor, Font, LoadedControl,
+    Marker, ObjectAnchor, Persistence, Picture, PreviewImage, Property, PropertyObject,
+    load_from_worksheet, remove_from_worksheet, replace_controls_xml, replace_on_worksheet,
+    store_on_worksheet,
 };
 pub use auto_filter::{
     AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,
@@ -67,10 +67,7 @@ pub use auto_filter::{
     FilterValues, IconFilter, SortConditionDefinition, SortStateDefinition, Top10Filter,
     parse_auto_filter, parse_auto_filter_fragment, write_auto_filter_fragment,
 };
-pub use calculation_properties::{
-    WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
-    parse_workbook_calculation_properties,
-};
+pub use calculation_properties::{Mode, ReferenceMode};
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
 pub use cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
@@ -156,12 +153,7 @@ pub use sheet_protection::{
     validate_metadata, write_core, write_extensions, write_protection,
 };
 pub use sheet_view::parse_worksheet_views;
-pub use slicer_cache::{
-    SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, SlicerCacheData,
-    SlicerCacheDataKind, SlicerCacheDefinition, SlicerCacheExtensionList, SlicerCachePivotTable,
-    WorkbookSlicerCache, parse_slicer_cache_definition, validate_slicer_cache_definition,
-    write_slicer_cache_definition,
-};
+pub use slicer_cache::{SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE};
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use table::{
@@ -169,7 +161,7 @@ pub use table::{
     parse_table_xml, serialize_table, validate_table, write_table_xml,
 };
 pub use threaded_comments::{
-    Comment, Graph, Mention, People, Person, SheetPart, WorkbookPart, parse_comments,
+    Comment, CommentsPart, Graph, Mention, People, PeoplePart, Person, parse_comments,
     parse_persons, validate_comments, validate_graph, validate_guid, validate_people,
     validate_timestamp, write_comments, write_persons,
 };
@@ -191,5 +183,5 @@ pub use workbook::{
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
-    OpaqueMetadataExtension, WorkbookMetadata,
+    OpaqueMetadataExtension,
 };

@@ -226,7 +226,7 @@ pub struct RevisionLogPart {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WorkbookRevisions {
+pub struct Revisions {
     pub users_relationship_id: String,
     pub users_part_name: String,
     pub headers_relationship_id: String,
@@ -596,7 +596,7 @@ pub fn write_revision_log(
     finish(out)
 }
 
-pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<WorkbookRevisions>> {
+pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>> {
     let workbook = package.main_document_part()?;
     require_workbook_type(workbook.content_type())?;
     let workbook_name = workbook.partname().to_string();
@@ -680,7 +680,7 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<WorkbookRe
         Some(headers_uri.as_str()),
         &targets,
     )?;
-    let value = WorkbookRevisions {
+    let value = Revisions {
         users_relationship_id: users_rel.r_id().into(),
         users_part_name: users_uri.to_string(),
         headers_relationship_id: headers_rel.r_id().into(),
@@ -695,7 +695,7 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<WorkbookRe
 
 pub fn store_workbook_revisions(
     package: &mut OpcPackage,
-    value: &WorkbookRevisions,
+    value: &Revisions,
     conformance: RevisionConformance,
 ) -> Result<()> {
     validate_package(value)?;
@@ -845,7 +845,7 @@ fn validate_log(v: &RevisionLog) -> Result<()> {
     }
     Ok(())
 }
-fn validate_package(v: &WorkbookRevisions) -> Result<()> {
+fn validate_package(v: &Revisions) -> Result<()> {
     validate_users(&v.users)?;
     validate_headers(&v.headers)?;
     if v.logs.len() > MAX_LOGS || v.logs.len() != v.headers.headers.len() {
@@ -1448,7 +1448,7 @@ mod tests {
             }],
         }
     }
-    fn value() -> WorkbookRevisions {
+    fn value() -> Revisions {
         let h = RevisionHeader {
             guid: guid(2),
             date_time: "2026-07-17T12:00:00Z".into(),
@@ -1460,7 +1460,7 @@ mod tests {
             sheet_ids: vec![1],
             trailing_elements: vec![],
         };
-        WorkbookRevisions {
+        Revisions {
             users_relationship_id: "rId2".into(),
             users_part_name: "/xl/revisions/userNames.xml".into(),
             headers_relationship_id: "rId3".into(),

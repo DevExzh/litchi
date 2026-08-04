@@ -497,10 +497,10 @@ impl WorkbookWriter {
     }
 
     fn normalized_pivot_chart(
-        chart: &crate::xlsx::WorksheetChart,
+        chart: &crate::xlsx::Chart,
         host_sheet_name: &str,
         authored_pivot_tables: &[(String, String)],
-    ) -> Result<crate::xlsx::WorksheetChart> {
+    ) -> Result<crate::xlsx::Chart> {
         let Some(source) = chart.chart.pivot_source.as_ref() else {
             return Ok(chart.clone());
         };
@@ -1783,9 +1783,9 @@ mod tests {
     fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
         use crate::xlsb::chartsheet::{Color, ColorType, PageSetup, Protection, State, View};
         use crate::xlsb::worksheet::StrongProtection;
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor};
 
-        let chart = WorksheetChart::bar_chart_with_cache(
+        let chart = Chart::bar_chart_with_cache(
             "Sales",
             "Data!$A$2:$A$3",
             &["North", "South"],
@@ -1889,9 +1889,9 @@ mod tests {
     #[test]
     fn chart_sheet_validation_is_lossless_or_refuse() {
         use crate::xlsb::chartsheet::{Color, ColorType};
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor};
 
-        let chart = WorksheetChart::bar_chart(
+        let chart = Chart::bar_chart(
             "T",
             "Data!$A$1:$A$2",
             "Data!$B$1:$B$2",
@@ -3062,10 +3062,10 @@ mod tests {
     #[test]
     fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
         use crate::xlsb::drawing::AnchorKind;
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor};
         use litchi_drawingml::chart::plot_area::TypeGroup;
 
-        let bar = WorksheetChart::bar_chart_with_cache(
+        let bar = Chart::bar_chart_with_cache(
             "Quarterly sales",
             "Charts!$A$2:$A$4",
             &["Q1", "Q2", "Q3"],
@@ -3074,7 +3074,7 @@ mod tests {
             ChartAnchor::with_offsets(1, 10, 1, 20, 8, 30, 15, 40),
         )
         .unwrap();
-        let line = WorksheetChart::line_chart(
+        let line = Chart::line_chart(
             "Trend",
             "Charts!$A$2:$A$4",
             "Charts!$B$2:$B$4",
@@ -3089,7 +3089,7 @@ mod tests {
         sheet.add_chart(line).unwrap();
         assert_eq!(sheet.charts().len(), 2);
 
-        let pie = WorksheetChart::pie_chart(
+        let pie = Chart::pie_chart(
             "Share",
             "Summary!$A$1:$A$3",
             "Summary!$B$1:$B$3",
@@ -3172,7 +3172,7 @@ mod tests {
 
     #[test]
     fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor};
 
         let mut begin_view = vec![0u8; 32];
         begin_view[28..32].copy_from_slice(&1u32.to_le_bytes());
@@ -3195,7 +3195,7 @@ mod tests {
         }
         let view = litchi_xlsb::pivot_view::Part::from_bytes(view_bytes.clone()).unwrap();
 
-        let chart = WorksheetChart::line_chart(
+        let chart = Chart::line_chart(
             "Revenue",
             "Pivot Host!$A$2:$A$3",
             "Pivot Host!$B$2:$B$3",
@@ -3258,9 +3258,9 @@ mod tests {
 
     #[test]
     fn pivot_chart_refuses_a_missing_view_binding() {
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{Chart, ChartAnchor};
 
-        let chart = WorksheetChart::line_chart(
+        let chart = Chart::line_chart(
             "Revenue",
             "Host!$A$1:$A$2",
             "Host!$B$1:$B$2",
@@ -3283,12 +3283,12 @@ mod tests {
     #[test]
     fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         use crate::xlsx::{
-            ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
-            Relationship, RelationshipTarget, WorksheetChart,
+            Chart, ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget,
+            ChartUserShapesPart, Relationship, RelationshipTarget,
         };
         use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties};
 
-        let mut worksheet_chart = WorksheetChart::bar_chart(
+        let mut worksheet_chart = Chart::bar_chart(
             "Resources",
             "Data!$A$1:$A$2",
             "Data!$B$1:$B$2",
@@ -3341,7 +3341,7 @@ mod tests {
                 }],
             });
 
-        let chart_sheet_chart = WorksheetChart::line_chart(
+        let chart_sheet_chart = Chart::line_chart(
             "Linked",
             "Data!$A$1:$A$2",
             "Data!$B$1:$B$2",
@@ -3423,11 +3423,11 @@ mod tests {
     #[test]
     fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
         use crate::xlsx::{
-            ChartAnchor, ChartUserShapesPart, Relationship, RelationshipTarget, WorksheetChart,
+            Chart, ChartAnchor, ChartUserShapesPart, Relationship, RelationshipTarget,
         };
 
         let mut sheet = MutableWorksheet::new("Charts");
-        let valid = WorksheetChart::bar_chart(
+        let valid = Chart::bar_chart(
             "Valid",
             "Charts!$A$1:$A$2",
             "Charts!$B$1:$B$2",
@@ -3474,8 +3474,7 @@ mod tests {
     fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
         use crate::xlsb::{AnchorKind, Image, ImageFormat, Object};
         use crate::xlsx::{
-            ChartAnchor, DrawingObject, Emu, EmuExtent, EmuOffset, Preset, ShapeAnchor,
-            WorksheetChart,
+            Chart, ChartAnchor, DrawingObject, Emu, EmuExtent, EmuOffset, Preset, ShapeAnchor,
         };
 
         const PNG_1X1: &[u8] = &[
@@ -3500,7 +3499,7 @@ mod tests {
             .with_description("Logo & <mark>")
             .unwrap();
         let svg = Image::new(SVG.to_vec(), ImageFormat::Svg, ChartAnchor::new(6, 2, 9, 8)).unwrap();
-        let chart = WorksheetChart::line_chart(
+        let chart = Chart::line_chart(
             "Trend",
             "Pictures!$A$1:$A$2",
             "Pictures!$B$1:$B$2",

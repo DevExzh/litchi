@@ -10,8 +10,8 @@ use litchi_opc::OpcPackage;
 use litchi_xlsx::workbook_metadata as owner;
 
 pub use owner::{
-    FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
-    OpaqueMetadataExtension, WorkbookMetadata,
+    FutureMetadata, Metadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
+    OpaqueMetadataExtension,
 };
 
 #[cfg(test)]
@@ -25,7 +25,7 @@ const XDA: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/dynami
 const MAX_STRING: usize = 1024 * 1024;
 
 /// Loads the optional workbook metadata part selected by the workbook relationship.
-pub fn load_from_package(package: &OpcPackage) -> Result<Option<WorkbookMetadata>> {
+pub fn load_from_package(package: &OpcPackage) -> Result<Option<Metadata>> {
     let workbook = package.main_document_part()?;
     let mut relationships = workbook
         .rels()
@@ -57,9 +57,7 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<WorkbookMetadata
             "workbook metadata part must not have relationships".into(),
         ));
     }
-    Ok(Some(
-        WorkbookMetadata::parse(part.blob()).map_err(map_owner_error)?,
-    ))
+    Ok(Some(Metadata::parse(part.blob()).map_err(map_owner_error)?))
 }
 
 fn map_owner_error(error: litchi_xlsx::Error) -> OoxmlError {
@@ -80,7 +78,7 @@ fn map_owner_error(error: litchi_xlsx::Error) -> OoxmlError {
 mod tests {
     use super::*;
     use litchi_opc::{BlobPart, PackURI, Part};
-    fn fixture(bytes: &[u8]) -> WorkbookMetadata {
+    fn fixture(bytes: &[u8]) -> Metadata {
         let p = OpcPackage::from_bytes(bytes).unwrap();
         load_from_package(&p).unwrap().unwrap()
     }
@@ -121,8 +119,8 @@ mod tests {
         assert_eq!(lambda.future[1].blocks.len(), 2);
         assert_eq!(lambda.value_blocks.len(), 2);
     }
-    fn sample() -> WorkbookMetadata {
-        WorkbookMetadata {
+    fn sample() -> Metadata {
+        Metadata {
             types: vec![MetadataType {
                 name: "XLDAPR".into(),
                 minimum_supported_version: 120000,
@@ -160,7 +158,7 @@ mod tests {
     fn strict_deterministic_roundtrip_and_index_api() {
         let m = sample();
         let x = m.to_xml(true).unwrap();
-        let p = WorkbookMetadata::parse(&x).unwrap();
+        let p = Metadata::parse(&x).unwrap();
         assert_eq!(p.cell_block(1).unwrap().records[0].type_index, 1);
         assert!(p.cell_block(0).is_none());
         assert_eq!(p.to_xml(true).unwrap(), x);
@@ -178,15 +176,12 @@ mod tests {
                 "</metadataTypes></mc:Choice><mc:Fallback/></mc:AlternateContent>",
             );
         let xml=body.replace("<metadata xmlns=\"",&format!("<metadata xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:xda=\"{XDA}\" xmlns=\""));
-        assert_eq!(
-            WorkbookMetadata::parse(xml.as_bytes()).unwrap().types.len(),
-            1
-        );
+        assert_eq!(Metadata::parse(xml.as_bytes()).unwrap().types.len(), 1);
     }
     #[test]
     fn malformed_and_bounds() {
-        assert!(WorkbookMetadata::parse(br#"<!DOCTYPE x><metadata/>"#).is_err());
-        assert!(WorkbookMetadata::parse(format!("<metadata xmlns=\"{SML}\"><metadataTypes count=\"2\"><metadataType name=\"x\" minSupportedVersion=\"1\"/></metadataTypes></metadata>").as_bytes()).is_err());
+        assert!(Metadata::parse(br#"<!DOCTYPE x><metadata/>"#).is_err());
+        assert!(Metadata::parse(format!("<metadata xmlns=\"{SML}\"><metadataTypes count=\"2\"><metadataType name=\"x\" minSupportedVersion=\"1\"/></metadataTypes></metadata>").as_bytes()).is_err());
         let mut m = sample();
         m.cell_blocks[0].records[0].type_index = 2;
         assert!(m.to_xml(false).is_err());

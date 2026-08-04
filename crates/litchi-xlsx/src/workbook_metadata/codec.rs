@@ -9,8 +9,8 @@ use quick_xml::{NsReader, XmlVersion};
 use std::collections::HashSet;
 
 use super::model::{
-    FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
-    OpaqueMetadataExtension, WorkbookMetadata,
+    FutureMetadata, Metadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
+    OpaqueMetadataExtension,
 };
 use super::package::{
     SPREADSHEETML_NAMESPACE as SML, STRICT_SPREADSHEETML_NAMESPACE as SML_STRICT,
@@ -46,7 +46,7 @@ struct Node {
     text: String,
 }
 
-impl WorkbookMetadata {
+impl Metadata {
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_XML {
             return Err(limit("metadata XML bytes"));

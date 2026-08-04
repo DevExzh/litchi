@@ -13,7 +13,7 @@ pub use codec::{
     parse_comments, parse_persons, validate_comments, validate_graph, validate_guid,
     validate_people, validate_timestamp, write_comments, write_persons,
 };
-pub use model::{Comment, Comments, Graph, Mention, People, Person, SheetPart, WorkbookPart};
+pub use model::{Comment, Comments, CommentsPart, Graph, Mention, People, PeoplePart, Person};
 
 /// Maximum serialized size accepted for one threaded-comments XML part.
 pub const MAX_PART_BYTES: usize = 64 * 1024 * 1024;

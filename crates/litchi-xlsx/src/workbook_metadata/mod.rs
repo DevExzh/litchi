@@ -11,8 +11,8 @@ mod package;
 mod tests;
 
 pub use model::{
-    FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
-    OpaqueMetadataExtension, WorkbookMetadata,
+    FutureMetadata, Metadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
+    OpaqueMetadataExtension,
 };
 pub use package::{
     SHEET_METADATA_CONTENT_TYPE, SHEET_METADATA_RELATIONSHIP_TYPE, SPREADSHEETML_NAMESPACE,
