@@ -1226,7 +1226,7 @@ fn reachable_floating_drawable_comment_crud_is_guarded() {
             .drawables()
             .unwrap()
             .into_iter()
-            .map(|drawable| drawable.object_id)
+            .map(|drawable| drawable.object_id.object_id())
             .collect::<Vec<_>>(),
         vec![drawable_id]
     );

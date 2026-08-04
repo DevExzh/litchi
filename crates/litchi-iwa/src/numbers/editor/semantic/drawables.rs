@@ -11,9 +11,9 @@ impl NumbersEditor {
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package.clone())?
             .drawables()?
             .into_iter()
-            .filter(|drawable| owned.contains(&drawable.object_id))
+            .filter(|drawable| owned.contains(&drawable.object_id.object_id()))
             .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id);
+        drawables.sort_by_key(|drawable| drawable.object_id.object_id());
         Ok(drawables)
     }
 
@@ -75,7 +75,7 @@ impl NumbersEditor {
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
         let reply_id = comments.add_reply(drawable_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id)
+        Ok(reply_id.object_id())
     }
 
     /// Update a direct reply, returning its current storage identifier.
@@ -90,7 +90,7 @@ impl NumbersEditor {
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
         let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id)
+        Ok(reply_id.object_id())
     }
 
     /// Remove a direct reply from a comment on one sheet drawable.

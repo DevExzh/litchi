@@ -3367,9 +3367,9 @@ impl KeynoteEditor {
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .drawables()?
             .into_iter()
-            .filter(|drawable| owned.contains(&drawable.object_id))
+            .filter(|drawable| owned.contains(&drawable.object_id.object_id()))
             .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id);
+        drawables.sort_by_key(|drawable| drawable.object_id.object_id());
         Ok(drawables)
     }
 
@@ -3439,7 +3439,7 @@ impl KeynoteEditor {
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
-        Ok(reply_id)
+        Ok(reply_id.object_id())
     }
 
     /// Update a direct reply, returning its current storage identifier.
@@ -3456,7 +3456,7 @@ impl KeynoteEditor {
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
-        Ok(reply_id)
+        Ok(reply_id.object_id())
     }
 
     /// Remove a direct reply from a comment on one slide drawable.
@@ -4905,7 +4905,7 @@ impl KeynoteEditor {
         if !self
             .slide_drawables(slide_index)?
             .iter()
-            .any(|drawable| drawable.object_id == drawable_object_id)
+            .any(|drawable| drawable.object_id.object_id() == drawable_object_id)
         {
             return Err(Error::InvalidFormat(format!(
                 "Keynote slide drawable {drawable_object_id} has no supported direct drawable payload"

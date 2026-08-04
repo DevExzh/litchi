@@ -699,7 +699,7 @@ impl NumbersEditor {
         if !self
             .sheet_drawables(sheet_id)?
             .iter()
-            .any(|drawable| drawable.object_id == drawable_object_id)
+            .any(|drawable| drawable.object_id.object_id() == drawable_object_id)
         {
             return Err(Error::InvalidFormat(format!(
                 "Numbers sheet drawable {drawable_object_id} has no supported direct drawable payload"

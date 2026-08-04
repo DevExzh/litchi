@@ -161,9 +161,9 @@ impl PagesEditor {
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .drawables()?
             .into_iter()
-            .filter(|drawable| reachable.contains(&drawable.object_id))
+            .filter(|drawable| reachable.contains(&drawable.object_id.object_id()))
             .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id);
+        drawables.sort_by_key(|drawable| drawable.object_id.object_id());
         Ok(drawables)
     }
 
@@ -179,7 +179,9 @@ impl PagesEditor {
             let Some(storage_id) = drawable_owned_text_storage(self.package(), &drawable)? else {
                 continue;
             };
-            if let Some(previous_drawable) = storage_owners.insert(storage_id, drawable.object_id) {
+            if let Some(previous_drawable) =
+                storage_owners.insert(storage_id, drawable.object_id.object_id())
+            {
                 return Err(Error::InvalidFormat(format!(
                     "Pages drawables {previous_drawable} and {} share owned text storage {storage_id}",
                     drawable.object_id
@@ -192,7 +194,7 @@ impl PagesEditor {
                 ))
             })?;
             result.push(PagesDrawableTextInfo {
-                drawable_object_id: drawable.object_id,
+                drawable_object_id: drawable.object_id.object_id(),
                 storage,
             });
         }
@@ -2271,7 +2273,7 @@ impl PagesEditor {
         if verified
             .drawables()?
             .iter()
-            .any(|drawable| drawable.object_id == drawable_object_id)
+            .any(|drawable| drawable.object_id.object_id() == drawable_object_id)
         {
             return Err(Error::InvalidFormat(
                 "Pages text-box deletion failed validation".to_owned(),
@@ -2333,7 +2335,7 @@ impl PagesEditor {
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.add_reply(drawable_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id)
+        Ok(reply_id.object_id())
     }
 
     /// Update a direct reply, returning its current storage identifier.
@@ -2347,7 +2349,7 @@ impl PagesEditor {
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id)
+        Ok(reply_id.object_id())
     }
 
     /// Remove a direct reply from a reachable Pages drawable comment.
@@ -2843,7 +2845,7 @@ impl PagesEditor {
         if !self
             .drawables()?
             .iter()
-            .any(|drawable| drawable.object_id == drawable_object_id)
+            .any(|drawable| drawable.object_id.object_id() == drawable_object_id)
         {
             return Err(Error::ParseError(format!(
                 "drawable object {drawable_object_id} is not reachable from the Pages document"
@@ -3865,7 +3867,7 @@ fn drawable_owned_text_storage(
     let mut owned_storage = None;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
-        let Some(object) = archive.object(drawable.object_id) else {
+        let Some(object) = archive.object(drawable.object_id.object_id()) else {
             continue;
         };
         if owned_storage.is_some() {

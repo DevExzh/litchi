@@ -80,7 +80,7 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
             .sheet_drawables(2)
             .unwrap()
             .into_iter()
-            .map(|drawable| drawable.object_id)
+            .map(|drawable| drawable.object_id.object_id())
             .collect::<Vec<_>>(),
         vec![50]
     );
@@ -103,7 +103,7 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
         .set_sheet_drawable_comment(2, 50, "Sheet annotation")
         .unwrap();
     let comment = editor.sheet_drawable_comment(2, 50).unwrap().unwrap();
-    assert_eq!(comment.drawable_object_id, 50);
+    assert_eq!(comment.drawable_object_id.object_id(), 50);
     assert_eq!(comment.comment.text, "Sheet annotation");
     assert_eq!(
         editor.sheet_text_boxes(2).unwrap()[0].storage.text,

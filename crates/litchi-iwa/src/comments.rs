@@ -1,6 +1,8 @@
 //! Cross-application comments attached directly to drawable objects.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::num::NonZeroU64;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -30,6 +32,107 @@ const ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
 const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
 const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
 
+/// A validated native object identifier for a drawable.
+///
+/// iWork uses zero as the absence value in protobuf references. Keeping that
+/// sentinel out of the semantic API prevents callers from accidentally
+/// addressing an invalid drawable while leaving the wire representation as a
+/// plain `u64` at the archive boundary.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct DrawableObjectId(NonZeroU64);
+
+impl DrawableObjectId {
+    /// Construct a drawable identifier, returning `None` for the protobuf
+    /// null sentinel.
+    pub const fn new(raw: u64) -> Option<Self> {
+        match NonZeroU64::new(raw) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    /// Construct an identifier from a native iWork object identifier.
+    pub fn from_object_id(raw: u64) -> Result<Self> {
+        Self::new(raw).ok_or_else(|| {
+            Error::ParseError("drawable object identifier must be non-zero".to_owned())
+        })
+    }
+
+    /// Return the native identifier used at the archive boundary.
+    pub const fn object_id(self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl TryFrom<u64> for DrawableObjectId {
+    type Error = Error;
+
+    fn try_from(raw: u64) -> Result<Self> {
+        Self::from_object_id(raw)
+    }
+}
+
+impl From<DrawableObjectId> for u64 {
+    fn from(value: DrawableObjectId) -> Self {
+        value.object_id()
+    }
+}
+
+impl fmt::Display for DrawableObjectId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.object_id().fmt(formatter)
+    }
+}
+
+/// A validated native object identifier for a comment-storage archive.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CommentStorageId(NonZeroU64);
+
+impl CommentStorageId {
+    /// Construct a comment-storage identifier, returning `None` for the
+    /// protobuf null sentinel.
+    pub const fn new(raw: u64) -> Option<Self> {
+        match NonZeroU64::new(raw) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    /// Construct an identifier from a native iWork object identifier.
+    pub fn from_object_id(raw: u64) -> Result<Self> {
+        Self::new(raw).ok_or_else(|| {
+            Error::ParseError("comment-storage object identifier must be non-zero".to_owned())
+        })
+    }
+
+    /// Return the native identifier used at the archive boundary.
+    pub const fn object_id(self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl TryFrom<u64> for CommentStorageId {
+    type Error = Error;
+
+    fn try_from(raw: u64) -> Result<Self> {
+        Self::from_object_id(raw)
+    }
+}
+
+impl From<CommentStorageId> for u64 {
+    fn from(value: CommentStorageId) -> Self {
+        value.object_id()
+    }
+}
+
+impl fmt::Display for CommentStorageId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.object_id().fmt(formatter)
+    }
+}
+
 /// Stable UUID stored on an iWork comment archive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IWorkCommentUuid {
@@ -51,25 +154,25 @@ pub struct IWorkComment {
 /// A drawable object and its direct comment attachment, if present.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IWorkDrawableInfo {
-    pub object_id: u64,
+    pub object_id: DrawableObjectId,
     pub message_type: u32,
-    pub comment_storage_object_id: Option<u64>,
+    pub comment_storage_object_id: Option<CommentStorageId>,
 }
 
 /// A resolved direct drawable comment.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrawableCommentInfo {
-    pub drawable_object_id: u64,
-    pub storage_object_id: u64,
+    pub drawable_object_id: DrawableObjectId,
+    pub storage_object_id: CommentStorageId,
     pub comment: IWorkComment,
 }
 
 /// A resolved reply in a drawable's direct comment thread.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrawableCommentReplyInfo {
-    pub drawable_object_id: u64,
-    pub root_storage_object_id: u64,
-    pub storage_object_id: u64,
+    pub drawable_object_id: DrawableObjectId,
+    pub root_storage_object_id: CommentStorageId,
+    pub storage_object_id: CommentStorageId,
     pub comment: IWorkComment,
 }
 
@@ -134,26 +237,46 @@ impl IWorkDrawableCommentEditor {
     pub fn drawables(&self) -> Result<Vec<IWorkDrawableInfo>> {
         let mut drawables = drawable_locations(&self.package, self.application)?
             .into_values()
-            .map(|location| IWorkDrawableInfo {
-                object_id: location.object_id,
-                message_type: location.message_type,
-                comment_storage_object_id: location.comment_storage_object_id,
+            .map(|location| {
+                Ok(IWorkDrawableInfo {
+                    object_id: DrawableObjectId::from_object_id(location.object_id)?,
+                    message_type: location.message_type,
+                    comment_storage_object_id: location
+                        .comment_storage_object_id
+                        .map(CommentStorageId::from_object_id)
+                        .transpose()?,
+                })
             })
-            .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id);
+            .collect::<Result<Vec<_>>>()?;
+        drawables.sort_by_key(|drawable| drawable.object_id.object_id());
         Ok(drawables)
     }
 
-    pub fn comment(&self, drawable_object_id: u64) -> Result<Option<DrawableCommentInfo>> {
+    pub fn comment<D>(&self, drawable_object_id: D) -> Result<Option<DrawableCommentInfo>>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+    {
+        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
         drawable_comment_in_package(&self.package, self.application, drawable_object_id)
     }
 
     /// Resolves the direct replies to a drawable comment in stored order.
-    pub fn replies(&self, drawable_object_id: u64) -> Result<Vec<DrawableCommentReplyInfo>> {
+    pub fn replies<D>(&self, drawable_object_id: D) -> Result<Vec<DrawableCommentReplyInfo>>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+    {
+        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
         drawable_comment_replies_in_package(&self.package, self.application, drawable_object_id)
     }
 
-    pub fn set_comment(&mut self, drawable_object_id: u64, text: impl Into<String>) -> Result<()> {
+    pub fn set_comment<D>(&mut self, drawable_object_id: D, text: impl Into<String>) -> Result<()>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+    {
+        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
         let mut staged = self.package.clone();
         set_drawable_comment_in_package(
             &mut staged,
@@ -166,7 +289,12 @@ impl IWorkDrawableCommentEditor {
         Ok(())
     }
 
-    pub fn clear_comment(&mut self, drawable_object_id: u64) -> Result<()> {
+    pub fn clear_comment<D>(&mut self, drawable_object_id: D) -> Result<()>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+    {
+        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
         let mut staged = self.package.clone();
         clear_drawable_comment_in_package(&mut staged, self.application, drawable_object_id)?;
         validate_package_round_trip(&staged)?;
@@ -178,7 +306,29 @@ impl IWorkDrawableCommentEditor {
     ///
     /// The root storage is copy-on-written, matching native iWork saves and
     /// isolating a drawable when multiple drawables share one thread.
-    pub fn add_reply(&mut self, drawable_object_id: u64, text: impl Into<String>) -> Result<u64> {
+    pub fn add_reply<D>(
+        &mut self,
+        drawable_object_id: D,
+        text: impl Into<String>,
+    ) -> Result<CommentStorageId>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+    {
+        self.add_reply_id(drawable_object_id, text)
+    }
+
+    /// Adds a reply and returns its validated comment-storage identifier.
+    pub fn add_reply_id<D>(
+        &mut self,
+        drawable_object_id: D,
+        text: impl Into<String>,
+    ) -> Result<CommentStorageId>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+    {
+        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
         let mut staged = self.package.clone();
         let reply_id = add_drawable_comment_reply_in_package(
             &mut staged,
@@ -187,6 +337,7 @@ impl IWorkDrawableCommentEditor {
             text.into(),
         )?;
         validate_package_round_trip(&staged)?;
+        let reply_id = CommentStorageId::from_object_id(reply_id)?;
         self.package = staged;
         Ok(reply_id)
     }
@@ -195,12 +346,37 @@ impl IWorkDrawableCommentEditor {
     ///
     /// A changed reply and its root are copy-on-written. The returned value can
     /// therefore differ from `reply_storage_object_id`.
-    pub fn set_reply(
+    pub fn set_reply<D, S>(
         &mut self,
-        drawable_object_id: u64,
-        reply_storage_object_id: u64,
+        drawable_object_id: D,
+        reply_storage_object_id: S,
         text: impl Into<String>,
-    ) -> Result<u64> {
+    ) -> Result<CommentStorageId>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+        S: TryInto<CommentStorageId>,
+        S::Error: fmt::Debug,
+    {
+        self.set_reply_id(drawable_object_id, reply_storage_object_id, text)
+    }
+
+    /// Updates one direct reply and returns its validated comment-storage
+    /// identifier.
+    pub fn set_reply_id<D, S>(
+        &mut self,
+        drawable_object_id: D,
+        reply_storage_object_id: S,
+        text: impl Into<String>,
+    ) -> Result<CommentStorageId>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+        S: TryInto<CommentStorageId>,
+        S::Error: fmt::Debug,
+    {
+        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
+        let reply_storage_object_id = normalize_comment_storage_id(reply_storage_object_id)?;
         let mut staged = self.package.clone();
         let reply_id = set_drawable_comment_reply_in_package(
             &mut staged,
@@ -210,16 +386,25 @@ impl IWorkDrawableCommentEditor {
             text.into(),
         )?;
         validate_package_round_trip(&staged)?;
+        let reply_id = CommentStorageId::from_object_id(reply_id)?;
         self.package = staged;
         Ok(reply_id)
     }
 
     /// Removes one direct reply from a drawable's comment thread.
-    pub fn remove_reply(
+    pub fn remove_reply<D, S>(
         &mut self,
-        drawable_object_id: u64,
-        reply_storage_object_id: u64,
-    ) -> Result<()> {
+        drawable_object_id: D,
+        reply_storage_object_id: S,
+    ) -> Result<()>
+    where
+        D: TryInto<DrawableObjectId>,
+        D::Error: fmt::Debug,
+        S: TryInto<CommentStorageId>,
+        S::Error: fmt::Debug,
+    {
+        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
+        let reply_storage_object_id = normalize_comment_storage_id(reply_storage_object_id)?;
         let mut staged = self.package.clone();
         remove_drawable_comment_reply_in_package(
             &mut staged,
@@ -247,6 +432,34 @@ impl IWorkDrawableCommentEditor {
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         self.package.save(path)
     }
+}
+
+fn normalize_drawable_object_id<D>(value: D) -> Result<u64>
+where
+    D: TryInto<DrawableObjectId>,
+    D::Error: fmt::Debug,
+{
+    value
+        .try_into()
+        .map(DrawableObjectId::object_id)
+        .map_err(|error| {
+            Error::ParseError(format!("invalid drawable object identifier: {error:?}"))
+        })
+}
+
+fn normalize_comment_storage_id<S>(value: S) -> Result<u64>
+where
+    S: TryInto<CommentStorageId>,
+    S::Error: fmt::Debug,
+{
+    value
+        .try_into()
+        .map(CommentStorageId::object_id)
+        .map_err(|error| {
+            Error::ParseError(format!(
+                "invalid comment-storage object identifier: {error:?}"
+            ))
+        })
 }
 
 #[derive(Debug, Clone)]
@@ -373,6 +586,8 @@ fn drawable_comment_in_package(
     };
     let locations = object_locations(package)?;
     let comment = read_comment_storage(package, &locations, storage_object_id)?;
+    let drawable_object_id = DrawableObjectId::from_object_id(drawable_object_id)?;
+    let storage_object_id = CommentStorageId::from_object_id(storage_object_id)?;
     Ok(Some(DrawableCommentInfo {
         drawable_object_id,
         storage_object_id,
@@ -388,20 +603,23 @@ fn drawable_comment_replies_in_package(
     let Some(root) = drawable_comment_in_package(package, application, drawable_object_id)? else {
         return Ok(Vec::new());
     };
+    let drawable_object_id = DrawableObjectId::from_object_id(drawable_object_id)?;
+    let root_storage_id = root.storage_object_id.object_id();
     let locations = object_locations(package)?;
     let mut seen = HashSet::new();
     let mut replies = Vec::with_capacity(root.comment.reply_object_ids.len());
     for reply_id in root.comment.reply_object_ids {
-        if reply_id == root.storage_object_id || !seen.insert(reply_id) {
+        if reply_id == root_storage_id || !seen.insert(reply_id) {
             return Err(Error::InvalidFormat(format!(
                 "comment storage {} contains a duplicate or cyclic reply reference to {reply_id}",
-                root.storage_object_id
+                root_storage_id
             )));
         }
+        let storage_object_id = CommentStorageId::from_object_id(reply_id)?;
         replies.push(DrawableCommentReplyInfo {
             drawable_object_id,
             root_storage_object_id: root.storage_object_id,
-            storage_object_id: reply_id,
+            storage_object_id,
             comment: read_comment_storage(package, &locations, reply_id)?,
         });
     }
@@ -529,7 +747,8 @@ fn clear_drawable_comment_in_package(
     // Validate the target before changing the attachment. This keeps malformed
     // comment graphs transactional instead of silently detaching corrupt data.
     let locations = object_locations(package)?;
-    read_comment_storage(package, &locations, storage_id)?;
+    let root = read_comment_storage(package, &locations, storage_id)?;
+    validate_direct_reply_graph(package, &locations, storage_id, &root)?;
     replace_drawable_comment_reference(package, application, &location, Some(storage_id), None)?;
     let mut removed = remove_unreferenced_comment_graph(package, application, storage_id)?;
     let mut modified_entries = vec![location.archive_name];
