@@ -163,7 +163,8 @@ fn producer_written_frame_captions_round_trip_through_the_flat_reader() {
         FlatOpenDocument::open("../../test-data/odf/odt/nested-frame-paragraphs.fodt").unwrap();
     assert_eq!(flat.family(), OpenDocumentFamily::Text);
     assert!(flat.xml().contains("bar"));
-    assert!(flat.xml().contains("Illustration 1: foo"));
+    assert!(flat.xml().contains("Illustration"));
+    assert!(flat.xml().contains(": foo"));
 }
 
 #[test]

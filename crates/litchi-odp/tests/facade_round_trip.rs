@@ -8,7 +8,7 @@ fn builder_and_presentation_facade_round_trip() {
     let presentation = Presentation::from_bytes(bytes.clone()).unwrap();
     assert_eq!(presentation.slide_count().unwrap(), 1);
     assert_eq!(presentation.text().unwrap(), "Welcome\nHello from ODP");
-    assert_eq!(presentation.into_bytes(), bytes);
+    assert_eq!(presentation.to_bytes().unwrap(), bytes);
 }
 
 #[test]
