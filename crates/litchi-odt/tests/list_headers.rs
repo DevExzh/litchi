@@ -7,7 +7,7 @@
 
 use litchi_odt::elements::text::TextElements;
 use litchi_odt::elements::parser::{DocumentOrderElement, DocumentParser};
-use litchi_odt::elements::text::{List, ListHeader, Paragraph};
+use litchi_odt::elements::text::{ListHeader, Paragraph};
 
 /// A list whose first block is an unnumbered header followed by two items.
 const LIST_XML: &str = concat!(
@@ -21,7 +21,7 @@ const LIST_XML: &str = concat!(
     "</text:list></office:text></office:body></office:document-content>",
 );
 
-fn parsed_list() -> litchi_odt::List {
+fn parsed_list() -> litchi_odt::elements::text::List {
     let elements = DocumentParser::parse_elements_in_order(LIST_XML).unwrap();
     elements
         .into_iter()

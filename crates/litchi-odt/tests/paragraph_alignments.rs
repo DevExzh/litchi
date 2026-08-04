@@ -91,7 +91,7 @@ fn round_trip_serialize_reparse() {
     let reparsed = parse(&wrap(&fragment)).unwrap();
     assert_eq!(reparsed.get("P1"), Some(style));
     let default = Style::default_style(Some(Properties {
-        text_align: Some(Horizontal::Center),
+        horizontal: Some(Horizontal::Center),
         ..Default::default()
     }));
     let fragment = default.to_xml_fragment().unwrap();
@@ -150,7 +150,7 @@ fn mutation_replaces_inserts_and_strips_owned_attributes() {
     let changed = Style::named(
         "P1",
         Some(Properties {
-            text_align: Some(Horizontal::End),
+            horizontal: Some(Horizontal::End),
             ..Default::default()
         }),
     )
@@ -180,7 +180,7 @@ fn mutation_replaces_inserts_and_strips_owned_attributes() {
         Style::named(
             name,
             Some(Properties {
-                vertical_align: Some(Vertical::Baseline),
+                vertical: Some(Vertical::Baseline),
                 ..Default::default()
             }),
         )
@@ -220,8 +220,8 @@ fn builder_package_round_trip() {
     let style = Style::named(
         "Body",
         Some(Properties {
-            text_align: Some(Horizontal::Justify),
-            vertical_align: Some(Vertical::Auto),
+            horizontal: Some(Horizontal::Justify),
+            vertical: Some(Vertical::Auto),
         }),
     )
     .unwrap();

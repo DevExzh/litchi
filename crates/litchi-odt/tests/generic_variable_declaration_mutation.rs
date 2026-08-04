@@ -15,9 +15,9 @@ fn package(content: &str) -> Vec<u8> {
         MIMETYPE,
         &[
         ("content.xml", content.as_bytes()),
-        ("meta.xml", b"<meta-preserved/>" as &[u8]),
-        ("settings.xml", b"<settings-preserved/>" as &[u8]),
-        ("Objects/asset.bin", b"\x00preserved\xff" as &[u8]),
+        ("meta.xml", b"<meta-preserved/>"),
+        ("settings.xml", b"<settings-preserved/>"),
+        ("Objects/asset.bin", b"\x00preserved\xff"),
         ],
     )
 }

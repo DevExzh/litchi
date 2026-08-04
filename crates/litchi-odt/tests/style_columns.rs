@@ -3,9 +3,7 @@ use litchi_odt::{
     StyleColumnLength, StyleColumnSeparator, StyleColumnSeparatorAlignment,
     StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
 };
-use std::io::{Cursor, Write};
-use zip::CompressionMethod;
-use zip::write::SimpleFileOptions;
+mod support;
 
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const FO: &str = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
@@ -169,22 +167,11 @@ fn mutable_update_preserves_inherited_aliases() {
         r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="{STYLE}" xmlns:f="{FO}" o:version="1.3"><o:automatic-styles><s:page-layout s:name="Alias"><s:page-layout-properties><s:columns f:column-count="2"/></s:page-layout-properties></s:page-layout></o:automatic-styles><o:master-styles/></o:document-styles>"#
     );
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" o:version="1.3"><o:body><o:text><t:p>body</t:p></o:text></o:body></o:document-content>"#;
-    let mut archive = zip::ZipWriter::new(Cursor::new(Vec::new()));
-    let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
-    let deflated = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    archive.start_file("mimetype", stored).unwrap();
-    archive
-        .write_all(b"application/vnd.oasis.opendocument.text")
-        .unwrap();
-    archive.start_file("content.xml", deflated).unwrap();
-    archive.write_all(content.as_bytes()).unwrap();
-    archive.start_file("styles.xml", deflated).unwrap();
-    archive.write_all(styles.as_bytes()).unwrap();
-    archive
-        .start_file("META-INF/manifest.xml", deflated)
-        .unwrap();
-    archive.write_all(br#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/></manifest:manifest>"#).unwrap();
-    let document = Document::from_bytes(archive.finish().unwrap().into_inner()).unwrap();
+    let document = Document::from_bytes(support::package(
+        "application/vnd.oasis.opendocument.text",
+        &[("content.xml", content.as_bytes()), ("styles.xml", styles.as_bytes())],
+    ))
+    .unwrap();
     assert_eq!(
         document.page_layouts().unwrap()[0]
             .properties
