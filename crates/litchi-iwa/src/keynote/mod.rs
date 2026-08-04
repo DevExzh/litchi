@@ -94,6 +94,4 @@ pub use editor::{
     RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideMovie,
     RemovedKeynoteSlideShape, RemovedKeynoteSlideTable, RemovedKeynoteTextBox,
 };
-pub use litchi_keynote::{
-    BuildAnimation, BuildAnimationType, Show, Slide, SlideTransition, TransitionType,
-};
+pub use litchi_keynote::{BuildAnimation, BuildAnimationType, Show, Slide, SlideTransition};

@@ -39,9 +39,11 @@ use crate::{Error, Result};
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 
-type FormulaTable = HashMap<u32, tsce::FormulaArchive>;
-type FormulaErrorTable = HashMap<u32, String>;
-type CommentTable = HashMap<u32, NumbersCellComment>;
+type CompactTable<T> = Box<[(u32, T)]>;
+type StringTable = CompactTable<String>;
+type FormulaTable = CompactTable<tsce::FormulaArchive>;
+type FormulaErrorTable = CompactTable<String>;
+type CommentTable = CompactTable<NumbersCellComment>;
 type FormulaOwnerKey = [u32; 4];
 type FormulaCategoryKey = [u64; 2];
 
@@ -53,10 +55,10 @@ const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
 const MAX_MATERIALIZED_CELLS: usize = 1 << 20;
 
 struct CellTables<'a> {
-    strings: &'a HashMap<u32, String>,
+    strings: &'a StringTable,
     formulas: &'a FormulaTable,
     formula_errors: &'a FormulaErrorTable,
-    rich_text: &'a HashMap<u32, String>,
+    rich_text: &'a StringTable,
     comments: &'a CommentTable,
     formula_references: &'a FormulaReferenceMaps,
 }
@@ -100,6 +102,39 @@ impl CellBudget {
 
 fn allocation_error(resource: &'static str, amount: usize) -> Error {
     Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<CompactTable<T>> {
+    let mut compacted = Vec::new();
+    let entries = entries.into_iter();
+    let (lower_bound, _) = entries.size_hint();
+    compacted
+        .try_reserve(lower_bound)
+        .map_err(|_| allocation_error("Numbers table sidecar entries", lower_bound))?;
+    for entry in entries {
+        compacted
+            .try_reserve(1)
+            .map_err(|_| allocation_error("Numbers table sidecar entries", compacted.len() + 1))?;
+        compacted.push(entry);
+    }
+    compact_table_vec(compacted)
+}
+
+fn compact_table_vec<T>(mut compacted: Vec<(u32, T)>) -> Result<CompactTable<T>> {
+    compacted.sort_unstable_by_key(|(key, _)| *key);
+    if compacted.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        return Err(Error::InvalidFormat(
+            "Numbers table sidecar contains duplicate keys".to_owned(),
+        ));
+    }
+    Ok(compacted.into_boxed_slice())
+}
+
+fn compact_table_get<T>(table: &[(u32, T)], key: u32) -> Option<&T> {
+    table
+        .binary_search_by_key(&key, |(entry_key, _)| *entry_key)
+        .ok()
+        .map(|index| &table[index].1)
 }
 
 fn checked_table_dimensions(row_count: u32, column_count: u32) -> Result<(usize, usize)> {
@@ -303,16 +338,16 @@ impl<'a> TableDataExtractor<'a> {
             self.load_formula_table(table_model.base_data_store.formula_table.identifier)?;
         let formula_error_table = match table_model.base_data_store.formula_error_table {
             Some(reference) => self.load_formula_error_table(reference.identifier)?,
-            None => HashMap::new(),
+            None => Box::default(),
         };
 
         let rich_text_table = match table_model.base_data_store.rich_text_table {
             Some(reference) => self.load_rich_text_table(reference.identifier)?,
-            None => HashMap::new(),
+            None => Box::default(),
         };
         let comment_table = match table_model.base_data_store.comment_storage_table {
             Some(reference) => self.load_comment_table(reference.identifier)?,
-            None => HashMap::new(),
+            None => Box::default(),
         };
 
         // Parse tiles to extract cell data
@@ -330,32 +365,35 @@ impl<'a> TableDataExtractor<'a> {
     }
 
     /// Load a TableDataList from an object reference
-    fn load_string_table(&self, object_id: u64) -> Result<HashMap<u32, String>> {
-        Ok(self
-            .load_table_data_list_entries(object_id, tst::table_data_list::ListType::String)?
-            .into_iter()
-            .filter_map(|entry| entry.string.map(|value| (entry.key, value)))
-            .collect())
+    fn load_string_table(&self, object_id: u64) -> Result<StringTable> {
+        compact_table(
+            self.load_table_data_list_entries(object_id, tst::table_data_list::ListType::String)?
+                .into_iter()
+                .filter_map(|entry| entry.string.map(|value| (entry.key, value))),
+        )
     }
 
     fn load_formula_table(&self, object_id: u64) -> Result<FormulaTable> {
-        Ok(self
-            .load_table_data_list_entries(object_id, tst::table_data_list::ListType::Formula)?
-            .into_iter()
-            .filter_map(|entry| entry.formula.map(|value| (entry.key, value)))
-            .collect())
+        compact_table(
+            self.load_table_data_list_entries(object_id, tst::table_data_list::ListType::Formula)?
+                .into_iter()
+                .filter_map(|entry| entry.formula.map(|value| (entry.key, value))),
+        )
     }
 
     fn load_formula_error_table(&self, object_id: u64) -> Result<FormulaErrorTable> {
-        Ok(self
-            .load_table_data_list_entries(object_id, tst::table_data_list::ListType::FormulaError)?
+        compact_table(
+            self.load_table_data_list_entries(
+                object_id,
+                tst::table_data_list::ListType::FormulaError,
+            )?
             .into_iter()
-            .filter_map(|entry| entry.string.map(|value| (entry.key, value)))
-            .collect())
+            .filter_map(|entry| entry.string.map(|value| (entry.key, value))),
+        )
     }
 
-    fn load_rich_text_table(&self, object_id: u64) -> Result<HashMap<u32, String>> {
-        let mut result = HashMap::new();
+    fn load_rich_text_table(&self, object_id: u64) -> Result<StringTable> {
+        let mut result = Vec::new();
 
         for entry in self.load_table_data_list_entries(
             object_id,
@@ -377,17 +415,20 @@ impl<'a> TableDataExtractor<'a> {
                     continue;
                 };
                 if let Some(text) = self.extract_rich_text(payload.storage.identifier)? {
-                    result.insert(entry.key, text);
+                    result.try_reserve(1).map_err(|_| {
+                        allocation_error("Numbers rich-text sidecar", result.len() + 1)
+                    })?;
+                    result.push((entry.key, text));
                     break;
                 }
             }
         }
 
-        Ok(result)
+        compact_table_vec(result)
     }
 
     fn load_comment_table(&self, object_id: u64) -> Result<CommentTable> {
-        let mut result = HashMap::new();
+        let mut result = Vec::new();
         for entry in self.load_table_data_list_entries(
             object_id,
             tst::table_data_list::ListType::CommentStorage,
@@ -432,7 +473,10 @@ impl<'a> TableDataExtractor<'a> {
                     "Object {storage_id} has multiple TSD comment-storage payloads"
                 )));
             }
-            result.insert(
+            result
+                .try_reserve(1)
+                .map_err(|_| allocation_error("Numbers comment sidecar", result.len() + 1))?;
+            result.push((
                 entry.key,
                 NumbersCellComment {
                     text: comment.text.clone().unwrap_or_default(),
@@ -451,9 +495,9 @@ impl<'a> TableDataExtractor<'a> {
                             upper: uuid.upper,
                         }),
                 },
-            );
+            ));
         }
-        Ok(result)
+        compact_table_vec(result)
     }
 
     fn load_table_data_list_entries(
@@ -757,7 +801,7 @@ impl<'a> TableDataExtractor<'a> {
             )?;
             table.try_set_cell(row_index, column_index, parsed.value)?;
             if let Some(identifier) = parsed.comment_identifier {
-                let comment = cell_tables.comments.get(&identifier).ok_or_else(|| {
+                let comment = compact_table_get(cell_tables.comments, identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Numbers comment table has no entry {identifier} referenced by cell ({row_index}, {column_index})"
                     ))
@@ -930,7 +974,7 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         if let Some(identifier) = formula_id {
-            let formula = cell_tables.formulas.get(&identifier).ok_or_else(|| {
+            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
                 ))
@@ -956,18 +1000,18 @@ impl<'a> TableDataExtractor<'a> {
             0 => CellValue::Empty,
             2 | 10 => CellValue::Number(decimal.or(number).unwrap_or(0.0)),
             3 => string_id
-                .and_then(|id| cell_tables.strings.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
             5 => CellValue::Date(date.unwrap_or(0.0)),
             6 => CellValue::Boolean(number.unwrap_or(0.0) != 0.0),
             7 => CellValue::Duration(number.unwrap_or(0.0)),
             8 => CellValue::Error(
                 formula_error_id
-                    .and_then(|id| cell_tables.formula_errors.get(&id).cloned())
+                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
                     .unwrap_or_else(|| "FORMULA".to_owned()),
             ),
             9 => rich_text_id
-                .and_then(|id| cell_tables.rich_text.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
             other => {
                 return Err(Error::ParseError(format!(
@@ -1049,7 +1093,7 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         if let Some(identifier) = formula_id {
-            let formula = cell_tables.formulas.get(&identifier).ok_or_else(|| {
+            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
                 ))
@@ -1075,18 +1119,18 @@ impl<'a> TableDataExtractor<'a> {
             0 => CellValue::Empty,
             2 => CellValue::Number(number.unwrap_or(0.0)),
             3 => string_id
-                .and_then(|id| cell_tables.strings.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
             5 => CellValue::Date(date.unwrap_or(0.0)),
             6 => CellValue::Boolean(number.unwrap_or(0.0) != 0.0),
             7 => CellValue::Duration(number.unwrap_or(0.0)),
             8 => CellValue::Error(
                 formula_error_id
-                    .and_then(|id| cell_tables.formula_errors.get(&id).cloned())
+                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
                     .unwrap_or_else(|| "FORMULA".to_owned()),
             ),
             9 => rich_text_id
-                .and_then(|id| cell_tables.rich_text.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
             other => {
                 return Err(Error::ParseError(format!(
@@ -2237,17 +2281,34 @@ mod tests {
     }
 
     #[test]
+    fn compact_sidecars_sort_and_binary_search_without_hash_buckets() {
+        let table = compact_table([(9, "nine"), (1, "one"), (5, "five")]).unwrap();
+        assert_eq!(
+            table.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
+            [1, 5, 9]
+        );
+        assert_eq!(compact_table_get(&table, 5), Some(&"five"));
+        assert_eq!(compact_table_get(&table, 7), None);
+    }
+
+    #[test]
+    fn compact_sidecars_reject_duplicate_keys() {
+        let error = compact_table([(7, "first"), (7, "second")]).unwrap_err();
+        assert!(matches!(error, Error::InvalidFormat(message) if message.contains("duplicate")));
+    }
+
+    #[test]
     fn test_bnc_string_cell() {
         let data = [
             5, 3, 0, 0, 0, 0, 0, 0, // version and type
             0x08, 0x00, 0x00, 0x00, // string-id flag
             7, 0, 0, 0, // string id
         ];
-        let strings = HashMap::from([(7, "hello".to_string())]);
-        let formulas = HashMap::new();
-        let errors = HashMap::new();
-        let rich_text = HashMap::new();
-        let comments = HashMap::new();
+        let strings: StringTable = compact_table([(7, "hello".to_string())]).unwrap();
+        let formulas: FormulaTable = Box::default();
+        let errors: FormulaErrorTable = Box::default();
+        let rich_text: StringTable = Box::default();
+        let comments: CommentTable = Box::default();
         let formula_references = FormulaReferenceMaps::default();
         let tables = CellTables {
             strings: &strings,
@@ -2263,16 +2324,16 @@ mod tests {
 
     #[test]
     fn bnc_and_pre_bnc_error_cells_resolve_formula_error_text() {
-        let errors = HashMap::from([(7, "Syntax Error".to_owned())]);
+        let errors: FormulaErrorTable = compact_table([(7, "Syntax Error".to_owned())]).unwrap();
         let bnc = [
             5, 8, 0, 0, 0, 0, 0, 0, // version and type
             0x00, 0x08, 0x00, 0x00, // formula-error flag
             7, 0, 0, 0,
         ];
-        let strings = HashMap::new();
-        let formulas = HashMap::new();
-        let rich_text = HashMap::new();
-        let comments = HashMap::new();
+        let strings: StringTable = Box::default();
+        let formulas: FormulaTable = Box::default();
+        let rich_text: StringTable = Box::default();
+        let comments: CommentTable = Box::default();
         let formula_references = FormulaReferenceMaps::default();
         let tables = CellTables {
             strings: &strings,
@@ -2297,11 +2358,11 @@ mod tests {
 
     #[test]
     fn bnc_and_pre_bnc_cells_expose_comment_identifiers() {
-        let strings = HashMap::new();
-        let formulas = HashMap::new();
-        let errors = HashMap::new();
-        let rich_text = HashMap::new();
-        let comments = HashMap::new();
+        let strings: StringTable = Box::default();
+        let formulas: FormulaTable = Box::default();
+        let errors: FormulaErrorTable = Box::default();
+        let rich_text: StringTable = Box::default();
+        let comments: CommentTable = Box::default();
         let formula_references = FormulaReferenceMaps::default();
         let tables = CellTables {
             strings: &strings,

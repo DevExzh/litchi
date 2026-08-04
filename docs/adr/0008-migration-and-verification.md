@@ -5769,7 +5769,10 @@ owns `Section` and `SectionType`; and `litchi-keynote` owns `Slide`, `Show`,
 build-animation, and transition values. Its `transition::Effect` now owns the
 lossless native transition-effect identifiers and canonical-known-value check;
 the monolith retains only archive-boundary transition settings and wire
-mutation. The old implementations were removed from the extracted value owners,
+mutation. The ordinary Keynote reader maps modern and legacy archive effect
+identifiers into the same leaf-owned `SlideTransition::effect` value, so the
+reader no longer collapses known or future effects to an untyped `Other` case.
+The old implementations were removed from the extracted value owners,
 while the monolith still has migration
 adapters where existing reader/editor surfaces need archive-boundary context.
 These adapters are staged ownership work, not a compatibility API. No archive,
@@ -5782,7 +5785,7 @@ private adapter for the remaining reader/editor migration. The BNC wire slice
 now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
 CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
 the monolith retains only a private module alias plus its archive/protobuf
-callers. The combined Numbers leaf suite has 26 tests, the IWA suite has 1,499
+callers. The combined Numbers leaf suite has 26 tests, the IWA suite has 1,502
 tests, and the boundary check plus native Numbers smoke cover the extraction.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
@@ -5795,7 +5798,7 @@ The physical IWA substrate slice is complete as well: raw schemas remain in
 use the allocation-conscious slice API. The core framing suite has 17 passing
 tests. The facade varint exit is now complete too: `varint.rs` was deleted,
 all callers use the common bounded implementation, and the IWA suite still
-passes 1,498 tests. The facade `WireField` representation and direct wire
+passes 1,502 tests. The facade `WireField` representation and direct wire
 mutation exit is complete without a compatibility shim; only the callback
 error boundary remains before `wire.rs` itself can be deleted. The Numbers
 table/sheet semantic slice is now extracted into dependency-free
@@ -5807,12 +5810,20 @@ finished tables into immutable leaf sheets without rebuilding cell maps; the
 legacy archive adapter remains available for comments and native sidecars
 during the staged reader migration. Dense views remain explicitly budgeted and
 reject ranges outside the declared extent. The leaf suite has 26 tests, the
-IWA suite has 1,499 tests, and the generated Numbers round trip passes. Formula
+IWA suite has 1,502 tests, and the generated Numbers round trip passes. Formula
 values and the generic structured-facade handoff remain the next ownership
 slices. Pages and Keynote table readers now borrow canonical sparse leaf tables
 directly while retaining their format-owned comment and merge sidecars;
 read-only comment snapshots use sorted boxed pairs, and Numbers ingress moves
 table names into the adapter without a redundant clone.
+
+The immutable Numbers table-data-list sidecars are now represented as sorted
+boxed `(u32, value)` pairs rather than hash tables. The loader already rejects
+duplicate keys, so binary search preserves strict missing-key behavior while
+removing hash-bucket and hasher state from each read-only table. Sidecar
+construction uses fallible reservations and checks the invariant again at the
+compact representation boundary; this is an allocation/layout improvement,
+not a measured throughput claim under ADR 0005.
 
 The IWA Numbers ingress adapter now protects the leaf ownership seam. It
 validates bounded dimensions before loading referenced data, rejects

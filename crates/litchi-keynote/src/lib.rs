@@ -8,6 +8,8 @@
 
 pub mod transition;
 
+pub use transition::Effect;
+
 use litchi_iwa_text::TextStorage;
 
 /// A Keynote slide and its extracted semantic content.
@@ -139,47 +141,12 @@ impl BuildAnimationType {
 }
 
 /// A slide transition effect.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SlideTransition {
-    /// Transition kind.
-    pub transition_type: TransitionType,
+    /// Lossless native transition effect.
+    pub effect: Effect,
     /// Transition duration in seconds.
     pub duration: f32,
-}
-
-/// Supported semantic slide transition kinds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransitionType {
-    /// No transition.
-    None,
-    /// Dissolve.
-    Dissolve,
-    /// Push.
-    Push,
-    /// Wipe.
-    Wipe,
-    /// Flip.
-    Flip,
-    /// Cube.
-    Cube,
-    /// An unrecognized producer-specific transition.
-    Other,
-}
-
-impl TransitionType {
-    /// Returns a stable human-readable name.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::None => "None",
-            Self::Dissolve => "Dissolve",
-            Self::Push => "Push",
-            Self::Wipe => "Wipe",
-            Self::Flip => "Flip",
-            Self::Cube => "Cube",
-            Self::Other => "Other",
-        }
-    }
 }
 
 /// A Keynote presentation container.
@@ -282,7 +249,7 @@ mod tests {
     #[test]
     fn animation_and_transition_names_are_stable() {
         assert_eq!(BuildAnimationType::MoveIn.name(), "Move In");
-        assert_eq!(TransitionType::Dissolve.name(), "Dissolve");
+        assert_eq!(Effect::Dissolve.identifier(), "apple:dissolve");
     }
 
     #[test]

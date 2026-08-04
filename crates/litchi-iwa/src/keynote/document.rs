@@ -11,7 +11,7 @@ use crate::object_index::ObjectIndex;
 use crate::registry::Application;
 use crate::text::TextExtractor;
 use crate::{Error, Result};
-use litchi_keynote::{Show, Slide};
+use litchi_keynote::{Show, Slide, transition::Effect};
 
 /// High-level interface for Keynote documents
 #[derive(Debug, Clone)]
@@ -413,7 +413,7 @@ impl KeynoteDocument {
         &self,
         transition: &crate::protobuf::kn::TransitionArchive,
     ) -> Option<litchi_keynote::SlideTransition> {
-        use litchi_keynote::{SlideTransition, TransitionType};
+        use litchi_keynote::SlideTransition;
 
         // Extract duration from attributes
         // The attributes field is required (not Optional)
@@ -425,13 +425,8 @@ impl KeynoteDocument {
             .or_else(|| Self::legacy_transition_duration(&transition.attributes))
             .unwrap_or(0.0) as f32;
 
-        // Determine transition type from attributes
-        // The actual transition type is embedded in the attributes structure
-        // For now, we use a generic transition type
-        let transition_type = TransitionType::Other;
-
         Some(SlideTransition {
-            transition_type,
+            effect: transition_effect(&transition.attributes),
             duration,
         })
     }
@@ -720,6 +715,16 @@ impl KeynoteDocument {
     }
 }
 
+#[allow(deprecated)]
+fn transition_effect(attributes: &crate::protobuf::kn::TransitionAttributesArchive) -> Effect {
+    attributes
+        .animation_attributes
+        .as_ref()
+        .and_then(|animation| animation.effect.as_deref())
+        .or(attributes.database_effect.as_deref())
+        .map_or(Effect::None, Effect::from_identifier)
+}
+
 /// Statistics about a Keynote document
 #[derive(Debug, Clone)]
 pub struct KeynoteDocumentStats {
@@ -732,6 +737,7 @@ pub struct KeynoteDocumentStats {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 
@@ -767,6 +773,32 @@ mod tests {
         let limits = BundleLimits::new(1, 10, 100, 100, 100).unwrap();
         let error = KeynoteDocument::from_bytes_with_limits(&[0, 1], limits).unwrap_err();
         assert!(error.to_string().contains("iWork bundle input"));
+    }
+
+    #[test]
+    fn transition_effect_prefers_modern_identifier_and_preserves_unknown_values() {
+        let attributes = crate::protobuf::kn::TransitionAttributesArchive {
+            animation_attributes: Some(crate::protobuf::kn::AnimationAttributesArchive {
+                effect: Some("com.example.future-transition".to_owned()),
+                ..Default::default()
+            }),
+            database_effect: Some("apple:dissolve".to_owned()),
+            ..Default::default()
+        };
+        assert_eq!(
+            transition_effect(&attributes),
+            Effect::Unknown("com.example.future-transition".to_owned())
+        );
+    }
+
+    #[test]
+    fn transition_effect_falls_back_to_legacy_identifier_and_defaults_to_none() {
+        let legacy = crate::protobuf::kn::TransitionAttributesArchive {
+            database_effect: Some("apple:dissolve".to_owned()),
+            ..Default::default()
+        };
+        assert_eq!(transition_effect(&legacy), Effect::Dissolve);
+        assert_eq!(transition_effect(&Default::default()), Effect::None);
     }
 
     #[test]

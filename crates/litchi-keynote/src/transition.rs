@@ -9,6 +9,7 @@ const MAGIC_MOVE_EFFECT: &str = "apple:magic-move-implied-motion-path";
 /// Named variants cover identifiers verified in native Keynote documents.
 /// [`Effect::Unknown`] preserves identifiers introduced by future releases
 /// without reducing the semantic API to an untyped string.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Effect {
     /// Keynote's native “No Transition Effect” representation.
