@@ -118,15 +118,3 @@ pub struct LoadedControl {
 pub struct ControlSet {
     pub controls: Vec<LoadedControl>,
 }
-
-// Historical names remain available for source compatibility. New code should
-// use the contextual names above within the active_x module.
-pub type ActiveXPicture = Picture;
-pub type ActiveXFont = Font;
-pub type ActiveXPropertyObject = PropertyObject;
-pub type ActiveXProperty = Property;
-pub type ActiveXDescriptor = Descriptor;
-pub type OpaqueActiveXBinary = Binary;
-pub type OpaqueActiveXPreviewImage = PreviewImage;
-pub type LoadedActiveXControl = LoadedControl;
-pub type ActiveXControlSet = ControlSet;
