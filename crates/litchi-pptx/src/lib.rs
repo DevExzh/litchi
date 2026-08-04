@@ -13,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod actions;
 pub mod animations;
 pub mod backgrounds;
 pub mod comments;
@@ -38,6 +39,10 @@ pub mod time;
 pub mod transition;
 pub mod view_properties;
 
+pub use actions::{
+    Jump, Kind, PptxActionKind, PptxActionSetting, PptxActionTarget, PptxActionTrigger,
+    PptxSlideShowJump, Setting, Target,
+};
 pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use comments::{

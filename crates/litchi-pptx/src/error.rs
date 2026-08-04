@@ -51,6 +51,14 @@ pub enum Error {
         actual: String,
     },
 
+    /// A PresentationML relationship is missing or malformed.
+    #[error("invalid PresentationML relationship: {0}")]
+    Relationship(String),
+
+    /// A relationship target part is absent from the OPC package.
+    #[error("PresentationML part not found: {0}")]
+    PartNotFound(String),
+
     /// No tag has the requested semantic name.
     #[error("tag name '{0}' was not found")]
     NameNotFound(String),
