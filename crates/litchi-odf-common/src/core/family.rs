@@ -36,7 +36,38 @@ impl FamilyPackage {
         body_marker: &str,
         family_name: &str,
     ) -> Result<Self> {
-        let archive = OwnedPackage::from_bytes(bytes)?;
+        Self::from_owned_package(
+            OwnedPackage::from_bytes(bytes)?,
+            mimetype,
+            body_marker,
+            family_name,
+        )
+    }
+
+    /// Decode a password-encrypted package after validating its MIME type and
+    /// content root marker.
+    pub fn from_bytes_with_password(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> Result<Self> {
+        Self::from_owned_package(
+            OwnedPackage::from_bytes_with_password(bytes, password)?,
+            mimetype,
+            body_marker,
+            family_name,
+        )
+    }
+
+    /// Adopt an already parsed archive without reparsing its ZIP structure.
+    pub fn from_owned_package(
+        archive: OwnedPackage,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> Result<Self> {
         let found = archive.mimetype()?;
         if found != mimetype {
             return Err(Error::InvalidFormat(format!(
@@ -98,6 +129,11 @@ impl FamilyPackage {
     /// Borrow the owned package for family-specific package edits.
     pub fn package(&self) -> &OwnedPackage {
         &self.archive
+    }
+
+    /// Borrow the original archive bytes without allocating.
+    pub fn as_bytes(&self) -> &[u8] {
+        self.archive.as_bytes()
     }
 
     /// List all safe package paths.

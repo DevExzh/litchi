@@ -1,13 +1,16 @@
 //! Main Presentation structure and implementation.
 
 use crate::codec::Parser;
-use crate::core::{Content, Meta, OwnedPackage, Styles};
+use crate::core::FamilyPackage;
 use crate::model::{
     Declarations, Layouts, PageMetadataCollection, Reference, Settings, Slide, declaration,
     page_layout, page_metadata, settings,
 };
 use litchi_core::{Error, Metadata, Result};
+use litchi_odf_common::constants::ODF_PRESENTATION;
 use std::path::Path;
+
+const BODY_MARKER: &str = "<office:presentation";
 
 /// An OpenDocument presentation (.odp).
 ///
@@ -34,12 +37,7 @@ use std::path::Path;
 /// # }
 /// ```
 pub struct Presentation {
-    package: OwnedPackage,
-    #[allow(dead_code)]
-    content: Content,
-    #[allow(dead_code)]
-    styles: Option<Styles>,
-    meta: Option<Meta>,
+    package: FamilyPackage,
 }
 
 impl Presentation {
@@ -64,8 +62,8 @@ impl Presentation {
     /// # }
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let bytes = std::fs::read(path.as_ref())?;
-        Self::from_bytes(bytes)
+        FamilyPackage::open(path, ODF_PRESENTATION, BODY_MARKER, "ODP")
+            .map(|package| Self { package })
     }
 
     /// Open a password-encrypted ODP presentation.
@@ -99,51 +97,20 @@ impl Presentation {
     /// # }
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let owned_package = OwnedPackage::from_bytes(bytes)?;
-        Self::from_owned_package(owned_package)
+        FamilyPackage::from_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
+            .map(|package| Self { package })
     }
 
     /// Create a presentation from password-encrypted ODP bytes.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Self::from_owned_package(OwnedPackage::from_bytes_with_password(bytes, password)?)
-    }
-
-    fn from_owned_package(owned_package: OwnedPackage) -> Result<Self> {
-        let package = owned_package.package()?;
-
-        // Verify this is a presentation
-        let mime_type = package.mimetype();
-        if !mime_type.contains("opendocument.presentation") {
-            return Err(Error::InvalidFormat(format!(
-                "Not an ODP file: MIME type is {}",
-                mime_type
-            )));
-        }
-
-        // Parse core components
-        let content_bytes = package.get_file("content.xml")?;
-        let content = Content::from_bytes(&content_bytes)?;
-
-        let styles = if package.has_file("styles.xml") {
-            let styles_bytes = package.get_file("styles.xml")?;
-            Some(Styles::from_bytes(&styles_bytes)?)
-        } else {
-            None
-        };
-
-        let meta = if package.has_file("meta.xml") {
-            let meta_bytes = package.get_file("meta.xml")?;
-            Some(Meta::from_bytes(&meta_bytes)?)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            package: owned_package,
-            content,
-            styles,
-            meta,
-        })
+        FamilyPackage::from_bytes_with_password(
+            bytes,
+            password,
+            ODF_PRESENTATION,
+            BODY_MARKER,
+            "ODP",
+        )
+        .map(|package| Self { package })
     }
 
     /// Create an ODP presentation from raw bytes (ZIP archive data).
@@ -164,35 +131,28 @@ impl Presentation {
     ///
     /// Returns a vector of `Slide` objects representing all slides in the document.
     pub fn slides(&self) -> Result<Vec<Slide>> {
-        let package = self.package.package()?;
-        let content_bytes = package.get_file("content.xml")?;
-        let content = Content::from_bytes(&content_bytes)?;
-
-        Parser::parse_slides_with_styles(
-            content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
-        )
+        Parser::parse_slides_with_styles(self.package.content_xml(), self.package.styles_xml())
     }
 
     /// Inspect inert slide-show settings and ordered custom shows.
     pub fn settings(&self) -> Result<Option<Settings>> {
-        settings::parse(self.content.xml_content())
+        settings::parse(self.package.content_xml())
     }
 
     /// Inspect inert header, footer, date-time, and page-binding declarations.
     pub fn declarations(&self) -> Result<Declarations> {
-        declaration::parse(self.content.xml_content())
+        declaration::parse(self.package.content_xml())
     }
 
     /// Inspect static page names, IDs, and layout/master references.
     pub fn page_metadata(&self) -> Result<PageMetadataCollection> {
-        page_metadata::parse(self.content.xml_content())
+        page_metadata::parse(self.package.content_xml())
     }
 
     /// Inspect named presentation page layouts and their typed placeholders.
     pub fn page_layouts(&self) -> Result<Layouts> {
-        match self.styles.as_ref() {
-            Some(styles) => page_layout::parse(styles.xml_content()),
+        match self.package.styles_xml() {
+            Some(styles) => page_layout::parse(styles),
             None => Ok(Layouts::default()),
         }
     }
@@ -218,7 +178,7 @@ impl Presentation {
         let Some(path) = media.package_path() else {
             return Ok(None);
         };
-        let package = self.package.package()?;
+        let package = self.package.package().package()?;
         if !package.has_file(path) {
             return Ok(None);
         }
@@ -246,16 +206,12 @@ impl Presentation {
     ///
     /// Extracts metadata from the meta.xml file.
     pub fn metadata(&self) -> Result<Metadata> {
-        if let Some(meta) = &self.meta {
-            meta.try_extract_metadata()
-        } else {
-            Ok(Metadata::default())
-        }
+        Ok(self.package.metadata().cloned().unwrap_or_default())
     }
 
     /// Read all inert RDF metadata graphs in package order.
     pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
-        crate::rdf::graphs(&self.package)
+        crate::rdf::graphs(self.package.package())
     }
 
     /// Add a graph and atomically replace this snapshot with the rebuilt package.
@@ -264,21 +220,21 @@ impl Presentation {
         preferred_path: Option<&str>,
         triples: &[crate::rdf::Triple],
     ) -> Result<String> {
-        let (bytes, path) = crate::rdf::add_graph(&self.package, preferred_path, triples)?;
+        let (bytes, path) = crate::rdf::add_graph(self.package.package(), preferred_path, triples)?;
         *self = Self::from_bytes(bytes)?;
         Ok(path)
     }
 
     /// Replace one complete RDF graph and atomically publish the result.
     pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
-        let bytes = crate::rdf::replace_graph(&self.package, path, triples)?;
+        let bytes = crate::rdf::replace_graph(self.package.package(), path, triples)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
     /// Remove one RDF graph after validating that no remaining graph references it.
     pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
-        let bytes = crate::rdf::remove_graph(&self.package, path)?;
+        let bytes = crate::rdf::remove_graph(self.package.package(), path)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
@@ -292,7 +248,7 @@ impl Presentation {
             .ok_or_else(|| Error::InvalidFormat(format!("RDF graph '{path}' was not found")))?
             .triples
             .len();
-        let (bytes, _) = crate::rdf::add_triple(&self.package, path, triple)?;
+        let (bytes, _) = crate::rdf::add_triple(self.package.package(), path, triple)?;
         *self = Self::from_bytes(bytes)?;
         Ok(index)
     }
@@ -304,21 +260,21 @@ impl Presentation {
         index: usize,
         triple: &crate::rdf::Triple,
     ) -> Result<()> {
-        let bytes = crate::rdf::replace_triple(&self.package, path, index, triple)?;
+        let bytes = crate::rdf::replace_triple(self.package.package(), path, index, triple)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
     /// Remove one triple from a graph.
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
-        let bytes = crate::rdf::remove_triple(&self.package, path, index)?;
+        let bytes = crate::rdf::remove_triple(self.package.package(), path, index)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
     /// Move one triple within its RDF description.
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::rdf::move_triple(&self.package, path, from, to)?;
+        let bytes = crate::rdf::move_triple(self.package.package(), path, from, to)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
