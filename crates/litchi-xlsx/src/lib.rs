@@ -27,6 +27,7 @@ pub mod scenarios;
 pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod style;
+pub mod views;
 pub mod volatile_dependencies;
 pub mod web;
 mod workbook;
@@ -73,6 +74,9 @@ pub use sheet_calculation_properties::{
     parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
 };
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
+pub use views::{
+    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
+};
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
     Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Sheet, SheetEdit,
