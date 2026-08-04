@@ -4,14 +4,17 @@ use std::collections::HashMap;
 
 use super::*;
 use crate::ImageAdjustments;
+use crate::comments::DrawableObjectId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
+use crate::ref_graph::ObjectId;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
+    ShapeImageDataIdentifier, flip_drawable_geometry, offset_drawable_geometry,
+    restore_drawable_original_size,
 };
 
 mod graph;
@@ -595,12 +598,14 @@ impl NumbersEditor {
     /// native Numbers shared-asset behavior.
     pub fn replace_sheet_image_data(
         &mut self,
-        sheet_id: u64,
-        drawable_object_id: u64,
+        sheet_id: ObjectId,
+        drawable_object_id: DrawableObjectId,
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
-        let source = image_graph(self, sheet_id, drawable_object_id)?;
-        self.replace_media(source.info.image_data_identifier, replacement)
+        let source = image_graph(self, sheet_id.get(), drawable_object_id.object_id())?;
+        let image_data_identifier =
+            ShapeImageDataIdentifier::new(source.info.image_data_identifier)?;
+        self.replace_media(image_data_identifier.get(), replacement)
     }
 
     /// Remove an ordinary image, its private graph, and unshared assets.
@@ -827,6 +832,21 @@ mod tests {
             .with_natural_size(NATURAL_IMAGE_SIZE)
     }
 
+    fn sheet_selector(raw: u64) -> ObjectId {
+        ObjectId::try_from(raw).expect("fixture sheet identifiers are non-zero")
+    }
+
+    fn drawable_selector(raw: u64) -> DrawableObjectId {
+        DrawableObjectId::from_object_id(raw).expect("fixture drawable identifiers are non-zero")
+    }
+
+    #[test]
+    fn replace_image_selector_types_reject_null_wire_identifiers() {
+        assert!(ObjectId::try_from(0).is_err());
+        assert!(DrawableObjectId::new(0).is_none());
+        assert!(ShapeImageDataIdentifier::new(0).is_err());
+    }
+
     #[test]
     fn scratch_spreadsheet_supports_image_crud_without_a_source_package() {
         let original = fixture("test-data/images/png/lena.png");
@@ -985,7 +1005,11 @@ mod tests {
         );
 
         let previous = editor
-            .replace_sheet_image_data(sheet_id, created.drawable_object_id, &replacement)
+            .replace_sheet_image_data(
+                sheet_selector(sheet_id),
+                drawable_selector(created.drawable_object_id),
+                &replacement,
+            )
             .unwrap();
         assert_eq!(previous, original);
         assert_eq!(
@@ -1226,7 +1250,11 @@ mod tests {
 
         assert_eq!(
             editor
-                .replace_sheet_image_data(sheet_id, duplicate.drawable_object_id, &replacement)
+                .replace_sheet_image_data(
+                    sheet_selector(sheet_id),
+                    drawable_selector(duplicate.drawable_object_id),
+                    &replacement,
+                )
                 .unwrap(),
             original
         );
