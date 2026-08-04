@@ -9,7 +9,7 @@ use std::io::{Cursor, Read};
 
 use prost::Message;
 
-use crate::protobuf::{self, DecodedMessage, decode};
+use crate::protobuf::{self, ApplicationDecodeContext, DecodedMessage, decode_with_context};
 use crate::snappy::SnappyStream;
 use crate::varint;
 use crate::{Error, Result};
@@ -1218,12 +1218,12 @@ fn decode_raw_messages(messages: &[RawMessage]) -> Vec<Box<dyn DecodedMessage>> 
     let mut decoded_messages =
         Vec::with_capacity(messages.len().min(ArchiveLimits::MAX_MESSAGES_PER_OBJECT));
     for message in messages.iter().take(ArchiveLimits::MAX_MESSAGES_PER_OBJECT) {
-        if let Ok(decoded) = decode(message.type_, &message.data) {
+        if let Ok(decoded) = decode_with_context(
+            ApplicationDecodeContext::Common,
+            message.type_,
+            &message.data,
+        ) {
             decoded_messages.push(decoded);
-        } else if let Ok(storage) = protobuf::tswp::StorageArchive::decode(message.data.as_slice())
-        {
-            decoded_messages
-                .push(Box::new(protobuf::StorageArchiveWrapper(storage)) as Box<dyn DecodedMessage>);
         }
     }
     decoded_messages
