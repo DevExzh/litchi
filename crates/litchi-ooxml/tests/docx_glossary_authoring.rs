@@ -32,19 +32,22 @@ fn entry(name: &str, relationship_id: Option<&str>) -> Entry {
 }
 
 fn mark_signed(package: &mut Package) {
-    let opc = package.opc_package_mut();
-    opc.try_add_part(Box::new(BlobPart::new(
-        PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
-        ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-        Vec::new(),
-    )))
-    .unwrap();
-    opc.rels_mut().add_relationship(
-        rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-        "_xmlsignatures/origin.sigs".to_owned(),
-        "rSignature".to_owned(),
-        false,
-    );
+    package
+        .edit_opc(|opc| {
+            opc.try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                Vec::new(),
+            )))?;
+            opc.rels_mut().add_relationship(
+                rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                "_xmlsignatures/origin.sigs".to_owned(),
+                "rSignature".to_owned(),
+                false,
+            );
+            Ok(())
+        })
+        .unwrap();
 }
 
 #[test]
@@ -237,8 +240,16 @@ fn invalid_graph_update_is_failure_atomic() {
         );
     }
 
-    assert!(glossary::remove(package.opc_package_mut()).unwrap());
-    assert!(!glossary::remove(package.opc_package_mut()).unwrap());
+    assert!(
+        package
+            .edit_opc(|opc| Ok::<_, litchi_ooxml::error::OoxmlError>(glossary::remove(opc)?))
+            .unwrap()
+    );
+    assert!(
+        !package
+            .edit_opc(|opc| Ok::<_, litchi_ooxml::error::OoxmlError>(glossary::remove(opc)?))
+            .unwrap()
+    );
 }
 
 #[test]

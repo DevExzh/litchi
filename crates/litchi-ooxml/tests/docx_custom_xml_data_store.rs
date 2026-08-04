@@ -57,11 +57,16 @@ fn binding_integrity_scans_word_containers_without_executing_xpath() {
     let header_xml = format!(
         r#"<w:hdr xmlns:w="{W}"><w:sdt><w:sdtPr><w:id w:val="17"/><w:dataBinding w:prefixMappings="xmlns:x='urn:test'" w:xpath="/x:root/x:value" w:storeItemID="{ITEM_A}"/></w:sdtPr><w:sdtContent/></w:sdt></w:hdr>"#
     );
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        PackURI::new("/word/header42.xml").unwrap(),
-        ct::WML_HEADER.to_string(),
-        header_xml.into_bytes(),
-    )));
+    package
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                PackURI::new("/word/header42.xml").unwrap(),
+                ct::WML_HEADER.to_string(),
+                header_xml.into_bytes(),
+            )));
+            Ok(())
+        })
+        .unwrap();
     let bindings = package.custom_xml_bindings().unwrap();
     assert_eq!(bindings.len(), 1);
     assert_eq!(bindings[0].control_id, 17);
@@ -78,11 +83,16 @@ fn malformed_binding_and_replacement_fail_without_mutation() {
     let bad_header = format!(
         r#"<w:hdr xmlns:w="{W}"><w:sdtPr><w:id w:val="1"/><w:dataBinding w:prefixMappings="xmlns:x=urn:test" w:xpath="/x" w:storeItemID="{ITEM_A}"/></w:sdtPr></w:hdr>"#
     );
-    package.opc_package_mut().add_part(Box::new(BlobPart::new(
-        PackURI::new("/word/headerBad.xml").unwrap(),
-        ct::WML_HEADER.to_string(),
-        bad_header.into_bytes(),
-    )));
+    package
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                PackURI::new("/word/headerBad.xml").unwrap(),
+                ct::WML_HEADER.to_string(),
+                bad_header.into_bytes(),
+            )));
+            Ok(())
+        })
+        .unwrap();
     assert!(package.custom_xml_bindings().is_err());
     assert!(package.remove_custom_xml(ITEM_A).is_err());
 
@@ -110,7 +120,12 @@ fn removal_preserves_a_data_part_with_an_unrelated_shared_reference() {
         "rIdShared".to_string(),
         false,
     );
-    package.opc_package_mut().add_part(Box::new(footer));
+    package
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(footer));
+            Ok(())
+        })
+        .unwrap();
     assert!(package.remove_custom_xml(ITEM_A).unwrap());
     assert!(package.opc_package().get_part(item.part()).is_ok());
     assert!(
@@ -125,17 +140,21 @@ fn removal_preserves_a_data_part_with_an_unrelated_shared_reference() {
 fn malformed_external_data_relationship_is_rejected_before_crud() {
     let mut package = Package::new().unwrap();
     let item = package.add_custom_xml(store(ITEM_A, "a")).unwrap();
-    let source = package
-        .opc_package_mut()
-        .get_part_mut(item.source())
+    let source_name = item.source().clone();
+    let relationship_id = item.rel_id().to_string();
+    package
+        .edit_opc(|opc| {
+            let source = opc.get_part_mut(&source_name)?;
+            source.rels_mut().remove(&relationship_id);
+            source.rels_mut().add_relationship(
+                TRANSITIONAL_RELATIONSHIP.to_string(),
+                "https://example.invalid/data.xml".to_string(),
+                relationship_id,
+                true,
+            );
+            Ok(())
+        })
         .unwrap();
-    source.rels_mut().remove(item.rel_id());
-    source.rels_mut().add_relationship(
-        TRANSITIONAL_RELATIONSHIP.to_string(),
-        "https://example.invalid/data.xml".to_string(),
-        item.rel_id().to_string(),
-        true,
-    );
     let part_count = package.opc_package().part_count();
     assert!(package.custom_xml().is_err());
     assert!(package.remove_custom_xml(ITEM_A).is_err());

@@ -216,6 +216,7 @@ fn map_writer_error(error: OleError) -> Error {
     match error {
         OleError::Io(error) => Error::Io(error),
         OleError::Allocation { resource, .. } => Error::Allocation(resource),
+        OleError::Committed { source } => Error::Io(source),
         OleError::InvalidFormat(message) => Error::Container(format!("Invalid format: {message}")),
         OleError::InvalidData(message) => Error::Container(format!("Invalid data: {message}")),
         OleError::NotOleFile => Error::Container("Not an OLE file".to_string()),
@@ -230,6 +231,7 @@ fn map_reader_error(error: OleError) -> Error {
     match error {
         OleError::Io(error) => Error::Container(format!("IO error: {error}")),
         OleError::Allocation { resource, .. } => Error::Allocation(resource),
+        OleError::Committed { source } => Error::Io(source),
         OleError::InvalidFormat(message) => Error::Container(format!("Invalid format: {message}")),
         OleError::InvalidData(message) => Error::Container(format!("Invalid data: {message}")),
         OleError::NotOleFile => Error::Container("Not an OLE file".to_string()),

@@ -112,10 +112,14 @@ pub struct Package {
     opc: OpcPackage,
     /// Mutable document for writing (cached)
     mutable_doc: Option<MutableDocument>,
+    /// Whether a committed raw edit has disabled the legacy document writer.
+    raw_edit_committed: bool,
     /// Authoritative, mutation-tracked core properties.
     properties: Slot,
     /// Custom document properties
     custom_props: CustomProps,
+    /// Whether the custom-property facade has unmaterialized changes.
+    custom_props_dirty: bool,
     /// Encryption profile of the opened outer package, retained to prevent an
     /// accidental plaintext downgrade on save.
     #[cfg(feature = "encryption")]
@@ -713,8 +717,10 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc,
+            raw_edit_committed: false,
             properties,
             custom_props,
+            custom_props_dirty: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -764,8 +770,10 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc: None,
+            raw_edit_committed: false,
             properties,
             custom_props,
+            custom_props_dirty: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -823,8 +831,10 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc: None,
+            raw_edit_committed: false,
             properties,
             custom_props,
+            custom_props_dirty: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -863,8 +873,10 @@ impl Package {
         Ok(Self {
             opc,
             mutable_doc: None,
+            raw_edit_committed: false,
             properties,
             custom_props,
+            custom_props_dirty: false,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -1024,6 +1036,33 @@ impl Package {
         Ok(font::remove(&mut self.opc)?)
     }
 
+    /// Select the font publication policy used by managed save operations.
+    #[cfg(feature = "fonts")]
+    pub fn set_font_embedding(
+        &mut self,
+        embedding: litchi_opc::FontEmbedding,
+    ) -> Result<&mut Self> {
+        if embedding != litchi_opc::FontEmbedding::None && self.mutable_doc.is_none() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation: "set_font_embedding",
+                reason: "font discovery requires a complete mutable document model",
+            });
+        }
+
+        if self.opc.save_options().fonts != embedding {
+            self.opc.with_fonts(embedding);
+        }
+        Ok(self)
+    }
+
+    /// Select the font publication policy and return this package by value.
+    #[cfg(feature = "fonts")]
+    pub fn with_font_embedding(mut self, embedding: litchi_opc::FontEmbedding) -> Result<Self> {
+        self.set_font_embedding(embedding)?;
+        Ok(self)
+    }
+
     /// Get the underlying OPC package.
     ///
     /// This provides access to lower-level package operations.
@@ -1131,13 +1170,51 @@ impl Package {
         crate::docx::chart::store_chart_graph(&mut self.opc, &document, graph)
     }
 
-    /// Get mutable access to the underlying OPC package.
+    /// Transactionally edit the current plaintext OPC graph.
     ///
-    /// This provides access to lower-level package operations for modification.
-    #[inline]
-    pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
-        self.opc.unsign();
-        &mut self.opc
+    /// The closure receives a structural candidate whose built-in part payloads
+    /// share immutable `Arc` storage. Returning an error or unwinding leaves
+    /// this package's graph unpublished; custom `Part` implementations retain
+    /// their own clone and interior-mutability policy. Before a successful
+    /// commit, the candidate's Word main relationship, content type, core
+    /// properties, and custom properties are validated and facade-owned state
+    /// is reloaded. Committing a raw edit disables the legacy document writer
+    /// so it cannot later erase the edit.
+    pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+        self.ensure_opc_current("edit_opc")?;
+        if self.opc.save_options().fonts != litchi_opc::FontEmbedding::None {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation: "edit_opc",
+                reason: "raw OPC editing cannot honor an automatic font policy; use the managed font facade",
+            });
+        }
+
+        let mut candidate = self.opc.clone();
+        candidate.unsign();
+        let value = edit(&mut candidate)?;
+
+        if candidate.save_options().fonts != litchi_opc::FontEmbedding::None {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation: "edit_opc",
+                reason: "raw OPC transactions cannot configure automatic font embedding; use the managed font facade",
+            });
+        }
+        let main_part = candidate
+            .main_document_part()
+            .map_err(|error| OoxmlError::PartNotFound(format!("main document part: {error}")))?;
+        validate_document_main_content_type(main_part.content_type())?;
+        let properties = Slot::load(&candidate)?;
+        let custom_props = CustomProps::read(&candidate)?;
+
+        self.opc = candidate;
+        self.properties = properties;
+        self.custom_props = custom_props;
+        self.custom_props_dirty = false;
+        self.mutable_doc = None;
+        self.raw_edit_committed = true;
+        Ok(value)
     }
 
     /// Get a mutable document for writing and modification.
@@ -1168,6 +1245,14 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn document_mut(&mut self) -> Result<&mut MutableDocument> {
+        if self.raw_edit_committed {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation: "document_mut",
+                reason: "a raw OPC edit committed; use edit_opc for further low-level changes",
+            });
+        }
+
         // If we don't have a mutable document, try to load it from the package
         if self.mutable_doc.is_none() {
             let doc_uri = PackURI::new("/word/document.xml")
@@ -2539,6 +2624,45 @@ impl Package {
         self.source_encryption
     }
 
+    fn ensure_opc_current(&self, operation: &'static str) -> Result<()> {
+        #[cfg(feature = "encryption")]
+        if self.source_encryption.is_some() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
+            });
+        }
+
+        if self
+            .mutable_doc
+            .as_ref()
+            .is_some_and(MutableDocument::is_modified)
+        {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "the legacy document writer has unmaterialized changes; use a managed save or to_plain_stream first",
+            });
+        }
+        if self.properties.is_dirty() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "core properties have unmaterialized changes; use a managed save or to_plain_stream first",
+            });
+        }
+        if self.custom_props_dirty {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "custom properties have unmaterialized changes; use a managed save or to_plain_stream first",
+            });
+        }
+
+        Ok(())
+    }
+
     fn ensure_plain_output(&self, _operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
         if self.source_encryption.is_some() {
@@ -3070,6 +3194,7 @@ impl Package {
                 )))
             })?;
             staged_properties.commit();
+            self.custom_props_dirty = false;
             Ok(())
         }));
 
@@ -3172,6 +3297,7 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn custom_props_mut(&mut self) -> &mut CustomProps {
+        self.custom_props_dirty = true;
         &mut self.custom_props
     }
 
@@ -3844,7 +3970,7 @@ mod tests {
 
     #[cfg(feature = "fonts")]
     #[test]
-    fn opened_document_font_embedding_fails_when_glyph_scan_is_incomplete() {
+    fn raw_opc_rejects_automatic_font_embedding_policy() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut source = Package::new().unwrap();
         source
@@ -3854,13 +3980,85 @@ mod tests {
         source.save(file.path()).unwrap();
 
         let mut opened = Package::open(file.path()).unwrap();
-        opened
-            .opc_package_mut()
-            .with_fonts(litchi_opc::FontEmbedding::Subset);
+        opened.opc.with_fonts(litchi_opc::FontEmbedding::Subset);
         assert!(matches!(
-            opened.embed_fonts(),
+            opened.edit_opc(|_| Ok(())),
             Err(OoxmlError::UnsafeEdit {
-                operation: "embed_fonts",
+                operation: "edit_opc",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn raw_opc_transaction_publishes_candidate_and_disables_writer() {
+        let mut package = Package::new().unwrap();
+        let marker = PackURI::new("/custom/raw-edit-marker.bin").unwrap();
+
+        package
+            .edit_opc(|candidate| {
+                candidate.try_add_part(Box::new(BlobPart::new(
+                    marker.clone(),
+                    "application/octet-stream".to_string(),
+                    b"raw edit".to_vec(),
+                )))?;
+                Ok::<_, OoxmlError>(())
+            })
+            .unwrap();
+
+        assert_eq!(
+            package.opc_package().get_part(&marker).unwrap().blob(),
+            b"raw edit"
+        );
+        assert!(matches!(
+            package.document_mut(),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "document_mut",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn failed_raw_opc_transaction_preserves_graph_and_writer_state() {
+        let mut package = Package::new().unwrap();
+        let document_uri = PackURI::new("/word/document.xml").unwrap();
+        let original = package
+            .opc_package()
+            .get_part(&document_uri)
+            .unwrap()
+            .blob_arc();
+
+        let error = package
+            .edit_opc(|candidate| {
+                candidate.remove_part(&document_uri);
+                Ok::<_, OoxmlError>(())
+            })
+            .unwrap_err();
+        assert!(matches!(error, OoxmlError::PartNotFound(_)));
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            &package
+                .opc_package()
+                .get_part(&document_uri)
+                .unwrap()
+                .blob_arc()
+        ));
+        assert!(package.document_mut().is_ok());
+    }
+
+    #[test]
+    fn raw_opc_transaction_rejects_pending_managed_state() {
+        let mut package = Package::new().unwrap();
+        package
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("managed edit");
+
+        assert!(matches!(
+            package.edit_opc(|_| Ok::<_, OoxmlError>(())),
+            Err(OoxmlError::UnsafeEdit {
+                operation: "edit_opc",
                 ..
             })
         ));

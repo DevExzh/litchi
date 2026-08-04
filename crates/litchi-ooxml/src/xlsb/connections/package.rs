@@ -274,6 +274,33 @@ mod tests {
     }
 
     #[test]
+    fn raw_opc_edit_preserves_the_validated_connections_graph() {
+        let mut workbook = generated_workbook();
+        let original = connections(7, "Raw edit connection");
+        workbook.set_connections(original.clone()).unwrap();
+        let marker = PackURI::new("/xl/raw-edit-marker.bin").unwrap();
+
+        workbook
+            .edit_opc(|package| {
+                package.try_add_part(Box::new(BlobPart::new(
+                    marker.clone(),
+                    "application/octet-stream".to_string(),
+                    b"preserve connections".to_vec(),
+                )))?;
+                Ok::<_, XlsbError>(())
+            })
+            .unwrap();
+
+        assert_eq!(workbook.connections(), Some(&original));
+        assert_eq!(
+            workbook.opc_package().get_part(&marker).unwrap().blob(),
+            b"preserve connections"
+        );
+        let reopened = XlsbWorkbook::new(Cursor::new(saved(&workbook))).unwrap();
+        assert_eq!(reopened.connections(), Some(&original));
+    }
+
+    #[test]
     fn invalid_replacement_is_rejected_before_package_mutation() {
         let mut workbook = generated_workbook();
         let original = connections(7, "Original");

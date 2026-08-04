@@ -20,10 +20,11 @@ fn with_document_blob(
     let mut package = Package::open(output.path()).unwrap();
     let part_name = PackURI::new("/word/document.xml").unwrap();
     package
-        .opc_package_mut()
-        .get_part_mut(&part_name)
-        .unwrap()
-        .set_blob(blob.to_vec());
+        .edit_opc(|opc| {
+            opc.get_part_mut(&part_name)?.set_blob(blob.to_vec());
+            Ok(())
+        })
+        .unwrap();
 
     let document = package.document().unwrap();
     (

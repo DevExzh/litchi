@@ -748,7 +748,16 @@ impl OleWriter {
     /// # Ok::<(), litchi_cfb::OleError>(())
     /// ```
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), OleError> {
+        self.save_with_parent_sync(path, sync_parent)
+    }
+
+    fn save_with_parent_sync<P, S>(&mut self, path: P, sync_parent: S) -> Result<(), OleError>
+    where
+        P: AsRef<Path>,
+        S: FnOnce(&Path) -> io::Result<()>,
+    {
         let path = path.as_ref();
+        let parent = parent_directory(path);
         let (temporary_path, file) = create_sibling_temp_file(path)?;
 
         let result = (|| {
@@ -759,6 +768,7 @@ impl OleWriter {
             drop(buffered);
 
             atomic_replace(&temporary_path, path)?;
+            sync_parent(parent).map_err(|source| OleError::Committed { source })?;
             Ok(())
         })();
 
@@ -770,6 +780,12 @@ impl OleWriter {
     }
 }
 
+fn parent_directory(path: &Path) -> &Path {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+}
+
 fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
     let file_name = path.file_name().ok_or_else(|| {
         OleError::Io(io::Error::new(
@@ -777,7 +793,7 @@ fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
             "CFB output path must name a file",
         ))
     })?;
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = parent_directory(path);
 
     for _ in 0..MAX_TEMP_FILE_ATTEMPTS {
         let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -806,6 +822,30 @@ fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
 #[cfg(not(windows))]
 fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
     fs::rename(temporary_path, destination)
+}
+
+#[cfg(unix)]
+fn sync_parent(parent: &Path) -> io::Result<()> {
+    match File::open(parent).and_then(|directory| directory.sync_all()) {
+        Ok(()) => Ok(()),
+        Err(error)
+            if matches!(
+                error.kind(),
+                ErrorKind::InvalidInput | ErrorKind::Unsupported
+            ) =>
+        {
+            Ok(())
+        },
+        Err(error) => Err(error),
+    }
+}
+
+// MoveFileExW is requested with MOVEFILE_WRITE_THROUGH above. Windows does
+// not provide the same portable directory-handle fsync contract as Unix, so
+// there is no separate parent-directory failure to report on this target.
+#[cfg(not(unix))]
+fn sync_parent(_parent: &Path) -> io::Result<()> {
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -1173,6 +1213,40 @@ mod tests {
         assert!(!temporary_exists);
 
         std::fs::remove_file(destination).unwrap();
+    }
+
+    #[test]
+    fn save_reports_committed_when_parent_sync_fails() {
+        let directory = std::env::temp_dir().join(format!(
+            "litchi-cfb-committed-save-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let destination = directory.join("document.ole");
+        std::fs::write(&destination, b"old destination").unwrap();
+
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["Document"], b"new contents")
+            .unwrap();
+        let result = writer.save_with_parent_sync(&destination, |parent| {
+            assert_eq!(parent, directory.as_path());
+            Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                "injected parent directory sync failure",
+            ))
+        });
+
+        assert!(matches!(
+            result,
+            Err(OleError::Committed { source })
+                if source.kind() == ErrorKind::PermissionDenied
+        ));
+        assert_ne!(std::fs::read(&destination).unwrap(), b"old destination");
+        assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

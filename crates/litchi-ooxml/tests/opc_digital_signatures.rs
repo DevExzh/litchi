@@ -36,7 +36,7 @@ fn digital_signature_mutable_opc_access_drops_stale_signatures() {
     let policy = Policy::compatible();
 
     let mut docx = litchi_ooxml::docx::Package::from_reader(Cursor::new(DOCX)).unwrap();
-    let _ = docx.opc_package_mut();
+    docx.edit_opc(|_| Ok(())).unwrap();
     assert!(!docx.is_signed());
     assert!(docx.signatures_with(&policy).unwrap().is_empty());
 

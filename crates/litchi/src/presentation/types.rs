@@ -45,6 +45,9 @@ pub(super) enum PresentationImpl {
     /// OpenDocument Presentation format
     #[cfg(feature = "odf")]
     Odp(litchi_odf::Presentation),
+    /// Flat OpenDocument Presentation XML format
+    #[cfg(feature = "odf")]
+    FlatOdp(litchi_odf::FlatPresentation),
 }
 
 /// Presentation format detection.

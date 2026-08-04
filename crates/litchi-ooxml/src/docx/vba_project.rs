@@ -655,10 +655,11 @@ mod tests {
             .partname()
             .clone();
         package
-            .opc_package_mut()
-            .get_part_mut(&source)
-            .unwrap()
-            .set_content_type(content_type::WML_TEMPLATE_MAIN.to_string())
+            .edit_opc(|opc| {
+                opc.get_part_mut(&source)?
+                    .set_content_type(content_type::WML_TEMPLATE_MAIN.to_string())?;
+                Ok(())
+            })
             .unwrap();
 
         package.set_vba(authored_project()).unwrap();

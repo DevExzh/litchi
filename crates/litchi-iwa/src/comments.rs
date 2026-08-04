@@ -266,23 +266,25 @@ fn validate_package_round_trip(package: &IWorkPackage) -> Result<()> {
 fn package_application(package: &IWorkPackage) -> Result<Application> {
     let mut detected = None;
     for name in package.iwa_entry_names() {
-        let archive = package.archive(name)?;
-        let Some(document) = archive.object(1) else {
-            continue;
-        };
-        for message in &document.messages {
-            let Some(application) = detect_application_from_document(&message.data) else {
-                continue;
+        package.with_parsed_archive(name, |archive| {
+            let Some(document) = archive.object(1) else {
+                return Ok(());
             };
-            if detected
-                .replace(application)
-                .is_some_and(|old| old != application)
-            {
-                return Err(Error::InvalidFormat(
-                    "package contains conflicting iWork document roots".to_owned(),
-                ));
+            for message in &document.messages {
+                let Some(application) = detect_application_from_document(&message.data) else {
+                    continue;
+                };
+                if detected
+                    .replace(application)
+                    .is_some_and(|old| old != application)
+                {
+                    return Err(Error::InvalidFormat(
+                        "package contains conflicting iWork document roots".to_owned(),
+                    ));
+                }
             }
-        }
+            Ok(())
+        })?;
     }
     detected.ok_or_else(|| {
         Error::InvalidFormat("package has no recognizable iWork document root".to_owned())
@@ -292,17 +294,19 @@ fn package_application(package: &IWorkPackage) -> Result<Application> {
 fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, String>> {
     let mut locations = HashMap::new();
     for name in package.iwa_entry_names() {
-        let archive = package.archive(name)?;
-        for object in archive.objects {
-            let identifier = object.archive_info.identifier.ok_or_else(|| {
-                Error::Archive(format!("object in {name} has no archive identifier"))
-            })?;
-            if let Some(previous) = locations.insert(identifier, name.to_owned()) {
-                return Err(Error::Archive(format!(
-                    "object {identifier} appears in both {previous} and {name}"
-                )));
+        package.with_parsed_archive(name, |archive| {
+            for object in &archive.objects {
+                let identifier = object.archive_info.identifier.ok_or_else(|| {
+                    Error::Archive(format!("object in {name} has no archive identifier"))
+                })?;
+                if let Some(previous) = locations.insert(identifier, name.to_owned()) {
+                    return Err(Error::Archive(format!(
+                        "object {identifier} appears in both {previous} and {name}"
+                    )));
+                }
             }
-        }
+            Ok(())
+        })?;
     }
     Ok(locations)
 }
@@ -313,35 +317,40 @@ fn drawable_locations(
 ) -> Result<HashMap<u64, DrawableLocation>> {
     let mut result = HashMap::new();
     for name in package.iwa_entry_names() {
-        let archive = package.archive(name)?;
-        for object in &archive.objects {
-            let object_id = object.archive_info.identifier.ok_or_else(|| {
-                Error::Archive(format!("object in {name} has no archive identifier"))
-            })?;
-            let mut location = None;
-            for (message_index, message) in object.messages.iter().enumerate() {
-                let Some(payload) =
-                    DrawablePayload::decode(application, message.type_, message.data.as_slice())?
-                else {
-                    continue;
-                };
-                if location.is_some() {
-                    return Err(Error::InvalidFormat(format!(
-                        "object {object_id} contains multiple direct drawable payloads"
-                    )));
+        package.with_parsed_archive(name, |archive| {
+            for object in &archive.objects {
+                let object_id = object.archive_info.identifier.ok_or_else(|| {
+                    Error::Archive(format!("object in {name} has no archive identifier"))
+                })?;
+                let mut location = None;
+                for (message_index, message) in object.messages.iter().enumerate() {
+                    let Some(payload) = DrawablePayload::decode(
+                        application,
+                        message.type_,
+                        message.data.as_slice(),
+                    )?
+                    else {
+                        continue;
+                    };
+                    if location.is_some() {
+                        return Err(Error::InvalidFormat(format!(
+                            "object {object_id} contains multiple direct drawable payloads"
+                        )));
+                    }
+                    location = Some(DrawableLocation {
+                        object_id,
+                        archive_name: name.to_owned(),
+                        message_index,
+                        message_type: message.type_,
+                        comment_storage_object_id: payload.comment_identifier(),
+                    });
                 }
-                location = Some(DrawableLocation {
-                    object_id,
-                    archive_name: name.to_owned(),
-                    message_index,
-                    message_type: message.type_,
-                    comment_storage_object_id: payload.comment_identifier(),
-                });
+                if let Some(location) = location {
+                    result.insert(object_id, location);
+                }
             }
-            if let Some(location) = location {
-                result.insert(object_id, location);
-            }
-        }
+            Ok(())
+        })?;
     }
     Ok(result)
 }
@@ -907,34 +916,35 @@ fn read_comment_storage(
     let archive_name = locations.get(&storage_id).ok_or_else(|| {
         Error::InvalidFormat(format!("comment storage object {storage_id} is missing"))
     })?;
-    let archive = package.archive(archive_name)?;
-    let object = archive.object(storage_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("comment storage object {storage_id} is missing"))
-    })?;
-    let messages = object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    if messages.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "object {storage_id} must contain exactly one TSD comment-storage payload"
-        )));
-    }
-    let comment = tsd::CommentStorageArchive::decode(messages[0].data.as_slice())?;
-    Ok(IWorkComment {
-        text: comment.text.unwrap_or_default(),
-        creation_date_seconds: comment.creation_date.map(|date| date.seconds),
-        author_object_id: comment.author.map(|author| author.identifier),
-        reply_object_ids: comment
-            .replies
-            .into_iter()
-            .map(|reply| reply.identifier)
-            .collect(),
-        storage_uuid: comment.storage_uuid.map(|uuid| IWorkCommentUuid {
-            lower: uuid.lower,
-            upper: uuid.upper,
-        }),
+    package.with_parsed_archive(archive_name, |archive| {
+        let object = archive.object(storage_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("comment storage object {storage_id} is missing"))
+        })?;
+        let messages = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        if messages.len() != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "object {storage_id} must contain exactly one TSD comment-storage payload"
+            )));
+        }
+        let comment = tsd::CommentStorageArchive::decode(messages[0].data.as_slice())?;
+        Ok(IWorkComment {
+            text: comment.text.unwrap_or_default(),
+            creation_date_seconds: comment.creation_date.map(|date| date.seconds),
+            author_object_id: comment.author.map(|author| author.identifier),
+            reply_object_ids: comment
+                .replies
+                .into_iter()
+                .map(|reply| reply.identifier)
+                .collect(),
+            storage_uuid: comment.storage_uuid.map(|uuid| IWorkCommentUuid {
+                lower: uuid.lower,
+                upper: uuid.upper,
+            }),
+        })
     })
 }
 

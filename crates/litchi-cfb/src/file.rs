@@ -260,6 +260,11 @@ pub enum OleError {
         resource: &'static str,
         source: std::collections::TryReserveError,
     },
+    /// The destination was replaced, but its parent directory could not be
+    /// synchronized, so durability of the new name is not known.
+    Committed {
+        source: io::Error,
+    },
     InvalidFormat(String),
     InvalidData(String),
     NotOleFile,
@@ -295,6 +300,10 @@ impl std::fmt::Display for OleError {
             OleError::Allocation { resource, source } => {
                 write!(f, "could not reserve memory for CFB {resource}: {source}")
             },
+            OleError::Committed { source } => write!(
+                f,
+                "CFB destination was replaced but directory durability could not be confirmed: {source}"
+            ),
             OleError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
             OleError::InvalidData(s) => write!(f, "Invalid data: {}", s),
             OleError::NotOleFile => write!(f, "Not an OLE file"),
@@ -309,6 +318,7 @@ impl std::error::Error for OleError {
         match self {
             Self::Io(source) => Some(source),
             Self::Allocation { source, .. } => Some(source),
+            Self::Committed { source } => Some(source),
             _ => None,
         }
     }
@@ -327,6 +337,7 @@ impl From<OleError> for litchi_core::Error {
             OleError::Allocation { resource, source } => {
                 litchi_core::Error::Allocation { resource, source }
             },
+            error @ OleError::Committed { .. } => litchi_core::Error::Other(error.to_string()),
             OleError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             OleError::InvalidData(s) => litchi_core::Error::InvalidFormat(s),
             OleError::NotOleFile => litchi_core::Error::NotOfficeFile,

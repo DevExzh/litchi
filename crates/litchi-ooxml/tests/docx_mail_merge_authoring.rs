@@ -146,16 +146,20 @@ fn strict_relationships_and_settings_order_are_emitted() {
 fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
     let mut package = Package::new().unwrap();
     let settings_uri = PackURI::new("/word/settings.xml").unwrap();
-    let settings_part = package
-        .opc_package_mut()
-        .get_part_mut(&settings_uri)
+    package
+        .edit_opc(|opc| {
+            let settings_part = opc.get_part_mut(&settings_uri)?;
+            let original = std::str::from_utf8(settings_part.blob()).map_err(|error| {
+                litchi_ooxml::error::OoxmlError::InvalidFormat(error.to_string())
+            })?;
+            let marked = original.replace(
+                "</w:settings>",
+                r#"<x:sentinel xmlns:x="urn:test" keep="exact"/></w:settings>"#,
+            );
+            settings_part.set_blob(marked.into_bytes());
+            Ok(())
+        })
         .unwrap();
-    let original = std::str::from_utf8(settings_part.blob()).unwrap();
-    let marked = original.replace(
-        "</w:settings>",
-        r#"<x:sentinel xmlns:x="urn:test" keep="exact"/></w:settings>"#,
-    );
-    settings_part.set_blob(marked.into_bytes());
     package
         .set_mail_merge(
             settings_model(),
@@ -239,7 +243,12 @@ fn clear_preserves_an_internal_source_still_shared_elsewhere() {
         "rIdShared".into(),
         false,
     );
-    package.opc_package_mut().add_part(Box::new(footer));
+    package
+        .edit_opc(|opc| {
+            opc.add_part(Box::new(footer));
+            Ok(())
+        })
+        .unwrap();
     assert!(package.clear_mail_merge().unwrap());
     assert!(package.mail_merge_settings().unwrap().is_none());
     assert!(package.opc_package().get_part(&target).is_ok());

@@ -32,7 +32,7 @@ use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
-use litchi_opc::constants::relationship_type;
+use litchi_opc::constants::{content_type, relationship_type};
 use litchi_xlsb::calc::{self, Props};
 use litchi_xlsb::raw::{Records, kind};
 use std::cmp::Reverse;
@@ -177,10 +177,68 @@ impl XlsbWorkbook {
         &self.package
     }
 
-    /// Get mutable OPC access, dropping signatures that would become stale.
-    pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
+    /// Get mutable OPC access for XLSB-internal package adapters.
+    ///
+    /// Public callers must use [`Self::edit_opc`], which stages a structural
+    /// candidate and reparses the complete XLSB host before publication.
+    #[allow(dead_code)]
+    pub(crate) fn opc_package_mut(&mut self) -> &mut OpcPackage {
         self.package.unsign();
         &mut self.package
+    }
+
+    /// Transactionally edit the current XLSB OPC graph.
+    ///
+    /// The closure receives a cloned candidate package. Returning an error,
+    /// producing a package whose main relationship or XLSB graph is invalid,
+    /// or unwinding leaves this workbook unchanged. A successful edit drops
+    /// package signatures, reparses workbook-owned state, and revalidates the
+    /// inert VBA and External Data Connections relationship graphs before
+    /// publication.
+    pub fn edit_opc<T>(
+        &mut self,
+        edit: impl FnOnce(&mut OpcPackage) -> XlsbResult<T>,
+    ) -> XlsbResult<T> {
+        let mut candidate = self.package.clone();
+        candidate.unsign();
+        let value = edit(&mut candidate)?;
+
+        Self::validate_edit_candidate(&candidate)?;
+        let validated = Self::from_opc_package(candidate)?;
+        *self = validated;
+        Ok(value)
+    }
+
+    fn validate_edit_candidate(package: &OpcPackage) -> XlsbResult<()> {
+        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
+        let workbook = package.get_part(&workbook_uri)?;
+        if workbook.content_type() != content_type::XLSB_BIN {
+            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                typ: "XLSB workbook content type".to_string(),
+                val: format!(
+                    "expected '{}', found '{}'",
+                    content_type::XLSB_BIN,
+                    workbook.content_type()
+                ),
+            });
+        }
+
+        let main = package.main_document_part()?;
+        if main.partname() != workbook.partname() || main.content_type() != content_type::XLSB_BIN {
+            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                typ: "XLSB main workbook relationship".to_string(),
+                val: format!(
+                    "expected '{}' to be the binary workbook main part",
+                    workbook_uri.as_str()
+                ),
+            });
+        }
+
+        // These readers validate relationship cardinality, target mode,
+        // target content type, and orphan/inbound graph invariants without
+        // parsing or executing opaque payload bytes.
+        discover_vba_project(package, main)?;
+        Ok(())
     }
 
     /// Return whether this workbook contains package signatures.
@@ -751,27 +809,7 @@ impl XlsbWorkbook {
     /// Open an XLSB workbook from a reader
     pub fn new<R: Read + Seek>(reader: R) -> XlsbResult<Self> {
         let package = OpcPackage::from_reader(reader)?;
-        let mut workbook = XlsbWorkbook {
-            package,
-            worksheets: Vec::new(),
-            worksheet_rel_ids: Vec::new(),
-            formula_context: FormulaResolutionContext::default(),
-            shared_strings: Vec::new(),
-            styles: StylesTable::default(),
-            calc: Props::default(),
-            is_1904: false,
-            pivot_cache_definitions: Vec::new(),
-            structured_tables: Vec::new(),
-            chart_sheets: Vec::new(),
-            sheet_drawings: Vec::new(),
-            connections: None,
-        };
-
-        workbook.load_workbook_info()?;
-        workbook.load_styles()?;
-        workbook.load_shared_strings()?;
-
-        Ok(workbook)
+        Self::from_opc_package(package)
     }
 
     /// Create an XLSB workbook from an already-parsed OPC package.
@@ -2666,7 +2704,7 @@ impl<'a> WorksheetIterator<'a> for XlsbWorksheetIterator<'a> {
 mod tests {
     use super::*;
     use crate::xlsb::formula::{FormulaConverter, FormulaParser};
-    use litchi_core::sheet::{Cell, Worksheet};
+    use litchi_core::sheet::{Cell, WorkbookTrait, Worksheet};
     use litchi_ooxml_common::embedded::{Kind, Target};
     use litchi_opc::part::Part;
     use litchi_opc::{BlobPart, PackURI};
@@ -2707,6 +2745,67 @@ mod tests {
             sheet_drawings: Vec::new(),
             connections: None,
         }
+    }
+
+    fn generated_workbook() -> XlsbWorkbook {
+        let mut writer = crate::xlsb::writer::XlsbWorkbookWriter::new();
+        writer.add_worksheet(crate::xlsb::writer::MutableXlsbWorksheet::new("Sheet1"));
+        let mut bytes = Cursor::new(Vec::new());
+        writer.save(&mut bytes).unwrap();
+        XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap()
+    }
+
+    #[test]
+    fn raw_opc_edit_publishes_a_reparsed_candidate() {
+        let mut workbook = generated_workbook();
+        let marker = PackURI::new("/xl/raw-edit-marker.bin").unwrap();
+
+        let value = workbook
+            .edit_opc(|package| {
+                package.try_add_part(Box::new(BlobPart::new(
+                    marker.clone(),
+                    "application/octet-stream".to_string(),
+                    b"published".to_vec(),
+                )))?;
+                Ok::<_, crate::xlsb::error::XlsbError>("published")
+            })
+            .unwrap();
+
+        assert_eq!(value, "published");
+        assert_eq!(
+            workbook.opc_package().get_part(&marker).unwrap().blob(),
+            b"published"
+        );
+        assert_eq!(workbook.worksheet_names(), &["Sheet1".to_string()]);
+    }
+
+    #[test]
+    fn raw_opc_edit_rejects_invalid_workbook_without_publishing() {
+        let mut workbook = generated_workbook();
+        let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+        let original = workbook
+            .opc_package()
+            .get_part(&workbook_uri)
+            .unwrap()
+            .blob_arc();
+
+        let error = workbook
+            .edit_opc(|candidate| {
+                candidate.remove_part(&workbook_uri);
+                Ok::<_, crate::xlsb::error::XlsbError>(())
+            })
+            .expect_err("an XLSB candidate without workbook.bin must be rejected");
+
+        assert!(!error.to_string().is_empty());
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            &workbook
+                .opc_package()
+                .get_part(&workbook_uri)
+                .unwrap()
+                .blob_arc()
+        ));
+        assert_eq!(workbook.worksheet_names(), &["Sheet1".to_string()]);
     }
 
     #[test]

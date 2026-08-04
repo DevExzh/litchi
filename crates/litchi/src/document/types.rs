@@ -33,6 +33,9 @@ pub(super) enum DocumentImpl {
     /// OpenDocument Text format
     #[cfg(feature = "odf")]
     Odt(litchi_odf::Document),
+    /// Flat OpenDocument Text XML format
+    #[cfg(feature = "odf")]
+    FlatOdt(litchi_odf::FlatTextDocument),
 }
 
 /// Document format detection.

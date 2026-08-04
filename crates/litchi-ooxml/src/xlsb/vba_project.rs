@@ -527,12 +527,16 @@ mod tests {
             content_type::OFC_VBA_PROJECT.to_string(),
             b"intentionally not a compound file".to_vec(),
         );
-        let package = workbook.opc_package_mut();
-        package.add_part(Box::new(project));
-        package
-            .get_part_mut(&workbook_name)
-            .unwrap()
-            .relate_to("vbaProject.bin", relationship_type::VBA_PROJECT);
+        workbook
+            .edit_opc(|package| {
+                package.add_part(Box::new(project));
+                package
+                    .get_part_mut(&workbook_name)
+                    .unwrap()
+                    .relate_to("vbaProject.bin", relationship_type::VBA_PROJECT);
+                Ok::<_, crate::xlsb::error::XlsbError>(())
+            })
+            .unwrap();
 
         let project = workbook.vba().unwrap().unwrap();
         assert_eq!(project.source_part_name(), &workbook_name);

@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pkg = Package::new()?;
 
     // Enable font embedding
-    pkg.opc_package_mut().with_fonts(FontEmbedding::Subset);
+    pkg.set_font_embedding(FontEmbedding::Subset)?;
 
     // Add simple paragraph with Liberation Sans
     {

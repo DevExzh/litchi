@@ -18,7 +18,11 @@ const SNAPSHOT_IMAGE: &[u8] = include_bytes!("../../../test-data/images/jpg/abst
 #[test]
 fn package_wrappers_discover_local_task_panes_without_activation() {
     let mut docx = litchi_ooxml::docx::Package::new().unwrap();
-    install_task_panes(docx.opc_package_mut());
+    docx.edit_opc(|opc| {
+        install_task_panes(opc);
+        Ok(())
+    })
+    .unwrap();
     assert_task_pane(docx.task_panes().unwrap().unwrap());
 
     let xlsx_directory = tempfile::tempdir().unwrap();
