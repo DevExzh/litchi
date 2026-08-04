@@ -99,27 +99,26 @@ const MAX_EXTENSION_PAYLOAD_BYTES: usize = 1024 * 1024;
 const MAX_EXTENSION_RELATIONSHIPS: usize = 1024;
 const MAX_EXTENSION_RELATIONSHIP_STRING_BYTES: usize = 64 * 1024;
 pub use litchi_xlsx::chart_sheet::{
-    ChartSheet, ChartSheetColor, ChartSheetConformance, ChartSheetCustomView, ChartSheetExtension,
-    ChartSheetExtensionList, ChartSheetHeaderFooter, ChartSheetMargins, ChartSheetPageSetup,
-    ChartSheetProperties, ChartSheetProtection, ChartSheetState, ChartSheetView,
-    ChartSheetWebPublishItem, ChartSheetWebPublishItems, ChartSheetWebSourceType, PageOrientation,
+    Chart, Color, Conformance, CustomView, Extension, ExtensionList, HeaderFooter, Margins,
+    PageOrientation, PageSetup, Properties, Protection, State, View, WebPublishItem,
+    WebPublishItems, WebSourceType,
 };
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ChartSheetExtensionRelationshipTarget {
+pub enum ExtensionRelationshipTarget {
     Internal { part_name: String },
     External { target: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetExtensionRelationship {
+pub struct ExtensionRelationship {
     pub relationship_id: String,
     pub relationship_type: String,
-    pub target: ChartSheetExtensionRelationshipTarget,
+    pub target: ExtensionRelationshipTarget,
 }
 
 /// Supported inert image media types for chartsheet backgrounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartSheetImageContentType {
+pub enum BackgroundImageContentType {
     Png,
     Jpeg,
     Gif,
@@ -129,7 +128,7 @@ pub enum ChartSheetImageContentType {
     Wmf,
 }
 
-impl ChartSheetImageContentType {
+impl BackgroundImageContentType {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Png => "image/png",
@@ -159,24 +158,24 @@ impl ChartSheetImageContentType {
 
 /// Opaque internal package resource referenced by `chartsheet/picture`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetBackgroundPicture {
+pub struct BackgroundPicture {
     pub relationship_id: String,
     pub part_name: String,
-    pub content_type: ChartSheetImageContentType,
+    pub content_type: BackgroundImageContentType,
     /// Preserved without decoding, rendering, metadata inspection, or external fetches.
     pub data: Vec<u8>,
 }
 
 /// Chartsheet `pageSetup` relationship paired with a generic inert DEVMODE resource.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetPrinterSettings {
+pub struct PrinterSettings {
     pub relationship_id: String,
     pub resource: PrinterSettingsResource,
 }
 
 /// Opaque internal VML drawing bytes; VML semantics are intentionally not interpreted.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetVmlDrawingResource {
+pub struct VmlDrawingResource {
     pub relationship_id: String,
     pub part_name: String,
     pub content_type: String,
@@ -185,17 +184,17 @@ pub struct ChartSheetVmlDrawingResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetChartResource {
+pub struct ChartResource {
     pub relationship_id: String,
     pub part_name: String,
     pub content_type: String,
     /// Preserved without chart evaluation, external-data loading, or macro execution.
     pub data: Vec<u8>,
-    pub kind: ChartSheetChartResourceKind,
+    pub kind: ChartResourceKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetChartCompanionResource {
+pub struct ChartCompanionResource {
     pub relationship_id: String,
     pub part_name: String,
     pub content_type: String,
@@ -285,7 +284,7 @@ pub struct ImageResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetChartUserShapesResource {
+pub struct ChartUserShapesResource {
     pub relationship_id: String,
     pub part_name: String,
     pub content_type: String,
@@ -295,7 +294,7 @@ pub struct ChartSheetChartUserShapesResource {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartSheetChartEmbeddedPackageContentType {
+pub enum ChartEmbeddedPackageContentType {
     Docx,
     Dotx,
     Potx,
@@ -306,7 +305,7 @@ pub enum ChartSheetChartEmbeddedPackageContentType {
     Xlsx,
     Xltx,
 }
-impl ChartSheetChartEmbeddedPackageContentType {
+impl ChartEmbeddedPackageContentType {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -367,7 +366,7 @@ impl ChartSheetChartEmbeddedPackageContentType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetChartThemeOverrideResource {
+pub struct ChartThemeOverrideResource {
     pub relationship_id: String,
     pub part_name: String,
     pub content_type: String,
@@ -377,21 +376,21 @@ pub struct ChartSheetChartThemeOverrideResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetChartEmbeddedPackageResource {
+pub struct ChartEmbeddedPackageResource {
     pub relationship_id: String,
     pub part_name: String,
-    pub content_type: ChartSheetChartEmbeddedPackageContentType,
+    pub content_type: ChartEmbeddedPackageContentType,
     /// Preserved without opening, parsing, activation, macro execution, or external access.
     pub data: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ChartSheetChartOutboundResource {
+pub enum ChartOutboundResource {
     Image(ImageResource),
-    ThemeOverride(ChartSheetChartThemeOverrideResource),
-    EmbeddedPackage(ChartSheetChartEmbeddedPackageResource),
+    ThemeOverride(ChartThemeOverrideResource),
+    EmbeddedPackage(ChartEmbeddedPackageResource),
 }
-impl ChartSheetChartOutboundResource {
+impl ChartOutboundResource {
     fn relationship_id(&self) -> &str {
         match self {
             Self::Image(value) => &value.relationship_id,
@@ -402,45 +401,45 @@ impl ChartSheetChartOutboundResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ChartSheetChartResourceKind {
+pub enum ChartResourceKind {
     Classic,
     Extended {
-        styles: Vec<ChartSheetChartCompanionResource>,
-        color_styles: Vec<ChartSheetChartCompanionResource>,
-        user_shapes: Option<ChartSheetChartUserShapesResource>,
-        outbound_resources: Vec<ChartSheetChartOutboundResource>,
+        styles: Vec<ChartCompanionResource>,
+        color_styles: Vec<ChartCompanionResource>,
+        user_shapes: Option<ChartUserShapesResource>,
+        outbound_resources: Vec<ChartOutboundResource>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetDrawingResource {
+pub struct DrawingResource {
     pub part_name: String,
     pub content_type: String,
     /// Preserved without rendering or interpreting drawing actions.
     pub data: Vec<u8>,
-    pub charts: Vec<ChartSheetChartResource>,
+    pub charts: Vec<ChartResource>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetEntry {
+pub struct Entry {
     pub name: String,
     pub sheet_id: u32,
-    pub state: ChartSheetState,
+    pub state: State,
     pub workbook_relationship_id: String,
     pub part_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChartSheetPackage {
-    pub entry: ChartSheetEntry,
-    pub chartsheet: ChartSheet,
-    pub drawing: ChartSheetDrawingResource,
-    pub legacy_drawing: Option<ChartSheetVmlDrawingResource>,
-    pub legacy_header_footer_drawing: Option<ChartSheetVmlDrawingResource>,
-    pub background_picture: Option<ChartSheetBackgroundPicture>,
-    pub printer_settings: Option<ChartSheetPrinterSettings>,
+pub struct Package {
+    pub entry: Entry,
+    pub chartsheet: Chart,
+    pub drawing: DrawingResource,
+    pub legacy_drawing: Option<VmlDrawingResource>,
+    pub legacy_header_footer_drawing: Option<VmlDrawingResource>,
+    pub background_picture: Option<BackgroundPicture>,
+    pub printer_settings: Option<PrinterSettings>,
     /// Metadata for otherwise-unknown relationships referenced by extension markup.
-    pub extension_relationships: Vec<ChartSheetExtensionRelationship>,
+    pub extension_relationships: Vec<ExtensionRelationship>,
 }
 
 #[derive(Clone)]
@@ -466,12 +465,12 @@ enum NodeContent {
 
 /// Parses the selected, bounded core of a complete Chartsheet part.
 /// Parse the bounded SpreadsheetML chartsheet part through the canonical XLSX owner.
-pub fn parse_chartsheet(xml: &[u8]) -> Result<(ChartSheetConformance, ChartSheet)> {
+pub fn parse_chartsheet(xml: &[u8]) -> Result<(Conformance, Chart)> {
     litchi_xlsx::chart_sheet::parse_chartsheet(xml).map_err(map_owner_error)
 }
 
 /// Serialize the bounded SpreadsheetML chartsheet part through the canonical XLSX owner.
-pub fn write_chartsheet(value: &ChartSheet, conformance: ChartSheetConformance) -> Result<Vec<u8>> {
+pub fn write_chartsheet(value: &Chart, conformance: Conformance) -> Result<Vec<u8>> {
     litchi_xlsx::chart_sheet::write_chartsheet(value, conformance).map_err(map_owner_error)
 }
 
@@ -493,7 +492,7 @@ pub fn load_chartsheet(
     package: &OpcPackage,
     workbook_name: &PackURI,
     workbook_relationship_id: &str,
-) -> Result<ChartSheetPackage> {
+) -> Result<Package> {
     if package.rels().iter().any(|rel| {
         matches!(rel.reltype(), CHARTSHEET_REL | STRICT_CHARTSHEET_REL)
             || is_printer_relationship(rel.reltype())
@@ -553,7 +552,7 @@ pub fn load_chartsheet(
             return Err(invalid("chartsheet background image is outside /xl/media"));
         }
         let part = package.get_part(&name)?;
-        let content_type = ChartSheetImageContentType::parse(part.content_type())?;
+        let content_type = BackgroundImageContentType::parse(part.content_type())?;
         if part.blob().len() > MAX_BACKGROUND_IMAGE_BYTES {
             return Err(limit("background image bytes"));
         }
@@ -562,7 +561,7 @@ pub fn load_chartsheet(
                 "chartsheet background image must be a relationship-free leaf",
             ));
         }
-        Some(ChartSheetBackgroundPicture {
+        Some(BackgroundPicture {
             relationship_id: id.clone(),
             part_name: name.to_string(),
             content_type,
@@ -587,7 +586,7 @@ pub fn load_chartsheet(
                 "chartsheet Printer Settings must be a relationship-free leaf",
             ));
         }
-        Some(ChartSheetPrinterSettings {
+        Some(PrinterSettings {
             relationship_id: id.clone(),
             resource: PrinterSettingsResource {
                 part_name: name.to_string(),
@@ -612,16 +611,16 @@ pub fn load_chartsheet(
         validate_extension_relationship_string(relationship.reltype(), "type")?;
         let target = if relationship.is_external() {
             validate_extension_relationship_string(relationship.target_ref(), "target")?;
-            ChartSheetExtensionRelationshipTarget::External {
+            ExtensionRelationshipTarget::External {
                 target: relationship.target_ref().to_owned(),
             }
         } else {
             let name = relationship.target_partname()?;
-            ChartSheetExtensionRelationshipTarget::Internal {
+            ExtensionRelationshipTarget::Internal {
                 part_name: name.to_string(),
             }
         };
-        extension_relationships.push(ChartSheetExtensionRelationship {
+        extension_relationships.push(ExtensionRelationship {
             relationship_id: id.clone(),
             relationship_type: relationship.reltype().to_owned(),
             target,
@@ -682,10 +681,10 @@ pub fn load_chartsheet(
             &mut total,
         )?);
     }
-    Ok(ChartSheetPackage {
+    Ok(Package {
         entry,
         chartsheet,
-        drawing: ChartSheetDrawingResource {
+        drawing: DrawingResource {
             part_name: drawing_name.to_string(),
             content_type: drawing_part.content_type().to_owned(),
             data: drawing_part.blob().to_vec(),
@@ -703,8 +702,8 @@ fn load_vml_resource(
     package: &OpcPackage,
     chartsheet_part: &dyn Part,
     id: &str,
-    conformance: ChartSheetConformance,
-) -> Result<ChartSheetVmlDrawingResource> {
+    conformance: Conformance,
+) -> Result<VmlDrawingResource> {
     let rel = internal_relationship(chartsheet_part, id, conformance.vml_drawing_rel())?;
     let name = rel.target_partname()?;
     if !name.as_str().starts_with("/xl/drawings/") || !name.as_str().ends_with(".vml") {
@@ -722,7 +721,7 @@ fn load_vml_resource(
             "chartsheet VML drawing must be a relationship-free leaf",
         ));
     }
-    Ok(ChartSheetVmlDrawingResource {
+    Ok(VmlDrawingResource {
         relationship_id: id.to_owned(),
         part_name: name.to_string(),
         content_type: part.content_type().to_owned(),
@@ -734,9 +733,9 @@ fn load_chart_resource(
     package: &OpcPackage,
     drawing_part: &dyn Part,
     reference: &DrawingChartReference,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     total: &mut usize,
-) -> Result<ChartSheetChartResource> {
+) -> Result<ChartResource> {
     let relationship_type = match reference.kind {
         DrawingChartKind::Classic => conformance.chart_rel(),
         DrawingChartKind::Extended => CHART_EX_REL,
@@ -760,7 +759,7 @@ fn load_chart_resource(
                 ));
             }
             add_resource(total, part.blob().len(), MAX_CHART_BYTES, "chart bytes")?;
-            ChartSheetChartResourceKind::Classic
+            ChartResourceKind::Classic
         },
         DrawingChartKind::Extended => {
             require_content_type(part, CHART_EX_CT, "chartEx")?;
@@ -802,13 +801,13 @@ fn load_chart_resource(
                 if relationship.reltype() == conformance.image_rel() {
                     if outbound_resources
                         .iter()
-                        .filter(|value| matches!(value, ChartSheetChartOutboundResource::Image(_)))
+                        .filter(|value| matches!(value, ChartOutboundResource::Image(_)))
                         .count()
                         >= MAX_CHART_DIRECT_IMAGES
                     {
                         return Err(limit("chartEx direct image count"));
                     }
-                    outbound_resources.push(ChartSheetChartOutboundResource::Image(
+                    outbound_resources.push(ChartOutboundResource::Image(
                         load_chart_image_resource(
                             package,
                             relationship,
@@ -823,7 +822,7 @@ fn load_chart_resource(
                         return Err(invalid("chartEx has multiple themeOverride relationships"));
                     }
                     theme_seen = true;
-                    outbound_resources.push(ChartSheetChartOutboundResource::ThemeOverride(
+                    outbound_resources.push(ChartOutboundResource::ThemeOverride(
                         load_chart_theme_override_resource(
                             package,
                             relationship,
@@ -840,7 +839,7 @@ fn load_chart_resource(
                         ));
                     }
                     package_seen = true;
-                    outbound_resources.push(ChartSheetChartOutboundResource::EmbeddedPackage(
+                    outbound_resources.push(ChartOutboundResource::EmbeddedPackage(
                         load_chart_embedded_package_resource(package, relationship, total)?,
                     ));
                     continue;
@@ -892,7 +891,7 @@ fn load_chart_resource(
                     max_bytes,
                     "chart companion bytes",
                 )?;
-                collection.push(ChartSheetChartCompanionResource {
+                collection.push(ChartCompanionResource {
                     relationship_id: relationship.r_id().to_owned(),
                     part_name: companion_name.to_string(),
                     content_type: companion.content_type().to_owned(),
@@ -902,14 +901,12 @@ fn load_chart_resource(
             let image_ids = outbound_resources
                 .iter()
                 .filter_map(|value| match value {
-                    ChartSheetChartOutboundResource::Image(image) => {
-                        Some(image.relationship_id.clone())
-                    },
+                    ChartOutboundResource::Image(image) => Some(image.relationship_id.clone()),
                     _ => None,
                 })
                 .collect::<BTreeSet<_>>();
             let package_id = outbound_resources.iter().find_map(|value| match value {
-                ChartSheetChartOutboundResource::EmbeddedPackage(package) => {
+                ChartOutboundResource::EmbeddedPackage(package) => {
                     Some(package.relationship_id.clone())
                 },
                 _ => None,
@@ -923,7 +920,7 @@ fn load_chart_resource(
             color_styles.sort_by(|left, right| left.relationship_id.cmp(&right.relationship_id));
             outbound_resources
                 .sort_by(|left, right| left.relationship_id().cmp(right.relationship_id()));
-            ChartSheetChartResourceKind::Extended {
+            ChartResourceKind::Extended {
                 styles,
                 color_styles,
                 user_shapes,
@@ -931,7 +928,7 @@ fn load_chart_resource(
             }
         },
     };
-    Ok(ChartSheetChartResource {
+    Ok(ChartResource {
         relationship_id: reference.relationship_id.clone(),
         part_name: name.to_string(),
         content_type: part.content_type().to_owned(),
@@ -943,9 +940,9 @@ fn load_chart_resource(
 fn load_chart_user_shapes_resource(
     package: &OpcPackage,
     relationship: &litchi_opc::Relationship,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     total: &mut usize,
-) -> Result<ChartSheetChartUserShapesResource> {
+) -> Result<ChartUserShapesResource> {
     let name = relationship.target_partname()?;
     if !name.as_str().starts_with("/xl/drawings/") || !name.as_str().ends_with(".xml") {
         return Err(invalid(
@@ -1005,7 +1002,7 @@ fn load_chart_user_shapes_resource(
         });
     }
     images.sort_by(|left, right| left.relationship_id.cmp(&right.relationship_id));
-    Ok(ChartSheetChartUserShapesResource {
+    Ok(ChartUserShapesResource {
         relationship_id: relationship.r_id().to_owned(),
         part_name: name.to_string(),
         content_type: part.content_type().to_owned(),
@@ -1056,9 +1053,9 @@ fn load_chart_image_resource(
 fn load_chart_theme_override_resource(
     package: &OpcPackage,
     relationship: &litchi_opc::Relationship,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     total: &mut usize,
-) -> Result<ChartSheetChartThemeOverrideResource> {
+) -> Result<ChartThemeOverrideResource> {
     if relationship.is_external() {
         return Err(invalid("external themeOverride relationship is rejected"));
     }
@@ -1099,7 +1096,7 @@ fn load_chart_theme_override_resource(
         )?);
     }
     images.sort_by(|left, right| left.relationship_id.cmp(&right.relationship_id));
-    Ok(ChartSheetChartThemeOverrideResource {
+    Ok(ChartThemeOverrideResource {
         relationship_id: relationship.r_id().to_owned(),
         part_name: name.to_string(),
         content_type: part.content_type().to_owned(),
@@ -1112,7 +1109,7 @@ fn load_chart_embedded_package_resource(
     package: &OpcPackage,
     relationship: &litchi_opc::Relationship,
     total: &mut usize,
-) -> Result<ChartSheetChartEmbeddedPackageResource> {
+) -> Result<ChartEmbeddedPackageResource> {
     if relationship.is_external() {
         return Err(invalid(
             "external chartEx embedded-package relationship is rejected",
@@ -1125,7 +1122,7 @@ fn load_chart_embedded_package_resource(
         ));
     }
     let part = package.get_part(&name)?;
-    let content_type = ChartSheetChartEmbeddedPackageContentType::parse(part.content_type())?;
+    let content_type = ChartEmbeddedPackageContentType::parse(part.content_type())?;
     if !content_type.validates_part_name(name.as_str()) {
         return Err(invalid(
             "chartEx embedded-package suffix does not match its content type",
@@ -1142,7 +1139,7 @@ fn load_chart_embedded_package_resource(
         MAX_CHART_EMBEDDED_PACKAGE_BYTES,
         "chartEx embedded-package bytes",
     )?;
-    Ok(ChartSheetChartEmbeddedPackageResource {
+    Ok(ChartEmbeddedPackageResource {
         relationship_id: relationship.r_id().to_owned(),
         part_name: name.to_string(),
         content_type,
@@ -1154,8 +1151,8 @@ fn load_chart_embedded_package_resource(
 pub fn store_chartsheet(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
-    value: &ChartSheetPackage,
-    conformance: ChartSheetConformance,
+    value: &Package,
+    conformance: Conformance,
 ) -> Result<()> {
     validate_package_value(value, conformance)?;
     let mut staged = package.clone();
@@ -1167,8 +1164,8 @@ pub fn store_chartsheet(
 fn store_chartsheet_inner(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
-    value: &ChartSheetPackage,
-    conformance: ChartSheetConformance,
+    value: &Package,
+    conformance: Conformance,
 ) -> Result<()> {
     let workbook = package.get_part(workbook_name)?;
     require_workbook(workbook)?;
@@ -1222,7 +1219,7 @@ fn store_chartsheet_inner(
             chart.relationship_id.clone(),
             new_uri(package, &chart.part_name, "/xl/charts/")?,
         );
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             styles,
             color_styles,
             user_shapes,
@@ -1253,13 +1250,11 @@ fn store_chartsheet_inner(
             for resource in outbound_resources {
                 let relationship_id = resource.relationship_id().to_owned();
                 let (prefix, part_name) = match resource {
-                    ChartSheetChartOutboundResource::Image(image) => {
-                        ("/xl/media/", image.part_name.as_str())
-                    },
-                    ChartSheetChartOutboundResource::ThemeOverride(theme) => {
+                    ChartOutboundResource::Image(image) => ("/xl/media/", image.part_name.as_str()),
+                    ChartOutboundResource::ThemeOverride(theme) => {
                         ("/xl/theme/", theme.part_name.as_str())
                     },
-                    ChartSheetChartOutboundResource::EmbeddedPackage(embedded) => {
+                    ChartOutboundResource::EmbeddedPackage(embedded) => {
                         ("/xl/embeddings/", embedded.part_name.as_str())
                     },
                 };
@@ -1267,7 +1262,7 @@ fn store_chartsheet_inner(
                     (chart.relationship_id.clone(), relationship_id.clone()),
                     new_uri(package, part_name, prefix)?,
                 );
-                if let ChartSheetChartOutboundResource::ThemeOverride(theme) = resource {
+                if let ChartOutboundResource::ThemeOverride(theme) = resource {
                     for image in &theme.images {
                         theme_image_uris.insert(
                             (
@@ -1332,7 +1327,7 @@ fn store_chartsheet_inner(
             chart.content_type.clone(),
             chart.data.clone(),
         )))?;
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             styles,
             color_styles,
             user_shapes,
@@ -1382,14 +1377,10 @@ fn store_chartsheet_inner(
                 );
                 let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                 match resource {
-                    ChartSheetChartOutboundResource::Image(image) => {
-                        package.try_add_part(Box::new(BlobPart::new(
-                            uri,
-                            image.content_type.as_str().into(),
-                            image.data.clone(),
-                        )))?
-                    },
-                    ChartSheetChartOutboundResource::ThemeOverride(theme) => {
+                    ChartOutboundResource::Image(image) => package.try_add_part(Box::new(
+                        BlobPart::new(uri, image.content_type.as_str().into(), image.data.clone()),
+                    ))?,
+                    ChartOutboundResource::ThemeOverride(theme) => {
                         package.try_add_part(Box::new(BlobPart::new(
                             uri.clone(),
                             theme.content_type.clone(),
@@ -1412,12 +1403,13 @@ fn store_chartsheet_inner(
                             )))?;
                         }
                     },
-                    ChartSheetChartOutboundResource::EmbeddedPackage(embedded) => package
-                        .try_add_part(Box::new(BlobPart::new(
+                    ChartOutboundResource::EmbeddedPackage(embedded) => {
+                        package.try_add_part(Box::new(BlobPart::new(
                             uri,
                             embedded.content_type.as_str().into(),
                             embedded.data.clone(),
-                        )))?,
+                        )))?
+                    },
                 }
             }
         }
@@ -1480,13 +1472,13 @@ fn store_chartsheet_inner(
     }
     for relationship in &value.extension_relationships {
         let (target, external) = match &relationship.target {
-            ChartSheetExtensionRelationshipTarget::Internal { part_name } => (
+            ExtensionRelationshipTarget::Internal { part_name } => (
                 PackURI::new(part_name)
                     .map_err(OoxmlError::InvalidUri)?
                     .relative_ref(chartsheet_uri.base_uri()),
                 false,
             ),
-            ChartSheetExtensionRelationshipTarget::External { target } => (target.clone(), true),
+            ExtensionRelationshipTarget::External { target } => (target.clone(), true),
         };
         add_relationship_checked(
             package,
@@ -1503,8 +1495,8 @@ fn store_chartsheet_inner(
     }
     for chart in &value.drawing.charts {
         let relationship_type = match &chart.kind {
-            ChartSheetChartResourceKind::Classic => conformance.chart_rel(),
-            ChartSheetChartResourceKind::Extended { .. } => CHART_EX_REL,
+            ChartResourceKind::Classic => conformance.chart_rel(),
+            ChartResourceKind::Extended { .. } => CHART_EX_REL,
         };
         let chart_uri = staged_uri(&chart_uris, &chart.relationship_id, "chart")?;
         add_relationship_checked(
@@ -1515,7 +1507,7 @@ fn store_chartsheet_inner(
             chart.relationship_id.clone(),
             TargetMode::Internal,
         )?;
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             styles,
             color_styles,
             user_shapes,
@@ -1578,13 +1570,9 @@ fn store_chartsheet_inner(
                 );
                 let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                 let relationship_type = match resource {
-                    ChartSheetChartOutboundResource::Image(_) => conformance.image_rel(),
-                    ChartSheetChartOutboundResource::ThemeOverride(_) => {
-                        conformance.theme_override_rel()
-                    },
-                    ChartSheetChartOutboundResource::EmbeddedPackage(_) => {
-                        conformance.package_rel()
-                    },
+                    ChartOutboundResource::Image(_) => conformance.image_rel(),
+                    ChartOutboundResource::ThemeOverride(_) => conformance.theme_override_rel(),
+                    ChartOutboundResource::EmbeddedPackage(_) => conformance.package_rel(),
                 };
                 add_relationship_checked(
                     package,
@@ -1594,7 +1582,7 @@ fn store_chartsheet_inner(
                     resource.relationship_id().to_owned(),
                     TargetMode::Internal,
                 )?;
-                if let ChartSheetChartOutboundResource::ThemeOverride(theme) = resource {
+                if let ChartOutboundResource::ThemeOverride(theme) = resource {
                     for image in &theme.images {
                         let image_uri = staged_uri(
                             &theme_image_uris,
@@ -1621,10 +1609,7 @@ fn store_chartsheet_inner(
     Ok(())
 }
 
-fn validate_package_value(
-    value: &ChartSheetPackage,
-    conformance: ChartSheetConformance,
-) -> Result<()> {
+fn validate_package_value(value: &Package, conformance: Conformance) -> Result<()> {
     validate_entry(&value.entry)?;
     validate_chartsheet(&value.chartsheet)?;
     if value.drawing.content_type != DRAWING_CT || value.drawing.data.len() > MAX_DRAWING_BYTES {
@@ -1767,9 +1752,9 @@ fn validate_package_value(
 }
 
 fn validate_chart_resource_value<'a>(
-    chart: &'a ChartSheetChartResource,
+    chart: &'a ChartResource,
     reference: &DrawingChartReference,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     total: &mut usize,
     resources: &mut BTreeMap<String, &'a Vec<u8>>,
 ) -> Result<()> {
@@ -1781,7 +1766,7 @@ fn validate_chart_resource_value<'a>(
         ));
     }
     match (&chart.kind, reference.kind) {
-        (ChartSheetChartResourceKind::Classic, DrawingChartKind::Classic) => {
+        (ChartResourceKind::Classic, DrawingChartKind::Classic) => {
             if chart.content_type != CHART_CT {
                 return Err(invalid("classic chart has invalid content type"));
             }
@@ -1789,7 +1774,7 @@ fn validate_chart_resource_value<'a>(
             add_resource(total, chart.data.len(), MAX_CHART_BYTES, "chart bytes")?;
         },
         (
-            ChartSheetChartResourceKind::Extended {
+            ChartResourceKind::Extended {
                 styles,
                 color_styles,
                 user_shapes,
@@ -1929,12 +1914,12 @@ fn validate_chart_resource_value<'a>(
 }
 
 fn validate_chart_outbound_resources<'a>(
-    chart: &'a ChartSheetChartResource,
-    conformance: ChartSheetConformance,
+    chart: &'a ChartResource,
+    conformance: Conformance,
     total: &mut usize,
     resources: &mut BTreeMap<String, &'a Vec<u8>>,
 ) -> Result<()> {
-    let ChartSheetChartResourceKind::Extended {
+    let ChartResourceKind::Extended {
         styles,
         color_styles,
         user_shapes,
@@ -1957,7 +1942,7 @@ fn validate_chart_outbound_resources<'a>(
     let mut package_count = 0usize;
     if outbound_resources
         .iter()
-        .filter(|resource| matches!(resource, ChartSheetChartOutboundResource::Image(_)))
+        .filter(|resource| matches!(resource, ChartOutboundResource::Image(_)))
         .count()
         > MAX_CHART_DIRECT_IMAGES
     {
@@ -1969,7 +1954,7 @@ fn validate_chart_outbound_resources<'a>(
             return Err(invalid("chartEx outbound relationship IDs collide"));
         }
         match resource {
-            ChartSheetChartOutboundResource::Image(image) => {
+            ChartOutboundResource::Image(image) => {
                 if !direct_ids.insert(image.relationship_id.clone()) {
                     return Err(invalid("chartEx direct image relationship IDs collide"));
                 }
@@ -1981,7 +1966,7 @@ fn validate_chart_outbound_resources<'a>(
                     "chartEx direct image bytes",
                 )?;
             },
-            ChartSheetChartOutboundResource::ThemeOverride(theme) => {
+            ChartOutboundResource::ThemeOverride(theme) => {
                 theme_count += 1;
                 if theme_count > 1 {
                     return Err(invalid("chartEx has multiple themeOverride relationships"));
@@ -2034,7 +2019,7 @@ fn validate_chart_outbound_resources<'a>(
                     )?;
                 }
             },
-            ChartSheetChartOutboundResource::EmbeddedPackage(embedded) => {
+            ChartOutboundResource::EmbeddedPackage(embedded) => {
                 package_count += 1;
                 if package_count > 1 {
                     return Err(invalid(
@@ -2098,7 +2083,7 @@ fn validate_chart_image_value<'a>(
 
 fn validate_vml_pair<'a>(
     id: Option<&str>,
-    resource: Option<&'a ChartSheetVmlDrawingResource>,
+    resource: Option<&'a VmlDrawingResource>,
     label: &str,
     total: &mut usize,
     resources: &mut BTreeMap<String, &'a Vec<u8>>,
@@ -2142,15 +2127,15 @@ fn validate_vml_pair<'a>(
     }
 }
 
-fn validate_chartsheet(value: &ChartSheet) -> Result<()> {
+fn validate_chartsheet(value: &Chart) -> Result<()> {
     litchi_xlsx::chart_sheet::validate_chartsheet(value).map_err(map_owner_error)
 }
 fn workbook_entry(
     root: &Node,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     relationship_id: &str,
     part_name: String,
-) -> Result<ChartSheetEntry> {
+) -> Result<Entry> {
     let sheets = required_child(root, conformance.sml(), "sheets")?;
     let mut found = None;
     for sheet in &sheets.children {
@@ -2169,17 +2154,13 @@ fn workbook_entry(
     found.ok_or_else(|| invalid("workbook has no sheet entry for the chartsheet relationship"))
 }
 
-fn parse_entry(
-    node: &Node,
-    conformance: ChartSheetConformance,
-    part_name: String,
-) -> Result<ChartSheetEntry> {
+fn parse_entry(node: &Node, conformance: Conformance, part_name: String) -> Result<Entry> {
     leaf(node, "workbook sheet")?;
     let state = optional(node, "", "state")
         .map(parse_state)
         .transpose()?
-        .unwrap_or(ChartSheetState::Visible);
-    Ok(ChartSheetEntry {
+        .unwrap_or(State::Visible);
+    Ok(Entry {
         name: required(node, "", "name")?.to_owned(),
         sheet_id: required(node, "", "sheetId")?
             .parse()
@@ -2190,11 +2171,7 @@ fn parse_entry(
     })
 }
 
-fn validate_new_entry(
-    root: &Node,
-    conformance: ChartSheetConformance,
-    entry: &ChartSheetEntry,
-) -> Result<()> {
+fn validate_new_entry(root: &Node, conformance: Conformance, entry: &Entry) -> Result<()> {
     let sheets = required_child(root, conformance.sml(), "sheets")?;
     for sheet in &sheets.children {
         if sheet.namespace == conformance.sml() && sheet.name == "sheet" {
@@ -2209,7 +2186,7 @@ fn validate_new_entry(
     Ok(())
 }
 
-fn validate_entry(entry: &ChartSheetEntry) -> Result<()> {
+fn validate_entry(entry: &Entry) -> Result<()> {
     bounded(&entry.name)?;
     if entry.name.is_empty()
         || entry.name.chars().count() > 31
@@ -2231,11 +2208,7 @@ fn validate_entry(entry: &ChartSheetEntry) -> Result<()> {
     Ok(())
 }
 
-fn insert_workbook_entry(
-    xml: &[u8],
-    entry: &ChartSheetEntry,
-    conformance: ChartSheetConformance,
-) -> Result<Vec<u8>> {
+fn insert_workbook_entry(xml: &[u8], entry: &Entry, conformance: Conformance) -> Result<Vec<u8>> {
     let mut fragment = Vec::new();
     fragment.extend_from_slice(b"<x:sheet xmlns:x=\"");
     escape(&mut fragment, conformance.sml());
@@ -2244,14 +2217,14 @@ fn insert_workbook_entry(
     fragment.extend_from_slice(b"\"");
     attr(&mut fragment, "name", &entry.name);
     attr(&mut fragment, "sheetId", &entry.sheet_id.to_string());
-    if entry.state != ChartSheetState::Visible {
+    if entry.state != State::Visible {
         attr(
             &mut fragment,
             "state",
             match entry.state {
-                ChartSheetState::Visible => "visible",
-                ChartSheetState::Hidden => "hidden",
-                ChartSheetState::VeryHidden => "veryHidden",
+                State::Visible => "visible",
+                State::Hidden => "hidden",
+                State::VeryHidden => "veryHidden",
             },
         );
     }
@@ -2317,7 +2290,7 @@ fn insert_workbook_entry(
     Ok(out)
 }
 
-fn known_chartsheet_relationship_ids(value: &ChartSheet) -> BTreeSet<String> {
+fn known_chartsheet_relationship_ids(value: &Chart) -> BTreeSet<String> {
     let mut ids = BTreeSet::new();
     ids.insert(value.drawing_relationship_id.clone());
     for id in [
@@ -2336,10 +2309,7 @@ fn known_chartsheet_relationship_ids(value: &ChartSheet) -> BTreeSet<String> {
     }
     ids
 }
-fn extension_relationship_ids(
-    value: &ChartSheet,
-    conformance: ChartSheetConformance,
-) -> Result<BTreeSet<String>> {
+fn extension_relationship_ids(value: &Chart, conformance: Conformance) -> Result<BTreeSet<String>> {
     let mut ids = BTreeSet::new();
     if let Some(list) = &value.extension_list {
         for extension in &list.extensions {
@@ -2386,10 +2356,7 @@ fn validate_extension_relationship_string(value: &str, label: &str) -> Result<()
     }
     Ok(())
 }
-fn validate_extension_relationships(
-    value: &ChartSheetPackage,
-    conformance: ChartSheetConformance,
-) -> Result<()> {
+fn validate_extension_relationships(value: &Package, conformance: Conformance) -> Result<()> {
     if value.extension_relationships.len() > MAX_EXTENSION_RELATIONSHIPS {
         return Err(limit("extension relationship count"));
     }
@@ -2416,7 +2383,7 @@ fn validate_extension_relationships(
         }
         validate_extension_relationship_string(&relationship.relationship_type, "type")?;
         match &relationship.target {
-            ChartSheetExtensionRelationshipTarget::Internal { part_name } => {
+            ExtensionRelationshipTarget::Internal { part_name } => {
                 validate_extension_relationship_string(part_name, "target")?;
                 let uri = PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?;
                 if !uri.as_str().starts_with('/') {
@@ -2425,7 +2392,7 @@ fn validate_extension_relationships(
                     ));
                 }
             },
-            ChartSheetExtensionRelationshipTarget::External { target } => {
+            ExtensionRelationshipTarget::External { target } => {
                 validate_extension_relationship_string(target, "target")?
             },
         }
@@ -2453,7 +2420,7 @@ fn chart_ex_mce_capabilities() -> MceCapabilities {
 }
 fn drawing_chart_references(
     xml: &[u8],
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
 ) -> Result<Vec<DrawingChartReference>> {
     if xml.len() > MAX_DRAWING_BYTES {
         return Err(limit("drawing bytes"));
@@ -2481,7 +2448,7 @@ fn drawing_chart_references(
 }
 fn collect_drawing_chart_references(
     node: &Node,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     references: &mut Vec<DrawingChartReference>,
 ) -> Result<()> {
     if matches!(node.namespace.as_str(), DRAWING_MAIN | STRICT_DRAWING_MAIN)
@@ -2539,7 +2506,7 @@ fn collect_drawing_chart_references(
     Ok(())
 }
 
-fn validate_chart_xml(xml: &[u8], conformance: ChartSheetConformance) -> Result<()> {
+fn validate_chart_xml(xml: &[u8], conformance: Conformance) -> Result<()> {
     if xml.len() > MAX_CHART_BYTES {
         return Err(limit("chart bytes"));
     }
@@ -2565,7 +2532,7 @@ fn validate_chart_companion_xml(xml: &[u8], root_name: &str, max_bytes: usize) -
 }
 fn validate_chart_user_shapes_xml(
     xml: &[u8],
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
 ) -> Result<BTreeSet<String>> {
     if xml.len() > MAX_CHART_USER_SHAPES_BYTES {
         return Err(limit("chartUserShapes bytes"));
@@ -2592,7 +2559,7 @@ struct ChartExRelationshipReferences {
 }
 fn validate_chart_ex_relationships(
     xml: &[u8],
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
 ) -> Result<ChartExRelationshipReferences> {
     if xml.len() > MAX_CHART_EX_BYTES {
         return Err(limit("chartEx bytes"));
@@ -2607,7 +2574,7 @@ fn validate_chart_ex_relationships(
 }
 fn collect_chart_ex_relationships(
     node: &Node,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     references: &mut ChartExRelationshipReferences,
 ) -> Result<()> {
     let external_data = node.namespace == CHART_EX && node.name == "externalData";
@@ -2649,15 +2616,12 @@ fn collect_chart_ex_relationships(
     }
     Ok(())
 }
-fn validate_theme_override_xml(
-    xml: &[u8],
-    conformance: ChartSheetConformance,
-) -> Result<BTreeSet<String>> {
+fn validate_theme_override_xml(xml: &[u8], conformance: Conformance) -> Result<BTreeSet<String>> {
     if xml.len() > MAX_CHART_THEME_OVERRIDE_BYTES {
         return Err(limit("themeOverride bytes"));
     }
     let root = parse_document(xml, MAX_CHART_THEME_OVERRIDE_BYTES)?;
-    let namespace = if conformance == ChartSheetConformance::Strict {
+    let namespace = if conformance == Conformance::Strict {
         STRICT_DRAWING_MAIN
     } else {
         DRAWING_MAIN
@@ -2835,13 +2799,13 @@ fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()>
     }
     Ok(())
 }
-fn root_conformance(root: &Node, name: &str) -> Result<ChartSheetConformance> {
+fn root_conformance(root: &Node, name: &str) -> Result<Conformance> {
     if root.name != name {
         return Err(invalid(format!("expected {name} root")));
     }
     match root.namespace.as_str() {
-        SML => Ok(ChartSheetConformance::Transitional),
-        STRICT_SML => Ok(ChartSheetConformance::Strict),
+        SML => Ok(Conformance::Transitional),
+        STRICT_SML => Ok(Conformance::Strict),
         _ => Err(invalid("unsupported SpreadsheetML namespace")),
     }
 }
@@ -2903,11 +2867,11 @@ fn leaf(node: &Node, label: &str) -> Result<()> {
         Err(invalid(format!("{label} must not contain child elements")))
     }
 }
-fn parse_state(value: &str) -> Result<ChartSheetState> {
+fn parse_state(value: &str) -> Result<State> {
     match value {
-        "visible" => Ok(ChartSheetState::Visible),
-        "hidden" => Ok(ChartSheetState::Hidden),
-        "veryHidden" => Ok(ChartSheetState::VeryHidden),
+        "visible" => Ok(State::Visible),
+        "hidden" => Ok(State::Hidden),
+        "veryHidden" => Ok(State::VeryHidden),
         _ => Err(invalid("invalid workbook sheet state")),
     }
 }
@@ -3087,12 +3051,12 @@ mod tests {
     pub(super) const LO_USER_SHAPES_IMAGES: &[u8] = include_bytes!(
         "../../../../test-data/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx"
     );
-    fn sheet() -> ChartSheet {
-        ChartSheet {
-            properties: Some(ChartSheetProperties {
+    fn sheet() -> Chart {
+        Chart {
+            properties: Some(Properties {
                 published: Some(true),
                 code_name: Some("ChartCode".into()),
-                tab_color: Some(ChartSheetColor {
+                tab_color: Some(Color {
                     automatic: None,
                     indexed: None,
                     rgb: Some("FF336699".into()),
@@ -3100,32 +3064,32 @@ mod tests {
                     tint: Some(0.25),
                 }),
             }),
-            views: vec![ChartSheetView {
+            views: vec![View {
                 tab_selected: Some(true),
                 zoom_scale: Some(125),
                 workbook_view_id: 0,
                 zoom_to_fit: Some(false),
             }],
-            protection: Some(ChartSheetProtection {
+            protection: Some(Protection {
                 password_hash: Some("ABCD".into()),
                 content: Some(true),
                 objects: Some(false),
             }),
             custom_views: Some(vec![
-                ChartSheetCustomView {
+                CustomView {
                     guid: "{00112233-4455-6677-8899-AABBCCDDEEFF}".into(),
                     scale: Some(175),
-                    state: Some(ChartSheetState::Hidden),
+                    state: Some(State::Hidden),
                     zoom_to_fit: Some(true),
                 },
-                ChartSheetCustomView {
+                CustomView {
                     guid: "{10213243-5465-7687-98A9-BACBDCEDFE0F}".into(),
                     scale: None,
                     state: None,
                     zoom_to_fit: Some(false),
                 },
             ]),
-            margins: Some(ChartSheetMargins {
+            margins: Some(Margins {
                 left: 0.7,
                 right: 0.7,
                 top: 0.75,
@@ -3133,7 +3097,7 @@ mod tests {
                 header: 0.3,
                 footer: 0.3,
             }),
-            page_setup: Some(ChartSheetPageSetup {
+            page_setup: Some(PageSetup {
                 paper_size: Some(1),
                 first_page_number: Some(1),
                 orientation: Some(PageOrientation::Landscape),
@@ -3146,7 +3110,7 @@ mod tests {
                 copies: Some(1),
                 printer_settings_relationship_id: Some("rIdPrinter".into()),
             }),
-            header_footer: Some(ChartSheetHeaderFooter {
+            header_footer: Some(HeaderFooter {
                 align_with_margins: Some(false),
                 odd_header: Some("&CChart & Report".into()),
                 ..Default::default()
@@ -3155,23 +3119,23 @@ mod tests {
             legacy_drawing_relationship_id: Some("rIdLegacy".into()),
             legacy_header_footer_drawing_relationship_id: Some("rIdLegacyHF".into()),
             background_picture_relationship_id: Some("rIdBackground".into()),
-            web_publish_items: Some(ChartSheetWebPublishItems {
+            web_publish_items: Some(WebPublishItems {
                 count: Some(2),
                 items: vec![
-                    ChartSheetWebPublishItem {
+                    WebPublishItem {
                         id: 11289,
                         div_id: "Views_11289".into(),
-                        source_type: ChartSheetWebSourceType::Range,
+                        source_type: WebSourceType::Range,
                         source_ref: Some("A6:C6".into()),
                         source_object: None,
                         destination_file: "file:///definitely/not/accessed/Publish.htm".into(),
                         title: Some("Range & title".into()),
                         auto_republish: Some(false),
                     },
-                    ChartSheetWebPublishItem {
+                    WebPublishItem {
                         id: 6433,
                         div_id: "Views_6433".into(),
-                        source_type: ChartSheetWebSourceType::Chart,
+                        source_type: WebSourceType::Chart,
                         source_ref: None,
                         source_object: Some("https://example.invalid/Chart 1".into()),
                         destination_file: "https://example.invalid/Publish.mht".into(),
@@ -3183,50 +3147,50 @@ mod tests {
             extension_list: None,
         }
     }
-    fn drawing(conformance: ChartSheetConformance) -> Vec<u8> {
+    fn drawing(conformance: Conformance) -> Vec<u8> {
         format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><xdr:absoluteAnchor><a:graphic><a:graphicData><c:chart xmlns:c=\"{}\" xmlns:r=\"{}\" r:id=\"rIdChart\"/></a:graphicData></a:graphic></xdr:absoluteAnchor></xdr:wsDr>", conformance.xdr(), conformance.chart(), conformance.rel()).into_bytes()
     }
-    fn chart(conformance: ChartSheetConformance) -> Vec<u8> {
+    fn chart(conformance: Conformance) -> Vec<u8> {
         format!(
             "<c:chartSpace xmlns:c=\"{}\"><c:chart/></c:chartSpace>",
             conformance.chart()
         )
         .into_bytes()
     }
-    fn vml(id: &str, name: &str) -> ChartSheetVmlDrawingResource {
-        ChartSheetVmlDrawingResource{relationship_id:id.into(),part_name:format!("/xl/drawings/{name}.vml"),content_type:VML_DRAWING_CT.into(),data:format!("<xml xmlns:v=\"urn:schemas-microsoft-com:vml\"><v:shape href=\"https://example.invalid/{name}\"/></xml>").into_bytes()}
+    fn vml(id: &str, name: &str) -> VmlDrawingResource {
+        VmlDrawingResource{relationship_id:id.into(),part_name:format!("/xl/drawings/{name}.vml"),content_type:VML_DRAWING_CT.into(),data:format!("<xml xmlns:v=\"urn:schemas-microsoft-com:vml\"><v:shape href=\"https://example.invalid/{name}\"/></xml>").into_bytes()}
     }
-    fn value(conformance: ChartSheetConformance) -> ChartSheetPackage {
-        ChartSheetPackage {
-            entry: ChartSheetEntry {
+    fn value(conformance: Conformance) -> Package {
+        Package {
+            entry: Entry {
                 name: "Chart 1".into(),
                 sheet_id: 2,
-                state: ChartSheetState::Visible,
+                state: State::Visible,
                 workbook_relationship_id: "rIdChartSheet".into(),
                 part_name: "/xl/chartsheets/sheet1.xml".into(),
             },
             chartsheet: sheet(),
-            drawing: ChartSheetDrawingResource {
+            drawing: DrawingResource {
                 part_name: "/xl/drawings/drawing1.xml".into(),
                 content_type: DRAWING_CT.into(),
                 data: drawing(conformance),
-                charts: vec![ChartSheetChartResource {
+                charts: vec![ChartResource {
                     relationship_id: "rIdChart".into(),
                     part_name: "/xl/charts/chart1.xml".into(),
                     content_type: CHART_CT.into(),
                     data: chart(conformance),
-                    kind: ChartSheetChartResourceKind::Classic,
+                    kind: ChartResourceKind::Classic,
                 }],
             },
             legacy_drawing: Some(vml("rIdLegacy", "vmlDrawing1")),
             legacy_header_footer_drawing: Some(vml("rIdLegacyHF", "vmlDrawing2")),
-            background_picture: Some(ChartSheetBackgroundPicture {
+            background_picture: Some(BackgroundPicture {
                 relationship_id: "rIdBackground".into(),
                 part_name: "/xl/media/background1.png".into(),
-                content_type: ChartSheetImageContentType::Png,
+                content_type: BackgroundImageContentType::Png,
                 data: vec![0, 255, 1, 254],
             }),
-            printer_settings: Some(ChartSheetPrinterSettings {
+            printer_settings: Some(PrinterSettings {
                 relationship_id: "rIdPrinter".into(),
                 resource: PrinterSettingsResource {
                     part_name: "/xl/printerSettings/printerSettings1.bin".into(),
@@ -3236,7 +3200,7 @@ mod tests {
             extension_relationships: vec![],
         }
     }
-    pub(super) fn base_package(conformance: ChartSheetConformance) -> (OpcPackage, PackURI) {
+    pub(super) fn base_package(conformance: Conformance) -> (OpcPackage, PackURI) {
         let mut package = OpcPackage::new();
         let uri = PackURI::new("/xl/workbook.xml").unwrap();
         let xml = format!(
@@ -3252,19 +3216,14 @@ mod tests {
         (package, uri)
     }
 
-    fn ext(uri: &str, payload: &str) -> ChartSheetExtension {
-        ChartSheetExtension {
+    fn ext(uri: &str, payload: &str) -> Extension {
+        Extension {
             uri: uri.into(),
             payload_xml: payload.as_bytes().to_vec(),
         }
     }
-    fn companion(
-        id: &str,
-        path: &str,
-        content_type: &str,
-        data: &[u8],
-    ) -> ChartSheetChartCompanionResource {
-        ChartSheetChartCompanionResource {
+    fn companion(id: &str, path: &str, content_type: &str, data: &[u8]) -> ChartCompanionResource {
+        ChartCompanionResource {
             relationship_id: id.into(),
             part_name: path.into(),
             content_type: content_type.into(),
@@ -3282,14 +3241,14 @@ mod tests {
                 .blob()
                 .to_vec()
         };
-        let mut expected = value(ChartSheetConformance::Transitional);
+        let mut expected = value(Conformance::Transitional);
         expected.drawing.data = blob("/xl/drawings/drawing1.xml");
-        expected.drawing.charts = vec![ChartSheetChartResource {
+        expected.drawing.charts = vec![ChartResource {
             relationship_id: "rId1".into(),
             part_name: "/xl/charts/chartEx1.xml".into(),
             content_type: CHART_EX_CT.into(),
             data: blob("/xl/charts/chartEx1.xml"),
-            kind: ChartSheetChartResourceKind::Extended {
+            kind: ChartResourceKind::Extended {
                 styles: vec![companion(
                     "rId1",
                     "/xl/charts/style1.xml",
@@ -3306,19 +3265,19 @@ mod tests {
                 outbound_resources: vec![],
             },
         }];
-        let (mut package, workbook) = base_package(ChartSheetConformance::Transitional);
+        let (mut package, workbook) = base_package(Conformance::Transitional);
         store_chartsheet(
             &mut package,
             &workbook,
             &expected,
-            ChartSheetConformance::Transitional,
+            Conformance::Transitional,
         )
         .unwrap();
         let loaded = load_chartsheet(&package, &workbook, "rIdChartSheet").unwrap();
         assert_eq!(loaded, expected);
         assert!(matches!(
             loaded.drawing.charts[0].kind,
-            ChartSheetChartResourceKind::Extended { .. }
+            ChartResourceKind::Extended { .. }
         ));
     }
 
@@ -3327,8 +3286,7 @@ mod tests {
         let strict = format!(
             "<xdr:wsDr xmlns:xdr=\"{STRICT_XDR}\" xmlns:a=\"{STRICT_DRAWING_MAIN}\" xmlns:c=\"{STRICT_CHART}\" xmlns:r=\"{STRICT_REL}\" xmlns:cx=\"{CHART_EX}\" xmlns:cx1=\"{CHART_EX_CHOICE}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:AlternateContent><mc:Choice Requires=\"cx1\"><a:graphic><a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdExtended\"/></a:graphicData></a:graphic></mc:Choice><mc:Fallback><a:graphic><a:graphicData uri=\"{STRICT_CHART}\"><c:chart r:id=\"rIdClassic\"/></a:graphicData></a:graphic></mc:Fallback></mc:AlternateContent></xdr:wsDr>"
         );
-        let references =
-            drawing_chart_references(strict.as_bytes(), ChartSheetConformance::Strict).unwrap();
+        let references = drawing_chart_references(strict.as_bytes(), Conformance::Strict).unwrap();
         assert_eq!(
             references,
             vec![DrawingChartReference {
@@ -3341,7 +3299,7 @@ mod tests {
             "xmlns:cx1=\"urn:unsupported-chart-version\"",
         );
         let references =
-            drawing_chart_references(fallback.as_bytes(), ChartSheetConformance::Strict).unwrap();
+            drawing_chart_references(fallback.as_bytes(), Conformance::Strict).unwrap();
         assert_eq!(
             references,
             vec![DrawingChartReference {
@@ -3371,18 +3329,15 @@ mod tests {
             ),
         ] {
             assert!(
-                drawing_chart_references(
-                    drawing(&body).as_bytes(),
-                    ChartSheetConformance::Transitional
-                )
-                .is_err(),
+                drawing_chart_references(drawing(&body).as_bytes(), Conformance::Transitional)
+                    .is_err(),
                 "accepted {body}"
             );
         }
         assert!(
             validate_chart_ex_relationships(
                 b"<cx:chartSpace xmlns:cx=\"urn:wrong\"/>",
-                ChartSheetConformance::Transitional
+                Conformance::Transitional
             )
             .is_err()
         );
@@ -3390,21 +3345,21 @@ mod tests {
         assert!(
             validate_chart_ex_relationships(
                 &[b' '; MAX_CHART_EX_BYTES + 1],
-                ChartSheetConformance::Transitional
+                Conformance::Transitional
             )
             .is_err()
         );
-        let mut bad = value(ChartSheetConformance::Transitional);
+        let mut bad = value(Conformance::Transitional);
         bad.drawing.data = drawing(&format!(
             "<a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdEx\"/></a:graphicData>"
         ))
         .into_bytes();
-        bad.drawing.charts = vec![ChartSheetChartResource {
+        bad.drawing.charts = vec![ChartResource {
             relationship_id: "rIdEx".into(),
             part_name: "/xl/charts/chartEx1.xml".into(),
             content_type: CHART_EX_CT.into(),
             data: format!("<cx:chartSpace xmlns:cx=\"{CHART_EX}\"/>").into_bytes(),
-            kind: ChartSheetChartResourceKind::Extended {
+            kind: ChartResourceKind::Extended {
                 styles: vec![companion(
                     "rIdSame",
                     "/xl/charts/style1.xml",
@@ -3421,15 +3376,9 @@ mod tests {
                 outbound_resources: vec![],
             },
         }];
-        let (mut package, workbook) = base_package(ChartSheetConformance::Transitional);
+        let (mut package, workbook) = base_package(Conformance::Transitional);
         assert!(
-            store_chartsheet(
-                &mut package,
-                &workbook,
-                &bad,
-                ChartSheetConformance::Transitional
-            )
-            .is_err()
+            store_chartsheet(&mut package, &workbook, &bad, Conformance::Transitional).is_err()
         );
         assert!(
             package
@@ -3440,7 +3389,7 @@ mod tests {
 
     #[test]
     fn rejects_chart_ex_wrong_type_orphan_escape_outbound_and_companion_graphs() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let source = OpcPackage::from_bytes(LO_CHART_EX).unwrap();
         let blob = |path: &str| {
             source
@@ -3451,12 +3400,12 @@ mod tests {
         };
         let mut expected = value(conformance);
         expected.drawing.data = blob("/xl/drawings/drawing1.xml");
-        expected.drawing.charts = vec![ChartSheetChartResource {
+        expected.drawing.charts = vec![ChartResource {
             relationship_id: "rId1".into(),
             part_name: "/xl/charts/chartEx1.xml".into(),
             content_type: CHART_EX_CT.into(),
             data: blob("/xl/charts/chartEx1.xml"),
-            kind: ChartSheetChartResourceKind::Extended {
+            kind: ChartResourceKind::Extended {
                 styles: vec![companion(
                     "rId1",
                     "/xl/charts/style1.xml",
@@ -3536,7 +3485,7 @@ mod tests {
         assert!(load_chartsheet(&package, &workbook, "rIdChartSheet").is_err());
     }
 
-    pub(super) fn chart_ex_user_shapes(conformance: ChartSheetConformance) -> ChartSheetPackage {
+    pub(super) fn chart_ex_user_shapes(conformance: Conformance) -> Package {
         let source = OpcPackage::from_bytes(LO_USER_SHAPES_IMAGES).unwrap();
         let blob = |path: &str| {
             source
@@ -3546,8 +3495,8 @@ mod tests {
                 .to_vec()
         };
         let mut value = value(conformance);
-        value.drawing.data=format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"{}\" xmlns:r=\"{}\" xmlns:cx=\"{CHART_EX}\"><a:graphic><a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdChartEx\"/></a:graphicData></a:graphic></xdr:wsDr>",conformance.xdr(),if conformance==ChartSheetConformance::Strict{STRICT_DRAWING_MAIN}else{DRAWING_MAIN},conformance.rel()).into_bytes();
-        let user_shapes_data = if conformance == ChartSheetConformance::Transitional {
+        value.drawing.data=format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"{}\" xmlns:r=\"{}\" xmlns:cx=\"{CHART_EX}\"><a:graphic><a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdChartEx\"/></a:graphicData></a:graphic></xdr:wsDr>",conformance.xdr(),if conformance==Conformance::Strict{STRICT_DRAWING_MAIN}else{DRAWING_MAIN},conformance.rel()).into_bytes();
+        let user_shapes_data = if conformance == Conformance::Transitional {
             blob("/xl/drawings/drawing2.xml")
         } else {
             String::from_utf8(blob("/xl/drawings/drawing2.xml"))
@@ -3561,15 +3510,15 @@ mod tests {
                 .replace(REL, STRICT_REL)
                 .into_bytes()
         };
-        value.drawing.charts = vec![ChartSheetChartResource {
+        value.drawing.charts = vec![ChartResource {
             relationship_id: "rIdChartEx".into(),
             part_name: "/xl/charts/chartEx1.xml".into(),
             content_type: CHART_EX_CT.into(),
             data: format!("<cx:chartSpace xmlns:cx=\"{CHART_EX}\"/>").into_bytes(),
-            kind: ChartSheetChartResourceKind::Extended {
+            kind: ChartResourceKind::Extended {
                 styles: vec![],
                 color_styles: vec![],
-                user_shapes: Some(ChartSheetChartUserShapesResource {
+                user_shapes: Some(ChartUserShapesResource {
                     relationship_id: "rIdUserShapes".into(),
                     part_name: "/xl/drawings/chartDrawing1.xml".into(),
                     content_type: CHART_USER_SHAPES_CT.into(),
@@ -3596,10 +3545,7 @@ mod tests {
     }
     #[test]
     fn chart_ex_user_shapes_png_svg_transitional_and_strict_round_trip() {
-        for conformance in [
-            ChartSheetConformance::Transitional,
-            ChartSheetConformance::Strict,
-        ] {
+        for conformance in [Conformance::Transitional, Conformance::Strict] {
             let expected = chart_ex_user_shapes(conformance);
             let (mut package, workbook) = base_package(conformance);
             store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
@@ -3625,9 +3571,9 @@ mod tests {
     }
     #[test]
     fn chart_ex_user_shapes_rejects_graph_mime_namespace_collision_and_caps() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let mut bad = chart_ex_user_shapes(conformance);
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             user_shapes: Some(shapes),
             ..
         } = &mut bad.drawing.charts[0].kind
@@ -3637,7 +3583,7 @@ mod tests {
         let (mut package, workbook) = base_package(conformance);
         assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
         let mut bad = chart_ex_user_shapes(conformance);
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             user_shapes: Some(shapes),
             ..
         } = &mut bad.drawing.charts[0].kind
@@ -3646,8 +3592,8 @@ mod tests {
         }
         let (mut package, workbook) = base_package(conformance);
         assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
-        let mut bad = chart_ex_user_shapes(ChartSheetConformance::Strict);
-        if let ChartSheetChartResourceKind::Extended {
+        let mut bad = chart_ex_user_shapes(Conformance::Strict);
+        if let ChartResourceKind::Extended {
             user_shapes: Some(shapes),
             ..
         } = &mut bad.drawing.charts[0].kind
@@ -3657,12 +3603,10 @@ mod tests {
                 .replace(STRICT_CHART, CHART)
                 .into_bytes();
         }
-        let (mut package, workbook) = base_package(ChartSheetConformance::Strict);
-        assert!(
-            store_chartsheet(&mut package, &workbook, &bad, ChartSheetConformance::Strict).is_err()
-        );
+        let (mut package, workbook) = base_package(Conformance::Strict);
+        assert!(store_chartsheet(&mut package, &workbook, &bad, Conformance::Strict).is_err());
         let mut bad = chart_ex_user_shapes(conformance);
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             styles,
             user_shapes: Some(shapes),
             ..
@@ -3678,7 +3622,7 @@ mod tests {
         let (mut package, workbook) = base_package(conformance);
         assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
         let mut bad = chart_ex_user_shapes(conformance);
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             user_shapes: Some(shapes),
             ..
         } = &mut bad.drawing.charts[0].kind
@@ -3688,9 +3632,9 @@ mod tests {
         let (mut package, workbook) = base_package(conformance);
         assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
     }
-    fn with_extension_relationships(conformance: ChartSheetConformance) -> ChartSheetPackage {
+    fn with_extension_relationships(conformance: Conformance) -> Package {
         let mut value = value(conformance);
-        value.chartsheet.extension_list = Some(ChartSheetExtensionList {
+        value.chartsheet.extension_list = Some(ExtensionList {
             extensions: vec![
                 ext(
                     "urn:duplicate",
@@ -3709,17 +3653,17 @@ mod tests {
             ],
         });
         value.extension_relationships = vec![
-            ChartSheetExtensionRelationship {
+            ExtensionRelationship {
                 relationship_id: "rIdExtInternal".into(),
                 relationship_type: "urn:relationship:internal".into(),
-                target: ChartSheetExtensionRelationshipTarget::Internal {
+                target: ExtensionRelationshipTarget::Internal {
                     part_name: "/xl/custom/ext.bin".into(),
                 },
             },
-            ChartSheetExtensionRelationship {
+            ExtensionRelationship {
                 relationship_id: "rIdExtExternal".into(),
                 relationship_type: "urn:relationship:external".into(),
-                target: ChartSheetExtensionRelationshipTarget::External {
+                target: ExtensionRelationshipTarget::External {
                     target: "https://example.invalid/not-fetched".into(),
                 },
             },
@@ -3738,7 +3682,7 @@ mod tests {
             "<x:chartsheet xmlns:x=\"{STRICT_SML}\" xmlns:r=\"{STRICT_REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:z=\"urn:unsupported-choice\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><x:drawing r:id=\"rIdD\"/><mc:AlternateContent><mc:Choice Requires=\"z\"><z:ignored/></mc:Choice><mc:Fallback><x:extLst><x:ext uri=\"urn:same\"><u:payload xmlns:u=\"urn:vendor\" r:id=\"rIdExt\">before<u:child a=\"1\"/>after</u:payload></x:ext><x:ext uri=\"urn:same\"><v:other xmlns:v=\"urn:vendor-two\"/></x:ext></x:extLst></mc:Fallback></mc:AlternateContent></x:chartsheet>"
         );
         let (kind, parsed) = parse_chartsheet(xml.as_bytes()).unwrap();
-        assert_eq!(kind, ChartSheetConformance::Strict);
+        assert_eq!(kind, Conformance::Strict);
         let extensions = &parsed.extension_list.as_ref().unwrap().extensions;
         assert_eq!(extensions.len(), 2);
         assert_eq!(extensions[0].uri, extensions[1].uri);
@@ -3754,7 +3698,7 @@ mod tests {
 
     #[test]
     fn ext_list_package_round_trip_preserves_inert_internal_and_external_relationships() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let expected = with_extension_relationships(conformance);
         store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
@@ -3806,31 +3750,31 @@ mod tests {
         );
         assert!(parse_chartsheet(out_of_order.as_bytes()).is_err());
         let mut value = sheet();
-        value.extension_list = Some(ChartSheetExtensionList {
+        value.extension_list = Some(ExtensionList {
             extensions: vec![ext("u", "<?run?><a/>")],
         });
-        assert!(write_chartsheet(&value, ChartSheetConformance::Transitional).is_err());
-        value.extension_list = Some(ChartSheetExtensionList {
+        assert!(write_chartsheet(&value, Conformance::Transitional).is_err());
+        value.extension_list = Some(ExtensionList {
             extensions: vec![ext(&"u".repeat(MAX_EXTENSION_URI_BYTES + 1), "<a/>")],
         });
-        assert!(write_chartsheet(&value, ChartSheetConformance::Transitional).is_err());
-        value.extension_list = Some(ChartSheetExtensionList {
+        assert!(write_chartsheet(&value, Conformance::Transitional).is_err());
+        value.extension_list = Some(ExtensionList {
             extensions: vec![ext(
                 "u",
                 &format!("<a>{}</a>", "x".repeat(MAX_EXTENSION_PAYLOAD_BYTES)),
             )],
         });
-        assert!(write_chartsheet(&value, ChartSheetConformance::Transitional).is_err());
-        value.extension_list = Some(ChartSheetExtensionList {
+        assert!(write_chartsheet(&value, Conformance::Transitional).is_err());
+        value.extension_list = Some(ExtensionList {
             extensions: vec![ext("u", "<a/>"); MAX_EXTENSIONS + 1],
         });
-        assert!(write_chartsheet(&value, ChartSheetConformance::Transitional).is_err());
+        assert!(write_chartsheet(&value, Conformance::Transitional).is_err());
     }
 
     #[test]
     fn rejects_extension_relationship_missing_orphan_mismatch_duplicate_escape_caps_and_wrong_namespace()
      {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let mut missing = with_extension_relationships(conformance);
         missing.extension_relationships.clear();
@@ -3850,19 +3794,18 @@ mod tests {
         assert!(store_chartsheet(&mut package, &workbook, &duplicate, conformance).is_err());
         let (mut package, workbook) = base_package(conformance);
         let mut escaped = with_extension_relationships(conformance);
-        escaped.extension_relationships[0].target =
-            ChartSheetExtensionRelationshipTarget::Internal {
-                part_name: "../../../evil.bin".into(),
-            };
+        escaped.extension_relationships[0].target = ExtensionRelationshipTarget::Internal {
+            part_name: "../../../evil.bin".into(),
+        };
         assert!(store_chartsheet(&mut package, &workbook, &escaped, conformance).is_err());
         let (mut package, workbook) = base_package(conformance);
         let mut oversized = with_extension_relationships(conformance);
         oversized.extension_relationships[0].relationship_type =
             "x".repeat(MAX_EXTENSION_RELATIONSHIP_STRING_BYTES + 1);
         assert!(store_chartsheet(&mut package, &workbook, &oversized, conformance).is_err());
-        let (mut package, workbook) = base_package(ChartSheetConformance::Strict);
-        let mut wrong_namespace = with_extension_relationships(ChartSheetConformance::Strict);
-        wrong_namespace.chartsheet.extension_list = Some(ChartSheetExtensionList {
+        let (mut package, workbook) = base_package(Conformance::Strict);
+        let mut wrong_namespace = with_extension_relationships(Conformance::Strict);
+        wrong_namespace.chartsheet.extension_list = Some(ExtensionList {
             extensions: vec![ext(
                 "u",
                 &format!("<u:a xmlns:u=\"urn:v\" xmlns:r=\"{REL}\" r:id=\"rIdExtInternal\"/>"),
@@ -3874,7 +3817,7 @@ mod tests {
                 &mut package,
                 &workbook,
                 &wrong_namespace,
-                ChartSheetConformance::Strict
+                Conformance::Strict
             )
             .is_err()
         );
@@ -3905,9 +3848,9 @@ mod tests {
     #[test]
     fn strict_typed_xml_round_trip() {
         let expected = sheet();
-        let xml = write_chartsheet(&expected, ChartSheetConformance::Strict).unwrap();
+        let xml = write_chartsheet(&expected, Conformance::Strict).unwrap();
         let (kind, parsed) = parse_chartsheet(&xml).unwrap();
-        assert_eq!(kind, ChartSheetConformance::Strict);
+        assert_eq!(kind, Conformance::Strict);
         assert_eq!(parsed, expected);
     }
     #[test]
@@ -3918,9 +3861,9 @@ mod tests {
         let (_, parsed) = parse_chartsheet(xml.as_bytes()).unwrap();
         let views = parsed.custom_views.as_ref().unwrap();
         assert_eq!(views.len(), 2);
-        assert_eq!(views[0].state, Some(ChartSheetState::VeryHidden));
+        assert_eq!(views[0].state, Some(State::VeryHidden));
         assert_eq!(views[0].scale, Some(10));
-        let written = write_chartsheet(&parsed, ChartSheetConformance::Transitional).unwrap();
+        let written = write_chartsheet(&parsed, Conformance::Transitional).unwrap();
         assert_eq!(parse_chartsheet(&written).unwrap().1, parsed);
     }
     #[test]
@@ -3960,7 +3903,7 @@ mod tests {
     }
     #[test]
     fn strict_package_writer_round_trips_complete_leaf_graph() {
-        let conformance = ChartSheetConformance::Strict;
+        let conformance = Conformance::Strict;
         let (mut package, workbook) = base_package(conformance);
         let expected = value(conformance);
         store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
@@ -3975,7 +3918,7 @@ mod tests {
             "<x:chartsheet xmlns:x=\"{STRICT_SML}\" xmlns:r=\"{STRICT_REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><mc:AlternateContent><mc:Choice Requires=\"u\"><u:pageSetup/></mc:Choice><mc:Fallback><x:pageSetup orientation=\"landscape\" r:id=\"rIdPrinter\"/></mc:Fallback></mc:AlternateContent><x:drawing r:id=\"rIdDrawing\"/></x:chartsheet>"
         );
         let (kind, parsed) = parse_chartsheet(xml.as_bytes()).unwrap();
-        assert_eq!(kind, ChartSheetConformance::Strict);
+        assert_eq!(kind, Conformance::Strict);
         assert_eq!(
             parsed
                 .page_setup
@@ -4005,7 +3948,7 @@ mod tests {
     }
     #[test]
     fn printer_settings_package_round_trip_preserves_opaque_bytes() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let expected = value(conformance);
         store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
@@ -4022,7 +3965,7 @@ mod tests {
     }
     #[test]
     fn rejects_printer_settings_pairing_paths_collisions_and_caps_before_mutation() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let mut bad = value(conformance);
         bad.printer_settings.as_mut().unwrap().relationship_id = "rIdOther".into();
@@ -4072,7 +4015,7 @@ mod tests {
             (IMAGE_REL, "../printerSettings/printerSettings1.bin", false),
             (PRINTER_REL, "../../../evil.bin", false),
         ] {
-            let conformance = ChartSheetConformance::Transitional;
+            let conformance = Conformance::Transitional;
             let (mut package, workbook) = base_package(conformance);
             store_chartsheet(&mut package, &workbook, &value(conformance), conformance).unwrap();
             let chartsheet = package
@@ -4090,7 +4033,7 @@ mod tests {
                 "accepted {kind} {target}"
             );
         }
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         store_chartsheet(&mut package, &workbook, &value(conformance), conformance).unwrap();
         package
@@ -4159,7 +4102,7 @@ mod tests {
             "<chartsheet xmlns=\"{STRICT_SML}\" xmlns:r=\"{STRICT_REL}\"><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><drawing r:id=\"rIdD\"/>{body}</chartsheet>"
         );
         let (kind, parsed) = parse_chartsheet(xml.as_bytes()).unwrap();
-        assert_eq!(kind, ChartSheetConformance::Strict);
+        assert_eq!(kind, Conformance::Strict);
         let items = &parsed.web_publish_items.as_ref().unwrap().items;
         assert_eq!(
             items
@@ -4167,14 +4110,14 @@ mod tests {
                 .map(|item| item.source_type)
                 .collect::<Vec<_>>(),
             vec![
-                ChartSheetWebSourceType::Sheet,
-                ChartSheetWebSourceType::PrintArea,
-                ChartSheetWebSourceType::AutoFilter,
-                ChartSheetWebSourceType::Range,
-                ChartSheetWebSourceType::Chart,
-                ChartSheetWebSourceType::PivotTable,
-                ChartSheetWebSourceType::Query,
-                ChartSheetWebSourceType::Label
+                WebSourceType::Sheet,
+                WebSourceType::PrintArea,
+                WebSourceType::AutoFilter,
+                WebSourceType::Range,
+                WebSourceType::Chart,
+                WebSourceType::PivotTable,
+                WebSourceType::Query,
+                WebSourceType::Label
             ]
         );
         let first = write_chartsheet(&parsed, kind).unwrap();
@@ -4193,17 +4136,15 @@ mod tests {
         assert_eq!(item.destination_file, "/tmp/not-written");
         assert_eq!(item.auto_republish, None);
         assert_eq!(
-            parse_chartsheet(
-                &write_chartsheet(&parsed, ChartSheetConformance::Transitional).unwrap()
-            )
-            .unwrap()
-            .1,
+            parse_chartsheet(&write_chartsheet(&parsed, Conformance::Transitional).unwrap())
+                .unwrap()
+                .1,
             parsed
         );
     }
     #[test]
     fn web_publish_package_load_store_preserves_metadata_only() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let expected = value(conformance);
         store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
@@ -4254,7 +4195,7 @@ mod tests {
         let mut value = sheet();
         value.web_publish_items.as_mut().unwrap().items[0].title =
             Some("x".repeat(MAX_WEB_PUBLISH_STRING_BYTES + 1));
-        assert!(write_chartsheet(&value, ChartSheetConformance::Transitional).is_err());
+        assert!(write_chartsheet(&value, Conformance::Transitional).is_err());
     }
     #[test]
     fn picture_mce_schema_and_inert_round_trip() {
@@ -4266,7 +4207,7 @@ mod tests {
             parsed.background_picture_relationship_id.as_deref(),
             Some("rIdBackground")
         );
-        let written = write_chartsheet(&parsed, ChartSheetConformance::Transitional).unwrap();
+        let written = write_chartsheet(&parsed, Conformance::Transitional).unwrap();
         assert!(
             String::from_utf8(written.clone())
                 .unwrap()
@@ -4276,7 +4217,7 @@ mod tests {
     }
     #[test]
     fn transitional_picture_package_round_trip_preserves_opaque_bytes() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let expected = value(conformance);
         store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
@@ -4303,7 +4244,7 @@ mod tests {
                 .as_deref(),
             Some("rIdLegacyHF")
         );
-        let written = write_chartsheet(&parsed, ChartSheetConformance::Transitional).unwrap();
+        let written = write_chartsheet(&parsed, Conformance::Transitional).unwrap();
         let text = String::from_utf8(written.clone()).unwrap();
         assert!(text.contains("<x:drawing r:id=\"rIdDrawing\"/><x:legacyDrawing r:id=\"rIdLegacy\"/><x:legacyDrawingHF r:id=\"rIdLegacyHF\"/><x:picture"));
         assert_eq!(parse_chartsheet(&written).unwrap().1, parsed);
@@ -4324,7 +4265,7 @@ mod tests {
     }
     #[test]
     fn rejects_vml_pairing_content_type_collision_and_caps() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let mut bad = value(conformance);
         bad.legacy_drawing.as_mut().unwrap().relationship_id = "rIdOther".into();
@@ -4361,7 +4302,7 @@ mod tests {
             (IMAGE_REL, "../drawings/vmlDrawing1.vml", false),
             (VML_DRAWING_REL, "../../../evil.vml", false),
         ] {
-            let conformance = ChartSheetConformance::Transitional;
+            let conformance = Conformance::Transitional;
             let (mut package, workbook) = base_package(conformance);
             store_chartsheet(&mut package, &workbook, &value(conformance), conformance).unwrap();
             let chartsheet = package
@@ -4379,7 +4320,7 @@ mod tests {
                 "accepted {kind} {target}"
             );
         }
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         store_chartsheet(&mut package, &workbook, &value(conformance), conformance).unwrap();
         package
@@ -4422,7 +4363,7 @@ mod tests {
         ] {
             assert!(parse_chartsheet(xml.as_bytes()).is_err(), "{xml}");
         }
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let mut bad = value(conformance);
         bad.background_picture.as_mut().unwrap().relationship_id = "different".into();
@@ -4443,7 +4384,7 @@ mod tests {
             (rt::CHART, "../media/background1.png", false),
             (IMAGE_REL, "../../../evil.png", false),
         ] {
-            let conformance = ChartSheetConformance::Transitional;
+            let conformance = Conformance::Transitional;
             let (mut package, workbook) = base_package(conformance);
             store_chartsheet(&mut package, &workbook, &value(conformance), conformance).unwrap();
             let chartsheet = package
@@ -4461,7 +4402,7 @@ mod tests {
                 "accepted {kind} {target}"
             );
         }
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         store_chartsheet(&mut package, &workbook, &value(conformance), conformance).unwrap();
         package
@@ -4478,7 +4419,7 @@ mod tests {
     }
     #[test]
     fn rejects_existing_background_part_collision_before_mutation() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/media/background1.png").unwrap(),
@@ -4496,7 +4437,7 @@ mod tests {
     }
     #[test]
     fn store_is_atomic_when_new_candidate_parts_conflict_case_insensitively() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let original_workbook = package.get_part(&workbook).unwrap().blob().to_vec();
         let mut bad = value(conformance);
@@ -4527,7 +4468,7 @@ mod tests {
     }
     #[test]
     fn store_rejects_non_bijective_drawing_chart_resources() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let (mut package, workbook) = base_package(conformance);
         let mut bad = value(conformance);
         bad.drawing.data = format!(
@@ -4548,7 +4489,7 @@ mod tests {
     }
     #[test]
     fn drawing_chart_reference_cap_is_checked_before_retention_grows() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let mut xml =
             format!("<xdr:wsDr xmlns:xdr=\"{XDR}\" xmlns:c=\"{CHART}\" xmlns:r=\"{REL}\">");
         for index in 0..=MAX_CHARTS {
@@ -4573,13 +4514,13 @@ mod tests {
             assert!(parse_chartsheet(xml.as_bytes()).is_err(), "{custom}");
         }
         assert!(parse_chartsheet(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
-        let (mut package, workbook) = base_package(ChartSheetConformance::Transitional);
-        let expected = value(ChartSheetConformance::Transitional);
+        let (mut package, workbook) = base_package(Conformance::Transitional);
+        let expected = value(Conformance::Transitional);
         store_chartsheet(
             &mut package,
             &workbook,
             &expected,
-            ChartSheetConformance::Transitional,
+            Conformance::Transitional,
         )
         .unwrap();
         package
@@ -4600,7 +4541,7 @@ mod tests {
 mod chart_outbound_tests {
     use super::*;
 
-    fn outbound_value(conformance: ChartSheetConformance) -> ChartSheetPackage {
+    fn outbound_value(conformance: Conformance) -> Package {
         let source = OpcPackage::from_bytes(tests::LO_USER_SHAPES_IMAGES).unwrap();
         let blob = |path: &str| {
             source
@@ -4610,7 +4551,7 @@ mod chart_outbound_tests {
                 .to_vec()
         };
         let mut value = tests::chart_ex_user_shapes(conformance);
-        let drawing_main = if conformance == ChartSheetConformance::Strict {
+        let drawing_main = if conformance == Conformance::Strict {
             STRICT_DRAWING_MAIN
         } else {
             DRAWING_MAIN
@@ -4626,28 +4567,26 @@ mod chart_outbound_tests {
             conformance.rel()
         )
         .into_bytes();
-        let ChartSheetChartResourceKind::Extended {
+        let ChartResourceKind::Extended {
             outbound_resources, ..
         } = &mut chart.kind
         else {
             unreachable!()
         };
         *outbound_resources = vec![
-            ChartSheetChartOutboundResource::Image(ImageResource {
+            ChartOutboundResource::Image(ImageResource {
                 relationship_id: "rIdDirectImage".into(),
                 part_name: "/xl/media/chartDirect1.png".into(),
                 content_type: ImageContentType::Png,
                 data: blob("/xl/media/image1.png"),
             }),
-            ChartSheetChartOutboundResource::EmbeddedPackage(
-                ChartSheetChartEmbeddedPackageResource {
-                    relationship_id: "rIdPackage".into(),
-                    part_name: "/xl/embeddings/Microsoft_Excel_Worksheet1.xlsx".into(),
-                    content_type: ChartSheetChartEmbeddedPackageContentType::Xlsx,
-                    data: tests::LO_USER_SHAPES_IMAGES.to_vec(),
-                },
-            ),
-            ChartSheetChartOutboundResource::ThemeOverride(ChartSheetChartThemeOverrideResource {
+            ChartOutboundResource::EmbeddedPackage(ChartEmbeddedPackageResource {
+                relationship_id: "rIdPackage".into(),
+                part_name: "/xl/embeddings/Microsoft_Excel_Worksheet1.xlsx".into(),
+                content_type: ChartEmbeddedPackageContentType::Xlsx,
+                data: tests::LO_USER_SHAPES_IMAGES.to_vec(),
+            }),
+            ChartOutboundResource::ThemeOverride(ChartThemeOverrideResource {
                 relationship_id: "rIdTheme".into(),
                 part_name: "/xl/theme/themeOverride1.xml".into(),
                 content_type: THEME_OVERRIDE_CT.into(),
@@ -4665,10 +4604,7 @@ mod chart_outbound_tests {
 
     #[test]
     fn chart_ex_complete_outbound_family_round_trips_strict_and_transitional() {
-        for conformance in [
-            ChartSheetConformance::Transitional,
-            ChartSheetConformance::Strict,
-        ] {
+        for conformance in [Conformance::Transitional, Conformance::Strict] {
             let expected = outbound_value(conformance);
             let (mut package, workbook) = tests::base_package(conformance);
             store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
@@ -4706,7 +4642,7 @@ mod chart_outbound_tests {
 
     #[test]
     fn chart_ex_outbound_rejects_active_external_mismatch_collision_roots_and_caps() {
-        let conformance = ChartSheetConformance::Transitional;
+        let conformance = Conformance::Transitional;
         let mut bad = outbound_value(conformance);
         bad.drawing.charts[0].data = String::from_utf8(bad.drawing.charts[0].data.clone())
             .unwrap()
@@ -4729,14 +4665,14 @@ mod chart_outbound_tests {
         assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
 
         let mut bad = outbound_value(conformance);
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             outbound_resources, ..
         } = &mut bad.drawing.charts[0].kind
         {
             let theme = outbound_resources
                 .iter_mut()
                 .find_map(|resource| match resource {
-                    ChartSheetChartOutboundResource::ThemeOverride(theme) => Some(theme),
+                    ChartOutboundResource::ThemeOverride(theme) => Some(theme),
                     _ => None,
                 })
                 .unwrap();
@@ -4749,16 +4685,16 @@ mod chart_outbound_tests {
         assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
 
         let mut bad = outbound_value(conformance);
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             user_shapes: Some(shapes),
             outbound_resources,
             ..
         } = &mut bad.drawing.charts[0].kind
         {
             outbound_resources[0] = match outbound_resources[0].clone() {
-                ChartSheetChartOutboundResource::Image(mut image) => {
+                ChartOutboundResource::Image(mut image) => {
                     image.relationship_id = shapes.relationship_id.clone();
-                    ChartSheetChartOutboundResource::Image(image)
+                    ChartOutboundResource::Image(image)
                 },
                 _ => unreachable!(),
             };
@@ -4782,14 +4718,14 @@ mod chart_outbound_tests {
         assert!(load_chartsheet(&package, &workbook, "rIdChartSheet").is_err());
 
         let mut bad = outbound_value(conformance);
-        if let ChartSheetChartResourceKind::Extended {
+        if let ChartResourceKind::Extended {
             outbound_resources, ..
         } = &mut bad.drawing.charts[0].kind
         {
             let embedded = outbound_resources
                 .iter_mut()
                 .find_map(|resource| match resource {
-                    ChartSheetChartOutboundResource::EmbeddedPackage(embedded) => Some(embedded),
+                    ChartOutboundResource::EmbeddedPackage(embedded) => Some(embedded),
                     _ => None,
                 })
                 .unwrap();

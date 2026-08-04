@@ -9,9 +9,7 @@
 //! `xlsx::workbook` wires the parts and relationships into the package.
 
 use super::sheet::WorksheetChart;
-use crate::xlsx::chartsheet::{
-    ChartSheet, ChartSheetConformance, ChartSheetMargins, ChartSheetView, write_chartsheet,
-};
+use crate::xlsx::chartsheet::{Chart, Conformance, Margins, View, write_chartsheet};
 use litchi_core::sheet::Result as SheetResult;
 
 /// Relationship type linking a workbook to a chartsheet part.
@@ -116,9 +114,9 @@ pub(crate) fn validate_sheet_name(name: &str) -> SheetResult<()> {
 
 /// Serialize the chartsheet part XML through the typed chartsheet writer.
 pub(crate) fn chart_sheet_part_xml() -> SheetResult<Vec<u8>> {
-    let chartsheet = ChartSheet {
+    let chartsheet = Chart {
         properties: None,
-        views: vec![ChartSheetView {
+        views: vec![View {
             tab_selected: None,
             zoom_scale: None,
             workbook_view_id: 0,
@@ -126,7 +124,7 @@ pub(crate) fn chart_sheet_part_xml() -> SheetResult<Vec<u8>> {
         }],
         protection: None,
         custom_views: None,
-        margins: Some(ChartSheetMargins {
+        margins: Some(Margins {
             left: 0.75,
             right: 0.75,
             top: 1.0,
@@ -143,7 +141,7 @@ pub(crate) fn chart_sheet_part_xml() -> SheetResult<Vec<u8>> {
         web_publish_items: None,
         extension_list: None,
     };
-    write_chartsheet(&chartsheet, ChartSheetConformance::Transitional).map_err(Into::into)
+    write_chartsheet(&chartsheet, Conformance::Transitional).map_err(Into::into)
 }
 
 /// Serialize the chartsheet drawing part: one absolute-anchored graphic
@@ -189,7 +187,7 @@ mod tests {
     fn emitted_chartsheet_part_parses_through_typed_reader() {
         let xml = chart_sheet_part_xml().unwrap();
         let (conformance, chartsheet) = parse_chartsheet(&xml).unwrap();
-        assert_eq!(conformance, ChartSheetConformance::Transitional);
+        assert_eq!(conformance, Conformance::Transitional);
         assert_eq!(chartsheet.views.len(), 1);
         assert_eq!(
             chartsheet.drawing_relationship_id,

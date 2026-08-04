@@ -76,13 +76,7 @@ pub use cell_watches::{
     CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
     parse_worksheet_cell_watches, write_worksheet_cell_watches,
 };
-pub use chart_sheet::{
-    ChartSheet, ChartSheetColor, ChartSheetConformance, ChartSheetCustomView, ChartSheetExtension,
-    ChartSheetExtensionList, ChartSheetHeaderFooter, ChartSheetMargins, ChartSheetPageSetup,
-    ChartSheetProperties, ChartSheetProtection, ChartSheetState, ChartSheetView,
-    ChartSheetWebPublishItem, ChartSheetWebPublishItems, ChartSheetWebSourceType, PageOrientation,
-    parse_chartsheet, validate_chartsheet, write_chartsheet,
-};
+pub use chart_sheet::{parse_chartsheet, validate_chartsheet, write_chartsheet};
 pub use color::{ParseRgbError, Rgb};
 pub use column::{Column, Columns, Width, WidthAt};
 pub use conditional_formatting::{

@@ -67,12 +67,12 @@ const MAX_EXTENSION_PAYLOAD_BYTES: usize = 1024 * 1024;
 const MAX_RETAINED_EXTENSION_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartSheetConformance {
+pub enum Conformance {
     Transitional,
     Strict,
 }
 
-impl ChartSheetConformance {
+impl Conformance {
     pub fn sml(self) -> &'static str {
         match self {
             Self::Transitional => SML,
@@ -154,7 +154,7 @@ impl ChartSheetConformance {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartSheetState {
+pub enum State {
     Visible,
     Hidden,
     VeryHidden,
@@ -168,7 +168,7 @@ pub enum PageOrientation {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChartSheetColor {
+pub struct Color {
     pub automatic: Option<bool>,
     pub indexed: Option<u32>,
     pub rgb: Option<String>,
@@ -177,14 +177,14 @@ pub struct ChartSheetColor {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChartSheetProperties {
+pub struct Properties {
     pub published: Option<bool>,
     pub code_name: Option<String>,
-    pub tab_color: Option<ChartSheetColor>,
+    pub tab_color: Option<Color>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetView {
+pub struct View {
     pub tab_selected: Option<bool>,
     pub zoom_scale: Option<u32>,
     pub workbook_view_id: u32,
@@ -192,7 +192,7 @@ pub struct ChartSheetView {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetProtection {
+pub struct Protection {
     pub password_hash: Option<String>,
     pub content: Option<bool>,
     pub objects: Option<bool>,
@@ -200,16 +200,16 @@ pub struct ChartSheetProtection {
 
 /// One saved chartsheet view from `CT_CustomChartsheetView`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetCustomView {
+pub struct CustomView {
     /// Braced UUID lexical form required by SpreadsheetML `ST_Guid`.
     pub guid: String,
     pub scale: Option<u32>,
-    pub state: Option<ChartSheetState>,
+    pub state: Option<State>,
     pub zoom_to_fit: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ChartSheetMargins {
+pub struct Margins {
     pub left: f64,
     pub right: f64,
     pub top: f64,
@@ -219,7 +219,7 @@ pub struct ChartSheetMargins {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetPageSetup {
+pub struct PageSetup {
     pub paper_size: Option<u32>,
     pub first_page_number: Option<u32>,
     pub orientation: Option<PageOrientation>,
@@ -235,7 +235,7 @@ pub struct ChartSheetPageSetup {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartSheetHeaderFooter {
+pub struct HeaderFooter {
     pub different_odd_even: Option<bool>,
     pub different_first: Option<bool>,
     pub scale_with_document: Option<bool>,
@@ -250,7 +250,7 @@ pub struct ChartSheetHeaderFooter {
 
 /// Schema-complete `ST_WebSourceType` values for inert web-publishing metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartSheetWebSourceType {
+pub enum WebSourceType {
     Sheet,
     PrintArea,
     AutoFilter,
@@ -261,7 +261,7 @@ pub enum ChartSheetWebSourceType {
     Label,
 }
 
-impl ChartSheetWebSourceType {
+impl WebSourceType {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Sheet => "sheet",
@@ -291,10 +291,10 @@ impl ChartSheetWebSourceType {
 
 /// One `webPublishItem`; all paths, names, and references are opaque inert strings.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetWebPublishItem {
+pub struct WebPublishItem {
     pub id: u32,
     pub div_id: String,
-    pub source_type: ChartSheetWebSourceType,
+    pub source_type: WebSourceType,
     pub source_ref: Option<String>,
     pub source_object: Option<String>,
     pub destination_file: String,
@@ -305,43 +305,43 @@ pub struct ChartSheetWebPublishItem {
 
 /// A present `webPublishItems` collection is schema-required to be non-empty.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetWebPublishItems {
+pub struct WebPublishItems {
     /// Preserves explicit `count`; when present it must equal `items.len()`.
     pub count: Option<u32>,
-    pub items: Vec<ChartSheetWebPublishItem>,
+    pub items: Vec<WebPublishItem>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ChartSheet {
-    pub properties: Option<ChartSheetProperties>,
-    pub views: Vec<ChartSheetView>,
-    pub protection: Option<ChartSheetProtection>,
+pub struct Chart {
+    pub properties: Option<Properties>,
+    pub views: Vec<View>,
+    pub protection: Option<Protection>,
     /// `None` preserves absence; a present collection must be non-empty.
-    pub custom_views: Option<Vec<ChartSheetCustomView>>,
-    pub margins: Option<ChartSheetMargins>,
-    pub page_setup: Option<ChartSheetPageSetup>,
-    pub header_footer: Option<ChartSheetHeaderFooter>,
+    pub custom_views: Option<Vec<CustomView>>,
+    pub margins: Option<Margins>,
+    pub page_setup: Option<PageSetup>,
+    pub header_footer: Option<HeaderFooter>,
     pub drawing_relationship_id: String,
     pub legacy_drawing_relationship_id: Option<String>,
     pub legacy_header_footer_drawing_relationship_id: Option<String>,
     /// Relationship for the optional tiled chartsheet background image.
     pub background_picture_relationship_id: Option<String>,
     /// Inert web-publishing metadata. Destinations and sources are never resolved or accessed.
-    pub web_publish_items: Option<ChartSheetWebPublishItems>,
+    pub web_publish_items: Option<WebPublishItems>,
     /// Inert, canonicalized wildcard extension markup. Payload semantics are never interpreted.
-    pub extension_list: Option<ChartSheetExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetExtension {
+pub struct Extension {
     pub uri: String,
     /// Canonical, namespace-aware XML for the single wildcard child of `ext`.
     pub payload_xml: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetExtensionList {
-    pub extensions: Vec<ChartSheetExtension>,
+pub struct ExtensionList {
+    pub extensions: Vec<Extension>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -367,7 +367,7 @@ enum NodeContent {
 }
 
 /// Parses the selected, bounded core of a complete Chartsheet part.
-pub fn parse_chartsheet(xml: &[u8]) -> Result<(ChartSheetConformance, ChartSheet)> {
+pub fn parse_chartsheet(xml: &[u8]) -> Result<(Conformance, Chart)> {
     let root = parse_document(xml, MAX_XML_BYTES)?;
     let conformance = root_conformance(&root, "chartsheet")?;
     whitespace(&root)?;
@@ -413,7 +413,7 @@ pub fn parse_chartsheet(xml: &[u8]) -> Result<(ChartSheetConformance, ChartSheet
     let extension_list = one_child(&root, conformance.sml(), "extLst")?
         .map(|node| parse_extension_list(node, conformance))
         .transpose()?;
-    let value = ChartSheet {
+    let value = Chart {
         properties,
         views,
         protection,
@@ -469,7 +469,7 @@ fn validate_root_order(root: &Node) -> Result<()> {
 
 fn parse_relationship_leaf(
     root: &Node,
-    conformance: ChartSheetConformance,
+    conformance: Conformance,
     name: &str,
 ) -> Result<Option<String>> {
     one_child(root, conformance.sml(), name)?
@@ -481,10 +481,7 @@ fn parse_relationship_leaf(
         .transpose()
 }
 
-fn parse_web_publish_items(
-    node: &Node,
-    conformance: ChartSheetConformance,
-) -> Result<ChartSheetWebPublishItems> {
+fn parse_web_publish_items(node: &Node, conformance: Conformance) -> Result<WebPublishItems> {
     whitespace(node)?;
     no_attributes(node, &[("", "count")])?;
     if node.children.is_empty() {
@@ -516,12 +513,12 @@ fn parse_web_publish_items(
                 ("", "autoRepublish"),
             ],
         )?;
-        items.push(ChartSheetWebPublishItem {
+        items.push(WebPublishItem {
             id: required(child, "", "id")?
                 .parse()
                 .map_err(|_| invalid("invalid web publish item id"))?,
             div_id: required(child, "", "divId")?.to_owned(),
-            source_type: ChartSheetWebSourceType::parse(required(child, "", "sourceType")?)?,
+            source_type: WebSourceType::parse(required(child, "", "sourceType")?)?,
             source_ref: optional(child, "", "sourceRef").map(str::to_owned),
             source_object: optional(child, "", "sourceObject").map(str::to_owned),
             destination_file: required(child, "", "destinationFile")?.to_owned(),
@@ -529,15 +526,12 @@ fn parse_web_publish_items(
             auto_republish: bool_optional(child, "autoRepublish")?,
         });
     }
-    let value = ChartSheetWebPublishItems { count, items };
+    let value = WebPublishItems { count, items };
     validate_web_publish_items(&value)?;
     Ok(value)
 }
 
-fn parse_extension_list(
-    node: &Node,
-    conformance: ChartSheetConformance,
-) -> Result<ChartSheetExtensionList> {
+fn parse_extension_list(node: &Node, conformance: Conformance) -> Result<ExtensionList> {
     whitespace(node)?;
     no_attributes(node, &[])?;
     if node.children.is_empty() {
@@ -570,12 +564,12 @@ fn parse_extension_list(
         if total > MAX_RETAINED_EXTENSION_BYTES {
             return Err(limit("retained extension bytes"));
         }
-        extensions.push(ChartSheetExtension { uri, payload_xml });
+        extensions.push(Extension { uri, payload_xml });
     }
-    Ok(ChartSheetExtensionList { extensions })
+    Ok(ExtensionList { extensions })
 }
 
-fn parse_properties(node: &Node) -> Result<ChartSheetProperties> {
+fn parse_properties(node: &Node) -> Result<Properties> {
     whitespace(node)?;
     no_attributes(node, &[("", "published"), ("", "codeName")])?;
     let published = optional(node, "", "published")
@@ -588,14 +582,14 @@ fn parse_properties(node: &Node) -> Result<ChartSheetProperties> {
     if node.children.len() > usize::from(tab_color.is_some()) {
         return Err(invalid("sheetPr contains unsupported children"));
     }
-    Ok(ChartSheetProperties {
+    Ok(Properties {
         published,
         code_name,
         tab_color,
     })
 }
 
-fn parse_color(node: &Node) -> Result<ChartSheetColor> {
+fn parse_color(node: &Node) -> Result<Color> {
     leaf(node, "tab color")?;
     no_attributes(
         node,
@@ -607,7 +601,7 @@ fn parse_color(node: &Node) -> Result<ChartSheetColor> {
             ("", "tint"),
         ],
     )?;
-    Ok(ChartSheetColor {
+    Ok(Color {
         automatic: bool_optional(node, "auto")?,
         indexed: u32_optional(node, "indexed")?,
         rgb: optional(node, "", "rgb").map(str::to_owned),
@@ -618,7 +612,7 @@ fn parse_color(node: &Node) -> Result<ChartSheetColor> {
     })
 }
 
-fn parse_views(node: &Node) -> Result<Vec<ChartSheetView>> {
+fn parse_views(node: &Node) -> Result<Vec<View>> {
     whitespace(node)?;
     no_attributes(node, &[])?;
     if node.children.is_empty() {
@@ -642,7 +636,7 @@ fn parse_views(node: &Node) -> Result<Vec<ChartSheetView>> {
                 ("", "zoomToFit"),
             ],
         )?;
-        views.push(ChartSheetView {
+        views.push(View {
             tab_selected: bool_optional(child, "tabSelected")?,
             zoom_scale: u32_optional(child, "zoomScale")?,
             workbook_view_id: required(child, "", "workbookViewId")?
@@ -654,20 +648,17 @@ fn parse_views(node: &Node) -> Result<Vec<ChartSheetView>> {
     Ok(views)
 }
 
-fn parse_protection(node: &Node) -> Result<ChartSheetProtection> {
+fn parse_protection(node: &Node) -> Result<Protection> {
     leaf(node, "chartsheet protection")?;
     no_attributes(node, &[("", "password"), ("", "content"), ("", "objects")])?;
-    Ok(ChartSheetProtection {
+    Ok(Protection {
         password_hash: optional(node, "", "password").map(str::to_owned),
         content: bool_optional(node, "content")?,
         objects: bool_optional(node, "objects")?,
     })
 }
 
-fn parse_custom_views(
-    node: &Node,
-    conformance: ChartSheetConformance,
-) -> Result<Vec<ChartSheetCustomView>> {
+fn parse_custom_views(node: &Node, conformance: Conformance) -> Result<Vec<CustomView>> {
     whitespace(node)?;
     no_attributes(node, &[])?;
     if node.children.is_empty() {
@@ -693,7 +684,7 @@ fn parse_custom_views(
                 ("", "zoomToFit"),
             ],
         )?;
-        values.push(ChartSheetCustomView {
+        values.push(CustomView {
             guid: required(child, "", "guid")?.to_owned(),
             scale: u32_optional(child, "scale")?,
             state: optional(child, "", "state").map(parse_state).transpose()?,
@@ -703,7 +694,7 @@ fn parse_custom_views(
     Ok(values)
 }
 
-fn parse_margins(node: &Node) -> Result<ChartSheetMargins> {
+fn parse_margins(node: &Node) -> Result<Margins> {
     leaf(node, "chartsheet margins")?;
     no_attributes(
         node,
@@ -721,7 +712,7 @@ fn parse_margins(node: &Node) -> Result<ChartSheetMargins> {
             .parse()
             .map_err(|_| invalid(format!("invalid {name} page margin")))
     };
-    Ok(ChartSheetMargins {
+    Ok(Margins {
         left: number("left")?,
         right: number("right")?,
         top: number("top")?,
@@ -731,10 +722,7 @@ fn parse_margins(node: &Node) -> Result<ChartSheetMargins> {
     })
 }
 
-fn parse_page_setup(
-    node: &Node,
-    conformance: ChartSheetConformance,
-) -> Result<ChartSheetPageSetup> {
+fn parse_page_setup(node: &Node, conformance: Conformance) -> Result<PageSetup> {
     leaf(node, "chartsheet page setup")?;
     no_attributes(
         node,
@@ -752,7 +740,7 @@ fn parse_page_setup(
             (conformance.rel(), "id"),
         ],
     )?;
-    Ok(ChartSheetPageSetup {
+    Ok(PageSetup {
         paper_size: u32_optional(node, "paperSize")?,
         first_page_number: u32_optional(node, "firstPageNumber")?,
         orientation: optional(node, "", "orientation")
@@ -770,7 +758,7 @@ fn parse_page_setup(
     })
 }
 
-fn parse_header_footer(node: &Node) -> Result<ChartSheetHeaderFooter> {
+fn parse_header_footer(node: &Node) -> Result<HeaderFooter> {
     whitespace(node)?;
     no_attributes(
         node,
@@ -781,7 +769,7 @@ fn parse_header_footer(node: &Node) -> Result<ChartSheetHeaderFooter> {
             ("", "alignWithMargins"),
         ],
     )?;
-    let mut value = ChartSheetHeaderFooter {
+    let mut value = HeaderFooter {
         different_odd_even: bool_optional(node, "differentOddEven")?,
         different_first: bool_optional(node, "differentFirst")?,
         scale_with_document: bool_optional(node, "scaleWithDoc")?,
@@ -816,7 +804,7 @@ fn parse_header_footer(node: &Node) -> Result<ChartSheetHeaderFooter> {
 }
 
 /// Deterministically serializes one complete Chartsheet part.
-pub fn write_chartsheet(value: &ChartSheet, conformance: ChartSheetConformance) -> Result<Vec<u8>> {
+pub fn write_chartsheet(value: &Chart, conformance: Conformance) -> Result<Vec<u8>> {
     validate_chartsheet(value)?;
     let mut out = BoundedXml::new(MAX_XML_BYTES);
     out.extend_from_slice(b"<x:chartsheet xmlns:x=\"");
@@ -875,9 +863,9 @@ pub fn write_chartsheet(value: &ChartSheet, conformance: ChartSheetConformance) 
                     &mut out,
                     "state",
                     match state {
-                        ChartSheetState::Visible => "visible",
-                        ChartSheetState::Hidden => "hidden",
-                        ChartSheetState::VeryHidden => "veryHidden",
+                        State::Visible => "visible",
+                        State::Hidden => "hidden",
+                        State::VeryHidden => "veryHidden",
                     },
                 );
             }
@@ -1016,7 +1004,7 @@ fn write_relationship_leaf<T: XmlOutput>(out: &mut T, name: &str, id: &str) {
     out.extend_from_slice(b"/>");
 }
 
-pub fn validate_chartsheet(value: &ChartSheet) -> Result<()> {
+pub fn validate_chartsheet(value: &Chart) -> Result<()> {
     if value.views.is_empty() || value.views.len() > MAX_VIEWS {
         return Err(invalid("chartsheet requires a bounded non-empty view list"));
     }
@@ -1152,7 +1140,7 @@ pub fn validate_chartsheet(value: &ChartSheet) -> Result<()> {
     Ok(())
 }
 
-fn validate_web_publish_items(value: &ChartSheetWebPublishItems) -> Result<()> {
+fn validate_web_publish_items(value: &WebPublishItems) -> Result<()> {
     if value.items.is_empty() {
         return Err(invalid(
             "webPublishItems requires at least one webPublishItem",
@@ -1201,7 +1189,7 @@ fn validate_web_publish_items(value: &ChartSheetWebPublishItems) -> Result<()> {
                 item.div_id
             )));
         }
-        if item.source_type == ChartSheetWebSourceType::Range
+        if item.source_type == WebSourceType::Range
             && item.source_ref.as_deref().is_none_or(str::is_empty)
         {
             return Err(invalid(
@@ -1210,9 +1198,7 @@ fn validate_web_publish_items(value: &ChartSheetWebPublishItems) -> Result<()> {
         }
         if matches!(
             item.source_type,
-            ChartSheetWebSourceType::PivotTable
-                | ChartSheetWebSourceType::Query
-                | ChartSheetWebSourceType::Label
+            WebSourceType::PivotTable | WebSourceType::Query | WebSourceType::Label
         ) && item.source_object.as_deref().is_none_or(str::is_empty)
         {
             return Err(invalid(
@@ -1246,7 +1232,7 @@ fn validate_extension_uri(uri: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_extension_list(value: &ChartSheetExtensionList) -> Result<()> {
+fn validate_extension_list(value: &ExtensionList) -> Result<()> {
     if value.extensions.is_empty() {
         return Err(invalid("extLst requires at least one ext"));
     }
@@ -1267,15 +1253,12 @@ fn validate_extension_list(value: &ChartSheetExtensionList) -> Result<()> {
     Ok(())
 }
 
-fn canonical_extension_payload(xml: &[u8], conformance: ChartSheetConformance) -> Result<Vec<u8>> {
+fn canonical_extension_payload(xml: &[u8], conformance: Conformance) -> Result<Vec<u8>> {
     let node = parse_document(xml, MAX_EXTENSION_PAYLOAD_BYTES)?;
     canonical_extension_payload_node(&node, conformance)
 }
 
-fn canonical_extension_payload_node(
-    node: &Node,
-    conformance: ChartSheetConformance,
-) -> Result<Vec<u8>> {
+fn canonical_extension_payload_node(node: &Node, conformance: Conformance) -> Result<Vec<u8>> {
     let mut namespaces = BTreeSet::new();
     collect_namespaces(node, &mut namespaces)?;
     let mut prefixes = BTreeMap::new();
@@ -1543,13 +1526,13 @@ fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()>
     }
     Ok(())
 }
-fn root_conformance(root: &Node, name: &str) -> Result<ChartSheetConformance> {
+fn root_conformance(root: &Node, name: &str) -> Result<Conformance> {
     if root.name != name {
         return Err(invalid(format!("expected {name} root")));
     }
     match root.namespace.as_str() {
-        SML => Ok(ChartSheetConformance::Transitional),
-        STRICT_SML => Ok(ChartSheetConformance::Strict),
+        SML => Ok(Conformance::Transitional),
+        STRICT_SML => Ok(Conformance::Strict),
         _ => Err(invalid("unsupported SpreadsheetML namespace")),
     }
 }
@@ -1651,11 +1634,11 @@ fn parse_orientation(value: &str) -> Result<PageOrientation> {
         _ => Err(invalid("invalid chartsheet page orientation")),
     }
 }
-fn parse_state(value: &str) -> Result<ChartSheetState> {
+fn parse_state(value: &str) -> Result<State> {
     match value {
-        "visible" => Ok(ChartSheetState::Visible),
-        "hidden" => Ok(ChartSheetState::Hidden),
-        "veryHidden" => Ok(ChartSheetState::VeryHidden),
+        "visible" => Ok(State::Visible),
+        "hidden" => Ok(State::Hidden),
+        "veryHidden" => Ok(State::VeryHidden),
         _ => Err(invalid("invalid workbook sheet state")),
     }
 }
