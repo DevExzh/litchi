@@ -131,6 +131,22 @@ class BoundaryPolicyTests(unittest.TestCase):
             violations,
         )
 
+    def test_odf_common_cannot_depend_on_format_host(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-odf-common", "litchi-odf")
+        edges = dict(snapshot.edges)
+        edges[edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            "foundation crate litchi-odf-common depends upward on: litchi-odf",
+            violations,
+        )
+
     def test_pptx_drawingml_edge_is_canonical(self) -> None:
         edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
 

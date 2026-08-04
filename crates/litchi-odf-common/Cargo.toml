@@ -1,0 +1,17 @@
+[package]
+name = "litchi-odf-common"
+description = "Shared, format-neutral OpenDocument vocabulary and scalar codecs for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+litchi-core = { workspace = true }
+phf = { workspace = true }
+
+[lints]
+workspace = true

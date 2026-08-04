@@ -4420,6 +4420,34 @@ the four affected crates, all features and targets, followed by the
 no-default-features `litchi-ooxml` host suite. Formatting, diff checks, and
 the 35-package crate-boundary audit also pass.
 
+## OOXML common relationships, ODF common vocabulary, and owner migration
+
+This slice makes the common/format-specific boundary explicit:
+
+- `litchi-odf-common` owns ODF constants, coordinates, and datatype
+  vocabulary; `litchi-odf` retains detection, package orchestration, and
+  family-specific semantics while re-exporting the established paths.
+- `litchi-ooxml-common::relationships` owns Transitional/Strict relationship
+  attribute decoding, including unresolved `r:` fragments. OOXML hosts keep
+  their format-specific error and facade layers.
+- `litchi-pptx::actions`, `litchi-xlsx::header_footer`,
+  `litchi-xlsb::named_ranges`, and `litchi-odf::font_face` now use layered
+  `{model,codec,package,tests}` owner folders. Canonical types are contextual
+  and prefix-free; historical names remain compatibility aliases.
+
+The checked-in specification anchors for this batch are `[MS-PPTX]` §3.4 for
+slide-show action references and `[MS-XLSB]` §§2.4.718 and 2.5.73 for defined
+names and header/footer strings. The repository has no checked-in ODF
+specification snapshot, so the ODF extraction makes no external conformance
+claim. ADR 0009 continues to keep ODF detection in `litchi-odf`, and ADR 0010
+continues to keep archive grammar below the public facade.
+
+Verification passes for the affected common and owner crates with all features
+and targets, the no-default-features OOXML host suite, formatting, diff
+checks, and the 36-package crate-boundary audit. Full workspace all-features
+verification remains environment-limited by the existing native fontconfig
+dependency, and broad strict-Clippy status is not claimed.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

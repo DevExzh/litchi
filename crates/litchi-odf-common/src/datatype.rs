@@ -14,7 +14,10 @@
 //!
 //! - odfdo: `3rdparty/odfdo/src/odfdo/datatype.py`
 
-use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, Utc};
+use chrono::{
+    DateTime as ChronoDateTime, Duration as ChronoDuration, FixedOffset, NaiveDate, NaiveDateTime,
+    Utc,
+};
 use litchi_core::Result;
 use std::fmt;
 
@@ -42,7 +45,7 @@ impl Boolean {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::Boolean;
+    /// use litchi_odf_common::datatype::Boolean;
     ///
     /// assert_eq!(Boolean::decode("true").unwrap(), true);
     /// assert_eq!(Boolean::decode("false").unwrap(), false);
@@ -72,7 +75,7 @@ impl Boolean {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::Boolean;
+    /// use litchi_odf_common::datatype::Boolean;
     ///
     /// assert_eq!(Boolean::encode(true), "true");
     /// assert_eq!(Boolean::encode(false), "false");
@@ -107,7 +110,7 @@ impl Date {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::Date;
+    /// use litchi_odf_common::datatype::Date;
     /// use chrono::NaiveDate;
     ///
     /// let date = Date::decode("2024-01-31").unwrap();
@@ -132,7 +135,7 @@ impl Date {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::Date;
+    /// use litchi_odf_common::datatype::Date;
     /// use chrono::NaiveDate;
     ///
     /// let date = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
@@ -152,9 +155,9 @@ impl Date {
 /// DateTime data type conversion utilities
 ///
 /// Converts between ODF datetime format (ISO 8601) and chrono::DateTime.
-pub struct DateTimeOdf;
+pub struct DateTime;
 
-impl DateTimeOdf {
+impl DateTime {
     /// Decode ODF datetime string to chrono::DateTime
     ///
     /// Supports various ISO 8601 formats including timezone information.
@@ -165,18 +168,18 @@ impl DateTimeOdf {
     ///
     /// # Returns
     ///
-    /// `Ok(DateTime<FixedOffset>)` on success, `Err` on parse error
+    /// `Ok(chrono::DateTime<FixedOffset>)` on success, `Err` on parse error
     ///
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::DateTimeOdf;
+    /// use litchi_odf_common::datatype::DateTime;
     ///
-    /// let dt = DateTimeOdf::decode("2024-01-31T15:30:00").unwrap();
-    /// let dt_with_tz = DateTimeOdf::decode("2024-01-31T15:30:00+01:00").unwrap();
-    /// let dt_utc = DateTimeOdf::decode("2024-01-31T15:30:00Z").unwrap();
+    /// let dt = DateTime::decode("2024-01-31T15:30:00").unwrap();
+    /// let dt_with_tz = DateTime::decode("2024-01-31T15:30:00+01:00").unwrap();
+    /// let dt_utc = DateTime::decode("2024-01-31T15:30:00Z").unwrap();
     /// ```
-    pub fn decode(data: &str) -> Result<DateTime<FixedOffset>> {
+    pub fn decode(data: &str) -> Result<ChronoDateTime<FixedOffset>> {
         // Handle 'Z' suffix (UTC timezone)
         let normalized = if data.ends_with('Z') {
             data.replacen('Z', "+00:00", 1)
@@ -185,18 +188,22 @@ impl DateTimeOdf {
         };
 
         // Try parsing with timezone
-        if let Ok(dt) = DateTime::parse_from_rfc3339(&normalized) {
+        if let Ok(dt) = ChronoDateTime::parse_from_rfc3339(&normalized) {
             return Ok(dt);
         }
 
         // Try parsing without timezone (assume UTC)
         if let Ok(naive_dt) = NaiveDateTime::parse_from_str(&normalized, "%Y-%m-%dT%H:%M:%S") {
-            return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc).fixed_offset());
+            return Ok(
+                ChronoDateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc).fixed_offset(),
+            );
         }
 
         // Try with microseconds
         if let Ok(naive_dt) = NaiveDateTime::parse_from_str(&normalized, "%Y-%m-%dT%H:%M:%S%.f") {
-            return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc).fixed_offset());
+            return Ok(
+                ChronoDateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc).fixed_offset(),
+            );
         }
 
         Err(litchi_core::Error::Other(format!(
@@ -218,14 +225,14 @@ impl DateTimeOdf {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::DateTimeOdf;
-    /// use chrono::{DateTime, Utc, TimeZone};
+    /// use litchi_odf_common::datatype::DateTime;
+    /// use chrono::{TimeZone, Utc};
     ///
     /// let dt = Utc.with_ymd_and_hms(2024, 1, 31, 15, 30, 0).unwrap();
-    /// let encoded = DateTimeOdf::encode(&dt.fixed_offset());
+    /// let encoded = DateTime::encode(&dt.fixed_offset());
     /// assert!(encoded.ends_with("Z"));
     /// ```
-    pub fn encode(value: &DateTime<FixedOffset>) -> String {
+    pub fn encode(value: &ChronoDateTime<FixedOffset>) -> String {
         let formatted = value.to_rfc3339();
         // Convert +00:00 to Z for canonical representation
         if formatted.ends_with("+00:00") {
@@ -244,7 +251,7 @@ impl DateTimeOdf {
 /// Duration data type conversion utilities
 ///
 /// Converts between ODF duration format (ISO 8601: "PT1H30M") and chrono::Duration.
-pub struct DurationOdf;
+pub struct Duration;
 
 /// Exact XML Schema duration value used by ODF.
 ///
@@ -253,7 +260,7 @@ pub struct DurationOdf;
 /// lexical representation, including arbitrary-width integers and fractional
 /// seconds.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OdfDurationValue {
+pub struct DurationValue {
     lexical: String,
     negative: bool,
     years: Option<String>,
@@ -264,7 +271,7 @@ pub struct OdfDurationValue {
     seconds: Option<String>,
 }
 
-impl OdfDurationValue {
+impl DurationValue {
     /// Return the exact validated ODF lexical representation.
     pub fn as_str(&self) -> &str {
         &self.lexical
@@ -310,7 +317,7 @@ impl OdfDurationValue {
     /// Non-zero calendar years or months require a reference date and are
     /// rejected. Fractional precision beyond nanoseconds is accepted only when
     /// the additional digits are zero.
-    pub fn to_chrono(&self) -> Result<Duration> {
+    pub fn to_chrono(&self) -> Result<ChronoDuration> {
         if self.years.as_deref().is_some_and(component_is_nonzero)
             || self.months.as_deref().is_some_and(component_is_nonzero)
         {
@@ -319,31 +326,33 @@ impl OdfDurationValue {
             ));
         }
 
-        let mut value = Duration::zero();
-        for (component, unit, description) in [
-            (
-                &self.days,
-                Duration::try_days as fn(i64) -> Option<Duration>,
-                "days",
-            ),
-            (&self.hours, Duration::try_hours, "hours"),
-            (&self.minutes, Duration::try_minutes, "minutes"),
-        ] {
-            if let Some(component) = component {
-                let amount = parse_duration_i64(component, description)?;
-                let part = unit(amount).ok_or_else(|| duration_range_error(description))?;
-                value = value
-                    .checked_add(&part)
-                    .ok_or_else(|| duration_range_error("total"))?;
-            }
-        }
+        let mut value = ChronoDuration::zero();
+        add_duration_component(
+            &mut value,
+            self.days.as_deref(),
+            "days",
+            ChronoDuration::try_days,
+        )?;
+        add_duration_component(
+            &mut value,
+            self.hours.as_deref(),
+            "hours",
+            ChronoDuration::try_hours,
+        )?;
+        add_duration_component(
+            &mut value,
+            self.minutes.as_deref(),
+            "minutes",
+            ChronoDuration::try_minutes,
+        )?;
 
         if let Some(seconds) = &self.seconds {
             let (whole, fraction) = seconds.split_once('.').unwrap_or((seconds, ""));
             let whole = parse_duration_i64(whole, "seconds")?;
             value = value
                 .checked_add(
-                    &Duration::try_seconds(whole).ok_or_else(|| duration_range_error("seconds"))?,
+                    &ChronoDuration::try_seconds(whole)
+                        .ok_or_else(|| duration_range_error("seconds"))?,
                 )
                 .ok_or_else(|| duration_range_error("total"))?;
             if !fraction.is_empty() {
@@ -363,14 +372,14 @@ impl OdfDurationValue {
                         nanoseconds *= 10;
                     }
                     value = value
-                        .checked_add(&Duration::nanoseconds(nanoseconds))
+                        .checked_add(&ChronoDuration::nanoseconds(nanoseconds))
                         .ok_or_else(|| duration_range_error("total"))?;
                 }
             }
         }
 
         if self.negative {
-            Duration::zero()
+            ChronoDuration::zero()
                 .checked_sub(&value)
                 .ok_or_else(|| duration_range_error("total"))
         } else {
@@ -379,7 +388,24 @@ impl OdfDurationValue {
     }
 }
 
-impl fmt::Display for OdfDurationValue {
+fn add_duration_component(
+    value: &mut ChronoDuration,
+    component: Option<&str>,
+    description: &str,
+    unit: fn(i64) -> Option<ChronoDuration>,
+) -> Result<()> {
+    let Some(component) = component else {
+        return Ok(());
+    };
+    let amount = parse_duration_i64(component, description)?;
+    let part = unit(amount).ok_or_else(|| duration_range_error(description))?;
+    *value = value
+        .checked_add(&part)
+        .ok_or_else(|| duration_range_error("total"))?;
+    Ok(())
+}
+
+impl fmt::Display for DurationValue {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.lexical)
     }
@@ -399,7 +425,7 @@ fn duration_range_error(component: &str) -> litchi_core::Error {
     litchi_core::Error::InvalidFormat(format!("duration {component} is out of range"))
 }
 
-impl DurationOdf {
+impl Duration {
     /// Decode ODF duration string to chrono::Duration
     ///
     /// Supports ISO 8601 duration format (e.g., "PT1H30M", "P1DT2H", "-PT5M").
@@ -410,26 +436,26 @@ impl DurationOdf {
     ///
     /// # Returns
     ///
-    /// `Ok(Duration)` on success, `Err` on parse error
+    /// `Ok(chrono::Duration)` on success, `Err` on parse error
     ///
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::DurationOdf;
-    /// use chrono::Duration;
+    /// use litchi_odf_common::datatype::Duration;
+    /// use chrono::Duration as ChronoDuration;
     ///
-    /// let dur = DurationOdf::decode("PT1H30M").unwrap();
-    /// assert_eq!(dur, Duration::minutes(90));
+    /// let dur = Duration::decode("PT1H30M").unwrap();
+    /// assert_eq!(dur, ChronoDuration::minutes(90));
     ///
-    /// let dur_neg = DurationOdf::decode("-PT5M").unwrap();
-    /// assert_eq!(dur_neg, Duration::minutes(-5));
+    /// let dur_neg = Duration::decode("-PT5M").unwrap();
+    /// assert_eq!(dur_neg, ChronoDuration::minutes(-5));
     /// ```
-    pub fn decode(data: &str) -> Result<Duration> {
+    pub fn decode(data: &str) -> Result<ChronoDuration> {
         Self::decode_exact(data)?.to_chrono()
     }
 
     /// Parse and retain a complete XML Schema duration without narrowing it.
-    pub fn decode_exact(data: &str) -> Result<OdfDurationValue> {
+    pub fn decode_exact(data: &str) -> Result<DurationValue> {
         parse_exact_duration(data)
     }
 
@@ -446,16 +472,16 @@ impl DurationOdf {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odf::datatype::DurationOdf;
-    /// use chrono::Duration;
+    /// use litchi_odf_common::datatype::Duration;
+    /// use chrono::Duration as ChronoDuration;
     ///
-    /// let dur = Duration::minutes(90);
-    /// assert_eq!(DurationOdf::encode(&dur), "PT1H30M0S");
+    /// let dur = ChronoDuration::minutes(90);
+    /// assert_eq!(Duration::encode(&dur), "PT1H30M0S");
     ///
-    /// let dur_neg = Duration::minutes(-5);
-    /// assert_eq!(DurationOdf::encode(&dur_neg), "-PT0H5M0S");
+    /// let dur_neg = ChronoDuration::minutes(-5);
+    /// assert_eq!(Duration::encode(&dur_neg), "-PT0H5M0S");
     /// ```
-    pub fn encode(value: &Duration) -> String {
+    pub fn encode(value: &ChronoDuration) -> String {
         let total_seconds = value.num_seconds();
         let subsecond_nanoseconds = value.subsec_nanos();
         let negative = total_seconds < 0 || subsecond_nanoseconds < 0;
@@ -478,7 +504,16 @@ impl DurationOdf {
     }
 }
 
-fn parse_exact_duration(data: &str) -> Result<OdfDurationValue> {
+/// Compatibility alias for the pre-layered ODF API.
+pub type DateTimeOdf = DateTime;
+
+/// Compatibility alias for the pre-layered ODF API.
+pub type DurationOdf = Duration;
+
+/// Compatibility alias for the pre-layered ODF API.
+pub type OdfDurationValue = DurationValue;
+
+fn parse_exact_duration(data: &str) -> Result<DurationValue> {
     if data.len() > 1_048_576 {
         return Err(litchi_core::Error::InvalidFormat(
             "duration exceeds 1 MiB".to_string(),
@@ -493,7 +528,7 @@ fn parse_exact_duration(data: &str) -> Result<OdfDurationValue> {
         ))
     })?;
 
-    let mut value = OdfDurationValue {
+    let mut value = DurationValue {
         lexical: data.to_string(),
         negative,
         years: None,
@@ -625,17 +660,17 @@ mod tests {
     #[test]
     fn test_datetime_decode() {
         // Without timezone
-        let dt = DateTimeOdf::decode("2024-01-31T15:30:00").unwrap();
+        let dt = DateTime::decode("2024-01-31T15:30:00").unwrap();
         assert_eq!(dt.year(), 2024);
         assert_eq!(dt.month(), 1);
         assert_eq!(dt.day(), 31);
 
         // With timezone
-        let dt = DateTimeOdf::decode("2024-01-31T15:30:00+01:00").unwrap();
+        let dt = DateTime::decode("2024-01-31T15:30:00+01:00").unwrap();
         assert_eq!(dt.year(), 2024);
 
         // UTC (Z suffix)
-        let dt = DateTimeOdf::decode("2024-01-31T15:30:00Z").unwrap();
+        let dt = DateTime::decode("2024-01-31T15:30:00Z").unwrap();
         assert_eq!(dt.year(), 2024);
     }
 
@@ -645,7 +680,7 @@ mod tests {
             .with_ymd_and_hms(2024, 1, 31, 15, 30, 0)
             .unwrap()
             .fixed_offset();
-        let encoded = DateTimeOdf::encode(&dt);
+        let encoded = DateTime::encode(&dt);
         assert!(encoded.ends_with("Z"));
         assert!(encoded.starts_with("2024-01-31"));
     }
@@ -653,41 +688,44 @@ mod tests {
     #[test]
     fn test_duration_decode() {
         // Hours and minutes
-        let dur = DurationOdf::decode("PT1H30M").unwrap();
-        assert_eq!(dur, Duration::minutes(90));
+        let dur = Duration::decode("PT1H30M").unwrap();
+        assert_eq!(dur, ChronoDuration::minutes(90));
 
         // Days
-        let dur = DurationOdf::decode("P1D").unwrap();
-        assert_eq!(dur, Duration::days(1));
+        let dur = Duration::decode("P1D").unwrap();
+        assert_eq!(dur, ChronoDuration::days(1));
 
         // Negative
-        let dur = DurationOdf::decode("-PT5M").unwrap();
-        assert_eq!(dur, Duration::minutes(-5));
+        let dur = Duration::decode("-PT5M").unwrap();
+        assert_eq!(dur, ChronoDuration::minutes(-5));
 
         // Complex
-        let dur = DurationOdf::decode("P1DT2H30M15S").unwrap();
+        let dur = Duration::decode("P1DT2H30M15S").unwrap();
         assert_eq!(
             dur,
-            Duration::days(1) + Duration::hours(2) + Duration::minutes(30) + Duration::seconds(15)
+            ChronoDuration::days(1)
+                + ChronoDuration::hours(2)
+                + ChronoDuration::minutes(30)
+                + ChronoDuration::seconds(15)
         );
     }
 
     #[test]
     fn test_duration_encode() {
-        let dur = Duration::minutes(90);
-        assert_eq!(DurationOdf::encode(&dur), "PT1H30M0S");
+        let dur = ChronoDuration::minutes(90);
+        assert_eq!(Duration::encode(&dur), "PT1H30M0S");
 
-        let dur = Duration::minutes(-5);
-        assert_eq!(DurationOdf::encode(&dur), "-PT0H5M0S");
+        let dur = ChronoDuration::minutes(-5);
+        assert_eq!(Duration::encode(&dur), "-PT0H5M0S");
 
-        let dur = Duration::days(1) + Duration::hours(2) + Duration::minutes(30);
-        assert_eq!(DurationOdf::encode(&dur), "PT26H30M0S"); // 24+2 hours
+        let dur = ChronoDuration::days(1) + ChronoDuration::hours(2) + ChronoDuration::minutes(30);
+        assert_eq!(Duration::encode(&dur), "PT26H30M0S"); // 24+2 hours
     }
 
     #[test]
     fn exact_duration_preserves_calendar_and_arbitrary_width_components() {
         let lexical = "-P123456789012345678901234567890Y11M30DT23H59M59.123456789012S";
-        let duration = DurationOdf::decode_exact(lexical).unwrap();
+        let duration = Duration::decode_exact(lexical).unwrap();
 
         assert_eq!(duration.as_str(), lexical);
         assert_eq!(duration.to_string(), lexical);
@@ -704,33 +742,33 @@ mod tests {
     #[test]
     fn duration_fractional_seconds_convert_and_encode_without_truncation() {
         assert_eq!(
-            DurationOdf::decode("PT1.125S").unwrap(),
-            Duration::milliseconds(1125)
+            Duration::decode("PT1.125S").unwrap(),
+            ChronoDuration::milliseconds(1125)
         );
         assert_eq!(
-            DurationOdf::decode("-PT0.000000001S").unwrap(),
-            Duration::nanoseconds(-1)
+            Duration::decode("-PT0.000000001S").unwrap(),
+            ChronoDuration::nanoseconds(-1)
         );
         assert_eq!(
-            DurationOdf::encode(&Duration::milliseconds(1125)),
+            Duration::encode(&ChronoDuration::milliseconds(1125)),
             "PT0H0M1.125S"
         );
         assert_eq!(
-            DurationOdf::encode(&Duration::nanoseconds(-1)),
+            Duration::encode(&ChronoDuration::nanoseconds(-1)),
             "-PT0H0M0.000000001S"
         );
     }
 
     #[test]
     fn exact_duration_retains_precision_beyond_chrono() {
-        let exact = DurationOdf::decode_exact("PT0.123456789012300S").unwrap();
+        let exact = Duration::decode_exact("PT0.123456789012300S").unwrap();
         assert_eq!(exact.seconds(), Some("0.123456789012300"));
         assert!(exact.to_chrono().is_err());
 
-        let exact_zero_tail = DurationOdf::decode_exact("PT0.123456789000S").unwrap();
+        let exact_zero_tail = Duration::decode_exact("PT0.123456789000S").unwrap();
         assert_eq!(
             exact_zero_tail.to_chrono().unwrap(),
-            Duration::nanoseconds(123_456_789)
+            ChronoDuration::nanoseconds(123_456_789)
         );
     }
 
@@ -754,7 +792,7 @@ mod tests {
             "P1DT2H3M4S5S",
         ] {
             assert!(
-                DurationOdf::decode_exact(value).is_err(),
+                Duration::decode_exact(value).is_err(),
                 "accepted malformed duration {value}"
             );
         }
@@ -762,8 +800,8 @@ mod tests {
 
     #[test]
     fn duration_chrono_conversion_reports_range_errors() {
-        let huge = DurationOdf::decode_exact("P999999999999999999999999999D").unwrap();
+        let huge = Duration::decode_exact("P999999999999999999999999999D").unwrap();
         assert!(huge.to_chrono().is_err());
-        assert!(DurationOdf::decode("P999999999999999999999999999D").is_err());
+        assert!(Duration::decode("P999999999999999999999999999D").is_err());
     }
 }

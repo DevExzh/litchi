@@ -526,7 +526,7 @@ impl AttrParser {
             AttrType::Duration => {
                 let value = std::str::from_utf8(value)
                     .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?;
-                crate::datatype::DurationOdf::decode_exact(value)?;
+                crate::datatype::Duration::decode_exact(value)?;
                 Ok(ParsedValue::String(value.to_string()))
             },
             _ => Ok(ParsedValue::String(

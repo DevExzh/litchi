@@ -76,8 +76,12 @@
     "litchi-odf": [
       "litchi-core",
       "litchi-eval",
+      "litchi-odf-common",
       "soapberry-zip",
       "xml-minifier"
+    ],
+    "litchi-odf-common": [
+      "litchi-core"
     ],
     "litchi-odraw": [],
     "litchi-ograph": [
@@ -264,6 +268,7 @@
     "litchi-docx",
     "litchi-drawingml",
     "litchi-eval",
+    "litchi-odf-common",
     "litchi-odraw",
     "litchi-ograph",
     "litchi-ole-common",

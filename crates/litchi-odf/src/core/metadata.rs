@@ -3,7 +3,6 @@
 //! This module provides comprehensive parsing of ODF metadata from meta.xml,
 //! including document properties, statistics, and user information.
 
-use crate::datatype::DateTimeOdf;
 use chrono::{DateTime, Utc};
 use litchi_core::{Error, Metadata, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
@@ -280,7 +279,7 @@ impl OdfMetadata {
     /// Parse a date string into DateTime<Utc>
     fn parse_date(date_str: Option<String>) -> Option<DateTime<Utc>> {
         date_str.and_then(|value| {
-            DateTimeOdf::decode(&value)
+            crate::datatype::DateTime::decode(&value)
                 .ok()
                 .map(|date| date.with_timezone(&Utc))
         })

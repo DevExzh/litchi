@@ -296,14 +296,14 @@
 //! ```
 
 /// ODF constants, MIME types, and XML tags
-pub mod constants;
+pub use litchi_odf_common::constants;
 pub mod content_validation;
 /// Cell coordinate conversion utilities (A1 notation)
-pub mod coordinates;
+pub use litchi_odf_common::coordinates;
 /// Core ODF parsing functionality
 mod core;
 /// ODF data type conversions (Boolean, Date, DateTime, Duration)
-pub mod datatype;
+pub use litchi_odf_common::datatype;
 /// Best-effort detection for packaged and flat OpenDocument files.
 pub mod detect;
 pub mod drawing_fill_image;

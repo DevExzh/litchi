@@ -456,7 +456,7 @@ impl OdfFieldDuration {
 
     fn validate(&self, name: &str, aggregate: &mut usize) -> Result<()> {
         validate_dynamic_value(name, Some(&self.0), true, aggregate)?;
-        crate::datatype::DurationOdf::decode_exact(&self.0).map_err(|_| {
+        crate::datatype::Duration::decode_exact(&self.0).map_err(|_| {
             Error::InvalidFormat(format!("invalid XML Schema duration '{}'", self.0))
         })?;
         Ok(())
@@ -1324,7 +1324,7 @@ impl OdfCalculatedFieldValue {
             },
             Self::Date(value) => {
                 if value.contains('T') {
-                    crate::datatype::DateTimeOdf::decode(value).map_err(|_| {
+                    crate::datatype::DateTime::decode(value).map_err(|_| {
                         Error::InvalidFormat(format!("invalid office:date-value '{value}'"))
                     })?;
                 } else {
@@ -1335,7 +1335,7 @@ impl OdfCalculatedFieldValue {
                 validate_dynamic_value("office:date-value", Some(value), true, aggregate)
             },
             Self::Time(value) => {
-                crate::datatype::DurationOdf::decode_exact(value).map_err(|_| {
+                crate::datatype::Duration::decode_exact(value).map_err(|_| {
                     Error::InvalidFormat(format!("invalid office:time-value '{value}'"))
                 })?;
                 validate_dynamic_value("office:time-value", Some(value), true, aggregate)

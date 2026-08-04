@@ -1,6 +1,6 @@
 //! Bounded, inert semantic inventory of ODF variable declarations.
 
-use crate::datatype::{Boolean, Date, DateTimeOdf, DurationOdf, OdfDurationValue};
+use crate::datatype::{Boolean, Date, DurationValue};
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
@@ -108,7 +108,7 @@ pub enum OdfVariableValue {
         lexical: String,
     },
     Time {
-        value: OdfDurationValue,
+        value: DurationValue,
         lexical: String,
     },
     Boolean {
@@ -1220,7 +1220,7 @@ fn parse_user_value(
             let lexical = required(attributes, OFFICE, "date-value")?.to_string();
             let value = if lexical.contains('T') {
                 OdfVariableDateValue::DateTime(
-                    DateTimeOdf::decode(&lexical)
+                    crate::datatype::DateTime::decode(&lexical)
                         .map_err(|_| invalid("invalid user-field date-time"))?,
                 )
             } else {
@@ -1232,7 +1232,7 @@ fn parse_user_value(
         },
         OdfVariableValueType::Time => {
             let lexical = required(attributes, OFFICE, "time-value")?.to_string();
-            let value = DurationOdf::decode_exact(&lexical)
+            let value = crate::datatype::Duration::decode_exact(&lexical)
                 .map_err(|_| invalid("invalid user-field duration"))?;
             OdfVariableValue::Time { value, lexical }
         },
