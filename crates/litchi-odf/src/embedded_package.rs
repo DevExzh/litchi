@@ -9,10 +9,10 @@ use crate::{
     ImagePart, ImageSource, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart, OdfEmbeddedObjectSource,
     OdfInlineObjectRoot, constants,
 };
-use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
+use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};

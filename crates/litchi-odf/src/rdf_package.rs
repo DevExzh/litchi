@@ -1,8 +1,8 @@
 //! Inert, bounded RDF/XML package metadata discovery and mutation.
 
+use crate::constants;
 use crate::core::OwnedPackage;
 use crate::embedded_chart::{Addition, rebuild_package, splice};
-use crate::constants;
 use litchi_core::{Error, Result};
 use litchi_odf_common::package::resolve_package_path;
 use quick_xml::XmlVersion;
