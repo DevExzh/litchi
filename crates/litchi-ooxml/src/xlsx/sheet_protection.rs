@@ -7,9 +7,6 @@ mod tests {
     use super::*;
 
     const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-    const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
-    const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
-    const XM: &[u8] = b"http://schemas.microsoft.com/office/excel/2006/main";
     const START: &str =
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
 
