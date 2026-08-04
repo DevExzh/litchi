@@ -26,6 +26,7 @@ use crate::docx::paragraph::Paragraph;
 use crate::docx::parts::DocumentPart;
 use crate::docx::section::{Section, Sections};
 use crate::docx::settings::DocumentSettings;
+use crate::docx::settings::extract_document_variables;
 use crate::docx::smart_tag::SmartTag;
 use crate::docx::statistics::{
     DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
@@ -34,9 +35,9 @@ use crate::docx::statistics::{
 use crate::docx::styles::Styles;
 use crate::docx::table::Table;
 use crate::docx::theme::Theme;
-use crate::docx::variables::DocumentVariables;
 use crate::docx::writer::Watermark;
 use crate::error::{OoxmlError, Result};
+use litchi_docx::DocumentVariables;
 use litchi_docx::alt::{Chunk, Part, Target, is_relationship};
 use litchi_docx::numbering::{Collection, Suffix};
 use litchi_docx::web;
@@ -2513,9 +2514,7 @@ impl<'a> Document<'a> {
         }
         let target = relationship.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
-        Ok(Some(DocumentVariables::extract_from_settings_part(
-            settings_part,
-        )?))
+        Ok(Some(extract_document_variables(settings_part)?))
     }
 
     /// Get the document theme.

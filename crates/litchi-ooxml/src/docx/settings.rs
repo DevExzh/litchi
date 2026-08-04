@@ -9,8 +9,8 @@ use crate::docx::mail_merge::{
 use crate::docx::namespace::{
     STRICT_WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace, word_attribute_value,
 };
-use crate::docx::variables::DocumentVariables;
 use crate::error::{OoxmlError, Result};
+use litchi_docx::DocumentVariables;
 use litchi_docx::numbering::Format;
 use litchi_opc::part::Part;
 use quick_xml::XmlVersion;
@@ -35,6 +35,21 @@ const MAX_ATTACHED_TEMPLATE_TARGET_LEN: usize = 32 * 1024;
 const MAX_SETTINGS_XML_BYTES: usize = 16 * 1024 * 1024;
 const MAX_SETTINGS_XML_NODES: usize = 250_000;
 const MAX_SETTINGS_XML_DEPTH: usize = 256;
+
+/// Decode the canonical DOCX document-variable collection from a settings part.
+///
+/// Markup-compatibility preprocessing and OPC ownership remain host concerns;
+/// the validated model and XML codec belong to `litchi-docx`.
+pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<DocumentVariables> {
+    let limit = litchi_docx::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES;
+    if part.blob().len() > limit {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "settings XML exceeds the {limit} byte document-variable limit"
+        )));
+    }
+    let xml = litchi_ooxml_common::mce::process_part(part)?;
+    Ok(litchi_docx::parse_document_variables(xml.as_ref())?)
+}
 
 /// An inert reference to the external template associated with a document.
 ///
@@ -1118,7 +1133,7 @@ pub(crate) fn patch_document_variables(
     variables: &DocumentVariables,
 ) -> Result<Vec<u8>> {
     variables.validate()?;
-    DocumentVariables::extract_from_xml(xml)?;
+    DocumentVariables::from_xml(xml)?;
     let layout = scan_settings_xml_layout(xml)?;
     let replacement = if variables.is_empty() {
         String::new()

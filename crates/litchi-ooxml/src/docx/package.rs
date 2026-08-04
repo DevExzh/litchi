@@ -9,10 +9,10 @@ use crate::docx::mail_merge::{
 };
 use crate::docx::parts::DocumentPart;
 use crate::docx::settings::{
-    ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings, patch_attached_template,
-    patch_document_variables, patch_mail_merge, validate_attached_template_target,
+    ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings, extract_document_variables,
+    patch_attached_template, patch_document_variables, patch_mail_merge,
+    validate_attached_template_target,
 };
-use crate::docx::variables::DocumentVariables;
 use crate::docx::vba_project::{
     VbaProject, VbaSupplementalData, discover_vba_project,
     remove_vba_project as clear_vba_graph_from_document,
@@ -23,6 +23,7 @@ use crate::docx::writer::MutableDocument;
 use crate::encryption::{Limits, Mode};
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
+use litchi_docx::DocumentVariables;
 use litchi_docx::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_relationship};
 use litchi_docx::{font, glossary, web as docx_web};
 use litchi_drawingml::diagram::{
@@ -2415,7 +2416,7 @@ impl Package {
             return Ok(None);
         }
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(Some(DocumentVariables::extract_from_settings_part(&part)?))
+        Ok(Some(extract_document_variables(&part)?))
     }
 
     /// Insert or replace one document variable atomically.
@@ -2427,12 +2428,12 @@ impl Package {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
         DocumentSettings::extract_from_part(&original)?;
-        let mut variables = DocumentVariables::extract_from_settings_part(&original)?;
+        let mut variables = extract_document_variables(&original)?;
         let previous = variables.insert(name, value)?;
         let xml = patch_document_variables(&snapshot.xml, &variables)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
         DocumentSettings::extract_from_part(&replacement)?;
-        DocumentVariables::extract_from_settings_part(&replacement)?;
+        extract_document_variables(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(previous)
     }
@@ -2445,14 +2446,14 @@ impl Package {
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
         DocumentSettings::extract_from_part(&original)?;
-        let mut variables = DocumentVariables::extract_from_settings_part(&original)?;
+        let mut variables = extract_document_variables(&original)?;
         let Some(previous) = variables.remove(name) else {
             return Ok(None);
         };
         let xml = patch_document_variables(&snapshot.xml, &variables)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
         DocumentSettings::extract_from_part(&replacement)?;
-        DocumentVariables::extract_from_settings_part(&replacement)?;
+        extract_document_variables(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(Some(previous))
     }
@@ -2465,7 +2466,7 @@ impl Package {
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
         DocumentSettings::extract_from_part(&original)?;
-        let mut variables = DocumentVariables::extract_from_settings_part(&original)?;
+        let mut variables = extract_document_variables(&original)?;
         let count = variables.count();
         if count == 0 {
             return Ok(0);
@@ -2474,7 +2475,7 @@ impl Package {
         let xml = patch_document_variables(&snapshot.xml, &variables)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
         DocumentSettings::extract_from_part(&replacement)?;
-        DocumentVariables::extract_from_settings_part(&replacement)?;
+        extract_document_variables(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(count)
     }

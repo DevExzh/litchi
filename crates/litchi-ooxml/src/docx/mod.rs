@@ -84,7 +84,6 @@ pub mod table;
 pub mod template;
 pub mod textbox;
 pub mod theme;
-pub mod variables;
 pub mod vba_project;
 pub mod writer;
 
@@ -169,7 +168,6 @@ pub use textbox::{
     TextWrap, WordArt, load_text_boxes,
 };
 pub use theme::Theme;
-pub use variables::DocumentVariables;
 pub use vba_project::{VbaDocumentEvent, VbaMacroDescriptor, VbaProject, VbaSupplementalData};
 // Re-export shared formatting types
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
