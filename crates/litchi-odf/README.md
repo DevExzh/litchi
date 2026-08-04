@@ -4,7 +4,7 @@ OpenDocument Format (ODF) reader and writer for `.odt`, `.ods`, and `.odp` files
 
 ## Overview
 
-`litchi-odf` parses and produces OpenDocument files conforming to ISO/IEC 26300 (ODF 1.2): text documents (`.odt`), spreadsheets (`.ods`), and presentations (`.odp`). It includes a ZIP-based package layer, XML element model for content / styles / metadata, and high-level types for each document family. Builders and `Mutable*` views are provided for creating and editing files in addition to read-only access.
+`litchi-odf` provides detection, common ODF vocabulary, and an optional facade over the independently selectable family crates. For the smallest dependency and memory footprint, depend directly on `litchi-odt`, `litchi-ods`, or `litchi-odp`.
 
 ## Usage
 
@@ -14,7 +14,9 @@ litchi-odf = "0.0.1"
 ```
 
 ```rust
-use litchi_odf::{Document, Spreadsheet, Presentation};
+use litchi_odt::Document;
+use litchi_ods::Spreadsheet;
+use litchi_odp::Presentation;
 
 let mut doc = Document::open("document.odt")?;
 let text = doc.text()?;

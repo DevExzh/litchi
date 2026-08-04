@@ -1,7 +1,8 @@
-use litchi_odf::{
-    Document, OwnedPackage, PackageWriter, Presentation, Spreadsheet, constants,
-    rdf::{Object, Subject, Triple},
-};
+use litchi_odf_common::{constants, rdf::{Object, Subject, Triple}};
+use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+use litchi_odp::Presentation;
+use litchi_ods::Spreadsheet;
+use litchi_odt::Document;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";

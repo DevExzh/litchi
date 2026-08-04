@@ -1,7 +1,7 @@
 //! Read an OpenDocument Text (`.odt`) file and print its text content.
 //!
 //! If a path argument is supplied, that file is opened. Otherwise the example
-//! creates a small ODT in a tempfile via [`DocumentBuilder`] and reads it back.
+//! creates a small ODT in a tempfile via [`litchi_odt::Builder`] and reads it back.
 //!
 //! Run with:
 //! ```bash
@@ -11,7 +11,7 @@
 
 use std::path::PathBuf;
 
-use litchi_odf::{Document, DocumentBuilder};
+use litchi_odt::{Builder, Document};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,9 +19,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (path, _tempfile_guard): (PathBuf, Option<NamedTempFile>) = match std::env::args().nth(1) {
         Some(arg) => (PathBuf::from(arg), None),
         None => {
-            println!("No path provided; creating a fresh ODT via DocumentBuilder...");
+            println!("No path provided; creating a fresh ODT via litchi_odt::Builder...");
             let tmp = NamedTempFile::with_suffix(".odt")?;
-            let mut builder = DocumentBuilder::new();
+            let mut builder = Builder::new();
             builder.add_heading("litchi-odf example", 1)?;
             builder.add_paragraph("This document was created by the read_odt example.")?;
             builder.add_paragraph("It demonstrates a simple build-then-read round trip.")?;
