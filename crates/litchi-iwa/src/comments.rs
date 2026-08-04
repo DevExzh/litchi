@@ -252,36 +252,39 @@ impl IWorkDrawableCommentEditor {
         Ok(drawables)
     }
 
-    pub fn comment<D>(&self, drawable_object_id: D) -> Result<Option<DrawableCommentInfo>>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
-        drawable_comment_in_package(&self.package, self.application, drawable_object_id)
+    pub fn comment(
+        &self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<Option<DrawableCommentInfo>> {
+        drawable_comment_in_package(
+            &self.package,
+            self.application,
+            drawable_object_id.object_id(),
+        )
     }
 
     /// Resolves the direct replies to a drawable comment in stored order.
-    pub fn replies<D>(&self, drawable_object_id: D) -> Result<Vec<DrawableCommentReplyInfo>>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
-        drawable_comment_replies_in_package(&self.package, self.application, drawable_object_id)
+    pub fn replies(
+        &self,
+        drawable_object_id: DrawableObjectId,
+    ) -> Result<Vec<DrawableCommentReplyInfo>> {
+        drawable_comment_replies_in_package(
+            &self.package,
+            self.application,
+            drawable_object_id.object_id(),
+        )
     }
 
-    pub fn set_comment<D>(&mut self, drawable_object_id: D, text: impl Into<String>) -> Result<()>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
+    pub fn set_comment(
+        &mut self,
+        drawable_object_id: DrawableObjectId,
+        text: impl Into<String>,
+    ) -> Result<()> {
         let mut staged = self.package.clone();
         set_drawable_comment_in_package(
             &mut staged,
             self.application,
-            drawable_object_id,
+            drawable_object_id.object_id(),
             text.into(),
         )?;
         validate_package_round_trip(&staged)?;
@@ -289,14 +292,13 @@ impl IWorkDrawableCommentEditor {
         Ok(())
     }
 
-    pub fn clear_comment<D>(&mut self, drawable_object_id: D) -> Result<()>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
+    pub fn clear_comment(&mut self, drawable_object_id: DrawableObjectId) -> Result<()> {
         let mut staged = self.package.clone();
-        clear_drawable_comment_in_package(&mut staged, self.application, drawable_object_id)?;
+        clear_drawable_comment_in_package(
+            &mut staged,
+            self.application,
+            drawable_object_id.object_id(),
+        )?;
         validate_package_round_trip(&staged)?;
         self.package = staged;
         Ok(())
@@ -306,34 +308,16 @@ impl IWorkDrawableCommentEditor {
     ///
     /// The root storage is copy-on-written, matching native iWork saves and
     /// isolating a drawable when multiple drawables share one thread.
-    pub fn add_reply<D>(
+    pub fn add_reply(
         &mut self,
-        drawable_object_id: D,
+        drawable_object_id: DrawableObjectId,
         text: impl Into<String>,
-    ) -> Result<CommentStorageId>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        self.add_reply_id(drawable_object_id, text)
-    }
-
-    /// Adds a reply and returns its validated comment-storage identifier.
-    pub fn add_reply_id<D>(
-        &mut self,
-        drawable_object_id: D,
-        text: impl Into<String>,
-    ) -> Result<CommentStorageId>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
+    ) -> Result<CommentStorageId> {
         let mut staged = self.package.clone();
         let reply_id = add_drawable_comment_reply_in_package(
             &mut staged,
             self.application,
-            drawable_object_id,
+            drawable_object_id.object_id(),
             text.into(),
         )?;
         validate_package_round_trip(&staged)?;
@@ -346,43 +330,18 @@ impl IWorkDrawableCommentEditor {
     ///
     /// A changed reply and its root are copy-on-written. The returned value can
     /// therefore differ from `reply_storage_object_id`.
-    pub fn set_reply<D, S>(
+    pub fn set_reply(
         &mut self,
-        drawable_object_id: D,
-        reply_storage_object_id: S,
+        drawable_object_id: DrawableObjectId,
+        reply_storage_object_id: CommentStorageId,
         text: impl Into<String>,
-    ) -> Result<CommentStorageId>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-        S: TryInto<CommentStorageId>,
-        S::Error: fmt::Debug,
-    {
-        self.set_reply_id(drawable_object_id, reply_storage_object_id, text)
-    }
-
-    /// Updates one direct reply and returns its validated comment-storage
-    /// identifier.
-    pub fn set_reply_id<D, S>(
-        &mut self,
-        drawable_object_id: D,
-        reply_storage_object_id: S,
-        text: impl Into<String>,
-    ) -> Result<CommentStorageId>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-        S: TryInto<CommentStorageId>,
-        S::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
-        let reply_storage_object_id = normalize_comment_storage_id(reply_storage_object_id)?;
+    ) -> Result<CommentStorageId> {
         let mut staged = self.package.clone();
         let reply_id = set_drawable_comment_reply_in_package(
             &mut staged,
             self.application,
-            drawable_object_id,
-            reply_storage_object_id,
+            drawable_object_id.object_id(),
+            reply_storage_object_id.object_id(),
             text.into(),
         )?;
         validate_package_round_trip(&staged)?;
@@ -392,25 +351,17 @@ impl IWorkDrawableCommentEditor {
     }
 
     /// Removes one direct reply from a drawable's comment thread.
-    pub fn remove_reply<D, S>(
+    pub fn remove_reply(
         &mut self,
-        drawable_object_id: D,
-        reply_storage_object_id: S,
-    ) -> Result<()>
-    where
-        D: TryInto<DrawableObjectId>,
-        D::Error: fmt::Debug,
-        S: TryInto<CommentStorageId>,
-        S::Error: fmt::Debug,
-    {
-        let drawable_object_id = normalize_drawable_object_id(drawable_object_id)?;
-        let reply_storage_object_id = normalize_comment_storage_id(reply_storage_object_id)?;
+        drawable_object_id: DrawableObjectId,
+        reply_storage_object_id: CommentStorageId,
+    ) -> Result<()> {
         let mut staged = self.package.clone();
         remove_drawable_comment_reply_in_package(
             &mut staged,
             self.application,
-            drawable_object_id,
-            reply_storage_object_id,
+            drawable_object_id.object_id(),
+            reply_storage_object_id.object_id(),
         )?;
         validate_package_round_trip(&staged)?;
         self.package = staged;
@@ -432,34 +383,6 @@ impl IWorkDrawableCommentEditor {
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         self.package.save(path)
     }
-}
-
-fn normalize_drawable_object_id<D>(value: D) -> Result<u64>
-where
-    D: TryInto<DrawableObjectId>,
-    D::Error: fmt::Debug,
-{
-    value
-        .try_into()
-        .map(DrawableObjectId::object_id)
-        .map_err(|error| {
-            Error::ParseError(format!("invalid drawable object identifier: {error:?}"))
-        })
-}
-
-fn normalize_comment_storage_id<S>(value: S) -> Result<u64>
-where
-    S: TryInto<CommentStorageId>,
-    S::Error: fmt::Debug,
-{
-    value
-        .try_into()
-        .map(CommentStorageId::object_id)
-        .map_err(|error| {
-            Error::ParseError(format!(
-                "invalid comment-storage object identifier: {error:?}"
-            ))
-        })
 }
 
 #[derive(Debug, Clone)]
