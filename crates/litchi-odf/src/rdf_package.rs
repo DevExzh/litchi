@@ -68,11 +68,11 @@ pub(crate) fn graphs(package: &OwnedPackage) -> Result<Vec<OdfRdfGraph>> {
     let mut paths: Vec<String> = archive
         .manifest()
         .entries
-        .values()
-        .filter(|entry| {
-            entry.media_type == constants::ODF_MANIFEST_RDF_TYPE && !entry.full_path.ends_with('/')
+        .iter()
+        .filter(|(path, entry)| {
+            entry.media_type == constants::ODF_MANIFEST_RDF_TYPE && !path.ends_with('/')
         })
-        .map(|entry| entry.full_path.clone())
+        .map(|(path, _)| path.clone())
         .collect();
     paths.sort();
     let mut result = Vec::with_capacity(paths.len());

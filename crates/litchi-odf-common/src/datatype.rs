@@ -504,15 +504,6 @@ impl Duration {
     }
 }
 
-/// Compatibility alias for the pre-layered ODF API.
-pub type DateTimeOdf = DateTime;
-
-/// Compatibility alias for the pre-layered ODF API.
-pub type DurationOdf = Duration;
-
-/// Compatibility alias for the pre-layered ODF API.
-pub type OdfDurationValue = DurationValue;
-
 fn parse_exact_duration(data: &str) -> Result<DurationValue> {
     if data.len() > 1_048_576 {
         return Err(litchi_core::Error::InvalidFormat(

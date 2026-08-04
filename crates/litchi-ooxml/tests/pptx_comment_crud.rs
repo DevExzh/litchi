@@ -2,24 +2,25 @@ use litchi_ooxml::pptx::comments::{
     PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
     PresentationComments, SlideCommentList,
 };
-use litchi_ooxml::pptx::modern_comment_authors::ModernCommentAuthor;
-use litchi_ooxml::pptx::modern_comments::{ModernComment, ModernCommentReply, Progress};
 use litchi_ooxml::pptx::{
-    add_modern_comment, add_modern_comment_author, add_modern_comment_reply,
-    add_presentation_comment, add_presentation_comment_author, find_modern_comment,
-    find_modern_comment_reply, find_presentation_comment, find_presentation_comment_author,
-    remove_modern_comment, remove_modern_comment_author, remove_modern_comment_reply,
-    remove_presentation_comment, remove_presentation_comment_author,
-    reorder_modern_comment_authors, reorder_modern_comments, reorder_presentation_comment_authors,
-    reorder_presentation_comments, replace_modern_comment, replace_modern_comment_author,
-    replace_modern_comment_reply, replace_presentation_comment,
-    replace_presentation_comment_author, store_presentation_comments, update_modern_comment,
-    update_modern_comment_author, update_modern_comment_reply, update_presentation_comment,
+    add_presentation_comment, add_presentation_comment_author, find_presentation_comment,
+    find_presentation_comment_author, remove_presentation_comment,
+    remove_presentation_comment_author, reorder_presentation_comment_authors,
+    reorder_presentation_comments, replace_presentation_comment,
+    replace_presentation_comment_author, store_presentation_comments, update_presentation_comment,
     update_presentation_comment_author,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_pptx::modern_comments::{
+    Author, Comment, Progress, Reply, add_modern_comment, add_modern_comment_author,
+    add_modern_comment_reply, find_modern_comment, find_modern_comment_reply,
+    remove_modern_comment, remove_modern_comment_author, remove_modern_comment_reply,
+    reorder_modern_comment_authors, reorder_modern_comments, replace_modern_comment,
+    replace_modern_comment_author, replace_modern_comment_reply, update_modern_comment,
+    update_modern_comment_author, update_modern_comment_reply,
+};
 
 const SLIDE: &str = "/ppt/slides/slide1.xml";
 const AUTHOR_A: &str = "{CD37207E-7903-4ED4-8AE8-017538D2DF7E}";
@@ -70,8 +71,8 @@ fn legacy_comment(author_id: u32, index: u32, text: &str) -> PresentationComment
     }
 }
 
-fn modern_author(id: &str, name: &str) -> ModernCommentAuthor {
-    ModernCommentAuthor {
+fn modern_author(id: &str, name: &str) -> Author {
+    Author {
         id: id.into(),
         name: name.into(),
         initials: Some(name.chars().next().unwrap().to_string()),
@@ -82,8 +83,8 @@ fn modern_author(id: &str, name: &str) -> ModernCommentAuthor {
     }
 }
 
-fn modern_comment(id: &str, author_id: &str, title: &str) -> ModernComment {
-    ModernComment {
+fn modern_comment(id: &str, author_id: &str, title: &str) -> Comment {
+    Comment {
         id: id.into(),
         author_id: author_id.into(),
         status: None,
@@ -104,8 +105,8 @@ fn modern_comment(id: &str, author_id: &str, title: &str) -> ModernComment {
     }
 }
 
-fn modern_reply(id: &str, author_id: &str) -> ModernCommentReply {
-    ModernCommentReply {
+fn modern_reply(id: &str, author_id: &str) -> Reply {
+    Reply {
         id: id.into(),
         author_id: author_id.into(),
         status: None,

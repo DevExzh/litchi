@@ -146,7 +146,7 @@ pub struct MutableXlsbWorksheet {
     /// Structured tables (ListObjects) hosted on this sheet.
     tables: Vec<crate::xlsb::table::XlsbTable>,
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
-    pivot_table_views: Vec<crate::xlsb::pivot_view::XlsbPivotTableViewPart>,
+    pivot_table_views: Vec<litchi_xlsb::pivot_view::Part>,
     /// Typed DrawingML charts anchored on this sheet.
     charts: Vec<crate::xlsx::WorksheetChart>,
     /// Typed image parts anchored in the same Drawings part.
@@ -1098,10 +1098,7 @@ impl MutableXlsbWorksheet {
     ///
     /// Its cache identifier is resolved against workbook PivotCaches at save
     /// time. Duplicate view names on one sheet are rejected immediately.
-    pub fn add_pivot_table_view(
-        &mut self,
-        view: crate::xlsb::pivot_view::XlsbPivotTableViewPart,
-    ) -> XlsbResult<()> {
+    pub fn add_pivot_table_view(&mut self, view: litchi_xlsb::pivot_view::Part) -> XlsbResult<()> {
         if self.pivot_table_views.len() >= 4_096 {
             return Err(XlsbError::InvalidFormula(
                 "worksheet PivotTable count exceeds the safety limit".to_string(),
@@ -1123,7 +1120,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
-    pub fn pivot_table_views(&self) -> &[crate::xlsb::pivot_view::XlsbPivotTableViewPart] {
+    pub fn pivot_table_views(&self) -> &[litchi_xlsb::pivot_view::Part] {
         &self.pivot_table_views
     }
 

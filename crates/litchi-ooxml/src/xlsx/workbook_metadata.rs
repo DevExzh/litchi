@@ -1,8 +1,9 @@
-//! Compatibility adapter for the canonical XLSX workbook metadata codec.
+//! OPC relationship boundary for the XLSX workbook-metadata owner.
 //!
 //! `litchi_xlsx` owns the bounded SpreadsheetML metadata XML grammar,
 //! validation, MCE processing, and inert extension payloads. This module
-//! retains the historical host model/error API and owns only OPC discovery.
+//! `litchi_xlsx` owns the semantic model and XML codec; this module only
+//! resolves the workbook relationship and translates package-boundary errors.
 
 use crate::error::{OoxmlError, Result};
 use litchi_opc::OpcPackage;
@@ -10,78 +11,18 @@ use litchi_xlsx::workbook_metadata as owner;
 
 pub use owner::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,
-    OpaqueMetadataExtension,
+    OpaqueMetadataExtension, WorkbookMetadata,
 };
 
 #[cfg(test)]
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const REL: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata";
-const REL_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/sheetMetadata";
-const CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml";
+const REL: &str = owner::SHEET_METADATA_RELATIONSHIP_TYPE;
+const REL_STRICT: &str = owner::STRICT_SHEET_METADATA_RELATIONSHIP_TYPE;
+const CONTENT_TYPE: &str = owner::SHEET_METADATA_CONTENT_TYPE;
 #[cfg(test)]
 const XDA: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray";
 #[cfg(test)]
 const MAX_STRING: usize = 1024 * 1024;
-
-/// Historical host-facing workbook metadata model.
-///
-/// The fields and value semantics remain source-compatible with the former
-/// host model; XML operations delegate to the canonical owner and translate
-/// its typed failures at this boundary.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct WorkbookMetadata {
-    pub types: Vec<MetadataType>,
-    pub future: Vec<FutureMetadata>,
-    pub cell_blocks: Vec<MetadataBlock>,
-    pub value_blocks: Vec<MetadataBlock>,
-    pub extensions: Vec<OpaqueMetadataExtension>,
-}
-
-impl WorkbookMetadata {
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        owner::WorkbookMetadata::parse(xml)
-            .map(Self::from_owner)
-            .map_err(map_owner_error)
-    }
-
-    pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
-        self.to_owner().to_xml(strict).map_err(map_owner_error)
-    }
-
-    pub fn cell_block(&self, one_based_index: u32) -> Option<&MetadataBlock> {
-        one_based_index
-            .checked_sub(1)
-            .and_then(|index| self.cell_blocks.get(index as usize))
-    }
-
-    pub fn value_block(&self, one_based_index: u32) -> Option<&MetadataBlock> {
-        one_based_index
-            .checked_sub(1)
-            .and_then(|index| self.value_blocks.get(index as usize))
-    }
-
-    fn to_owner(&self) -> owner::WorkbookMetadata {
-        owner::WorkbookMetadata {
-            types: self.types.clone(),
-            future: self.future.clone(),
-            cell_blocks: self.cell_blocks.clone(),
-            value_blocks: self.value_blocks.clone(),
-            extensions: self.extensions.clone(),
-        }
-    }
-
-    fn from_owner(value: owner::WorkbookMetadata) -> Self {
-        Self {
-            types: value.types,
-            future: value.future,
-            cell_blocks: value.cell_blocks,
-            value_blocks: value.value_blocks,
-            extensions: value.extensions,
-        }
-    }
-}
 
 /// Loads the optional workbook metadata part selected by the workbook relationship.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<WorkbookMetadata>> {
@@ -116,7 +57,9 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<WorkbookMetadata
             "workbook metadata part must not have relationships".into(),
         ));
     }
-    Ok(Some(WorkbookMetadata::parse(part.blob())?))
+    Ok(Some(
+        WorkbookMetadata::parse(part.blob()).map_err(map_owner_error)?,
+    ))
 }
 
 fn map_owner_error(error: litchi_xlsx::Error) -> OoxmlError {

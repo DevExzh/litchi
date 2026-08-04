@@ -736,7 +736,7 @@ impl Package {
     /// Discover bounded, inert click and hover action settings on slides.
     ///
     /// Declared targets are never followed, opened, activated, or executed.
-    pub fn action_settings(&self) -> Result<Vec<crate::pptx::PptxActionSetting>> {
+    pub fn action_settings(&self) -> Result<Vec<crate::pptx::Setting>> {
         self.presentation()?.action_settings()
     }
 

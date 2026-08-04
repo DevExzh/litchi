@@ -266,19 +266,3 @@ pub struct Graph {
     pub authors: Option<AuthorPart>,
     pub comments: Vec<Part>,
 }
-
-// Historical type names remain aliases, so compatibility does not introduce
-// another model implementation.
-pub type ModernCommentNamespaceDeclaration = NamespaceDeclaration;
-pub type ModernCommentStatus = Status;
-pub type ModernCommentAnchorKind = AnchorKind;
-pub type ModernCommentAnchor = Anchor;
-pub type ModernCommentPosition = Position;
-pub type ModernCommentReply = Reply;
-pub type ModernComment = Comment;
-pub type ModernCommentList = List;
-pub type ModernCommentPart = Part;
-pub type ModernCommentAuthor = Author;
-pub type ModernCommentAuthorList = Authors;
-pub type ModernCommentAuthorPart = AuthorPart;
-pub type ModernCommentGraph = Graph;

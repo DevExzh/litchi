@@ -1,25 +1,20 @@
-//! Compatibility facade for the canonical PPTX action-settings owner.
+//! OOXML package boundary for PPTX action-setting discovery.
 //!
 //! Semantic values and bounded package discovery live in
-//! [`litchi_pptx::actions`]. This adapter retains the historical OOXML names
-//! and maps relationship failures back to their established `OoxmlError`
-//! variants.
+//! [`litchi_pptx::actions`]. This private boundary only maps owner failures
+//! into the host error type while the owner supplies the returned values.
 
 use crate::error::{OoxmlError, Result};
 use litchi_opc::{OpcPackage, Part};
 
-pub use litchi_pptx::actions::{
-    PptxActionKind, PptxActionSetting, PptxActionTarget, PptxActionTrigger, PptxSlideShowJump,
-};
-
-pub(crate) use litchi_pptx::actions::Limits as ActionLoadLimits;
+pub(crate) use litchi_pptx::actions::{Limits as ActionLoadLimits, Setting};
 
 pub(crate) fn load_slide_action_settings(
     package: &OpcPackage,
     slide_index: usize,
     slide: &dyn Part,
     limits: &mut ActionLoadLimits,
-) -> Result<Vec<PptxActionSetting>> {
+) -> Result<Vec<Setting>> {
     litchi_pptx::actions::load_slide_action_settings(package, slide_index, slide, limits)
         .map_err(map_error)
 }

@@ -1,8 +1,7 @@
-use litchi_ooxml::pptx::{
-    Package, PptxActionKind, PptxActionTarget, PptxActionTrigger, PptxSlideShowJump,
-};
+use litchi_ooxml::pptx::Package;
 use litchi_ooxml::{OoxmlError, PackURI};
 use litchi_opc::constants::relationship_type::{HYPERLINK, SLIDE};
+use litchi_pptx::actions::{Jump, Kind, Target, Trigger};
 use tempfile::NamedTempFile;
 
 const LOCAL_ACTIONS: &[u8] =
@@ -17,10 +16,10 @@ fn package_inventory_reports_local_action_settings() {
 
     assert_eq!(settings[0].slide_index(), 0);
     assert_eq!(settings[0].action_index(), 0);
-    assert_eq!(settings[0].trigger(), PptxActionTrigger::Click);
+    assert_eq!(settings[0].trigger(), Trigger::Click);
     assert_eq!(
         settings[0].kind(),
-        PptxActionKind::Presentation {
+        Kind::Presentation {
             start_slide_index: 2
         }
     );
@@ -29,36 +28,33 @@ fn package_inventory_reports_local_action_settings() {
     assert_eq!(settings[0].target_frame(), Some("_blank"));
     assert!(matches!(
         settings[0].target(),
-        Some(PptxActionTarget::External {
+        Some(Target::External {
             target,
             relationship_type,
         }) if target == "https://example.invalid/other.pptx" && relationship_type == HYPERLINK
     ));
 
-    assert_eq!(settings[1].trigger(), PptxActionTrigger::Hover);
-    assert_eq!(
-        settings[1].kind(),
-        PptxActionKind::SlideShowJump(PptxSlideShowJump::NextSlide)
-    );
+    assert_eq!(settings[1].trigger(), Trigger::Hover);
+    assert_eq!(settings[1].kind(), Kind::SlideShowJump(Jump::NextSlide));
     assert_eq!(settings[1].target(), None);
 
-    assert_eq!(settings[2].kind(), PptxActionKind::SlideJump);
+    assert_eq!(settings[2].kind(), Kind::SlideJump);
     assert!(matches!(
         settings[2].target(),
-        Some(PptxActionTarget::Internal {
+        Some(Target::Internal {
             part_name,
             relationship_type,
         }) if part_name.as_str() == "/ppt/slides/slide2.xml" && relationship_type == SLIDE
     ));
-    assert_eq!(settings[3].kind(), PptxActionKind::Macro);
+    assert_eq!(settings[3].kind(), Kind::Macro);
     assert_eq!(
         settings[3].action(),
         Some("ppaction://macro?name=Module1.Run")
     );
-    assert_eq!(settings[4].kind(), PptxActionKind::Program);
-    assert_eq!(settings[5].kind(), PptxActionKind::Media);
+    assert_eq!(settings[4].kind(), Kind::Program);
+    assert_eq!(settings[5].kind(), Kind::Media);
     assert_eq!(settings[5].relationship_id(), None);
-    assert_eq!(settings[6].kind(), PptxActionKind::Unknown);
+    assert_eq!(settings[6].kind(), Kind::Unknown);
     assert_eq!(settings[6].action(), Some("urn:producer:unrecognized"));
 
     assert_eq!(

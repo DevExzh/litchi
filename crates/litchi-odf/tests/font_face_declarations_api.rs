@@ -1,7 +1,4 @@
-use litchi_odf::{
-    Document, FlatOpenDocument, MutableDocument, OdfFontFace, OdfFontFaceDeclarations,
-    OpenDocumentPackage,
-};
+use litchi_odf::{Document, Face, Faces, FlatOpenDocument, MutableDocument, OpenDocumentPackage};
 use std::io::{Cursor, Write};
 
 const CONTENT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-content.xml");
@@ -9,9 +6,9 @@ const STYLES: &str = include_str!("../../../test-data/odf/odt/font-face-declarat
 const FLAT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-flat.fodt");
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
-fn declarations(name: &str) -> OdfFontFaceDeclarations {
-    OdfFontFaceDeclarations {
-        faces: vec![OdfFontFace {
+fn declarations(name: &str) -> Faces {
+    Faces {
+        faces: vec![Face {
             name: name.to_string(),
             family: Some(format!("'{name}'")),
             ..Default::default()

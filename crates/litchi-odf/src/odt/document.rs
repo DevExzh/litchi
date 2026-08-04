@@ -441,7 +441,7 @@ impl Document {
     ///
     /// This preserves stored metadata only. It does not fetch linked font
     /// resources, load fonts, or inspect embedded font data.
-    pub fn content_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+    pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
         crate::font_face::parse_content_font_face_declarations(self.content.xml_content())
     }
 
@@ -449,7 +449,7 @@ impl Document {
     ///
     /// This preserves stored metadata only. It does not fetch linked font
     /// resources, load fonts, or inspect embedded font data.
-    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
         self.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| crate::font_face::parse_styles_font_face_declarations(styles.xml_content()),

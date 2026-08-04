@@ -166,13 +166,11 @@ pub mod conditional_formatting;
 /// PivotCache definition stream parsing (MS-XLSB 2.1.7.38)
 pub mod pivot;
 
+/// Lossless PivotTable definition parts (MS-XLSB 2.1.7.40)
+pub mod connections;
 /// Typed, inert External Link data (MS-XLSB 2.1.7.25)
 pub mod external_link;
 mod external_link_write;
-/// Lossless PivotTable definition parts (MS-XLSB 2.1.7.40)
-pub mod pivot_view;
-
-pub mod connections;
 /// Table (ListObject) stream parsing (MS-XLSB 2.1.7.51)
 pub mod table;
 pub(crate) mod walker;

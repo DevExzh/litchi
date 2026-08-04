@@ -34,7 +34,3 @@ pub enum Error {
 }
 
 pub use model::Part;
-
-// Historical names remain aliases at the owner facade. New code should use
-// the contextual `pivot_view::Part` spelling.
-pub type PivotTableViewPart = Part;

@@ -370,7 +370,7 @@ impl MutableDocument {
     ///
     /// Linked font resources remain inert metadata. This does not fetch a URI,
     /// load a font, or inspect embedded font data.
-    pub fn content_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+    pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
         self.with_content_xml(crate::font_face::parse_content_font_face_declarations)
     }
 
@@ -380,8 +380,8 @@ impl MutableDocument {
     /// load a font, or inspect embedded font data.
     pub fn set_content_font_face_declarations(
         &mut self,
-        declarations: &crate::OdfFontFaceDeclarations,
-    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        declarations: &crate::font_face::Faces,
+    ) -> Result<Option<crate::font_face::Faces>> {
         let (updated, old) = self.with_content_xml(|xml| {
             crate::font_face::set_content_font_face_declarations_xml(xml, declarations)
         })?;
@@ -395,7 +395,7 @@ impl MutableDocument {
     /// verbatim so callers can manage their lifecycle separately.
     pub fn clear_content_font_face_declarations(
         &mut self,
-    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+    ) -> Result<Option<crate::font_face::Faces>> {
         let (updated, old) =
             self.with_content_xml(crate::font_face::remove_content_font_face_declarations_xml)?;
         self.content_xml = Some(updated);
@@ -406,7 +406,7 @@ impl MutableDocument {
     ///
     /// Linked font resources remain inert metadata. This does not fetch a URI,
     /// load a font, or inspect embedded font data.
-    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
             crate::font_face::parse_styles_font_face_declarations,
@@ -419,8 +419,8 @@ impl MutableDocument {
     /// load a font, or inspect embedded font data.
     pub fn set_styles_font_face_declarations(
         &mut self,
-        declarations: &crate::OdfFontFaceDeclarations,
-    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        declarations: &crate::font_face::Faces,
+    ) -> Result<Option<crate::font_face::Faces>> {
         let styles = self
             .styles_xml
             .clone()
@@ -437,7 +437,7 @@ impl MutableDocument {
     /// verbatim so callers can manage their lifecycle separately.
     pub fn clear_styles_font_face_declarations(
         &mut self,
-    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+    ) -> Result<Option<crate::font_face::Faces>> {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };

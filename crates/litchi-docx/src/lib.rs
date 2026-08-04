@@ -62,14 +62,11 @@ pub use mail_merge::{
     RECIPIENT_CONTENT_TYPE, parse_settings_mail_merge,
 };
 pub use modern_comments::{
-    Comment, CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo,
-    CommentReactionUser, Conformance, Extended, ExtensibleComment, Extension, ExtensionList,
-    IdMapping, Metadata, ModernCommentConformance, ModernCommentExtension,
-    ModernCommentExtensionList, ModernCommentMetadata, ModernCommentRelationshipIds, Person,
-    Presence, PresenceInfo, Reaction, ReactionInfo, ReactionUser, RelationshipIds,
-    load_modern_comment_metadata, parse_comments_extended, parse_comments_extensible,
-    parse_comments_ids, parse_people, store_modern_comment_metadata, write_comments_extended,
-    write_comments_extensible, write_comments_ids, write_people,
+    Comment, Conformance, Extended, Extension, ExtensionList, IdMapping, Metadata, Person,
+    Presence, Reaction, ReactionInfo, ReactionUser, RelationshipIds, load_modern_comment_metadata,
+    parse_comments_extended, parse_comments_extensible, parse_comments_ids, parse_people,
+    store_modern_comment_metadata, write_comments_extended, write_comments_extensible,
+    write_comments_ids, write_people,
 };
 pub use numbering::{
     Collection, Definition, Format, Instance, Level, MultiLevel, Override, Paragraph,

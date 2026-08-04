@@ -29,7 +29,7 @@ use super::data_validation::{
 };
 use super::drawing::parse_drawing_xml;
 use super::format::{CellFill, CellFont, CellFormat};
-use super::header_footer::{WorksheetHeaderFooter, parse_worksheet_header_footer};
+use super::header_footer::{Settings, parse_worksheet_header_footer};
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::page_setup::{Setup, parse_worksheet_page_setup};
 use super::parsers::worksheet_parser;
@@ -223,7 +223,7 @@ pub struct Worksheet<'a> {
     /// Static worksheet protection and editable-range metadata.
     protection_metadata: WorksheetProtectionMetadata,
     /// Static worksheet header/footer settings.
-    header_footer: Option<WorksheetHeaderFooter>,
+    header_footer: Option<Settings>,
     /// Static worksheet page margins.
     page_margins: Option<WorksheetPageMargins>,
     /// Static worksheet print options.
@@ -2058,7 +2058,7 @@ impl<'a> Worksheet<'a> {
     // ===== Header and Footer =====
 
     /// Complete immutable worksheet header/footer settings.
-    pub fn header_footer(&self) -> Option<&WorksheetHeaderFooter> {
+    pub fn header_footer(&self) -> Option<&Settings> {
         self.header_footer.as_ref()
     }
 

@@ -300,7 +300,6 @@ fn invalid<T>(message: String) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::super::model::*;
-    use super::super::*;
     use super::*;
     use litchi_opc::part::BlobPart;
 
@@ -335,14 +334,14 @@ mod tests {
         let metadata = sample_metadata();
         let extended = write_comments_extended(
             metadata.comments_extended.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
+            Conformance::Strict,
         )
         .unwrap();
         assert_eq!(
             extended,
             write_comments_extended(
                 metadata.comments_extended.as_ref().unwrap(),
-                ModernCommentConformance::Strict
+                Conformance::Strict
             )
             .unwrap()
         );
@@ -356,29 +355,22 @@ mod tests {
             metadata.comments_extended.unwrap()
         );
 
-        let ids = write_comments_ids(
-            metadata.comments_ids.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
-        )
-        .unwrap();
+        let ids = write_comments_ids(metadata.comments_ids.as_ref().unwrap(), Conformance::Strict)
+            .unwrap();
         assert_eq!(
             parse_comments_ids(&ids).unwrap(),
             metadata.comments_ids.unwrap()
         );
         let extensible = write_comments_extensible(
             metadata.comments_extensible.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
+            Conformance::Strict,
         )
         .unwrap();
         assert_eq!(
             parse_comments_extensible(&extensible).unwrap(),
             metadata.comments_extensible.unwrap()
         );
-        let people = write_people(
-            metadata.people.as_ref().unwrap(),
-            ModernCommentConformance::Strict,
-        )
-        .unwrap();
+        let people = write_people(metadata.people.as_ref().unwrap(), Conformance::Strict).unwrap();
         assert_eq!(parse_people(&people).unwrap(), metadata.people.unwrap());
     }
 
@@ -406,13 +398,13 @@ mod tests {
             &mut package,
             &PackURI::new("/word/document.xml").unwrap(),
             &metadata,
-            &ModernCommentRelationshipIds {
+            &RelationshipIds {
                 comments_extended: Some("rIdEx".into()),
                 comments_ids: Some("rIdIds".into()),
                 comments_extensible: Some("rIdCex".into()),
                 people: Some("rIdPeople".into()),
             },
-            ModernCommentConformance::Transitional,
+            Conformance::Transitional,
         )
         .unwrap();
         assert_eq!(
@@ -472,26 +464,26 @@ mod tests {
         assert!(validate_metadata(&metadata).is_err());
     }
 
-    fn sample_metadata() -> ModernCommentMetadata {
-        ModernCommentMetadata {
-            comments_extended: Some(vec![CommentExtension {
+    fn sample_metadata() -> Metadata {
+        Metadata {
+            comments_extended: Some(vec![Extended {
                 paragraph_id: 0x1234_ABCD,
                 parent_paragraph_id: None,
                 done: true,
             }]),
-            comments_ids: Some(vec![CommentIdMapping {
+            comments_ids: Some(vec![IdMapping {
                 paragraph_id: 0x1234_ABCD,
                 durable_id: 0x0123_4567,
             }]),
-            comments_extensible: Some(vec![ExtensibleComment {
+            comments_extensible: Some(vec![Comment {
                 durable_id: 0x0123_4567,
                 date_utc: Some("2026-07-17T00:00:00Z".into()),
                 intelligent_placeholder: Some(false),
-                reactions: vec![CommentReaction {
+                reactions: vec![Reaction {
                     reaction_type: 1,
-                    reactions: vec![CommentReactionInfo {
+                    reactions: vec![ReactionInfo {
                         date_utc: Some("2026-07-17T01:00:00Z".into()),
-                        user: Some(CommentReactionUser {
+                        user: Some(ReactionUser {
                             user_id: "alice@example.test".into(),
                             user_name: "Alice & Bob".into(),
                             user_provider: "O365".into(),
@@ -504,7 +496,7 @@ mod tests {
             }]),
             people: Some(vec![Person {
                 author: "Alice & Bob".into(),
-                presence: Some(PresenceInfo {
+                presence: Some(Presence {
                     provider_id: "O365".into(),
                     user_id: "alice@example.test".into(),
                 }),
@@ -517,7 +509,6 @@ mod tests {
 mod reaction_extension_list_tests {
     use super::super::codec::REACTIONS_EXTENSION_URI;
     use super::super::model::*;
-    use super::super::*;
     use super::*;
 
     fn comments_with_reaction(reaction_body: &str) -> String {
@@ -558,11 +549,9 @@ mod reaction_extension_list_tests {
                 .contains("xmlns:x=\"urn:example:unknown\"")
         );
 
-        let first =
-            write_comments_extensible(&comments, ModernCommentConformance::Transitional).unwrap();
+        let first = write_comments_extensible(&comments, Conformance::Transitional).unwrap();
         let reparsed = parse_comments_extensible(&first).unwrap();
-        let second =
-            write_comments_extensible(&reparsed, ModernCommentConformance::Transitional).unwrap();
+        let second = write_comments_extensible(&reparsed, Conformance::Transitional).unwrap();
         assert_eq!(first, second);
         assert_eq!(comments, reparsed);
 
@@ -580,12 +569,11 @@ mod reaction_extension_list_tests {
             )
             .unwrap();
         user_list
-            .push(ModernCommentExtension::new(None, r#"<q:extra xmlns:q="urn:q"/>"#).unwrap())
+            .push(Extension::new(None, r#"<q:extra xmlns:q="urn:q"/>"#).unwrap())
             .unwrap();
         let removed = user_list.remove(1).unwrap();
         assert_eq!(removed.uri(), None);
-        let mutated =
-            write_comments_extensible(&comments, ModernCommentConformance::Strict).unwrap();
+        let mutated = write_comments_extensible(&comments, Conformance::Strict).unwrap();
         let reparsed = parse_comments_extensible(&mutated).unwrap();
         let extension = &reparsed[0].reactions[0].reactions[0]
             .user
@@ -618,24 +606,19 @@ mod reaction_extension_list_tests {
             );
         }
 
-        let extension = ModernCommentExtension::new(None, r#"<x:a xmlns:x="urn:x"/>"#).unwrap();
-        assert!(
-            ModernCommentExtensionList::new(vec![extension; MAX_MODERN_COMMENT_ITEMS + 1]).is_err()
-        );
+        let extension = Extension::new(None, r#"<x:a xmlns:x="urn:x"/>"#).unwrap();
+        assert!(ExtensionList::new(vec![extension; MAX_MODERN_COMMENT_ITEMS + 1]).is_err());
         let oversized = format!(
             "<x:a xmlns:x=\"urn:x\">{}</x:a>",
             "x".repeat(MAX_MODERN_COMMENT_PART_BYTES)
         );
-        assert!(ModernCommentExtension::new(None, oversized).is_err());
+        assert!(Extension::new(None, oversized).is_err());
         let deep = format!(
             "<x:a xmlns:x=\"urn:x\">{}{}</x:a>",
             "<x:b>".repeat(MAX_MODERN_COMMENT_DEPTH),
             "</x:b>".repeat(MAX_MODERN_COMMENT_DEPTH)
         );
-        assert!(ModernCommentExtension::new(None, deep).is_err());
-        assert!(
-            ModernCommentExtension::new(None, "<?xml version=\"1.0\"?><x:a xmlns:x=\"urn:x\"/>")
-                .is_err()
-        );
+        assert!(Extension::new(None, deep).is_err());
+        assert!(Extension::new(None, "<?xml version=\"1.0\"?><x:a xmlns:x=\"urn:x\"/>").is_err());
     }
 }

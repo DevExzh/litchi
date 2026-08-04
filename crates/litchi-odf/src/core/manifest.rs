@@ -3,11 +3,11 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
+use litchi_odf_common::package as common_package;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use soapberry_zip::office::ArchiveReader;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
@@ -31,7 +31,6 @@ pub struct Manifest {
 /// One file entry in the ODF manifest.
 #[derive(Debug, Clone)]
 pub struct ManifestEntry {
-    pub full_path: String,
     pub media_type: String,
     pub size: Option<u64>,
     pub encryption: Option<ManifestEncryption>,
@@ -143,20 +142,26 @@ struct PartialEncryption {
 }
 
 impl Manifest {
-    pub fn from_archive_reader(archive: &ArchiveReader<'_>) -> Result<Self> {
-        let content = archive
-            .read_string("META-INF/manifest.xml")
-            .or_else(|_| archive.read_string("manifest.xml"))
-            .map_err(|_| {
-                Error::InvalidFormat("No manifest.xml found in ODF package".to_string())
-            })?;
-        Self::parse(&content)
-    }
-
     pub fn parse(xml: &str) -> Result<Self> {
+        let common_package::Manifest {
+            mimetype,
+            entries: neutral_entries,
+        } = common_package::parse_manifest(xml)?;
+        let mut entries: HashMap<String, ManifestEntry> = neutral_entries
+            .into_iter()
+            .map(|(path, entry)| {
+                (
+                    path,
+                    ManifestEntry {
+                        media_type: entry.media_type,
+                        size: entry.size,
+                        encryption: None,
+                    },
+                )
+            })
+            .collect();
         let mut reader = NsReader::from_str(xml);
         let mut buffer = Vec::new();
-        let mut entries = HashMap::new();
         let mut current_path: Option<String> = None;
         let mut encryption: Option<PartialEncryption> = None;
 
@@ -173,29 +178,15 @@ impl Manifest {
                             "Nested manifest file entries are invalid".to_string(),
                         ));
                     }
-                    let entry = parse_file_entry(&reader, &element)?.ok_or_else(|| {
-                        Error::InvalidFormat("Manifest file entry has no full path".to_string())
-                    })?;
-                    let path = entry.full_path.clone();
-                    if entries.insert(path.clone(), entry).is_some() {
-                        return Err(Error::InvalidFormat(format!(
-                            "Duplicate manifest file entry '{path}'"
-                        )));
-                    }
-                    current_path = Some(path);
+                    let attributes = manifest_attributes(&reader, &element)?;
+                    current_path = Some(required(&attributes, b"full-path")?.to_string());
                 },
                 Event::Empty(element)
                     if is_manifest_element(&namespace, &element, b"file-entry") =>
                 {
-                    let entry = parse_file_entry(&reader, &element)?.ok_or_else(|| {
-                        Error::InvalidFormat("Manifest file entry has no full path".to_string())
-                    })?;
-                    let path = entry.full_path.clone();
-                    if entries.insert(path.clone(), entry).is_some() {
-                        return Err(Error::InvalidFormat(format!(
-                            "Duplicate manifest file entry '{path}'"
-                        )));
-                    }
+                    // Neutral file-entry validation and indexing are owned by
+                    // litchi-odf-common. There is no encryption subtree to
+                    // inspect on an empty element.
                 },
                 Event::Start(element)
                     if is_manifest_element(&namespace, &element, b"encryption-data") =>
@@ -261,9 +252,9 @@ impl Manifest {
                     let descriptor = finish_encryption(encryption.take().ok_or_else(|| {
                         Error::InvalidFormat("Unexpected encryption-data end".to_string())
                     })?)?;
-                    let entry = entries
-                        .get_mut(path)
-                        .expect("current manifest entry exists");
+                    let entry = entries.get_mut(path).ok_or_else(|| {
+                        Error::InvalidFormat(format!("Manifest entry '{path}' disappeared"))
+                    })?;
                     if entry.size.is_none() {
                         return Err(Error::InvalidFormat(format!(
                             "Encrypted manifest entry '{path}' has no plaintext size"
@@ -293,10 +284,6 @@ impl Manifest {
                 "Incomplete manifest file entry".to_string(),
             ));
         }
-        let mimetype = entries
-            .get("/")
-            .map(|entry| entry.media_type.clone())
-            .unwrap_or_else(|| "application/vnd.oasis.opendocument.text".to_string());
         Ok(Self { mimetype, entries })
     }
 
@@ -310,8 +297,8 @@ impl Manifest {
         self.entries.contains_key(path)
     }
 
-    pub fn paths(&self) -> impl Iterator<Item = &String> {
-        self.entries.keys()
+    pub fn paths(&self) -> impl Iterator<Item = &str> {
+        self.entries.keys().map(String::as_str)
     }
 
     pub fn get_entry(&self, path: &str) -> Option<&ManifestEntry> {
@@ -404,36 +391,6 @@ fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
     BASE64_STANDARD
         .decode(value)
         .map_err(|_| Error::InvalidFormat(format!("Invalid Base64 in manifest {field}")))
-}
-
-fn parse_file_entry(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<Option<ManifestEntry>> {
-    let attributes = manifest_attributes(reader, element)?;
-    let Some(full_path) = attributes.get(b"full-path".as_slice()).cloned() else {
-        return Ok(None);
-    };
-    if full_path.is_empty() {
-        return Ok(None);
-    }
-    let size = attributes
-        .get(b"size".as_slice())
-        .map(|value| {
-            value.parse::<u64>().map_err(|_| {
-                Error::InvalidFormat(format!("Invalid manifest size for '{full_path}'"))
-            })
-        })
-        .transpose()?;
-    Ok(Some(ManifestEntry {
-        full_path,
-        media_type: attributes
-            .get(b"media-type".as_slice())
-            .cloned()
-            .unwrap_or_default(),
-        size,
-        encryption: None,
-    }))
 }
 
 fn parse_checksum(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ManifestChecksum> {

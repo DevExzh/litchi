@@ -6,7 +6,7 @@
 //! Uses soapberry-zip for high-performance zero-copy ZIP parsing.
 
 use litchi_core::{Error, Result};
-use soapberry_zip::office::ArchiveReader;
+use litchi_odf_common::package::{self, Archive};
 use std::io::Read;
 use zeroize::Zeroizing;
 
@@ -14,7 +14,7 @@ use zeroize::Zeroizing;
 ///
 /// Uses soapberry-zip for efficient lazy decompression.
 pub struct Package<'data> {
-    archive: ArchiveReader<'data>,
+    archive: Archive<'data>,
     #[allow(dead_code)]
     manifest: super::manifest::Manifest,
     mimetype: String,
@@ -35,8 +35,7 @@ impl OwnedPackage {
         reader.read_to_end(&mut data)?;
 
         // Validate the archive can be parsed
-        let _ = ArchiveReader::new(&data)
-            .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
+        let _ = Archive::new(&data)?;
 
         Ok(Self {
             data,
@@ -47,8 +46,7 @@ impl OwnedPackage {
     /// Create an ODF package from bytes
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
         // Validate the archive can be parsed
-        let _ = ArchiveReader::new(&data)
-            .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
+        let _ = Archive::new(&data)?;
 
         Ok(Self {
             data,
@@ -68,8 +66,7 @@ impl OwnedPackage {
 
     /// Open ODF bytes and retain a password for lazy entry decryption.
     pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        let _ = ArchiveReader::new(&data)
-            .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
+        let _ = Archive::new(&data)?;
         Ok(Self {
             data,
             password: Some(Zeroizing::new(password.into())),
@@ -147,8 +144,7 @@ impl<'data> Package<'data> {
     }
 
     fn new_with_password(data: &'data [u8], password: Option<&'data str>) -> Result<Self> {
-        let archive = ArchiveReader::new(data)
-            .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
+        let archive = Archive::new(data)?;
 
         // Read MIME type from mimetype file
         let mimetype = archive
@@ -158,7 +154,7 @@ impl<'data> Package<'data> {
             .to_string();
 
         // Parse the manifest
-        let manifest = super::manifest::Manifest::from_archive_reader(&archive)?;
+        let manifest = super::manifest::Manifest::parse(&archive.read_manifest_xml()?)?;
 
         Ok(Self {
             archive,
@@ -228,16 +224,7 @@ impl<'data> Package<'data> {
         let all_files = self.files()?;
         Ok(all_files
             .into_iter()
-            .filter(|path| {
-                path.starts_with("Pictures/")
-                    || path.starts_with("media/")
-                    || path.starts_with("Object/")
-                    || path.ends_with(".png")
-                    || path.ends_with(".jpg")
-                    || path.ends_with(".jpeg")
-                    || path.ends_with(".gif")
-                    || path.ends_with(".svg")
-            })
+            .filter(|path| package::is_media_path(path))
             .collect())
     }
 

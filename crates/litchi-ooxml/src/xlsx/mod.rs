@@ -179,9 +179,7 @@ pub use format::{
     CellFill, CellFillPatternType, CellFont, CellFormat, DataValidation, DataValidationOperator,
     DataValidationType,
 };
-pub use header_footer::{
-    HeaderFooterSectionKind, HeaderFooterText, WorksheetHeaderFooter, parse_worksheet_header_footer,
-};
+pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
 pub use litchi_drawingml::geom::Preset;
 pub use litchi_xlsx::ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,

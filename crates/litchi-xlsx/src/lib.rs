@@ -125,9 +125,7 @@ pub use external_links::{
     load_external_link,
 };
 pub use formula::Formula;
-pub use header_footer::{
-    HeaderFooterSectionKind, HeaderFooterText, WorksheetHeaderFooter, parse_worksheet_header_footer,
-};
+pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
 pub use ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,

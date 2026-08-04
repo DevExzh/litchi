@@ -1,14 +1,11 @@
 use litchi_ooxml::pptx::Package;
-use litchi_ooxml::pptx::modern_comment_authors::{
-    MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE,
-    ModernCommentAuthorList,
-};
-use litchi_ooxml::pptx::modern_comments::{
-    MODERN_COMMENT_CONTENT_TYPE, MODERN_COMMENT_RELATIONSHIP_TYPE, ModernCommentList,
-};
 use litchi_ooxml::{OoxmlError, PackURI};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
+use litchi_pptx::modern_comments::{
+    Authors, List, MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE,
+    MODERN_COMMENT_CONTENT_TYPE, MODERN_COMMENT_RELATIONSHIP_TYPE,
+};
 
 const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/modern-comments/slide.xml");
 
@@ -77,12 +74,12 @@ fn package_with_modern_comments() -> Package {
             opc.add_part(Box::new(BlobPart::new(
                 authors_name,
                 MODERN_COMMENT_AUTHOR_CONTENT_TYPE.to_string(),
-                ModernCommentAuthorList::default().to_xml().unwrap(),
+                Authors::default().to_xml().unwrap(),
             )));
             opc.add_part(Box::new(BlobPart::new(
                 comments_name,
                 MODERN_COMMENT_CONTENT_TYPE.to_string(),
-                ModernCommentList::default().to_xml().unwrap(),
+                List::default().to_xml().unwrap(),
             )));
             opc.get_part_mut(&slide_name)?.rels_mut().add_relationship(
                 MODERN_COMMENT_RELATIONSHIP_TYPE.to_string(),

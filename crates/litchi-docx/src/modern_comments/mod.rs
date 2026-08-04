@@ -25,18 +25,3 @@ pub use package::{
     COMMENTS_IDS_RELATIONSHIP, PEOPLE_CONTENT_TYPE, PEOPLE_RELATIONSHIP,
     load_modern_comment_metadata, store_modern_comment_metadata,
 };
-
-// Historical names remain aliases at the owner facade boundary. Keeping them
-// here leaves `model` canonical while preserving every established path.
-pub type ModernCommentConformance = Conformance;
-pub type CommentExtension = Extended;
-pub type CommentIdMapping = IdMapping;
-pub type CommentReactionUser = ReactionUser;
-pub type CommentReactionInfo = ReactionInfo;
-pub type CommentReaction = Reaction;
-pub type ModernCommentExtension = Extension;
-pub type ModernCommentExtensionList = ExtensionList;
-pub type ExtensibleComment = Comment;
-pub type PresenceInfo = Presence;
-pub type ModernCommentMetadata = Metadata;
-pub type ModernCommentRelationshipIds = RelationshipIds;

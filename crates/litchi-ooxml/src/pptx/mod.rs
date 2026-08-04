@@ -57,7 +57,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub mod actions;
+mod actions;
 mod animation_relationships;
 pub mod animations;
 pub mod backgrounds;
@@ -75,12 +75,6 @@ pub mod laser;
 pub mod master_layout;
 pub mod media;
 pub mod media_parts;
-pub mod modern_comments;
-/// Historical author-module path retained as a compatibility facade.
-#[doc(hidden)]
-pub mod modern_comment_authors {
-    pub use super::modern_comments::*;
-}
 mod namespace;
 pub mod ole;
 pub mod ole_object;
@@ -106,9 +100,6 @@ pub mod vba_project;
 pub mod view_properties;
 pub mod writer;
 
-pub use actions::{
-    PptxActionKind, PptxActionSetting, PptxActionTarget, PptxActionTrigger, PptxSlideShowJump,
-};
 pub use animations::{
     Animation, AnimationDirection, AnimationEffect, AnimationSequence, AnimationTrigger,
 };
@@ -146,14 +137,7 @@ pub use ink::{
     INK_CONTENT_TYPE, PptxInkAnnotation, StoredInkAnnotation, store_slide_ink_annotation,
 };
 pub use litchi_drawingml::coord;
-pub use modern_comments::{
-    add_modern_comment, add_modern_comment_author, add_modern_comment_reply, find_modern_comment,
-    find_modern_comment_author, find_modern_comment_reply, remove_modern_comment,
-    remove_modern_comment_author, remove_modern_comment_reply, reorder_modern_comment_authors,
-    reorder_modern_comments, replace_modern_comment, replace_modern_comment_author,
-    replace_modern_comment_reply, update_modern_comment, update_modern_comment_author,
-    update_modern_comment_reply,
-};
+pub use litchi_pptx::actions::{Jump, Kind, Setting, Target, Trigger};
 pub(crate) mod slide_patch;
 pub use laser::store_slide_laser_trace;
 pub use litchi_opc::FontEmbedding;

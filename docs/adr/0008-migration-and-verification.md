@@ -4117,13 +4117,13 @@ format-specific seams highlighted by the public API audit:
 
 - `litchi-pptx::modern_comments` is now the single owner folder for comments
   and authors, split into `model.rs`, `codec.rs`, and `package.rs`. The former
-  `modern_comment_authors` module remains only as a compatibility re-export;
-  `ModernComment*` values are aliases of concise `Comment`, `Author`, `Part`,
-  `Graph`, and related models.
+  `modern_comment_authors` module and the `ModernComment*` aliases were
+  removed in the owner-only API convergence pass below; `Comment`, `Author`,
+  `Part`, `Graph`, and related models are canonical.
 - `litchi-docx::modern_comments` is split into `model.rs`, `codec.rs`, and
   `package.rs`. `Conformance`, `Comment`, `Reaction`, `Metadata`, `Person`,
-  and related concise models are canonical; historical `ModernComment*` and
-  `CommentReaction*` spellings remain aliases.
+  and related concise models are canonical; historical expanded spellings
+  were removed in the owner-only API convergence pass below.
 - `litchi-xlsb::conditional_formatting` is split into `model.rs` and
   `codec.rs`. `Formatting`, `Rule`, `RuleType`, `Value`, `Color`, `Bar`, and
   related names are canonical; the host's historical conditional-formatting
@@ -4433,7 +4433,7 @@ This slice makes the common/format-specific boundary explicit:
 - `litchi-pptx::actions`, `litchi-xlsx::header_footer`,
   `litchi-xlsb::named_ranges`, and `litchi-odf::font_face` now use layered
   `{model,codec,package,tests}` owner folders. Canonical types are contextual
-  and prefix-free; historical names remain compatibility aliases.
+  and prefix-free; the owner facades expose only those canonical types.
 
 The checked-in specification anchors for this batch are `[MS-PPTX]` §3.4 for
 slide-show action references and `[MS-XLSB]` §§2.4.718 and 2.5.73 for defined
@@ -4447,6 +4447,44 @@ and targets, the no-default-features OOXML host suite, formatting, diff
 checks, and the 36-package crate-boundary audit. Full workspace all-features
 verification remains environment-limited by the existing native fontconfig
 dependency, and broad strict-Clippy status is not claimed.
+
+## ODF common package and manifest seam
+
+The next ODF extraction is intentionally bounded under
+`litchi-odf-common::package`:
+
+- `Archive` owns borrowed ZIP access, manifest-location lookup, and the
+  neutral archive operations used by every ODF document family;
+- `Manifest` and `Entry` own only manifest file paths, media types, sizes, and
+  neutral XML validation; and
+- media-path classification is shared without importing any document-family
+  model.
+
+The `litchi-odf` manifest layer converts the common neutral model into its
+encrypted-entry overlay and continues to own encryption metadata validation,
+password decryption/authoring, digital signatures, `OwnedPackage`, and
+document-family package orchestration. Encryption child elements are therefore
+recognized by the common XML traversal but interpreted only by the format
+crate. The remaining package seam is deliberate: moving signatures, password
+state, or family orchestration would create an upward dependency or make the
+common crate format-aware.
+
+The layered common layout is
+`litchi-odf-common/src/package/{mod,model,codec,tests}.rs`; canonical common
+names are `Archive`, `Manifest`, and `Entry`, with manifest paths stored as
+map keys so each path is allocated once.
+No checked-in ODF specification snapshot is available, so this extraction
+makes no new external conformance claim beyond the existing parser fixtures.
+
+## Owner-only API convergence
+
+The migration now removes compatibility-only aliases and duplicate host model
+wrappers for the touched seams. PPTX and DOCX modern comments, PPTX actions,
+XLSX header/footer, XLSB PivotTable views, ODF font faces, and ODF datatypes
+are consumed through their canonical owner types. OOXML host package methods
+may still map owner errors or resolve OPC relationships, but they no longer
+invent a second semantic type or a prefix-expanded alias. Callers that need a
+format-neutral model use the owning common crate directly.
 
 ## Evidence levels
 

@@ -12,6 +12,8 @@ rust-version.workspace = true
 chrono = { workspace = true }
 litchi-core = { workspace = true }
 phf = { workspace = true }
+quick-xml = { workspace = true }
+soapberry-zip = { workspace = true }
 
 [lints]
 workspace = true

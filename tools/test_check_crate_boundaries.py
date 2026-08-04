@@ -147,6 +147,19 @@ class BoundaryPolicyTests(unittest.TestCase):
             violations,
         )
 
+    def test_odf_common_package_dependencies_are_neutral(self) -> None:
+        self.assertEqual(
+            self.policy.canonical_edges
+            & {
+                boundaries.Edge("litchi-odf-common", dependency)
+                for dependency in self.policy.packages
+            },
+            {
+                boundaries.Edge("litchi-odf-common", "litchi-core"),
+                boundaries.Edge("litchi-odf-common", "soapberry-zip"),
+            },
+        )
+
     def test_pptx_drawingml_edge_is_canonical(self) -> None:
         edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
 

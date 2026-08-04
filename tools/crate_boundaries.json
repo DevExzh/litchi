@@ -81,7 +81,8 @@
       "xml-minifier"
     ],
     "litchi-odf-common": [
-      "litchi-core"
+      "litchi-core",
+      "soapberry-zip"
     ],
     "litchi-odraw": [],
     "litchi-ograph": [

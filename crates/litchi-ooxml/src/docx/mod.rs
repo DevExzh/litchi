@@ -68,7 +68,6 @@ pub mod image;
 pub mod list;
 pub mod mail_merge;
 pub mod math;
-pub mod modern_comments;
 mod namespace;
 pub mod numbering;
 pub mod package;
@@ -142,14 +141,6 @@ pub use mail_merge::{
     MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
 };
 pub use math::{OfficeMath, OfficeMathParagraph};
-pub use modern_comments::{
-    CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo, CommentReactionUser,
-    ExtensibleComment, ModernCommentConformance, ModernCommentMetadata,
-    ModernCommentRelationshipIds, Person, PresenceInfo, load_modern_comment_metadata,
-    parse_comments_extended, parse_comments_extensible, parse_comments_ids, parse_people,
-    store_modern_comment_metadata, write_comments_extended, write_comments_extensible,
-    write_comments_ids, write_people,
-};
 pub use numbering::{
     AbstractNum, MultiLevelType, Num, NumberFormat, Numbering, ParseMultiLevelTypeError,
     ParseNumberFormatError, PictureBullet,

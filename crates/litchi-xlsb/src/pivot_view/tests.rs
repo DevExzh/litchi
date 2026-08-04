@@ -43,10 +43,3 @@ fn refuses_truncation_and_records_outside_view() {
         .unwrap();
     assert!(Part::from_bytes(trailing).is_err());
 }
-
-#[test]
-fn retains_historical_owner_reexport() {
-    let bytes = view_stream("P", 1);
-    let via_owner: PivotTableViewPart = PivotTableViewPart::from_bytes(bytes.clone()).unwrap();
-    assert_eq!(via_owner.name(), "P");
-}

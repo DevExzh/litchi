@@ -1,5 +1,5 @@
 use crate::error::{OoxmlError, Result};
-use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
+use crate::pptx::actions::{ActionLoadLimits, Setting, load_slide_action_settings};
 use crate::pptx::controls::{ControlLoadLimits, PptxSlideControl, load_slide_controls};
 use crate::pptx::handout::HandoutMaster;
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
@@ -774,8 +774,8 @@ impl<'a> Presentation<'a> {
     ///
     /// Author and comment XML remain inert document data. This accessor never
     /// resolves identities or executes embedded payloads.
-    pub fn modern_comments(&self) -> Result<crate::pptx::modern_comments::ModernCommentGraph> {
-        crate::pptx::modern_comments::load_modern_comment_graph(self.package)
+    pub fn modern_comments(&self) -> Result<litchi_pptx::modern_comments::Graph> {
+        litchi_pptx::modern_comments::load_modern_comment_graph(self.package)
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
@@ -1025,7 +1025,7 @@ impl<'a> Presentation<'a> {
     /// Declared targets remain stored metadata only. This never follows links,
     /// opens files or presentations, runs macros or programs, plays media, or
     /// controls a slide show.
-    pub fn action_settings(&self) -> Result<Vec<PptxActionSetting>> {
+    pub fn action_settings(&self) -> Result<Vec<Setting>> {
         let mut settings = Vec::new();
         let mut limits = ActionLoadLimits::default();
 

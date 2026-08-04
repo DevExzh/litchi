@@ -467,9 +467,8 @@ pub use flat::{
     FlatMutableTextDocument, FlatPresentation, FlatSpreadsheet, FlatTextDocument,
 };
 pub use font_face::{
-    OdfFontFace, OdfFontFaceDeclarations, OdfFontFaceLink, OdfFontFaceSource, OdfFontMetric,
-    OdfFontMetricKind, OdfFontPitch, OdfFontStretch, OdfFontStyle, OdfFontVariant, OdfFontWeight,
-    OdfGenericFontFamily, OdfPositiveLength, parse_font_face_declarations,
+    Face, Faces, GenericFamily, Link, Metric, MetricKind, Pitch, PositiveLength, Source, Stretch,
+    Style, Variant, Weight, parse_font_face_declarations,
 };
 pub use footnote_separator::{
     FootnoteSeparatorAdjustment, FootnoteSeparatorLength, FootnoteSeparatorLineStyle,

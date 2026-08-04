@@ -69,7 +69,6 @@ pub use crate::xlsb::external_link::{
     XlsbExternalLinkKind, XlsbExternalNameFormula, XlsbExternalNameFormulaKind,
     XlsbExternalSheetRange, XlsbExternalValueMatrix, XlsbOleItem,
 };
-pub use crate::xlsb::pivot_view::XlsbPivotTableViewPart;
 pub use crate::xlsx::writer::{
     Geometry, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
     XlsxShapeSpec,
@@ -81,6 +80,7 @@ pub use crate::xlsx::{
     XlsxTextInsets, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap,
 };
 pub use chartsheet::MutableXlsbChartSheet;
+pub use litchi_xlsb::pivot_view::Part;
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};
 pub use workbook::XlsbWorkbookWriter;

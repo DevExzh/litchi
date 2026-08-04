@@ -25,11 +25,6 @@ pub mod laser;
 pub mod media_parts;
 pub mod modern_comments;
 
-/// Historical module path retained as a re-export-only compatibility facade.
-#[doc(hidden)]
-pub mod modern_comment_authors {
-    pub use crate::modern_comments::*;
-}
 pub mod notes;
 pub mod presentation_properties;
 pub mod shape;
@@ -39,10 +34,7 @@ pub mod time;
 pub mod transition;
 pub mod view_properties;
 
-pub use actions::{
-    Jump, Kind, PptxActionKind, PptxActionSetting, PptxActionTarget, PptxActionTrigger,
-    PptxSlideShowJump, Setting, Target,
-};
+pub use actions::{Jump, Kind, Setting, Target, Trigger};
 pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use comments::{

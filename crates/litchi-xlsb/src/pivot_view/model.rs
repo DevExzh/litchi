@@ -1,8 +1,7 @@
 //! Semantic PivotTable-view values.
 //!
 //! The owner module supplies the PivotTable-view context, so the canonical
-//! model name is concise. The former `PivotTableViewPart` spelling remains a
-//! compatibility alias in `mod.rs`.
+//! model name is concise within the `pivot_view` owner.
 
 use std::fmt;
 
@@ -50,12 +49,10 @@ impl Part {
     }
 }
 
-// Keep diagnostics compatible with the former concrete type name even though
-// the canonical Rust type is now contextual to `pivot_view`.
 impl fmt::Debug for Part {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("PivotTableViewPart")
+            .debug_struct("Part")
             .field("name", &self.name)
             .field("cache_id", &self.cache_id)
             .field("version_created", &self.version_created)
@@ -67,7 +64,7 @@ impl fmt::Debug for Part {
 impl fmt::Display for Part {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("PivotTableViewPart")
+            .debug_struct("Part")
             .field("name", &self.name)
             .field("cache_id", &self.cache_id)
             .field("version_created", &self.version_created)

@@ -3250,8 +3250,7 @@ mod tests {
             writer.write_record(kind::END_SX_LOCATION, &[]).unwrap();
             writer.write_record(kind::END_SX_VIEW, &[]).unwrap();
         }
-        let view = crate::xlsb::pivot_view::XlsbPivotTableViewPart::from_bytes(view_bytes.clone())
-            .unwrap();
+        let view = litchi_xlsb::pivot_view::Part::from_bytes(view_bytes.clone()).unwrap();
 
         let chart = WorksheetChart::line_chart(
             "Revenue",

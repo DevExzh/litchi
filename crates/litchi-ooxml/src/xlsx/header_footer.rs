@@ -1,17 +1,15 @@
-//! Compatibility facade for the canonical XLSX header/footer owner.
+//! OOXML package boundary for worksheet header/footer settings.
 //!
 //! The worksheet model and bounded SpreadsheetML codec live in
-//! litchi_xlsx::header_footer. This module retains the historical
-//! litchi_ooxml::xlsx::header_footer path and OoxmlError boundary.
+//! `litchi_xlsx::header_footer`. This module only maps owner errors into the
+//! host error type while the owner supplies the semantic values.
 
 use crate::error::{OoxmlError, Result};
 
-pub use litchi_xlsx::header_footer::{
-    HeaderFooterSectionKind, HeaderFooterText, SectionKind, Settings, Text, WorksheetHeaderFooter,
-};
+pub use litchi_xlsx::header_footer::{SectionKind, Settings, Text};
 
 /// Parse worksheet header/footer settings through the canonical XLSX owner.
-pub fn parse_worksheet_header_footer(xml: &[u8]) -> Result<Option<WorksheetHeaderFooter>> {
+pub fn parse_worksheet_header_footer(xml: &[u8]) -> Result<Option<Settings>> {
     litchi_xlsx::header_footer::parse_worksheet_header_footer(xml).map_err(map_owner_error)
 }
 

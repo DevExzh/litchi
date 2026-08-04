@@ -50,18 +50,3 @@ pub(crate) use package::{
     remove_content_font_face_declarations_xml, remove_styles_font_face_declarations_xml,
     set_content_font_face_declarations_xml, set_styles_font_face_declarations_xml,
 };
-
-// Historical names remain available only at this ergonomic facade boundary.
-pub type OdfFontFace = Face;
-pub type OdfFontFaceDeclarations = Faces;
-pub type OdfFontFaceLink = Link;
-pub type OdfFontFaceSource = Source;
-pub type OdfFontMetric = Metric;
-pub type OdfFontMetricKind = MetricKind;
-pub type OdfFontPitch = Pitch;
-pub type OdfFontStretch = Stretch;
-pub type OdfFontStyle = Style;
-pub type OdfFontVariant = Variant;
-pub type OdfFontWeight = Weight;
-pub type OdfGenericFontFamily = GenericFamily;
-pub type OdfPositiveLength = PositiveLength;

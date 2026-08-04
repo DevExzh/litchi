@@ -297,9 +297,9 @@ impl PackageWriter {
             files.push((path, bytes, media_type));
         }
 
-        for entry in package.manifest().entries.values() {
-            if entry.full_path.ends_with('/') && !is_regenerated_package_part(&entry.full_path) {
-                self.add_manifest_entry(&entry.full_path, &entry.media_type)?;
+        for (path, entry) in &package.manifest().entries {
+            if path.ends_with('/') && !is_regenerated_package_part(path) {
+                self.add_manifest_entry(path, &entry.media_type)?;
             }
         }
 
@@ -354,12 +354,9 @@ impl PackageWriter {
             files.push((path, bytes, media_type));
         }
 
-        for entry in package.manifest().entries.values() {
-            if entry.full_path.ends_with('/')
-                && !is_regenerated_package_part(&entry.full_path)
-                && !excluded(&entry.full_path)
-            {
-                self.add_manifest_entry(&entry.full_path, &entry.media_type)?;
+        for (path, entry) in &package.manifest().entries {
+            if path.ends_with('/') && !is_regenerated_package_part(path) && !excluded(path) {
+                self.add_manifest_entry(path, &entry.media_type)?;
             }
         }
         for (path, bytes, media_type) in files {
