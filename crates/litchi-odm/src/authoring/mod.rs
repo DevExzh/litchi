@@ -5,11 +5,11 @@ use litchi_odf_common::core::PackageWriter;
 
 /// Detached builder; publication validates through the package facade.
 #[derive(Clone, Debug)]
-pub struct MasterBuilder {
+pub struct Builder {
     content_xml: String,
 }
 
-impl MasterBuilder {
+impl Builder {
     pub fn new() -> Self {
         Self {
             content_xml: empty_content().to_owned(),
@@ -28,7 +28,7 @@ impl MasterBuilder {
     }
 }
 
-impl Default for MasterBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

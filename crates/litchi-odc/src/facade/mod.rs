@@ -3,7 +3,7 @@
 use litchi_core::{Metadata, Result};
 use std::path::Path;
 
-pub use crate::authoring::ChartBuilder;
+pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
 pub struct Chart {
@@ -36,11 +36,11 @@ impl Chart {
 
 #[cfg(test)]
 mod tests {
-    use super::{Chart, ChartBuilder};
+    use super::{Builder, Chart};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = ChartBuilder::new().build().unwrap();
+        let bytes = Builder::new().build().unwrap();
         let document = Chart::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:chart"));
     }

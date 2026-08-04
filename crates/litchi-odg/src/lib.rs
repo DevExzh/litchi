@@ -7,4 +7,4 @@ pub mod facade;
 pub mod model;
 pub mod package;
 
-pub use facade::{Drawing, DrawingBuilder};
+pub use facade::{Builder, Drawing};

@@ -3,7 +3,7 @@
 use litchi_core::{Metadata, Result};
 use std::path::Path;
 
-pub use crate::authoring::DatabaseBuilder;
+pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
 pub struct Database {
@@ -36,11 +36,11 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
-    use super::{Database, DatabaseBuilder};
+    use super::{Builder, Database};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = DatabaseBuilder::new().build().unwrap();
+        let bytes = Builder::new().build().unwrap();
         let document = Database::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:database"));
     }

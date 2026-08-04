@@ -7,4 +7,4 @@ pub mod facade;
 pub mod model;
 pub mod package;
 
-pub use facade::{Image, ImageBuilder};
+pub use facade::{Builder, Image};

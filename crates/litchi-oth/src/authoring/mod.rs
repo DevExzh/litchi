@@ -5,11 +5,11 @@ use litchi_odf_common::core::PackageWriter;
 
 /// Detached builder; publication validates through the package facade.
 #[derive(Clone, Debug)]
-pub struct WebTemplateBuilder {
+pub struct Builder {
     content_xml: String,
 }
 
-impl WebTemplateBuilder {
+impl Builder {
     pub fn new() -> Self {
         Self {
             content_xml: empty_content().to_owned(),
@@ -28,7 +28,7 @@ impl WebTemplateBuilder {
     }
 }
 
-impl Default for WebTemplateBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

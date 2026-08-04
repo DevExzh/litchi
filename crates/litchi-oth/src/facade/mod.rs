@@ -3,14 +3,14 @@
 use litchi_core::{Metadata, Result};
 use std::path::Path;
 
-pub use crate::authoring::WebTemplateBuilder;
+pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
-pub struct WebTemplate {
+pub struct Template {
     package: crate::package::Package,
 }
 
-impl WebTemplate {
+impl Template {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         crate::package::Package::open(path).map(|package| Self { package })
     }
@@ -36,12 +36,12 @@ impl WebTemplate {
 
 #[cfg(test)]
 mod tests {
-    use super::{WebTemplate, WebTemplateBuilder};
+    use super::{Builder, Template};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = WebTemplateBuilder::new().build().unwrap();
-        let document = WebTemplate::from_bytes(bytes).unwrap();
+        let bytes = Builder::new().build().unwrap();
+        let document = Template::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:text"));
     }
 }

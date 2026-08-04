@@ -3,7 +3,7 @@
 use litchi_core::{Metadata, Result};
 use std::path::Path;
 
-pub use crate::authoring::MasterBuilder;
+pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
 pub struct Master {
@@ -36,11 +36,11 @@ impl Master {
 
 #[cfg(test)]
 mod tests {
-    use super::{Master, MasterBuilder};
+    use super::{Builder, Master};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = MasterBuilder::new().build().unwrap();
+        let bytes = Builder::new().build().unwrap();
         let document = Master::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:text"));
     }

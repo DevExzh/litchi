@@ -1,10 +1,16 @@
 # litchi-odf
 
-OpenDocument Format (ODF) reader and writer for `.odt`, `.ods`, and `.odp` files.
+OpenDocument Format (ODF) umbrella for the independently selectable family
+crates covering `.odt`, `.ods`, `.odp`, `.odg`, `.odc`, `.odi`, `.odm`, `.oth`,
+and `.odb` files.
 
 ## Overview
 
-`litchi-odf` provides detection, common ODF vocabulary, and an optional facade over the independently selectable family crates. For the smallest dependency and memory footprint, depend directly on `litchi-odt`, `litchi-ods`, or `litchi-odp`.
+`litchi-odf` provides detection, common ODF vocabulary, and an optional facade
+over independently selectable family crates. For the smallest dependency and
+memory footprint, depend directly on the family crate you need. Each family
+keeps its API contextual: for example, `litchi_odg::Builder` and
+`litchi_oth::{Builder, Template}`.
 
 ## Usage
 
@@ -34,6 +40,9 @@ let slides = pres.slide_count()?;
 - Read and write ODF text documents (`.odt`) with paragraphs, lists, tables, and styles
 - Read and write ODF spreadsheets (`.ods`) with typed cell values and formulas
 - Read and write ODF presentations (`.odp`) with slides and shapes
+- Read and write standalone drawings (`.odg`), charts (`.odc`), images (`.odi`),
+  master documents (`.odm`), web templates (`.oth`), and database front ends
+  (`.odb`) through their optional family facades
 - Metadata extraction (title, author, statistics) for all three formats
 
 ## License

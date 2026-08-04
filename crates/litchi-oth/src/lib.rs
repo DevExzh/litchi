@@ -7,4 +7,4 @@ pub mod facade;
 pub mod model;
 pub mod package;
 
-pub use facade::{WebTemplate, WebTemplateBuilder};
+pub use facade::{Builder, Template};

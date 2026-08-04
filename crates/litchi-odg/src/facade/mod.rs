@@ -3,7 +3,7 @@
 use litchi_core::{Metadata, Result};
 use std::path::Path;
 
-pub use crate::authoring::DrawingBuilder;
+pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
 pub struct Drawing {
@@ -36,11 +36,11 @@ impl Drawing {
 
 #[cfg(test)]
 mod tests {
-    use super::{Drawing, DrawingBuilder};
+    use super::{Builder, Drawing};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = DrawingBuilder::new().build().unwrap();
+        let bytes = Builder::new().build().unwrap();
         let document = Drawing::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:drawing"));
     }

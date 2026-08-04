@@ -3,7 +3,7 @@
 use litchi_core::{Metadata, Result};
 use std::path::Path;
 
-pub use crate::authoring::ImageBuilder;
+pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
 pub struct Image {
@@ -36,11 +36,11 @@ impl Image {
 
 #[cfg(test)]
 mod tests {
-    use super::{Image, ImageBuilder};
+    use super::{Builder, Image};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = ImageBuilder::new().build().unwrap();
+        let bytes = Builder::new().build().unwrap();
         let document = Image::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:image"));
     }

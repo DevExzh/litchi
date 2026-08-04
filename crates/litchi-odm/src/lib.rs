@@ -7,4 +7,4 @@ pub mod facade;
 pub mod model;
 pub mod package;
 
-pub use facade::{Master, MasterBuilder};
+pub use facade::{Builder, Master};
