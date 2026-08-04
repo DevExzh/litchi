@@ -1,7 +1,9 @@
 //! Bounded XML codecs for the modern comment and author parts.
 
 mod comments {
-    use super::super::model::*;
+    use super::super::model::{
+        Anchor, AnchorKind, Comment, List, NamespaceDeclaration, Position, Reply, Status,
+    };
     use super::super::{
         AC, MAX_BYTES, MAX_COMMENTS, MAX_DEPTH, MAX_NODES, MAX_REPLIES, MAX_STRING_BYTES, P188, PC,
     };
@@ -30,7 +32,7 @@ mod comments {
 
     #[derive(Debug, Clone, Copy)]
     enum RawKind {
-        Anchor(usize, ModernCommentAnchorKind),
+        Anchor(usize, AnchorKind),
         TextBody(RawOwner),
         Extension(RawOwner),
     }
@@ -66,7 +68,7 @@ mod comments {
         local: String,
     }
 
-    fn parse_comment_list(xml: &[u8]) -> Result<ModernCommentList> {
+    fn parse_comment_list(xml: &[u8]) -> Result<List> {
         if xml.len() > MAX_BYTES {
             return Err(limit("modern Comment part bytes"));
         }
@@ -199,7 +201,7 @@ mod comments {
         if !root_seen || !root_closed || !stack.is_empty() {
             return Err(invalid("unterminated modern Comment part"));
         }
-        let value = ModernCommentList {
+        let value = List {
             root_prefix,
             namespace_declarations,
             comments,
@@ -210,7 +212,7 @@ mod comments {
 
     #[allow(clippy::too_many_arguments)]
     fn child_frame(
-        comments: &mut Vec<ModernComment>,
+        comments: &mut Vec<Comment>,
         reply_count: &mut usize,
         parent: &mut Frame,
         element: &BytesStart<'_>,
@@ -295,7 +297,7 @@ mod comments {
                     let y = required(&attributes, "y")?
                         .parse::<i64>()
                         .map_err(|_| invalid("invalid modern comment y coordinate"))?;
-                    comments[*index].position = Some(ModernCommentPosition { x, y });
+                    comments[*index].position = Some(Position { x, y });
                     Ok(FrameKind::Position)
                 } else if namespace == P188 && local == "replyLst" {
                     if *stage > 2 || comments[*index].reply_list_present {
@@ -403,8 +405,8 @@ mod comments {
 
     fn parse_comment_attributes(
         attributes: HashMap<String, String>,
-        namespace_declarations: Vec<ModernCommentNamespaceDeclaration>,
-    ) -> Result<ModernComment> {
+        namespace_declarations: Vec<NamespaceDeclaration>,
+    ) -> Result<Comment> {
         let id = required(&attributes, "id")?.to_owned();
         let author_id = required(&attributes, "authorId")?.to_owned();
         let created = required(&attributes, "created")?.to_owned();
@@ -413,7 +415,7 @@ mod comments {
         validate_date_time(&created)?;
         let status = attributes
             .get("status")
-            .map(|value| ModernCommentStatus::parse(value))
+            .map(|value| Status::parse(value))
             .transpose()?;
         let start_date = attributes.get("startDate").cloned();
         let due_date = attributes.get("dueDate").cloned();
@@ -439,7 +441,7 @@ mod comments {
             .get("complete")
             .map(|value| value.parse())
             .transpose()?;
-        Ok(ModernComment {
+        Ok(Comment {
             id,
             author_id,
             status,
@@ -462,20 +464,20 @@ mod comments {
 
     fn parse_reply_attributes(
         attributes: HashMap<String, String>,
-        namespace_declarations: Vec<ModernCommentNamespaceDeclaration>,
-    ) -> Result<ModernCommentReply> {
+        namespace_declarations: Vec<NamespaceDeclaration>,
+    ) -> Result<Reply> {
         let id = required(&attributes, "id")?.to_owned();
         let author_id = required(&attributes, "authorId")?.to_owned();
         let created = required(&attributes, "created")?.to_owned();
         validate_guid(&id)?;
         validate_guid(&author_id)?;
         validate_date_time(&created)?;
-        Ok(ModernCommentReply {
+        Ok(Reply {
             id,
             author_id,
             status: attributes
                 .get("status")
-                .map(|value| ModernCommentStatus::parse(value))
+                .map(|value| Status::parse(value))
                 .transpose()?,
             created,
             namespace_declarations,
@@ -484,23 +486,12 @@ mod comments {
         })
     }
 
-    fn anchor_kind(
-        namespace: &str,
-        local: &str,
-    ) -> Option<(AnchorFamily, ModernCommentAnchorKind)> {
+    fn anchor_kind(namespace: &str, local: &str) -> Option<(AnchorFamily, AnchorKind)> {
         match (namespace, local) {
-            (PC, "sldMkLst") => Some((AnchorFamily::Slide, ModernCommentAnchorKind::SlideMoniker)),
-            (AC, "deMkLst") => Some((
-                AnchorFamily::Drawing,
-                ModernCommentAnchorKind::DrawingElementMoniker,
-            )),
-            (AC, "txMkLst") => Some((
-                AnchorFamily::Text,
-                ModernCommentAnchorKind::TextRangeMoniker,
-            )),
-            (P188, "unknownAnchor") => {
-                Some((AnchorFamily::Unknown, ModernCommentAnchorKind::Unknown))
-            },
+            (PC, "sldMkLst") => Some((AnchorFamily::Slide, AnchorKind::SlideMoniker)),
+            (AC, "deMkLst") => Some((AnchorFamily::Drawing, AnchorKind::DrawingElementMoniker)),
+            (AC, "txMkLst") => Some((AnchorFamily::Text, AnchorKind::TextRangeMoniker)),
+            (P188, "unknownAnchor") => Some((AnchorFamily::Unknown, AnchorKind::Unknown)),
             _ => None,
         }
     }
@@ -522,7 +513,7 @@ mod comments {
         bytes: &[u8],
         empty_start: usize,
         end: usize,
-        comments: &mut [ModernComment],
+        comments: &mut [Comment],
     ) -> Result<()> {
         let FrameKind::Raw { start, kind } = kind else {
             return Ok(());
@@ -537,12 +528,10 @@ mod comments {
         }
         let xml = bytes[start..end].to_vec();
         match *kind {
-            RawKind::Anchor(comment, anchor_kind) => {
-                comments[comment].anchors.push(ModernCommentAnchor {
-                    kind: anchor_kind,
-                    xml,
-                })
-            },
+            RawKind::Anchor(comment, anchor_kind) => comments[comment].anchors.push(Anchor {
+                kind: anchor_kind,
+                xml,
+            }),
             RawKind::TextBody(RawOwner::Comment(comment)) => {
                 comments[comment].text_body_xml = Some(xml)
             },
@@ -565,7 +554,7 @@ mod comments {
             .any(|frame| matches!(frame.kind, FrameKind::Raw { .. }))
     }
 
-    fn validate_model(value: &ModernCommentList) -> Result<()> {
+    fn validate_model(value: &List) -> Result<()> {
         validate_prefix(&value.root_prefix)?;
         validate_namespaces(&value.namespace_declarations, Some(&value.root_prefix))?;
         if value.comments.len() > MAX_COMMENTS {
@@ -618,7 +607,7 @@ mod comments {
         Ok(())
     }
 
-    fn write_comment(out: &mut Vec<u8>, prefix: &str, comment: &ModernComment) {
+    fn write_comment(out: &mut Vec<u8>, prefix: &str, comment: &Comment) {
         open_tag(out, prefix, "cm");
         write_attr(out, "id", &comment.id);
         write_attr(out, "authorId", &comment.author_id);
@@ -683,7 +672,7 @@ mod comments {
         close_tag(out, prefix, "cm");
     }
 
-    fn write_reply(out: &mut Vec<u8>, prefix: &str, reply: &ModernCommentReply) {
+    fn write_reply(out: &mut Vec<u8>, prefix: &str, reply: &Reply) {
         open_tag(out, prefix, "reply");
         write_attr(out, "id", &reply.id);
         write_attr(out, "authorId", &reply.author_id);
@@ -758,7 +747,7 @@ mod comments {
         element: &BytesStart<'_>,
         decoder: Decoder,
         exclude_prefix: Option<&str>,
-    ) -> Result<Vec<ModernCommentNamespaceDeclaration>> {
+    ) -> Result<Vec<NamespaceDeclaration>> {
         let mut result = Vec::new();
         for attribute in element.attributes().with_checks(true) {
             let attribute = attribute.map_err(xml_error)?;
@@ -778,16 +767,13 @@ mod comments {
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
                 .map_err(xml_error)?
                 .into_owned();
-            result.push(ModernCommentNamespaceDeclaration { prefix, uri });
+            result.push(NamespaceDeclaration { prefix, uri });
         }
         validate_namespaces(&result, None)?;
         Ok(result)
     }
 
-    fn validate_namespaces(
-        value: &[ModernCommentNamespaceDeclaration],
-        excluded: Option<&str>,
-    ) -> Result<()> {
+    fn validate_namespaces(value: &[NamespaceDeclaration], excluded: Option<&str>) -> Result<()> {
         let mut seen = HashSet::new();
         for declaration in value {
             validate_prefix(&declaration.prefix)?;
@@ -929,7 +915,7 @@ mod comments {
         out.push(b'"');
     }
 
-    fn write_namespaces(out: &mut Vec<u8>, declarations: &[ModernCommentNamespaceDeclaration]) {
+    fn write_namespaces(out: &mut Vec<u8>, declarations: &[NamespaceDeclaration]) {
         for declaration in declarations {
             write_namespace_binding(out, &declaration.prefix, &declaration.uri);
         }
@@ -1022,7 +1008,7 @@ mod comments {
 }
 
 mod authors {
-    use super::super::model::*;
+    use super::super::model::{Author, Authors, NamespaceDeclaration};
     use super::super::{MAX_AUTHORS, MAX_BYTES, MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES, P188};
     use crate::{Error, Result};
     use litchi_ooxml_common::{custom_xml::valid_guid, mce::process_ooxml};
@@ -1047,7 +1033,7 @@ mod authors {
         local: String,
     }
 
-    fn parse_author_list(xml: &[u8]) -> Result<ModernCommentAuthorList> {
+    fn parse_author_list(xml: &[u8]) -> Result<Authors> {
         if xml.len() > MAX_BYTES {
             return Err(limit("modern Comment Author part bytes"));
         }
@@ -1180,7 +1166,7 @@ mod authors {
         if !root_seen || !root_closed || !stack.is_empty() {
             return Err(invalid("unterminated modern Comment Author part"));
         }
-        let value = ModernCommentAuthorList {
+        let value = Authors {
             root_prefix,
             namespace_declarations,
             authors,
@@ -1190,7 +1176,7 @@ mod authors {
     }
 
     fn child_frame(
-        authors: &mut Vec<ModernCommentAuthor>,
+        authors: &mut Vec<Author>,
         parent: &mut Frame,
         element: &BytesStart<'_>,
         decoder: Decoder,
@@ -1243,11 +1229,11 @@ mod authors {
 
     fn parse_author(
         attributes: HashMap<String, String>,
-        namespace_declarations: Vec<ModernCommentNamespaceDeclaration>,
-    ) -> Result<ModernCommentAuthor> {
+        namespace_declarations: Vec<NamespaceDeclaration>,
+    ) -> Result<Author> {
         let id = required(&attributes, "id")?.to_owned();
         validate_guid(&id)?;
-        Ok(ModernCommentAuthor {
+        Ok(Author {
             id,
             name: required(&attributes, "name")?.to_owned(),
             initials: attributes.get("initials").cloned(),
@@ -1262,7 +1248,7 @@ mod authors {
         kind: &FrameKind,
         bytes: &[u8],
         end: usize,
-        authors: &mut [ModernCommentAuthor],
+        authors: &mut [Author],
     ) -> Result<()> {
         let FrameKind::RawExtension { index, start } = kind else {
             return Ok(());
@@ -1280,7 +1266,7 @@ mod authors {
             .any(|frame| matches!(frame.kind, FrameKind::RawExtension { .. }))
     }
 
-    fn validate_author_model(value: &ModernCommentAuthorList) -> Result<()> {
+    fn validate_author_model(value: &Authors) -> Result<()> {
         validate_prefix(&value.root_prefix)?;
         validate_namespaces(&value.namespace_declarations, Some(&value.root_prefix))?;
         if value.authors.len() > MAX_AUTHORS {
@@ -1310,7 +1296,7 @@ mod authors {
         Ok(())
     }
 
-    fn write_author(out: &mut Vec<u8>, prefix: &str, author: &ModernCommentAuthor) {
+    fn write_author(out: &mut Vec<u8>, prefix: &str, author: &Author) {
         open_tag(out, prefix, "author");
         write_attr(out, "id", &author.id);
         write_attr(out, "name", &author.name);
@@ -1383,7 +1369,7 @@ mod authors {
         element: &BytesStart<'_>,
         decoder: Decoder,
         exclude_prefix: Option<&str>,
-    ) -> Result<Vec<ModernCommentNamespaceDeclaration>> {
+    ) -> Result<Vec<NamespaceDeclaration>> {
         let mut result = Vec::new();
         for attribute in element.attributes().with_checks(true) {
             let attribute = attribute.map_err(xml_error)?;
@@ -1403,16 +1389,13 @@ mod authors {
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
                 .map_err(xml_error)?
                 .into_owned();
-            result.push(ModernCommentNamespaceDeclaration { prefix, uri });
+            result.push(NamespaceDeclaration { prefix, uri });
         }
         validate_namespaces(&result, None)?;
         Ok(result)
     }
 
-    fn validate_namespaces(
-        value: &[ModernCommentNamespaceDeclaration],
-        excluded: Option<&str>,
-    ) -> Result<()> {
+    fn validate_namespaces(value: &[NamespaceDeclaration], excluded: Option<&str>) -> Result<()> {
         let mut seen = HashSet::new();
         for declaration in value {
             validate_prefix(&declaration.prefix)?;
@@ -1534,7 +1517,7 @@ mod authors {
         out.push(b'"');
     }
 
-    fn write_namespaces(out: &mut Vec<u8>, declarations: &[ModernCommentNamespaceDeclaration]) {
+    fn write_namespaces(out: &mut Vec<u8>, declarations: &[NamespaceDeclaration]) {
         for declaration in declarations {
             write_namespace_binding(out, &declaration.prefix, &declaration.uri);
         }

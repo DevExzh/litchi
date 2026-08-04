@@ -1,16 +1,27 @@
 //! Canonical layered owner for PowerPoint 2018 modern comments.
+//!
+//! The model, bounded XML codecs, OPC graph lifecycle, and regression tests
+//! stay together under this owner. Canonical model names are contextual to
+//! this module; the historical `ModernComment*` names below are aliases only.
 
 mod codec;
 mod model;
 mod package;
+#[cfg(test)]
+mod tests;
 
 pub use model::{
-    Anchor, AnchorKind, Author, AuthorPart, Authors, Comment, Graph, List, ModernComment,
-    ModernCommentAnchor, ModernCommentAnchorKind, ModernCommentAuthor, ModernCommentAuthorList,
-    ModernCommentAuthorPart, ModernCommentGraph, ModernCommentList,
+    Anchor, AnchorKind, Author, AuthorPart, Authors, Comment, Graph, List, NamespaceDeclaration,
+    Part, Position, Progress, Reply, Status,
+};
+
+// Historical public spellings remain aliases to the canonical contextual
+// models. Keeping these at the facade prevents duplicate model definitions.
+pub use model::{
+    ModernComment, ModernCommentAnchor, ModernCommentAnchorKind, ModernCommentAuthor,
+    ModernCommentAuthorList, ModernCommentAuthorPart, ModernCommentGraph, ModernCommentList,
     ModernCommentNamespaceDeclaration, ModernCommentPart, ModernCommentPosition,
-    ModernCommentReply, ModernCommentStatus, NamespaceDeclaration, Part, Position, Progress, Reply,
-    Status,
+    ModernCommentReply, ModernCommentStatus,
 };
 pub use package::{
     add_modern_comment, add_modern_comment_author, add_modern_comment_reply, find_modern_comment,
