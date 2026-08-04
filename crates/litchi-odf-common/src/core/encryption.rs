@@ -31,7 +31,7 @@ const MAX_ENCRYPTED_ENTRY_SIZE: usize = 1024 * 1024 * 1024;
 
 /// Cipher used to encrypt ODF package payload entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfEncryptionCipher {
+pub enum Cipher {
     Aes128Cbc,
     Aes192Cbc,
     Aes256Cbc,
@@ -44,7 +44,7 @@ pub enum OdfEncryptionCipher {
     },
 }
 
-impl OdfEncryptionCipher {
+impl Cipher {
     fn key_size(self) -> u16 {
         match self {
             Self::Aes128Cbc | Self::Aes128Gcm => 16,
@@ -57,14 +57,14 @@ impl OdfEncryptionCipher {
 
 /// Digest used to turn the password into KDF input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfEncryptionStartKey {
+pub enum StartKey {
     Sha1,
     Sha256,
 }
 
 /// Password-based key derivation settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfEncryptionKdf {
+pub enum Kdf {
     Pbkdf2 {
         iterations: NonZeroU32,
     },
@@ -77,19 +77,15 @@ pub enum OdfEncryptionKdf {
 
 /// Validated encryption settings for ODF package authoring.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct OdfEncryptionProfile {
-    cipher: OdfEncryptionCipher,
-    start_key: OdfEncryptionStartKey,
-    kdf: OdfEncryptionKdf,
+pub struct Profile {
+    cipher: Cipher,
+    start_key: StartKey,
+    kdf: Kdf,
 }
 
-impl OdfEncryptionProfile {
+impl Profile {
     /// Build and validate a custom encryption profile.
-    pub fn new(
-        cipher: OdfEncryptionCipher,
-        start_key: OdfEncryptionStartKey,
-        kdf: OdfEncryptionKdf,
-    ) -> Result<Self> {
+    pub fn new(cipher: Cipher, start_key: StartKey, kdf: Kdf) -> Result<Self> {
         let profile = Self {
             cipher,
             start_key,
@@ -102,9 +98,9 @@ impl OdfEncryptionProfile {
     /// AES-256-CBC with SHA-256 and PBKDF2 for broad ODF compatibility.
     pub fn compatible() -> Self {
         Self {
-            cipher: OdfEncryptionCipher::Aes256Cbc,
-            start_key: OdfEncryptionStartKey::Sha256,
-            kdf: OdfEncryptionKdf::Pbkdf2 {
+            cipher: Cipher::Aes256Cbc,
+            start_key: StartKey::Sha256,
+            kdf: Kdf::Pbkdf2 {
                 iterations: NonZeroU32::new(100_000).expect("constant is nonzero"),
             },
         }
@@ -113,9 +109,9 @@ impl OdfEncryptionProfile {
     /// AES-256-GCM with SHA-256 and Argon2id for authenticated encryption.
     pub fn authenticated() -> Self {
         Self {
-            cipher: OdfEncryptionCipher::Aes256Gcm,
-            start_key: OdfEncryptionStartKey::Sha256,
-            kdf: OdfEncryptionKdf::Argon2id {
+            cipher: Cipher::Aes256Gcm,
+            start_key: StartKey::Sha256,
+            kdf: Kdf::Argon2id {
                 iterations: NonZeroU32::new(3).expect("constant is nonzero"),
                 memory_kib: NonZeroU32::new(65_536).expect("constant is nonzero"),
                 lanes: NonZeroU32::new(1).expect("constant is nonzero"),
@@ -123,15 +119,15 @@ impl OdfEncryptionProfile {
         }
     }
 
-    pub fn cipher(self) -> OdfEncryptionCipher {
+    pub fn cipher(self) -> Cipher {
         self.cipher
     }
 
-    pub fn start_key(self) -> OdfEncryptionStartKey {
+    pub fn start_key(self) -> StartKey {
         self.start_key
     }
 
-    pub fn kdf(self) -> OdfEncryptionKdf {
+    pub fn kdf(self) -> Kdf {
         self.kdf
     }
 
@@ -143,14 +139,14 @@ impl OdfEncryptionProfile {
             )));
         }
         match self.kdf {
-            OdfEncryptionKdf::Pbkdf2 { iterations }
+            Kdf::Pbkdf2 { iterations }
                 if iterations.get() > super::manifest::MAX_PBKDF2_ITERATIONS =>
             {
                 Err(Error::InvalidFormat(
                     "PBKDF2 iteration count exceeds the supported limit".to_string(),
                 ))
             },
-            OdfEncryptionKdf::Argon2id {
+            Kdf::Argon2id {
                 iterations,
                 memory_kib,
                 lanes,
@@ -165,11 +161,9 @@ impl OdfEncryptionProfile {
                     "Argon2id parameters exceed supported resource limits".to_string(),
                 ))
             },
-            OdfEncryptionKdf::Argon2id { .. } if !matches!(key_size, 16 | 24 | 32) => {
-                Err(Error::InvalidFormat(
-                    "Argon2id derived key size must be 16, 24, or 32 bytes".to_string(),
-                ))
-            },
+            Kdf::Argon2id { .. } if !matches!(key_size, 16 | 24 | 32) => Err(Error::InvalidFormat(
+                "Argon2id derived key size must be 16, 24, or 32 bytes".to_string(),
+            )),
             _ => Ok(()),
         }
     }
@@ -178,7 +172,7 @@ impl OdfEncryptionProfile {
 pub(crate) fn encrypt_entry(
     plaintext: &[u8],
     password: &str,
-    profile: OdfEncryptionProfile,
+    profile: Profile,
 ) -> Result<(Vec<u8>, ManifestEncryption)> {
     profile.validate()?;
     if plaintext.len() as u64 > MAX_PLAINTEXT_ENTRY_SIZE {
@@ -195,16 +189,16 @@ pub(crate) fn encrypt_entry(
     let mut salt = vec![0_u8; 16];
     fill_random(&mut salt, "salt")?;
     let start_key = match profile.start_key {
-        OdfEncryptionStartKey::Sha1 => ManifestStartKeyGeneration::Sha1,
-        OdfEncryptionStartKey::Sha256 => ManifestStartKeyGeneration::Sha256,
+        StartKey::Sha1 => ManifestStartKeyGeneration::Sha1,
+        StartKey::Sha256 => ManifestStartKeyGeneration::Sha256,
     };
     let key_derivation = match profile.kdf {
-        OdfEncryptionKdf::Pbkdf2 { iterations } => ManifestKeyDerivation::Pbkdf2 {
+        Kdf::Pbkdf2 { iterations } => ManifestKeyDerivation::Pbkdf2 {
             salt,
             iterations,
             key_size: profile.cipher.key_size(),
         },
-        OdfEncryptionKdf::Argon2id {
+        Kdf::Argon2id {
             iterations,
             memory_kib,
             lanes,
@@ -228,18 +222,16 @@ pub(crate) fn encrypt_entry(
 
     let checksum = (!matches!(
         profile.cipher,
-        OdfEncryptionCipher::Aes128Gcm
-            | OdfEncryptionCipher::Aes192Gcm
-            | OdfEncryptionCipher::Aes256Gcm
+        Cipher::Aes128Gcm | Cipher::Aes192Gcm | Cipher::Aes256Gcm
     ))
     .then(|| {
         let prefix = &compressed[..compressed.len().min(1024)];
         match profile.start_key {
-            OdfEncryptionStartKey::Sha1 => super::manifest::ManifestChecksum {
+            StartKey::Sha1 => super::manifest::ManifestChecksum {
                 algorithm: ManifestChecksumAlgorithm::Sha1First1024,
                 value: Sha1::digest(prefix).to_vec(),
             },
-            OdfEncryptionStartKey::Sha256 => super::manifest::ManifestChecksum {
+            StartKey::Sha256 => super::manifest::ManifestChecksum {
                 algorithm: ManifestChecksumAlgorithm::Sha256First1024,
                 value: Sha256::digest(prefix).to_vec(),
             },
@@ -265,24 +257,22 @@ fn fill_random(bytes: &mut [u8], field: &str) -> Result<()> {
     })
 }
 
-fn algorithm_without_iv(cipher: OdfEncryptionCipher) -> ManifestEncryptionAlgorithm {
+fn algorithm_without_iv(cipher: Cipher) -> ManifestEncryptionAlgorithm {
     match cipher {
-        OdfEncryptionCipher::Aes128Cbc => ManifestEncryptionAlgorithm::Aes128Cbc { iv: [0; 16] },
-        OdfEncryptionCipher::Aes192Cbc => ManifestEncryptionAlgorithm::Aes192Cbc { iv: [0; 16] },
-        OdfEncryptionCipher::Aes256Cbc => ManifestEncryptionAlgorithm::Aes256Cbc { iv: [0; 16] },
-        OdfEncryptionCipher::Aes128Gcm => ManifestEncryptionAlgorithm::Aes128Gcm { iv: [0; 12] },
-        OdfEncryptionCipher::Aes192Gcm => ManifestEncryptionAlgorithm::Aes192Gcm { iv: [0; 12] },
-        OdfEncryptionCipher::Aes256Gcm => ManifestEncryptionAlgorithm::Aes256Gcm { iv: [0; 12] },
-        OdfEncryptionCipher::BlowfishCfb8 { .. } => {
-            ManifestEncryptionAlgorithm::BlowfishCfb8 { iv: [0; 8] }
-        },
+        Cipher::Aes128Cbc => ManifestEncryptionAlgorithm::Aes128Cbc { iv: [0; 16] },
+        Cipher::Aes192Cbc => ManifestEncryptionAlgorithm::Aes192Cbc { iv: [0; 16] },
+        Cipher::Aes256Cbc => ManifestEncryptionAlgorithm::Aes256Cbc { iv: [0; 16] },
+        Cipher::Aes128Gcm => ManifestEncryptionAlgorithm::Aes128Gcm { iv: [0; 12] },
+        Cipher::Aes192Gcm => ManifestEncryptionAlgorithm::Aes192Gcm { iv: [0; 12] },
+        Cipher::Aes256Gcm => ManifestEncryptionAlgorithm::Aes256Gcm { iv: [0; 12] },
+        Cipher::BlowfishCfb8 { .. } => ManifestEncryptionAlgorithm::BlowfishCfb8 { iv: [0; 8] },
     }
 }
 
 fn encrypt_compressed(
     compressed: &[u8],
     key: &[u8],
-    cipher: OdfEncryptionCipher,
+    cipher: Cipher,
 ) -> Result<(Vec<u8>, ManifestEncryptionAlgorithm)> {
     macro_rules! encrypt_cbc {
         ($aes:ty, $variant:ident) => {{
@@ -318,13 +308,13 @@ fn encrypt_compressed(
     }
 
     Ok(match cipher {
-        OdfEncryptionCipher::Aes128Cbc => encrypt_cbc!(Aes128, Aes128Cbc),
-        OdfEncryptionCipher::Aes192Cbc => encrypt_cbc!(Aes192, Aes192Cbc),
-        OdfEncryptionCipher::Aes256Cbc => encrypt_cbc!(Aes256, Aes256Cbc),
-        OdfEncryptionCipher::Aes128Gcm => encrypt_gcm!(Aes128Gcm, Aes128Gcm),
-        OdfEncryptionCipher::Aes192Gcm => encrypt_gcm!(Aes192Gcm, Aes192Gcm),
-        OdfEncryptionCipher::Aes256Gcm => encrypt_gcm!(Aes256Gcm, Aes256Gcm),
-        OdfEncryptionCipher::BlowfishCfb8 { .. } => {
+        Cipher::Aes128Cbc => encrypt_cbc!(Aes128, Aes128Cbc),
+        Cipher::Aes192Cbc => encrypt_cbc!(Aes192, Aes192Cbc),
+        Cipher::Aes256Cbc => encrypt_cbc!(Aes256, Aes256Cbc),
+        Cipher::Aes128Gcm => encrypt_gcm!(Aes128Gcm, Aes128Gcm),
+        Cipher::Aes192Gcm => encrypt_gcm!(Aes192Gcm, Aes192Gcm),
+        Cipher::Aes256Gcm => encrypt_gcm!(Aes256Gcm, Aes256Gcm),
+        Cipher::BlowfishCfb8 { .. } => {
             let mut iv = [0_u8; 8];
             fill_random(&mut iv, "initialisation vector")?;
             (

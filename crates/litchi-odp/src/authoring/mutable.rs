@@ -3,7 +3,7 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::core::{MetaXmlPatch, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml};
+use crate::core::{MetaXmlPatch, Structure, OwnedPackage, PackageWriter, patch_meta_xml};
 use crate::animation::validate_animation_roots;
 use crate::codec::content_source::ContentSource;
 use crate::legacy_animation::validate_legacy_animation_root;
@@ -1131,7 +1131,7 @@ impl MutablePresentation {
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml (preserved or default)
-        let default_styles = OdfStructure::default_styles_xml();
+        let default_styles = Structure::default_styles_xml();
         let styles_xml = self.styles_xml.as_deref().unwrap_or(&default_styles);
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 

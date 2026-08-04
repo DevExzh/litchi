@@ -126,14 +126,14 @@ impl OwnedPackage {
     /// Read inert document and macro signature metadata from the package.
     ///
     /// This does not verify cryptographic signatures or execute macro content.
-    pub fn digital_signatures(&self) -> Result<crate::signature::OdfDigitalSignatures> {
+    pub fn digital_signatures(&self) -> Result<crate::signature::DigitalSignatures> {
         self.package()?.digital_signatures()
     }
 
     /// Cryptographically verify document signatures without making any PKI trust claim.
     pub fn verify_document_signatures(
         &self,
-    ) -> Result<Vec<crate::signature::OdfSignatureVerification>> {
+    ) -> Result<Vec<crate::signature::SignatureVerification>> {
         crate::signature::verify_package(&self.data)
     }
 }
@@ -239,12 +239,12 @@ impl<'data> Package<'data> {
     /// Read inert document and macro signature metadata from the package.
     ///
     /// This does not verify cryptographic signatures or execute macro content.
-    pub fn digital_signatures(&self) -> Result<crate::signature::OdfDigitalSignatures> {
+    pub fn digital_signatures(&self) -> Result<crate::signature::DigitalSignatures> {
         use crate::signature::{
             DOCUMENT_SIGNATURE_PATH, MACRO_SIGNATURE_PATH, parse_signature_container,
         };
 
-        let mut result = crate::signature::OdfDigitalSignatures::default();
+        let mut result = crate::signature::DigitalSignatures::default();
         if self.has_file(DOCUMENT_SIGNATURE_PATH) {
             result.document_signatures =
                 parse_signature_container(&self.get_file(DOCUMENT_SIGNATURE_PATH)?)?;

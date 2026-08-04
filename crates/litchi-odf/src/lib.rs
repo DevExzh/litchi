@@ -41,11 +41,11 @@ pub use litchi_odt as odt;
 pub use litchi_oth as oth;
 
 pub use litchi_odf_common::core::{
-    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Manifest, ManifestChecksum,
-    ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm, ManifestEntry,
-    ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OdfEncryptionCipher,
-    OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey, OdfStructure, OwnedPackage,
-    PackageWriter, TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
+    AutoReloadMetadata, Cipher, DocumentStatistics, HyperlinkBehaviourMetadata, Kdf, Manifest,
+    ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
+    ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OwnedPackage,
+    PackageWriter, Profile, StartKey, Structure, TemplateMetadata, UserDefinedMetadata,
+    UserDefinedValueType,
 };
 
 #[cfg(feature = "odb")]

@@ -1,9 +1,6 @@
 use litchi_odf_common::{
-    core::{OdfEncryptionProfile, OwnedPackage, PackageWriter},
-    signature::{
-        OdfCanonicalizationAlgorithm, OdfDocumentSigner, OdfSignatureAlgorithm,
-        OdfSignatureValidity,
-    },
+    core::{OwnedPackage, PackageWriter, Profile},
+    signature::{CanonicalizationAlgorithm, DocumentSigner, SignatureAlgorithm, SignatureValidity},
 };
 
 const MIME: &str = "application/vnd.oasis.opendocument.text";
@@ -12,18 +9,18 @@ const RSA_CERT: &[u8] = include_bytes!("fixtures/signatures/rsa-cert.der");
 const EC_KEY: &[u8] = include_bytes!("fixtures/signatures/ec-key.pk8");
 const EC_CERT: &[u8] = include_bytes!("fixtures/signatures/ec-cert.der");
 
-fn signer(algorithm: OdfSignatureAlgorithm) -> OdfDocumentSigner {
+fn signer(algorithm: SignatureAlgorithm) -> DocumentSigner {
     let (key, cert) = match algorithm {
-        OdfSignatureAlgorithm::RsaSha256 => (RSA_KEY, RSA_CERT),
-        OdfSignatureAlgorithm::EcdsaP256Sha256 => (EC_KEY, EC_CERT),
+        SignatureAlgorithm::RsaSha256 => (RSA_KEY, RSA_CERT),
+        SignatureAlgorithm::EcdsaP256Sha256 => (EC_KEY, EC_CERT),
     };
-    OdfDocumentSigner::from_pkcs8_der(algorithm, key, vec![cert.to_vec()], "2026-07-19T12:00:00Z")
+    DocumentSigner::from_pkcs8_der(algorithm, key, vec![cert.to_vec()], "2026-07-19T12:00:00Z")
         .unwrap()
 }
 
 fn signed_package(
-    algorithm: OdfSignatureAlgorithm,
-    canonicalization: OdfCanonicalizationAlgorithm,
+    algorithm: SignatureAlgorithm,
+    canonicalization: CanonicalizationAlgorithm,
     encrypted: bool,
 ) -> Vec<u8> {
     let mut writer = PackageWriter::new();
@@ -33,7 +30,7 @@ fn signed_package(
         .unwrap();
     if encrypted {
         writer
-            .set_encryption("encryption-password", OdfEncryptionProfile::compatible())
+            .set_encryption("encryption-password", Profile::compatible())
             .unwrap();
     }
     writer
@@ -48,12 +45,12 @@ fn signed_package(
 #[test]
 fn authors_and_verifies_rsa_and_ecdsa_with_both_canonicalizations() {
     for algorithm in [
-        OdfSignatureAlgorithm::RsaSha256,
-        OdfSignatureAlgorithm::EcdsaP256Sha256,
+        SignatureAlgorithm::RsaSha256,
+        SignatureAlgorithm::EcdsaP256Sha256,
     ] {
         for canonicalization in [
-            OdfCanonicalizationAlgorithm::InclusiveXml10,
-            OdfCanonicalizationAlgorithm::ExclusiveXml10,
+            CanonicalizationAlgorithm::InclusiveXml10,
+            CanonicalizationAlgorithm::ExclusiveXml10,
         ] {
             let package =
                 OwnedPackage::from_bytes(signed_package(algorithm, canonicalization, false))
@@ -62,7 +59,7 @@ fn authors_and_verifies_rsa_and_ecdsa_with_both_canonicalizations() {
             assert_eq!(results.len(), 1);
             assert_eq!(results[0].algorithm, Some(algorithm));
             assert_eq!(results[0].canonicalization, Some(canonicalization));
-            assert_eq!(results[0].validity, OdfSignatureValidity::Valid);
+            assert_eq!(results[0].validity, SignatureValidity::Valid);
             assert_eq!(results[0].signing_certificate_index, Some(0));
         }
     }
@@ -71,15 +68,15 @@ fn authors_and_verifies_rsa_and_ecdsa_with_both_canonicalizations() {
 #[test]
 fn signing_composes_with_encrypt_first_packages() {
     let bytes = signed_package(
-        OdfSignatureAlgorithm::RsaSha256,
-        OdfCanonicalizationAlgorithm::InclusiveXml10,
+        SignatureAlgorithm::RsaSha256,
+        CanonicalizationAlgorithm::InclusiveXml10,
         true,
     );
     let verification = OwnedPackage::from_bytes(bytes.clone())
         .unwrap()
         .verify_document_signatures()
         .unwrap();
-    assert_eq!(verification[0].validity, OdfSignatureValidity::Valid);
+    assert_eq!(verification[0].validity, SignatureValidity::Valid);
     let decrypted = OwnedPackage::from_bytes_with_password(bytes, "encryption-password").unwrap();
     assert_eq!(
         decrypted.get_file("content.xml").unwrap(),
@@ -95,8 +92,8 @@ fn signing_composes_with_encrypt_first_packages() {
 #[test]
 fn rejects_a_private_key_that_does_not_match_the_leaf_certificate() {
     assert!(
-        OdfDocumentSigner::from_pkcs8_der(
-            OdfSignatureAlgorithm::RsaSha256,
+        DocumentSigner::from_pkcs8_der(
+            SignatureAlgorithm::RsaSha256,
             RSA_KEY,
             vec![EC_CERT.to_vec()],
             "2026-07-19T12:00:00Z",
@@ -115,11 +112,7 @@ fn verifies_the_bundled_libreoffice_xades_signature() {
         .verify_document_signatures()
         .unwrap();
     assert_eq!(results.len(), 1);
-    assert_eq!(
-        results[0].validity,
-        OdfSignatureValidity::Valid,
-        "{results:?}"
-    );
+    assert_eq!(results[0].validity, SignatureValidity::Valid, "{results:?}");
 }
 
 #[test]
@@ -152,8 +145,8 @@ fn rewrite_entry(
 #[test]
 fn reports_tampering_and_unsupported_algorithms() {
     let bytes = signed_package(
-        OdfSignatureAlgorithm::RsaSha256,
-        OdfCanonicalizationAlgorithm::InclusiveXml10,
+        SignatureAlgorithm::RsaSha256,
+        CanonicalizationAlgorithm::InclusiveXml10,
         false,
     );
     let tampered = rewrite_entry(&bytes, "content.xml", |content| {
@@ -168,7 +161,7 @@ fn reports_tampering_and_unsupported_algorithms() {
         .unwrap();
     assert_eq!(
         result[0].validity,
-        OdfSignatureValidity::ReferenceDigestMismatch
+        SignatureValidity::ReferenceDigestMismatch
     );
     assert_eq!(
         result[0].failed_reference_uri.as_deref(),
@@ -188,10 +181,7 @@ fn reports_tampering_and_unsupported_algorithms() {
         .unwrap()
         .verify_document_signatures()
         .unwrap();
-    assert_eq!(
-        result[0].validity,
-        OdfSignatureValidity::UnsupportedAlgorithm
-    );
+    assert_eq!(result[0].validity, SignatureValidity::UnsupportedAlgorithm);
 
     let invalid_signature =
         rewrite_entry(&bytes, "META-INF/documentsignatures.xml", |mut content| {
@@ -208,14 +198,14 @@ fn reports_tampering_and_unsupported_algorithms() {
         .unwrap()
         .verify_document_signatures()
         .unwrap();
-    assert_eq!(result[0].validity, OdfSignatureValidity::InvalidSignature);
+    assert_eq!(result[0].validity, SignatureValidity::InvalidSignature);
 }
 
 #[test]
 fn rejects_spoofed_and_duplicate_package_reference_paths() {
     let bytes = signed_package(
-        OdfSignatureAlgorithm::RsaSha256,
-        OdfCanonicalizationAlgorithm::InclusiveXml10,
+        SignatureAlgorithm::RsaSha256,
+        CanonicalizationAlgorithm::InclusiveXml10,
         false,
     );
     for replacement in ["../escape", "content.xml"] {
@@ -241,7 +231,7 @@ fn late_signing_configuration_failure_is_atomic() {
     writer.add_file("content.xml", b"<root/>").unwrap();
     assert!(
         writer
-            .set_document_signer(signer(OdfSignatureAlgorithm::RsaSha256))
+            .set_document_signer(signer(SignatureAlgorithm::RsaSha256))
             .is_err()
     );
     let package = OwnedPackage::from_bytes(writer.finish().unwrap()).unwrap();

@@ -32,12 +32,12 @@ pub(crate) const MACRO_SIGNATURE_PATH: &str = "META-INF/macrosignatures.xml";
 
 /// Signature metadata stored in an OpenDocument package.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OdfDigitalSignatures {
-    pub document_signatures: Vec<OdfDigitalSignature>,
-    pub macro_signatures: Vec<OdfDigitalSignature>,
+pub struct DigitalSignatures {
+    pub document_signatures: Vec<DigitalSignature>,
+    pub macro_signatures: Vec<DigitalSignature>,
 }
 
-impl OdfDigitalSignatures {
+impl DigitalSignatures {
     pub fn is_empty(&self) -> bool {
         self.document_signatures.is_empty() && self.macro_signatures.is_empty()
     }
@@ -49,11 +49,11 @@ impl OdfDigitalSignatures {
 
 /// One inert XMLDSIG signature record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfDigitalSignature {
+pub struct DigitalSignature {
     pub id: Option<String>,
     pub canonicalization_method: String,
     pub signature_method: String,
-    pub references: Vec<OdfSignatureReference>,
+    pub references: Vec<SignatureReference>,
     /// Whitespace-normalized base64 signature bytes.
     pub signature_value: String,
     /// Whitespace-normalized base64 DER certificates, in document order.
@@ -64,7 +64,7 @@ pub struct OdfDigitalSignature {
 
 /// One `ds:Reference` from a signature's signed-info block.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfSignatureReference {
+pub struct SignatureReference {
     pub uri: String,
     pub type_uri: Option<String>,
     pub transforms: Vec<String>,
@@ -80,7 +80,7 @@ struct SignatureBuilder {
     signed_info_depth: Option<usize>,
     canonicalization_method: Option<String>,
     signature_method: Option<String>,
-    references: Vec<OdfSignatureReference>,
+    references: Vec<SignatureReference>,
     reference: Option<ReferenceBuilder>,
     signature_value: Option<String>,
     certificates: Vec<String>,
@@ -112,7 +112,7 @@ struct TextTarget {
     value: String,
 }
 
-pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<OdfDigitalSignature>> {
+pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignature>> {
     if xml.len() > MAX_SIGNATURE_XML_BYTES {
         return invalid("ODF signature XML exceeds 16 MiB");
     }
@@ -414,7 +414,7 @@ fn finish_reference(signature: &mut SignatureBuilder) -> Result<()> {
         .reference
         .take()
         .ok_or_else(|| format_error("missing signature reference"))?;
-    signature.references.push(OdfSignatureReference {
+    signature.references.push(SignatureReference {
         uri: reference.uri,
         type_uri: reference.type_uri,
         transforms: reference.transforms,
@@ -428,12 +428,12 @@ fn finish_reference(signature: &mut SignatureBuilder) -> Result<()> {
     Ok(())
 }
 
-fn finish_signature(value: SignatureBuilder) -> Result<OdfDigitalSignature> {
+fn finish_signature(value: SignatureBuilder) -> Result<DigitalSignature> {
     if value.signed_info_depth.is_some() || value.reference.is_some() || value.references.is_empty()
     {
         return invalid("signature has incomplete or empty signed information");
     }
-    Ok(OdfDigitalSignature {
+    Ok(DigitalSignature {
         id: value.id,
         canonicalization_method: value
             .canonicalization_method

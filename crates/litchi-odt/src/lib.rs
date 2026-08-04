@@ -166,11 +166,11 @@ pub use chart_properties::{
     reason = "ODT facade exposes the canonical shared package types"
 )]
 pub use core::{
-    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Manifest, ManifestChecksum,
-    ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm, ManifestEntry,
-    ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OdfEncryptionCipher,
-    OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey, OdfStructure, OwnedPackage,
-    PackageWriter, TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
+    AutoReloadMetadata, Cipher, DocumentStatistics, HyperlinkBehaviourMetadata, Kdf, Manifest,
+    ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
+    ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OwnedPackage,
+    PackageWriter, Profile, StartKey, Structure, TemplateMetadata, UserDefinedMetadata,
+    UserDefinedValueType,
 };
 #[allow(
     unused_imports,

@@ -4,7 +4,7 @@
 
 use crate::MediaReference;
 use crate::Slide;
-use crate::core::{OdfStructure, PackageWriter};
+use crate::core::{PackageWriter, Structure};
 use crate::model::action::write_event_listeners;
 use crate::model::animation::validate_animation_roots;
 use crate::model::legacy_animation::validate_legacy_animation_root;
@@ -1207,7 +1207,7 @@ impl Builder {
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml
-        let mut styles_xml = OdfStructure::default_styles_xml();
+        let mut styles_xml = Structure::default_styles_xml();
         for layout in &self.page_layouts.layouts {
             styles_xml = crate::set_page_layout_xml(&styles_xml, layout)?;
         }

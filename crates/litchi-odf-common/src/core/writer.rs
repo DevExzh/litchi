@@ -11,7 +11,7 @@ use soapberry_zip::office::StreamingArchiveWriter;
 use std::collections::HashSet;
 use zeroize::Zeroizing;
 
-use super::encryption::{OdfEncryptionProfile, encrypt_entry};
+use super::encryption::{Profile, encrypt_entry};
 use super::manifest::{
     ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
     ManifestKeyDerivation, ManifestStartKeyGeneration,
@@ -48,11 +48,11 @@ pub struct PackageWriter {
     wrote_mimetype: bool,
     wrote_payload_entry: bool,
     encryption: Option<WriterEncryption>,
-    document_signer: Option<crate::signature::OdfDocumentSigner>,
+    document_signer: Option<crate::signature::DocumentSigner>,
 }
 
 struct WriterEncryption {
-    profile: OdfEncryptionProfile,
+    profile: Profile,
     password: Zeroizing<String>,
 }
 
@@ -81,10 +81,7 @@ impl PackageWriter {
     }
 
     /// Configure a document signature generated after every other package entry is final.
-    pub fn set_document_signer(
-        &mut self,
-        signer: crate::signature::OdfDocumentSigner,
-    ) -> Result<()> {
+    pub fn set_document_signer(&mut self, signer: crate::signature::DocumentSigner) -> Result<()> {
         if self.wrote_payload_entry {
             return Err(Error::InvalidFormat(
                 "ODF signing must be configured before payload entries".to_string(),
@@ -108,11 +105,7 @@ impl PackageWriter {
     /// Configure encryption for subsequently written payload entries.
     ///
     /// This may be called after `mimetype`, but not after any payload entry was emitted.
-    pub fn set_encryption(
-        &mut self,
-        password: impl Into<String>,
-        profile: OdfEncryptionProfile,
-    ) -> Result<()> {
+    pub fn set_encryption(&mut self, password: impl Into<String>, profile: Profile) -> Result<()> {
         if self.wrote_payload_entry {
             return Err(Error::InvalidFormat(
                 "ODF encryption must be configured before payload entries".to_string(),
@@ -585,9 +578,9 @@ impl Default for PackageWriter {
 }
 
 /// Helper to create standard ODF directory structure
-pub struct OdfStructure;
+pub struct Structure;
 
-impl OdfStructure {
+impl Structure {
     /// Generate a default content.xml skeleton
     #[allow(dead_code)] // Reserved for future use
     pub fn default_content_xml(office_type: &str) -> String {
@@ -771,14 +764,14 @@ mod tests {
 
     #[test]
     fn test_odf_structure_default_styles_xml() {
-        let styles = OdfStructure::default_styles_xml();
+        let styles = Structure::default_styles_xml();
         assert!(styles.contains("office:document-styles"));
         assert!(styles.contains("office:styles"));
     }
 
     #[test]
     fn test_odf_structure_default_meta_xml() {
-        let meta = OdfStructure::default_meta_xml();
+        let meta = Structure::default_meta_xml();
         assert!(meta.contains("office:document-meta"));
         assert!(meta.contains("Litchi"));
         assert!(meta.contains("meta:creation-date"));
@@ -786,14 +779,14 @@ mod tests {
 
     #[test]
     fn test_odf_structure_default_settings_xml() {
-        let settings = OdfStructure::default_settings_xml();
+        let settings = Structure::default_settings_xml();
         assert!(settings.contains("office:document-settings"));
         assert!(settings.contains("config:config-item"));
     }
 
     #[test]
     fn test_odf_structure_default_content_xml() {
-        let content = OdfStructure::default_content_xml("office:text");
+        let content = Structure::default_content_xml("office:text");
         assert!(content.contains("office:document-content"));
         assert!(content.contains("office:text"));
         assert!(content.contains("office:body"));
@@ -852,7 +845,7 @@ mod encrypted_copy_tests {
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
         source_writer
-            .set_encryption("source-password", OdfEncryptionProfile::compatible())
+            .set_encryption("source-password", Profile::compatible())
             .unwrap();
         source_writer
             .add_file("Pictures/asset.bin", b"encrypted auxiliary bytes")
@@ -877,7 +870,7 @@ mod encrypted_copy_tests {
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
         destination
-            .set_encryption("new-password", OdfEncryptionProfile::compatible())
+            .set_encryption("new-password", Profile::compatible())
             .unwrap();
         destination.copy_auxiliary_files_from(&source).unwrap();
         let rewritten =

@@ -1,6 +1,6 @@
 //! Safe, trust-neutral ODF document-signature cryptography.
 
-use super::model::{DOCUMENT_SIGNATURE_PATH, OdfDigitalSignature, parse_signature_container};
+use super::model::{DOCUMENT_SIGNATURE_PATH, DigitalSignature, parse_signature_container};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use bergshamra_c14n::{C14nMode, canonicalize};
 use litchi_core::{Error, Result, xml::escape_xml};
@@ -34,12 +34,12 @@ const SIGNED_PROPERTIES_TYPE: &str = "http://uri.etsi.org/01903#SignedProperties
 
 /// Supported XMLDSIG signature algorithms.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfSignatureAlgorithm {
+pub enum SignatureAlgorithm {
     RsaSha256,
     EcdsaP256Sha256,
 }
 
-impl OdfSignatureAlgorithm {
+impl SignatureAlgorithm {
     fn uri(self) -> &'static str {
         match self {
             Self::RsaSha256 => RSA_SHA256_URI,
@@ -58,12 +58,12 @@ impl OdfSignatureAlgorithm {
 
 /// Supported XML canonicalization modes, always without comments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfCanonicalizationAlgorithm {
+pub enum CanonicalizationAlgorithm {
     InclusiveXml10,
     ExclusiveXml10,
 }
 
-impl OdfCanonicalizationAlgorithm {
+impl CanonicalizationAlgorithm {
     fn uri(self) -> &'static str {
         match self {
             Self::InclusiveXml10 => C14N_INCLUSIVE_URI,
@@ -89,11 +89,11 @@ impl OdfCanonicalizationAlgorithm {
 
 /// Trust-neutral cryptographic result for one embedded signature.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdfSignatureVerification {
+pub struct SignatureVerification {
     pub signature_id: Option<String>,
-    pub algorithm: Option<OdfSignatureAlgorithm>,
-    pub canonicalization: Option<OdfCanonicalizationAlgorithm>,
-    pub validity: OdfSignatureValidity,
+    pub algorithm: Option<SignatureAlgorithm>,
+    pub canonicalization: Option<CanonicalizationAlgorithm>,
+    pub validity: SignatureValidity,
     pub signing_time: Option<String>,
     pub certificate_chain_der: Vec<Vec<u8>>,
     /// Certificate whose public key verified the signature, if any.
@@ -104,7 +104,7 @@ pub struct OdfSignatureVerification {
 
 /// This reports mathematical/package validity only and never PKI trust.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdfSignatureValidity {
+pub enum SignatureValidity {
     Valid,
     ReferenceDigestMismatch,
     InvalidSignature,
@@ -113,18 +113,18 @@ pub enum OdfSignatureValidity {
 }
 
 /// A validated document signer retaining PKCS#8 key bytes in zeroizing storage.
-pub struct OdfDocumentSigner {
-    algorithm: OdfSignatureAlgorithm,
-    canonicalization: OdfCanonicalizationAlgorithm,
+pub struct DocumentSigner {
+    algorithm: SignatureAlgorithm,
+    canonicalization: CanonicalizationAlgorithm,
     private_key: Zeroizing<Vec<u8>>,
     certificates: Vec<Vec<u8>>,
     signing_time: String,
 }
 
-impl OdfDocumentSigner {
+impl DocumentSigner {
     /// Parse a DER PKCS#8 private key and DER X.509 chain. The leaf certificate must be first.
     pub fn from_pkcs8_der(
-        algorithm: OdfSignatureAlgorithm,
+        algorithm: SignatureAlgorithm,
         private_key: impl AsRef<[u8]>,
         certificates: Vec<Vec<u8>>,
         signing_time: impl Into<String>,
@@ -139,7 +139,7 @@ impl OdfDocumentSigner {
 
     /// Parse an unencrypted PEM PKCS#8 key and a PEM X.509 certificate chain.
     pub fn from_pkcs8_pem(
-        algorithm: OdfSignatureAlgorithm,
+        algorithm: SignatureAlgorithm,
         private_key_pem: &str,
         certificate_chain_pem: &str,
         signing_time: impl Into<String>,
@@ -157,13 +157,13 @@ impl OdfDocumentSigner {
         )
     }
 
-    pub fn with_canonicalization(mut self, value: OdfCanonicalizationAlgorithm) -> Self {
+    pub fn with_canonicalization(mut self, value: CanonicalizationAlgorithm) -> Self {
         self.canonicalization = value;
         self
     }
 
     fn new(
-        algorithm: OdfSignatureAlgorithm,
+        algorithm: SignatureAlgorithm,
         private_key: Vec<u8>,
         certificates: Vec<Vec<u8>>,
         signing_time: String,
@@ -181,7 +181,7 @@ impl OdfDocumentSigner {
         validate_key_matches_certificate(algorithm, &private_key, &certificates[0])?;
         Ok(Self {
             algorithm,
-            canonicalization: OdfCanonicalizationAlgorithm::InclusiveXml10,
+            canonicalization: CanonicalizationAlgorithm::InclusiveXml10,
             private_key: Zeroizing::new(private_key),
             certificates,
             signing_time,
@@ -189,7 +189,7 @@ impl OdfDocumentSigner {
     }
 }
 
-pub(crate) fn sign_package(unsigned: &[u8], signer: &OdfDocumentSigner) -> Result<Vec<u8>> {
+pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<Vec<u8>> {
     let archive = ArchiveReader::new(unsigned)
         .map_err(|_| format_error("invalid ODF ZIP archive while signing"))?;
     let mut names: Vec<String> = archive
@@ -267,7 +267,7 @@ pub(crate) fn sign_package(unsigned: &[u8], signer: &OdfDocumentSigner) -> Resul
     rebuild_with_signature(&archive, &signature_xml)
 }
 
-pub(crate) fn verify_package(data: &[u8]) -> Result<Vec<OdfSignatureVerification>> {
+pub(crate) fn verify_package(data: &[u8]) -> Result<Vec<SignatureVerification>> {
     let archive = ArchiveReader::new(data).map_err(|_| format_error("invalid ODF ZIP archive"))?;
     if !archive.contains(DOCUMENT_SIGNATURE_PATH) {
         return Ok(Vec::new());
@@ -292,11 +292,11 @@ pub(crate) fn verify_package(data: &[u8]) -> Result<Vec<OdfSignatureVerification
 fn verify_one(
     archive: &ArchiveReader<'_>,
     signature_xml: &str,
-    signature: &OdfDigitalSignature,
+    signature: &DigitalSignature,
     signed_info_xml: &str,
-) -> Result<OdfSignatureVerification> {
-    let algorithm = OdfSignatureAlgorithm::parse(&signature.signature_method);
-    let canonicalization = OdfCanonicalizationAlgorithm::parse(&signature.canonicalization_method);
+) -> Result<SignatureVerification> {
+    let algorithm = SignatureAlgorithm::parse(&signature.signature_method);
+    let canonicalization = CanonicalizationAlgorithm::parse(&signature.canonicalization_method);
     let certificates = signature
         .x509_certificates
         .iter()
@@ -309,11 +309,11 @@ fn verify_one(
     for value in &certificates {
         Certificate::from_der(value).map_err(|_| format_error("invalid DER X.509 certificate"))?;
     }
-    let mut result = OdfSignatureVerification {
+    let mut result = SignatureVerification {
         signature_id: signature.id.clone(),
         algorithm,
         canonicalization,
-        validity: OdfSignatureValidity::UnsupportedAlgorithm,
+        validity: SignatureValidity::UnsupportedAlgorithm,
         signing_time: signature.signing_time.clone(),
         certificate_chain_der: certificates,
         signing_certificate_index: None,
@@ -363,7 +363,7 @@ fn verify_one(
                 return invalid("missing or duplicate same-document signature reference");
             }
             if reference.transforms.is_empty() {
-                canonicalize_fragment(&elements[0], OdfCanonicalizationAlgorithm::InclusiveXml10)?
+                canonicalize_fragment(&elements[0], CanonicalizationAlgorithm::InclusiveXml10)?
             } else {
                 apply_transforms(elements[0].as_bytes(), &reference.transforms)?
             }
@@ -375,13 +375,13 @@ fn verify_one(
             apply_transforms(&bytes, &reference.transforms)?
         };
         if Sha256::digest(&bytes).as_slice() != expected_digest.as_slice() {
-            result.validity = OdfSignatureValidity::ReferenceDigestMismatch;
+            result.validity = SignatureValidity::ReferenceDigestMismatch;
             result.failed_reference_uri = Some(reference.uri.clone());
             return Ok(result);
         }
     }
     if result.certificate_chain_der.is_empty() {
-        result.validity = OdfSignatureValidity::MissingCertificate;
+        result.validity = SignatureValidity::MissingCertificate;
         return Ok(result);
     }
     let signed_info = canonicalize_fragment(signed_info_xml, canonicalization)?;
@@ -390,12 +390,12 @@ fn verify_one(
         .map_err(|_| format_error("invalid signature value base64"))?;
     for (index, certificate) in result.certificate_chain_der.iter().enumerate() {
         if verify_bytes(algorithm, certificate, &signed_info, &signature_value).unwrap_or(false) {
-            result.validity = OdfSignatureValidity::Valid;
+            result.validity = SignatureValidity::Valid;
             result.signing_certificate_index = Some(index);
             return Ok(result);
         }
     }
-    result.validity = OdfSignatureValidity::InvalidSignature;
+    result.validity = SignatureValidity::InvalidSignature;
     Ok(result)
 }
 
@@ -403,7 +403,7 @@ fn apply_transforms(bytes: &[u8], transforms: &[String]) -> Result<Vec<u8>> {
     match transforms {
         [] => Ok(bytes.to_vec()),
         [transform] => {
-            let mode = OdfCanonicalizationAlgorithm::parse(transform)
+            let mode = CanonicalizationAlgorithm::parse(transform)
                 .ok_or_else(|| format_error("unsupported signature reference transform"))?;
             digest_input_canonical_xml(bytes, mode)
         },
@@ -411,27 +411,27 @@ fn apply_transforms(bytes: &[u8], transforms: &[String]) -> Result<Vec<u8>> {
     }
 }
 
-fn digest_input_canonical_xml(bytes: &[u8], mode: OdfCanonicalizationAlgorithm) -> Result<Vec<u8>> {
+fn digest_input_canonical_xml(bytes: &[u8], mode: CanonicalizationAlgorithm) -> Result<Vec<u8>> {
     let xml = std::str::from_utf8(bytes).map_err(|_| format_error("C14N input is not UTF-8"))?;
     canonicalize_fragment(xml, mode)
 }
 
-fn digest_canonical_xml(xml: &str, mode: OdfCanonicalizationAlgorithm) -> Result<Vec<u8>> {
+fn digest_canonical_xml(xml: &str, mode: CanonicalizationAlgorithm) -> Result<Vec<u8>> {
     Ok(Sha256::digest(canonicalize_fragment(xml, mode)?).to_vec())
 }
 
-fn digest_canonical_xml_bytes(xml: &[u8], mode: OdfCanonicalizationAlgorithm) -> Result<Vec<u8>> {
+fn digest_canonical_xml_bytes(xml: &[u8], mode: CanonicalizationAlgorithm) -> Result<Vec<u8>> {
     Ok(Sha256::digest(digest_input_canonical_xml(xml, mode)?).to_vec())
 }
 
-fn canonicalize_fragment(xml: &str, mode: OdfCanonicalizationAlgorithm) -> Result<Vec<u8>> {
+fn canonicalize_fragment(xml: &str, mode: CanonicalizationAlgorithm) -> Result<Vec<u8>> {
     canonicalize::<&str>(xml, mode.mode(), None, &[])
         .map_err(|error| format_error(format!("XML canonicalization failed: {error}")))
 }
 
-fn sign_bytes(signer: &OdfDocumentSigner, message: &[u8]) -> Result<Vec<u8>> {
+fn sign_bytes(signer: &DocumentSigner, message: &[u8]) -> Result<Vec<u8>> {
     match signer.algorithm {
-        OdfSignatureAlgorithm::RsaSha256 => {
+        SignatureAlgorithm::RsaSha256 => {
             let key = RsaPrivateKey::from_pkcs8_der(&signer.private_key)
                 .map_err(|_| format_error("invalid RSA PKCS#8 private key"))?;
             if key.n().bits() < 2048 {
@@ -440,7 +440,7 @@ fn sign_bytes(signer: &OdfDocumentSigner, message: &[u8]) -> Result<Vec<u8>> {
             let signature: RsaSignature = RsaSigningKey::<RsaSha256>::new(key).sign(message);
             Ok(signature.to_vec())
         },
-        OdfSignatureAlgorithm::EcdsaP256Sha256 => {
+        SignatureAlgorithm::EcdsaP256Sha256 => {
             let key = EcdsaSigningKey::from_pkcs8_der(&signer.private_key)
                 .map_err(|_| format_error("invalid P-256 PKCS#8 private key"))?;
             let signature: EcdsaSignature = key.sign(message);
@@ -450,7 +450,7 @@ fn sign_bytes(signer: &OdfDocumentSigner, message: &[u8]) -> Result<Vec<u8>> {
 }
 
 fn verify_bytes(
-    algorithm: OdfSignatureAlgorithm,
+    algorithm: SignatureAlgorithm,
     certificate_der: &[u8],
     message: &[u8],
     signature: &[u8],
@@ -463,7 +463,7 @@ fn verify_bytes(
         .subject_public_key
         .raw_bytes();
     Ok(match algorithm {
-        OdfSignatureAlgorithm::RsaSha256 => {
+        SignatureAlgorithm::RsaSha256 => {
             let key = RsaPublicKey::from_pkcs1_der(public)
                 .map_err(|_| format_error("certificate does not contain an RSA public key"))?;
             let signature = RsaSignature::try_from(signature)
@@ -472,7 +472,7 @@ fn verify_bytes(
                 .verify(message, &signature)
                 .is_ok()
         },
-        OdfSignatureAlgorithm::EcdsaP256Sha256 => {
+        SignatureAlgorithm::EcdsaP256Sha256 => {
             let key = VerifyingKey::from_sec1_bytes(public)
                 .map_err(|_| format_error("certificate does not contain a P-256 public key"))?;
             let signature = EcdsaSignature::from_slice(signature)
@@ -483,7 +483,7 @@ fn verify_bytes(
 }
 
 fn validate_key_matches_certificate(
-    algorithm: OdfSignatureAlgorithm,
+    algorithm: SignatureAlgorithm,
     private_key: &[u8],
     certificate: &[u8],
 ) -> Result<()> {
@@ -495,7 +495,7 @@ fn validate_key_matches_certificate(
         .subject_public_key
         .raw_bytes();
     let matches = match algorithm {
-        OdfSignatureAlgorithm::RsaSha256 => {
+        SignatureAlgorithm::RsaSha256 => {
             let private = RsaPrivateKey::from_pkcs8_der(private_key)
                 .map_err(|_| format_error("invalid RSA PKCS#8 private key"))?;
             if private.n().bits() < 2048 {
@@ -505,7 +505,7 @@ fn validate_key_matches_certificate(
                 .map_err(|_| format_error("leaf certificate is not RSA"))?;
             private.to_public_key() == certificate_key
         },
-        OdfSignatureAlgorithm::EcdsaP256Sha256 => {
+        SignatureAlgorithm::EcdsaP256Sha256 => {
             let private = EcdsaSigningKey::from_pkcs8_der(private_key)
                 .map_err(|_| format_error("invalid P-256 PKCS#8 private key"))?;
             private.verifying_key().to_encoded_point(false).as_bytes() == public

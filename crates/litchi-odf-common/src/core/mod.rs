@@ -68,9 +68,7 @@ pub mod xml;
 
 // Re-export main types for convenience
 // Manifest is internal to the package system
-pub use encryption::{
-    OdfEncryptionCipher, OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey,
-};
+pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::FamilyPackage;
 #[allow(unused_imports)]
 pub use manifest::{
@@ -83,5 +81,5 @@ pub use metadata::{
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::OwnedPackage;
-pub use writer::{OdfStructure, PackageWriter};
+pub use writer::{PackageWriter, Structure};
 pub use xml::{Content, Meta, Styles};

@@ -8,7 +8,7 @@ use crate::Document;
 use crate::ReferenceMark;
 use crate::TextIndex;
 use crate::TextIndexMark;
-use crate::core::{MetaXmlPatch, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml};
+use crate::core::{MetaXmlPatch, OwnedPackage, PackageWriter, Structure, patch_meta_xml};
 use crate::elements::field::{DynamicTextField, FieldParser};
 use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
@@ -345,7 +345,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .clone()
-            .unwrap_or_else(OdfStructure::default_styles_xml);
+            .unwrap_or_else(Structure::default_styles_xml);
         self.styles_xml = Some(crate::set_ruby_style_xml(&styles, style)?);
         Ok(old)
     }
@@ -421,7 +421,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .clone()
-            .unwrap_or_else(OdfStructure::default_styles_xml);
+            .unwrap_or_else(Structure::default_styles_xml);
         let (updated, old) =
             crate::font_face::set_styles_font_face_declarations_xml(&styles, declarations)?;
         self.styles_xml = Some(updated);
@@ -541,7 +541,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .clone()
-            .unwrap_or_else(OdfStructure::default_styles_xml);
+            .unwrap_or_else(Structure::default_styles_xml);
         let (updated, old) = crate::set_outline_style_xml(&styles, style)?;
         self.styles_xml = Some(updated);
         Ok(old)
@@ -576,7 +576,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .clone()
-            .unwrap_or_else(OdfStructure::default_styles_xml);
+            .unwrap_or_else(Structure::default_styles_xml);
         self.styles_xml = Some(crate::set_notes_configuration_xml(&styles, configuration)?);
         Ok(old)
     }
@@ -600,7 +600,7 @@ impl MutableDocument {
         let mut styles = self
             .styles_xml
             .clone()
-            .unwrap_or_else(OdfStructure::default_styles_xml);
+            .unwrap_or_else(Structure::default_styles_xml);
         for note_class in crate::notes_configuration::NoteClass::ALL {
             styles = match configurations.get(note_class) {
                 Some(configuration) => crate::set_notes_configuration_xml(&styles, configuration)?,
@@ -651,7 +651,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .clone()
-            .unwrap_or_else(OdfStructure::default_styles_xml);
+            .unwrap_or_else(Structure::default_styles_xml);
         self.styles_xml = Some(
             crate::bibliography_configuration::set_bibliography_configuration_xml(
                 &styles,
@@ -702,7 +702,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .clone()
-            .unwrap_or_else(OdfStructure::default_styles_xml);
+            .unwrap_or_else(Structure::default_styles_xml);
         self.styles_xml = Some(crate::line_numbering::set_line_numbering_configuration_xml(
             &styles,
             configuration,
@@ -2150,7 +2150,7 @@ impl MutableDocument {
     pub fn add_master_page(&mut self, name: &str, page_layout_name: &str) -> Result<()> {
         let styles = self
             .styles_xml
-            .get_or_insert_with(OdfStructure::default_styles_xml);
+            .get_or_insert_with(Structure::default_styles_xml);
         *styles = add_master_page(styles, name, page_layout_name)?;
         Ok(())
     }
@@ -2160,7 +2160,7 @@ impl MutableDocument {
         let fragment = page.to_xml_fragment()?;
         let styles = self
             .styles_xml
-            .get_or_insert_with(OdfStructure::default_styles_xml);
+            .get_or_insert_with(Structure::default_styles_xml);
         *styles = crate::insert_master_page_xml(styles, &fragment)?;
         Ok(())
     }
@@ -2951,7 +2951,7 @@ impl MutableDocument {
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml (preserved or default)
-        let default_styles = OdfStructure::default_styles_xml();
+        let default_styles = Structure::default_styles_xml();
         let styles_xml = self.styles_xml.as_deref().unwrap_or(&default_styles);
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 
