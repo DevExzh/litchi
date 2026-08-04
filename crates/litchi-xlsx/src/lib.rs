@@ -125,17 +125,16 @@ pub use named_sheet_view::{
 };
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{OutlineProperties, parse_outline_properties};
-pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
+pub use page_margins::{Margins, PageMargin, parse_page_margins};
 pub use page_setup::{
     Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, LexicalError, Measure, Order, Orientation,
     Paper, RangeError, RelId, Scale, Setup, Unit, parse_worksheet_page_setup,
     parse_worksheet_page_setup_relationship_id,
 };
 pub use phonetic_properties::{
-    WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
-    parse_worksheet_phonetic_properties,
+    PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
-pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+pub use print_options::{PrintOptions, parse_print_options};
 // Query-table semantic types remain under the contextual `query_table` owner;
 // package operations are also available at this convenience facade.
 pub use query_table::{

@@ -159,14 +159,11 @@ pub use litchi_xlsx::ignored_errors::{
     IgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
 pub use litchi_xlsx::outline_properties::{OutlineProperties, parse_outline_properties};
-pub use litchi_xlsx::page_margins::{
-    PageMargin, WorksheetPageMargins, parse_worksheet_page_margins,
-};
+pub use litchi_xlsx::page_margins::{Margins, PageMargin, parse_page_margins};
 pub use litchi_xlsx::phonetic_properties::{
-    WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
-    parse_worksheet_phonetic_properties,
+    PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
-pub use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+pub use litchi_xlsx::print_options::{PrintOptions, parse_print_options};
 pub use litchi_xlsx::sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
     parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,

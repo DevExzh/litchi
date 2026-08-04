@@ -17,7 +17,7 @@ const MAX_EVENTS: usize = 1_000_000;
 
 /// The effective flags from one worksheet `printOptions` element.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct WorksheetPrintOptions {
+pub struct PrintOptions {
     horizontal_centered: bool,
     vertical_centered: bool,
     print_headings: bool,
@@ -25,7 +25,7 @@ pub struct WorksheetPrintOptions {
     grid_lines_set: bool,
 }
 
-impl WorksheetPrintOptions {
+impl PrintOptions {
     /// Center the printed content horizontally on the page.
     pub fn horizontal_centered(&self) -> bool {
         self.horizontal_centered
@@ -60,7 +60,7 @@ impl WorksheetPrintOptions {
 }
 
 /// Parse a worksheet's optional core `printOptions` element.
-pub fn parse_worksheet_print_options(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
+pub fn parse_print_options(xml: &[u8]) -> Result<Option<PrintOptions>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
@@ -82,14 +82,14 @@ pub fn parse_worksheet_print_options(xml: &[u8]) -> Result<Option<WorksheetPrint
     parse_selected(selected)
 }
 
-fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
+fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
     let mut result = None;
-    let mut open: Option<(usize, WorksheetPrintOptions)> = None;
+    let mut open: Option<(usize, PrintOptions)> = None;
     let mut declaration_seen = false;
     let mut events = 0usize;
     reader.config_mut().check_end_names = true;
@@ -241,8 +241,8 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPrintOptions>> {
     Ok(result)
 }
 
-fn parse_options(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetPrintOptions> {
-    let mut options = WorksheetPrintOptions::default();
+fn parse_options(element: &BytesStart<'_>, decoder: Decoder) -> Result<PrintOptions> {
+    let mut options = PrintOptions::default();
     let mut seen = [false; 5];
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
@@ -306,14 +306,14 @@ mod tests {
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
     const CORE_STR: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(body: &str) -> Result<Option<WorksheetPrintOptions>> {
-        parse_worksheet_print_options(format!("{START}{body}</worksheet>").as_bytes())
+    fn parse(body: &str) -> Result<Option<PrintOptions>> {
+        parse_print_options(format!("{START}{body}</worksheet>").as_bytes())
     }
 
-    fn parse_fixture(path: &str) -> WorksheetPrintOptions {
+    fn parse_fixture(path: &str) -> PrintOptions {
         let package = OpcPackage::open(path).unwrap();
         let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
-        parse_worksheet_print_options(package.get_part(&uri).unwrap().blob())
+        parse_print_options(package.get_part(&uri).unwrap().blob())
             .unwrap()
             .unwrap()
     }
@@ -329,7 +329,7 @@ mod tests {
         assert!(!options.prints_grid_lines());
         assert_eq!(
             parse("<printOptions/>").unwrap().unwrap(),
-            WorksheetPrintOptions::default()
+            PrintOptions::default()
         );
     }
 
@@ -337,7 +337,7 @@ mod tests {
     fn accepts_strict_namespace_and_absence() {
         let xml = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><printOptions gridLines="1" gridLinesSet="true"/></worksheet>"#;
         assert!(
-            parse_worksheet_print_options(xml)
+            parse_print_options(xml)
                 .unwrap()
                 .unwrap()
                 .prints_grid_lines()
@@ -356,11 +356,11 @@ mod tests {
     #[test]
     fn rejects_malformed_closing_state_without_panicking() {
         let xml = format!(r#"{START}<printOptions/></worksheet><printOptions/>"#);
-        let parsed = std::panic::catch_unwind(|| parse_worksheet_print_options(xml.as_bytes()));
+        let parsed = std::panic::catch_unwind(|| parse_print_options(xml.as_bytes()));
         assert!(matches!(parsed, Ok(Err(_))));
 
         let incomplete = format!(r#"{START}<printOptions>"#);
-        assert!(parse_worksheet_print_options(incomplete.as_bytes()).is_err());
+        assert!(parse_print_options(incomplete.as_bytes()).is_err());
     }
 
     #[test]
@@ -376,7 +376,7 @@ mod tests {
             format!(r#"{}<![CDATA[data]]></worksheet>"#, START),
         ] {
             assert!(
-                parse_worksheet_print_options(xml.as_bytes()).is_err(),
+                parse_print_options(xml.as_bytes()).is_err(),
                 "expected rejection for {xml}"
             );
         }
@@ -389,7 +389,7 @@ mod tests {
             xml.push_str("</extension>");
         }
         xml.push_str("</worksheet>");
-        assert!(parse_worksheet_print_options(xml.as_bytes()).is_err());
+        assert!(parse_print_options(xml.as_bytes()).is_err());
     }
 
     #[test]

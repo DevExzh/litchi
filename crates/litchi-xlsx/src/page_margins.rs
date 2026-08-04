@@ -39,7 +39,7 @@ impl PageMargin {
 
 /// The six required margins from one worksheet `pageMargins` element.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct WorksheetPageMargins {
+pub struct Margins {
     left: PageMargin,
     right: PageMargin,
     top: PageMargin,
@@ -48,7 +48,7 @@ pub struct WorksheetPageMargins {
     footer: PageMargin,
 }
 
-impl WorksheetPageMargins {
+impl Margins {
     pub fn left(&self) -> PageMargin {
         self.left
     }
@@ -70,7 +70,7 @@ impl WorksheetPageMargins {
 }
 
 /// Parse a worksheet's optional core `pageMargins` element.
-pub fn parse_worksheet_page_margins(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
+pub fn parse_page_margins(xml: &[u8]) -> Result<Option<Margins>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
@@ -92,14 +92,14 @@ pub fn parse_worksheet_page_margins(xml: &[u8]) -> Result<Option<WorksheetPageMa
     parse_selected(selected)
 }
 
-fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
+fn parse_selected(xml: &[u8]) -> Result<Option<Margins>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
     let mut result = None;
-    let mut open: Option<(usize, WorksheetPageMargins)> = None;
+    let mut open: Option<(usize, Margins)> = None;
     let mut declaration_seen = false;
     let mut events = 0usize;
     reader.config_mut().check_end_names = true;
@@ -251,7 +251,7 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageMargins>> {
     Ok(result)
 }
 
-fn parse_margins(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetPageMargins> {
+fn parse_margins(element: &BytesStart<'_>, decoder: Decoder) -> Result<Margins> {
     let mut values = [None; 6];
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
@@ -281,7 +281,7 @@ fn parse_margins(element: &BytesStart<'_>, decoder: Decoder) -> Result<Worksheet
         values[slot] = Some(parse_margin(&raw, attribute.key.local_name().as_ref())?);
     }
     let [left, right, top, bottom, header, footer] = values;
-    Ok(WorksheetPageMargins {
+    Ok(Margins {
         left: left.ok_or_else(|| missing("left"))?,
         right: right.ok_or_else(|| missing("right"))?,
         top: top.ok_or_else(|| missing("top"))?,
@@ -336,14 +336,14 @@ mod tests {
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
     const CORE_NAMESPACE: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(body: &str) -> Result<Option<WorksheetPageMargins>> {
-        parse_worksheet_page_margins(format!("{START}{body}</worksheet>").as_bytes())
+    fn parse(body: &str) -> Result<Option<Margins>> {
+        parse_page_margins(format!("{START}{body}</worksheet>").as_bytes())
     }
 
-    fn parse_fixture(path: &str) -> WorksheetPageMargins {
+    fn parse_fixture(path: &str) -> Margins {
         let package = OpcPackage::open(path).unwrap();
         let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
-        parse_worksheet_page_margins(package.get_part(&uri).unwrap().blob())
+        parse_page_margins(package.get_part(&uri).unwrap().blob())
             .unwrap()
             .unwrap()
     }
@@ -365,11 +365,7 @@ mod tests {
     fn accepts_strict_namespace_and_absence() {
         let xml = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><pageMargins left="1" right="2" top="3" bottom="4" header="5" footer="6"/></worksheet>"#;
         assert_eq!(
-            parse_worksheet_page_margins(xml)
-                .unwrap()
-                .unwrap()
-                .footer()
-                .inches(),
+            parse_page_margins(xml).unwrap().unwrap().footer().inches(),
             6.0
         );
         assert!(parse("").unwrap().is_none());
@@ -405,7 +401,7 @@ mod tests {
             format!(r#"{}<![CDATA[data]]></worksheet>"#, START),
         ] {
             assert!(
-                parse_worksheet_page_margins(xml.as_bytes()).is_err(),
+                parse_page_margins(xml.as_bytes()).is_err(),
                 "expected rejection for {xml}"
             );
         }
@@ -418,7 +414,7 @@ mod tests {
             xml.push_str("</extension>");
         }
         xml.push_str("</worksheet>");
-        assert!(parse_worksheet_page_margins(xml.as_bytes()).is_err());
+        assert!(parse_page_margins(xml.as_bytes()).is_err());
     }
 
     #[test]

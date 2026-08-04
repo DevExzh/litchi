@@ -15,14 +15,14 @@ const MAX_EVENTS: usize = 1_000_000;
 
 /// East Asian character conversion used for worksheet phonetic text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetPhoneticType {
+pub enum PhoneticType {
     HalfWidthKatakana,
     FullWidthKatakana,
     Hiragana,
     NoConversion,
 }
 
-impl WorksheetPhoneticType {
+impl PhoneticType {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "halfwidthKatakana" => Ok(Self::HalfWidthKatakana),
@@ -38,14 +38,14 @@ impl WorksheetPhoneticType {
 
 /// Alignment of phonetic text relative to its base text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetPhoneticAlignment {
+pub enum PhoneticAlignment {
     NoControl,
     Left,
     Center,
     Distributed,
 }
 
-impl WorksheetPhoneticAlignment {
+impl PhoneticAlignment {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "noControl" => Ok(Self::NoControl),
@@ -61,21 +61,21 @@ impl WorksheetPhoneticAlignment {
 
 /// Effective default formatting from a worksheet's direct `phoneticPr` child.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WorksheetPhoneticProperties {
+pub struct PhoneticProperties {
     font_id: u32,
-    phonetic_type: WorksheetPhoneticType,
-    alignment: WorksheetPhoneticAlignment,
+    phonetic_type: PhoneticType,
+    alignment: PhoneticAlignment,
 }
 
-impl WorksheetPhoneticProperties {
+impl PhoneticProperties {
     /// Zero-based font index. Out-of-range indices fall back to the Normal-style font.
     pub fn font_id(&self) -> u32 {
         self.font_id
     }
-    pub fn phonetic_type(&self) -> WorksheetPhoneticType {
+    pub fn phonetic_type(&self) -> PhoneticType {
         self.phonetic_type
     }
-    pub fn alignment(&self) -> WorksheetPhoneticAlignment {
+    pub fn alignment(&self) -> PhoneticAlignment {
         self.alignment
     }
 }
@@ -89,14 +89,12 @@ enum Context {
 
 struct Parser {
     stack: Vec<Context>,
-    properties: Option<WorksheetPhoneticProperties>,
+    properties: Option<PhoneticProperties>,
     seen_properties: bool,
 }
 
 /// Parse the worksheet's exact `worksheet/phoneticPr` child path.
-pub fn parse_worksheet_phonetic_properties(
-    xml: &[u8],
-) -> Result<Option<WorksheetPhoneticProperties>> {
+pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
@@ -297,7 +295,7 @@ fn parse_attributes(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<WorksheetPhoneticProperties> {
+) -> Result<PhoneticProperties> {
     let mut font_id = None;
     let mut phonetic_type = None;
     let mut alignment = None;
@@ -318,14 +316,10 @@ fn parse_attributes(
             .map_err(xml_error)?;
         match local.as_ref() {
             b"fontId" => set_once(&mut font_id, parse_font_id(&value)?, "fontId")?,
-            b"type" => set_once(
-                &mut phonetic_type,
-                WorksheetPhoneticType::parse(&value)?,
-                "type",
-            )?,
+            b"type" => set_once(&mut phonetic_type, PhoneticType::parse(&value)?, "type")?,
             b"alignment" => set_once(
                 &mut alignment,
-                WorksheetPhoneticAlignment::parse(&value)?,
+                PhoneticAlignment::parse(&value)?,
                 "alignment",
             )?,
             name => {
@@ -336,10 +330,10 @@ fn parse_attributes(
             },
         }
     }
-    Ok(WorksheetPhoneticProperties {
+    Ok(PhoneticProperties {
         font_id: font_id.ok_or_else(|| invalid("worksheet phoneticPr requires fontId"))?,
-        phonetic_type: phonetic_type.unwrap_or(WorksheetPhoneticType::FullWidthKatakana),
-        alignment: alignment.unwrap_or(WorksheetPhoneticAlignment::Left),
+        phonetic_type: phonetic_type.unwrap_or(PhoneticType::FullWidthKatakana),
+        alignment: alignment.unwrap_or(PhoneticAlignment::Left),
     })
 }
 
@@ -392,8 +386,8 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetPhoneticProperties>> {
-        parse_worksheet_phonetic_properties(
+    fn parse(child: &str) -> Result<Option<PhoneticProperties>> {
+        parse_phonetic_properties(
             format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
         )
     }
@@ -404,23 +398,14 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(defaults.font_id(), u32::MAX);
-        assert_eq!(
-            defaults.phonetic_type(),
-            WorksheetPhoneticType::FullWidthKatakana
-        );
-        assert_eq!(defaults.alignment(), WorksheetPhoneticAlignment::Left);
+        assert_eq!(defaults.phonetic_type(), PhoneticType::FullWidthKatakana);
+        assert_eq!(defaults.alignment(), PhoneticAlignment::Left);
 
         for (lexical, expected) in [
-            (
-                "halfwidthKatakana",
-                WorksheetPhoneticType::HalfWidthKatakana,
-            ),
-            (
-                "fullwidthKatakana",
-                WorksheetPhoneticType::FullWidthKatakana,
-            ),
-            ("Hiragana", WorksheetPhoneticType::Hiragana),
-            ("noConversion", WorksheetPhoneticType::NoConversion),
+            ("halfwidthKatakana", PhoneticType::HalfWidthKatakana),
+            ("fullwidthKatakana", PhoneticType::FullWidthKatakana),
+            ("Hiragana", PhoneticType::Hiragana),
+            ("noConversion", PhoneticType::NoConversion),
         ] {
             let value = parse(&format!(r#"<phoneticPr fontId="3" type="{lexical}"/>"#))
                 .unwrap()
@@ -428,10 +413,10 @@ mod tests {
             assert_eq!(value.phonetic_type(), expected);
         }
         for (lexical, expected) in [
-            ("noControl", WorksheetPhoneticAlignment::NoControl),
-            ("left", WorksheetPhoneticAlignment::Left),
-            ("center", WorksheetPhoneticAlignment::Center),
-            ("distributed", WorksheetPhoneticAlignment::Distributed),
+            ("noControl", PhoneticAlignment::NoControl),
+            ("left", PhoneticAlignment::Left),
+            ("center", PhoneticAlignment::Center),
+            ("distributed", PhoneticAlignment::Distributed),
         ] {
             let value = parse(&format!(
                 r#"<phoneticPr fontId="3" alignment="{lexical}"/>"#
@@ -446,12 +431,10 @@ mod tests {
     #[test]
     fn supports_strict_mce_and_exact_scoping() {
         let strict = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><phoneticPr fontId="9" type="Hiragana" alignment="center"/></worksheet>"#;
-        let value = parse_worksheet_phonetic_properties(strict)
-            .unwrap()
-            .unwrap();
+        let value = parse_phonetic_properties(strict).unwrap().unwrap();
         assert_eq!(value.font_id(), 9);
-        assert_eq!(value.phonetic_type(), WorksheetPhoneticType::Hiragana);
-        assert_eq!(value.alignment(), WorksheetPhoneticAlignment::Center);
+        assert_eq!(value.phonetic_type(), PhoneticType::Hiragana);
+        assert_eq!(value.alignment(), PhoneticAlignment::Center);
 
         let mce = format!(
             concat!(
@@ -463,7 +446,7 @@ mod tests {
             NS
         );
         assert_eq!(
-            parse_worksheet_phonetic_properties(mce.as_bytes())
+            parse_phonetic_properties(mce.as_bytes())
                 .unwrap()
                 .unwrap()
                 .font_id(),
@@ -506,7 +489,7 @@ mod tests {
             format!(r#"<worksheet xmlns="{NS}"><phoneticPr></worksheet>"#),
         ] {
             assert!(
-                parse_worksheet_phonetic_properties(xml.as_bytes()).is_err(),
+                parse_phonetic_properties(xml.as_bytes()).is_err(),
                 "expected rejection for {xml}"
             );
         }
@@ -519,17 +502,15 @@ mod tests {
             xml.push_str("</extension>");
         }
         xml.push_str("</worksheet>");
-        assert!(parse_worksheet_phonetic_properties(xml.as_bytes()).is_err());
+        assert!(parse_phonetic_properties(xml.as_bytes()).is_err());
     }
 
-    fn fixture(bytes: &[u8]) -> WorksheetPhoneticProperties {
+    fn fixture(bytes: &[u8]) -> PhoneticProperties {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .unwrap();
-        parse_worksheet_phonetic_properties(part.blob())
-            .unwrap()
-            .unwrap()
+        parse_phonetic_properties(part.blob()).unwrap().unwrap()
     }
 
     #[test]
@@ -541,7 +522,7 @@ mod tests {
         assert_eq!(preserve_attributes.font_id(), 3);
         assert_eq!(
             preserve_attributes.phonetic_type(),
-            WorksheetPhoneticType::NoConversion
+            PhoneticType::NoConversion
         );
 
         let poi = fixture(include_bytes!(concat!(
@@ -549,18 +530,15 @@ mod tests {
             "/../../test-data/poi/test-data/spreadsheet/54071.xlsx"
         )));
         assert_eq!(poi.font_id(), 1);
-        assert_eq!(poi.phonetic_type(), WorksheetPhoneticType::NoConversion);
-        assert_eq!(poi.alignment(), WorksheetPhoneticAlignment::Left);
+        assert_eq!(poi.phonetic_type(), PhoneticType::NoConversion);
+        assert_eq!(poi.alignment(), PhoneticAlignment::Left);
 
         let libreoffice = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx"
         )));
         assert_eq!(libreoffice.font_id(), 1);
-        assert_eq!(
-            libreoffice.phonetic_type(),
-            WorksheetPhoneticType::NoConversion
-        );
-        assert_eq!(libreoffice.alignment(), WorksheetPhoneticAlignment::Left);
+        assert_eq!(libreoffice.phonetic_type(), PhoneticType::NoConversion);
+        assert_eq!(libreoffice.alignment(), PhoneticAlignment::Left);
     }
 }

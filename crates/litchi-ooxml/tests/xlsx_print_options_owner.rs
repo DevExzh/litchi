@@ -1,4 +1,4 @@
-use litchi_ooxml::xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+use litchi_ooxml::xlsx::print_options::{PrintOptions, parse_print_options};
 
 #[test]
 fn host_reexports_the_canonical_print_options_owner() {
@@ -7,14 +7,12 @@ fn host_reexports_the_canonical_print_options_owner() {
         r#"<printOptions horizontalCentered="1" gridLines="1" gridLinesSet="true"/>"#,
         r#"</worksheet>"#,
     );
-    let value = parse_worksheet_print_options(document.as_bytes())
-        .unwrap()
-        .unwrap();
+    let value = parse_print_options(document.as_bytes()).unwrap().unwrap();
 
-    fn accepts_canonical_owner(_: &litchi_xlsx::print_options::WorksheetPrintOptions) {}
+    fn accepts_canonical_owner(_: &litchi_xlsx::print_options::PrintOptions) {}
     accepts_canonical_owner(&value);
 
-    let _: &WorksheetPrintOptions = &value;
+    let _: &PrintOptions = &value;
     assert!(value.horizontal_centered());
     assert!(value.prints_grid_lines());
 }

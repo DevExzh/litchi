@@ -59,11 +59,9 @@ use super::{
 use litchi_xlsx::cell_watches::{CellWatches, parse_cell_watches};
 use litchi_xlsx::ignored_errors::{IgnoredErrors, parse_worksheet_ignored_errors};
 use litchi_xlsx::outline_properties::OutlineProperties;
-use litchi_xlsx::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
-use litchi_xlsx::phonetic_properties::{
-    WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
-};
-use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+use litchi_xlsx::page_margins::{Margins, parse_page_margins};
+use litchi_xlsx::phonetic_properties::{PhoneticProperties, parse_phonetic_properties};
+use litchi_xlsx::print_options::{PrintOptions, parse_print_options};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::scenarios::{Scenarios, parse_worksheet_scenarios};
 use litchi_xlsx::web::Bindings;
@@ -218,9 +216,9 @@ pub struct Worksheet<'a> {
     /// Static worksheet header/footer settings.
     header_footer: Option<Settings>,
     /// Static worksheet page margins.
-    page_margins: Option<WorksheetPageMargins>,
+    page_margins: Option<Margins>,
     /// Static worksheet print options.
-    print_options: Option<WorksheetPrintOptions>,
+    print_options: Option<PrintOptions>,
     /// Typed static worksheet page setup.
     page_setup: Option<Setup>,
     /// Effective static worksheet row/column defaults and outline metadata.
@@ -238,7 +236,7 @@ pub struct Worksheet<'a> {
     /// Complete worksheet-level properties from `sheetPr`.
     sheet_properties: Option<WorksheetSheetProperties>,
     /// Default East Asian phonetic text formatting.
-    phonetic_properties: Option<WorksheetPhoneticProperties>,
+    phonetic_properties: Option<PhoneticProperties>,
     /// Data consolidation function, labels, linking, and source references.
     data_consolidation: Option<DataConsolidation>,
     /// Manual row page breaks
@@ -409,8 +407,8 @@ impl<'a> Worksheet<'a> {
         let sheet_view_collection = parse_worksheet_views(sheet_data.as_bytes())?;
         let protection_metadata = parse_worksheet_protection(sheet_data.as_bytes())?;
         let header_footer = parse_worksheet_header_footer(sheet_data.as_bytes())?;
-        let page_margins = parse_worksheet_page_margins(sheet_data.as_bytes())?;
-        let print_options = parse_worksheet_print_options(sheet_data.as_bytes())?;
+        let page_margins = parse_page_margins(sheet_data.as_bytes())?;
+        let print_options = parse_print_options(sheet_data.as_bytes())?;
         let page_setup = parse_worksheet_page_setup(sheet_data.as_bytes())?;
         let sheet_format_properties =
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
@@ -420,7 +418,7 @@ impl<'a> Worksheet<'a> {
             parse_worksheet_sheet_calculation_properties(sheet_data.as_bytes())?;
         let scenarios = parse_worksheet_scenarios(sheet_data.as_bytes())?;
         let sheet_properties = parse_worksheet_sheet_properties(sheet_data.as_bytes())?;
-        let phonetic_properties = parse_worksheet_phonetic_properties(sheet_data.as_bytes())?;
+        let phonetic_properties = parse_phonetic_properties(sheet_data.as_bytes())?;
         let data_consolidation = parse_worksheet_data_consolidation(sheet_data.as_bytes())?;
         let outline_properties = sheet_properties
             .as_ref()
@@ -2023,7 +2021,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Default East Asian phonetic text formatting, when explicitly present.
-    pub fn phonetic_properties(&self) -> Option<&WorksheetPhoneticProperties> {
+    pub fn phonetic_properties(&self) -> Option<&PhoneticProperties> {
         self.phonetic_properties.as_ref()
     }
 
@@ -2035,14 +2033,14 @@ impl<'a> Worksheet<'a> {
     // ===== Print Options =====
 
     /// Complete immutable worksheet print options, when explicitly present.
-    pub fn print_options(&self) -> Option<&WorksheetPrintOptions> {
+    pub fn print_options(&self) -> Option<&PrintOptions> {
         self.print_options.as_ref()
     }
 
     // ===== Page Margins =====
 
     /// Complete immutable worksheet page margins, when explicitly present.
-    pub fn page_margins(&self) -> Option<&WorksheetPageMargins> {
+    pub fn page_margins(&self) -> Option<&Margins> {
         self.page_margins.as_ref()
     }
 
