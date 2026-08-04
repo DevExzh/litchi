@@ -131,9 +131,8 @@ pub use litchi_xlsx::cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };
 pub use litchi_xlsx::scenarios::{
-    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,
-    WorksheetScenarioInputCell, WorksheetScenarios, parse_worksheet_scenarios,
-    write_worksheet_scenarios,
+    InputCell, Scenario, ScenarioCellReference, ScenarioRangeReference, Scenarios,
+    parse_worksheet_scenarios, write_worksheet_scenarios,
 };
 pub use query_table::{
     QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,

@@ -65,7 +65,7 @@ use litchi_xlsx::phonetic_properties::{
 };
 use litchi_xlsx::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use litchi_xlsx::raw::web as raw_web;
-use litchi_xlsx::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};
+use litchi_xlsx::scenarios::{Scenarios, parse_worksheet_scenarios};
 use litchi_xlsx::web::Bindings;
 
 /// Information about a worksheet
@@ -232,7 +232,7 @@ pub struct Worksheet<'a> {
     /// Worksheet-level calculation properties from `sheetCalcPr`.
     sheet_calculation_properties: Option<WorksheetSheetCalculationProperties>,
     /// Worksheet what-if scenario collection.
-    scenarios: Option<WorksheetScenarios>,
+    scenarios: Option<Scenarios>,
     /// Effective worksheet outline and summary-placement policy.
     outline_properties: Option<OutlineProperties>,
     /// Complete worksheet-level properties from `sheetPr`.
@@ -2006,7 +2006,7 @@ impl<'a> Worksheet<'a> {
     // ===== Scenarios =====
 
     /// Worksheet what-if scenario collection, when present.
-    pub fn scenarios(&self) -> Option<&WorksheetScenarios> {
+    pub fn scenarios(&self) -> Option<&Scenarios> {
         self.scenarios.as_ref()
     }
 

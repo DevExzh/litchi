@@ -26,12 +26,12 @@ const MAX_COLUMN: u32 = 16_384;
 
 /// Namespace form used when serializing a scenarios fragment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorksheetScenarioConformance {
+pub enum Conformance {
     Transitional,
     Strict,
 }
 
-impl WorksheetScenarioConformance {
+impl Conformance {
     fn main_namespace(self) -> &'static str {
         match self {
             Self::Transitional => TRANSITIONAL_MAIN,
@@ -74,7 +74,7 @@ impl ScenarioRangeReference {
 
 /// One substitute value assignment (`CT_InputCells`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetScenarioInputCell {
+pub struct InputCell {
     reference: ScenarioCellReference,
     deleted: bool,
     undone: bool,
@@ -82,7 +82,7 @@ pub struct WorksheetScenarioInputCell {
     number_format_id: Option<u32>,
 }
 
-impl WorksheetScenarioInputCell {
+impl InputCell {
     pub fn new(reference: ScenarioCellReference, value: impl Into<String>) -> Result<Self> {
         let value = checked_xstring(value.into(), "inputCells val")?;
         Ok(Self {
@@ -126,17 +126,17 @@ impl WorksheetScenarioInputCell {
 
 /// One named what-if scenario (`CT_Scenario`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetScenario {
+pub struct Scenario {
     name: String,
     locked: bool,
     hidden: bool,
     count: Option<u32>,
     user: Option<String>,
     comment: Option<String>,
-    input_cells: Vec<WorksheetScenarioInputCell>,
+    input_cells: Vec<InputCell>,
 }
 
-impl WorksheetScenario {
+impl Scenario {
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let name = checked_xstring(name.into(), "scenario name")?;
         Ok(Self {
@@ -170,7 +170,7 @@ impl WorksheetScenario {
         self.comment = Some(checked_xstring(value.into(), "scenario comment")?);
         Ok(self)
     }
-    pub fn with_input_cells(mut self, value: Vec<WorksheetScenarioInputCell>) -> Result<Self> {
+    pub fn with_input_cells(mut self, value: Vec<InputCell>) -> Result<Self> {
         if value.len() > MAX_INPUT_CELLS {
             return Err(invalid(format!(
                 "scenario inputCells exceeds safety limit {MAX_INPUT_CELLS}"
@@ -198,22 +198,22 @@ impl WorksheetScenario {
     pub fn comment(&self) -> Option<&str> {
         self.comment.as_deref()
     }
-    pub fn input_cells(&self) -> &[WorksheetScenarioInputCell] {
+    pub fn input_cells(&self) -> &[InputCell] {
         &self.input_cells
     }
 }
 
 /// The worksheet `scenarios` collection in document order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorksheetScenarios {
+pub struct Scenarios {
     current: Option<u32>,
     show: Option<u32>,
     ranges: Vec<ScenarioRangeReference>,
-    scenarios: Vec<WorksheetScenario>,
+    scenarios: Vec<Scenario>,
 }
 
-impl WorksheetScenarios {
-    pub fn new(scenarios: Vec<WorksheetScenario>) -> Result<Self> {
+impl Scenarios {
+    pub fn new(scenarios: Vec<Scenario>) -> Result<Self> {
         if scenarios.is_empty() {
             return Err(invalid("scenarios requires at least one scenario"));
         }
@@ -257,7 +257,7 @@ impl WorksheetScenarios {
     pub fn ranges(&self) -> &[ScenarioRangeReference] {
         &self.ranges
     }
-    pub fn scenarios(&self) -> &[WorksheetScenario] {
+    pub fn scenarios(&self) -> &[Scenario] {
         &self.scenarios
     }
 }
@@ -279,7 +279,7 @@ enum NamespaceKind {
 }
 
 /// Parses the direct worksheet `scenarios` child after applying shared MCE processing.
-pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<WorksheetScenarios>> {
+pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Scenarios>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML exceeds safety limit"));
     }
@@ -471,7 +471,7 @@ struct ScenariosBuilder {
     current: Option<u32>,
     show: Option<u32>,
     ranges: Vec<ScenarioRangeReference>,
-    scenarios: Vec<WorksheetScenario>,
+    scenarios: Vec<Scenario>,
     open_scenario: Option<ScenarioBuilder>,
 }
 
@@ -483,7 +483,7 @@ struct ScenarioBuilder {
     count: Option<u32>,
     user: Option<String>,
     comment: Option<String>,
-    input_cells: Vec<WorksheetScenarioInputCell>,
+    input_cells: Vec<InputCell>,
 }
 
 fn begin_element(
@@ -585,7 +585,7 @@ fn end_scope(scope: Scope, state: &mut Option<ScenariosBuilder>) -> Result<()> {
     let name = scenario
         .name
         .ok_or_else(|| invalid("scenario requires name"))?;
-    builder.scenarios.push(WorksheetScenario {
+    builder.scenarios.push(Scenario {
         name,
         locked: scenario.locked.unwrap_or(false),
         hidden: scenario.hidden.unwrap_or(false),
@@ -597,11 +597,11 @@ fn end_scope(scope: Scope, state: &mut Option<ScenariosBuilder>) -> Result<()> {
     Ok(())
 }
 
-fn finish_builder(builder: ScenariosBuilder) -> Result<WorksheetScenarios> {
+fn finish_builder(builder: ScenariosBuilder) -> Result<Scenarios> {
     if builder.scenarios.is_empty() {
         return Err(invalid("scenarios requires at least one scenario"));
     }
-    Ok(WorksheetScenarios {
+    Ok(Scenarios {
         current: builder.current,
         show: builder.show,
         ranges: builder.ranges,
@@ -697,7 +697,7 @@ fn parse_scenario_attributes(
 fn parse_input_cell_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<WorksheetScenarioInputCell> {
+) -> Result<InputCell> {
     let mut reference = None;
     let mut deleted = None;
     let mut undone = None;
@@ -734,7 +734,7 @@ fn parse_input_cell_attributes(
             _ => return Err(invalid("unknown inputCells attribute")),
         }
     }
-    Ok(WorksheetScenarioInputCell {
+    Ok(InputCell {
         reference: reference.ok_or_else(|| invalid("inputCells requires r"))?,
         deleted: deleted.unwrap_or(false),
         undone: undone.unwrap_or(false),
@@ -744,10 +744,7 @@ fn parse_input_cell_attributes(
 }
 
 /// Serializes one canonical, namespace-complete `scenarios` fragment.
-pub fn write_worksheet_scenarios(
-    value: &WorksheetScenarios,
-    conformance: WorksheetScenarioConformance,
-) -> Result<String> {
+pub fn write_worksheet_scenarios(value: &Scenarios, conformance: Conformance) -> Result<String> {
     if value.scenarios.is_empty() {
         return Err(invalid("scenarios requires at least one scenario"));
     }
@@ -1026,7 +1023,7 @@ mod tests {
 
     const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    fn parse(child: &str) -> Result<Option<WorksheetScenarios>> {
+    fn parse(child: &str) -> Result<Option<Scenarios>> {
         parse_worksheet_scenarios(
             format!(r#"<worksheet xmlns="{NS}">{child}</worksheet>"#).as_bytes(),
         )
@@ -1147,7 +1144,7 @@ mod tests {
 
     #[test]
     fn write_round_trips_through_the_reader() {
-        let scenario = WorksheetScenario::new("baseline")
+        let scenario = Scenario::new("baseline")
             .unwrap()
             .with_locked(true)
             .with_count(1)
@@ -1156,28 +1153,22 @@ mod tests {
             .with_comment("Q1 <plan> & \"notes\"")
             .unwrap()
             .with_input_cells(vec![
-                WorksheetScenarioInputCell::new(ScenarioCellReference::new("A1").unwrap(), "10")
+                InputCell::new(ScenarioCellReference::new("A1").unwrap(), "10")
                     .unwrap()
                     .with_number_format_id(14),
-                WorksheetScenarioInputCell::new(
-                    ScenarioCellReference::new("$B$2").unwrap(),
-                    "hold",
-                )
-                .unwrap()
-                .with_deleted(true)
-                .with_undone(true),
+                InputCell::new(ScenarioCellReference::new("$B$2").unwrap(), "hold")
+                    .unwrap()
+                    .with_deleted(true)
+                    .with_undone(true),
             ])
             .unwrap();
-        let expected = WorksheetScenarios::new(vec![scenario])
+        let expected = Scenarios::new(vec![scenario])
             .unwrap()
             .with_current(0)
             .with_show(0)
             .with_ranges(vec![ScenarioRangeReference::new("A1:B2").unwrap()])
             .unwrap();
-        for conformance in [
-            WorksheetScenarioConformance::Transitional,
-            WorksheetScenarioConformance::Strict,
-        ] {
+        for conformance in [Conformance::Transitional, Conformance::Strict] {
             let fragment = write_worksheet_scenarios(&expected, conformance).unwrap();
             let document = format!(r#"<worksheet xmlns="{NS}">{fragment}</worksheet>"#);
             let parsed = parse_worksheet_scenarios(document.as_bytes())
@@ -1191,11 +1182,10 @@ mod tests {
     fn writer_rejects_output_over_limit_before_final_append() {
         let long_name = "x".repeat(MAX_XSTRING_CHARS);
         let scenarios = (0..1_025)
-            .map(|_| WorksheetScenario::new(long_name.clone()).unwrap())
+            .map(|_| Scenario::new(long_name.clone()).unwrap())
             .collect();
-        let value = WorksheetScenarios::new(scenarios).unwrap();
-        let error = write_worksheet_scenarios(&value, WorksheetScenarioConformance::Transitional)
-            .unwrap_err();
+        let value = Scenarios::new(scenarios).unwrap();
+        let error = write_worksheet_scenarios(&value, Conformance::Transitional).unwrap_err();
         assert!(
             error
                 .to_string()

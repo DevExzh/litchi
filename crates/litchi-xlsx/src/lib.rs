@@ -147,9 +147,8 @@ pub use query_table::{
 };
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{
-    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,
-    WorksheetScenarioInputCell, WorksheetScenarios, parse_worksheet_scenarios,
-    write_worksheet_scenarios,
+    InputCell, Scenario, ScenarioCellReference, ScenarioRangeReference, Scenarios,
+    parse_worksheet_scenarios, write_worksheet_scenarios,
 };
 pub use sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
