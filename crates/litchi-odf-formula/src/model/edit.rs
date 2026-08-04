@@ -6,7 +6,7 @@
 //! is deliberately left to the caller; the tree remains inert data and is
 //! never evaluated.
 
-use super::document::{Attribute, Content, Element, MATHML_NAMESPACE};
+use super::{Attribute, Content, Element, MATHML_NAMESPACE};
 use litchi_core::{Error, Result};
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -174,6 +174,6 @@ impl Element {
     /// subtree root; foreign namespaces receive generated `ns1..nsN`
     /// prefixes in first-use order.
     pub fn to_xml(&self) -> String {
-        super::serialize::write_mathml(self)
+        crate::codec::serialize::write_mathml(self)
     }
 }

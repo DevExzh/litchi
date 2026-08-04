@@ -7,7 +7,7 @@
 //! [`Element`] mutation API and installed through the [`crate::Formula`]
 //! facade.
 
-use super::document::Element;
+use crate::model::Element;
 
 /// The MathML `mathvariant` attribute value family (MathML 2 §3.2.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

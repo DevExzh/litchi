@@ -1,4 +1,4 @@
-//! Inert, namespace-aware MathML access for OpenDocument Formula packages.
+//! Bounded MathML parsing for OpenDocument Formula packages.
 
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
@@ -6,243 +6,15 @@ use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-pub(crate) const MATHML_NAMESPACE: &str = "http://www.w3.org/1998/Math/MathML";
+use crate::model::{Attribute, Content, Element, MATHML_NAMESPACE};
+
 const MAX_MATH_DEPTH: usize = 128;
 const MAX_MATH_NODES: usize = 65_536;
 const MAX_ATTRIBUTES: usize = 256;
 const MAX_ATTRIBUTE_BYTES: usize = 1_048_576;
 const MAX_TEXT_BYTES: usize = 32 * 1_048_576;
 
-/// A commonly used MathML element kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum Kind {
-    Math,
-    Semantics,
-    Annotation,
-    AnnotationXml,
-    Row,
-    Identifier,
-    Number,
-    Operator,
-    Text,
-    Space,
-    StringLiteral,
-    Glyph,
-    Fraction,
-    SquareRoot,
-    Root,
-    Style,
-    Error,
-    Padded,
-    Phantom,
-    Fenced,
-    Enclose,
-    Subscript,
-    Superscript,
-    SubSuperscript,
-    Under,
-    Over,
-    UnderOver,
-    MultiScripts,
-    Table,
-    TableRow,
-    TableCell,
-    AlignGroup,
-    AlignMark,
-    /// A future MathML element or a vendor element in another namespace.
-    Other,
-}
-
-/// One decoded attribute with its expanded namespace name.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Attribute {
-    namespace_uri: Option<String>,
-    local_name: String,
-    value: String,
-}
-
-impl Attribute {
-    pub(crate) fn from_parts(
-        namespace_uri: Option<String>,
-        local_name: String,
-        value: String,
-    ) -> Self {
-        Self {
-            namespace_uri,
-            local_name,
-            value,
-        }
-    }
-
-    /// Return the expanded namespace URI, or `None` for an unqualified attribute.
-    pub fn namespace_uri(&self) -> Option<&str> {
-        self.namespace_uri.as_deref()
-    }
-
-    /// Return the XML local name.
-    pub fn local_name(&self) -> &str {
-        &self.local_name
-    }
-
-    /// Return the decoded and normalized XML attribute value.
-    pub fn value(&self) -> &str {
-        &self.value
-    }
-}
-
-/// Ordered mixed content within a MathML element.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Content {
-    /// Decoded character content, including CDATA and character references.
-    ///
-    /// Named references other than XML's five predefined entities are retained
-    /// in `&name;` notation because MathML 2 documents may declare them in a
-    /// document type definition that is intentionally not evaluated here.
-    Text(String),
-    /// A child element.
-    Element(Element),
-}
-
-/// A complete element in the formula's MathML subtree.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Element {
-    namespace_uri: Option<String>,
-    local_name: String,
-    attributes: Vec<Attribute>,
-    content: Vec<Content>,
-}
-
-impl Element {
-    pub(crate) fn from_parts(
-        namespace_uri: Option<String>,
-        local_name: String,
-        attributes: Vec<Attribute>,
-        content: Vec<Content>,
-    ) -> Self {
-        Self {
-            namespace_uri,
-            local_name,
-            attributes,
-            content,
-        }
-    }
-
-    pub(crate) fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
-        &mut self.attributes
-    }
-
-    pub(crate) fn content_mut(&mut self) -> &mut Vec<Content> {
-        &mut self.content
-    }
-
-    /// Return the element's expanded namespace URI.
-    pub fn namespace_uri(&self) -> Option<&str> {
-        self.namespace_uri.as_deref()
-    }
-
-    /// Return the element's XML local name.
-    pub fn local_name(&self) -> &str {
-        &self.local_name
-    }
-
-    /// Classify common MathML elements without discarding unknown ones.
-    pub fn kind(&self) -> Kind {
-        if self.namespace_uri() != Some(MATHML_NAMESPACE) {
-            return Kind::Other;
-        }
-        match self.local_name.as_str() {
-            "math" => Kind::Math,
-            "semantics" => Kind::Semantics,
-            "annotation" => Kind::Annotation,
-            "annotation-xml" => Kind::AnnotationXml,
-            "mrow" => Kind::Row,
-            "mi" => Kind::Identifier,
-            "mn" => Kind::Number,
-            "mo" => Kind::Operator,
-            "mtext" => Kind::Text,
-            "mspace" => Kind::Space,
-            "ms" => Kind::StringLiteral,
-            "mglyph" => Kind::Glyph,
-            "mfrac" => Kind::Fraction,
-            "msqrt" => Kind::SquareRoot,
-            "mroot" => Kind::Root,
-            "mstyle" => Kind::Style,
-            "merror" => Kind::Error,
-            "mpadded" => Kind::Padded,
-            "mphantom" => Kind::Phantom,
-            "mfenced" => Kind::Fenced,
-            "menclose" => Kind::Enclose,
-            "msub" => Kind::Subscript,
-            "msup" => Kind::Superscript,
-            "msubsup" => Kind::SubSuperscript,
-            "munder" => Kind::Under,
-            "mover" => Kind::Over,
-            "munderover" => Kind::UnderOver,
-            "mmultiscripts" => Kind::MultiScripts,
-            "mtable" => Kind::Table,
-            "mtr" | "mlabeledtr" => Kind::TableRow,
-            "mtd" => Kind::TableCell,
-            "maligngroup" => Kind::AlignGroup,
-            "malignmark" => Kind::AlignMark,
-            _ => Kind::Other,
-        }
-    }
-
-    /// Return all decoded attributes in document order.
-    pub fn attributes(&self) -> &[Attribute] {
-        &self.attributes
-    }
-
-    /// Find an attribute by expanded name.
-    pub fn attribute(&self, namespace_uri: Option<&str>, local_name: &str) -> Option<&str> {
-        self.attributes
-            .iter()
-            .find(|attribute| {
-                attribute.namespace_uri() == namespace_uri && attribute.local_name == local_name
-            })
-            .map(Attribute::value)
-    }
-
-    /// Return ordered mixed content.
-    pub fn content(&self) -> &[Content] {
-        &self.content
-    }
-
-    /// Iterate direct child elements.
-    pub fn children(&self) -> impl Iterator<Item = &Element> {
-        self.content.iter().filter_map(|content| match content {
-            Content::Element(element) => Some(element),
-            Content::Text(_) => None,
-        })
-    }
-
-    /// Compose all descendant character content in exact element/text order.
-    pub fn all_text(&self) -> String {
-        fn append(element: &Element, output: &mut String) {
-            for content in &element.content {
-                match content {
-                    Content::Text(text) => output.push_str(text),
-                    Content::Element(child) => append(child, output),
-                }
-            }
-        }
-        let mut output = String::new();
-        append(self, &mut output);
-        output
-    }
-
-    pub(crate) fn collect_annotations<'a>(&'a self, output: &mut Vec<&'a Element>) {
-        if matches!(self.kind(), Kind::Annotation | Kind::AnnotationXml) {
-            output.push(self);
-        }
-        for child in self.children() {
-            child.collect_annotations(output);
-        }
-    }
-}
-
-pub(crate) fn parse_mathml(xml: &str) -> Result<Element> {
+pub fn parse(xml: &str) -> Result<Element> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
@@ -305,7 +77,7 @@ pub(crate) fn parse_mathml(xml: &str) -> Result<Element> {
                 stack
                     .last_mut()
                     .expect("parent exists")
-                    .content
+                    .content_mut()
                     .push(Content::Element(node));
             },
             Event::End(_) => {
@@ -313,7 +85,7 @@ pub(crate) fn parse_mathml(xml: &str) -> Result<Element> {
                     Error::InvalidFormat("MathML element stack underflow".to_string())
                 })?;
                 if let Some(parent) = stack.last_mut() {
-                    parent.content.push(Content::Element(node));
+                    parent.content_mut().push(Content::Element(node));
                 } else {
                     if root.is_some() {
                         return Err(Error::InvalidFormat(
@@ -405,7 +177,8 @@ fn make_element(
         let namespace_uri = namespace_uri(&namespace)?;
         let local_name = decode_utf8(local.as_ref(), "attribute name")?;
         if attributes.iter().any(|existing: &Attribute| {
-            existing.namespace_uri == namespace_uri && existing.local_name == local_name
+            existing.namespace_uri() == namespace_uri.as_deref()
+                && existing.local_name() == local_name
         }) {
             return Err(Error::InvalidFormat(format!(
                 "duplicate expanded MathML attribute '{local_name}'"
@@ -422,18 +195,14 @@ fn make_element(
                 "MathML attribute exceeds 1 MiB".to_string(),
             ));
         }
-        attributes.push(Attribute {
-            namespace_uri,
-            local_name,
-            value,
-        });
+        attributes.push(Attribute::from_parts(namespace_uri, local_name, value));
     }
-    Ok(Element {
-        namespace_uri: resolved_namespace_uri,
+    Ok(Element::from_parts(
+        resolved_namespace_uri,
         local_name,
         attributes,
-        content: Vec::new(),
-    })
+        Vec::new(),
+    ))
 }
 
 fn push_text(element: &mut Element, value: String, total: &mut usize) -> Result<()> {
@@ -445,10 +214,10 @@ fn push_text(element: &mut Element, value: String, total: &mut usize) -> Result<
             "formula exceeds 32 MiB of MathML text".to_string(),
         ));
     }
-    if let Some(Content::Text(existing)) = element.content.last_mut() {
+    if let Some(Content::Text(existing)) = element.content_mut().last_mut() {
         existing.push_str(&value);
     } else {
-        element.content.push(Content::Text(value));
+        element.content_mut().push(Content::Text(value));
     }
     Ok(())
 }

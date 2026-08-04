@@ -4,7 +4,9 @@ use litchi_core::Result;
 
 use crate::model::Element;
 
-pub use crate::migration::builder::{
+mod constructors;
+
+pub use constructors::{
     Display, Variant, document_root, fenced, fraction, identifier, identifier_with_variant,
     literal_text, number, operator, over, root, row, semantics, square_root, string_literal,
     sub_superscript, subscript, superscript, table, under, under_over,

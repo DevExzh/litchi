@@ -12,8 +12,6 @@ pub mod facade;
 pub mod model;
 pub mod package;
 
-mod migration;
-
 pub use authoring::Builder;
 pub use facade::Formula;
 pub use model::{Attribute, Content, Element, Kind};

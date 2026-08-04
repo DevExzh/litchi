@@ -13,11 +13,15 @@
 //! well-formed without a DTD, at the cost of no longer spelling the original
 //! reference literally.
 
-use super::document::{Content, Element, MATHML_NAMESPACE};
+use crate::model::{Content, Element, MATHML_NAMESPACE};
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
 /// Serialize a MathML subtree to a well-formed, self-contained XML string.
+pub fn serialize(root: &Element) -> String {
+    write_mathml(root)
+}
+
 pub(crate) fn write_mathml(root: &Element) -> String {
     let mut namespaces = NamespaceMap::default();
     namespaces.collect(root);
