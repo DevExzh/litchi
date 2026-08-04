@@ -8,7 +8,8 @@ use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
+    CommentStorageId, DrawableCommentInfo, DrawableCommentReplyInfo, DrawableObjectId,
+    IWorkDrawableCommentEditor, IWorkDrawableInfo,
 };
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
@@ -2318,9 +2319,9 @@ impl PagesEditor {
     /// Read the direct replies in a reachable Pages drawable comment thread.
     pub fn drawable_comment_replies(
         &self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
     ) -> Result<Vec<DrawableCommentReplyInfo>> {
-        self.require_drawable(drawable_object_id)?;
+        self.require_drawable(drawable_object_id.object_id())?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .replies(drawable_object_id)
     }
@@ -2328,37 +2329,37 @@ impl PagesEditor {
     /// Add a reply to a reachable Pages drawable comment.
     pub fn add_drawable_comment_reply(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableObjectId,
         text: impl Into<String>,
-    ) -> Result<u64> {
-        self.require_drawable(drawable_object_id)?;
+    ) -> Result<CommentStorageId> {
+        self.require_drawable(drawable_object_id.object_id())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.add_reply(drawable_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id.object_id())
+        Ok(reply_id)
     }
 
     /// Update a direct reply, returning its current storage identifier.
     pub fn set_drawable_comment_reply(
         &mut self,
-        drawable_object_id: u64,
-        reply_storage_object_id: u64,
+        drawable_object_id: DrawableObjectId,
+        reply_storage_object_id: CommentStorageId,
         text: impl Into<String>,
-    ) -> Result<u64> {
-        self.require_drawable(drawable_object_id)?;
+    ) -> Result<CommentStorageId> {
+        self.require_drawable(drawable_object_id.object_id())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id.object_id())
+        Ok(reply_id)
     }
 
     /// Remove a direct reply from a reachable Pages drawable comment.
     pub fn remove_drawable_comment_reply(
         &mut self,
-        drawable_object_id: u64,
-        reply_storage_object_id: u64,
+        drawable_object_id: DrawableObjectId,
+        reply_storage_object_id: CommentStorageId,
     ) -> Result<()> {
-        self.require_drawable(drawable_object_id)?;
+        self.require_drawable(drawable_object_id.object_id())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
         *self = Self::from_package(comments.into_package())?;
@@ -4712,3 +4713,32 @@ pub use tables::{
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod strict_selector_tests {
+    use super::*;
+
+    #[test]
+    fn direct_comment_reply_api_uses_semantic_ids() {
+        let drawable = DrawableObjectId::from_object_id(7).unwrap();
+        let reply = CommentStorageId::from_object_id(9).unwrap();
+
+        assert_eq!(drawable.object_id(), 7);
+        assert_eq!(reply.object_id(), 9);
+        assert_eq!(DrawableObjectId::new(0), None);
+        assert_eq!(CommentStorageId::new(0), None);
+
+        let _: fn(&PagesEditor, DrawableObjectId) -> Result<Vec<DrawableCommentReplyInfo>> =
+            PagesEditor::drawable_comment_replies;
+        let _: fn(&mut PagesEditor, DrawableObjectId, String) -> Result<CommentStorageId> =
+            PagesEditor::add_drawable_comment_reply;
+        let _: fn(
+            &mut PagesEditor,
+            DrawableObjectId,
+            CommentStorageId,
+            String,
+        ) -> Result<CommentStorageId> = PagesEditor::set_drawable_comment_reply;
+        let _: fn(&mut PagesEditor, DrawableObjectId, CommentStorageId) -> Result<()> =
+            PagesEditor::remove_drawable_comment_reply;
+    }
+}
