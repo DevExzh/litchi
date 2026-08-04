@@ -13,6 +13,7 @@
       "litchi-formula",
       "litchi-imgconv",
       "litchi-iwa",
+      "litchi-iwa-graph",
       "litchi-markdown",
       "litchi-odf-common",
       "litchi-odp",
@@ -81,8 +82,10 @@
     ],
     "litchi-iwa": [
       "litchi-core",
+      "litchi-iwa-graph",
       "soapberry-zip"
     ],
+    "litchi-iwa-graph": [],
     "litchi-markdown": [
       "litchi-core"
     ],
@@ -259,6 +262,7 @@
     "litchi-docx",
     "litchi-drawingml",
     "litchi-eval",
+    "litchi-iwa-graph",
     "litchi-odb",
     "litchi-odc",
     "litchi-odf-common",
