@@ -178,13 +178,8 @@ impl Value {
     }
 }
 
-pub type GraphicPropertyNamespace = Namespace;
-pub type GraphicPropertyValue = Value;
-
 // The generated table is the normative 174-property ODF grammar.
 include!("../graphic_property_specs.rs");
-
-pub type Kind = GraphicPropertyKind;
 
 fn validate_ref(reference: &str, value: &str) -> Option<Value> {
     match reference {

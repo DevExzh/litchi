@@ -37,14 +37,3 @@ pub(super) const MAX_EVENTS: usize = 1_000_000;
 
 pub use codec::{parse_graphic_style_properties, set_graphic_style_properties_xml};
 pub use model::{Child, ChildKind, Kind, Namespace, Properties, Property, Style, Styles, Value};
-
-// Historical public names remain aliases; the concise declarations above are canonical.
-pub type GraphicProperty = Property;
-pub type GraphicPropertyChild = Child;
-pub type GraphicPropertyChildKind = ChildKind;
-pub type GraphicPropertyKind = Kind;
-pub type GraphicPropertyNamespace = Namespace;
-pub type GraphicPropertyValue = Value;
-pub type GraphicStyleProperties = Properties;
-pub type GraphicStylePropertiesSet = Styles;
-pub type GraphicStyleRecord = Style;

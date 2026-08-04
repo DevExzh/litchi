@@ -7,36 +7,29 @@ fn doc(body: &str) -> String {
 }
 #[test]
 fn every_normative_property_kind_round_trips() {
-    let mut value = GraphicStyleProperties::default();
-    for kind in GraphicPropertyKind::ALL {
+    let mut value = Properties::default();
+    for kind in Kind::ALL {
         value.set_lexical(*kind, kind.example()).unwrap();
     }
     value.set_child(
-        GraphicPropertyChild::new(
-            GraphicPropertyChildKind::ListStyle,
-            r#"<text:list-style style:name="L"/>"#,
-        )
-        .unwrap(),
+        Child::new(ChildKind::ListStyle, r#"<text:list-style style:name="L"/>"#).unwrap(),
     );
     value.set_child(
-        GraphicPropertyChild::new(
-            GraphicPropertyChildKind::BackgroundImage,
+        Child::new(
+            ChildKind::BackgroundImage,
             r#"<style:background-image xlink:href="Pictures/a&amp;b.png"/>"#,
         )
         .unwrap(),
     );
     value.set_child(
-        GraphicPropertyChild::new(
-            GraphicPropertyChildKind::Columns,
+        Child::new(
+            ChildKind::Columns,
             r#"<style:columns fo:column-count="2" fo:column-gap="0cm"/>"#,
         )
         .unwrap(),
     );
     let fragment = value.to_xml_fragment().unwrap();
-    assert_eq!(
-        GraphicStyleProperties::from_xml_fragment(&fragment).unwrap(),
-        value
-    );
+    assert_eq!(Properties::from_xml_fragment(&fragment).unwrap(), value);
     assert_eq!(value.iter().count(), 174)
 }
 #[test]
@@ -48,12 +41,9 @@ fn parses_real_odfdo_fixture_values() {
     let end = begin + fixture[begin..].find("</style:style>").unwrap() + "</style:style>".len();
     let set = parse_graphic_style_properties(&doc(&fixture[begin..end])).unwrap();
     let value = set.get("fr1").unwrap().properties.as_ref().unwrap();
+    assert_eq!(value.get(Kind::DrawGamma).unwrap().lexical(), "100%");
     assert_eq!(
-        value.get(GraphicPropertyKind::DrawGamma).unwrap().lexical(),
-        "100%"
-    );
-    assert_eq!(
-        value.get(GraphicPropertyKind::FoClip).unwrap().lexical(),
+        value.get(Kind::FoClip).unwrap().lexical(),
         "rect(0cm, 0cm, 0cm, 0cm)"
     )
 }
@@ -62,19 +52,16 @@ fn lossless_replace_insert_remove() {
     let original = doc(
         "<!--keep--><style:style style:name=\"a\" style:family=\"graphic\"><x:k xmlns:x=\"urn:k\"/></style:style><style:style style:name=\"b\" style:family=\"graphic\"><style:graphic-properties draw:fill=\"none\"/></style:style>",
     );
-    let mut properties = GraphicStyleProperties::default();
-    properties
-        .set_lexical(GraphicPropertyKind::DrawFill, "solid")
-        .unwrap();
-    let mut a = GraphicStyleRecord::named("a", Some(properties)).unwrap();
+    let mut properties = Properties::default();
+    properties.set_lexical(Kind::DrawFill, "solid").unwrap();
+    let mut a = Style::named("a", Some(properties)).unwrap();
     let inserted = set_graphic_style_properties_xml(&original, &a).unwrap();
     assert!(inserted.contains("<x:k xmlns:x=\"urn:k\"/><style:graphic-properties"));
     a.properties = None;
     let restored = set_graphic_style_properties_xml(&inserted, &a).unwrap();
     assert_eq!(restored, original);
     let removed =
-        set_graphic_style_properties_xml(&restored, &GraphicStyleRecord::named("b", None).unwrap())
-            .unwrap();
+        set_graphic_style_properties_xml(&restored, &Style::named("b", None).unwrap()).unwrap();
     assert!(!removed.contains("draw:fill=\"none\""));
     assert!(removed.contains("<!--keep-->"))
 }
@@ -93,7 +80,7 @@ fn rejects_malformed_and_capped_input() {
         )
     }
     let huge = "x".repeat(MAX_VALUE + 1);
-    assert!(GraphicProperty::new(GraphicPropertyKind::DrawStrokeDash, &huge).is_err());
+    assert!(Property::new(Kind::DrawStrokeDash, &huge).is_err());
     let mut attributes = String::new();
     for index in 0..=MAX_ATTRIBUTES {
         attributes.push_str(&format!(" x:a{index}=\"1\""))
