@@ -4231,6 +4231,23 @@ The full workspace test remains blocked before project compilation because
 `pkg-config` is unavailable for `yeslogic-fontconfig-sys`/fontconfig. No
 native Office or performance claim is made for this batch.
 
+## PPTX view-properties semantic layering
+
+The existing `litchi-pptx::view_properties` owner is now physically layered
+as `model.rs`, `codec.rs`, and `package.rs`. The model owns contextual
+PresentationML values; the codec owns bounded MCE-aware XML parsing,
+validation, strict/transitional serialization, and fixture tests; and the
+package layer owns the presentation relationship, content-type, and outline
+slide-target checks. The historical `view_properties` module path and
+`load_view_properties` root re-export remain unchanged.
+
+The checked-in `[MS-OE376]` normal-view and view-properties references and
+`[MS-PPTX]` view-properties structures continue to govern the model and codec.
+The focused PPTX all-target suite passes 196 library tests plus its
+integration/doctest targets; strict all-features Clippy, formatting, diff, and
+crate-boundary checks pass. No native Office or performance claim is made for
+this structural-only migration.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

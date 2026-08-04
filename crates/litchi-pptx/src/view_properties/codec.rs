@@ -1,10 +1,10 @@
-//! Typed PresentationML view properties with bounded opaque extensions.
+//! Bounded PresentationML view-properties XML codec.
 //!
 //! This module owns the package-independent view-properties model, bounded XML
 //! codec, and inert presentation relationship loading.
 
+use super::model::*;
 use crate::{Error, Result};
-use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -17,129 +17,11 @@ const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const AS: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const RS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps";
-const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/viewProps";
-const CT: &str = "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml";
 const MAX: usize = 8 * 1024 * 1024;
 const MAX_DEPTH: usize = 128;
 const MAX_NODES: usize = 100_000;
 const MAX_GUIDES: usize = 4096;
 const MAX_SLIDES: usize = 100_000;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ViewKind {
-    Slide,
-    SlideMaster,
-    Notes,
-    Handout,
-    NotesMaster,
-    Outline,
-    SlideSorter,
-    SlideThumbnail,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SplitterState {
-    Minimized,
-    Restored,
-    Maximized,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GuideOrientation {
-    Horizontal,
-    Vertical,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Ratio {
-    pub numerator: i64,
-    pub denominator: i64,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Point {
-    pub x: i64,
-    pub y: i64,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CommonView {
-    pub variable_scale: Option<bool>,
-    pub scale_x: Ratio,
-    pub scale_y: Ratio,
-    pub origin: Point,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Guide {
-    pub orientation: Option<GuideOrientation>,
-    pub position: Option<i32>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CommonSlideView {
-    pub snap_to_grid: Option<bool>,
-    pub snap_to_objects: Option<bool>,
-    pub show_guides: Option<bool>,
-    pub view: CommonView,
-    pub guides: Vec<Guide>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RestoredPane {
-    pub size: u32,
-    pub auto_adjust: Option<bool>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NormalView {
-    pub show_outline_icons: Option<bool>,
-    pub snap_vertical_splitter: Option<bool>,
-    pub vertical_bar_state: Option<SplitterState>,
-    pub horizontal_bar_state: Option<SplitterState>,
-    pub prefer_single_view: Option<bool>,
-    pub restored_left: RestoredPane,
-    pub restored_top: RestoredPane,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OutlineSlide {
-    pub relationship_id: String,
-    pub collapse: Option<bool>,
-    pub target: Option<String>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OutlineView {
-    pub view: CommonView,
-    pub slides: Vec<OutlineSlide>,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SimpleView {
-    pub view: CommonView,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SorterView {
-    pub show_formatting: Option<bool>,
-    pub view: CommonView,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SlideLikeView {
-    pub common: CommonSlideView,
-    pub extension_xml: Option<Vec<u8>>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GridSpacing {
-    pub cx: u32,
-    pub cy: u32,
-}
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct ViewProperties {
-    pub last_view: Option<ViewKind>,
-    pub show_comments: Option<bool>,
-    pub normal: Option<NormalView>,
-    pub slide: Option<SlideLikeView>,
-    pub outline: Option<OutlineView>,
-    pub notes_text: Option<SimpleView>,
-    pub sorter: Option<SorterView>,
-    pub notes: Option<SlideLikeView>,
-    pub grid_spacing: Option<GridSpacing>,
-    pub extension_xml: Option<Vec<u8>>,
-}
 
 impl ViewProperties {
     pub fn parse(xml: &[u8]) -> Result<Self> {
@@ -195,49 +77,6 @@ impl ViewProperties {
         }
         Ok(x.into_bytes())
     }
-}
-
-pub fn load_from_package(package: &OpcPackage) -> Result<Option<ViewProperties>> {
-    let presentation = package.main_document_part()?;
-    let mut found = presentation
-        .rels()
-        .iter()
-        .filter(|x| matches!(x.reltype(), REL | STRICT_REL));
-    let Some(rel) = found.next() else {
-        return Ok(None);
-    };
-    if found.next().is_some() {
-        return Err(invalid(
-            "presentation has multiple view-properties relationships",
-        ));
-    }
-    if rel.is_external() {
-        return Err(invalid("view-properties relationship cannot be external"));
-    }
-    let uri: PackURI = rel.target_partname()?;
-    let part = package.get_part(&uri)?;
-    if part.content_type() != CT {
-        return Err(invalid(format!(
-            "view-properties part '{uri}' has invalid content type '{}'",
-            part.content_type()
-        )));
-    }
-    let mut value = ViewProperties::parse(part.blob())?;
-    if let Some(outline) = value.outline.as_mut() {
-        for slide in &mut outline.slides {
-            let relationship = part.rels().get(&slide.relationship_id).ok_or_else(|| {
-                invalid(format!(
-                    "missing outline slide relationship '{}'",
-                    slide.relationship_id
-                ))
-            })?;
-            if relationship.is_external() {
-                return Err(invalid("outline slide relationship cannot be external"));
-            }
-            slide.target = Some(relationship.target_ref().to_string());
-        }
-    }
-    Ok(Some(value))
 }
 
 #[derive(Clone)]
@@ -1110,7 +949,9 @@ fn xml_error(e: impl std::fmt::Display) -> Error {
 
 #[cfg(test)]
 mod tests {
+    use super::super::package::load_from_package;
     use super::*;
+    use litchi_opc::OpcPackage;
     fn f(b: &[u8]) -> ViewProperties {
         let p = OpcPackage::from_bytes(b).unwrap();
         load_from_package(&p).unwrap().unwrap()
@@ -1118,7 +959,7 @@ mod tests {
     #[test]
     fn poi_prprops_guides_grid_and_strict_roundtrip() {
         let v = f(include_bytes!(
-            "../../../test-data/poi/test-data/slideshow/prProps.pptx"
+            "../../../../test-data/poi/test-data/slideshow/prProps.pptx"
         ));
         assert_eq!(v.slide.as_ref().unwrap().common.guides.len(), 2);
         assert_eq!(
@@ -1141,7 +982,7 @@ mod tests {
     #[test]
     fn poi_outline_and_splitters() {
         let v = f(include_bytes!(
-            "../../../test-data/poi/test-data/slideshow/45545_Comment.pptx"
+            "../../../../test-data/poi/test-data/slideshow/45545_Comment.pptx"
         ));
         let n = v.normal.unwrap();
         assert_eq!(n.vertical_bar_state, Some(SplitterState::Minimized));
@@ -1152,7 +993,7 @@ mod tests {
     #[test]
     fn libreoffice_ratio_and_sparse_views() {
         let v = f(include_bytes!(
-            "../../../test-data/libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx"
+            "../../../../test-data/libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx"
         ));
         assert_eq!(
             v.notes_text.unwrap().view.scale_x,
