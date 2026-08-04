@@ -20,7 +20,7 @@ use crate::docx::field::{
 use crate::docx::footnote::Note;
 use crate::docx::header_footer::HeaderFooter;
 use crate::docx::hyperlink::Hyperlink;
-use crate::docx::mail_merge::{MailMergeRecipients, is_settings_relationship};
+use crate::docx::mail_merge::{Recipients, extract_recipients, is_settings_relationship};
 use crate::docx::numbering::parse_part;
 use crate::docx::paragraph::Paragraph;
 use crate::docx::parts::DocumentPart;
@@ -2403,7 +2403,7 @@ impl<'a> Document<'a> {
     }
 
     /// Load the ISO mail-merge recipient-data part referenced by `settings.xml`.
-    pub fn mail_merge_recipients(&self) -> Result<Option<MailMergeRecipients>> {
+    pub fn mail_merge_recipients(&self) -> Result<Option<Recipients>> {
         let Some(settings) = self.settings()? else {
             return Ok(None);
         };
@@ -2429,9 +2429,7 @@ impl<'a> Document<'a> {
             ))
         })?;
         let recipient_part = self.opc.get_part(&relationship.target_partname()?)?;
-        Ok(Some(MailMergeRecipients::extract_from_part(
-            recipient_part,
-        )?))
+        Ok(Some(extract_recipients(recipient_part)?))
     }
 
     /// Read the document's typed web-output settings and conformance family.
@@ -2749,8 +2747,8 @@ impl<'a> Document<'a> {
     // ✅ Mail merge field discovery: merge_fields(), merge_field_names(), typed_merge_fields(),
     //    mail_merge_data_fields(), mail_merge_counters()
     // ✅ COMPLETED: Mail merge settings mutation (MS-DOCX Section 17.16.5.35)
-    // - Typed inert `w:mailMerge` model: MailMergeSettings, MailMergeDataSourceObject,
-    //   MailMergeFieldMap, MailMergeRecipients (see mail_merge.rs)
+    // - Typed inert `w:mailMerge` model: Settings, DataSourceObject, FieldMap,
+    //   Recipients (see litchi_docx::mail_merge)
     // - Package-level create/replace/remove: Package::set_mail_merge(),
     //   update_mail_merge(), update_mail_merge_recipients(), clear_mail_merge()
     // - Connection strings, queries, and data sources stay inert typed data;

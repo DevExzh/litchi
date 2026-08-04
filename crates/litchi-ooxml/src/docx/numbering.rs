@@ -6,10 +6,7 @@
 //! type.
 
 use crate::error::{OoxmlError, Result};
-pub use litchi_docx::numbering::{
-    Collection, Definition, Format, Instance, Level, MultiLevel, Override, Paragraph,
-    ParseFormatError, ParseMultiLevelError, PictureBullet, Restart, Suffix, parse_numbering,
-};
+use litchi_docx::numbering::Collection;
 use litchi_opc::part::Part;
 
 pub(crate) fn parse_part(part: &dyn Part) -> Result<Collection> {

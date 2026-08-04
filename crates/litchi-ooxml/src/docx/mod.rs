@@ -69,7 +69,7 @@ pub mod list;
 pub mod mail_merge;
 pub mod math;
 mod namespace;
-pub mod numbering;
+mod numbering;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -136,9 +136,8 @@ pub use image::InlineImage;
 pub use litchi_docx::{color, glossary, web};
 pub use litchi_opc::FontEmbedding;
 pub use mail_merge::{
-    MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
-    MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
-    MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
+    Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,
+    MainDocumentType, RECIPIENT_CONTENT_TYPE, Recipient, Recipients, Settings, Source, Target,
 };
 pub use math::{OfficeMath, OfficeMathParagraph};
 pub use package::Package;

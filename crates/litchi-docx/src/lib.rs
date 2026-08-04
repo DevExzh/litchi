@@ -56,10 +56,8 @@ pub use field::{
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 pub use hyperlink::Hyperlink;
 pub use mail_merge::{
-    MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
-    MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
-    MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
-    RECIPIENT_CONTENT_TYPE, parse_settings_mail_merge,
+    DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, MainDocumentType,
+    RECIPIENT_CONTENT_TYPE, Recipient, Recipients, Source, Target, parse_settings_mail_merge,
 };
 pub use modern_comments::{
     Comment, Conformance, Extended, Extension, ExtensionList, IdMapping, Metadata, Person,

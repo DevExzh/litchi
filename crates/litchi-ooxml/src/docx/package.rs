@@ -5,7 +5,7 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::{Binding, NewStore};
 use crate::docx::document::Document;
 use crate::docx::mail_merge::{
-    MailMergeConformance, MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
+    self, Recipients, Settings, Source, Target, is_mail_merge_relationship_type, map_docx_error,
 };
 use crate::docx::parts::DocumentPart;
 use crate::docx::settings::{
@@ -2003,7 +2003,7 @@ impl Package {
     }
 
     /// Return the validated inert mail-merge settings, if configured.
-    pub fn mail_merge_settings(&self) -> Result<Option<MailMergeSettings>> {
+    pub fn mail_merge_settings(&self) -> Result<Option<Settings>> {
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
         Ok(DocumentSettings::extract_from_part(&part)?
@@ -2012,7 +2012,7 @@ impl Package {
     }
 
     /// Resolve a mail-merge relationship without opening or fetching its target.
-    pub fn mail_merge_target(&self, relationship_id: &str) -> Result<MailMergeTarget> {
+    pub fn mail_merge_target(&self, relationship_id: &str) -> Result<Target> {
         let snapshot = self.settings_part_snapshot()?;
         let part = self.opc.get_part(&snapshot.target)?;
         let relationship = part.rels().get(relationship_id).ok_or_else(|| {
@@ -2026,13 +2026,11 @@ impl Package {
             )));
         }
         if relationship.is_external() {
-            return Ok(MailMergeTarget::External(
-                relationship.target_ref().to_string(),
-            ));
+            return Ok(Target::External(relationship.target_ref().to_string()));
         }
         let target = relationship.target_partname()?;
         let target_part = self.opc.get_part(&target)?;
-        Ok(MailMergeTarget::Internal {
+        Ok(Target::Internal {
             part_name: target,
             bytes: target_part.blob().to_vec(),
             content_type: target_part.content_type().to_string(),
@@ -2042,11 +2040,11 @@ impl Package {
     /// Set or replace the complete mail-merge graph atomically.
     pub fn set_mail_merge(
         &mut self,
-        mut settings: MailMergeSettings,
-        data_source: Option<MailMergeSource>,
-        header_source: Option<MailMergeSource>,
-        recipients: Option<MailMergeRecipients>,
-        conformance: MailMergeConformance,
+        mut settings: Settings,
+        data_source: Option<Source>,
+        header_source: Option<Source>,
+        recipients: Option<Recipients>,
+        conformance: mail_merge::Conformance,
     ) -> Result<()> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
@@ -2096,13 +2094,16 @@ impl Package {
             None
         };
         let recipient_id = if let Some(recipients) = recipients {
-            let xml = recipients.to_xml(conformance)?.into_bytes();
+            let xml = recipients
+                .to_xml(conformance)
+                .map_err(map_docx_error)?
+                .into_bytes();
             let id = allocate_mail_merge_relationship_id("Recipients", &mut used_ids)?;
             let uri = self.allocate_mail_merge_part_name("recipientData", "xml")?;
             let target = uri.relative_ref(snapshot.target.base_uri());
             staged_parts.push(BlobPart::new(
                 uri,
-                MailMergeRecipients::content_type().to_string(),
+                Recipients::content_type().to_string(),
                 xml,
             ));
             staged_relationships.push(StoredRelationship {
@@ -2166,11 +2167,11 @@ impl Package {
     /// Update settings and sources using the same atomic replacement semantics.
     pub fn update_mail_merge(
         &mut self,
-        settings: MailMergeSettings,
-        data_source: Option<MailMergeSource>,
-        header_source: Option<MailMergeSource>,
-        recipients: Option<MailMergeRecipients>,
-        conformance: MailMergeConformance,
+        settings: Settings,
+        data_source: Option<Source>,
+        header_source: Option<Source>,
+        recipients: Option<Recipients>,
+        conformance: mail_merge::Conformance,
     ) -> Result<()> {
         self.set_mail_merge(
             settings,
@@ -2184,8 +2185,8 @@ impl Package {
     /// Replace recipient inclusion flags while retaining inert source targets and settings.
     pub fn update_mail_merge_recipients(
         &mut self,
-        recipients: MailMergeRecipients,
-        conformance: MailMergeConformance,
+        recipients: Recipients,
+        conformance: mail_merge::Conformance,
     ) -> Result<()> {
         let settings = self.mail_merge_settings()?.ok_or_else(|| {
             OoxmlError::InvalidFormat("document has no mail-merge settings".into())
@@ -2218,7 +2219,7 @@ impl Package {
             return Ok(false);
         }
         let old_targets = self.mail_merge_internal_targets(&snapshot)?;
-        let patched = patch_mail_merge(&snapshot.xml, None, MailMergeConformance::Transitional)?;
+        let patched = patch_mail_merge(&snapshot.xml, None, mail_merge::Conformance::Transitional)?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
         let ids = replacement
             .rels()
@@ -2242,16 +2243,16 @@ impl Package {
 
     fn stage_mail_merge_source(
         &self,
-        source: MailMergeSource,
+        source: Source,
         label: &str,
         relationship_suffix: &str,
-        conformance: MailMergeConformance,
+        conformance: mail_merge::Conformance,
         used_ids: &mut std::collections::HashSet<String>,
     ) -> Result<(StoredRelationship, Option<BlobPart>)> {
         let id = allocate_mail_merge_relationship_id(label, used_ids)?;
         let settings_target = self.settings_part_snapshot()?.target;
         match source {
-            MailMergeSource::External(uri) => {
+            Source::External(uri) => {
                 validate_mail_merge_external_uri(&uri)?;
                 Ok((
                     StoredRelationship {
@@ -2263,7 +2264,7 @@ impl Package {
                     None,
                 ))
             },
-            MailMergeSource::Internal {
+            Source::Internal {
                 bytes,
                 content_type,
                 extension,
@@ -3631,25 +3632,14 @@ fn settings_part_from_snapshot(
     part
 }
 
-fn is_mail_merge_relationship_type(value: &str) -> bool {
-    ["mailMergeSource", "mailMergeHeaderSource", "recipientData"]
-        .iter()
-        .any(|suffix| {
-            value
-                == format!(
-                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/{suffix}"
-                )
-                || value
-                    == format!("http://purl.oclc.org/ooxml/officeDocument/relationships/{suffix}")
-        })
-}
-
-fn mail_merge_relationship_type(conformance: MailMergeConformance, suffix: &str) -> String {
+fn mail_merge_relationship_type(conformance: mail_merge::Conformance, suffix: &str) -> String {
     let base = match conformance {
-        MailMergeConformance::Transitional => {
+        mail_merge::Conformance::Transitional => {
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
         },
-        MailMergeConformance::Strict => "http://purl.oclc.org/ooxml/officeDocument/relationships",
+        mail_merge::Conformance::Strict => {
+            "http://purl.oclc.org/ooxml/officeDocument/relationships"
+        },
     };
     format!("{base}/{suffix}")
 }
@@ -3704,10 +3694,10 @@ fn validate_mail_merge_internal_source(
     Ok(())
 }
 
-fn mail_merge_target_as_source(target: MailMergeTarget) -> MailMergeSource {
+fn mail_merge_target_as_source(target: Target) -> Source {
     match target {
-        MailMergeTarget::External(uri) => MailMergeSource::External(uri),
-        MailMergeTarget::Internal {
+        Target::External(uri) => Source::External(uri),
+        Target::Internal {
             part_name,
             bytes,
             content_type,
@@ -3723,7 +3713,7 @@ fn mail_merge_target_as_source(target: MailMergeTarget) -> MailMergeSource {
                 })
                 .unwrap_or("bin")
                 .to_string();
-            MailMergeSource::Internal {
+            Source::Internal {
                 bytes,
                 content_type,
                 extension,

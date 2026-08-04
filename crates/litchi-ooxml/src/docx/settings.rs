@@ -4,14 +4,14 @@
 //! and protection status.
 
 use crate::docx::mail_merge::{
-    MailMergeSettings, parse_settings_mail_merge, validate_mail_merge_relationships,
+    Settings, parse_settings_mail_merge, validate_mail_merge_relationships,
 };
 use crate::docx::namespace::{
     STRICT_WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace, word_attribute_value,
 };
-use crate::docx::numbering::NumberFormat;
 use crate::docx::variables::DocumentVariables;
 use crate::error::{OoxmlError, Result};
+use litchi_docx::numbering::Format;
 use litchi_opc::part::Part;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -84,7 +84,7 @@ pub struct DocumentSettings {
     /// Whether applications should omit embedded smart-tag data when saving.
     do_not_embed_smart_tags: bool,
     /// Inert mail-merge connection and display metadata.
-    mail_merge: Option<MailMergeSettings>,
+    mail_merge: Option<Settings>,
     /// Inert external attached-template reference.
     attached_template: Option<AttachedTemplate>,
 }
@@ -101,9 +101,9 @@ pub use litchi_docx::settings::{
 
 /// Historical host spelling retained while note-number formats are owned by
 /// the canonical DOCX settings module.
-pub type NoteNumberingProperties = litchi_docx::settings::NoteNumberingProperties<NumberFormat>;
+pub type NoteNumberingProperties = litchi_docx::settings::NoteNumberingProperties<Format>;
 
-type OwnedSettings = litchi_docx::settings::Settings<NumberFormat>;
+type OwnedSettings = litchi_docx::settings::Settings<Format>;
 impl DocumentSettings {
     /// Create a new DocumentSettings with default values.
     pub fn new() -> Self {
@@ -154,7 +154,7 @@ impl DocumentSettings {
 
     /// Return the document's inert mail-merge metadata, if present.
     #[inline]
-    pub fn mail_merge(&self) -> Option<&MailMergeSettings> {
+    pub fn mail_merge(&self) -> Option<&Settings> {
         self.mail_merge.as_ref()
     }
 
@@ -1059,13 +1059,17 @@ fn settings_patch_buffer(capacity: usize) -> Result<Vec<u8>> {
 
 pub(crate) fn patch_mail_merge(
     xml: &[u8],
-    mail_merge: Option<&MailMergeSettings>,
-    conformance: crate::docx::mail_merge::MailMergeConformance,
+    mail_merge: Option<&Settings>,
+    conformance: crate::docx::mail_merge::Conformance,
 ) -> Result<Vec<u8>> {
     DocumentSettings::extract_from_xml(xml)?;
     let layout = scan_settings_xml_layout(xml)?;
     let replacement = mail_merge
-        .map(|value| value.to_xml(conformance))
+        .map(|value| {
+            value
+                .to_xml(conformance)
+                .map_err(crate::docx::mail_merge::map_docx_error)
+        })
         .transpose()?
         .unwrap_or_default();
     if let Some(range) = layout.mail_merge_range {
@@ -2022,13 +2026,13 @@ mod tests {
 
         let footnotes = settings.footnote_properties().unwrap();
         assert_eq!(footnotes.position(), Some(NotePosition::PageBottom));
-        assert_eq!(footnotes.format(), Some(NumberFormat::LowerRoman));
+        assert_eq!(footnotes.format(), Some(Format::LowerRoman));
         assert_eq!(footnotes.start(), Some(2));
         assert_eq!(footnotes.restart(), Some(NoteNumberingRestart::EachPage));
 
         let endnotes = settings.endnote_properties().unwrap();
         assert_eq!(endnotes.position(), Some(NotePosition::DocumentEnd));
-        assert_eq!(endnotes.format(), Some(NumberFormat::UpperLetter));
+        assert_eq!(endnotes.format(), Some(Format::UpperLetter));
         assert_eq!(endnotes.start(), None);
         assert_eq!(endnotes.restart(), None);
     }

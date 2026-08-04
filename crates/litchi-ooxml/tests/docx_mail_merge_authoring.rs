@@ -1,31 +1,31 @@
-use litchi_ooxml::docx::{
-    MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
-    MailMergeFieldMap, MailMergeFieldMappingType, MailMergeRecipient, MailMergeRecipients,
-    MailMergeSettings, MailMergeSource, MailMergeTarget, Package,
+use litchi_docx::mail_merge::{
+    Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, Recipient,
+    Recipients, Settings, Source, Target,
 };
+use litchi_ooxml::docx::Package;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::{BlobPart, Part};
 
-fn settings_model() -> MailMergeSettings {
-    let mut field = MailMergeFieldMap::new();
+fn settings_model() -> Settings {
+    let mut field = FieldMap::new();
     field
-        .set_mapping_type(Some(MailMergeFieldMappingType::DatabaseColumn))
+        .set_mapping_type(Some(FieldMappingType::DatabaseColumn))
         .set_name(Some("Name".into()))
         .set_mapped_name(Some("Full Name".into()))
         .set_column(Some(0))
         .set_dynamic_address(true);
-    let mut odso = MailMergeDataSourceObject::new();
+    let mut odso = DataSourceObject::new();
     odso.set_table(Some("Sheet1$".into()))
         .set_source_type(Some("spreadsheet".into()))
         .set_first_row_header(true)
         .add_field_map(field);
-    let mut settings = MailMergeSettings::new();
+    let mut settings = Settings::new();
     settings
-        .set_data_type(Some(MailMergeDataType::Spreadsheet))
+        .set_data_type(Some(DataType::Spreadsheet))
         .set_connect_string(Some("Provider=Inert;Data Source=never-opened".into()))
         .set_query(Some("SELECT * FROM [Sheet1$]".into()))
-        .set_destination(MailMergeDestination::Email)
+        .set_destination(Destination::Email)
         .set_mail_subject(Some("Subject & inert".into()))
         .set_view_merged_data(true)
         .set_active_record(2)
@@ -33,13 +33,13 @@ fn settings_model() -> MailMergeSettings {
     settings
 }
 
-fn recipients() -> MailMergeRecipients {
-    let mut recipients = MailMergeRecipients::new();
+fn recipients() -> Recipients {
+    let mut recipients = Recipients::new();
     recipients
-        .add_recipient(MailMergeRecipient::new(true, Some(0), Some(vec![1, 2, 3])))
+        .add_recipient(Recipient::new(true, Some(0), Some(vec![1, 2, 3])))
         .unwrap();
     recipients
-        .add_recipient(MailMergeRecipient::new(false, Some(1), Some(vec![4, 5])))
+        .add_recipient(Recipient::new(false, Some(1), Some(vec![4, 5])))
         .unwrap();
     recipients
 }
@@ -52,16 +52,16 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
     package
         .set_mail_merge(
             settings_model(),
-            Some(MailMergeSource::External(
+            Some(Source::External(
                 "https://example.invalid/never-fetch.csv".into(),
             )),
-            Some(MailMergeSource::Internal {
+            Some(Source::Internal {
                 bytes: b"opaque header bytes".to_vec(),
                 content_type: "text/csv".into(),
                 extension: "csv".into(),
             }),
             Some(recipients()),
-            MailMergeConformance::Transitional,
+            Conformance::Transitional,
         )
         .unwrap();
     package.save(&path).unwrap();
@@ -74,7 +74,7 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
         .mail_merge_target(merge.data_source_relationship_id().unwrap())
         .unwrap()
     {
-        MailMergeTarget::External(uri) => {
+        Target::External(uri) => {
             assert_eq!(uri, "https://example.invalid/never-fetch.csv")
         },
         _ => panic!("expected inert external URI"),
@@ -91,7 +91,7 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
     let mut updated = loaded_recipients.clone();
     updated.set_recipient_active(1, true).unwrap();
     reopened
-        .update_mail_merge_recipients(updated, MailMergeConformance::Transitional)
+        .update_mail_merge_recipients(updated, Conformance::Transitional)
         .unwrap();
     assert!(
         reopened
@@ -111,10 +111,10 @@ fn strict_relationships_and_settings_order_are_emitted() {
     package
         .set_mail_merge(
             settings_model(),
-            Some(MailMergeSource::External("urn:inert:data".into())),
+            Some(Source::External("urn:inert:data".into())),
             None,
             Some(recipients()),
-            MailMergeConformance::Strict,
+            Conformance::Strict,
         )
         .unwrap();
     let merge = package.mail_merge_settings().unwrap().unwrap();
@@ -166,7 +166,7 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
             None,
             None,
             None,
-            MailMergeConformance::Transitional,
+            Conformance::Transitional,
         )
         .unwrap();
     let before_count = package.opc_package().part_count();
@@ -188,10 +188,10 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
         package
             .update_mail_merge(
                 invalid,
-                Some(MailMergeSource::External("https://example.invalid".into())),
+                Some(Source::External("https://example.invalid".into())),
                 None,
                 None,
-                MailMergeConformance::Transitional,
+                Conformance::Transitional,
             )
             .is_err()
     );
@@ -212,14 +212,14 @@ fn clear_preserves_an_internal_source_still_shared_elsewhere() {
     package
         .set_mail_merge(
             settings_model(),
-            Some(MailMergeSource::Internal {
+            Some(Source::Internal {
                 bytes: b"shared opaque source".to_vec(),
                 content_type: "application/octet-stream".into(),
                 extension: "bin".into(),
             }),
             None,
             None,
-            MailMergeConformance::Transitional,
+            Conformance::Transitional,
         )
         .unwrap();
     let merge = package.mail_merge_settings().unwrap().unwrap();
@@ -227,7 +227,7 @@ fn clear_preserves_an_internal_source_still_shared_elsewhere() {
         .mail_merge_target(merge.data_source_relationship_id().unwrap())
         .unwrap()
     {
-        MailMergeTarget::Internal { part_name, .. } => part_name,
+        Target::Internal { part_name, .. } => part_name,
         _ => panic!("expected internal source"),
     };
     let footer_uri = PackURI::new("/word/footerMailMerge.xml").unwrap();
@@ -263,10 +263,10 @@ fn malformed_uri_and_recipient_limits_fail_before_package_mutation() {
         package
             .set_mail_merge(
                 settings_model(),
-                Some(MailMergeSource::External("bad\nuri".into())),
+                Some(Source::External("bad\nuri".into())),
                 None,
                 None,
-                MailMergeConformance::Transitional,
+                Conformance::Transitional,
             )
             .is_err()
     );
