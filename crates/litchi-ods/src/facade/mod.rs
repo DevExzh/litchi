@@ -3,7 +3,7 @@
 use litchi_core::Result;
 use std::path::Path;
 
-pub use crate::authoring::{MutableSpreadsheet, SpreadsheetBuilder};
+pub use crate::authoring::{Builder, MutableSpreadsheet};
 pub use crate::model::{
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage,
 };
@@ -11,22 +11,22 @@ pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
-    package: crate::package::SpreadsheetPackage,
+    package: crate::package::Package,
     named_definitions: Vec<NamedDefinition>,
 }
 
 impl Spreadsheet {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let package = crate::package::SpreadsheetPackage::open(path)?;
+        let package = crate::package::Package::open(path)?;
         Self::from_package(package)
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        let package = crate::package::Package::from_bytes(bytes)?;
         Self::from_package(package)
     }
 
-    fn from_package(package: crate::package::SpreadsheetPackage) -> Result<Self> {
+    fn from_package(package: crate::package::Package) -> Result<Self> {
         let named_definitions = package.named_definitions()?;
         Ok(Self {
             package,
@@ -127,21 +127,21 @@ impl Spreadsheet {
     ) -> Result<String> {
         let (bytes, path) =
             litchi_odf_common::rdf::add_graph(self.package.package(), preferred_path, triples)?;
-        self.package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        self.package = crate::package::Package::from_bytes(bytes)?;
         Ok(path)
     }
 
     /// Replace one complete RDF graph and atomically publish the result.
     pub fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> Result<()> {
         let bytes = litchi_odf_common::rdf::replace_graph(self.package.package(), path, triples)?;
-        self.package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        self.package = crate::package::Package::from_bytes(bytes)?;
         Ok(())
     }
 
     /// Remove one RDF graph after validating that no remaining graph references it.
     pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
         let bytes = litchi_odf_common::rdf::remove_graph(self.package.package(), path)?;
-        self.package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        self.package = crate::package::Package::from_bytes(bytes)?;
         Ok(())
     }
 
@@ -157,7 +157,7 @@ impl Spreadsheet {
             .triples
             .len();
         let bytes = litchi_odf_common::rdf::add_triple(self.package.package(), path, triple)?.0;
-        self.package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        self.package = crate::package::Package::from_bytes(bytes)?;
         Ok(index)
     }
 
@@ -165,21 +165,21 @@ impl Spreadsheet {
     pub fn replace_rdf_triple(&mut self, path: &str, index: usize, triple: &Triple) -> Result<()> {
         let bytes =
             litchi_odf_common::rdf::replace_triple(self.package.package(), path, index, triple)?;
-        self.package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        self.package = crate::package::Package::from_bytes(bytes)?;
         Ok(())
     }
 
     /// Remove one triple from a graph.
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
         let bytes = litchi_odf_common::rdf::remove_triple(self.package.package(), path, index)?;
-        self.package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        self.package = crate::package::Package::from_bytes(bytes)?;
         Ok(())
     }
 
     /// Move one triple within its RDF description.
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
         let bytes = litchi_odf_common::rdf::move_triple(self.package.package(), path, from, to)?;
-        self.package = crate::package::SpreadsheetPackage::from_bytes(bytes)?;
+        self.package = crate::package::Package::from_bytes(bytes)?;
         Ok(())
     }
 }
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn builder_round_trips_through_facade() {
-        let bytes = SpreadsheetBuilder::new().build().unwrap();
+        let bytes = Builder::new().build().unwrap();
         let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
     }

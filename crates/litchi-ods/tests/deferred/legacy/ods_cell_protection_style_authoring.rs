@@ -1,6 +1,6 @@
 use litchi_ods::{
     CellStyleProtection, ConditionalCellStyle, ConditionalCellStyleRule, MutableSpreadsheet,
-    Spreadsheet, SpreadsheetBuilder, TableCellProtectionStyle,
+    Spreadsheet, Builder, TableCellProtectionStyle,
 };
 
 #[test]
@@ -12,7 +12,7 @@ fn every_protection_value_round_trips_through_builder_and_mutable_packages() {
         CellStyleProtection::ProtectedFormulaHidden,
         CellStyleProtection::HiddenAndProtected,
     ];
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Sheet1").unwrap();
     builder.add_common_table_cell_style("Base").unwrap();
     for (index, value) in values.into_iter().enumerate() {
@@ -53,7 +53,7 @@ fn every_protection_value_round_trips_through_builder_and_mutable_packages() {
 
 #[test]
 fn combined_conditional_and_protection_style_survives_replace_and_remove() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_common_table_cell_style("Red").unwrap();
     let conditional = ConditionalCellStyle::new(
         "combo",
@@ -98,7 +98,7 @@ fn combined_conditional_and_protection_style_survives_replace_and_remove() {
 
 #[test]
 fn malformed_names_parents_duplicates_and_failed_replacements_are_atomic() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_common_table_cell_style("Base").unwrap();
     let valid = TableCellProtectionStyle::new("p", CellStyleProtection::Protected)
         .with_parent_style_name("Base");

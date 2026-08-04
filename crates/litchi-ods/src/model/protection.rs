@@ -28,7 +28,7 @@ pub struct ProtectionKey {
 
 /// Protection metadata on the document-level `office:spreadsheet` element.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SpreadsheetProtection {
+pub struct Protection {
     /// `None` preserves an omitted attribute; `Some(false)` preserves an explicit false value.
     pub structure_protected: Option<bool>,
     pub key: ProtectionKey,
@@ -68,10 +68,10 @@ pub struct SheetProtection {
     pub options: SheetProtectionOptions,
 }
 
-pub(crate) fn parse_protection(xml: &str) -> Result<(SpreadsheetProtection, Vec<SheetProtection>)> {
+pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<SheetProtection>)> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
-    let mut spreadsheet = SpreadsheetProtection::default();
+    let mut spreadsheet = Protection::default();
     let mut spreadsheet_seen = false;
     let mut sheets = Vec::new();
     let mut current_sheet: Option<SheetProtection> = None;
@@ -184,8 +184,8 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(SpreadsheetProtection, Vec<
 fn parse_spreadsheet_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<SpreadsheetProtection> {
-    Ok(SpreadsheetProtection {
+) -> Result<Protection> {
+    Ok(Protection {
         structure_protected: optional_bool_attribute(
             reader,
             element,
@@ -262,7 +262,7 @@ fn optional_extension_bool(
     Ok(None)
 }
 
-pub(crate) fn write_spreadsheet_attributes(out: &mut String, value: &SpreadsheetProtection) {
+pub(crate) fn write_spreadsheet_attributes(out: &mut String, value: &Protection) {
     write_bool_attribute(out, "table:structure-protected", value.structure_protected);
     write_key_attributes(out, &value.key);
 }
@@ -297,7 +297,7 @@ pub(crate) fn write_sheet_options(out: &mut String, value: &SheetProtectionOptio
 }
 
 pub(crate) fn has_extensions<'a>(
-    spreadsheet: &SpreadsheetProtection,
+    spreadsheet: &Protection,
     mut sheets: impl Iterator<Item = &'a SheetProtection>,
 ) -> bool {
     spreadsheet.key.secondary_digest_algorithm.is_some()

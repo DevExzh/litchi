@@ -442,7 +442,7 @@ fn xml_error(error: quick_xml::Error) -> Error {
 #[cfg(any())]
 mod tests {
     use super::*;
-    use crate::{MutableSpreadsheet, Spreadsheet, SpreadsheetBuilder};
+    use crate::{Builder, MutableSpreadsheet, Spreadsheet};
 
     const PREFIX: &str = concat!(
         "<office:document-content ",
@@ -524,7 +524,7 @@ mod tests {
         let replacement =
             Consolidation::new("average", vec!["Sheet1.A1:E2".to_string()], "Sheet1.G3").unwrap();
 
-        let mut builder = SpreadsheetBuilder::new();
+        let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();
         builder.set_consolidation(Some(original.clone())).unwrap();
         let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();

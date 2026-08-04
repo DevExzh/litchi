@@ -6,7 +6,7 @@
 //! cargo run -p litchi-odf --example write_ods
 //! ```
 
-use litchi_odf::{CellValue, Spreadsheet, SpreadsheetBuilder};
+use litchi_ods::{Builder, CellValue, Spreadsheet};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ---- Build phase ----
     println!("Building ODS at: {}", path.display());
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Demo")?;
 
     // Header row.

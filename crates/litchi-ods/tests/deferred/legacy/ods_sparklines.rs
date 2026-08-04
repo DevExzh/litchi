@@ -9,7 +9,7 @@ use litchi_ods::{
     ColorTransformationType, FlatSpreadsheet, MutableSpreadsheet, Sparkline, SparklineAxisType,
     SparklineColorTransformation, SparklineColors, SparklineComplexColor, SparklineComplexColors,
     SparklineEmptyCells, SparklineFlags, SparklineGroup, SparklineType, Spreadsheet,
-    SpreadsheetBuilder, ThemeColorType,
+    Builder, ThemeColorType,
 };
 
 /// Flat spreadsheet written in the shape LibreOffice Calc produces.
@@ -93,7 +93,7 @@ fn reads_libreoffice_calcext_sparkline_groups() {
 
 #[test]
 fn builder_authored_sparkline_groups_round_trip_the_package() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Scores").unwrap();
     builder.add_row_with_values(&["3", "7", "5"]).unwrap();
     builder
@@ -128,7 +128,7 @@ fn builder_authored_sparkline_groups_round_trip_the_package() {
 
 #[test]
 fn mutable_creates_replaces_and_removes_sparkline_groups() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Scores").unwrap();
     builder.add_row_with_values(&["3", "7", "5"]).unwrap();
     let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
@@ -178,7 +178,7 @@ fn mutable_creates_replaces_and_removes_sparkline_groups() {
 
 #[test]
 fn invalid_sparkline_groups_are_rejected_atomically() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Sheet1").unwrap();
     // A group without sparklines cannot be authored.
     assert!(

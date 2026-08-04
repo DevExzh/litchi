@@ -971,7 +971,7 @@ mod tests {
         let mut source = DdeSource::new("app", "topic", "item");
         source.automatic_update = Some(true);
 
-        let mut builder = crate::SpreadsheetBuilder::new();
+        let mut builder = crate::Builder::new();
         builder.add_sheet("Visible").unwrap();
         builder
             .add_dde_link(DdeLink::new(source, cached_table).unwrap())

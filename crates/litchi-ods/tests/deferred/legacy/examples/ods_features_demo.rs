@@ -3,12 +3,13 @@
 
 use litchi::Result;
 use litchi::common::Metadata;
-use litchi::odf::{CellValue, Spreadsheet, SpreadsheetBuilder};
+use litchi::odf::ods::Builder;
+use litchi::odf::{CellValue, Spreadsheet};
 
 fn main() -> Result<()> {
     println!("Creating comprehensive ODS file with supported features...");
 
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
 
     // Set metadata
     builder.set_metadata(Metadata {

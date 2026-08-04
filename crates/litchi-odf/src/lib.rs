@@ -65,7 +65,7 @@ pub use litchi_odp::Builder;
 #[cfg(feature = "odp")]
 pub use litchi_odp::Presentation;
 #[cfg(feature = "ods")]
-pub use litchi_ods::{Spreadsheet, SpreadsheetBuilder};
+pub use litchi_ods::Spreadsheet;
 #[cfg(feature = "odt")]
 pub use litchi_odt::{Document, DocumentBuilder, MutableDocument};
 #[cfg(feature = "oth")]

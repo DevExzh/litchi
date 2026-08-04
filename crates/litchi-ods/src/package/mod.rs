@@ -2,4 +2,4 @@
 
 mod document;
 
-pub use document::SpreadsheetPackage;
+pub use document::Package;

@@ -13,7 +13,9 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::Metadata;
 #[cfg(feature = "odf")]
-use litchi::odf::{CellValue, SpreadsheetBuilder};
+use litchi::odf::CellValue;
+#[cfg(feature = "odf")]
+use litchi::odf::ods::Builder;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
@@ -22,8 +24,8 @@ fn main() -> Result<()> {
     let output_file = "ods_writer_test_output.ods";
     println!("📝 Creating comprehensive ODS spreadsheet: {}", output_file);
 
-    // Create a new spreadsheet using SpreadsheetBuilder
-    let mut builder = SpreadsheetBuilder::new();
+    // Create a new spreadsheet using Builder
+    let mut builder = Builder::new();
 
     // Set document metadata
     println!("✅ Setting metadata...");

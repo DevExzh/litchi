@@ -95,11 +95,11 @@ impl MutableSpreadsheet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SpreadsheetBuilder;
+    use crate::Builder;
 
     #[test]
     fn preserves_owned_package_without_edits() {
-        let bytes = SpreadsheetBuilder::new().build().unwrap();
+        let bytes = Builder::new().build().unwrap();
         let mutable = MutableSpreadsheet::from_bytes(bytes).unwrap();
         let reopened = Spreadsheet::from_bytes(mutable.to_bytes()).unwrap();
         assert!(reopened.content_xml().contains("office:spreadsheet"));

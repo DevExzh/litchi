@@ -1,6 +1,5 @@
 use litchi_ods::{
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Spreadsheet,
-    SpreadsheetBuilder,
+    Builder, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Spreadsheet,
 };
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -25,7 +24,7 @@ fn named_definitions_round_trip_in_order_and_scope() {
     let expression = NamedExpression::new("TaxRate", "of:=0.2", global()).unwrap();
     let local = NamedRange::new("Input", "$Sheet1.$C$1", sheet("Sheet1")).unwrap();
 
-    let mut builder = SpreadsheetBuilder::new().content_xml(CONTENT);
+    let mut builder = Builder::new().content_xml(CONTENT);
     builder.add_named_range(range).unwrap();
     builder.add_named_expression(expression).unwrap();
     builder.add_named_range(local).unwrap();
@@ -70,8 +69,7 @@ fn named_definitions_round_trip_in_order_and_scope() {
 
 #[test]
 fn duplicate_and_invalid_definitions_are_rejected_without_mutation() {
-    let mut spreadsheet =
-        Spreadsheet::from_bytes(SpreadsheetBuilder::new().build().unwrap()).unwrap();
+    let mut spreadsheet = Spreadsheet::from_bytes(Builder::new().build().unwrap()).unwrap();
     let first = NamedRange::new("Total", "$Sheet1.$A$1", global()).unwrap();
     spreadsheet.add_named_range(first).unwrap();
     let before_xml = spreadsheet.content_xml().to_owned();
@@ -96,7 +94,7 @@ fn duplicate_and_invalid_definitions_are_rejected_without_mutation() {
 
 #[test]
 fn builder_rejects_duplicate_definitions_before_building() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_named_range(NamedRange::new("Total", "$Sheet1.$A$1", global()).unwrap())
         .unwrap();

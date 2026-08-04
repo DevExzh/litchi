@@ -1,6 +1,6 @@
 use litchi_ods::{
     CellValue, Image, ImageFrame, ImagePart, ImageSource, MutableSpreadsheet, OdfLength,
-    OpenDocumentPackage, OwnedPackage, Spreadsheet, SpreadsheetBuilder,
+    OpenDocumentPackage, OwnedPackage, Spreadsheet, Builder,
 };
 use std::io::{Cursor, Write};
 
@@ -35,7 +35,7 @@ fn linked_image(href: &str) -> Image {
 
 #[test]
 fn builder_and_mutable_round_trip_inert_sheet_images() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_sheet("Forecast")
         .unwrap()
@@ -116,7 +116,7 @@ fn parses_libreoffice_table_shapes_references_alternatives_and_invalid_forms() {
     assert_eq!(reparsed_images.len(), 2);
     assert_eq!(reparsed_images[1].alternative_index, 1);
 
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     let mut invalid = linked_image("relative.png");
     invalid.frame.as_mut().unwrap().width = Some("-1cm".to_string());
     assert!(builder.add_sheet_image(invalid).is_err());

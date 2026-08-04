@@ -8,9 +8,9 @@ const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const BODY_MARKER: &str = "<office:spreadsheet";
 
 /// Validated ownership boundary for an ODS package.
-pub struct SpreadsheetPackage(FamilyPackage);
+pub struct Package(FamilyPackage);
 
-impl SpreadsheetPackage {
+impl Package {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         FamilyPackage::open(path, MIMETYPE, BODY_MARKER, "ODS").map(Self)
     }

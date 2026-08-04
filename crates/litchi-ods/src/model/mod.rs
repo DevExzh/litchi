@@ -45,9 +45,7 @@ pub use named_expression::{
     FormulaNamespace, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage,
 };
-pub use protection::{
-    ProtectionKey, SheetProtection, SheetProtectionOptions, SpreadsheetProtection,
-};
+pub use protection::{Protection, ProtectionKey, SheetProtection, SheetProtectionOptions};
 pub use source::{CellRangeSource, SheetTableSource, TableSourceMode};
 pub use sparkline::*;
 pub use structure::{

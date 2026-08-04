@@ -1925,7 +1925,7 @@ mod tests {
     #[test]
     fn round_trips_through_builder_and_mutable_packages() {
         let table = parse_data_pilot_tables(&complete_xml()).unwrap().remove(0);
-        let mut builder = crate::SpreadsheetBuilder::new();
+        let mut builder = crate::Builder::new();
         builder.add_sheet("Source").unwrap();
         builder.add_data_pilot_table(table).unwrap();
         let spreadsheet = crate::Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();

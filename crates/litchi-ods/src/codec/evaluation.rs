@@ -660,7 +660,7 @@ fn column_to_letters(mut column: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SpreadsheetBuilder;
+    use crate::Builder;
 
     #[test]
     fn normalizes_common_open_formula_syntax_without_touching_strings() {
@@ -692,7 +692,7 @@ mod tests {
 
     #[test]
     fn exposes_ods_values_through_the_shared_workbook_traits() {
-        let mut builder = SpreadsheetBuilder::new();
+        let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();
         builder.add_row_with_numbers(&[2.0, 3.0]).unwrap();
         builder
@@ -723,7 +723,7 @@ mod tests {
 
     #[tokio::test]
     async fn evaluates_uncached_open_formula_cells() {
-        let mut builder = SpreadsheetBuilder::new();
+        let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();
         builder.add_row_with_numbers(&[2.0, 3.0]).unwrap();
         builder

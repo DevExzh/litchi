@@ -349,7 +349,7 @@ fn xml_error(error: quick_xml::Error) -> Error {
 #[cfg(any())]
 mod tests {
     use super::*;
-    use crate::{MutableSpreadsheet, Spreadsheet, SpreadsheetBuilder};
+    use crate::{Builder, MutableSpreadsheet, Spreadsheet};
 
     const PREFIX: &str = concat!(
         "<office:document-content ",
@@ -424,7 +424,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut builder = SpreadsheetBuilder::new();
+        let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();
         builder.add_label_range(first.clone()).unwrap();
         let bytes = builder.build().unwrap();

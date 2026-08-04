@@ -1,6 +1,6 @@
 use litchi_ods::{
     ConditionalCellStyle, ConditionalCellStyleRule, FormulaNamespace, MutableSpreadsheet,
-    Spreadsheet, SpreadsheetBuilder,
+    Spreadsheet, Builder,
 };
 
 fn rule(condition: &str, target: &str) -> ConditionalCellStyleRule {
@@ -14,7 +14,7 @@ fn rule(condition: &str, target: &str) -> ConditionalCellStyleRule {
 
 #[test]
 fn builder_and_mutable_conditional_styles_have_stable_packaged_roundtrips() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Sheet1").unwrap();
     builder.add_common_table_cell_style("Red").unwrap();
     builder.add_common_table_cell_style("Blue").unwrap();
@@ -55,7 +55,7 @@ fn builder_and_mutable_conditional_styles_have_stable_packaged_roundtrips() {
 
 #[test]
 fn validation_failures_are_atomic_and_conditions_remain_inert() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_common_table_cell_style("Red").unwrap();
     let valid = ConditionalCellStyle::new("ce1", vec![rule("of:is-true-formula([.A1])", "Red")]);
     builder

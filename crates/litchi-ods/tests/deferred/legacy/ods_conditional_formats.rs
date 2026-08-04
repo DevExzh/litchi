@@ -10,7 +10,7 @@ use litchi_ods::{
     ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType, ConditionalFormat,
     ConditionalFormatCondition, ConditionalFormatEntryType, ConditionalFormatRule,
     ConditionalIconSet, ConditionalIconSetEntry, DataBarAxisPosition, FlatSpreadsheet, IconSetType,
-    MutableSpreadsheet, Spreadsheet, SpreadsheetBuilder,
+    MutableSpreadsheet, Spreadsheet, Builder,
 };
 
 /// Flat spreadsheet written in the shape LibreOffice Calc produces.
@@ -116,7 +116,7 @@ fn reads_libreoffice_calcext_conditional_formats() {
 
 #[test]
 fn builder_authored_conditional_formats_round_trip_the_package() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Grades").unwrap();
     builder.add_row_with_values(&["name", "score"]).unwrap();
     builder.add_row_with_values(&["alice", "7"]).unwrap();
@@ -166,7 +166,7 @@ fn builder_authored_conditional_formats_round_trip_the_package() {
 
 #[test]
 fn mutable_creates_replaces_and_removes_conditional_formats() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Grades").unwrap();
     builder.add_row_with_values(&["alice", "7"]).unwrap();
     let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
@@ -229,7 +229,7 @@ fn mutable_creates_replaces_and_removes_conditional_formats() {
 
 #[test]
 fn invalid_conditional_formats_are_rejected_atomically() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Sheet1").unwrap();
     assert!(
         builder

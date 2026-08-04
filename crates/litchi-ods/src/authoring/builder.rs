@@ -6,18 +6,18 @@ const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 
 /// Minimal package builder; richer sheet authoring is migrated independently.
 #[derive(Clone, Debug)]
-pub struct SpreadsheetBuilder {
+pub struct Builder {
     content_xml: String,
     named_definitions: Vec<NamedDefinition>,
 }
 
-impl Default for SpreadsheetBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl SpreadsheetBuilder {
+impl Builder {
     pub fn new() -> Self {
         Self {
             content_xml: empty_content().to_owned(),

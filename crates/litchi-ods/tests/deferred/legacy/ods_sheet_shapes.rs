@@ -1,13 +1,13 @@
 //! General drawing-shape support in ODS `table:shapes` containers.
 //!
-//! Covers authoring through `SpreadsheetBuilder` and `MutableSpreadsheet`,
+//! Covers authoring through `Builder` and `MutableSpreadsheet`,
 //! semantic reparsing, ODS-specific end-cell anchoring, and lossless
 //! round-trips of packaged and flat spreadsheets.
 
 use litchi_ods::{
     DrawingAttribute, DrawingAttributeNamespace, DrawingShapeKind, EnhancedGeometry,
     EnhancedGeometryChild, EnhancedGeometryChildKind, FlatSpreadsheet, MutableSpreadsheet, Shape,
-    SheetShape, SheetShapeAnchor, Spreadsheet, SpreadsheetBuilder,
+    SheetShape, SheetShapeAnchor, Spreadsheet, Builder,
 };
 
 const SHEET_SHAPES_FODS: &str = include_str!("../../../test-data/odf/ods/sheet-shapes.fods");
@@ -182,7 +182,7 @@ fn assert_shape_matches(actual: &Shape, expected: &Shape, label: &str) {
 #[test]
 fn builder_authors_general_shapes_that_reparse() {
     let expected = authored_shapes("Data");
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Data").unwrap();
     builder.add_row_with_values(&["Region"]).unwrap();
     for shape in &expected {
@@ -407,7 +407,7 @@ fn assert_shapes_precede_structure(content: &str, label: &str) {
 
 #[test]
 fn table_shapes_precede_column_and_row_groups() {
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder.add_sheet("Data").unwrap();
     builder.add_row_with_values(&["Region"]).unwrap();
     builder

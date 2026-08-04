@@ -3,5 +3,5 @@
 mod builder;
 mod mutable;
 
-pub use builder::SpreadsheetBuilder;
+pub use builder::Builder;
 pub use mutable::MutableSpreadsheet;

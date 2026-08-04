@@ -1508,7 +1508,7 @@ fn unexpected_eof(element: &str) -> Error {
 #[cfg(any())]
 mod tests {
     use super::*;
-    use crate::{MutableSpreadsheet, Spreadsheet, SpreadsheetBuilder};
+    use crate::{Builder, MutableSpreadsheet, Spreadsheet};
 
     #[test]
     fn parses_and_writes_complete_database_range_metadata() {
@@ -1604,7 +1604,7 @@ mod tests {
             ..SubtotalRules::default()
         });
 
-        let mut builder = SpreadsheetBuilder::new();
+        let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();
         builder.add_database_range(range.clone()).unwrap();
         let bytes = builder.build().unwrap();

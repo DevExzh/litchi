@@ -1,10 +1,10 @@
 use litchi_odf_common::constants;
 use litchi_ods::rdf::{Object, Subject, Triple};
-use litchi_ods::{Spreadsheet, SpreadsheetBuilder};
+use litchi_ods::{Builder, Spreadsheet};
 
 #[test]
 fn builder_and_package_facade_round_trip() {
-    let bytes = SpreadsheetBuilder::new().build().unwrap();
+    let bytes = Builder::new().build().unwrap();
     let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).unwrap();
     assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
     assert_eq!(spreadsheet.into_bytes(), bytes);
@@ -13,10 +13,7 @@ fn builder_and_package_facade_round_trip() {
 #[test]
 fn spreadsheet_facade_owns_rdf_crud() {
     let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:spreadsheet><table:table xml:id="sheet" table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
-    let bytes = SpreadsheetBuilder::new()
-        .content_xml(content)
-        .build()
-        .unwrap();
+    let bytes = Builder::new().content_xml(content).build().unwrap();
     let mut spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
     let triple = Triple {
         subject: Subject::Iri("#sheet".to_string()),

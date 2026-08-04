@@ -1,5 +1,5 @@
 use litchi_ods::{
-    DdeConversionMode, DdeSource, MutableSpreadsheet, Spreadsheet, SpreadsheetBuilder,
+    DdeConversionMode, DdeSource, MutableSpreadsheet, Spreadsheet, Builder,
 };
 use std::io::{Cursor, Write};
 
@@ -28,7 +28,7 @@ fn builder_and_mutable_round_trip_sheet_dde_source_inertly() {
     source.conversion_mode = Some(DdeConversionMode::IntoEnglishNumber);
     source.automatic_update = Some(true);
 
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     builder
         .add_sheet("Prices")
         .unwrap()
@@ -66,7 +66,7 @@ fn rejects_malformed_spoofed_duplicate_and_oversized_sources() {
         assert!(result.is_err(), "accepted {child}");
     }
 
-    let mut builder = SpreadsheetBuilder::new();
+    let mut builder = Builder::new();
     let oversized = DdeSource::new("a".repeat(65_537), "topic", "item");
     assert!(builder.set_sheet_dde_source(Some(oversized)).is_err());
 }
