@@ -4126,10 +4126,11 @@ format-specific seams highlighted by the public API audit:
   `package.rs`. `Conformance`, `Comment`, `Reaction`, `Metadata`, `Person`,
   and related concise models are canonical; historical expanded spellings
   were removed in the owner-only API convergence pass below.
-- `litchi-xlsb::conditional_formatting` is split into `model.rs` and
-  `codec.rs`. `Formatting`, `Rule`, `RuleType`, `Value`, `Color`, `Bar`, and
-  related names are canonical; the host's historical conditional-formatting
-  vocabulary remains aliases with no duplicate definitions.
+- `litchi-xlsb::conditional_formatting` is split into `model.rs`, `codec.rs`,
+  and `tests.rs`. `Formatting`, `Rule`, `RuleType`, `Value`, `Color`, `Bar`, and
+  related names are canonical. The owner now also contains focused facade
+  tests, while the host publishes no conditional-formatting aliases or
+  duplicate codec.
 
 The shared OOXML `ST_Guid` lexical validator already owned by
 `litchi-ooxml-common::custom_xml` is now reused by PPTX modern comments, XLSX
@@ -4487,6 +4488,15 @@ ODF datatypes are consumed through their canonical owner types. OOXML host
 package methods may still map owner errors or resolve OPC relationships, but
 they no longer invent a second semantic type or a prefix-expanded alias.
 Callers that need a format-neutral model use the owning common crate directly.
+
+For XLSB conditional formatting, the owner-only boundary is
+`litchi-xlsb::conditional_formatting/{mod,model,codec,tests}.rs`. Its
+canonical facade exposes `Formatting`, `Rule`, `RuleType`, `Value`, `Scale`,
+`Bar`, `IconSet`, and the related record values without compatibility aliases
+or format-expanded spellings. The OOXML migration host no longer publishes a
+conditional-formatting forwarding module or writer codec; it retains worksheet
+record orchestration and maps owner failures into `XlsbError` at the host
+error boundary.
 
 ## ODF namespace vocabulary extraction
 
