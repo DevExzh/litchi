@@ -3680,7 +3680,7 @@ impl Workbook {
                             .into());
                         }
                         let (target, external) = match &relationship.target {
-                            crate::xlsx::ChartRelationshipTarget::Embedded {
+                            crate::xlsx::RelationshipTarget::Embedded {
                                 data,
                                 content_type,
                                 extension,
@@ -3711,7 +3711,7 @@ impl Workbook {
                                 ));
                                 (format!("../chartResources/{resource_name}"), false)
                             },
-                            crate::xlsx::ChartRelationshipTarget::External { target } => {
+                            crate::xlsx::RelationshipTarget::External { target } => {
                                 if target.is_empty() {
                                     return Err(format!(
                                         "Worksheet chart {} has an empty external related target",
@@ -3876,7 +3876,7 @@ impl Workbook {
                                 .into());
                             }
                             let (target, external) = match &relationship.target {
-                                crate::xlsx::ChartUserShapesRelationshipTarget::Embedded {
+                                crate::xlsx::RelationshipTarget::Embedded {
                                     data,
                                     content_type,
                                     extension,
@@ -3909,9 +3909,7 @@ impl Workbook {
                                     ));
                                     (format!("../media/{resource_name}"), false)
                                 },
-                                crate::xlsx::ChartUserShapesRelationshipTarget::External {
-                                    target,
-                                } => {
+                                crate::xlsx::RelationshipTarget::External { target } => {
                                     if target.is_empty() {
                                         return Err(format!(
                                             "Worksheet chart {} has an empty external user-shapes target",
@@ -4804,9 +4802,8 @@ mod tests {
     use litchi_xlsx::threaded_comments::{Comment, Mention, People, Person};
 
     use crate::xlsx::{
-        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
-        ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
-        ChartUserShapesRelationshipTarget, ProtectionPasswordVerifier,
+        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
+        ProtectionPasswordVerifier, Relationship, RelationshipTarget,
         StrongProtectionPasswordVerifier, Table, TableColumn, WorksheetChart,
     };
 
@@ -5334,19 +5331,19 @@ mod tests {
         );
         worksheet.add_chart(
             worksheet_chart
-            .with_additional_relationship(ChartRelationship {
+            .with_additional_relationship(Relationship {
                 relationship_id: "rId9".to_string(),
                 relationship_type: rt::IMAGE.to_string(),
-                target: ChartRelationshipTarget::Embedded {
+                target: RelationshipTarget::Embedded {
                     data: b"chart background".to_vec(),
                     content_type: ct::PNG.to_string(),
                     extension: "png".to_string(),
                 },
             })
-            .with_additional_relationship(ChartRelationship {
+            .with_additional_relationship(Relationship {
                 relationship_id: "rId10".to_string(),
                 relationship_type: rt::HYPERLINK.to_string(),
-                target: ChartRelationshipTarget::External {
+                target: RelationshipTarget::External {
                     target: "https://example.test/chart".to_string(),
                 },
             })
@@ -5356,10 +5353,10 @@ mod tests {
             )
             .with_user_shapes_part(ChartUserShapesPart {
                 xml: br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><cdr:relSizeAnchor><cdr:from><cdr:x>0</cdr:x><cdr:y>0</cdr:y></cdr:from><cdr:to><cdr:x>1</cdr:x><cdr:y>1</cdr:y></cdr:to><cdr:pic><a:blip r:embed="rId5"/></cdr:pic></cdr:relSizeAnchor></c:userShapes>"#.to_vec(),
-                relationships: vec![ChartUserShapesRelationship {
+                relationships: vec![Relationship {
                     relationship_id: "rId5".to_string(),
                     relationship_type: rt::IMAGE.to_string(),
-                    target: ChartUserShapesRelationshipTarget::Embedded {
+                    target: RelationshipTarget::Embedded {
                         data: b"shape image".to_vec(),
                         content_type: ct::PNG.to_string(),
                         extension: "png".to_string(),
@@ -5482,9 +5479,7 @@ mod tests {
         let user_shapes = worksheet.charts()[0].user_shapes_part.as_ref().unwrap();
         assert_eq!(user_shapes.relationships.len(), 1);
         assert_eq!(user_shapes.relationships[0].relationship_id, "rId5");
-        let ChartUserShapesRelationshipTarget::Embedded { data, .. } =
-            &user_shapes.relationships[0].target
-        else {
+        let RelationshipTarget::Embedded { data, .. } = &user_shapes.relationships[0].target else {
             panic!("expected embedded chart user-shape resource");
         };
         assert_eq!(data, b"shape image");
@@ -5494,7 +5489,7 @@ mod tests {
             .iter()
             .find(|relationship| relationship.relationship_id == "rId9")
             .unwrap();
-        let ChartRelationshipTarget::Embedded { data, .. } = &background.target else {
+        let RelationshipTarget::Embedded { data, .. } = &background.target else {
             panic!("expected embedded chart relationship resource");
         };
         assert_eq!(data, b"chart background");
@@ -5503,7 +5498,7 @@ mod tests {
             .iter()
             .find(|relationship| relationship.relationship_id == "rId10")
             .unwrap();
-        let ChartRelationshipTarget::External { target } = &link.target else {
+        let RelationshipTarget::External { target } = &link.target else {
             panic!("expected external chart relationship target");
         };
         assert_eq!(target, "https://example.test/chart");

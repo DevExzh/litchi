@@ -81,18 +81,16 @@ pub mod xml_maps;
 pub use chartsheet::{
     ChartSheet, ChartSheetBackgroundPicture, ChartSheetChartCompanionResource,
     ChartSheetChartEmbeddedPackageContentType, ChartSheetChartEmbeddedPackageResource,
-    ChartSheetChartImageContentType, ChartSheetChartImageResource, ChartSheetChartOutboundResource,
-    ChartSheetChartResource, ChartSheetChartResourceKind, ChartSheetChartThemeOverrideResource,
-    ChartSheetChartUserShapeImageContentType, ChartSheetChartUserShapeImageResource,
-    ChartSheetChartUserShapesResource, ChartSheetColor, ChartSheetConformance,
-    ChartSheetCustomView, ChartSheetDrawingResource, ChartSheetEntry, ChartSheetExtension,
-    ChartSheetExtensionList, ChartSheetExtensionRelationship,
+    ChartSheetChartOutboundResource, ChartSheetChartResource, ChartSheetChartResourceKind,
+    ChartSheetChartThemeOverrideResource, ChartSheetChartUserShapesResource, ChartSheetColor,
+    ChartSheetConformance, ChartSheetCustomView, ChartSheetDrawingResource, ChartSheetEntry,
+    ChartSheetExtension, ChartSheetExtensionList, ChartSheetExtensionRelationship,
     ChartSheetExtensionRelationshipTarget, ChartSheetHeaderFooter, ChartSheetImageContentType,
     ChartSheetMargins, ChartSheetPackage, ChartSheetPageSetup, ChartSheetPrinterSettings,
     ChartSheetProperties, ChartSheetProtection, ChartSheetState, ChartSheetView,
     ChartSheetVmlDrawingResource, ChartSheetWebPublishItem, ChartSheetWebPublishItems,
-    ChartSheetWebSourceType, PageOrientation, load_chartsheet, parse_chartsheet, store_chartsheet,
-    write_chartsheet,
+    ChartSheetWebSourceType, ImageContentType, ImageResource, PageOrientation, load_chartsheet,
+    parse_chartsheet, store_chartsheet, write_chartsheet,
 };
 pub use litchi_xlsx::calculation_properties;
 pub use litchi_xlsx::cell_watches;
@@ -113,9 +111,8 @@ pub use auto_filter::{
 };
 pub use cell::Cell;
 pub use chart::{
-    ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
-    ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
-    ChartUserShapesRelationshipTarget, WorksheetChart,
+    ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
+    RelationshipTarget, WorksheetChart,
 };
 pub use conditional_formatting::{
     Association, Axis, Color, ColorRole, ColorScale, Component, DataBar, Differential,

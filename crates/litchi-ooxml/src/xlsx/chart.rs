@@ -58,7 +58,7 @@ pub struct ChartExternalDataPart {
 
 /// Target of a relationship owned by a chart or chart user-shapes part.
 #[derive(Debug, Clone)]
-pub enum ChartRelationshipTarget {
+pub enum RelationshipTarget {
     /// A directly related part embedded in the containing package
     Embedded {
         /// Complete target-part bytes
@@ -77,20 +77,14 @@ pub enum ChartRelationshipTarget {
 
 /// One relationship owned by a chart or chart user-shapes part.
 #[derive(Debug, Clone)]
-pub struct ChartRelationship {
+pub struct Relationship {
     /// Relationship identifier referenced by the owning part's XML
     pub relationship_id: String,
     /// Relationship type URI
     pub relationship_type: String,
     /// Internal payload or external target
-    pub target: ChartRelationshipTarget,
+    pub target: RelationshipTarget,
 }
-
-/// Backwards-compatible name for a chart user-shapes relationship target.
-pub type ChartUserShapesRelationshipTarget = ChartRelationshipTarget;
-
-/// Backwards-compatible name for a chart user-shapes relationship.
-pub type ChartUserShapesRelationship = ChartRelationship;
 
 /// Lossless chart user-shapes XML and its direct relationship targets.
 #[derive(Debug, Clone)]
@@ -98,7 +92,7 @@ pub struct ChartUserShapesPart {
     /// Complete chart user-shapes XML document
     pub xml: Vec<u8>,
     /// Relationships owned by the chart user-shapes part
-    pub relationships: Vec<ChartRelationship>,
+    pub relationships: Vec<Relationship>,
 }
 
 impl ChartUserShapesPart {
@@ -348,7 +342,7 @@ pub struct WorksheetChart {
     /// Optional chart user-shapes drawing and its direct related resources
     pub user_shapes_part: Option<ChartUserShapesPart>,
     /// Other direct relationships owned by the chart part
-    pub additional_relationships: Vec<ChartRelationship>,
+    pub additional_relationships: Vec<Relationship>,
 }
 
 impl WorksheetChart {
@@ -391,7 +385,7 @@ impl WorksheetChart {
     }
 
     /// Add a direct chart-part relationship retained with the worksheet chart.
-    pub fn with_additional_relationship(mut self, relationship: ChartRelationship) -> Self {
+    pub fn with_additional_relationship(mut self, relationship: Relationship) -> Self {
         self.additional_relationships.push(relationship);
         self
     }

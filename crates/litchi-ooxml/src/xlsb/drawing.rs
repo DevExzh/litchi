@@ -217,7 +217,7 @@ pub struct XlsbEmbeddedChart {
     pub user_shapes_part: Option<crate::xlsx::ChartUserShapesPart>,
     /// Other relationships owned by the Chart part, including resources
     /// referenced by preserved extension fragments.
-    pub additional_relationships: Vec<crate::xlsx::ChartRelationship>,
+    pub additional_relationships: Vec<crate::xlsx::Relationship>,
 }
 
 fn invalid(message: impl Into<String>) -> OoxmlError {

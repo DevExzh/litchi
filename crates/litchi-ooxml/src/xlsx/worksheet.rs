@@ -49,9 +49,8 @@ use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
 use super::{
-    ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship, ChartRelationshipTarget,
-    ChartUserShapesPart, ChartUserShapesRelationship, ChartUserShapesRelationshipTarget,
-    WorksheetChart,
+    ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
+    RelationshipTarget, WorksheetChart,
     chart::{
         chart_external_data_content_type, is_chart_external_data_relationship_type,
         is_chart_user_shapes_relationship_type, parse_chart_from_xml,
@@ -686,7 +685,7 @@ impl<'a> Worksheet<'a> {
                         )
                     })?;
                     let target = if related.is_external() {
-                        ChartUserShapesRelationshipTarget::External {
+                        RelationshipTarget::External {
                             target: related.target_ref().to_string(),
                         }
                     } else {
@@ -698,13 +697,13 @@ impl<'a> Worksheet<'a> {
                             )
                             .into());
                         }
-                        ChartUserShapesRelationshipTarget::Embedded {
+                        RelationshipTarget::Embedded {
                             data: target_part.blob().to_vec(),
                             content_type: target_part.content_type().to_string(),
                             extension: target_uri.ext().to_string(),
                         }
                     };
-                    relationships.push(ChartUserShapesRelationship {
+                    relationships.push(Relationship {
                         relationship_id: referenced_id,
                         relationship_type: related.reltype().to_string(),
                         target,
@@ -732,7 +731,7 @@ impl<'a> Worksheet<'a> {
                     continue;
                 }
                 let target = if related.is_external() {
-                    ChartRelationshipTarget::External {
+                    RelationshipTarget::External {
                         target: related.target_ref().to_string(),
                     }
                 } else {
@@ -744,19 +743,17 @@ impl<'a> Worksheet<'a> {
                         )
                         .into());
                     }
-                    ChartRelationshipTarget::Embedded {
+                    RelationshipTarget::Embedded {
                         data: target_part.blob().to_vec(),
                         content_type: target_part.content_type().to_string(),
                         extension: target_uri.ext().to_string(),
                     }
                 };
-                worksheet_chart
-                    .additional_relationships
-                    .push(ChartRelationship {
-                        relationship_id: related.r_id().to_string(),
-                        relationship_type: related.reltype().to_string(),
-                        target,
-                    });
+                worksheet_chart.additional_relationships.push(Relationship {
+                    relationship_id: related.r_id().to_string(),
+                    relationship_type: related.reltype().to_string(),
+                    target,
+                });
             }
             charts.push(worksheet_chart);
         }

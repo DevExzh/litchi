@@ -1497,7 +1497,7 @@ mod tests {
     use super::*;
     use crate::xlsb::comments::Comment;
     use crate::xlsb::data_validation::{
-        DataValidation, DataValidationRecordKind, DataValidationSettings,
+        DataValidationRecordKind, DataValidationSettings, Validation,
     };
     use crate::xlsb::{SharedStringRun, SheetProtection};
     use litchi_core::sheet::{CellValue, WorkbookTrait};
@@ -2255,7 +2255,7 @@ mod tests {
         let mut sheet = MutableXlsbWorksheet::new("Validated");
         sheet.set_cell(0, 0, 5);
 
-        let mut classic = DataValidation::new(1, "A1:A10 C1:C10".to_string());
+        let mut classic = Validation::new(1, "A1:A10 C1:C10".to_string());
         classic.operator = 0;
         classic.formula1 = Some("1".to_string());
         classic.formula2 = Some("10".to_string());
@@ -2265,7 +2265,7 @@ mod tests {
         classic.input_text = Some("Enter 1 through 10".to_string());
         sheet.add_data_validation(classic);
 
-        let mut extension = DataValidation::new(7, "B1:B20".to_string());
+        let mut extension = Validation::new(7, "B1:B20".to_string());
         extension.formula1 = Some("Source!A1>0".to_string());
         extension.record_kind = DataValidationRecordKind::Extension14;
         sheet.add_data_validation(extension);
@@ -3288,9 +3288,8 @@ mod tests {
     #[test]
     fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         use crate::xlsx::{
-            ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
-            ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
-            ChartUserShapesRelationshipTarget, WorksheetChart,
+            ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
+            Relationship, RelationshipTarget, WorksheetChart,
         };
         use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties};
 
@@ -3314,19 +3313,19 @@ mod tests {
             .unwrap(),
         );
         worksheet_chart = worksheet_chart
-            .with_additional_relationship(ChartRelationship {
+            .with_additional_relationship(Relationship {
                 relationship_id: "rId9".to_string(),
                 relationship_type: rel::IMAGE.to_string(),
-                target: ChartRelationshipTarget::Embedded {
+                target: RelationshipTarget::Embedded {
                     data: b"chart background".to_vec(),
                     content_type: "image/png".to_string(),
                     extension: "png".to_string(),
                 },
             })
-            .with_additional_relationship(ChartRelationship {
+            .with_additional_relationship(Relationship {
                 relationship_id: "rId10".to_string(),
                 relationship_type: rel::HYPERLINK.to_string(),
-                target: ChartRelationshipTarget::External {
+                target: RelationshipTarget::External {
                     target: "https://example.test/chart".to_string(),
                 },
             })
@@ -3336,10 +3335,10 @@ mod tests {
             )
             .with_user_shapes_part(ChartUserShapesPart {
                 xml: br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><cdr:relSizeAnchor><cdr:from><cdr:x>0</cdr:x><cdr:y>0</cdr:y></cdr:from><cdr:to><cdr:x>1</cdr:x><cdr:y>1</cdr:y></cdr:to><cdr:pic><a:blip r:embed="rId5"/></cdr:pic></cdr:relSizeAnchor></c:userShapes>"#.to_vec(),
-                relationships: vec![ChartUserShapesRelationship {
+                relationships: vec![Relationship {
                     relationship_id: "rId5".to_string(),
                     relationship_type: rel::IMAGE.to_string(),
-                    target: ChartUserShapesRelationshipTarget::Embedded {
+                    target: RelationshipTarget::Embedded {
                         data: b"shape image".to_vec(),
                         content_type: "image/png".to_string(),
                         extension: "png".to_string(),
@@ -3384,7 +3383,7 @@ mod tests {
         let user_shapes = worksheet_chart.user_shapes_part.as_ref().unwrap();
         assert_eq!(user_shapes.relationships.len(), 1);
         match &user_shapes.relationships[0].target {
-            ChartRelationshipTarget::Embedded { data, .. } => {
+            RelationshipTarget::Embedded { data, .. } => {
                 assert_eq!(data, b"shape image");
             },
             other => panic!("unexpected user-shapes target: {other:?}"),
@@ -3396,7 +3395,7 @@ mod tests {
             .find(|relationship| relationship.relationship_id == "rId9")
             .unwrap();
         match &background.target {
-            ChartRelationshipTarget::Embedded { data, .. } => {
+            RelationshipTarget::Embedded { data, .. } => {
                 assert_eq!(data, b"chart background");
             },
             other => panic!("unexpected background target: {other:?}"),
@@ -3407,7 +3406,7 @@ mod tests {
             .find(|relationship| relationship.relationship_id == "rId10")
             .unwrap();
         match &hyperlink.target {
-            ChartRelationshipTarget::External { target } => {
+            RelationshipTarget::External { target } => {
                 assert_eq!(target, "https://example.test/chart");
             },
             other => panic!("unexpected hyperlink target: {other:?}"),
@@ -3432,8 +3431,7 @@ mod tests {
     #[test]
     fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
         use crate::xlsx::{
-            ChartAnchor, ChartRelationship, ChartRelationshipTarget, ChartUserShapesPart,
-            WorksheetChart,
+            ChartAnchor, ChartUserShapesPart, Relationship, RelationshipTarget, WorksheetChart,
         };
 
         let mut sheet = MutableXlsbWorksheet::new("Charts");
@@ -3461,15 +3459,13 @@ mod tests {
             br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blip r:embed="rId5"/></c:userShapes>"#.to_vec(),
         ));
         assert!(sheet.add_chart(invalid_user_shapes).is_err());
-        let invalid_relationship = valid
-            .clone()
-            .with_additional_relationship(ChartRelationship {
-                relationship_id: "not an id".to_string(),
-                relationship_type: rel::HYPERLINK.to_string(),
-                target: ChartRelationshipTarget::External {
-                    target: "https://example.test".to_string(),
-                },
-            });
+        let invalid_relationship = valid.clone().with_additional_relationship(Relationship {
+            relationship_id: "not an id".to_string(),
+            relationship_type: rel::HYPERLINK.to_string(),
+            target: RelationshipTarget::External {
+                target: "https://example.test".to_string(),
+            },
+        });
         assert!(sheet.add_chart(invalid_relationship).is_err());
         assert_eq!(sheet.charts().len(), 1);
 

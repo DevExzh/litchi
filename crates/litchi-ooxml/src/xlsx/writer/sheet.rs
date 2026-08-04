@@ -37,9 +37,8 @@ pub use super::super::format::{
 
 // Import chart types
 pub use super::super::chart::{
-    ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
-    ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
-    ChartUserShapesRelationshipTarget, WorksheetChart,
+    ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
+    RelationshipTarget, WorksheetChart,
 };
 
 // Import from other writer modules

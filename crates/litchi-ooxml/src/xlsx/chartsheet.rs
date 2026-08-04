@@ -205,7 +205,7 @@ pub struct ChartSheetChartCompanionResource {
 
 /// Supported inert image payload types for a chartEx chart-user-shapes drawing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartSheetChartImageContentType {
+pub enum ImageContentType {
     Bmp,
     Gif,
     Png,
@@ -220,7 +220,7 @@ pub enum ChartSheetChartImageContentType {
     Svg,
 }
 
-impl ChartSheetChartImageContentType {
+impl ImageContentType {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Bmp => "image/bmp",
@@ -276,10 +276,10 @@ impl ChartSheetChartImageContentType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetChartImageResource {
+pub struct ImageResource {
     pub relationship_id: String,
     pub part_name: String,
-    pub content_type: ChartSheetChartImageContentType,
+    pub content_type: ImageContentType,
     /// Preserved without decoding, rendering, metadata inspection, or external fetches.
     pub data: Vec<u8>,
 }
@@ -291,11 +291,8 @@ pub struct ChartSheetChartUserShapesResource {
     pub content_type: String,
     /// Preserved without interpreting shapes, actions, hyperlinks, or embedded markup.
     pub data: Vec<u8>,
-    pub images: Vec<ChartSheetChartImageResource>,
+    pub images: Vec<ImageResource>,
 }
-
-pub type ChartSheetChartUserShapeImageContentType = ChartSheetChartImageContentType;
-pub type ChartSheetChartUserShapeImageResource = ChartSheetChartImageResource;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChartSheetChartEmbeddedPackageContentType {
@@ -376,7 +373,7 @@ pub struct ChartSheetChartThemeOverrideResource {
     pub content_type: String,
     /// Preserved without theme application, image rendering, or external access.
     pub data: Vec<u8>,
-    pub images: Vec<ChartSheetChartImageResource>,
+    pub images: Vec<ImageResource>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -390,7 +387,7 @@ pub struct ChartSheetChartEmbeddedPackageResource {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChartSheetChartOutboundResource {
-    Image(ChartSheetChartImageResource),
+    Image(ImageResource),
     ThemeOverride(ChartSheetChartThemeOverrideResource),
     EmbeddedPackage(ChartSheetChartEmbeddedPackageResource),
 }
@@ -983,7 +980,7 @@ fn load_chart_user_shapes_resource(
             return Err(invalid("chart user-shape image is outside /xl/media"));
         }
         let image = package.get_part(&image_name)?;
-        let content_type = ChartSheetChartUserShapeImageContentType::parse(image.content_type())?;
+        let content_type = ImageContentType::parse(image.content_type())?;
         if !content_type.validates_part_name(image_name.as_str()) {
             return Err(invalid(
                 "chart user-shape image suffix does not match its content type",
@@ -1000,7 +997,7 @@ fn load_chart_user_shapes_resource(
             MAX_CHART_USER_SHAPE_IMAGE_BYTES,
             "chart user-shape image bytes",
         )?;
-        images.push(ChartSheetChartUserShapeImageResource {
+        images.push(ImageResource {
             relationship_id: id,
             part_name: image_name.to_string(),
             content_type,
@@ -1022,7 +1019,7 @@ fn load_chart_image_resource(
     relationship: &litchi_opc::Relationship,
     total: &mut usize,
     label: &str,
-) -> Result<ChartSheetChartImageResource> {
+) -> Result<ImageResource> {
     if relationship.is_external() {
         return Err(invalid(format!(
             "external {label} relationship is rejected"
@@ -1033,7 +1030,7 @@ fn load_chart_image_resource(
         return Err(invalid(format!("{label} is outside /xl/media")));
     }
     let part = package.get_part(&name)?;
-    let content_type = ChartSheetChartImageContentType::parse(part.content_type())?;
+    let content_type = ImageContentType::parse(part.content_type())?;
     if !content_type.validates_part_name(name.as_str()) {
         return Err(invalid(format!(
             "{label} suffix does not match its content type"
@@ -1048,7 +1045,7 @@ fn load_chart_image_resource(
         MAX_CHART_USER_SHAPE_IMAGE_BYTES,
         "chart image bytes",
     )?;
-    Ok(ChartSheetChartImageResource {
+    Ok(ImageResource {
         relationship_id: relationship.r_id().to_owned(),
         part_name: name.to_string(),
         content_type,
@@ -2077,7 +2074,7 @@ fn validate_chart_outbound_resources<'a>(
 }
 
 fn validate_chart_image_value<'a>(
-    image: &'a ChartSheetChartImageResource,
+    image: &'a ImageResource,
     total: &mut usize,
     resources: &mut BTreeMap<String, &'a Vec<u8>>,
     max_bytes: usize,
@@ -3578,16 +3575,16 @@ mod tests {
                     content_type: CHART_USER_SHAPES_CT.into(),
                     data: user_shapes_data,
                     images: vec![
-                        ChartSheetChartUserShapeImageResource {
+                        ImageResource {
                             relationship_id: "rId1".into(),
                             part_name: "/xl/media/image1.png".into(),
-                            content_type: ChartSheetChartUserShapeImageContentType::Png,
+                            content_type: ImageContentType::Png,
                             data: blob("/xl/media/image1.png"),
                         },
-                        ChartSheetChartUserShapeImageResource {
+                        ImageResource {
                             relationship_id: "rId2".into(),
                             part_name: "/xl/media/image2.svg".into(),
-                            content_type: ChartSheetChartUserShapeImageContentType::Svg,
+                            content_type: ImageContentType::Svg,
                             data: blob("/xl/media/image2.svg"),
                         },
                     ],
@@ -3635,7 +3632,7 @@ mod tests {
             ..
         } = &mut bad.drawing.charts[0].kind
         {
-            shapes.images[0].content_type = ChartSheetChartUserShapeImageContentType::Gif;
+            shapes.images[0].content_type = ImageContentType::Gif;
         }
         let (mut package, workbook) = base_package(conformance);
         assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
@@ -4636,10 +4633,10 @@ mod chart_outbound_tests {
             unreachable!()
         };
         *outbound_resources = vec![
-            ChartSheetChartOutboundResource::Image(ChartSheetChartImageResource {
+            ChartSheetChartOutboundResource::Image(ImageResource {
                 relationship_id: "rIdDirectImage".into(),
                 part_name: "/xl/media/chartDirect1.png".into(),
-                content_type: ChartSheetChartImageContentType::Png,
+                content_type: ImageContentType::Png,
                 data: blob("/xl/media/image1.png"),
             }),
             ChartSheetChartOutboundResource::EmbeddedPackage(
@@ -4655,10 +4652,10 @@ mod chart_outbound_tests {
                 part_name: "/xl/theme/themeOverride1.xml".into(),
                 content_type: THEME_OVERRIDE_CT.into(),
                 data: theme_data,
-                images: vec![ChartSheetChartImageResource {
+                images: vec![ImageResource {
                     relationship_id: "rIdThemeImage".into(),
                     part_name: "/xl/media/themeImage1.svg".into(),
-                    content_type: ChartSheetChartImageContentType::Svg,
+                    content_type: ImageContentType::Svg,
                     data: blob("/xl/media/image2.svg"),
                 }],
             }),

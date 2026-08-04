@@ -6,8 +6,8 @@
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsx::{
-    ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship, ChartRelationshipTarget,
-    ChartUserShapesPart, WorksheetChart,
+    ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
+    RelationshipTarget, WorksheetChart,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
@@ -33,7 +33,7 @@ pub(crate) struct ResolvedChartGraph {
     pub chart: litchi_drawingml::chart::Chart,
     pub external_data_part: Option<ChartExternalDataPart>,
     pub user_shapes_part: Option<ChartUserShapesPart>,
-    pub additional_relationships: Vec<ChartRelationship>,
+    pub additional_relationships: Vec<Relationship>,
 }
 
 /// Validate a chart's complete package-resource model without mutating it.
@@ -441,16 +441,16 @@ fn validate_user_shapes(value: &ChartUserShapesPart, total: &mut usize) -> XlsbR
     Ok(())
 }
 
-fn validate_relationship(value: &ChartRelationship, total: &mut usize) -> XlsbResult<()> {
+fn validate_relationship(value: &Relationship, total: &mut usize) -> XlsbResult<()> {
     validate_relationship_id(&value.relationship_id)?;
     validate_relationship_type(&value.relationship_type)?;
     match &value.target {
-        ChartRelationshipTarget::Embedded {
+        RelationshipTarget::Embedded {
             data,
             content_type,
             extension,
         } => validate_embedded(data, content_type, extension, total),
-        ChartRelationshipTarget::External { target } => validate_external_target(target),
+        RelationshipTarget::External { target } => validate_external_target(target),
     }
 }
 
@@ -537,13 +537,13 @@ fn add_resource_bytes(total: &mut usize, size: usize) -> XlsbResult<()> {
 }
 
 fn author_relationship_target(
-    target: &ChartRelationshipTarget,
+    target: &RelationshipTarget,
     directory: &str,
     stem: &str,
     parts: &mut Vec<BlobPart>,
 ) -> XlsbResult<(String, bool)> {
     match target {
-        ChartRelationshipTarget::Embedded {
+        RelationshipTarget::Embedded {
             data,
             content_type,
             extension,
@@ -556,7 +556,7 @@ fn author_relationship_target(
             ));
             Ok((format!("../{directory}/{filename}"), false))
         },
-        ChartRelationshipTarget::External { target } => Ok((target.clone(), true)),
+        RelationshipTarget::External { target } => Ok((target.clone(), true)),
     }
 }
 
@@ -651,12 +651,12 @@ fn resolve_relationship(
     package: &OpcPackage,
     relationship: &litchi_opc::Relationship,
     total: &mut usize,
-) -> XlsbResult<ChartRelationship> {
+) -> XlsbResult<Relationship> {
     validate_relationship_id(relationship.r_id())?;
     validate_relationship_type(relationship.reltype())?;
     let target = if relationship.is_external() {
         validate_external_target(relationship.target_ref())?;
-        ChartRelationshipTarget::External {
+        RelationshipTarget::External {
             target: relationship.target_ref().to_string(),
         }
     } else {
@@ -668,13 +668,13 @@ fn resolve_relationship(
             )));
         }
         add_resource_bytes(total, part.blob().len())?;
-        ChartRelationshipTarget::Embedded {
+        RelationshipTarget::Embedded {
             data: part.blob().to_vec(),
             content_type: part.content_type().to_string(),
             extension: validated_part_extension(part.partname())?,
         }
     };
-    Ok(ChartRelationship {
+    Ok(Relationship {
         relationship_id: relationship.r_id().to_string(),
         relationship_type: relationship.reltype().to_string(),
         target,
