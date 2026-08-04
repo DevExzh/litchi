@@ -12,3 +12,5 @@ excessive-nesting-threshold = 10
 # Prefer parameter objects and type aliases once APIs become unwieldy.
 too-many-arguments-threshold = 12
 type-complexity-threshold = 500
+
+source-item-ordering = ["module", "trait"]

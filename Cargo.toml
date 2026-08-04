@@ -10,7 +10,132 @@ license      = "Apache-2.0"
 repository   = "https://github.com/DevExzh/litchi"
 rust-version = "1.89"
 
+[workspace.lints.rust]
+future_incompatible = { level = "deny", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+unused = { level = "deny", priority = -1 }
+
+# asciicheck / bidichk.
+non_ascii_idents = "deny"
+text_direction_codepoint_in_comment = "deny"
+text_direction_codepoint_in_literal = "deny"
+
+# Compiler-directive, suppression, conversion, and result handling checks.
+renamed_and_removed_lints = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unfulfilled_lint_expectations = "deny"
+unknown_lints = "deny"
+unreachable_pub = "deny"
+unexpected_cfgs = "deny"
+unused_must_use = "deny"
+unused_qualifications = "deny"
+
+
+[workspace.lints.rustdoc]
+bare_urls = "deny"
+broken_intra_doc_links = "deny"
+invalid_codeblock_attributes = "deny"
+invalid_html_tags = "deny"
+invalid_rust_codeblocks = "deny"
+private_intra_doc_links = "deny"
+redundant_explicit_links = "deny"
+unescaped_backticks = "deny"
+
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -2 }
+pedantic = { level = "deny", priority = -2 }
+
+# nolintlint: require reasons on #[allow] and #[expect].
+allow_attributes_without_reason = "deny"
+
+# funcorder / predeclared / complexity.
+arbitrary_source_item_ordering = "deny"
+builtin_type_shadow = "deny"
+cognitive_complexity = "deny"
+excessive_nesting = "deny"
+too_many_lines = "deny"
+
+# errcheck / errorlint.
+let_underscore_must_use = "deny"
+map_err_ignore = "deny"
+
+# Opinionated strengthening of errcheck. Remove these two when intentional
+# panic-on-error is accepted by the project.
+expect_used = "deny"
+unwrap_used = "deny"
+
+# exhaustive / gochecksumtype.
+wildcard_enum_match_arm = "deny"
+
+# Import and dependency hygiene.
+wildcard_imports = "deny"
+wildcard_dependencies = "deny"
+
+# Populate the disallowed lists in clippy.toml.
+dbg_macro = "deny"
+disallowed_fields = "deny"
+disallowed_macros = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+
+# shadow.strict.
+shadow_reuse = "deny"
+shadow_same = "deny"
+shadow_unrelated = "deny"
+
+# gosec-style unsafe-code review.
+multiple_unsafe_ops_per_block = "deny"
+undocumented_unsafe_blocks = "deny"
+
+# Pedantic checks.
+module_name_repetitions = "deny"
+struct_excessive_bools = "deny"
+too_many_arguments = "deny"
+
 [workspace.dependencies]
+# Path deps to internal crates.
+litchi              = { version = "0.0.1", path = "crates/litchi" }
+litchi-cfb          = { version = "0.0.1", path = "crates/litchi-cfb" }
+litchi-codepage     = { version = "0.0.1", path = "crates/litchi-codepage" }
+litchi-core         = { version = "0.0.1", path = "crates/litchi-core" }
+litchi-crypto       = { version = "0.0.1", path = "crates/litchi-crypto" }
+litchi-doc          = { version = "0.0.1", path = "crates/litchi-doc" }
+litchi-docx         = { version = "0.0.1", path = "crates/litchi-docx" }
+litchi-drawingml    = { version = "0.0.1", path = "crates/litchi-drawingml" }
+litchi-eval         = { version = "0.0.1", path = "crates/litchi-eval" }
+litchi-fonts        = { version = "0.0.1", path = "crates/litchi-fonts" }
+litchi-formula      = { version = "0.0.1", path = "crates/litchi-formula" }
+litchi-imgconv      = { version = "0.0.1", path = "crates/litchi-imgconv" }
+litchi-iwa          = { version = "0.0.1", path = "crates/litchi-iwa" }
+litchi-markdown     = { version = "0.0.1", path = "crates/litchi-markdown" }
+litchi-odf          = { version = "0.0.1", path = "crates/litchi-odf" }
+litchi-odraw        = { version = "0.0.1", path = "crates/litchi-odraw" }
+litchi-ograph       = { version = "0.0.1", path = "crates/litchi-ograph" }
+litchi-ole-common   = { version = "0.0.1", path = "crates/litchi-ole-common" }
+litchi-ooxml        = { version = "0.0.1", path = "crates/litchi-ooxml" }
+litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
+litchi-opc          = { version = "0.0.1", path = "crates/litchi-opc" }
+litchi-ppt          = { version = "0.0.1", path = "crates/litchi-ppt" }
+litchi-pptx         = { version = "0.0.1", path = "crates/litchi-pptx" }
+litchi-rtf          = { version = "0.0.1", path = "crates/litchi-rtf" }
+litchi-sheet        = { version = "0.0.1", path = "crates/litchi-sheet" }
+litchi-sign         = { version = "0.0.1", path = "crates/litchi-sign" }
+litchi-slide        = { version = "0.0.1", path = "crates/litchi-slide" }
+litchi-vba          = { version = "0.0.1", path = "crates/litchi-vba" }
+litchi-word         = { version = "0.0.1", path = "crates/litchi-word" }
+litchi-xls          = { version = "0.0.1", path = "crates/litchi-xls" }
+litchi-xlsb         = { version = "0.0.1", path = "crates/litchi-xlsb" }
+litchi-xlsx         = { version = "0.0.1", path = "crates/litchi-xlsx" }
+soapberry-zip       = { path = "crates/soapberry-zip" }
+xml-minifier        = { path = "crates/xml-minifier" }
+
+# External deps used by ≥2 crates — declared once, inherited by members.
+# VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.
 aes           = "0.9"
 aes-gcm       = { version = "0.11", features = ["alloc"] }
 aho-corasick  = "1.1"
@@ -35,39 +160,6 @@ font-kit      = "0.14"
 hmac          = "0.13"
 image         = { version = "0.25", features = ["default-formats", "rayon"] }
 itoa          = "1.0"
-litchi           = { version = "0.0.1", path = "crates/litchi" }
-litchi-cfb       = { version = "0.0.1", path = "crates/litchi-cfb" }
-litchi-codepage  = { version = "0.0.1", path = "crates/litchi-codepage" }
-# Path deps to internal crates.
-litchi-core      = { version = "0.0.1", path = "crates/litchi-core" }
-litchi-crypto    = { version = "0.0.1", path = "crates/litchi-crypto" }
-litchi-doc       = { version = "0.0.1", path = "crates/litchi-doc" }
-litchi-docx      = { version = "0.0.1", path = "crates/litchi-docx" }
-litchi-drawingml = { version = "0.0.1", path = "crates/litchi-drawingml" }
-litchi-eval      = { version = "0.0.1", path = "crates/litchi-eval" }
-litchi-fonts     = { version = "0.0.1", path = "crates/litchi-fonts" }
-litchi-formula   = { version = "0.0.1", path = "crates/litchi-formula" }
-litchi-imgconv   = { version = "0.0.1", path = "crates/litchi-imgconv" }
-litchi-iwa       = { version = "0.0.1", path = "crates/litchi-iwa" }
-litchi-markdown  = { version = "0.0.1", path = "crates/litchi-markdown" }
-litchi-odf       = { version = "0.0.1", path = "crates/litchi-odf" }
-litchi-odraw     = { version = "0.0.1", path = "crates/litchi-odraw" }
-litchi-ograph    = { version = "0.0.1", path = "crates/litchi-ograph" }
-litchi-ole-common = { version = "0.0.1", path = "crates/litchi-ole-common" }
-litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
-litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
-litchi-opc       = { version = "0.0.1", path = "crates/litchi-opc" }
-litchi-ppt       = { version = "0.0.1", path = "crates/litchi-ppt" }
-litchi-pptx      = { version = "0.0.1", path = "crates/litchi-pptx" }
-litchi-rtf       = { version = "0.0.1", path = "crates/litchi-rtf" }
-litchi-sheet     = { version = "0.0.1", path = "crates/litchi-sheet" }
-litchi-sign      = { version = "0.0.1", path = "crates/litchi-sign" }
-litchi-slide     = { version = "0.0.1", path = "crates/litchi-slide" }
-litchi-vba       = { version = "0.0.1", path = "crates/litchi-vba" }
-litchi-word      = { version = "0.0.1", path = "crates/litchi-word" }
-litchi-xls       = { version = "0.0.1", path = "crates/litchi-xls" }
-litchi-xlsb      = { version = "0.0.1", path = "crates/litchi-xlsb" }
-litchi-xlsx      = { version = "0.0.1", path = "crates/litchi-xlsx" }
 md-5          = { version = "0.11", features = ["zeroize"] }
 memchr        = "2.7"
 num-complex   = "0.4"
@@ -97,14 +189,10 @@ sha2_legacy   = { package = "sha2", version = "0.10" }
 signature     = "2.2"
 smallvec      = "1.15"
 snap          = "1"
-soapberry-zip    = { path = "crates/soapberry-zip" }
 statrs        = "0.18"
 subtle        = "2"
 sxd-document  = "0.3"
 sxd-xpath     = "0.4"
-
-# External deps used by ≥2 crates — declared once, inherited by members.
-# VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.
 tempfile      = "3"
 thiserror     = "2.0"
 tokio         = { version = "1", features = ["full"] }
@@ -112,7 +200,6 @@ unicode-normalization = "0.1"
 url           = "2.5"
 urlencoding   = "2.1"
 x509-cert     = { version = "0.2", features = ["pem"] }
-xml-minifier     = { path = "crates/xml-minifier" }
 zerocopy      = { version = "0.8", features = ["std"] }
 zerocopy-derive = "0.8"
 zeroize       = "1"

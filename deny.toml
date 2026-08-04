@@ -1,0 +1,28 @@
+[advisories]
+unmaintained = "workspace"
+unsound = "all"
+ignore = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+deny = [
+    # Replace with actual Rust crate policies:
+    #
+    # {
+    #   crate = "deprecated-crate",
+    #   use-instead = "replacement-crate",
+    #   reason = "Unmaintained"
+    # },
+]
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index",
+]
+
+allow-git = []
