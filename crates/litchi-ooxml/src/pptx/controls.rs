@@ -51,7 +51,7 @@ const BINARY_CONTENT_TYPE: &str = "application/vnd.ms-office.activeX";
 
 /// An inert slide control reference (`p:control`) and its resolved descriptor.
 #[derive(Debug, Clone)]
-pub struct PptxSlideControl {
+pub struct SlideControl {
     slide_index: usize,
     control_index: usize,
     shape_id: Option<String>,
@@ -60,10 +60,10 @@ pub struct PptxSlideControl {
     image_width: Option<u32>,
     image_height: Option<u32>,
     relationship_id: Option<String>,
-    descriptor: Option<PptxControlDescriptor>,
+    descriptor: Option<ControlDescriptor>,
 }
 
-impl PptxSlideControl {
+impl SlideControl {
     /// Zero-based slide index within the presentation.
     pub fn slide_index(&self) -> usize {
         self.slide_index
@@ -106,22 +106,22 @@ impl PptxSlideControl {
 
     /// The resolved controls-part descriptor, when the control declares a
     /// resolvable `r:id` relationship.
-    pub fn descriptor(&self) -> Option<&PptxControlDescriptor> {
+    pub fn descriptor(&self) -> Option<&ControlDescriptor> {
         self.descriptor.as_ref()
     }
 }
 
 /// Inert metadata of a resolved controls part (`ax:ocx` descriptor).
 #[derive(Debug, Clone)]
-pub struct PptxControlDescriptor {
+pub struct ControlDescriptor {
     part_name: PackURI,
     class_id: String,
     license: Option<String>,
     persistence: Persistence,
-    binary: Option<PptxControlBinary>,
+    binary: Option<ControlBinary>,
 }
 
-impl PptxControlDescriptor {
+impl ControlDescriptor {
     /// Absolute package part name of the controls part.
     pub fn part_name(&self) -> &PackURI {
         &self.part_name
@@ -144,20 +144,20 @@ impl PptxControlDescriptor {
 
     /// Inert metadata of the binary state part, when the descriptor relates
     /// to one. The binary payload itself is never read or interpreted.
-    pub fn binary(&self) -> Option<&PptxControlBinary> {
+    pub fn binary(&self) -> Option<&ControlBinary> {
         self.binary.as_ref()
     }
 }
 
 /// Inert OPC metadata of an ActiveX binary state part.
 #[derive(Debug, Clone)]
-pub struct PptxControlBinary {
+pub struct ControlBinary {
     relationship_id: String,
     part_name: PackURI,
     byte_length: usize,
 }
 
-impl PptxControlBinary {
+impl ControlBinary {
     /// The relationship ID from the controls part to the binary part.
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
@@ -240,7 +240,7 @@ pub(crate) fn load_slide_controls(
     slide_index: usize,
     slide: &dyn Part,
     limits: &mut ControlLoadLimits,
-) -> Result<Vec<PptxSlideControl>> {
+) -> Result<Vec<SlideControl>> {
     if slide.content_type() != ct::PML_SLIDE {
         return Err(invalid(
             "control discovery requires a PresentationML slide part",
@@ -262,7 +262,7 @@ pub(crate) fn load_slide_controls(
                 )?),
                 None => None,
             };
-            Ok(PptxSlideControl {
+            Ok(SlideControl {
                 slide_index,
                 control_index,
                 shape_id: parsed.shape_id,
@@ -469,7 +469,7 @@ fn resolve_descriptor(
     slide: &dyn Part,
     relationship_id: &str,
     limits: &mut ControlLoadLimits,
-) -> Result<PptxControlDescriptor> {
+) -> Result<ControlDescriptor> {
     let relationship = slide.rels().get(relationship_id).ok_or_else(|| {
         OoxmlError::InvalidRelationship(format!(
             "slide {slide_index} control references missing relationship '{relationship_id}'"
@@ -519,7 +519,7 @@ fn resolve_descriptor(
         None => None,
     };
 
-    Ok(PptxControlDescriptor {
+    Ok(ControlDescriptor {
         part_name,
         class_id: descriptor.class_id,
         license: descriptor.license,
@@ -534,7 +534,7 @@ fn resolve_binary(
     descriptor_part: &dyn Part,
     relationship_id: &str,
     limits: &mut ControlLoadLimits,
-) -> Result<PptxControlBinary> {
+) -> Result<ControlBinary> {
     let relationship = descriptor_part
         .rels()
         .get(relationship_id)
@@ -572,7 +572,7 @@ fn resolve_binary(
         });
     }
     limits.add_binary(part.blob().len())?;
-    Ok(PptxControlBinary {
+    Ok(ControlBinary {
         relationship_id: relationship_id.to_string(),
         part_name,
         byte_length: part.blob().len(),

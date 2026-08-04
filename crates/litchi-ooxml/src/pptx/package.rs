@@ -2,7 +2,7 @@
 use crate::encryption::{Limits, Mode};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
-use crate::pptx::presentation::{PptxChart, Presentation};
+use crate::pptx::presentation::{Chart, Presentation};
 use crate::pptx::show_events::Event;
 use crate::pptx::slide::Key as SlideKey;
 use crate::pptx::vba_project::{
@@ -649,7 +649,7 @@ impl Package {
     ///
     /// The returned items retain their owning slide, relationship ID, and OPC
     /// part name alongside basic inert chart metadata.
-    pub fn charts(&self) -> Result<Vec<PptxChart>> {
+    pub fn charts(&self) -> Result<Vec<Chart>> {
         self.presentation()?.charts()
     }
 
@@ -753,7 +753,7 @@ impl Package {
     ///
     /// This never instantiates a control, resolves a CLSID, decodes binary
     /// control state, executes a macro, or follows an external relationship.
-    pub fn controls(&self) -> Result<Vec<crate::pptx::PptxSlideControl>> {
+    pub fn controls(&self) -> Result<Vec<crate::pptx::SlideControl>> {
         self.presentation()?.controls()
     }
 

@@ -1,4 +1,6 @@
-use litchi_ooxml::pptx::{ControlPersistence, Package};
+use litchi_ooxml::pptx::{
+    ControlBinary, ControlDescriptor, ControlPersistence, Package, SlideControl,
+};
 
 const ACTIVEX_CHECKBOX: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -12,7 +14,7 @@ fn package_inventory_reports_activex_controls() {
     let controls = package.controls().unwrap();
     assert_eq!(controls.len(), 3);
 
-    let first = &controls[0];
+    let first: &SlideControl = &controls[0];
     assert_eq!(first.slide_index(), 0);
     assert_eq!(first.control_index(), 0);
     assert_eq!(first.shape_id(), Some("1031"));
@@ -22,7 +24,7 @@ fn package_inventory_reports_activex_controls() {
     assert_eq!(first.image_height(), Some(923_760));
     assert_eq!(first.relationship_id(), Some("rId2"));
 
-    let descriptor = first.descriptor().unwrap();
+    let descriptor: &ControlDescriptor = first.descriptor().unwrap();
     assert_eq!(descriptor.part_name().as_str(), "/ppt/activeX/activeX1.xml");
     assert_eq!(
         descriptor.class_id(),
@@ -31,7 +33,7 @@ fn package_inventory_reports_activex_controls() {
     assert_eq!(descriptor.license(), None);
     assert_eq!(descriptor.persistence(), ControlPersistence::Storage);
 
-    let binary = descriptor.binary().unwrap();
+    let binary: &ControlBinary = descriptor.binary().unwrap();
     assert_eq!(binary.relationship_id(), "rId1");
     assert_eq!(binary.part_name().as_str(), "/ppt/activeX/activeX1.bin");
     assert!(binary.byte_length() > 0);

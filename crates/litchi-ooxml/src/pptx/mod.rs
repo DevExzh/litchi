@@ -120,7 +120,7 @@ pub use comments::{
     write_slide_comments,
 };
 pub use controls::{
-    Persistence as ControlPersistence, PptxControlBinary, PptxControlDescriptor, PptxSlideControl,
+    ControlBinary, ControlDescriptor, Persistence as ControlPersistence, SlideControl,
 };
 pub use customshow::{CustomShow, CustomShowList};
 pub use extended_guides::{
@@ -193,7 +193,7 @@ pub use parts::{
     SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutReference, SlideMasterTextStyle,
     SlideMasterTextStyles, SlideSize,
 };
-pub use presentation::{PptxChart, Presentation};
+pub use presentation::{Chart, Presentation};
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
     PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,

@@ -1,4 +1,4 @@
-use litchi_ooxml::pptx::{ChartData, ChartSeries, ChartType, Package};
+use litchi_ooxml::pptx::{Chart, ChartData, ChartSeries, ChartType, Package};
 use litchi_ooxml::{OoxmlError, PackURI};
 use litchi_opc::constants::relationship_type::{CHART, STRICT_CHART};
 use tempfile::NamedTempFile;
@@ -9,7 +9,7 @@ fn package_inventory_reports_generated_native_chart_with_identity() {
     let charts = reopened.charts().unwrap();
     assert_eq!(charts.len(), 1);
 
-    let chart = &charts[0];
+    let chart: &Chart = &charts[0];
     assert_eq!(chart.slide_index(), 0);
     assert!(chart.relationship_id().starts_with("rId"));
     assert_eq!(chart.part_name().as_str(), "/ppt/charts/chart1.xml");

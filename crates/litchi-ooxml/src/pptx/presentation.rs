@@ -1,6 +1,6 @@
 use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, Setting, load_slide_action_settings};
-use crate::pptx::controls::{ControlLoadLimits, PptxSlideControl, load_slide_controls};
+use crate::pptx::controls::{ControlLoadLimits, SlideControl, load_slide_controls};
 use crate::pptx::handout::HandoutMaster;
 use crate::pptx::ink::{Annotation, InkLoadLimits, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, Trace, load_slide_laser_traces};
@@ -113,14 +113,14 @@ fn validate_handout_master_root(xml: &[u8]) -> Result<()> {
 /// The chart XML is parsed as inert document data. Its relationship and part
 /// identities are retained so callers can identify the source part precisely.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxChart {
+pub struct Chart {
     slide_index: usize,
     relationship_id: String,
     part_name: PackURI,
     info: crate::pptx::parts::ChartInfo,
 }
 
-impl PptxChart {
+impl Chart {
     /// Return the zero-based index of the slide that owns this chart.
     #[inline]
     pub fn slide_index(&self) -> usize {
@@ -904,7 +904,7 @@ impl<'a> Presentation<'a> {
     /// Each result retains the owning slide, relationship ID, and part name in
     /// addition to basic inert chart metadata. Both transitional and strict
     /// chart relationships are accepted.
-    pub fn charts(&self) -> Result<Vec<PptxChart>> {
+    pub fn charts(&self) -> Result<Vec<Chart>> {
         use crate::pptx::parts::ChartPart;
 
         let mut charts = Vec::new();
@@ -944,7 +944,7 @@ impl<'a> Presentation<'a> {
                 }
 
                 let info = ChartPart::from_part(part)?.chart_info()?;
-                charts.push(PptxChart {
+                charts.push(Chart {
                     slide_index,
                     relationship_id: relationship.r_id().to_string(),
                     part_name,
@@ -1066,7 +1066,7 @@ impl<'a> Presentation<'a> {
     ///
     /// This never instantiates a control, resolves a CLSID, decodes binary
     /// control state, executes a macro, or follows an external relationship.
-    pub fn controls(&self) -> Result<Vec<PptxSlideControl>> {
+    pub fn controls(&self) -> Result<Vec<SlideControl>> {
         let mut controls = Vec::new();
         let mut limits = ControlLoadLimits::default();
 
