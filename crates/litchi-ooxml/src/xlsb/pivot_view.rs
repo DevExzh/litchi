@@ -47,9 +47,7 @@ fn map_owner_error(error: litchi_xlsb::pivot_view::Error) -> XlsbError {
         litchi_xlsb::pivot_view::Error::InvalidLength { expected, found } => {
             XlsbError::InvalidLength { expected, found }
         },
-        litchi_xlsb::pivot_view::Error::InvalidFormula(message) => {
-            XlsbError::InvalidFormula(message)
-        },
+        litchi_xlsb::pivot_view::Error::Invalid(message) => XlsbError::InvalidFormula(message),
         other => XlsbError::InvalidFormula(other.to_string()),
     }
 }

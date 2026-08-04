@@ -31,7 +31,7 @@ pub enum Error {
     InvalidLength { expected: usize, found: usize },
     /// A PivotTable framing or identity invariant is invalid.
     #[error("invalid PivotTable view: {0}")]
-    InvalidFormula(String),
+    Invalid(String),
 }
 
 /// A complete PivotTable definition stream with validated framing.
@@ -64,28 +64,28 @@ impl PivotTableViewPart {
         let mut ended = false;
 
         while offset < bytes.len() {
-            count = count.checked_add(1).ok_or_else(|| {
-                Error::InvalidFormula("PivotTable record count overflow".to_string())
-            })?;
+            count = count
+                .checked_add(1)
+                .ok_or_else(|| Error::Invalid("PivotTable record count overflow".to_string()))?;
             if count > MAX_PIVOT_TABLE_RECORDS {
-                return Err(Error::InvalidFormula(
+                return Err(Error::Invalid(
                     "PivotTable record count exceeds the safety limit".to_string(),
                 ));
             }
 
             let tail = bytes.get(offset..).ok_or_else(|| {
-                Error::InvalidFormula(format!("PivotTable record offset {offset} is invalid"))
+                Error::Invalid(format!("PivotTable record offset {offset} is invalid"))
             })?;
             let (header, header_len) = Header::parse(tail, PIVOT_VIEW_LIMITS)?;
             let payload_start = offset.checked_add(header_len).ok_or_else(|| {
-                Error::InvalidFormula("PivotTable record header offset overflow".to_string())
+                Error::Invalid("PivotTable record header offset overflow".to_string())
             })?;
             let payload_end = payload_start.checked_add(header.len()).ok_or_else(|| {
-                Error::InvalidFormula("PivotTable record payload offset overflow".to_string())
+                Error::Invalid("PivotTable record payload offset overflow".to_string())
             })?;
             if payload_end > bytes.len() {
                 let remaining = bytes.len().saturating_sub(payload_start);
-                return Err(Error::InvalidFormula(format!(
+                return Err(Error::Invalid(format!(
                     "PivotTable record {} declares {} bytes with only {remaining} remaining",
                     header.kind(),
                     header.len()
@@ -97,7 +97,7 @@ impl PivotTableViewPart {
             match record_kind {
                 crate::raw::kind::BEGIN_SX_VIEW => {
                     if begin.is_some() || count != 1 || ended {
-                        return Err(Error::InvalidFormula(
+                        return Err(Error::Invalid(
                             "PivotTable has duplicate or misplaced BrtBeginSXView".to_string(),
                         ));
                     }
@@ -105,19 +105,19 @@ impl PivotTableViewPart {
                 },
                 crate::raw::kind::END_SX_VIEW => {
                     if begin.is_none() || ended || !payload.is_empty() {
-                        return Err(Error::InvalidFormula(
+                        return Err(Error::Invalid(
                             "PivotTable has malformed BrtEndSXView".to_string(),
                         ));
                     }
                     ended = true;
                     if payload_end != bytes.len() {
-                        return Err(Error::InvalidFormula(
+                        return Err(Error::Invalid(
                             "PivotTable has records after BrtEndSXView".to_string(),
                         ));
                     }
                 },
                 _ if begin.is_none() || ended => {
-                    return Err(Error::InvalidFormula(
+                    return Err(Error::Invalid(
                         "PivotTable record lies outside BrtBeginSXView collection".to_string(),
                     ));
                 },
@@ -127,12 +127,10 @@ impl PivotTableViewPart {
             offset = payload_end;
         }
 
-        let (name, cache_id, version_created) = begin
-            .ok_or_else(|| Error::InvalidFormula("PivotTable omits BrtBeginSXView".to_string()))?;
+        let (name, cache_id, version_created) =
+            begin.ok_or_else(|| Error::Invalid("PivotTable omits BrtBeginSXView".to_string()))?;
         if !ended {
-            return Err(Error::InvalidFormula(
-                "PivotTable omits BrtEndSXView".to_string(),
-            ));
+            return Err(Error::Invalid("PivotTable omits BrtEndSXView".to_string()));
         }
 
         Ok(Self {
@@ -193,7 +191,7 @@ fn parse_begin_view(data: &[u8]) -> Result<(String, u32, u8)> {
     let name = cursor.read_wide_string()?;
     let units = name.encode_utf16().count();
     if units == 0 || units > MAX_PIVOT_VIEW_NAME_UNITS || name.contains('\0') {
-        return Err(Error::InvalidFormula(
+        return Err(Error::Invalid(
             "PivotTable view name is empty, too long, or contains NUL".to_string(),
         ));
     }

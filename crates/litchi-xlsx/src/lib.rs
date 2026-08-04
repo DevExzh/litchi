@@ -42,6 +42,7 @@ pub mod sheet_view;
 pub mod slicer_cache;
 pub mod sort;
 pub mod style;
+pub mod table;
 pub mod timelines;
 pub mod views;
 pub mod volatile_dependencies;
@@ -189,6 +190,10 @@ pub use slicer_cache::{
 };
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
+pub use table::{
+    Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
+    parse_table_xml, serialize_table, validate_table, write_table_xml,
+};
 pub use timelines::{
     PivotFilterType, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,
     TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI,

@@ -89,34 +89,6 @@ pub struct DocumentSettings {
     attached_template: Option<AttachedTemplate>,
 }
 
-/// A smart-tag vocabulary declaration from `settings.xml`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SmartTagType {
-    namespace_uri: String,
-    name: String,
-    url: String,
-}
-
-impl SmartTagType {
-    /// Return the smart-tag vocabulary namespace URI.
-    #[inline]
-    pub fn namespace_uri(&self) -> &str {
-        &self.namespace_uri
-    }
-
-    /// Return the smart-tag type name.
-    #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Return the vocabulary download URL.
-    #[inline]
-    pub fn url(&self) -> &str {
-        &self.url
-    }
-}
-
 pub use litchi_docx::settings::{
     COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI, ColorSchemeIndex,
     ColorSchemeMapping, ColorSchemeSlot, CompatFlag, CompatibilityOption, CompatibilitySetting,
@@ -124,7 +96,7 @@ pub use litchi_docx::settings::{
     MAX_SETTINGS_XML_DEPTH as OWNER_MAX_SETTINGS_XML_DEPTH,
     MAX_SETTINGS_XML_NODES as OWNER_MAX_SETTINGS_XML_NODES, NoteNumberFormat, NoteNumberingRestart,
     NotePosition, ParseCompatFlagError, ParseNoteNumberFormatError, ParseNotePositionError,
-    ProofState, ProofingState, ProtectionType, ThemeFontLanguages,
+    ProofState, ProofingState, ProtectionType, SmartTagType, ThemeFontLanguages,
 };
 
 /// Historical host spelling retained while note-number formats are owned by
@@ -684,29 +656,25 @@ fn parse_setting(
             }
         },
         b"smartTagType" => {
-            settings.smart_tag_types.push(SmartTagType {
-                namespace_uri: required_attribute(
-                    element,
-                    b"namespaceuri",
-                    decoder,
-                    resolver,
-                    "smart-tag namespace URI",
-                )?,
-                name: required_attribute(
-                    element,
-                    b"name",
-                    decoder,
-                    resolver,
-                    "smart-tag type name",
-                )?,
-                url: required_attribute(
-                    element,
-                    b"url",
-                    decoder,
-                    resolver,
-                    "smart-tag vocabulary URL",
-                )?,
-            });
+            let namespace_uri = required_attribute(
+                element,
+                b"namespaceuri",
+                decoder,
+                resolver,
+                "smart-tag namespace URI",
+            )?;
+            let name =
+                required_attribute(element, b"name", decoder, resolver, "smart-tag type name")?;
+            let url = required_attribute(
+                element,
+                b"url",
+                decoder,
+                resolver,
+                "smart-tag vocabulary URL",
+            )?;
+            settings
+                .smart_tag_types
+                .push(SmartTagType::new(namespace_uri, name, url).map_err(map_docx_error)?);
         },
         b"doNotEmbedSmartTags" => {
             if std::mem::replace(&mut seen.do_not_embed_smart_tags, true) {
@@ -1765,6 +1733,13 @@ fn parse_on_off_value(value: &str) -> Result<bool> {
     }
 }
 
+fn map_docx_error(error: litchi_docx::Error) -> OoxmlError {
+    match error {
+        litchi_docx::Error::Invalid(message) => OoxmlError::InvalidFormat(message),
+        other => OoxmlError::Docx(other),
+    }
+}
+
 impl Default for DocumentSettings {
     fn default() -> Self {
         Self::new()
@@ -1843,6 +1818,15 @@ mod tests {
 
         let missing_url = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTagType w:namespaceuri="urn:test" w:name="test"/></w:settings>"#;
         assert!(DocumentSettings::extract_from_xml(missing_url).is_err());
+
+        let oversized_name = "n".repeat(litchi_docx::settings::MAX_SMART_TAG_NAME_CHARS + 1);
+        let oversized = format!(
+            r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTagType w:namespaceuri="urn:test" w:name="{oversized_name}" w:url="https://example.test"/></w:settings>"#
+        );
+        assert!(matches!(
+            DocumentSettings::extract_from_xml(oversized.as_bytes()),
+            Err(OoxmlError::InvalidFormat(message)) if message.contains("smart-tag name")
+        ));
 
         let invalid_on_off = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags w:val="maybe"/></w:settings>"#;
         assert!(DocumentSettings::extract_from_xml(invalid_on_off).is_err());

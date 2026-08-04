@@ -3992,6 +3992,50 @@ workspace test commands remain environment-blocked before compilation because
 `pkg-config`/fontconfig is unavailable. No native Office or performance claim
 is made for this batch.
 
+## XLSX tables, XLSB PivotTable views, and DOCX smart-tag settings follow-up
+
+The next disjoint owner batch moves three format-owned model/codec seams out
+of the migration host while retaining package traversal, worksheet/workbook
+orchestration, relationship validation, and historical host paths as explicit
+adapters:
+
+- SpreadsheetML table models, range and column validation, table-column
+  formulas, auto-filter/sort state, style information, bounded parsing, and
+  deterministic XML writing now live in `litchi-xlsx::table`. The host retains
+  worksheet table collections, table-part discovery, and package/relationship
+  traversal. The legacy writer path delegates to the owner serializer.
+- BIFF12 PivotTable-view framing, `BrtBeginSXView` identity extraction,
+  `BrtEndSXView` boundary validation, bounded record scanning, and lossless
+  stream retention now live in `litchi-xlsb::pivot_view`. The host retains
+  workbook/sheet/package orchestration and maps owner failures to the
+  historical `XlsbError` API.
+- WordprocessingML smart-tag vocabulary values now live in
+  `litchi-docx::settings`. The owner validates the checked client length
+  domains while retaining empty-but-present attribute values; the host keeps
+  settings-part parsing, required-attribute/cardinality checks, relationship
+  validation, and attached-template/lossless settings orchestration.
+
+The checked-in specification anchors are `[MS-XLSX]` §§2.4.22 and 2.6.35 for
+the `table` global element and `CT_Table`; `[MS-XLSB]` §§2.1.7.40, 2.4.278,
+2.4.631, and 2.5.169 for PivotTable parts, `BrtBeginSXView`,
+`BrtEndSXView`, and `XLWideString`; and `[MS-OE376]` §§2.1.615--2.1.616 for
+the `smartTagType` and `smartTagTypes` settings vocabulary. These anchors
+cover the models, record boundaries, strict/transitional settings namespace
+handling, bounded input/output, and inert lossless preservation implemented
+by this batch.
+
+The owner unit suites pass 387 XLSX, 86 XLSB, and 249 DOCX tests, with their
+available integration and doctest targets passing as well. The no-default-
+features `litchi-ooxml` all-target suite passes 1,504 host library tests plus
+its integration and doctest targets. Owner all-feature all-target strict
+Clippy, host no-default-feature all-target strict Clippy, formatting, diff,
+and the crate-boundary audit pass: 35 workspace packages, 107 internal
+dependency declarations, and the same 13 explicitly scheduled debt edges
+remain. Host all-features Clippy, host all-features tests, and the full
+workspace tests remain environment-blocked before compilation because
+`pkg-config`/fontconfig is unavailable. No native Office or performance claim
+is made for this batch.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
