@@ -53,6 +53,8 @@
 
 /// ODF package-entry decryption.
 mod encryption;
+/// Shared ownership for simple packaged ODF families.
+pub mod family;
 /// ODF manifest parsing
 mod manifest;
 /// ODF metadata parsing
@@ -69,6 +71,7 @@ pub mod xml;
 pub use encryption::{
     OdfEncryptionCipher, OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey,
 };
+pub use family::FamilyPackage;
 #[allow(unused_imports)]
 pub use manifest::{
     Manifest, ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption,

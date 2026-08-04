@@ -20,7 +20,19 @@ OOXML_FORMATS = frozenset(
 )
 OLE_FORMATS = frozenset({"litchi-doc", "litchi-ppt", "litchi-xls"})
 ODF_FORMATS = frozenset(
-    {"litchi-odf", "litchi-odt", "litchi-ods", "litchi-odp"}
+    {
+        "litchi-odb",
+        "litchi-odc",
+        "litchi-odf",
+        "litchi-odf-formula",
+        "litchi-odg",
+        "litchi-odi",
+        "litchi-odm",
+        "litchi-odp",
+        "litchi-ods",
+        "litchi-odt",
+        "litchi-oth",
+    }
 )
 COMMON_FAMILY_GUARDS = {
     "litchi-cfb": OLE_FORMATS,

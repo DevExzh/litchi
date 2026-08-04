@@ -117,6 +117,7 @@ litchi-odb          = { version = "0.0.1", path = "crates/litchi-odb" }
 litchi-odc          = { version = "0.0.1", path = "crates/litchi-odc" }
 litchi-odf          = { version = "0.0.1", path = "crates/litchi-odf" }
 litchi-odf-common   = { version = "0.0.1", path = "crates/litchi-odf-common" }
+litchi-odf-formula  = { version = "0.0.1", path = "crates/litchi-odf-formula" }
 litchi-odg          = { version = "0.0.1", path = "crates/litchi-odg" }
 litchi-odi          = { version = "0.0.1", path = "crates/litchi-odi" }
 litchi-odm          = { version = "0.0.1", path = "crates/litchi-odm" }

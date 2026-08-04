@@ -91,12 +91,12 @@ impl Formula {
     }
 
     /// Read the exact package `content.xml` as UTF-8.
-    pub fn content_xml(&self) -> litchi_core::Result<String> {
+    pub fn content_xml(&self) -> Result<String> {
         self.package.content_xml()
     }
 
     /// List package members in archive order.
-    pub fn files(&self) -> litchi_core::Result<Vec<String>> {
+    pub fn files(&self) -> Result<Vec<String>> {
         self.package.files()
     }
 
@@ -116,13 +116,13 @@ impl Formula {
     }
 
     /// Save the exact package bytes without rebuilding the archive.
-    pub fn save(&self, path: impl AsRef<Path>) -> litchi_core::Result<()> {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         std::fs::write(path, self.as_bytes())?;
         Ok(())
     }
 }
 
-fn read_all(mut reader: impl Read) -> litchi_core::Result<Vec<u8>> {
+fn read_all(mut reader: impl Read) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     reader.read_to_end(&mut bytes)?;
     Ok(bytes)

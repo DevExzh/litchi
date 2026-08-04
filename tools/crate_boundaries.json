@@ -16,6 +16,8 @@
       "litchi-odb",
       "litchi-odc",
       "litchi-odf",
+      "litchi-odf-common",
+      "litchi-odf-formula",
       "litchi-odg",
       "litchi-odi",
       "litchi-odm",
@@ -94,6 +96,7 @@
       "litchi-odb",
       "litchi-odc",
       "litchi-odf-common",
+      "litchi-odf-formula",
       "litchi-odg",
       "litchi-odi",
       "litchi-odm",
@@ -105,6 +108,10 @@
     "litchi-odf-common": [
       "litchi-core",
       "soapberry-zip"
+    ],
+    "litchi-odf-formula": [
+      "litchi-core",
+      "litchi-odf-common"
     ],
     "litchi-odg": [
       "litchi-core",
@@ -326,6 +333,7 @@
     "litchi-odb",
     "litchi-odc",
     "litchi-odf-common",
+    "litchi-odf-formula",
     "litchi-odg",
     "litchi-odi",
     "litchi-odm",

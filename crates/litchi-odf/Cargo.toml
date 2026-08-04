@@ -10,9 +10,10 @@ rust-version.workspace = true
 
 [features]
 default = ["odt", "ods", "odp"]
-all = ["odb", "odc", "odg", "odi", "odm", "odp", "ods", "odt", "oth"]
+all = ["odb", "odc", "formula", "odg", "odi", "odm", "odp", "ods", "odt", "oth"]
 odb = ["dep:litchi-odb"]
 odc = ["dep:litchi-odc"]
+formula = ["dep:litchi-odf-formula"]
 odg = ["dep:litchi-odg"]
 odi = ["dep:litchi-odi"]
 odm = ["dep:litchi-odm"]
@@ -25,6 +26,7 @@ oth = ["dep:litchi-oth"]
 litchi-odb = { workspace = true, optional = true }
 litchi-odc = { workspace = true, optional = true }
 litchi-odf-common = { workspace = true }
+litchi-odf-formula = { workspace = true, optional = true }
 litchi-odg = { workspace = true, optional = true }
 litchi-odi = { workspace = true, optional = true }
 litchi-odm = { workspace = true, optional = true }

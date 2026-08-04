@@ -18,6 +18,9 @@ pub use litchi_odc as odc;
 /// Dedicated OpenDocument Drawing implementation.
 #[cfg(feature = "odg")]
 pub use litchi_odg as odg;
+/// Dedicated OpenDocument Formula implementation.
+#[cfg(feature = "formula")]
+pub use litchi_odf_formula as formula;
 /// Dedicated OpenDocument Image implementation.
 #[cfg(feature = "odi")]
 pub use litchi_odi as odi;
@@ -51,6 +54,8 @@ pub use litchi_odb::{Database, DatabaseBuilder};
 pub use litchi_odc::{Chart, ChartBuilder};
 #[cfg(feature = "odg")]
 pub use litchi_odg::{Drawing, DrawingBuilder};
+#[cfg(feature = "formula")]
+pub use litchi_odf_formula::{Builder, Formula};
 #[cfg(feature = "odi")]
 pub use litchi_odi::{Image, ImageBuilder};
 #[cfg(feature = "odm")]
