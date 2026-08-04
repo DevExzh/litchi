@@ -1113,7 +1113,7 @@ impl<'a> Presentation<'a> {
         &self,
     ) -> Result<Option<crate::pptx::presentation_properties::PresentationProperties>> {
         crate::pptx::presentation_properties::load_from_package(self.package)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+            .map_err(OoxmlError::from)
     }
 
     /// Load the PowerPoint Revision Information part, if present.

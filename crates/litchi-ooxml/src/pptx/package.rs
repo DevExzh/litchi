@@ -996,8 +996,7 @@ impl Package {
     pub fn presentation_properties(
         &self,
     ) -> Result<Option<crate::pptx::presentation_properties::PresentationProperties>> {
-        crate::pptx::presentation_properties::load_from_package(&self.opc)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+        crate::pptx::presentation_properties::load_from_package(&self.opc).map_err(OoxmlError::from)
     }
 
     /// Load the presentation's typed embedded-font collection.
