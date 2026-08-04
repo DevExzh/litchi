@@ -44,6 +44,7 @@ pub mod slicer_cache;
 pub mod sort;
 pub mod style;
 pub mod table;
+pub mod threaded_comments;
 pub mod timelines;
 pub mod views;
 pub mod volatile_dependencies;
@@ -197,6 +198,11 @@ pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
     parse_table_xml, serialize_table, validate_table, write_table_xml,
+};
+pub use threaded_comments::{
+    Comment, Graph, Mention, People, Person, SheetPart, WorkbookPart, parse_comments,
+    parse_persons, validate_comments, validate_graph, validate_guid, validate_people,
+    validate_timestamp, write_comments, write_persons,
 };
 pub use timelines::{
     PivotFilterType, TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI,

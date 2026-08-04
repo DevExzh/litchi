@@ -18,6 +18,7 @@ pub mod hyperlinks;
 pub mod merged_cells;
 pub mod pivot_view;
 pub mod raw;
+pub mod styles;
 
 pub use raw::Error;
 

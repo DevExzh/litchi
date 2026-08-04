@@ -1,6 +1,6 @@
 //! Package-level CRUD for SpreadsheetML threaded comments and persons.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use litchi_core::sheet::Result as SheetResult;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -9,32 +9,15 @@ use litchi_opc::{OpcPackage, PackURI, Part};
 
 use super::{
     Person, PersonList, ThreadedComment, ThreadedComments, read_persons, read_threaded_comments,
-    validate_threaded_timestamp, write_persons, write_threaded_comments,
+    write_persons, write_threaded_comments,
 };
 
-/// The workbook-level persons part and its relationship identity.
-#[derive(Debug, Clone)]
-pub struct WorkbookPersonPart {
-    pub relationship_id: String,
-    pub part_name: String,
-    pub persons: PersonList,
-}
-
-/// One worksheet's threaded-comments part and relationship identity.
-#[derive(Debug, Clone)]
-pub struct WorksheetThreadedCommentPart {
-    pub worksheet_part_name: String,
-    pub relationship_id: String,
-    pub part_name: String,
-    pub comments: ThreadedComments,
-}
-
-/// Complete typed threaded-comment graph for one workbook.
-#[derive(Debug, Clone, Default)]
-pub struct ThreadedCommentGraph {
-    pub persons: Option<WorkbookPersonPart>,
-    pub worksheets: Vec<WorksheetThreadedCommentPart>,
-}
+/// Historical host name for the package-neutral workbook part.
+pub type WorkbookPersonPart = litchi_xlsx::threaded_comments::WorkbookPart;
+/// Historical host name for the package-neutral worksheet part.
+pub type WorksheetThreadedCommentPart = litchi_xlsx::threaded_comments::SheetPart;
+/// Historical host name for the package-neutral graph.
+pub type ThreadedCommentGraph = litchi_xlsx::threaded_comments::Graph;
 
 /// Load and cross-validate all persons and worksheet comment threads.
 pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<ThreadedCommentGraph> {
@@ -519,94 +502,7 @@ pub fn reorder_threaded_comments(
 }
 
 pub fn validate_threaded_comment_graph(graph: &ThreadedCommentGraph) -> SheetResult<()> {
-    let empty_persons = PersonList::default();
-    let persons = graph
-        .persons
-        .as_ref()
-        .map(|part| &part.persons)
-        .unwrap_or(&empty_persons);
-    write_persons(persons)?;
-    let person_ids: HashSet<&str> = persons
-        .persons
-        .iter()
-        .map(|person| person.id.as_str())
-        .collect();
-    let mut comment_ids = HashSet::new();
-    let mut mention_ids = HashSet::new();
-    for sheet in &graph.worksheets {
-        write_threaded_comments(&sheet.comments)?;
-        let mut root_cells = HashSet::new();
-        for comment in &sheet.comments.comments {
-            if !comment_ids.insert(comment.id.as_str()) {
-                return Err(
-                    format!("duplicate workbook threaded-comment ID '{}'", comment.id).into(),
-                );
-            }
-            if !person_ids.contains(comment.person_id.as_str()) {
-                return Err(format!(
-                    "threaded comment '{}' references missing person '{}'",
-                    comment.id, comment.person_id
-                )
-                .into());
-            }
-            validate_threaded_timestamp(comment.date_time.as_deref())?;
-            if comment.parent_id.is_none() {
-                let cell = comment.cell_ref.as_deref().ok_or_else(|| {
-                    format!(
-                        "threaded-comment root '{}' is missing its cell reference",
-                        comment.id
-                    )
-                })?;
-                if !root_cells.insert(cell) {
-                    return Err(
-                        format!("worksheet has multiple threaded-comment roots at {cell}").into(),
-                    );
-                }
-            } else if comment.cell_ref.is_some() {
-                return Err(format!(
-                    "threaded-comment reply '{}' must not carry a cell reference",
-                    comment.id
-                )
-                .into());
-            }
-            for mention in &comment.mentions {
-                if !person_ids.contains(mention.mention_person_id.as_str()) {
-                    return Err(format!(
-                        "mention '{}' references missing person '{}'",
-                        mention.mention_id, mention.mention_person_id
-                    )
-                    .into());
-                }
-                if !mention_ids.insert(mention.mention_id.as_str()) {
-                    return Err(
-                        format!("duplicate workbook mention ID '{}'", mention.mention_id).into(),
-                    );
-                }
-            }
-        }
-        let roots: HashSet<&str> = sheet
-            .comments
-            .comments
-            .iter()
-            .filter(|comment| comment.parent_id.is_none())
-            .map(|comment| comment.id.as_str())
-            .collect();
-        for reply in sheet
-            .comments
-            .comments
-            .iter()
-            .filter(|comment| comment.parent_id.is_some())
-        {
-            if !roots.contains(reply.parent_id.as_deref().expect("filtered")) {
-                return Err(format!(
-                    "threaded-comment reply '{}' must reference a root in the same worksheet",
-                    reply.id
-                )
-                .into());
-            }
-        }
-    }
-    Ok(())
+    litchi_xlsx::threaded_comments::validate_graph(graph)
 }
 
 fn commit_person_part(package: &mut OpcPackage, part: &WorkbookPersonPart) -> SheetResult<()> {

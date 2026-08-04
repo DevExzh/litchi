@@ -232,7 +232,7 @@ pub use sheet_view::{
 pub use styles::{
     Alignment, Border, BorderSide, BorderStyle, HorizontalAlignment, VerticalAlignment,
 };
-pub use styles_table::{CellFormat, Fill, Font, StylesTable};
+pub use styles_table::{CellFormat, Fill, Font, NumberFormat, StylesTable};
 pub use table::{
     XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableRange, XlsbTableStyleInfo,
     XlsbTableTotalsRowFunction, XlsbTableType, parse_table_part,

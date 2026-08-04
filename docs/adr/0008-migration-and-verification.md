@@ -4071,6 +4071,45 @@ all-features tests/Clippy and the full workspace test remain blocked before
 compilation because `pkg-config`/fontconfig is unavailable. No native Office
 or performance claim is made for this batch.
 
+## DOCX numbering, XLSB styles, and XLSX threaded-comments owner follow-up
+
+This batch applies the concise-name and layered-module rule across all three
+format crates. Each owner surface is split into `mod.rs`, `model.rs`, and
+`codec.rs`; host files retain only compatibility names, MCE/OPC preprocessing,
+relationship/content-type traversal, and legacy representation conversion:
+
+- `litchi-docx::numbering` owns the package-neutral numbering collection,
+  definitions, instances, levels, overrides, closed numbering enums, picture
+  bullets, and bounded WordprocessingML state machine. The host preserves the
+  historical `Numbering`, `AbstractNum`, `Num`, and related aliases while
+  retaining MCE/OPC extraction.
+- `litchi-xlsb::styles` owns neutral alignment, border, font, fill, number
+  format, cell-format, styles-table models and the strict Brt* codec. The host
+  preserves `StylesTable` and converts owner alignment/border values to the
+  existing host types.
+- `litchi-xlsx::threaded_comments` owns concise `Comment`, `Comments`,
+  `Person`, `People`, `Mention`, and graph models plus bounded XML parsing,
+  writing, and cross-reference validation. The host retains package graph CRUD
+  and relationship lifecycle operations under the historical public names.
+
+The checked-in specification anchors are `[MS-OE376]` §§2.1.277--2.1.291 and
+2.1.580 for numbering domains and limits; `[MS-XLSB]` §§2.3.7, 2.4.12,
+2.4.20, 2.4.22, 2.4.87, 2.4.89, 2.4.232, 2.4.314, 2.4.369, 2.4.377,
+2.4.441, 2.4.585, 2.4.688, 2.4.690, and 2.4.876 for styles records; and
+`[MS-XLSX]` §§2.1.17--2.1.18, 2.3.7--2.3.7.2, 2.4.85--2.4.86, and
+2.6.202--2.6.207 for threaded comments, people, mentions, and part roots.
+
+The owner suites pass 254 DOCX, 91 XLSB, and 395 XLSX tests, with their
+available integration and doctest targets passing. The no-default-features
+`litchi-ooxml` all-target suite passes 1,499 host library tests plus its
+integration and doctest targets. Owner all-feature all-target strict Clippy,
+host no-default-feature all-target strict Clippy, formatting, diff, and the
+crate-boundary audit pass: 35 workspace packages, 107 internal dependency
+declarations, and the same 13 explicitly scheduled debt edges remain. Host
+all-features tests/Clippy and the full workspace test remain blocked before
+compilation because `pkg-config`/fontconfig is unavailable. No native Office
+or performance claim is made for this batch.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
