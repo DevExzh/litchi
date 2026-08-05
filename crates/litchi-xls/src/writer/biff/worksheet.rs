@@ -41,7 +41,7 @@ fn write_dcon_file<W: Write>(writer: &mut W, file: &crate::XlsConsolidationFile)
 }
 
 /// Write one complete contiguous `DCON` worksheet directory.
-pub fn write_consolidation<W: Write>(
+pub(super) fn write_consolidation<W: Write>(
     writer: &mut W,
     consolidation: &crate::XlsConsolidation,
 ) -> XlsResult<()> {
@@ -175,7 +175,7 @@ fn write_pls<W: Write>(writer: &mut W, driver_data: &[u8]) -> XlsResult<()> {
 }
 
 /// Write the primary BIFF8 worksheet page-settings records in canonical order.
-pub fn write_page_settings<W: Write>(
+pub(super) fn write_page_settings<W: Write>(
     writer: &mut W,
     options: &XlsPageSetupOptions,
     horizontal_breaks: &[(u16, u16, u16)],
@@ -259,7 +259,7 @@ pub fn write_page_settings<W: Write>(
 /// Write DEFCOLWIDTH record.
 ///
 /// Record type: 0x0055, Length: 2
-pub fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> XlsResult<()> {
+pub(super) fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> XlsResult<()> {
     if width_chars > 255 {
         return Err(XlsError::InvalidData(
             "default column width exceeds 255 characters".to_string(),
@@ -274,7 +274,7 @@ pub fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> XlsRes
 ///
 /// Record type: 0x020B, Length: 16 + 4 * cDbCell
 #[allow(dead_code)]
-pub fn write_index<W: Write>(
+pub(super) fn write_index<W: Write>(
     writer: &mut W,
     first_row: u32,
     last_row_plus1: u32,
@@ -302,7 +302,7 @@ pub fn write_index<W: Write>(
 ///
 /// Record type: 0x00D7, Length: 4 + 2 * cOffsets
 #[allow(dead_code)]
-pub fn write_dbcell<W: Write>(
+pub(super) fn write_dbcell<W: Write>(
     writer: &mut W,
     row_offset: u32,
     cell_offsets: &[u16],
@@ -320,7 +320,7 @@ pub fn write_dbcell<W: Write>(
 }
 
 /// Write GUTS, DEFAULTROWHEIGHT, and WSBOOL from typed worksheet settings.
-pub fn write_worksheet_layout<W: Write>(
+pub(super) fn write_worksheet_layout<W: Write>(
     writer: &mut W,
     options: &XlsWorksheetLayoutOptions,
 ) -> XlsResult<()> {
@@ -363,13 +363,13 @@ pub fn write_worksheet_layout<W: Write>(
     Ok(())
 }
 
-pub fn write_uncalced<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_uncalced<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x005E, 2)?;
     writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
 }
 
-pub fn write_calculation_settings<W: Write>(
+pub(super) fn write_calculation_settings<W: Write>(
     writer: &mut W,
     settings: &crate::writer::core::XlsCalculationSettings,
 ) -> XlsResult<()> {
@@ -405,7 +405,7 @@ pub fn write_calculation_settings<W: Write>(
     Ok(())
 }
 
-pub fn write_pivot_sheet_preamble<W: Write>(
+pub(super) fn write_pivot_sheet_preamble<W: Write>(
     writer: &mut W,
     options: &XlsWorksheetLayoutOptions,
 ) -> XlsResult<()> {
@@ -450,7 +450,7 @@ pub fn write_pivot_sheet_preamble<W: Write>(
     Ok(())
 }
 
-pub fn write_pivot_colinfo<W: Write>(
+pub(super) fn write_pivot_colinfo<W: Write>(
     writer: &mut W,
     first_col: u16,
     last_col: u16,
@@ -473,7 +473,7 @@ pub fn write_pivot_colinfo<W: Write>(
 /// The width is expressed in units of 1/256 of the width of the
 /// character "0" in the workbook's default font, matching the
 /// semantics of Apache POI's `ColumnInfoRecord.setColumnWidth`.
-pub fn write_colinfo<W: Write>(
+pub(super) fn write_colinfo<W: Write>(
     writer: &mut W,
     first_col: u16,
     last_col: u16,
@@ -517,7 +517,11 @@ pub fn write_colinfo<W: Write>(
 /// - `topRow` and `leftColumn` are set to the same values.
 /// - `activePane` is derived from which sides are frozen.
 #[allow(dead_code)]
-pub fn write_pane<W: Write>(writer: &mut W, freeze_rows: u32, freeze_cols: u16) -> XlsResult<()> {
+pub(super) fn write_pane<W: Write>(
+    writer: &mut W,
+    freeze_rows: u32,
+    freeze_cols: u16,
+) -> XlsResult<()> {
     if freeze_rows == 0 && freeze_cols == 0 {
         return Ok(());
     }
@@ -556,7 +560,7 @@ pub fn write_pane<W: Write>(writer: &mut W, freeze_rows: u32, freeze_cols: u16) 
     Ok(())
 }
 
-pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResult<()> {
+pub(super) fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResult<()> {
     if c_entries == 0 {
         return Ok(());
     }
@@ -580,7 +584,7 @@ pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResu
 ///         var   rgch2      — string for condition 2 (if applicable)
 /// ```
 #[allow(clippy::too_many_arguments)]
-pub fn write_autofilter<W: Write>(
+pub(super) fn write_autofilter<W: Write>(
     writer: &mut W,
     column_index: u16,
     join_or: bool,
@@ -714,7 +718,7 @@ fn encode_autofilter_string(s: Option<&str>) -> Vec<u8> {
 /// 6       2     col3    — third sort key column index (0 if unused)
 /// 8       2     reserved
 /// ```
-pub fn write_sort<W: Write>(
+pub(super) fn write_sort<W: Write>(
     writer: &mut W,
     case_sensitive: bool,
     sort_by_columns: bool,
@@ -760,7 +764,7 @@ pub fn write_sort<W: Write>(
     Ok(())
 }
 
-pub fn write_sheet_protection<W: Write>(
+pub(super) fn write_sheet_protection<W: Write>(
     writer: &mut W,
     protect_objects: bool,
     protect_scenarios: bool,
@@ -927,7 +931,7 @@ fn write_hyperlink_internal<W: Write>(
 /// For now we support standard web/mail/ftp URLs and internal workbook
 /// references. External file hyperlinks can be added later using the
 /// more complex BIFF8 layout if required.
-pub fn write_hyperlink<W: Write>(
+pub(super) fn write_hyperlink<W: Write>(
     writer: &mut W,
     row1: u32,
     row2: u32,
@@ -992,7 +996,7 @@ pub fn write_hyperlink<W: Write>(
 /// FREEZE_PANES_NO_SPLIT (0x0100) bits are set in the options field,
 /// mirroring Apache POI's behaviour after `createFreezePane`.
 #[allow(dead_code)]
-pub fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsResult<()> {
+pub(super) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsResult<()> {
     write_record_header(writer, 0x023E, 18)?;
 
     // Base options value from POI's InternalSheet.createWindowTwo(): 0x06B6
@@ -1032,7 +1036,11 @@ pub fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsRes
 }
 
 /// Write an SCL record for a non-default worksheet zoom fraction.
-pub fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> XlsResult<()> {
+pub(super) fn write_scl<W: Write>(
+    writer: &mut W,
+    numerator: u16,
+    denominator: u16,
+) -> XlsResult<()> {
     if numerator == 0
         || denominator == 0
         || numerator > i16::MAX as u16
@@ -1050,7 +1058,7 @@ pub fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> 
     Ok(())
 }
 
-pub fn write_window2_options<W: Write>(
+pub(super) fn write_window2_options<W: Write>(
     writer: &mut W,
     options: &crate::writer::view::View,
 ) -> XlsResult<()> {
@@ -1085,7 +1093,7 @@ pub fn write_window2_options<W: Write>(
     Ok(())
 }
 
-pub fn write_pane_options<W: Write>(
+pub(super) fn write_pane_options<W: Write>(
     writer: &mut W,
     pane: &crate::writer::view::Pane,
 ) -> XlsResult<()> {
@@ -1099,7 +1107,7 @@ pub fn write_pane_options<W: Write>(
     Ok(())
 }
 
-pub fn write_selection_options<W: Write>(
+pub(super) fn write_selection_options<W: Write>(
     writer: &mut W,
     selection: &crate::writer::view::Selection,
 ) -> XlsResult<()> {
@@ -1131,7 +1139,7 @@ pub fn write_selection_options<W: Write>(
 
 /// Write the primary selection for a regular worksheet window.
 #[allow(dead_code)]
-pub fn write_default_selection<W: Write>(
+pub(super) fn write_default_selection<W: Write>(
     writer: &mut W,
     freeze_rows: u16,
     freeze_cols: u16,
@@ -1159,7 +1167,7 @@ pub fn write_default_selection<W: Write>(
     Ok(())
 }
 
-pub fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> XlsResult<()> {
+pub(super) fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> XlsResult<()> {
     const FLAGS: u16 = 0x00B6;
     static DATA: &[u8] = &[
         0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00,
@@ -1172,7 +1180,7 @@ pub fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> XlsResul
     Ok(())
 }
 
-pub fn write_plv<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_plv<W: Write>(writer: &mut W) -> XlsResult<()> {
     static DATA: &[u8] = &[
         0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12,
         0x00,
@@ -1182,7 +1190,7 @@ pub fn write_plv<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
-pub fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
     static DATA: &[u8] = &[
         0x03, 0x0F, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x0F, 0x00, 0x0F, 0x00, 0x03, 0x03,
     ];
@@ -1191,14 +1199,14 @@ pub fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
-pub fn write_phonetic_pr<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_phonetic_pr<W: Write>(writer: &mut W) -> XlsResult<()> {
     static DATA: &[u8] = &[0x17, 0x00, 0x37, 0x00, 0x00, 0x00];
     write_record_header(writer, 0x00EF, DATA.len() as u16)?;
     writer.write_all(DATA)?;
     Ok(())
 }
 
-pub fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
     static DATA: &[u8] = &[
         0x67, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
         0xFF, 0xFF, 0xFF, 0xFF, 0x03, 0x44, 0x00, 0x00,
@@ -1212,7 +1220,7 @@ pub fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// chunking long range lists into Continue records.
 ///
 /// Record type: 0x00EF
-pub fn write_phonetic_info<W: Write>(
+pub(super) fn write_phonetic_info<W: Write>(
     writer: &mut W,
     value: &crate::XlsPhoneticInfo,
 ) -> XlsResult<()> {
@@ -1236,7 +1244,7 @@ pub fn write_phonetic_info<W: Write>(
 /// Write a SHEETEXT record (MS-XLS 2.4.259) carrying a sheet tab color.
 ///
 /// Record type: 0x0862
-pub fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> XlsResult<()> {
+pub(super) fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> XlsResult<()> {
     let payload = crate::sheet_ext::XlsSheetExt::from_tab_color(Some(tab_color)).to_payload();
     write_record_header(
         writer,
@@ -1258,7 +1266,7 @@ pub fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> Xls
 /// * `last_row` - Last used row + 1
 /// * `first_col` - First used column
 /// * `last_col` - Last used column + 1
-pub fn write_dimensions<W: Write>(
+pub(super) fn write_dimensions<W: Write>(
     writer: &mut W,
     first_row: u32,
     last_row: u32,
@@ -1284,7 +1292,7 @@ pub fn write_dimensions<W: Write>(
 ///
 /// The height is stored in twips (1/20 of a point) as per MS-XLS
 /// and Apache POI's `RowRecord` implementation.
-pub fn write_row<W: Write>(
+pub(super) fn write_row<W: Write>(
     writer: &mut W,
     row_index: u32,
     first_col: u16,
@@ -1338,7 +1346,7 @@ pub fn write_row<W: Write>(
     Ok(())
 }
 
-pub fn write_mergedcells<W, I>(writer: &mut W, ranges: I) -> XlsResult<()>
+pub(super) fn write_mergedcells<W, I>(writer: &mut W, ranges: I) -> XlsResult<()>
 where
     W: Write,
     I: IntoIterator<Item = (u16, u16, u8, u8)>,

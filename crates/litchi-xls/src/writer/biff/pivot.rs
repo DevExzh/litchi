@@ -60,7 +60,7 @@ fn encode_xl_string_no_cch(s: &str) -> Vec<u8> {
 /// - `0x0002` — External
 /// - `0x0004` — Consolidation
 /// - `0x0010` — Scenario
-pub fn write_sxvs<W: Write>(writer: &mut W, source_type: u16) -> XlsResult<()> {
+pub(crate) fn write_sxvs<W: Write>(writer: &mut W, source_type: u16) -> XlsResult<()> {
     write_record_header(writer, 0x00E3, 2)?;
     writer.write_all(&source_type.to_le_bytes())?;
     Ok(())
@@ -71,7 +71,7 @@ pub fn write_sxvs<W: Write>(writer: &mut W, source_type: u16) -> XlsResult<()> {
 // ---------------------------------------------------------------------------
 
 /// Configuration for writing an SXVIEW record.
-pub struct SxViewConfig<'a> {
+pub(crate) struct SxViewConfig<'a> {
     pub first_row: u16,
     pub last_row: u16,
     pub first_col: u16,
@@ -134,7 +134,7 @@ pub struct SxViewConfig<'a> {
 /// 44  var  stTable         — XLUnicodeStringNoCch
 ///     var  stData          — XLUnicodeStringNoCch
 /// ```
-pub fn write_sxview<W: Write>(writer: &mut W, cfg: &SxViewConfig<'_>) -> XlsResult<()> {
+pub(crate) fn write_sxview<W: Write>(writer: &mut W, cfg: &SxViewConfig<'_>) -> XlsResult<()> {
     let name_bytes = encode_xl_string_no_cch(cfg.name);
     let data_name_bytes = encode_xl_string_no_cch(cfg.data_field_name);
 
@@ -180,7 +180,7 @@ pub fn write_sxview<W: Write>(writer: &mut W, cfg: &SxViewConfig<'_>) -> XlsResu
 // ---------------------------------------------------------------------------
 
 /// Configuration for writing an SXVD record.
-pub struct SxVdConfig<'a> {
+pub(crate) struct SxVdConfig<'a> {
     /// Axis: 0=none, 1=row, 2=col, 4=page, 8=data.
     pub axis: u16,
     /// Number of subtotals.
@@ -194,7 +194,7 @@ pub struct SxVdConfig<'a> {
 }
 
 /// Write an SXVD record.
-pub fn write_sxvd<W: Write>(writer: &mut W, cfg: &SxVdConfig<'_>) -> XlsResult<()> {
+pub(crate) fn write_sxvd<W: Write>(writer: &mut W, cfg: &SxVdConfig<'_>) -> XlsResult<()> {
     let (cch_name, name_bytes) = match cfg.name {
         Some(n) => {
             let bytes = encode_xl_string_no_cch(n);
@@ -221,7 +221,7 @@ pub fn write_sxvd<W: Write>(writer: &mut W, cfg: &SxVdConfig<'_>) -> XlsResult<(
 // ---------------------------------------------------------------------------
 
 /// Configuration for writing an SXVI record.
-pub struct SxViConfig<'a> {
+pub(crate) struct SxViConfig<'a> {
     /// Item type: 0x0000=Data, 0x0001=Default subtotal, 0x0002=Sum, etc.
     pub item_type: u16,
     /// Option flags.
@@ -233,7 +233,7 @@ pub struct SxViConfig<'a> {
 }
 
 /// Write an SXVI record.
-pub fn write_sxvi<W: Write>(writer: &mut W, cfg: &SxViConfig<'_>) -> XlsResult<()> {
+pub(crate) fn write_sxvi<W: Write>(writer: &mut W, cfg: &SxViConfig<'_>) -> XlsResult<()> {
     let (cch_name, name_bytes) = match cfg.name {
         Some(n) => {
             let bytes = encode_xl_string_no_cch(n);
@@ -259,7 +259,7 @@ pub fn write_sxvi<W: Write>(writer: &mut W, cfg: &SxViConfig<'_>) -> XlsResult<(
 // ---------------------------------------------------------------------------
 
 /// Configuration for writing an SXDI record.
-pub struct SxDiConfig<'a> {
+pub(crate) struct SxDiConfig<'a> {
     /// Index of the source field in the pivot cache.
     pub source_field_index: u16,
     /// Aggregation function: 0=Sum,1=Count,2=Average,3=Max,4=Min,5=Product,...
@@ -280,7 +280,7 @@ pub struct SxDiConfig<'a> {
 ///
 /// When `cfg.name` is empty, `cchName` is set to `0xFFFF` (not present),
 /// matching the convention used by SXVD / SXVI.
-pub fn write_sxdi<W: Write>(writer: &mut W, cfg: &SxDiConfig<'_>) -> XlsResult<()> {
+pub(crate) fn write_sxdi<W: Write>(writer: &mut W, cfg: &SxDiConfig<'_>) -> XlsResult<()> {
     let (cch_name, name_bytes) = if cfg.name.is_empty() {
         (0xFFFFu16, Vec::new())
     } else {
@@ -314,7 +314,7 @@ pub fn write_sxdi<W: Write>(writer: &mut W, cfg: &SxDiConfig<'_>) -> XlsResult<(
 ///
 /// The tuple format is `(item_index, field_index, object_id)` in the
 /// public API, but the BIFF wire order is field-first.
-pub fn write_sxpi<W: Write>(writer: &mut W, entries: &[(u16, u16, u16)]) -> XlsResult<()> {
+pub(crate) fn write_sxpi<W: Write>(writer: &mut W, entries: &[(u16, u16, u16)]) -> XlsResult<()> {
     if entries.is_empty() {
         return Ok(());
     }
@@ -337,7 +337,7 @@ pub fn write_sxpi<W: Write>(writer: &mut W, entries: &[(u16, u16, u16)]) -> XlsR
 /// This links a pivot view to its cache stream. The `id_stm` value
 /// is the zero-based index of the pivot cache (typically 0 for the
 /// first pivot table).
-pub fn write_sx_stream_id<W: Write>(writer: &mut W, id_stm: u16) -> XlsResult<()> {
+pub(crate) fn write_sx_stream_id<W: Write>(writer: &mut W, id_stm: u16) -> XlsResult<()> {
     write_record_header(writer, 0x00D5, 2)?;
     writer.write_all(&id_stm.to_le_bytes())?;
     Ok(())
@@ -348,7 +348,7 @@ pub fn write_sx_stream_id<W: Write>(writer: &mut W, id_stm: u16) -> XlsResult<()
 // ---------------------------------------------------------------------------
 
 /// Configuration for writing an SXEX record.
-pub struct SxExConfig {
+pub(crate) struct SxExConfig {
     /// Number of SxFormat records (usually 0).
     pub sx_format_count: u16,
     /// Number of selected items (usually 0).
@@ -394,7 +394,7 @@ impl Default for SxExConfig {
 /// 20  u16  cchTableStyle     — 0xFFFF = not set
 /// 22  u16  cchVacateStyle    — 0xFFFF = not set
 /// ```
-pub fn write_sxex<W: Write>(writer: &mut W, cfg: &SxExConfig) -> XlsResult<()> {
+pub(crate) fn write_sxex<W: Write>(writer: &mut W, cfg: &SxExConfig) -> XlsResult<()> {
     write_record_header(writer, 0x00F1, 24)?;
     writer.write_all(&cfg.sx_format_count.to_le_bytes())?; //  0: csxformat
     writer.write_all(&0xFFFFu16.to_le_bytes())?; //  2: cchErrorString
@@ -481,7 +481,7 @@ fn write_sxaddl_style_name<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_sxaddl_record(writer, 0x00, 0x1E, PAYLOAD)
 }
 
-pub fn write_pivot_modern_extensions<W: Write>(
+pub(crate) fn write_pivot_modern_extensions<W: Write>(
     writer: &mut W,
     table_name: &str,
     field_names: &[&str],
@@ -535,7 +535,7 @@ pub fn write_pivot_modern_extensions<W: Write>(
 /// 12  u16  mnAutoFormat    = 1
 /// 14  var  grand total name (XclExpString, empty = 3 bytes: 00 00 00)
 /// ```
-pub fn write_sx_view_ex9<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_sx_view_ex9<W: Write>(writer: &mut W) -> XlsResult<()> {
     const SX_VIEW_EX9_RECORD_ID: u16 = 0x0810;
     const SX_VIEW_EX9_FRT_FLAGS: u16 = 0x0002;
     const SX_VIEW_EX9_REPORT_FLAGS: u32 = 0;
@@ -691,7 +691,10 @@ fn write_ft_lbs_data<W: Write>(writer: &mut W) -> XlsResult<()> {
 
 /// Write a MsoDrawingGroup record (0x00EB) to the globals stream.
 /// This initializes the Escher drawing container group for the workbook.
-pub fn write_mso_drawing_group<W: Write>(writer: &mut W, clusters: &[(u32, u32)]) -> XlsResult<()> {
+pub(crate) fn write_mso_drawing_group<W: Write>(
+    writer: &mut W,
+    clusters: &[(u32, u32)],
+) -> XlsResult<()> {
     if clusters.is_empty() {
         return Err(XlsError::InvalidData(
             "MsoDrawingGroup requires at least one drawing cluster".to_string(),
@@ -786,7 +789,7 @@ pub fn write_mso_drawing_group<W: Write>(writer: &mut W, clusters: &[(u32, u32)]
     Ok(())
 }
 
-pub fn write_pivot_page_obj<W: Write>(writer: &mut W, object_id: u16) -> XlsResult<()> {
+pub(super) fn write_pivot_page_obj<W: Write>(writer: &mut W, object_id: u16) -> XlsResult<()> {
     write_record_header(writer, OBJ_RECORD_ID, 70)?;
     write_ft_cmo_combo_box(writer, object_id)?;
     write_ft_cbls(writer)?;
@@ -813,7 +816,7 @@ pub fn write_pivot_page_obj<W: Write>(writer: &mut W, object_id: u16) -> XlsResu
 /// For an internal worksheet source the virtual path is encoded as
 /// `\x02` + sheet name (the `\x02` prefix is the self-referential encoded
 /// URL, matching Excel's behaviour per MS-XLS VirtPath).
-pub fn write_dconref<W: Write>(
+pub(crate) fn write_dconref<W: Write>(
     writer: &mut W,
     first_row: u16,
     last_row: u16,
@@ -843,7 +846,7 @@ pub fn write_dconref<W: Write>(
 // ---------------------------------------------------------------------------
 
 /// Configuration for writing an SXDB record.
-pub struct SxDbConfig {
+pub(super) struct SxDbConfig {
     /// Number of source data records (rows excluding header).
     pub record_count: u32,
     /// Stream ID (must match the SxStreamID for this cache).
@@ -870,7 +873,7 @@ pub struct SxDbConfig {
 /// 16  u16  reserved      — MUST be 0x0001
 /// 18  var  userName      — ShortXLUnicodeString (empty = 3 bytes)
 /// ```
-pub fn write_sxdb<W: Write>(writer: &mut W, cfg: &SxDbConfig) -> XlsResult<()> {
+pub(super) fn write_sxdb<W: Write>(writer: &mut W, cfg: &SxDbConfig) -> XlsResult<()> {
     let user_name_bytes = encode_xl_unicode_string(""); // empty XLUnicodeString = 3 bytes
     let data_len = 18u16 + user_name_bytes.len() as u16;
     write_record_header(writer, 0x00C6, data_len)?;
@@ -894,7 +897,7 @@ pub fn write_sxdb<W: Write>(writer: &mut W, cfg: &SxDbConfig) -> XlsResult<()> {
 // ---------------------------------------------------------------------------
 
 /// Configuration for writing an SXFDB record.
-pub struct SxFdbConfig<'a> {
+pub(super) struct SxFdbConfig<'a> {
     /// Number of unique items for this field.
     pub item_count: u16,
     /// Field name.
@@ -957,7 +960,7 @@ fn encode_xl_unicode_string(s: &str) -> Vec<u8> {
 /// 12  u16  csxOrig        — original items (= citmUnq for base fields)
 /// 14  var  ShortXLUnicodeString — field name
 /// ```
-pub fn write_sxfdb<W: Write>(writer: &mut W, cfg: &SxFdbConfig<'_>) -> XlsResult<()> {
+pub(super) fn write_sxfdb<W: Write>(writer: &mut W, cfg: &SxFdbConfig<'_>) -> XlsResult<()> {
     let name_bytes = encode_xl_unicode_string(cfg.name);
     let data_len = 14u16 + name_bytes.len() as u16;
 
@@ -1001,7 +1004,7 @@ pub fn write_sxfdb<W: Write>(writer: &mut W, cfg: &SxFdbConfig<'_>) -> XlsResult
 /// Write an SXSTRING record containing a single cache string item.
 ///
 /// The data is an `XLUnicodeString` (u16 cch + u8 flags + chars).
-pub fn write_sxstring<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
+pub(super) fn write_sxstring<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
     let cch = value.chars().count() as u16;
     if value.is_ascii() {
         let data_len = 3u16 + cch; // u16 cch + u8 flags(0) + cch bytes
@@ -1062,7 +1065,7 @@ fn write_sxinteger<W: Write>(writer: &mut W, value: i16) -> XlsResult<()> {
 /// Always written by LO after each SXFDB record in the cache stream
 /// (see `XclExpPCField::Save` in `xepivot.cxx`).
 /// Value is `EXC_SXFDBTYPE_DEFAULT = 0x0000`.
-pub fn write_sxfdbtype<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_sxfdbtype<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x01BB, 2)?;
     writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
@@ -1079,7 +1082,7 @@ pub fn write_sxfdbtype<W: Write>(writer: &mut W) -> XlsResult<()> {
 ///  0  f64  fSxCreationDate — creation timestamp (51901.0296527…)
 ///  8  u32  cSxFormula      — number of SXFORMULA records (0)
 /// ```
-pub fn write_sxdbex<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_sxdbex<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x0122, 12)?;
     writer.write_all(&super::sxdbex_creation_timestamp_bytes())?;
     writer.write_all(&0u32.to_le_bytes())?; // cSxFormula = 0
@@ -1103,7 +1106,11 @@ pub fn write_sxdbex<W: Write>(writer: &mut W) -> XlsResult<()> {
 ///  6  u16  cchS         — 0x0000 for data lines, 0x0A00 for grand total
 ///  8  [u16 × index_count]  — pivot item indices
 /// ```
-pub fn write_sxli<W: Write>(writer: &mut W, line_count: u16, index_count: u16) -> XlsResult<()> {
+pub(crate) fn write_sxli<W: Write>(
+    writer: &mut W,
+    line_count: u16,
+    index_count: u16,
+) -> XlsResult<()> {
     if line_count == 0 {
         return Ok(());
     }
@@ -1152,7 +1159,7 @@ const SXVDEX_DEFAULT_FLAGS: u32 = 0x0AA0_141E;
 /// 10  u16  cchSubName      — 0xFFFF = not present
 /// 12  [8]  reserved        — zeros
 /// ```
-pub fn write_sxvdex<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_sxvdex<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x0100, 20)?;
     writer.write_all(&SXVDEX_DEFAULT_FLAGS.to_le_bytes())?; //  0: flags
     writer.write_all(&0xFFFFu16.to_le_bytes())?; //  4: isxdiAutoSort (-1)
@@ -1172,7 +1179,7 @@ pub fn write_sxvdex<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// One SXIVD is written for row fields and another for column fields.
 /// Each entry is a `u16` pivot field index. The special value `0xFFFE`
 /// (`EXC_SXIVD_DATA`) represents the data-layout pseudo-field.
-pub fn write_sxivd<W: Write>(writer: &mut W, field_indices: &[u16]) -> XlsResult<()> {
+pub(crate) fn write_sxivd<W: Write>(writer: &mut W, field_indices: &[u16]) -> XlsResult<()> {
     if field_indices.is_empty() {
         return Ok(());
     }
@@ -1189,7 +1196,7 @@ pub fn write_sxivd<W: Write>(writer: &mut W, field_indices: &[u16]) -> XlsResult
 // ---------------------------------------------------------------------------
 
 /// Per-field info for the pivot cache stream.
-pub struct PivotCacheFieldInfo<'a> {
+pub(crate) struct PivotCacheFieldInfo<'a> {
     /// Field (column) name.
     pub name: &'a str,
     /// Cache item string values (unique values from source data).
@@ -1208,7 +1215,7 @@ pub struct PivotCacheFieldInfo<'a> {
 ///
 /// Contains one byte per string field (the item index) and one f64 per
 /// numeric field. The order matches the field order.
-pub struct PivotCacheSourceRow<'a> {
+pub(crate) struct PivotCacheSourceRow<'a> {
     /// Packed string-field indices (one byte per string field, in order).
     pub item_indices: &'a [u16],
     /// Numeric values (one per numeric field, in order).
@@ -1216,7 +1223,7 @@ pub struct PivotCacheSourceRow<'a> {
 }
 
 /// Information needed to generate one pivot cache storage stream.
-pub struct PivotCacheStreamInfo<'a> {
+pub(crate) struct PivotCacheStreamInfo<'a> {
     /// Stream ID (matches the SxStreamID in globals).
     pub stream_id: u16,
     /// Number of source data records (rows excluding header).
@@ -1295,7 +1302,7 @@ fn write_sxnum<W: Write>(writer: &mut W, value: f64) -> XlsResult<()> {
 /// ```
 ///
 /// Note: LibreOffice does NOT write BOF for cache streams.
-pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult<Vec<u8>> {
+pub(crate) fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult<Vec<u8>> {
     let mut buf = Vec::new();
 
     let has_source_data = !info.source_rows.is_empty();

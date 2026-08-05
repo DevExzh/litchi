@@ -9,7 +9,7 @@ const WRITE_ACCESS_DATA_LEN: u16 = 112;
 
 /// Workbook-global EXTERNSHEET layout mode.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ExternSheetMode {
+pub(crate) enum ExternSheetMode {
     /// Emit one XTI per worksheet so 3D tokens can use the sheet index as `ixti`.
     PerSheet,
     /// Emit a single XTI spanning the whole workbook, matching Excel's pivot-only output.
@@ -19,7 +19,7 @@ pub enum ExternSheetMode {
 /// Write INTERFACEHDR record.
 ///
 /// Record type: 0x00E1
-pub fn write_interface_hdr<W: Write>(writer: &mut W, codepage: u16) -> XlsResult<()> {
+pub(super) fn write_interface_hdr<W: Write>(writer: &mut W, codepage: u16) -> XlsResult<()> {
     write_record_header(writer, 0x00E1, 2)?;
     writer.write_all(&codepage.to_le_bytes())?;
     Ok(())
@@ -28,7 +28,7 @@ pub fn write_interface_hdr<W: Write>(writer: &mut W, codepage: u16) -> XlsResult
 /// Write MMS record.
 ///
 /// Record type: 0x00C1
-pub fn write_mms<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_mms<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x00C1, 2)?;
     writer.write_all(&[0u8, 0u8])?;
     Ok(())
@@ -37,7 +37,7 @@ pub fn write_mms<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Write INTERFACEEND record.
 ///
 /// Record type: 0x00E2
-pub fn write_interface_end<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_interface_end<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x00E2, 0)?;
     Ok(())
 }
@@ -45,7 +45,7 @@ pub fn write_interface_end<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Write WRITEACCESS record.
 ///
 /// Record type: 0x005C
-pub fn write_write_access<W: Write>(writer: &mut W, username: &str) -> XlsResult<()> {
+pub(super) fn write_write_access<W: Write>(writer: &mut W, username: &str) -> XlsResult<()> {
     let access = crate::access::XlsWriteAccess::try_new(username)?;
     write_record_header(writer, 0x005C, WRITE_ACCESS_DATA_LEN)?;
     writer.write_all(&access.to_payload()?)?;
@@ -55,7 +55,7 @@ pub fn write_write_access<W: Write>(writer: &mut W, username: &str) -> XlsResult
 /// Write WINDOWPROTECT record.
 ///
 /// Record type: 0x0019
-pub fn write_window_protect<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
+pub(super) fn write_window_protect<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
     write_record_header(writer, 0x0019, 2)?;
     writer.write_all(&(u16::from(protect)).to_le_bytes())?;
     Ok(())
@@ -64,7 +64,7 @@ pub fn write_window_protect<W: Write>(writer: &mut W, protect: bool) -> XlsResul
 /// Write PROTECT record.
 ///
 /// Record type: 0x0012
-pub fn write_protect<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
+pub(super) fn write_protect<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
     write_record_header(writer, 0x0012, 2)?;
     writer.write_all(&(u16::from(protect)).to_le_bytes())?;
     Ok(())
@@ -73,7 +73,7 @@ pub fn write_protect<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
 /// Write PASSWORD record.
 ///
 /// Record type: 0x0013
-pub fn write_password<W: Write>(writer: &mut W, password_hash: u16) -> XlsResult<()> {
+pub(super) fn write_password<W: Write>(writer: &mut W, password_hash: u16) -> XlsResult<()> {
     write_record_header(writer, 0x0013, 2)?;
     writer.write_all(&password_hash.to_le_bytes())?;
     Ok(())
@@ -82,7 +82,7 @@ pub fn write_password<W: Write>(writer: &mut W, password_hash: u16) -> XlsResult
 /// Write PROTECTIONREV4 record.
 ///
 /// Record type: 0x01AF
-pub fn write_protection_rev4<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
+pub(super) fn write_protection_rev4<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
     write_record_header(writer, 0x01AF, 2)?;
     writer.write_all(&(u16::from(protect)).to_le_bytes())?;
     Ok(())
@@ -91,20 +91,20 @@ pub fn write_protection_rev4<W: Write>(writer: &mut W, protect: bool) -> XlsResu
 /// Write PASSWORDREV4 record.
 ///
 /// Record type: 0x01BC
-pub fn write_password_rev4<W: Write>(writer: &mut W, password_hash: u16) -> XlsResult<()> {
+pub(super) fn write_password_rev4<W: Write>(writer: &mut W, password_hash: u16) -> XlsResult<()> {
     write_record_header(writer, 0x01BC, 2)?;
     writer.write_all(&password_hash.to_le_bytes())?;
     Ok(())
 }
 
 /// Write the empty WRITEPROTECT marker.
-pub fn write_write_protect<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_write_protect<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x0086, 0)?;
     Ok(())
 }
 
 /// Write FILESHARING write-reservation metadata.
-pub fn write_file_sharing<W: Write>(
+pub(super) fn write_file_sharing<W: Write>(
     writer: &mut W,
     read_only_recommended: bool,
     password_hash: Option<u16>,
@@ -148,7 +148,7 @@ pub fn write_file_sharing<W: Write>(
 /// Write BACKUP record.
 ///
 /// Record type: 0x0040
-pub fn write_backup<W: Write>(writer: &mut W, backup: bool) -> XlsResult<()> {
+pub(super) fn write_backup<W: Write>(writer: &mut W, backup: bool) -> XlsResult<()> {
     write_record_header(writer, 0x0040, 2)?;
     writer.write_all(&(u16::from(backup)).to_le_bytes())?;
     Ok(())
@@ -157,7 +157,7 @@ pub fn write_backup<W: Write>(writer: &mut W, backup: bool) -> XlsResult<()> {
 /// Write HIDEOBJ record.
 ///
 /// Record type: 0x008D
-pub fn write_hide_obj<W: Write>(writer: &mut W, mode: u16) -> XlsResult<()> {
+pub(super) fn write_hide_obj<W: Write>(writer: &mut W, mode: u16) -> XlsResult<()> {
     write_record_header(writer, 0x008D, 2)?;
     writer.write_all(&mode.to_le_bytes())?;
     Ok(())
@@ -166,7 +166,7 @@ pub fn write_hide_obj<W: Write>(writer: &mut W, mode: u16) -> XlsResult<()> {
 /// Write PRECISION record.
 ///
 /// Record type: 0x000E
-pub fn write_precision<W: Write>(writer: &mut W, full_precision: bool) -> XlsResult<()> {
+pub(super) fn write_precision<W: Write>(writer: &mut W, full_precision: bool) -> XlsResult<()> {
     write_record_header(writer, 0x000E, 2)?;
     writer.write_all(&(u16::from(full_precision)).to_le_bytes())?;
     Ok(())
@@ -175,7 +175,7 @@ pub fn write_precision<W: Write>(writer: &mut W, full_precision: bool) -> XlsRes
 /// Write DSF record.
 ///
 /// Record type: 0x0161
-pub fn write_dsf<W: Write>(writer: &mut W, has_biff5_stream: bool) -> XlsResult<()> {
+pub(super) fn write_dsf<W: Write>(writer: &mut W, has_biff5_stream: bool) -> XlsResult<()> {
     write_record_header(writer, 0x0161, 2)?;
     writer.write_all(&(u16::from(has_biff5_stream)).to_le_bytes())?;
     Ok(())
@@ -184,7 +184,7 @@ pub fn write_dsf<W: Write>(writer: &mut W, has_biff5_stream: bool) -> XlsResult<
 /// Write TABID record.
 ///
 /// Record type: 0x013D
-pub fn write_tab_id<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
+pub(super) fn write_tab_id<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
     if sheet_count == 0 || sheet_count > 4112 {
         return Err(XlsError::InvalidData(
             "RRTabId requires 1..=4112 sheets".to_string(),
@@ -200,7 +200,7 @@ pub fn write_tab_id<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()>
 /// Write FNGROUPCOUNT record.
 ///
 /// Record type: 0x009C
-pub fn write_fn_group_count<W: Write>(writer: &mut W, count: u16) -> XlsResult<()> {
+pub(super) fn write_fn_group_count<W: Write>(writer: &mut W, count: u16) -> XlsResult<()> {
     write_record_header(writer, 0x009C, 2)?;
     writer.write_all(&count.to_le_bytes())?;
     Ok(())
@@ -238,7 +238,7 @@ fn write_function_group_name<W: Write>(
     Ok(())
 }
 
-pub fn write_function_groups<W: Write>(
+pub(super) fn write_function_groups<W: Write>(
     writer: &mut W,
     options: &crate::writer::core::XlsFunctionGroupOptions,
 ) -> XlsResult<()> {
@@ -261,7 +261,7 @@ pub fn write_function_groups<W: Write>(
 /// Write REFRESHALL record.
 ///
 /// Record type: 0x01B7
-pub fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> XlsResult<()> {
+pub(super) fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> XlsResult<()> {
     write_record_header(writer, 0x01B7, 2)?;
     writer.write_all(&(u16::from(refresh_all)).to_le_bytes())?;
     Ok(())
@@ -271,13 +271,13 @@ pub fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> XlsResu
 ///
 /// Record type: 0x00DA
 #[allow(dead_code)] // Compatibility implementation for the former fixed-bit API.
-pub fn write_book_bool<W: Write>(writer: &mut W, save_link_values: bool) -> XlsResult<()> {
+pub(super) fn write_book_bool<W: Write>(writer: &mut W, save_link_values: bool) -> XlsResult<()> {
     write_record_header(writer, 0x00DA, 2)?;
     writer.write_all(&(u16::from(save_link_values)).to_le_bytes())?;
     Ok(())
 }
 
-pub fn write_book_bool_raw<W: Write>(writer: &mut W, bits: u16) -> XlsResult<()> {
+pub(super) fn write_book_bool_raw<W: Write>(writer: &mut W, bits: u16) -> XlsResult<()> {
     write_record_header(writer, 0x00DA, 2)?;
     writer.write_all(&bits.to_le_bytes())?;
     Ok(())
@@ -286,7 +286,7 @@ pub fn write_book_bool_raw<W: Write>(writer: &mut W, bits: u16) -> XlsResult<()>
 /// Write COUNTRY record.
 ///
 /// Record type: 0x008C
-pub fn write_country<W: Write>(
+pub(super) fn write_country<W: Write>(
     writer: &mut W,
     default_country: u16,
     current_country: u16,
@@ -300,7 +300,7 @@ pub fn write_country<W: Write>(
 /// Write a BOOKEXT record (MS-XLS 2.4.23) with workbook extension flags.
 ///
 /// Record type: 0x0863
-pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::XlsBookExt) -> XlsResult<()> {
+pub(super) fn write_book_ext<W: Write>(writer: &mut W, value: &crate::XlsBookExt) -> XlsResult<()> {
     let payload = value.to_payload();
     write_record_header(
         writer,
@@ -318,7 +318,7 @@ const MAX_RECORD_DATA: usize = 8224;
 /// chunking oversized payloads into CONTINUEFRT records (MS-XLS 2.4.60).
 ///
 /// Record type: 0x0813
-pub fn write_real_time_data<W: Write>(
+pub(super) fn write_real_time_data<W: Write>(
     writer: &mut W,
     value: &crate::XlsRealTimeData,
 ) -> XlsResult<()> {
@@ -345,7 +345,7 @@ pub fn write_real_time_data<W: Write>(
 /// Write a WEBPUB record (MS-XLS 2.4.344) with one published Web page.
 ///
 /// Record type: 0x0801
-pub fn write_web_pub<W: Write>(writer: &mut W, value: &crate::XlsWebPub) -> XlsResult<()> {
+pub(super) fn write_web_pub<W: Write>(writer: &mut W, value: &crate::XlsWebPub) -> XlsResult<()> {
     let payload = value.to_payload()?;
     if payload.len() > MAX_RECORD_DATA {
         return Err(XlsError::InvalidData(
@@ -364,7 +364,10 @@ pub fn write_web_pub<W: Write>(writer: &mut W, value: &crate::XlsWebPub) -> XlsR
 /// Write a STYLEEXT record (MS-XLS 2.4.270) with a cell-style extension.
 ///
 /// Record type: 0x0892
-pub fn write_style_ext<W: Write>(writer: &mut W, value: &crate::XlsStyleExt) -> XlsResult<()> {
+pub(super) fn write_style_ext<W: Write>(
+    writer: &mut W,
+    value: &crate::XlsStyleExt,
+) -> XlsResult<()> {
     let payload = value.to_payload()?;
     write_record_header(
         writer,
@@ -379,7 +382,7 @@ pub fn write_style_ext<W: Write>(writer: &mut W, value: &crate::XlsStyleExt) -> 
 /// into ContinueFrt12 records.
 ///
 /// Record type: 0x0896
-pub fn write_theme<W: Write>(writer: &mut W, value: &crate::XlsTheme) -> XlsResult<()> {
+pub(super) fn write_theme<W: Write>(writer: &mut W, value: &crate::XlsTheme) -> XlsResult<()> {
     for payload in value.to_record_payloads() {
         let record_type = u16::from_le_bytes([payload[0], payload[1]]);
         write_record_header(writer, record_type, payload.len() as u16)?;
@@ -393,7 +396,7 @@ pub fn write_theme<W: Write>(writer: &mut W, value: &crate::XlsTheme) -> XlsResu
 /// ContinueFrt12 records (MS-XLS 2.4.61).
 ///
 /// Record types: 0x0884–0x088A
-pub fn write_mdx_metadata<W: Write>(
+pub(super) fn write_mdx_metadata<W: Write>(
     writer: &mut W,
     value: &crate::XlsMdxMetadata,
 ) -> XlsResult<()> {
@@ -417,7 +420,7 @@ pub fn write_mdx_metadata<W: Write>(
 /// Write an XFCRC record (MS-XLS 2.4.354) declaring `xf_count` XF records.
 ///
 /// Record type: 0x087C
-pub fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
+pub(super) fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
     write_record_header(writer, 0x087C, 20)?;
     writer.write_all(&0x087Cu16.to_le_bytes())?;
     writer.write_all(&[0; 12])?; // FrtHeader remainder + reserved
@@ -430,7 +433,7 @@ pub fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
 /// extensions for one XF record.
 ///
 /// Record type: 0x087D
-pub fn write_xf_ext<W: Write>(writer: &mut W, value: &crate::XlsXfExt) -> XlsResult<()> {
+pub(super) fn write_xf_ext<W: Write>(writer: &mut W, value: &crate::XlsXfExt) -> XlsResult<()> {
     let payload = value.to_payload()?;
     write_record_header(
         writer,
@@ -444,7 +447,7 @@ pub fn write_xf_ext<W: Write>(writer: &mut W, value: &crate::XlsXfExt) -> XlsRes
 /// Write EXCEL9FILE record.
 ///
 /// Record type: 0x01C0
-pub fn write_excel9_file<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_excel9_file<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x01C0, 0)?;
     Ok(())
 }
@@ -452,7 +455,7 @@ pub fn write_excel9_file<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Write RECALCID record.
 ///
 /// Record type: 0x01C1
-pub fn write_recalc_id<W: Write>(writer: &mut W, engine_id: u32) -> XlsResult<()> {
+pub(super) fn write_recalc_id<W: Write>(writer: &mut W, engine_id: u32) -> XlsResult<()> {
     write_record_header(writer, 0x01C1, 8)?;
     writer.write_all(&0x01C1u16.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
@@ -463,7 +466,7 @@ pub fn write_recalc_id<W: Write>(writer: &mut W, engine_id: u32) -> XlsResult<()
 /// Write MTRSETTINGS record.
 ///
 /// Record type: 0x089A
-pub fn write_mtr_settings<W: Write>(
+pub(super) fn write_mtr_settings<W: Write>(
     writer: &mut W,
     settings: crate::XlsMultithreadedCalculation,
 ) -> XlsResult<()> {
@@ -477,7 +480,7 @@ pub fn write_mtr_settings<W: Write>(
     Ok(())
 }
 
-pub fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool) -> XlsResult<()> {
+pub(super) fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool) -> XlsResult<()> {
     write_record_header(writer, 0x08A3, 16)?;
     writer.write_all(&0x08A3u16.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
@@ -489,7 +492,7 @@ pub fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool) -> Xl
 /// Write FORMAT record (number format string)
 ///
 /// Record type: 0x041E
-pub fn write_format_record<W: Write>(
+pub(super) fn write_format_record<W: Write>(
     writer: &mut W,
     index_code: u16,
     format_str: &str,
@@ -562,7 +565,7 @@ fn write_style_builtin<W: Write>(
 /// - (0x0013, 7)  => Currency [0 decimals]
 /// - (0x0000, 0)  => Normal
 /// - (0x0014, 5)  => Percent
-pub fn write_builtin_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_builtin_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
     // Order follows POI for easier comparison, but Excel only cares about
     // the XF indices and builtin IDs, not the sequence.
     const MAPPINGS: &[(u16, u8)] = &[
@@ -586,19 +589,19 @@ pub fn write_builtin_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Record type: 0x0160, Length: 2
 /// A value of 0 disables natural language formulas (modern Excel default).
 #[allow(dead_code)] // Compatibility implementation for the former fixed-value API.
-pub fn write_usesel_fs<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_usesel_fs<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x0160, 2)?;
     writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
 }
 
-pub fn write_usesel_fs_value<W: Write>(writer: &mut W, enabled: bool) -> XlsResult<()> {
+pub(super) fn write_usesel_fs_value<W: Write>(writer: &mut W, enabled: bool) -> XlsResult<()> {
     write_record_header(writer, 0x0160, 2)?;
     writer.write_all(&u16::from(enabled).to_le_bytes())?;
     Ok(())
 }
 
-pub fn write_template<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_template<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x0060, 0)
 }
 
@@ -610,7 +613,7 @@ pub fn write_template<W: Write>(writer: &mut W) -> XlsResult<()> {
 ///
 /// * `writer` - Output writer
 /// * `substream_type` - Type of substream (0x0005 = Workbook, 0x0010 = Worksheet)
-pub fn write_bof<W: Write>(writer: &mut W, substream_type: u16) -> XlsResult<()> {
+pub(super) fn write_bof<W: Write>(writer: &mut W, substream_type: u16) -> XlsResult<()> {
     write_record_header(writer, 0x0809, 16)?;
 
     writer.write_all(&0x0600u16.to_le_bytes())?;
@@ -626,7 +629,7 @@ pub fn write_bof<W: Write>(writer: &mut W, substream_type: u16) -> XlsResult<()>
 /// Write EOF (End of File) record
 ///
 /// Record type: 0x000A
-pub fn write_eof<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_eof<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x000A, 0)?;
     Ok(())
 }
@@ -639,7 +642,7 @@ pub fn write_eof<W: Write>(writer: &mut W) -> XlsResult<()> {
 ///
 /// * `writer` - Output writer
 /// * `codepage` - Code page identifier (default: 1252 for Windows Latin 1)
-pub fn write_codepage<W: Write>(writer: &mut W, codepage: u16) -> XlsResult<()> {
+pub(super) fn write_codepage<W: Write>(writer: &mut W, codepage: u16) -> XlsResult<()> {
     write_record_header(writer, 0x0042, 2)?;
     writer.write_all(&codepage.to_le_bytes())?;
     Ok(())
@@ -653,7 +656,7 @@ pub fn write_codepage<W: Write>(writer: &mut W, codepage: u16) -> XlsResult<()> 
 ///
 /// * `writer` - Output writer
 /// * `is_1904` - True for 1904 date system (Mac), false for 1900 (Windows)
-pub fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> {
+pub(super) fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> {
     write_record_header(writer, 0x0022, 2)?;
     let flag = if is_1904 { 1u16 } else { 0u16 };
     writer.write_all(&flag.to_le_bytes())?;
@@ -663,7 +666,7 @@ pub fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> 
 /// Write WINDOW1 record (workbook window properties)
 ///
 /// Record type: 0x003D
-pub fn write_window1<W: Write>(
+pub(super) fn write_window1<W: Write>(
     writer: &mut W,
     options: &crate::writer::core::XlsWorkbookWindowOptions,
     sheet_count: usize,
@@ -699,7 +702,7 @@ pub fn write_window1<W: Write>(
 ///
 /// - cTab (2 bytes): number of sheets in the workbook
 /// - reserved (2 bytes): MUST be 0x0401
-pub fn write_supbook_internal<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
+pub(super) fn write_supbook_internal<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
     write_record_header(writer, 0x01AE, 4)?;
     writer.write_all(&sheet_count.to_le_bytes())?;
     writer.write_all(&0x0401u16.to_le_bytes())?;
@@ -921,7 +924,7 @@ fn write_crn<W: Write>(
     Ok(())
 }
 
-pub fn write_external_link_table<W: Write>(
+pub(super) fn write_external_link_table<W: Write>(
     writer: &mut W,
     internal: Option<(u16, ExternSheetMode)>,
     external: &[crate::writer::core::XlsExternalWorkbookOptions],
@@ -1020,7 +1023,11 @@ pub fn write_external_link_table<W: Write>(
 ///
 /// The sheet name is encoded as ShortXLUnicodeString per BIFF8: 1-byte character count,
 /// 1-byte flags (0x00 = compressed 8-bit, 0x01 = uncompressed UTF-16LE), followed by characters.
-pub fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &str) -> XlsResult<()> {
+pub(super) fn write_boundsheet<W: Write>(
+    writer: &mut W,
+    position: u32,
+    name: &str,
+) -> XlsResult<()> {
     let truncated = if name.len() > 31 { &name[..31] } else { name };
 
     // Determine encoding: use compressed 8-bit if all ASCII; otherwise UTF-16LE
