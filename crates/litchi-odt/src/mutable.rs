@@ -2017,8 +2017,8 @@ impl MutableDocument {
     pub fn set_page_layout_header_footer_properties(
         &mut self,
         page_layout_name: &str,
-        region: crate::header_footer_properties::Region,
-        properties: &crate::header_footer_properties::StyleProperties,
+        region: crate::header_footer::properties::Region,
+        properties: &crate::header_footer::properties::StyleProperties,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
@@ -2034,7 +2034,7 @@ impl MutableDocument {
                     "page layout '{page_layout_name}' does not exist"
                 ))
             })?;
-        let replacement = crate::header_footer_properties::replace_page_layout_region_properties(
+        let replacement = crate::header_footer::properties::replace_page_layout_region_properties(
             layout, region, properties,
         )?;
         self.styles_xml = Some(set_page_layout_xml(styles, page_layout_name, &replacement)?);

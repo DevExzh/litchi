@@ -97,7 +97,6 @@ pub mod footnote_separator;
 pub mod form;
 pub mod generic;
 pub mod graphic_properties;
-pub mod header_footer_properties;
 pub mod image_map;
 pub mod line_numbering;
 pub mod list_label_alignment;
@@ -271,7 +270,6 @@ mod document;
 mod dynamic_text;
 pub mod frame;
 pub mod header_footer;
-pub mod header_footer_content;
 pub mod index;
 #[allow(
     unused_imports,

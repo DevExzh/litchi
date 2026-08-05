@@ -91,8 +91,8 @@ pub struct Builder {
     page_layout_footnote_separators: Vec<(String, crate::footnote_separator::Separator)>,
     page_layout_header_footer_properties: Vec<(
         String,
-        crate::header_footer_properties::Region,
-        crate::header_footer_properties::StyleProperties,
+        crate::header_footer::properties::Region,
+        crate::header_footer::properties::StyleProperties,
     )>,
     notes_configurations: crate::notes_configuration::Configurations,
     line_numbering_configuration: Option<crate::line_numbering::Configuration>,
@@ -673,8 +673,8 @@ impl Builder {
     pub fn add_page_layout_header_footer_properties(
         &mut self,
         page_layout_name: impl Into<String>,
-        region: crate::header_footer_properties::Region,
-        properties: crate::header_footer_properties::StyleProperties,
+        region: crate::header_footer::properties::Region,
+        properties: crate::header_footer::properties::StyleProperties,
     ) -> Result<&mut Self> {
         let name = page_layout_name.into();
         properties.validate()?;

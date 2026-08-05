@@ -1,4 +1,4 @@
-use litchi_odt::header_footer_properties::{
+use litchi_odt::header_footer::properties::{
     Border, BorderStyle, Color, Length, Region, Shadow, StyleProperties,
     parse_page_layout_header_footer_properties,
 };

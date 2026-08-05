@@ -54,7 +54,7 @@ pub struct ScriptResourceSpec {
 }
 
 pub(crate) fn document_scripts(content: &str) -> Result<Option<Scripts>> {
-    parse_scripts(content)
+    crate::document_scripts::package::read(content)
 }
 
 pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<ScriptResource>> {
