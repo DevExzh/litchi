@@ -16,7 +16,7 @@ use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
 use super::records::PptRecord;
-use super::routing_slip::PowerPointRoutingSlip;
+use super::routing_slip::Slip;
 use super::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
 use super::sound_collection::PowerPointSoundCollection;
 use super::view_info::PowerPointSlideViewInformation;
@@ -373,7 +373,7 @@ impl Presentation {
     ///
     /// Routing metadata is inert. This method never contacts recipients, starts
     /// a mail client, or updates routing status.
-    pub fn routing_slip(&self) -> Result<Option<PowerPointRoutingSlip>> {
+    pub fn routing_slip(&self) -> Result<Option<Slip>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
@@ -398,7 +398,7 @@ impl Presentation {
                 "PowerPoint document has multiple routing slips".to_string(),
             ));
         }
-        PowerPointRoutingSlip::parse(record).map(Some)
+        Slip::parse(record).map(Some)
     }
 
     /// Return the strictly validated document-level embedded sound collection.

@@ -285,9 +285,7 @@ pub use recolor::{
     PowerPointRecolorPattern, PowerPointRecolorSource, PowerPointWideColor,
     PowerPointWmfBrushStyle, PowerPointWmfHatchStyle,
 };
-pub use routing_slip::{
-    PowerPointRoutingSlip, RoutingSlipAddress, RoutingSlipCurrentRecipient, RoutingSlipText,
-};
+pub use routing_slip::{Address, CurrentRecipient, Slip, Text};
 pub use shape_flags::{
     PowerPointPresentationShapeFlagEntry, PowerPointShapeFlagEntry, PowerPointShapeFlagLimits,
     PowerPointShapeFlagProjection, PowerPointShapeFlags, PowerPointShapeFlags10,
