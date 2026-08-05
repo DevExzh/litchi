@@ -205,6 +205,16 @@ future states losslessly. IWA retains the pie field identifiers, strict
 varint validation, series graph, stylesheet/object-container ownership, and
 transactional package mutation; the former `ChartPie*Visibility` names are
 removed rather than retained as aliases.
+Chart reference lines follow the same ownership boundary at
+`litchi-iwa-common::chart::reference_line::{Value, Kind, Line}`. `Value` is a
+finite transparent scalar; `Line` stores a bounded optional label and packs its
+two visibility flags; and `Kind::Unsupported` can only be created through a
+checked lossless constructor. The public IWA path is the focused
+`charts::reference_line` module. IWA retains generated protobuf schemas,
+extension framing, graph/object ownership, and package transactions, including
+pre-decode graph budgets and wire-preserving nested custom-value patches.
+The former flat `ChartReferenceLine*` model is removed rather than kept as an
+alias.
 The existing `litchi-iwa` package reader temporarily consumes these leaf values
 through private migration adapters. The direct edges are present in the
 canonical boundary graph because the adapters are already dependency-safe;

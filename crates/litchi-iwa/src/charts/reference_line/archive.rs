@@ -6,6 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use litchi_iwa_common::chart::reference_line::{Kind, Line, Value};
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
@@ -18,7 +19,10 @@ use crate::package_metadata::{
     set_package_last_object_identifier,
 };
 use crate::protobuf::{tsch, tsp, tss};
-use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
+use crate::wire::{
+    WireField, parse_wire_fields, patch_fixed64_field, patch_length_delimited_field,
+    patch_varint_field,
+};
 use crate::{Error, IWorkPackage, Result};
 
 pub(crate) const REFERENCE_LINE_STYLE_MESSAGE_TYPE: u32 = 5_030;
@@ -39,196 +43,13 @@ const NATIVE_MEDIAN: i32 = 4;
 const NATIVE_CUSTOM: i32 = 5;
 const MAX_REFERENCE_LINE_COUNT: usize = 5;
 
-/// A finite custom value accepted by the iWork reference-line inspector.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartReferenceLineValue(f64);
-
-impl ChartReferenceLineValue {
-    /// Validate and construct a custom reference-line value.
-    pub fn new(value: f64) -> Result<Self> {
-        if !value.is_finite() {
-            return Err(Error::InvalidFormat(
-                "chart reference-line value must be finite".to_owned(),
-            ));
-        }
-        Ok(Self(value))
-    }
-
-    /// Return the finite numeric value.
-    pub const fn get(self) -> f64 {
-        self.0
-    }
-}
-
-impl TryFrom<f64> for ChartReferenceLineValue {
-    type Error = Error;
-
-    fn try_from(value: f64) -> Result<Self> {
-        Self::new(value)
-    }
-}
-
-/// Native calculation used to position one value-axis reference line.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
-pub enum ChartReferenceLineKind {
-    Minimum,
-    Maximum,
-    Average,
-    Median,
-    Custom(ChartReferenceLineValue),
-    /// Preserve a future native type and its optional custom-value payload.
-    Unsupported {
-        native_type: i32,
-        custom_value: Option<ChartReferenceLineValue>,
-    },
-}
-
-impl ChartReferenceLineKind {
-    const fn native_type(self) -> i32 {
-        match self {
-            Self::Minimum => NATIVE_MINIMUM,
-            Self::Maximum => NATIVE_MAXIMUM,
-            Self::Average => NATIVE_AVERAGE,
-            Self::Median => NATIVE_MEDIAN,
-            Self::Custom(_) => NATIVE_CUSTOM,
-            Self::Unsupported { native_type, .. } => native_type,
-        }
-    }
-
-    const fn custom_value(self) -> Option<ChartReferenceLineValue> {
-        match self {
-            Self::Custom(value) => Some(value),
-            Self::Unsupported { custom_value, .. } => custom_value,
-            Self::Minimum | Self::Maximum | Self::Average | Self::Median => None,
-        }
-    }
-
-    const fn default_name(self) -> &'static str {
-        match self {
-            Self::Minimum => "Minimum",
-            Self::Maximum => "Maximum",
-            Self::Average => "Average",
-            Self::Median => "Median",
-            Self::Custom(_) => "Custom",
-            Self::Unsupported { .. } => "Reference Line",
-        }
-    }
-
-    const fn default_show_value(self) -> bool {
-        matches!(self, Self::Custom(_))
-    }
-
-    fn validate(self) -> Result<()> {
-        if let Self::Unsupported { native_type, .. } = self
-            && matches!(
-                native_type,
-                NATIVE_MINIMUM | NATIVE_MAXIMUM | NATIVE_AVERAGE | NATIVE_MEDIAN | NATIVE_CUSTOM
-            )
-        {
-            return Err(Error::InvalidFormat(format!(
-                "known chart reference-line type {native_type} must use its named representation"
-            )));
-        }
-        Ok(())
-    }
-}
-
-/// Complete visible configuration for one native chart reference line.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ChartReferenceLine {
-    kind: ChartReferenceLineKind,
-    name: String,
-    show_name: bool,
-    show_value: bool,
-}
-
-impl ChartReferenceLine {
-    pub fn minimum() -> Self {
-        Self::from_kind(ChartReferenceLineKind::Minimum)
-    }
-
-    pub fn maximum() -> Self {
-        Self::from_kind(ChartReferenceLineKind::Maximum)
-    }
-
-    pub fn average() -> Self {
-        Self::from_kind(ChartReferenceLineKind::Average)
-    }
-
-    pub fn median() -> Self {
-        Self::from_kind(ChartReferenceLineKind::Median)
-    }
-
-    pub fn custom(value: ChartReferenceLineValue) -> Self {
-        Self::from_kind(ChartReferenceLineKind::Custom(value))
-    }
-
-    /// Preserve an unrecognized native calculation kind.
-    pub fn unsupported(
-        native_type: i32,
-        custom_value: Option<ChartReferenceLineValue>,
-    ) -> Result<Self> {
-        let line = Self::from_kind(ChartReferenceLineKind::Unsupported {
-            native_type,
-            custom_value,
-        });
-        line.validate()?;
-        Ok(line)
-    }
-
-    fn from_kind(kind: ChartReferenceLineKind) -> Self {
-        Self {
-            kind,
-            name: kind.default_name().to_owned(),
-            show_name: true,
-            show_value: kind.default_show_value(),
-        }
-    }
-
-    pub const fn kind(&self) -> ChartReferenceLineKind {
-        self.kind
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub const fn shows_name(&self) -> bool {
-        self.show_name
-    }
-
-    pub const fn shows_value(&self) -> bool {
-        self.show_value
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = name.into();
-        self
-    }
-
-    pub fn with_name_visibility(mut self, visible: bool) -> Self {
-        self.show_name = visible;
-        self
-    }
-
-    pub fn with_value_visibility(mut self, visible: bool) -> Self {
-        self.show_value = visible;
-        self
-    }
-
-    fn validate(&self) -> Result<()> {
-        self.kind.validate()
-    }
-}
-
 #[derive(Debug, Clone)]
 struct ReferenceLineSlot {
     archive_name: String,
     object_id: u64,
     message_index: usize,
     uuid: tsp::Uuid,
-    value: ChartReferenceLine,
+    value: Line,
 }
 
 #[derive(Debug)]
@@ -278,7 +99,7 @@ pub(crate) fn chart_reference_lines(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-) -> Result<Vec<ChartReferenceLine>> {
+) -> Result<Vec<Line>> {
     Ok(reference_line_graph(
         package,
         chart_archive_name,
@@ -297,7 +118,7 @@ pub(crate) fn set_chart_reference_lines(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    expected: &[ChartReferenceLine],
+    expected: &[Line],
 ) -> Result<()> {
     validate_reference_line_collection(expected)?;
     u32::try_from(expected.len())
@@ -464,6 +285,11 @@ fn reference_line_graph(
         })
         .map(|axis| axis.reference_line_non_style_items.as_slice())
         .unwrap_or_default();
+    if items.len() > MAX_REFERENCE_LINE_COUNT {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has more than {MAX_REFERENCE_LINE_COUNT} reference lines"
+        )));
+    }
     let mut object_ids = HashSet::with_capacity(items.len());
     let mut uuids = HashSet::with_capacity(items.len());
     let mut slots = Vec::with_capacity(items.len());
@@ -538,7 +364,7 @@ fn reference_line_graph(
     })
 }
 
-fn validate_reference_line_collection(reference_lines: &[ChartReferenceLine]) -> Result<()> {
+fn validate_reference_line_collection(reference_lines: &[Line]) -> Result<()> {
     if reference_lines.len() > MAX_REFERENCE_LINE_COUNT {
         return Err(Error::InvalidFormat(format!(
             "iWork supports at most {MAX_REFERENCE_LINE_COUNT} reference lines per value axis"
@@ -547,7 +373,7 @@ fn validate_reference_line_collection(reference_lines: &[ChartReferenceLine]) ->
     let mut native_types = HashSet::with_capacity(reference_lines.len());
     for line in reference_lines {
         line.validate()?;
-        let native_type = line.kind.native_type();
+        let native_type = line.kind().native_value();
         if !native_types.insert(native_type) {
             return Err(Error::InvalidFormat(format!(
                 "chart reference-line type {native_type} occurs more than once"
@@ -583,6 +409,11 @@ fn validate_reference_line_styles(
         )));
     }
     if let Some(styles) = axis.reference_line_styles.as_ref() {
+        if styles.entries.len() > MAX_REFERENCE_LINE_COUNT {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} has more than {MAX_REFERENCE_LINE_COUNT} reference-line styles"
+            )));
+        }
         if usize::try_from(styles.count).ok() != Some(styles.entries.len()) {
             return Err(Error::InvalidFormat(format!(
                 "{drawable_label} chart {drawable_object_id} reference-line style count is inconsistent"
@@ -957,10 +788,7 @@ fn fresh_reference_line_uuid(existing: &mut HashSet<(u64, u64)>) -> tsp::Uuid {
     }
 }
 
-fn reference_line_object(
-    identifier: u64,
-    reference_line: &ChartReferenceLine,
-) -> Result<ArchiveObject> {
+fn reference_line_object(identifier: u64, reference_line: &Line) -> Result<ArchiveObject> {
     let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
@@ -972,21 +800,22 @@ fn reference_line_object(
     Ok(object)
 }
 
-fn canonical_reference_line(reference_line: &ChartReferenceLine) -> Result<Vec<u8>> {
+fn canonical_reference_line(reference_line: &Line) -> Result<Vec<u8>> {
     reference_line.validate()?;
     let mut data = tsch::ReferenceLineNonStyleArchive {
         super_: Some(tss::StyleArchive::default()),
     }
     .encode_to_vec();
+    let kind = reference_line.kind();
     let generated = tsch::generated::ReferenceLineNonStyleArchive {
-        tschreferencelinedefaulttype: Some(reference_line.kind.native_type()),
+        tschreferencelinedefaulttype: Some(kind.native_value()),
         tschreferencelinedefaultshowline: Some(true),
-        tschreferencelinedefaultshowlabel: Some(reference_line.show_name),
-        tschreferencelinedefaultshowvaluelabel: Some(reference_line.show_value),
-        tschreferencelinedefaultlabel: Some(reference_line.name.clone()),
-        tschreferencelinedefaultcustomvalue: reference_line.kind.custom_value().map(|value| {
+        tschreferencelinedefaultshowlabel: Some(reference_line.shows_name()),
+        tschreferencelinedefaultshowvaluelabel: Some(reference_line.shows_value()),
+        tschreferencelinedefaultlabel: Some(reference_line.name().to_owned()),
+        tschreferencelinedefaultcustomvalue: kind.custom_value().map(|value| {
             tsch::ChartsNsNumberDoubleArchive {
-                number_archive: Some(value.get()),
+                number_archive: Some(value.value()),
             }
         }),
     };
@@ -1003,7 +832,7 @@ fn canonical_reference_line(reference_line: &ChartReferenceLine) -> Result<Vec<u
     Ok(data)
 }
 
-fn read_reference_line(data: &[u8]) -> Result<ChartReferenceLine> {
+fn read_reference_line(data: &[u8]) -> Result<Line> {
     tsch::ReferenceLineNonStyleArchive::decode(data)?;
     let extension = generated_reference_line_extension(data)?.ok_or_else(|| {
         Error::InvalidFormat("chart reference-line non-style has no generated payload".to_owned())
@@ -1014,29 +843,17 @@ fn read_reference_line(data: &[u8]) -> Result<ChartReferenceLine> {
         .transpose()?
         .unwrap_or_default();
     let custom_value = strict_optional_message(extension, CUSTOM_VALUE_FIELD)?
-        .map(|data| {
-            let value = tsch::ChartsNsNumberDoubleArchive::decode(data)?
-                .number_archive
-                .ok_or_else(|| {
-                    Error::InvalidFormat(
-                        "chart reference-line custom value is missing its number".to_owned(),
-                    )
-                })?;
-            ChartReferenceLineValue::new(value)
-        })
+        .map(read_custom_value)
         .transpose()?;
     let kind = match native_type {
-        NATIVE_MINIMUM => known_kind_without_custom(ChartReferenceLineKind::Minimum, custom_value)?,
-        NATIVE_MAXIMUM => known_kind_without_custom(ChartReferenceLineKind::Maximum, custom_value)?,
-        NATIVE_AVERAGE => known_kind_without_custom(ChartReferenceLineKind::Average, custom_value)?,
-        NATIVE_MEDIAN => known_kind_without_custom(ChartReferenceLineKind::Median, custom_value)?,
-        NATIVE_CUSTOM => ChartReferenceLineKind::Custom(custom_value.ok_or_else(|| {
+        NATIVE_MINIMUM => known_kind_without_custom(Kind::Minimum, custom_value)?,
+        NATIVE_MAXIMUM => known_kind_without_custom(Kind::Maximum, custom_value)?,
+        NATIVE_AVERAGE => known_kind_without_custom(Kind::Average, custom_value)?,
+        NATIVE_MEDIAN => known_kind_without_custom(Kind::Median, custom_value)?,
+        NATIVE_CUSTOM => Kind::Custom(custom_value.ok_or_else(|| {
             Error::InvalidFormat("custom chart reference line has no finite value".to_owned())
         })?),
-        native_type => ChartReferenceLineKind::Unsupported {
-            native_type,
-            custom_value,
-        },
+        native_type => Kind::unsupported(native_type, custom_value)?,
     };
     if !strict_optional_bool(extension, SHOW_LINE_FIELD)?.unwrap_or(true) {
         return Err(Error::InvalidFormat(
@@ -1045,73 +862,80 @@ fn read_reference_line(data: &[u8]) -> Result<ChartReferenceLine> {
     }
     let show_name = strict_optional_bool(extension, SHOW_NAME_FIELD)?.unwrap_or(true);
     let show_value = strict_optional_bool(extension, SHOW_VALUE_FIELD)?
-        .unwrap_or_else(|| kind.default_show_value());
-    let name = strict_optional_message(extension, NAME_FIELD)?
-        .map(|bytes| {
-            std::str::from_utf8(bytes)
-                .map(str::to_owned)
-                .map_err(|error| Error::InvalidFormat(error.to_string()))
-        })
-        .transpose()?
-        .unwrap_or_else(|| kind.default_name().to_owned());
-    let value = ChartReferenceLine {
-        kind,
-        name,
-        show_name,
-        show_value,
-    };
+        .unwrap_or_else(|| kind.default_shows_value());
+    let mut value = Line::from_kind(kind)?
+        .with_name_visibility(show_name)
+        .with_value_visibility(show_value);
+    if let Some(bytes) = strict_optional_message(extension, NAME_FIELD)? {
+        let name =
+            std::str::from_utf8(bytes).map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        value = value.try_with_name(name)?;
+    }
     value.validate()?;
     Ok(value)
 }
 
-fn known_kind_without_custom(
-    kind: ChartReferenceLineKind,
-    custom_value: Option<ChartReferenceLineValue>,
-) -> Result<ChartReferenceLineKind> {
+fn known_kind_without_custom(kind: Kind, custom_value: Option<Value>) -> Result<Kind> {
     if custom_value.is_some() {
         return Err(Error::InvalidFormat(format!(
             "chart reference-line type {} unexpectedly stores a custom value",
-            kind.native_type()
+            kind.native_value()
         )));
     }
     Ok(kind)
 }
 
-fn patch_reference_line(data: &[u8], reference_line: &ChartReferenceLine) -> Result<Vec<u8>> {
+fn patch_reference_line(data: &[u8], reference_line: &Line) -> Result<Vec<u8>> {
     reference_line.validate()?;
     tsch::ReferenceLineNonStyleArchive::decode(data)?;
-    let existing = generated_reference_line_extension(data)?;
-    let extension = existing.unwrap_or_default();
+    let existing = generated_reference_line_extension(data)?.ok_or_else(|| {
+        Error::InvalidFormat("chart reference-line non-style has no generated payload".to_owned())
+    })?;
+    let extension = existing;
     tsch::generated::ReferenceLineNonStyleArchive::decode(extension)?;
+    let _ = read_reference_line(data)?;
 
+    let kind = reference_line.kind();
     let mut patched = patch_varint(
         extension,
         TYPE_FIELD,
-        Some(reference_line.kind.native_type() as i64 as u64),
+        Some(kind.native_value() as i64 as u64),
     )?;
     patched = patch_varint(&patched, SHOW_LINE_FIELD, Some(1))?;
     patched = patch_varint(
         &patched,
         SHOW_NAME_FIELD,
-        Some(u64::from(reference_line.show_name)),
+        Some(u64::from(reference_line.shows_name())),
     )?;
     patched = patch_varint(
         &patched,
         SHOW_VALUE_FIELD,
-        Some(u64::from(reference_line.show_value)),
+        Some(u64::from(reference_line.shows_value())),
     )?;
-    patched = patch_message(&patched, NAME_FIELD, Some(reference_line.name.as_bytes()))?;
-    let custom_value = reference_line.kind.custom_value().map(|value| {
-        tsch::ChartsNsNumberDoubleArchive {
-            number_archive: Some(value.get()),
-        }
-        .encode_to_vec()
-    });
+    patched = patch_message(&patched, NAME_FIELD, Some(reference_line.name().as_bytes()))?;
+    let custom_value = kind
+        .custom_value()
+        .map(|value| {
+            let existing_custom = strict_optional_message(extension, CUSTOM_VALUE_FIELD)?;
+            if let Some(existing_custom) = existing_custom {
+                return patch_fixed64_field(
+                    existing_custom,
+                    1,
+                    strict_optional_fixed64(existing_custom, 1)?.is_some(),
+                    Some(value.value().to_bits()),
+                );
+            }
+            Ok(tsch::ChartsNsNumberDoubleArchive {
+                number_archive: Some(value.value()),
+            }
+            .encode_to_vec())
+        })
+        .transpose()?;
     patched = patch_message(&patched, CUSTOM_VALUE_FIELD, custom_value.as_deref())?;
     let output = patch_length_delimited_field(
         data,
         GENERATED_REFERENCE_LINE_NON_STYLE_EXTENSION_FIELD,
-        existing.is_some(),
+        true,
         Some(&patched),
     )?;
     if read_reference_line(&output)? != *reference_line {
@@ -1172,6 +996,7 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "chart reference-line field {field_number} is not a varint"
         )));
     }
+    validate_canonical_field(field, false)?;
     let payload = &data[field.payload_start()..field.end()];
     let (value, consumed) =
         litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
@@ -1203,7 +1028,67 @@ fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8
             "chart reference-line field {field_number} is not length-delimited"
         )));
     }
+    validate_canonical_field(field, true)?;
     Ok(Some(&data[field.payload_start()..field.end()]))
+}
+
+fn read_custom_value(data: &[u8]) -> Result<Value> {
+    let value = strict_optional_fixed64(data, 1)?.ok_or_else(|| {
+        Error::InvalidFormat("chart reference-line custom value is missing its number".to_owned())
+    })?;
+    Value::new(f64::from_le_bytes(value.to_le_bytes()))
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+}
+
+fn strict_optional_fixed64(data: &[u8], field_number: u32) -> Result<Option<u64>> {
+    let fields = parse_wire_fields(data)?;
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
+    let Some(field) = matches.next() else {
+        return Ok(None);
+    };
+    if matches.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "singular chart reference-line field {field_number} occurs more than once"
+        )));
+    }
+    if field.wire_type() != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "chart reference-line field {field_number} is not fixed64"
+        )));
+    }
+    validate_canonical_field(field, false)?;
+    let payload = &data[field.payload_start()..field.end()];
+    let bytes: [u8; 8] = payload.try_into().map_err(|_| {
+        Error::InvalidFormat(format!(
+            "chart reference-line field {field_number} has an invalid fixed64 payload"
+        ))
+    })?;
+    Ok(Some(u64::from_le_bytes(bytes)))
+}
+
+fn validate_canonical_field(field: &WireField, length_delimited: bool) -> Result<()> {
+    let key = (u64::from(field.number()) << 3) | u64::from(field.wire_type());
+    let key_length = field.key_end() - field.start();
+    if litchi_iwa_common::varint::encoded_len(key) != key_length {
+        return Err(Error::InvalidFormat(format!(
+            "chart reference-line field {} has a noncanonical key",
+            field.number()
+        )));
+    }
+    if length_delimited {
+        let length = field.end() - field.payload_start();
+        let length_prefix = field.payload_start() - field.key_end();
+        let length = u64::try_from(length).map_err(|_| {
+            Error::InvalidFormat("reference-line field length exceeds u64".to_owned())
+        })?;
+        if litchi_iwa_common::varint::encoded_len(length) != length_prefix {
+            return Err(Error::InvalidFormat(format!(
+                "chart reference-line field {} has a noncanonical length",
+                field.number()
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn raw_i32(value: u64) -> Result<i32> {
@@ -1221,20 +1106,21 @@ mod tests {
 
     #[test]
     fn custom_values_must_be_finite() {
-        assert!(ChartReferenceLineValue::new(17.5).is_ok());
-        assert!(ChartReferenceLineValue::new(f64::NAN).is_err());
-        assert!(ChartReferenceLineValue::new(f64::INFINITY).is_err());
+        assert!(Value::new(17.5).is_ok());
+        assert!(Value::new(f64::NAN).is_err());
+        assert!(Value::new(f64::INFINITY).is_err());
     }
 
     #[test]
     fn canonical_reference_lines_round_trip() {
         let lines = [
-            ChartReferenceLine::minimum(),
-            ChartReferenceLine::maximum().with_name_visibility(false),
-            ChartReferenceLine::average().with_value_visibility(true),
-            ChartReferenceLine::median().with_name("Middle"),
-            ChartReferenceLine::custom(ChartReferenceLineValue::new(17.5).unwrap())
-                .with_name("Threshold"),
+            Line::minimum(),
+            Line::maximum().with_name_visibility(false),
+            Line::average().with_value_visibility(true),
+            Line::median().try_with_name("Middle").unwrap(),
+            Line::custom(Value::new(17.5).unwrap())
+                .try_with_name("Threshold")
+                .unwrap(),
         ];
         for line in lines {
             let encoded = canonical_reference_line(&line).unwrap();
@@ -1244,7 +1130,7 @@ mod tests {
 
     #[test]
     fn malformed_reference_line_fields_are_rejected() {
-        let line = ChartReferenceLine::average();
+        let line = Line::average();
         let encoded = canonical_reference_line(&line).unwrap();
         let extension = generated_reference_line_extension(&encoded)
             .unwrap()
@@ -1262,23 +1148,54 @@ mod tests {
     }
 
     #[test]
+    fn custom_value_patching_retains_nested_unknown_fields() {
+        let original = canonical_reference_line(&Line::custom(Value::new(17.5).unwrap())).unwrap();
+        let extension = generated_reference_line_extension(&original)
+            .unwrap()
+            .unwrap();
+        let custom = strict_optional_message(extension, CUSTOM_VALUE_FIELD)
+            .unwrap()
+            .unwrap();
+        let mut custom_with_unknown = custom.to_vec();
+        crate::wire::append_varint_field(&mut custom_with_unknown, 99, 7).unwrap();
+        let extension_with_unknown = patch_length_delimited_field(
+            extension,
+            CUSTOM_VALUE_FIELD,
+            true,
+            Some(&custom_with_unknown),
+        )
+        .unwrap();
+        let input = patch_length_delimited_field(
+            &original,
+            GENERATED_REFERENCE_LINE_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&extension_with_unknown),
+        )
+        .unwrap();
+        let replacement = Line::custom(Value::new(23.0).unwrap());
+        let output = patch_reference_line(&input, &replacement).unwrap();
+        let output_extension = generated_reference_line_extension(&output)
+            .unwrap()
+            .unwrap();
+        let output_custom = strict_optional_message(output_extension, CUSTOM_VALUE_FIELD)
+            .unwrap()
+            .unwrap();
+        assert_eq!(strict_optional_varint(output_custom, 99).unwrap(), Some(7));
+        assert_eq!(read_reference_line(&output).unwrap(), replacement);
+    }
+
+    #[test]
     fn native_reference_line_kinds_are_unique_and_bounded() {
         assert!(
             validate_reference_line_collection(&[
-                ChartReferenceLine::minimum(),
-                ChartReferenceLine::maximum(),
-                ChartReferenceLine::average(),
-                ChartReferenceLine::median(),
-                ChartReferenceLine::custom(ChartReferenceLineValue::new(1.0).unwrap()),
+                Line::minimum(),
+                Line::maximum(),
+                Line::average(),
+                Line::median(),
+                Line::custom(Value::new(1.0).unwrap()),
             ])
             .is_ok()
         );
-        assert!(
-            validate_reference_line_collection(&[
-                ChartReferenceLine::average(),
-                ChartReferenceLine::average(),
-            ])
-            .is_err()
-        );
+        assert!(validate_reference_line_collection(&[Line::average(), Line::average(),]).is_err());
     }
 }

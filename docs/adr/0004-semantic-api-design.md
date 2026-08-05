@@ -150,6 +150,14 @@ lossless unknown-field patching, and the styled versus geometry-only series
 allocation boundary. Concrete Numbers, Pages, and Keynote APIs consume these
 short semantic values directly.
 
+Chart reference-line settings use the focused
+`litchi_iwa_common::chart::reference_line` module. `Value` rejects non-finite
+custom positions, `Kind` keeps known calculations distinct from checked
+future native kinds, and `Line` uses an optional bounded name plus packed
+visibility state so default labels do not allocate. The focused IWA facade
+module exposes `Line`, `Kind`, and `Value`; raw extension messages and graph
+identifiers are not part of ordinary CRUD signatures.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

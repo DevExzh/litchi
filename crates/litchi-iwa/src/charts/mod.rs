@@ -55,7 +55,7 @@ pub(crate) mod pie_wedge_explosion;
 pub(crate) mod radar_grid_shape;
 pub(crate) mod radar_series_style;
 pub(crate) mod radar_start_angle;
-pub(crate) mod reference_lines;
+pub mod reference_line;
 pub(crate) mod rounded_corners;
 pub(crate) mod scene_3d;
 pub(crate) mod series_connection_line;
@@ -119,7 +119,6 @@ pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use radar_grid_shape::ChartRadarGridShape;
 pub use radar_series_style::ChartRadarSeriesStyle;
 pub use radar_start_angle::ChartRadarStartAngle;
-pub use reference_lines::{ChartReferenceLine, ChartReferenceLineKind, ChartReferenceLineValue};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
 pub use scene_3d::Chart3dRotation;
 pub use series_connection_line::{ChartSeriesConnectionLine, ChartSeriesConnectionLineKind};
@@ -166,6 +165,12 @@ impl From<litchi_iwa_common::chart::axis::steps::Error> for crate::Error {
 
 impl From<litchi_iwa_common::chart::number_format::Error> for crate::Error {
     fn from(error: litchi_iwa_common::chart::number_format::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::reference_line::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::reference_line::Error) -> Self {
         Self::InvalidFormat(error.to_string())
     }
 }

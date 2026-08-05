@@ -6062,6 +6062,22 @@ a tracked Numbers series-non-style fixture limitation rather than claimed
 native resave support for that path; Numbers, Pages, and Keynote were quit
 after inspection.
 
+The chart reference-line ownership slice is complete. The archive-free
+`litchi-iwa-common::chart::reference_line` module now owns finite `Value`,
+checked `Kind`, and compact `Line`; the IWA facade exposes the focused
+`charts::reference_line` module and retains only archive/protobuf/graph
+adapters. Nested custom-value patching retains unknown fields, recognized
+fields reject duplicate, wrong-wire-type, and noncanonical framing, and the
+reference-line graph is bounded before generated protobuf allocation. The
+common suite passed 52 tests and the focused IWA reference-line suite passed 9
+tests, including CRUD in Numbers, Pages, and Keynote. ZIP validation passed.
+Native Pages and Keynote opened the generated line chart without repair
+prompts and exposed its `Revenue thresholds` title and Revenue/Cost series;
+Numbers rejected this source-generated chart fixture as damaged, which remains
+a tracked Numbers chart-fixture limitation rather than native support evidence.
+No native-resave claim is made, and Pages, Numbers, and Keynote were quit after
+inspection.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

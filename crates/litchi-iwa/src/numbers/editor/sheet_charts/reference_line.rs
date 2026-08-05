@@ -1,8 +1,8 @@
 //! Native value-axis reference-line CRUD for Numbers sheet charts.
 
 use super::*;
-use crate::charts::ChartReferenceLine;
-use crate::charts::reference_lines::{
+use crate::charts::reference_line::Line;
+use crate::charts::reference_line::{
     chart_reference_lines as read_native_reference_lines,
     set_chart_reference_lines as set_native_reference_lines,
 };
@@ -13,7 +13,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartReferenceLine>> {
+    ) -> Result<Vec<Line>> {
         sheet_chart_reference_lines(self, sheet_id, drawable_object_id)
     }
 
@@ -22,9 +22,9 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        reference_lines: &[ChartReferenceLine],
+        reference_line: &[Line],
     ) -> Result<()> {
-        set_sheet_chart_reference_lines(self, sheet_id, drawable_object_id, reference_lines)
+        set_sheet_chart_reference_lines(self, sheet_id, drawable_object_id, reference_line)
     }
 }
 
@@ -32,7 +32,7 @@ fn sheet_chart_reference_lines(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<Vec<ChartReferenceLine>> {
+) -> Result<Vec<Line>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_reference_lines(
         &editor.package,
@@ -46,7 +46,7 @@ fn set_sheet_chart_reference_lines(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    reference_lines: &[ChartReferenceLine],
+    reference_line: &[Line],
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();
@@ -55,10 +55,10 @@ fn set_sheet_chart_reference_lines(
         &graph.archive_name,
         drawable_object_id,
         "Numbers",
-        reference_lines,
+        reference_line,
     )?;
     let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
-    if verified.sheet_chart_reference_lines(sheet_id, drawable_object_id)? != reference_lines {
+    if verified.sheet_chart_reference_lines(sheet_id, drawable_object_id)? != reference_line {
         return Err(Error::InvalidFormat(
             "Numbers chart reference-line update failed validation".to_owned(),
         ));
@@ -70,7 +70,8 @@ fn set_sheet_chart_reference_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind, ChartReferenceLineValue};
+    use crate::charts::reference_line::Value;
+    use crate::charts::{ChartData, ChartKind};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -99,9 +100,10 @@ mod tests {
         );
 
         let initial = vec![
-            ChartReferenceLine::average(),
-            ChartReferenceLine::custom(ChartReferenceLineValue::new(17.5).unwrap())
-                .with_name("Threshold"),
+            Line::average(),
+            Line::custom(Value::new(17.5).unwrap())
+                .try_with_name("Threshold")
+                .unwrap(),
         ];
         editor
             .set_sheet_chart_reference_lines(sheet_id, chart.drawable_object_id, &initial)
@@ -123,11 +125,12 @@ mod tests {
         );
 
         let updated = vec![
-            ChartReferenceLine::median()
-                .with_name("Middle")
+            Line::median()
+                .try_with_name("Middle")
+                .unwrap()
                 .with_value_visibility(true),
-            ChartReferenceLine::minimum().with_name_visibility(false),
-            ChartReferenceLine::maximum(),
+            Line::minimum().with_name_visibility(false),
+            Line::maximum(),
         ];
         editor
             .set_sheet_chart_reference_lines(sheet_id, chart.drawable_object_id, &updated)

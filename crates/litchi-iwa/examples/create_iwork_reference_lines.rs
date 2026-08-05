@@ -3,7 +3,8 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{ChartData, ChartKind, ChartReferenceLine, ChartReferenceLineValue};
+use litchi_iwa::charts::reference_line::{Line, Value};
+use litchi_iwa::charts::{ChartData, ChartKind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -92,12 +93,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn reference_lines() -> Result<Vec<ChartReferenceLine>, Box<dyn std::error::Error>> {
+fn reference_lines() -> Result<Vec<Line>, Box<dyn std::error::Error>> {
     Ok(vec![
-        ChartReferenceLine::minimum().with_name("Observed floor"),
-        ChartReferenceLine::average().with_value_visibility(true),
-        ChartReferenceLine::custom(ChartReferenceLineValue::new(30.0)?)
-            .with_name("Target")
+        Line::minimum().try_with_name("Observed floor")?,
+        Line::average().with_value_visibility(true),
+        Line::custom(Value::new(30.0)?)
+            .try_with_name("Target")?
             .with_value_visibility(true),
     ])
 }

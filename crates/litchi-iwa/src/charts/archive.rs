@@ -6,6 +6,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::wire::parse_wire_fields_with_limits;
 use prost::Message;
 
 use crate::protobuf::{tsch, tsp};
@@ -18,6 +20,9 @@ const DRAWABLE_SUPER_FIELD: u32 = 1;
 const CHART_EXTENSION_FIELD: u32 = 10_000;
 const CHART_REFERENCE_LINES_EXTENSION_FIELD: u32 = 10_005;
 const CHART_BASE_FIELDS: std::ops::RangeInclusive<u32> = 1..=24;
+const MAX_REFERENCE_LINE_GRAPH_AXES: usize = 32;
+const MAX_REFERENCE_LINE_GRAPH_ENTRIES: usize = 128;
+const MAX_REFERENCE_LINE_GRAPH_FIELDS: usize = 256;
 
 /// A native chart drawable with its extension-backed chart payload retained.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -77,9 +82,9 @@ impl IWorkChartArchive {
                     "chart reference-line extension disappeared during decoding".to_owned(),
                 )
             })?;
-        Ok(Some(tsch::ChartReferenceLinesArchive::decode(
-            length_delimited_payload(encoded, field)?,
-        )?))
+        let payload = length_delimited_payload(encoded, field)?;
+        preflight_reference_line_graph(payload)?;
+        Ok(Some(tsch::ChartReferenceLinesArchive::decode(payload)?))
     }
 
     pub(crate) fn set_reference_lines(
@@ -267,6 +272,64 @@ fn encoded_chart_extension(field_number: u32, message: &impl Message) -> Result<
     let mut field = Vec::new();
     append_length_delimited_field(&mut field, field_number, &message.encode_to_vec())?;
     Ok(field)
+}
+
+/// Bound repeated reference-line graph nodes before Prost materializes them.
+///
+/// The generated graph type owns every repeated message, so checking the
+/// semantic five-line limit after decoding is too late for hostile archives.
+/// This shallow preflight keeps the generated decode behind finite axis,
+/// field, and entry budgets while retaining unknown fields for the normal
+/// chart extension path.
+fn preflight_reference_line_graph(data: &[u8]) -> Result<()> {
+    let limits = WireLimits::default().with_fields(MAX_REFERENCE_LINE_GRAPH_FIELDS)?;
+    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let mut axes = 0usize;
+    let mut entries = 0usize;
+    for field in fields {
+        if !matches!(field.number(), 1 | 2) {
+            continue;
+        }
+        axes = axes
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("reference-line axis count overflow".to_owned()))?;
+        if axes > MAX_REFERENCE_LINE_GRAPH_AXES {
+            return Err(Error::InvalidFormat(format!(
+                "chart reference-line graph has more than {MAX_REFERENCE_LINE_GRAPH_AXES} axes"
+            )));
+        }
+        let axis_payload = length_delimited_payload(data, &field)?;
+        let axis_fields = parse_wire_fields_with_limits(axis_payload, limits)?;
+        for axis_field in axis_fields {
+            if axis_field.number() != 2 {
+                continue;
+            }
+            if field.number() == 1 {
+                entries = entries.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("reference-line entry count overflow".to_owned())
+                })?;
+            } else {
+                let sparse_payload = length_delimited_payload(axis_payload, &axis_field)?;
+                let sparse_fields = parse_wire_fields_with_limits(sparse_payload, limits)?;
+                entries = entries
+                    .checked_add(
+                        sparse_fields
+                            .iter()
+                            .filter(|sparse_field| sparse_field.number() == 2)
+                            .count(),
+                    )
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("reference-line entry count overflow".to_owned())
+                    })?;
+            }
+            if entries > MAX_REFERENCE_LINE_GRAPH_ENTRIES {
+                return Err(Error::InvalidFormat(format!(
+                    "chart reference-line graph has more than {MAX_REFERENCE_LINE_GRAPH_ENTRIES} entries"
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn unique_opaque_field(fields: &[Vec<u8>], field_number: u32) -> Result<Option<&[u8]>> {
@@ -623,5 +686,22 @@ mod tests {
                 .remap_references(&HashMap::from([(21, 121)]), &[21])
                 .is_err()
         );
+    }
+
+    #[test]
+    fn reference_line_graph_is_bounded_before_materialization() {
+        let mut axis = Vec::new();
+        for _ in 0..=MAX_REFERENCE_LINE_GRAPH_ENTRIES {
+            append_length_delimited_field(&mut axis, 2, &[]).unwrap();
+        }
+        let mut graph = Vec::new();
+        append_length_delimited_field(&mut graph, 1, &axis).unwrap();
+        assert!(preflight_reference_line_graph(&graph).is_err());
+
+        let mut axes = Vec::new();
+        for _ in 0..=MAX_REFERENCE_LINE_GRAPH_AXES {
+            append_length_delimited_field(&mut axes, 1, &[]).unwrap();
+        }
+        assert!(preflight_reference_line_graph(&axes).is_err());
     }
 }

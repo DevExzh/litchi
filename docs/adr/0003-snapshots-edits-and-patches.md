@@ -24,6 +24,13 @@ diagnostics. It never mutates the source snapshot. A full validation pass is
 explicit. Untouched malformed or unknown content is preserved and may remain a
 diagnostic, but a commit cannot worsen it.
 
+IWA reference-line edits apply the same boundary at the archive adapter:
+malformed existing line payloads are rejected before patching, recognized
+fields are checked for canonical framing, nested custom-value unknown fields
+survive scalar replacement, and repeated graph nodes are bounded before
+generated protobuf materialization. Public format editors publish only after
+their staged CRUD operation and typed readback succeed.
+
 ## Identity and selection
 
 Handles carry snapshot lineage and stable internal identity. Public lookup is

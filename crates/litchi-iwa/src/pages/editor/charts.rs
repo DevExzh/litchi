@@ -36,7 +36,7 @@ mod pie_wedge_explosion;
 mod radar_grid_shape;
 mod radar_series_style;
 mod radar_start_angle;
-mod reference_lines;
+mod reference_line;
 mod rounded_corners;
 mod scene_3d;
 mod series_connection_line;
@@ -64,7 +64,7 @@ use theme::{chart_theme_context, patch_theme_chart_preset};
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::charts::reference_lines::chart_reference_line_objects;
+use crate::charts::reference_line::chart_reference_line_objects;
 use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE,
     CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE, CHART_STYLE_MESSAGE_TYPE,
