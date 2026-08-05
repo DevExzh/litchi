@@ -43,7 +43,7 @@ impl Position {
     pub fn from_utf16_index(index: usize) -> Result<Self> {
         u32::try_from(index)
             .map(Self)
-            .map_err(|_| Error::PositionOutOfRange)
+            .map_err(|_conversion_error| Error::PositionOutOfRange)
     }
 
     /// Return the UTF-16 code-unit index represented by this position.
@@ -115,10 +115,10 @@ impl Footnote {
     /// byte budget.
     pub fn with_custom_mark(
         position: Position,
-        text: impl Into<Box<str>>,
+        text_value: impl Into<Box<str>>,
         custom_mark: Option<Box<str>>,
     ) -> Result<Self> {
-        let text = text.into();
+        let text = text_value.into();
         if text.len() > MAX_TEXT_BYTES {
             return Err(Error::TextTooLarge);
         }
