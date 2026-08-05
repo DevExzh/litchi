@@ -3,7 +3,7 @@
 //! Provides high-level API for working with Apple Numbers spreadsheets.
 
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use super::sheet::NumbersSheet;
 use super::table::NumbersTable;
@@ -26,8 +26,8 @@ struct NumbersDocumentState {
     bundle: Bundle,
     /// Object index for cross-referencing
     object_index: ObjectIndex,
-    /// Lazily materialized archive-free semantic state shared by document clones.
-    semantic_document: OnceLock<litchi_numbers::Document>,
+    /// Immutable archive-free semantic state shared by document clones.
+    semantic_document: litchi_numbers::Document,
 }
 
 impl NumbersDocument {
@@ -84,13 +84,30 @@ impl NumbersDocument {
     fn from_parts(
         bundle: Bundle,
         object_index: ObjectIndex,
-        _root_document: crate::protobuf::tn::DocumentArchive,
+        root_document: crate::protobuf::tn::DocumentArchive,
     ) -> Result<Self> {
+        let archive_sheets = Self::decode_sheets(&bundle, &object_index, &root_document)?;
+        let mut semantic_sheets = Vec::new();
+        semantic_sheets.try_reserve(archive_sheets.len()).map_err(|_| {
+            crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers semantic sheets",
+                amount: archive_sheets.len(),
+            })
+        })?;
+        for sheet in archive_sheets {
+            semantic_sheets.push(sheet.into_semantic()?);
+        }
+        let semantic_document = litchi_numbers::Document::from_sheets(semantic_sheets)
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers semantic document is invalid at ingress: {error}"
+                ))
+            })?;
         Ok(Self {
             state: Arc::new(NumbersDocumentState {
                 bundle,
                 object_index,
-                semantic_document: OnceLock::new(),
+                semantic_document,
             }),
         })
     }
@@ -214,49 +231,27 @@ impl NumbersDocument {
         Ok(sheets)
     }
 
-    /// Extract one lazily cached immutable semantic sheet snapshot.
+    /// Return the immutable semantic sheet snapshot.
     ///
     /// The `Arc` is shared across repeated calls and cheap document snapshots;
     /// native IDs, protobuf records, package state, and comments stay in the
     /// archive-boundary view returned by [`Self::sheets`].
-    pub fn semantic_sheets(&self) -> Result<Arc<[litchi_numbers::Sheet]>> {
-        Ok(self.semantic_document()?.shared_sheets())
+    pub fn semantic_sheets(&self) -> Arc<[litchi_numbers::Sheet]> {
+        self.state.semantic_document.shared_sheets()
     }
 
     /// Borrow the immutable archive-free semantic Numbers document.
     ///
-    /// The first call performs the bounded archive-to-semantic conversion;
-    /// later calls and document snapshots share the same allocation.
-    pub fn semantic_document(&self) -> Result<&litchi_numbers::Document> {
-        if let Some(document) = self.state.semantic_document.get() {
-            return Ok(document);
-        }
-
-        let archive_sheets = self.sheets()?;
-        let mut semantic = Vec::new();
-        semantic.try_reserve(archive_sheets.len()).map_err(|_| {
-            crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "Numbers semantic sheets",
-                amount: archive_sheets.len(),
-            })
-        })?;
-        for sheet in archive_sheets {
-            semantic.push(sheet.into_semantic()?);
-        }
-        let document = litchi_numbers::Document::from_sheets(semantic).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Numbers semantic document is invalid at ingress: {error}"
-            ))
-        })?;
-        let _ = self.state.semantic_document.set(document);
-        self.state.semantic_document.get().ok_or_else(|| {
-            Error::InvalidFormat("Numbers semantic document was not published".to_owned())
-        })
+    /// Borrow the immutable archive-free semantic Numbers document.
+    #[must_use]
+    pub fn semantic_document(&self) -> &litchi_numbers::Document {
+        &self.state.semantic_document
     }
 
     /// Capture a cheap handle to the immutable semantic Numbers snapshot.
-    pub fn semantic_snapshot(&self) -> Result<litchi_numbers::Document> {
-        Ok(self.semantic_document()?.snapshot())
+    #[must_use]
+    pub fn semantic_snapshot(&self) -> litchi_numbers::Document {
+        self.state.semantic_document.snapshot()
     }
 
     /// Parse a single sheet from an object
