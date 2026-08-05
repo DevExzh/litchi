@@ -12,7 +12,7 @@ use crate::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::page_setup::XlsPageSetup;
 use crate::pivot_table::PivotTable;
 use crate::protection::SheetProtection;
-use crate::view::XlsWorksheetView;
+use crate::view::View;
 use crate::writer::sort::Config;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
@@ -58,7 +58,7 @@ pub struct XlsWorksheet {
     row_layouts: BTreeMap<u16, XlsRowLayout>,
     column_layouts: Vec<XlsColumnLayout>,
     sheet_layout: crate::sheet_layout::XlsWorksheetLayout,
-    worksheet_views: Vec<XlsWorksheetView>,
+    worksheet_views: Vec<View>,
     page_setup: Option<XlsPageSetup>,
     calculation: crate::calculation::XlsWorksheetCalculation,
     scenario_manager: Option<crate::scenario::XlsScenarioManager>,
@@ -538,12 +538,12 @@ impl XlsWorksheet {
     }
 
     /// The first display window associated with this worksheet.
-    pub fn worksheet_view(&self) -> Option<&XlsWorksheetView> {
+    pub fn worksheet_view(&self) -> Option<&View> {
         self.worksheet_views.first()
     }
 
     /// All display windows associated with this worksheet in record order.
-    pub fn worksheet_views(&self) -> &[XlsWorksheetView] {
+    pub fn worksheet_views(&self) -> &[View] {
         &self.worksheet_views
     }
 
@@ -551,7 +551,7 @@ impl XlsWorksheet {
     /// `(frozen_columns, frozen_rows)`.
     ///
     /// Returns `None` when the window has no panes or when the panes are
-    /// split (unfrozen); use [`XlsWorksheetView::pane`] for split geometry.
+    /// split (unfrozen); use [`View::pane`] for split geometry.
     pub fn frozen_panes(&self) -> Option<(u16, u16)> {
         let view = self.worksheet_views.first()?;
         if !view.has_frozen_panes() {
@@ -561,7 +561,7 @@ impl XlsWorksheet {
         Some((pane.horizontal_split(), pane.vertical_split()))
     }
 
-    pub(crate) fn set_worksheet_views(&mut self, views: Vec<XlsWorksheetView>) {
+    pub(crate) fn set_worksheet_views(&mut self, views: Vec<View>) {
         self.worksheet_views = views;
     }
 

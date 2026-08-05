@@ -13,7 +13,7 @@ use super::environment::XlsObjectDisplayMode;
 use super::records::XlsEncoding;
 use super::sheet_metadata::XlsSheetVisibility;
 use super::utils::parse_string_record;
-use super::view::XlsPaneType;
+use super::view::PaneType;
 use super::{XlsError, XlsResult};
 
 /// Record type of the `UserBView` record.
@@ -386,7 +386,7 @@ pub struct XlsSheetCustomViewBegin {
     tab_id: u16,
     scale: u32,
     gridline_color: u16,
-    active_pane: XlsPaneType,
+    active_pane: PaneType,
     /// Flag double-word (fields A–b); typed accessors decode the bits.
     flags: u32,
     hidden_rows: XlsCustomViewHiddenRows,
@@ -422,10 +422,10 @@ impl XlsSheetCustomViewBegin {
             ));
         }
         let active_pane = match read_u8(data, 28)? {
-            0 => XlsPaneType::LowerRight,
-            1 => XlsPaneType::UpperRight,
-            2 => XlsPaneType::LowerLeft,
-            3 => XlsPaneType::UpperLeft,
+            0 => PaneType::LowerRight,
+            1 => PaneType::UpperRight,
+            2 => PaneType::LowerLeft,
+            3 => PaneType::UpperLeft,
             value => {
                 return Err(invalid(
                     USER_S_VIEW_BEGIN_RECORD_TYPE,
@@ -475,7 +475,7 @@ impl XlsSheetCustomViewBegin {
         self.gridline_color
     }
     /// The active pane.
-    pub const fn active_pane(&self) -> XlsPaneType {
+    pub const fn active_pane(&self) -> PaneType {
         self.active_pane
     }
     /// Whether page breaks are displayed.
@@ -890,7 +890,7 @@ mod tests {
         assert_eq!(begin.tab_id(), 1);
         assert_eq!(begin.scale(), 75);
         assert_eq!(begin.gridline_color(), 64);
-        assert_eq!(begin.active_pane(), XlsPaneType::UpperLeft);
+        assert_eq!(begin.active_pane(), PaneType::UpperLeft);
         assert!(!begin.shows_page_breaks());
         assert!(!begin.shows_formulas());
         assert!(begin.shows_gridlines());

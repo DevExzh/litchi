@@ -1434,7 +1434,7 @@ mod view_round_trip_tests {
         assert_eq!(view.zoom_fraction(), Some((3, 4)));
         assert_eq!(
             view.pane().unwrap().active_pane(),
-            crate::view::XlsPaneType::LowerRight
+            crate::view::PaneType::LowerRight
         );
         assert_eq!(view.selections()[0].active_row(), 7);
         assert_eq!(view.selections()[0].active_column(), 5);

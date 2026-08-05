@@ -1,5 +1,5 @@
 use crate::error::{XlsError, XlsResult};
-use crate::{XlsPaneType, XlsSelectionRange};
+use crate::view::{PaneType, Range, pane_exists};
 
 const MAX_SCL_TERM: u16 = i16::MAX as u16;
 pub(crate) const MAX_SELECTION_RANGES: usize = 1_369;
@@ -66,7 +66,7 @@ pub struct Pane {
     vertical_split: u16,
     bottom_pane_top_row: u16,
     right_pane_left_column: u8,
-    active_pane: XlsPaneType,
+    active_pane: PaneType,
 }
 
 impl Pane {
@@ -90,7 +90,7 @@ impl Pane {
         vertical_twips: u16,
         bottom_pane_top_row: u16,
         right_pane_left_column: u8,
-        active_pane: XlsPaneType,
+        active_pane: PaneType,
     ) -> XlsResult<Self> {
         let value = Self {
             mode: Mode::Split,
@@ -130,7 +130,7 @@ impl Pane {
     }
 
     /// Return the pane that owns the active selection.
-    pub const fn active(self) -> XlsPaneType {
+    pub const fn active(self) -> PaneType {
         self.active_pane
     }
 
@@ -164,21 +164,21 @@ impl Pane {
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// A checked active cell and its selected ranges for one pane.
 pub struct Selection {
-    pane: XlsPaneType,
+    pane: PaneType,
     active_row: u16,
     active_column: u8,
     active_range_index: u16,
-    ranges: Vec<XlsSelectionRange>,
+    ranges: Vec<Range>,
 }
 
 impl Selection {
     /// Create a selection record from ordered, nonempty ranges.
     pub fn new(
-        pane: XlsPaneType,
+        pane: PaneType,
         active_row: u16,
         active_column: u8,
         active_range_index: u16,
-        ranges: Vec<XlsSelectionRange>,
+        ranges: Vec<Range>,
     ) -> XlsResult<Self> {
         let value = Self {
             pane,
@@ -192,18 +192,18 @@ impl Selection {
     }
 
     /// Select one cell in `pane`.
-    pub fn cell(pane: XlsPaneType, row: u16, column: u8) -> Self {
+    pub fn cell(pane: PaneType, row: u16, column: u8) -> Self {
         Self {
             pane,
             active_row: row,
             active_column: column,
             active_range_index: 0,
-            ranges: vec![XlsSelectionRange::cell(row, column)],
+            ranges: vec![Range::cell(row, column)],
         }
     }
 
     /// Return the pane containing this selection.
-    pub const fn pane(&self) -> XlsPaneType {
+    pub const fn pane(&self) -> PaneType {
         self.pane
     }
 
@@ -223,7 +223,7 @@ impl Selection {
     }
 
     /// Borrow the inclusive selected ranges.
-    pub fn ranges(&self) -> &[XlsSelectionRange] {
+    pub fn ranges(&self) -> &[Range] {
         &self.ranges
     }
 }
@@ -274,7 +274,7 @@ impl Default for View {
             normal_zoom_percent: None,
             scale: None,
             pane: None,
-            selections: vec![Selection::cell(XlsPaneType::UpperLeft, 0, 0)],
+            selections: vec![Selection::cell(PaneType::UpperLeft, 0, 0)],
         }
     }
 }
@@ -480,7 +480,7 @@ impl View {
         let previous_pane = self.pane.take();
         let previous_selections = std::mem::replace(
             &mut self.selections,
-            vec![Selection::cell(XlsPaneType::UpperLeft, 0, 0)],
+            vec![Selection::cell(PaneType::UpperLeft, 0, 0)],
         );
         (previous_pane, previous_selections)
     }
@@ -565,7 +565,7 @@ fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResu
             ))
         };
     }
-    let active_pane = pane.map_or(XlsPaneType::UpperLeft, |value| value.active_pane);
+    let active_pane = pane.map_or(PaneType::UpperLeft, |value| value.active_pane);
     let mut has_active = false;
     let mut seen = 0u8;
     let mut start = 0usize;
@@ -578,7 +578,7 @@ fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResu
                 "SELECTION pane groups must be contiguous".to_string(),
             ));
         }
-        if !pane.map_or(first.pane == XlsPaneType::UpperLeft, |value| {
+        if !pane.map_or(first.pane == PaneType::UpperLeft, |value| {
             pane_exists(value.horizontal_split, value.vertical_split, first.pane)
         }) {
             return Err(XlsError::InvalidData(
@@ -632,21 +632,12 @@ fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResu
     Ok(())
 }
 
-fn active_pane(has_columns: bool, has_rows: bool) -> XlsPaneType {
+fn active_pane(has_columns: bool, has_rows: bool) -> PaneType {
     match (has_columns, has_rows) {
-        (true, true) => XlsPaneType::LowerRight,
-        (true, false) => XlsPaneType::UpperRight,
-        (false, true) => XlsPaneType::LowerLeft,
-        (false, false) => XlsPaneType::UpperLeft,
-    }
-}
-
-pub(crate) fn pane_exists(x: u16, y: u16, pane: XlsPaneType) -> bool {
-    match pane {
-        XlsPaneType::LowerRight => x > 0 && y > 0,
-        XlsPaneType::UpperRight => x > 0,
-        XlsPaneType::LowerLeft => y > 0,
-        XlsPaneType::UpperLeft => true,
+        (true, true) => PaneType::LowerRight,
+        (true, false) => PaneType::UpperRight,
+        (false, true) => PaneType::LowerLeft,
+        (false, false) => PaneType::UpperLeft,
     }
 }
 
@@ -658,12 +649,12 @@ mod tests {
 
     #[test]
     fn serializes_exact_view_records() {
-        let pane = Pane::split(1_200, 800, 7, 4, XlsPaneType::LowerRight).unwrap();
+        let pane = Pane::split(1_200, 800, 7, 4, PaneType::LowerRight).unwrap();
         let mut view = View::default();
         view.formulas(true).gridlines(false);
         view.grid_color(Some(8)).unwrap();
         view.origin(2, 1).unwrap();
-        view.put_pane(pane, vec![Selection::cell(XlsPaneType::LowerRight, 7, 4)])
+        view.put_pane(pane, vec![Selection::cell(PaneType::LowerRight, 7, 4)])
             .unwrap();
         let mut window = Vec::new();
         let mut pane_bytes = Vec::new();
@@ -696,23 +687,23 @@ mod tests {
         assert!(Scale::new(1, 11).is_err());
         assert!(Scale::new(5, 1).is_err());
 
-        assert!(Pane::split(32_767, 0, 0, 0, XlsPaneType::UpperRight).is_ok());
-        assert!(Pane::split(32_768, 0, 0, 0, XlsPaneType::UpperRight).is_err());
-        assert!(Pane::split(0, 32_767, 0, 0, XlsPaneType::LowerLeft).is_ok());
-        assert!(Pane::split(0, 0, 0, 0, XlsPaneType::UpperLeft).is_err());
+        assert!(Pane::split(32_767, 0, 0, 0, PaneType::UpperRight).is_ok());
+        assert!(Pane::split(32_768, 0, 0, 0, PaneType::UpperRight).is_err());
+        assert!(Pane::split(0, 32_767, 0, 0, PaneType::LowerLeft).is_ok());
+        assert!(Pane::split(0, 0, 0, 0, PaneType::UpperLeft).is_err());
         assert!(Pane::frozen(0, 0).is_err());
 
-        assert!(XlsSelectionRange::new(0, u16::MAX, 0, u8::MAX).is_ok());
-        assert!(XlsSelectionRange::new(1, 0, 0, 0).is_err());
-        assert!(XlsSelectionRange::new(0, 0, 1, 0).is_err());
-        assert!(Selection::new(XlsPaneType::UpperLeft, 0, 0, 0, Vec::new()).is_err());
+        assert!(Range::new(0, u16::MAX, 0, u8::MAX).is_ok());
+        assert!(Range::new(1, 0, 0, 0).is_err());
+        assert!(Range::new(0, 0, 1, 0).is_err());
+        assert!(Selection::new(PaneType::UpperLeft, 0, 0, 0, Vec::new()).is_err());
         assert!(
             Selection::new(
-                XlsPaneType::UpperLeft,
+                PaneType::UpperLeft,
                 0,
                 0,
                 0,
-                vec![XlsSelectionRange::cell(0, 0); MAX_SELECTION_RANGES + 1],
+                vec![Range::cell(0, 0); MAX_SELECTION_RANGES + 1],
             )
             .is_err()
         );
@@ -747,8 +738,8 @@ mod tests {
         let mut view = View::default();
         view.formulas(true);
         let before = view.clone();
-        let pane = Pane::split(1_200, 0, 0, 4, XlsPaneType::UpperRight).unwrap();
-        let invalid = vec![Selection::cell(XlsPaneType::LowerLeft, 0, 0)];
+        let pane = Pane::split(1_200, 0, 0, 4, PaneType::UpperRight).unwrap();
+        let invalid = vec![Selection::cell(PaneType::LowerLeft, 0, 0)];
 
         let outcome = catch_unwind(AssertUnwindSafe(|| view.put_pane(pane, invalid)));
         assert!(outcome.is_ok());
@@ -764,7 +755,7 @@ mod tests {
         let pane = Pane::frozen(1, 1).unwrap();
 
         assert!(
-            view.put_pane(pane, vec![Selection::cell(XlsPaneType::LowerRight, 1, 1)],)
+            view.put_pane(pane, vec![Selection::cell(PaneType::LowerRight, 1, 1)],)
                 .is_err()
         );
         assert_eq!(view, before);
@@ -775,17 +766,17 @@ mod tests {
         let mut view = View::default();
         let frozen = Pane::frozen(1, 1).unwrap();
         let (old_pane, old_selections) = view
-            .put_pane(frozen, vec![Selection::cell(XlsPaneType::LowerRight, 1, 1)])
+            .put_pane(frozen, vec![Selection::cell(PaneType::LowerRight, 1, 1)])
             .unwrap();
         assert!(old_pane.is_none());
         assert_eq!(old_selections.len(), 1);
 
-        let split = Pane::split(600, 0, 0, 2, XlsPaneType::UpperRight).unwrap();
+        let split = Pane::split(600, 0, 0, 2, PaneType::UpperRight).unwrap();
         let (old_pane, old_selections) = view
-            .put_pane(split, vec![Selection::cell(XlsPaneType::UpperRight, 0, 2)])
+            .put_pane(split, vec![Selection::cell(PaneType::UpperRight, 0, 2)])
             .unwrap();
         assert_eq!(old_pane, Some(frozen));
-        assert_eq!(old_selections[0].pane(), XlsPaneType::LowerRight);
+        assert_eq!(old_selections[0].pane(), PaneType::LowerRight);
         assert_eq!(view.pane(), Some(&split));
     }
 }

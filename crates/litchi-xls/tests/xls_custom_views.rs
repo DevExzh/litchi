@@ -2,9 +2,9 @@
 //! `UserSViewBegin`, `UserSViewEnd`).
 
 use litchi_core::sheet::WorkbookTrait;
+use litchi_xls::view::PaneType;
 use litchi_xls::{
-    XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay, XlsObjectDisplayMode, XlsPaneType,
-    XlsWorkbook,
+    XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay, XlsObjectDisplayMode, XlsWorkbook,
 };
 
 const EXPECTED_GUID: [u8; 16] = [
@@ -62,7 +62,7 @@ fn reads_sheet_custom_views() {
         assert_eq!(begin.tab_id(), tab_id);
         assert_eq!(begin.scale(), scale);
         assert_eq!(begin.gridline_color(), 64);
-        assert_eq!(begin.active_pane(), XlsPaneType::UpperLeft);
+        assert_eq!(begin.active_pane(), PaneType::UpperLeft);
         assert!(begin.shows_gridlines());
         assert!(begin.shows_headings());
         assert!(!begin.shows_formulas());

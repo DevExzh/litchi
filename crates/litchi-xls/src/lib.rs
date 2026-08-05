@@ -213,7 +213,7 @@ mod sheet_layout;
 mod sheet_ext;
 
 /// BIFF8 worksheet window, zoom, pane, and selection state.
-mod view;
+pub mod view;
 
 /// BIFF8 worksheet print and page setup.
 mod page_setup;
@@ -472,7 +472,6 @@ pub use user_routing::{
 };
 pub use uses_elfs::XlsUsesElfs;
 pub use vba::{XlsVbaMetadata, XlsVbaProjectStorage};
-pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use web_pub::{XlsWebPageType, XlsWebPub, XlsWebPubRange, XlsWebSourceType};
 pub use workbook::{XlsOpenOptions, XlsWorkbook};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
